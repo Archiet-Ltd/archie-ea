@@ -4,6 +4,19 @@ Author: `refuter`. Read-only review of `to-be-plan.md`'s reasoning — no
 code in this bucket to review, so this is a review of the plan's claims
 against evidence, same standard as a code review.
 
+**Post-hoc correction (Phase 0 execution, `fix/phase0-ci-and-audit` commit
+`29ee0a15`):** Finding 1 below characterizes the `ErrorEvent` tenant-isolation
+test failure as a "gate regression"/"correctness issue"/"live data-leak risk
+class." That was itself wrong, made from the test's failure message without
+reading the model. `ErrorEvent`'s own docstring documents a deliberate,
+correct design decision (cross-tenant error visibility for platform admins);
+the actual defect was a missing `INTENTIONALLY_GLOBAL` allowlist entry, now
+fixed. The rest of Finding 1 — the "small, bounded" CI sizing claim being
+unsupported, and the other 3-4 root causes bundled into the `Tests` job —
+stands as originally written; only the tenant-isolation severity assessment
+was wrong. Left in place below rather than edited away, so the mistake is
+visible.
+
 ## Finding 1 (CONFIRMED): Phase 0's CI sizing claim is unsupported and wrong
 
 **Claim in the plan:** "Fix the 2 currently-failing CI jobs (`Tests`,

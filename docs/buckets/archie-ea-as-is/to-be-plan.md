@@ -57,13 +57,24 @@ another's by default.
 
 ## Ordered to-be plan
 
-**Priority 0 (elevated by refuter review — not a Phase 0 item, above all
-else):** `tests/test_tenant_isolation_matrix.py::test_every_unscoped_model_is_a_deliberate_decision`
-is failing in CI right now: "1 model(s) carry organization_id without
-TenantMixin and without a reason." This is a live tenant-isolation gate
-regression, not architecture debt — per this repo's own ADR 0003 standard it
-is a potential cross-tenant data-leak risk class and should be found and
-fixed before anything else in this plan, independent of sequencing.
+**Priority 0 — RESOLVED, and the original characterization below was wrong.**
+`tests/test_tenant_isolation_matrix.py::test_every_unscoped_model_is_a_deliberate_decision`
+was failing because `ErrorEvent` (organization_id, no TenantMixin) wasn't in
+the test's `INTENTIONALLY_GLOBAL` allowlist. This item originally read: "1
+model(s) carry organization_id without TenantMixin and without a reason...
+This is a live tenant-isolation gate regression... a potential cross-tenant
+data-leak risk class" — that assessment was made from the test failure
+message alone, without reading `ErrorEvent`'s actual model code. Corrected
+during Phase 0 execution (`fix/phase0-ci-and-audit`, commit `29ee0a15`):
+the model's own docstring documents a deliberate, well-reasoned design
+decision — error telemetry must stay cross-tenant so a platform admin can
+distinguish "one customer hit a bug" from "the deploy just broke
+everything." This was a test-allowlist registration gap, not a
+vulnerability. Fixed by adding `ErrorEvent` to `INTENTIONALLY_GLOBAL` with
+that reasoning; `tests/test_tenant_isolation_matrix.py` now passes 4/4.
+Leaving the original wording above (struck through in spirit, not deleted)
+so the correction is visible rather than quietly edited away, per this
+repo's own convention for self-corrections in `CLAUDE.md`.
 
 **Phase 0 (parallel, no dependencies, start immediately):**
 - Fix the CI failures in `Tests` and `Browser journeys` — **corrected by
