@@ -1,0 +1,9 @@
+{
+  "from": "refuter",
+  "to": "qa-lead",
+  "artifact": "docs/buckets/archie-ea-as-is/to-be-plan.md",
+  "approval_status": "approved",
+  "gate_conditions": ["plan_reasoning_defensible"],
+  "unmet_conditions": [],
+  "timestamp": "2026-09-15T00:00:00Z"
+}
