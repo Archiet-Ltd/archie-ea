@@ -1,0 +1,9 @@
+{
+  "from": "tech-lead",
+  "to": "refuter",
+  "artifact": "docs/buckets/archie-ea-as-is/to-be-plan.md",
+  "approval_status": "pending",
+  "gate_conditions": ["user_reviewed_to_be_plan", "deploy_pipeline_decision_made"],
+  "unmet_conditions": ["user_reviewed_to_be_plan", "deploy_pipeline_decision_made"],
+  "timestamp": "2026-09-15T00:00:00Z"
+}
