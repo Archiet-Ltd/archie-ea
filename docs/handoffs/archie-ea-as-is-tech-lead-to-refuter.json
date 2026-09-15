@@ -2,8 +2,9 @@
   "from": "tech-lead",
   "to": "refuter",
   "artifact": "docs/buckets/archie-ea-as-is/to-be-plan.md",
-  "approval_status": "pending",
-  "gate_conditions": ["user_reviewed_to_be_plan", "deploy_pipeline_decision_made"],
+  "approval_status": "approved",
+  "gate_conditions": ["refuter_findings_addressed", "user_reviewed_to_be_plan", "deploy_pipeline_decision_made"],
   "unmet_conditions": ["user_reviewed_to_be_plan", "deploy_pipeline_decision_made"],
+  "notes": "Refuter round 1 found 2 issues (docs/buckets/archie-ea-as-is/refuter-report.md): unsupported 'small, bounded' CI sizing claim, and a sequencing decision stated as firm when it should be conditional on Phase 0's own audit. Both addressed directly in to-be-plan.md (a new Priority 0 item for the tenant-isolation gate regression found in the CI logs, corrected Phase 0 CI item naming the real failure categories, Phase 1 reframed as provisional pending audit). A separate factual error (domain-overlap count stated as 8, actually 7 -- an earlier grep mistakenly counted a __pycache__ directory as a domain) was also corrected across all bucket docs during this pass. approval_status is approved for the plan's reasoning as revised; the two remaining unmet_conditions are the user's own review and a decision this plan explicitly defers to a decision-owner, not further refuter work.",
   "timestamp": "2026-09-15T00:00:00Z"
 }

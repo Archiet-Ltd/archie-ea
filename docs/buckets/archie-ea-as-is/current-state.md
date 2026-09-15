@@ -23,7 +23,7 @@ exist in `test_archetype_journeys.py`.
 
 **Duplicated code layout (ADR 0004).** Two parallel structures both live:
 48 domains under `app/<domain>/` (legacy flat blueprints), 36 under
-`app/modules/<domain>/` (canonical, self-contained). **8 domains exist in
+`app/modules/<domain>/` (canonical, self-contained). **7 domains exist in
 both** — `account`, `admin`, `ai_chat`, `auth`, `dashboard`, `integrations`,
 `monitoring` — selected at boot by `USE_*_GUARDRAILS` flags. Retiring the
 duplicates is ADR 0004's stated next step, still open.
@@ -112,7 +112,7 @@ semantic search — there is no custom model-training pipeline in this repo.
   bind-mount topology become the de facto permanent answer?
 - What's the actual current CI status right now — needs `gh run list`
   before `tech-lead` sequences a to-be remediation plan on top of it.
-- Of the 8 domains existing in both layouts, is there an agreed order for
+- Of the 7 domains existing in both layouts, is there an agreed order for
   retiring the legacy side, or does each need its own bucket?
 
 **Handoff:** to `solution-architect`, `data-architect`, `security-architect`,

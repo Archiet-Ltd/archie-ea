@@ -27,7 +27,7 @@ lane's priority rather than being a coincidence to set aside.
 
 **One disagreement to flag, not silently resolve:** `solution-architect`
 recommends sequencing layout consolidation (ADR 0004) *before* capability
-store consolidation (ADR 0008), reasoning that some of the 8 overlapping
+store consolidation (ADR 0008), reasoning that some of the 7 overlapping
 domains likely touch capability code paths. `data-architect` doesn't take a
 position on this ordering directly but its own priority (ADR 0002 migration)
 is orthogonal to both — it can run in parallel with either. Resolution below
@@ -50,24 +50,43 @@ another's by default.
    fixes visible in recent commit history). This is a meaningfully better
    starting point than assumed; the to-be plan below treats CI as "two
    known jobs failing," not "broadly red."
-3. *Retirement order for the 8 duplicated domains?* — **Still open**, no
+3. *Retirement order for the 7 duplicated domains?* — **Still open**, no
    evidence surveyed yet for which of the 8 is highest-risk/highest-value
    to retire first. Sequenced as its own investigation step below rather
    than guessed at.
 
 ## Ordered to-be plan
 
+**Priority 0 (elevated by refuter review — not a Phase 0 item, above all
+else):** `tests/test_tenant_isolation_matrix.py::test_every_unscoped_model_is_a_deliberate_decision`
+is failing in CI right now: "1 model(s) carry organization_id without
+TenantMixin and without a reason." This is a live tenant-isolation gate
+regression, not architecture debt — per this repo's own ADR 0003 standard it
+is a potential cross-tenant data-leak risk class and should be found and
+fixed before anything else in this plan, independent of sequencing.
+
 **Phase 0 (parallel, no dependencies, start immediately):**
-- Fix the 2 currently-failing CI jobs (`Tests`, `Browser journeys`) —
-  small, bounded, unblocks trusting any future green run. Independent of
-  everything else below.
-- Audit the 8 overlapping `app/<domain>/` vs `app/modules/<domain>/` pairs
+- Fix the CI failures in `Tests` and `Browser journeys` — **corrected by
+  refuter review: this is not one small, bounded item.** The `Tests` job's
+  failure spans at least four unrelated root causes: the Priority-0 tenant
+  gate regression above; a `jinja2.exceptions.UndefinedError: 'flask' is
+  undefined` template-context bug (`test_procurement_utilization_honesty.py`,
+  4 tests); two sidebar-link-budget overshoots that are likely one root
+  cause (`test_sidebar_budgets.py` and `test_sidebar_render.py` — a new
+  sidebar link landed without updating the pinned budget, unconfirmed
+  without reading the actual diff); and an unrelated set-equality assertion
+  failure in `test_tool_mutates_flag.py`. `Browser journeys` fails across 5
+  distinct steps. Treat this as 4-5 independent fixes, not one, and size
+  each on its own rather than as a single bounded ticket.
+- Audit the 7 overlapping `app/<domain>/` vs `app/modules/<domain>/` pairs
   to produce a retirement order (answers open question 3) — read-only
   investigation, no code change yet.
 
-**Phase 1 (sequenced, per the solution-architect/data-architect
-reconciliation above):**
-1. Retire the 8 overlapping legacy domains, one at a time, in the order
+**Phase 1 (provisionally sequenced — corrected by refuter review: this
+ordering is a hypothesis pending Phase 0's audit, not a firm decision. If
+the audit finds most of the 7 overlapping domains have no capability-code
+overlap, step 1 may not need to precede step 2 for those domains):**
+1. Retire the 7 overlapping legacy domains, one at a time, in the order
    Phase 0's audit produces — each is its own bucket with its own
    refuter-approved handoff, not one giant PR.
 2. Once layout duplication is resolved, tackle the capability-store

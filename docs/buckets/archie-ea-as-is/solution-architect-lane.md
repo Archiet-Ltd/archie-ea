@@ -12,7 +12,7 @@ matches its own documentation.
 
 The real structural problem is the **two parallel code layouts** already
 named in the as-is doc: 48 domains under `app/<domain>/`, 36 under
-`app/modules/<domain>/`, 8 overlapping (`account`, `admin`, `ai_chat`,
+`app/modules/<domain>/`, 7 overlapping (`account`, `admin`, `ai_chat`,
 `auth`, `dashboard`, `integrations`, `monitoring`) and switched at boot by
 `USE_*_GUARDRAILS` flags defaulting **on**. This is not cosmetic: it means
 "which code actually runs for `/admin`" is a runtime decision, not something
@@ -45,7 +45,7 @@ all, so it is not analyzed further here.
 
 ## To-be direction (this lane's opinion, for tech-lead to reconcile)
 
-1. Retiring the 8 overlapping legacy domains is the single highest-leverage
+1. Retiring the 7 overlapping legacy domains is the single highest-leverage
    structural fix available — it removes an entire class of "which copy is
    live" bugs in one motion, and ADR 0004 already names it as the next step.
    Recommend sequencing this **before** any of the 6-capability-store
