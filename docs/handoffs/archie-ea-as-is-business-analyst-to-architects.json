@@ -1,0 +1,9 @@
+{
+  "from": "business-analyst",
+  "to": "solution-architect,data-architect,security-architect,integration-architect",
+  "artifact": "docs/buckets/archie-ea-as-is/current-state.md",
+  "approval_status": "pending",
+  "gate_conditions": ["user_reviewed_as_is_doc", "open_questions_addressed_or_accepted"],
+  "unmet_conditions": ["user_reviewed_as_is_doc", "open_questions_addressed_or_accepted"],
+  "timestamp": "2026-09-15T00:00:00Z"
+}

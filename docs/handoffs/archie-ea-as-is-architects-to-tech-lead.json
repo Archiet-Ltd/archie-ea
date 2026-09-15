@@ -1,0 +1,9 @@
+{
+  "from": "solution-architect,data-architect,security-architect,integration-architect",
+  "to": "tech-lead",
+  "artifact": "docs/buckets/archie-ea-as-is/{solution-architect-lane,data-architect-lane,security-architect-lane,integration-architect-lane}.md",
+  "approval_status": "pending",
+  "gate_conditions": ["user_reviewed_lane_docs", "ci_status_reverified_before_to_be_plan"],
+  "unmet_conditions": ["user_reviewed_lane_docs", "ci_status_reverified_before_to_be_plan"],
+  "timestamp": "2026-09-15T00:00:00Z"
+}
