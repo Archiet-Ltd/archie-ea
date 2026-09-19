@@ -158,7 +158,7 @@
          including the decommissioned app the default table hides). Say "in the
          portfolio" so "24 of 24" cannot read as a contradiction of the 23-row
          active view below it. #}
-      <span>{{ stats.owner_assigned|dash }} of {{ stats.total|dash }} applications in the portfolio have an assigned owner</span>
+      <span>{{ stats.owner_assigned|dash }} of {{ stats.total|dash }} applications in the portfolio have a named owner (a business owner on record, or an application manager assigned)</span>
       <span>{{ stats.vendor_assigned|dash }} of {{ stats.total|dash }} applications in the portfolio have a vendor recorded</span>
       <span>{{ stats.decommissioned|dash }} of {{ stats.total|dash }} applications in the portfolio decommissioned</span>
       <a href="{{ url_for('enterprise_crud.data_freshness_cockpit') }}" class="inline-flex items-center gap-1 text-warning-emphasis font-medium hover:underline">

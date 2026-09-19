@@ -438,7 +438,9 @@ def application_list():
         # An application counts as having an assigned owner when a business owner is
         # recorded on it or an application manager is assigned to it; the second half
         # is the same ownership the My Applications screens count for a user.
-        owner_assigned_count = _stats_base.filter(has_assigned_owner()).count()
+        owner_assigned_count = _stats_base.filter(
+            has_assigned_owner(current_user.organization_id)
+        ).count()
         vendor_assigned_count = _stats_base.filter(
             db.or_(
                 db.and_(

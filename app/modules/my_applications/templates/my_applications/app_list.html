@@ -17,31 +17,31 @@
             Dashboard
         </a>
     {% endmacro %}
-    {{ page_shell(title='My Application Portfolio', breadcrumb=[('Home', '/'), ('My Application Portfolio', none)], subtitle='Applications you own and manage (' ~ ownership_summary.total ~ ' total)', actions_caller=_ps_actions) }}
+    {{ page_shell(title='My Application Portfolio', breadcrumb=[('Home', '/'), ('My Application Portfolio', none)], subtitle=('Applications you own and manage (' ~ ownership_summary.total ~ ' of ' ~ owned_total ~ ' match your search)') if search else ('Applications you own and manage (' ~ owned_total ~ ' total)'), actions_caller=_ps_actions) }}
 
     <!-- Ownership Summary -->
     <div class="flex flex-wrap gap-2 mb-6">
-        <a href="{{ url_for('my_applications.app_list') }}"
+        <a href="{{ url_for('my_applications.app_list', search=search or None) }}"
            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-colors
                {% if not ownership_type %}bg-primary text-primary-foreground{% else %}bg-muted hover:bg-muted/80{% endif %}">
             All ({{ ownership_summary.total }})
         </a>
-        <a href="{{ url_for('my_applications.app_list', type='primary') }}"
+        <a href="{{ url_for('my_applications.app_list', type='primary', search=search or None) }}"
            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-colors
                {% if ownership_type == 'primary' %}bg-primary text-primary-foreground{% else %}bg-muted hover:bg-muted/80{% endif %}">
             Primary ({{ ownership_summary.primary }})
         </a>
-        <a href="{{ url_for('my_applications.app_list', type='backup') }}"
+        <a href="{{ url_for('my_applications.app_list', type='backup', search=search or None) }}"
            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-colors
                {% if ownership_type == 'backup' %}bg-primary text-primary-foreground{% else %}bg-muted hover:bg-muted/80{% endif %}">
             Backup ({{ ownership_summary.backup }})
         </a>
-        <a href="{{ url_for('my_applications.app_list', type='technical') }}"
+        <a href="{{ url_for('my_applications.app_list', type='technical', search=search or None) }}"
            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-colors
                {% if ownership_type == 'technical' %}bg-primary text-primary-foreground{% else %}bg-muted hover:bg-muted/80{% endif %}">
             Technical ({{ ownership_summary.technical }})
         </a>
-        <a href="{{ url_for('my_applications.app_list', type='business') }}"
+        <a href="{{ url_for('my_applications.app_list', type='business', search=search or None) }}"
            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-colors
                {% if ownership_type == 'business' %}bg-primary text-primary-foreground{% else %}bg-muted hover:bg-muted/80{% endif %}">
             Business ({{ ownership_summary.business }})
@@ -105,25 +105,6 @@
         {% endfor %}
     </div>
 
-    <!-- Pagination -->
-    {% if total > 20 %}
-    <div class="flex items-center justify-between mt-6">
-        <div class="text-sm text-muted-foreground">
-            Page {{ page }} of {{ ((total - 1) // 20) + 1 }}
-        </div>
-        <div class="flex items-center gap-2">
-            {% if page > 1 %}
-            <a href="?page={{ page - 1 }}{% if search %}&search={{ search }}{% endif %}{% if ownership_type %}&type={{ ownership_type }}{% endif %}"
-               class="px-3 py-1 rounded border border-border hover:bg-accent text-sm">Previous</a>
-            {% endif %}
-            {% if page * 20 < total %}
-            <a href="?page={{ page + 1 }}{% if search %}&search={{ search }}{% endif %}{% if ownership_type %}&type={{ ownership_type }}{% endif %}"
-               class="px-3 py-1 rounded border border-border hover:bg-accent text-sm">Next</a>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
-
     {% else %}
     <div class="bg-card border border-border rounded-lg p-12 text-center">
         <div class="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
@@ -131,12 +112,34 @@
         </div>
         <h3 class="text-lg font-medium mb-2">No applications found</h3>
         <p class="text-muted-foreground">
-            {% if search %}No applications match your search.
-            {% else %}You don't have any applications assigned to you yet.{% endif %}
+            {% if search and ownership_type %}None of the applications you hold as {{ ownership_type }} owner match your search.
+            {% elif search %}No applications match your search.
+            {% elif ownership_type %}You don't hold any applications as {{ ownership_type }} owner.
+            {% elif owned_total == 0 %}You don't have any applications assigned to you yet.
+            {% else %}There are no applications on this page.{% endif %}
         </p>
-        {% if search %}
-        <a href="{{ url_for('my_applications.app_list') }}" class="text-primary hover:underline mt-2 inline-block">Clear search</a>
+        {% if search or ownership_type or owned_total > 0 %}
+        <a href="{{ url_for('my_applications.app_list') }}" class="text-primary hover:underline mt-2 inline-block">{% if search %}Clear search{% else %}Show all my applications{% endif %}</a>
         {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Pagination -->
+    {% if last_page > 1 %}
+    <div class="flex items-center justify-between mt-6">
+        <div class="text-sm text-muted-foreground">
+            Page {{ page }} of {{ last_page }}
+        </div>
+        <div class="flex items-center gap-2">
+            {% if page > 1 %}
+            <a href="{{ url_for('my_applications.app_list', page=page - 1, search=search or None, type=ownership_type) }}"
+               class="px-3 py-1 rounded border border-border hover:bg-accent text-sm">Previous</a>
+            {% endif %}
+            {% if page < last_page %}
+            <a href="{{ url_for('my_applications.app_list', page=page + 1, search=search or None, type=ownership_type) }}"
+               class="px-3 py-1 rounded border border-border hover:bg-accent text-sm">Next</a>
+            {% endif %}
+        </div>
     </div>
     {% endif %}
 </div>

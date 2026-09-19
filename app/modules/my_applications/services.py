@@ -9,10 +9,11 @@ ADR Reference: docs/adr/0011-application-manager-persona.md
 
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, select
 
 from app.models.application_owner import ApplicationOwner
 from app.models.application_portfolio import ApplicationComponent
+from app.models.user import User
 
 
 def _ownership_rows(
@@ -52,20 +53,41 @@ def get_owned_applications(user_id: int) -> List[ApplicationComponent]:
     return sorted(visible.values(), key=lambda a: (a.name or "").lower())
 
 
-def has_assigned_owner():
-    """SQL predicate over ApplicationComponent: someone is on record as its owner.
+def has_assigned_owner(organization_id: int):
+    """SQL predicate over ApplicationComponent: someone is named as its owner.
 
-    True when a business owner is recorded on the application or when at least one
-    application-manager assignment exists for it. The portfolio's "assigned owner"
-    count uses this, so it agrees with the ownership rows an application manager
-    sees on My Applications.
+    True when a business owner is recorded on the application, or when an
+    application manager of the given organisation is assigned to it. An assignment
+    only counts when both the assignment and the assigned user belong to that
+    organisation, so another organisation's rows never make an application look
+    owned. The portfolio's owner count uses this, so its assignment half is the
+    same ownership the My Applications screens count for a user.
     """
+    assigned_here = (
+        select(ApplicationOwner.id)
+        .join(User, User.id == ApplicationOwner.user_id)
+        .where(
+            ApplicationOwner.application_id == ApplicationComponent.id,
+            ApplicationOwner.organization_id == organization_id,
+            User.organization_id == organization_id,
+        )
+        .exists()
+    )
     return or_(
         and_(
             ApplicationComponent.business_owner.isnot(None),
             ApplicationComponent.business_owner != "",
         ),
-        ApplicationComponent.owners.any(),
+        assigned_here,
+    )
+
+
+def _search_clause(search: str):
+    """Match applications whose name or description contains the search text."""
+    term = f"%{search}%"
+    return or_(
+        ApplicationComponent.name.ilike(term),
+        ApplicationComponent.description.ilike(term),
     )
 
 
@@ -91,13 +113,7 @@ def get_user_applications(
     app_query = ApplicationComponent.query.filter(ApplicationComponent.id.in_(list(app_ids)))
 
     if search:
-        search_term = f"%{search}%"
-        app_query = app_query.filter(
-            or_(
-                ApplicationComponent.name.ilike(search_term),
-                ApplicationComponent.description.ilike(search_term),
-            )
-        )
+        app_query = app_query.filter(_search_clause(search))
 
     app_query = app_query.order_by(ApplicationComponent.name.asc())
 
@@ -125,14 +141,25 @@ def get_user_applications(
     return result, total
 
 
-def get_ownership_summary(user_id: int) -> Dict[str, int]:
+def get_ownership_summary(user_id: int, search: Optional[str] = None) -> Dict[str, int]:
     """Number of applications the user owns, in total and under each ownership type.
 
     Counts applications, not ownership rows: an application held under two types
     counts once in "total" and once under each type. Each type is therefore never
-    larger than "total".
+    larger than "total". With a search, only applications matching it are counted,
+    so the figures agree with the rows the list shows for that search.
     """
     rows, visible = _ownership_rows(user_id)
+
+    if search and visible:
+        matching = {
+            app_id
+            for (app_id,) in ApplicationComponent.query.with_entities(ApplicationComponent.id)
+            .filter(ApplicationComponent.id.in_(list(visible)), _search_clause(search))
+            .all()
+        }
+        visible = {app_id: a for app_id, a in visible.items() if app_id in matching}
+        rows = [r for r in rows if r.application_id in visible]
 
     summary = {"total": len(visible)}
     for ownership_type in ApplicationOwner.OWNERSHIP_TYPES:

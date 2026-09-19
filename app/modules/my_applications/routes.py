@@ -84,34 +84,45 @@ def app_list():
     # item.application and the page 500'd as soon as the user owned anything.
     #
     # The ownership-type tabs, the search box and the pager on that template all
-    # send query parameters; the route used to ignore them, so every tab showed the
-    # same list whatever its count said.
+    # send query parameters; the route reads them so each tab lists exactly the
+    # rows its count describes.
     ownership_type = request.args.get("type")
     if ownership_type not in ApplicationOwner.OWNERSHIP_TYPES:
         ownership_type = None
     search = (request.args.get("search") or "").strip()
     page = max(request.args.get("page", 1, type=int) or 1, 1)
 
-    apps, total = get_user_applications(
-        current_user.id,
-        ownership_type=ownership_type,
-        search=search or None,
-        page=page,
-        per_page=LIST_PAGE_SIZE,
-    )
+    def load(page_number):
+        return get_user_applications(
+            current_user.id,
+            ownership_type=ownership_type,
+            search=search or None,
+            page=page_number,
+            per_page=LIST_PAGE_SIZE,
+        )
 
+    apps, total = load(page)
+    last_page = max(1, -(-total // LIST_PAGE_SIZE))
+    if page > last_page:
+        # A page past the end (a stale bookmark, or an assignment removed while
+        # the list was open) serves the last page rather than an empty one.
+        page = last_page
+        apps, total = load(page)
+
+    owned = get_ownership_summary(current_user.id)
     return render_template(
         "my_applications/app_list.html",
         apps=apps,
-        # Rows matching the selected tab and search; the pager reads it. The page
-        # subtitle and the "All" tab read ownership_summary.total instead.
+        # Rows matching the selected tab and search; the pager reads it.
         total=total,
         page=page,
+        last_page=last_page,
         ownership_type=ownership_type,
         search=search,
-        # Template reads ownership_summary.{primary,backup,technical,business,
-        # total} - the exact shape get_ownership_summary() has always returned.
-        ownership_summary=get_ownership_summary(current_user.id),
+        # Tab counts follow an active search; owned_total is every application
+        # the user owns, whatever the search.
+        ownership_summary=get_ownership_summary(current_user.id, search=search) if search else owned,
+        owned_total=owned["total"],
     )
 
 

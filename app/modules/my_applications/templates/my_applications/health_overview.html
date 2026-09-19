@@ -20,7 +20,14 @@
     {{ page_shell(title='Application Health Overview', breadcrumb=[('Home', '/'), ('Application Health Overview', none)], subtitle='Health status of your applications', actions_caller=_ps_actions) }}
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div>
+        <h2 class="text-lg font-semibold">By lifecycle stage</h2>
+        <p class="text-sm text-muted-foreground mt-1">
+            Healthy is active or production, At Risk is sunset or retiring, Critical is decommissioned or retired,
+            and Not assessed is any other lifecycle stage.
+        </p>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
         <div class="bg-card border border-border rounded-lg p-4">
             <div class="flex items-center gap-3 mb-2">
                 <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -56,6 +63,15 @@
                 <div class="text-sm text-muted-foreground">Critical</div>
             </div>
             <div class="text-3xl font-bold text-destructive-emphasis">{{ health_summary.critical }}</div>
+        </div>
+        <div class="col-span-2 md:col-span-1 bg-card border border-border rounded-lg p-4">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                    <i data-lucide="help-circle" class="w-5 h-5 text-muted-foreground"></i>
+                </div>
+                <div class="text-sm text-muted-foreground">Not assessed</div>
+            </div>
+            <div class="text-3xl font-bold">{{ health_summary.unknown }}</div>
         </div>
     </div>
 
@@ -151,6 +167,13 @@
     {% set at_risk = by_health.at_risk %}
     {% set healthy = by_health.healthy %}
     {% set unknown = by_health.unknown %}
+    <div>
+        <h2 class="text-lg font-semibold">By recorded health status</h2>
+        <p class="text-sm text-muted-foreground mt-1">
+            Each application is listed under the health status recorded on it. An application with no health status
+            recorded is listed under Unknown Status.
+        </p>
+    </div>
     <div class="space-y-6">
         <!-- Critical Applications -->
         {% if critical %}
@@ -160,7 +183,7 @@
                     <i data-lucide="alert-circle" class="w-5 h-5 text-destructive-emphasis"></i>
                     <h2 class="text-lg font-semibold text-destructive-emphasis">Critical ({{ critical|length }})</h2>
                 </div>
-                <p class="text-sm text-destructive-emphasis mt-1">Applications that are decommissioned or retired</p>
+                <p class="text-sm text-destructive-emphasis mt-1">Applications with a recorded health status of critical</p>
             </div>
             <div class="divide-y divide-border">
                 {% for item in critical %}
@@ -197,7 +220,7 @@
                     <i data-lucide="alert-triangle" class="w-5 h-5 text-warning-emphasis"></i>
                     <h2 class="text-lg font-semibold text-warning-emphasis">At Risk ({{ at_risk|length }})</h2>
                 </div>
-                <p class="text-sm text-warning-emphasis mt-1">Applications in sunset or retiring phase</p>
+                <p class="text-sm text-warning-emphasis mt-1">Applications with a recorded health status of at risk</p>
             </div>
             <div class="divide-y divide-border">
                 {% for item in at_risk %}
@@ -234,7 +257,7 @@
                     <i data-lucide="check-circle" class="w-5 h-5 text-success"></i>
                     <h2 class="text-lg font-semibold text-success-emphasis">Healthy ({{ healthy|length }})</h2>
                 </div>
-                <p class="text-sm text-success-emphasis mt-1">Applications in active or production status</p>
+                <p class="text-sm text-success-emphasis mt-1">Applications with a recorded health status of healthy</p>
             </div>
             <div class="divide-y divide-border">
                 {% for item in healthy %}
@@ -271,7 +294,7 @@
                     <i data-lucide="help-circle" class="w-5 h-5 text-muted-foreground"></i>
                     <h2 class="text-lg font-semibold">Unknown Status ({{ unknown|length }})</h2>
                 </div>
-                <p class="text-sm text-muted-foreground mt-1">Applications with undefined lifecycle status</p>
+                <p class="text-sm text-muted-foreground mt-1">Applications with no health status recorded</p>
             </div>
             <div class="divide-y divide-border">
                 {% for item in unknown %}

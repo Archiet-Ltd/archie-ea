@@ -1,16 +1,12 @@
 """My Applications and the portfolio banner agree on what a user owns.
 
-The application manager's dashboard used to print "Total Apps 1" beside Healthy 0,
-At Risk 0, Critical 0 and an empty "No applications assigned yet" panel; the list
-page read "1 total" with tabs "All (1)" and "Primary (2)"; and the portfolio
-manager's Applications page read "0 of 6 applications ... have an assigned owner"
-while one application was assigned. Six numbers, three answers.
-
 This file asks the screens rather than the code. It seeds one tenant, signs in as
-the application manager over HTTP, reads all six numbers off the rendered pages
+the application manager over HTTP, reads the numbers off the rendered pages
 (Total Apps, the health tiles, the panel rows, "All (n)", "Primary (m)" and the
 other tabs, the portfolio banner) and asserts they are consistent with each other
-and with the ownership rows in the database.
+and with the ownership rows in the database. It also covers the list page's
+paging and search, the health page's tiles, and tenant isolation of the
+portfolio's owner count.
 
 Uses the shared fixtures in tests/conftest.py (db_session rolls everything back).
 """
@@ -19,6 +15,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from bs4 import BeautifulSoup
@@ -112,8 +109,8 @@ def _tabs(soup):
 
 def _portfolio_banner(soup):
     text = " ".join(soup.get_text().split())
-    m = re.search(r"(\d+) of (\d+) applications in the portfolio have an assigned owner", text)
-    assert m is not None, "portfolio page has no assigned-owner line"
+    m = re.search(r"(\d+) of (\d+) applications in the portfolio have a named owner", text)
+    assert m is not None, "portfolio page has no named-owner line"
     return int(m.group(1)), int(m.group(2))
 
 
@@ -154,11 +151,7 @@ def estate(db_session, make_org):
 
 
 def test_six_ownership_numbers_agree(estate, client, login_as):
-    """Total Apps, health tiles, panel rows, list tabs and portfolio banner agree.
-
-    Test id recorded in the change: tests/test_my_applications_ownership_numbers.py::
-    test_six_ownership_numbers_agree
-    """
+    """Total Apps, health tiles, panel rows, list tabs and portfolio banner agree."""
     manager = estate["manager"]
 
     # --- the dashboard ---------------------------------------------------------
@@ -207,7 +200,7 @@ def test_six_ownership_numbers_agree(estate, client, login_as):
     }
     with_business_owner = {a.id for a in estate["apps"].values() if a.business_owner}
     assert portfolio_total == len(estate["apps"])
-    # Every application either manager owns is counted as having an assigned owner,
+    # Every application either manager owns is counted as having a named owner,
     # so the sending side can never say "none" while the receiving side says "1".
     assert assigned == len(with_ownership_row | with_business_owner) == 5
     assert assigned >= total
@@ -260,3 +253,183 @@ def test_panel_states_how_many_it_is_showing_when_it_cannot_list_them_all(db_ses
     listing = _soup(_get(client, login_as, manager, "/my-applications/list"))
     assert _tabs(listing)["All"] == 12
     assert len(_list_rows(listing)) == 12
+
+
+def _pager_link(soup, label):
+    link = soup.find("a", string=lambda s: s and s.strip() == label)
+    return None if link is None else link["href"]
+
+
+def _own_many(db_session, org, user, count, name, ownership_type="primary", **extra):
+    apps = [_make_app(db_session, org, f"{name} {i:02d}", "active", **extra) for i in range(count)]
+    for a in apps:
+        _own(db_session, org, user, a, ownership_type)
+    return apps
+
+
+def test_a_page_past_the_end_serves_the_last_page(db_session, make_org, client, login_as):
+    """/list?page=N beyond the last page shows the last page, never an empty list."""
+    org = make_org("own-numbers-paging")
+    manager = _make_user(db_session, org, "application_manager", "paging")
+    _own_many(db_session, org, manager, 3, "Few")
+
+    listing = _soup(_get(client, login_as, manager, "/my-applications/list?page=2"))
+    assert len(_list_rows(listing)) == 3
+    text = " ".join(listing.get_text().split())
+    assert "(3 total)" in text
+    assert "You don't have any applications assigned to you yet" not in text
+    assert "No applications found" not in text
+
+    # Odd page values fall back to a real page as well.
+    for value in ("0", "-4", "abc"):
+        page = _soup(_get(client, login_as, manager, f"/my-applications/list?page={value}"))
+        assert len(_list_rows(page)) == 3, value
+
+
+def test_a_page_past_the_end_of_several_pages_serves_the_last_with_a_way_back(db_session, make_org, client, login_as):
+    org = make_org("own-numbers-paging-many")
+    manager = _make_user(db_session, org, "application_manager", "pagingmany")
+    _own_many(db_session, org, manager, 25, "Many")
+
+    last = _soup(_get(client, login_as, manager, "/my-applications/list?page=9"))
+    assert len(_list_rows(last)) == 5
+    assert "Page 2 of 2" in " ".join(last.get_text().split())
+    assert _pager_link(last, "Previous") is not None
+    assert _pager_link(last, "Next") is None
+
+    first = _soup(_get(client, login_as, manager, "/my-applications/list"))
+    assert len(_list_rows(first)) == 20
+    assert "Page 1 of 2" in " ".join(first.get_text().split())
+    assert _pager_link(first, "Next") is not None
+
+
+def test_a_tab_with_no_rows_does_not_say_nothing_is_assigned(db_session, make_org, client, login_as):
+    """An empty tab says so for that tab; it never claims the user owns nothing."""
+    org = make_org("own-numbers-empty-tab")
+    manager = _make_user(db_session, org, "application_manager", "emptytab")
+    _own_many(db_session, org, manager, 1, "Solo")
+
+    listing = _soup(_get(client, login_as, manager, "/my-applications/list?type=backup"))
+    assert _list_rows(listing) == []
+    text = " ".join(listing.get_text().split())
+    assert _tabs(listing)["All"] == 1
+    assert "You don't hold any applications as backup owner" in text
+    assert "assigned to you yet" not in text
+
+
+def test_the_health_page_tiles_add_up_and_say_what_they_count(db_session, make_org, client, login_as):
+    """Healthy, At Risk, Critical and Not assessed sum to Total, and each block says what it counts."""
+    org = make_org("own-numbers-health")
+    manager = _make_user(db_session, org, "application_manager", "health")
+    for name, lifecycle in (("Live", "active"), ("Fading", "sunset"), ("Gone", "retired"), ("Odd", "operational"), ("Blank", None)):
+        _own(db_session, org, manager, _make_app(db_session, org, name, lifecycle), "primary")
+
+    page = _soup(_get(client, login_as, manager, "/my-applications/health"))
+    total = _tile(page, "Total")
+    tiles = [_tile(page, label) for label in ("Healthy", "At Risk", "Critical", "Not assessed")]
+    assert total == 5
+    assert sum(tiles) == total
+    assert tiles == [1, 1, 1, 2]
+
+    text = " ".join(page.get_text().split())
+    # The tiles are counted from the lifecycle stage; the grouped list from the
+    # health status recorded on each application. The page says both.
+    assert "By lifecycle stage" in text
+    assert "Healthy is active or production" in text
+    assert "By recorded health status" in text
+    assert "listed under the health status recorded on it" in text
+    assert "Applications with no health status recorded" in text
+
+
+def test_the_portfolio_banner_says_what_it_counts(db_session, make_org, client, login_as):
+    """Named business owners with no assignment rows count, and the wording says why."""
+    org = make_org("own-numbers-named")
+    portfolio = _make_user(db_session, org, "portfolio_manager", "named")
+    manager = _make_user(db_session, org, "application_manager", "namedmanager")
+    for i in range(6):
+        _make_app(db_session, org, f"Named {i}", "active", business_owner=f"Owner {i}")
+
+    page = _soup(_get(client, login_as, portfolio, "/applications/"))
+    assert _portfolio_banner(page) == (6, 6)
+    text = " ".join(page.get_text().split())
+    assert (
+        "6 of 6 applications in the portfolio have a named owner "
+        "(a business owner on record, or an application manager assigned)"
+    ) in text
+    assert "have an assigned owner" not in text
+
+    # The application manager owns none of them, and the wording above is what
+    # keeps the two figures from reading as one question.
+    dash = _soup(_get(client, login_as, manager, "/my-applications/"))
+    assert _tile(dash, "Total Apps") == 0
+
+
+def test_other_organisations_assignments_do_not_count_as_owned(db_session, make_org, client, login_as):
+    """An application's owner count ignores ownership rows that belong to another organisation."""
+    org_a = make_org("own-numbers-tenant-a")
+    org_b = make_org("own-numbers-tenant-b")
+    portfolio = _make_user(db_session, org_a, "portfolio_manager", "tenantportfolio")
+    manager_a = _make_user(db_session, org_a, "application_manager", "tenantmanagera")
+    stranger = _make_user(db_session, org_b, "application_manager", "tenantstranger")
+
+    genuinely_owned = _make_app(db_session, org_a, "Genuinely owned", "active")
+    foreign_row_and_user = _make_app(db_session, org_a, "Foreign row and user", "active")
+    foreign_user_only = _make_app(db_session, org_a, "Foreign user only", "active")
+    foreign_row_only = _make_app(db_session, org_a, "Foreign row only", "active")
+    _make_app(db_session, org_a, "Unowned", "active")
+
+    _own(db_session, org_a, manager_a, genuinely_owned, "primary")
+    # Another organisation's user, recorded under that organisation.
+    _own(db_session, org_b, stranger, foreign_row_and_user, "primary")
+    # Another organisation's user, recorded under this organisation.
+    _own(db_session, org_a, stranger, foreign_user_only, "primary")
+    # This organisation's user, recorded under another organisation.
+    _own(db_session, org_b, manager_a, foreign_row_only, "primary")
+
+    page = _soup(_get(client, login_as, portfolio, "/applications/"))
+    assert _portfolio_banner(page) == (1, 5)
+
+
+def test_pager_links_keep_the_search_and_tab_and_encode_them(db_session, make_org, client, login_as):
+    """A search term containing an ampersand survives the pager and the tabs intact."""
+    org = make_org("own-numbers-encoding")
+    manager = _make_user(db_session, org, "application_manager", "encoding")
+    _own_many(db_session, org, manager, 25, "R&D Portal")
+    _own_many(db_session, org, manager, 5, "Other")
+
+    page = _soup(_get(client, login_as, manager, "/my-applications/list?search=R%26D&type=primary"))
+    assert len(_list_rows(page)) == 20
+    query = parse_qs(urlparse(_pager_link(page, "Next")).query)
+    assert query == {"page": ["2"], "search": ["R&D"], "type": ["primary"]}
+
+    second = _soup(_get(client, login_as, manager, "/my-applications/list?search=R%26D&type=primary&page=2"))
+    query = parse_qs(urlparse(_pager_link(second, "Previous")).query)
+    assert query == {"page": ["1"], "search": ["R&D"], "type": ["primary"]}
+
+    for a in page.find_all("a"):
+        if re.fullmatch(r"(Primary|Backup|Technical|Business) \(\d+\)", " ".join(a.get_text().split())):
+            assert parse_qs(urlparse(a["href"]).query)["search"] == ["R&D"]
+
+
+def test_tab_counts_and_subtitle_follow_an_active_search(db_session, make_org, client, login_as):
+    """With a search active the counts describe the matches, and the subtitle says how many match."""
+    org = make_org("own-numbers-search")
+    manager = _make_user(db_session, org, "application_manager", "search")
+    _own_many(db_session, org, manager, 20, "Riverbed", "primary")
+    _own_many(db_session, org, manager, 5, "Riverbed extra", "backup")
+    _own_many(db_session, org, manager, 5, "Other", "primary")
+
+    everything = _soup(_get(client, login_as, manager, "/my-applications/list"))
+    assert _tabs(everything)["All"] == 30
+    assert "(30 total)" in " ".join(everything.get_text().split())
+
+    found = _soup(_get(client, login_as, manager, "/my-applications/list?search=Riverbed"))
+    tabs = _tabs(found)
+    assert (tabs["All"], tabs["Primary"], tabs["Backup"], tabs["Technical"], tabs["Business"]) == (25, 20, 5, 0, 0)
+    assert "(25 of 30 match your search)" in " ".join(found.get_text().split())
+    assert len(_list_rows(found)) == 20
+
+    # Each tab under the search lists exactly the rows its count promises.
+    for name in ("Primary", "Backup"):
+        selected = _soup(_get(client, login_as, manager, f"/my-applications/list?search=Riverbed&type={name.lower()}"))
+        assert len(_list_rows(selected)) == tabs[name]

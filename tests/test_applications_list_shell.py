@@ -220,7 +220,7 @@ def test_data_quality_banner_reflects_real_owner_and_vendor_counts(app, db_sessi
 
     # Exactly one of the two seeded applications has an owner; zero have a
     # vendor recorded. The banner must say so in real sentences.
-    assert "1 of 2 applications in the portfolio have an assigned owner" in html
+    assert "1 of 2 applications in the portfolio have a named owner" in html
     assert "0 of 2 applications in the portfolio have a vendor recorded" in html
 
 
@@ -255,4 +255,4 @@ def test_data_quality_banner_owner_count_increases_with_data(app, db_session, ma
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
 
-    assert "3 of 4 applications in the portfolio have an assigned owner" in html
+    assert "3 of 4 applications in the portfolio have a named owner" in html
