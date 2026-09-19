@@ -70,6 +70,11 @@
 </head>
 <body class="h-full bg-background antialiased"{% if session_idle_timeout_seconds %} data-session-idle-seconds="{{ session_idle_timeout_seconds }}"{% endif %}>
     {% set resolved_page_guide_context = page_guide_context | default({'enabled': false, 'supported': false}, true) %}
+    {# A page that fills block guided_mode_steps gets the floating help button
+       (bottom of this file): fixed, 40px tall, 24px off the bottom-right corner.
+       Reserve room under the content (see the spacer after block content) so the
+       last row of the page scrolls clear of the button instead of ending under it. #}
+    {% set _guided_mode_present = (self.guided_mode_steps() | trim) != '' %}
     <!-- Skip navigation links for keyboard users -->
     <a href="#main-content"
        class="skip-link sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:rounded-md">
@@ -108,11 +113,16 @@
           could never be opened, and the only way to reach another page was to
           type a URL -- the application was effectively desktop-only.
           aria-expanded is bound so assistive technology is told the state too.
+
+          Position: this button is fixed, so it does not move with the header.
+          The header is h-16 (4rem) and shrink-0 (components/admin_header.html),
+          and top-3 + h-10 centres the button inside that band. Change one
+          and change the other.
         #}
         <button type="button" x-show="!isDesktop && !$store.sidebar.open" x-cloak
                 @click.stop="$store.sidebar.open = true"
                 :aria-expanded="$store.sidebar.open ? 'true' : 'false'"
-                class="fixed top-4 left-4 z-[60] lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-input bg-background text-foreground shadow-sm hover:bg-accent transition-colors"
+                class="fixed top-3 left-4 z-[60] lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-input bg-background text-foreground shadow-sm hover:bg-accent transition-colors"
                 aria-controls="admin-sidebar"
                 aria-label="Open sidebar">
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -146,7 +156,10 @@
             <main id="main-content"
                   class="flex-1 bg-background"
                   role="main">
-                <div class="px-6 py-8">
+                {# main_spacing: the padding around every page. A page that fills the whole
+                   area under the header (AI Chat) overrides this block to drop the vertical
+                   padding, so it lands flush under the header with nothing left to scroll. #}
+                <div class="{% block main_spacing %}px-6 py-8{% endblock %}">
                     {% block breadcrumb %}{% endblock %}
                     {# Flash messages surface as toasts only (components/toast-container.html,
                        included below) — this used to also render partials/_flashes.html as an
@@ -159,6 +172,8 @@
                     {# Inline page hints — templates fill this block with the inline_hint macro #}
                     {% block page_hint %}{% endblock %}
                     {% block content %}{% endblock %}
+                    {# py-8 (32px) + h-10 (40px) = 72px under the last row; the help button's top edge is 64px up. #}
+                    {% if _guided_mode_present %}<div class="h-10" aria-hidden="true"></div>{% endif %}
                 </div>
             </main>
         </div>

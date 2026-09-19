@@ -123,7 +123,13 @@
 </style>
 {% endblock %}
 
+{# The chat, with any notice above it, is exactly the area under the header (h-[calc(100vh-4rem)]
+   below), so it drops the shell's vertical page padding. With it kept, -my-6 left 8px above and
+   below the chat plus 16px of scroll, and a strip of bare page background under the composer. #}
+{% block main_spacing %}px-6{% endblock %}
+
 {% block content %}
+<div data-testid="ai-chat-frame" class="flex h-[calc(100vh-4rem)] flex-col">
 {% if chat_bootstrap_error %}
 <div class="mx-4 mt-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-emphasis" role="alert">
     <div class="flex items-start gap-2">
@@ -158,7 +164,8 @@
            same path is hardcoded in ai_chat/render.js for that reason. #}
         <a href="/admin/api-settings" class="underline hover:no-underline shrink-0">Open Admin → API Settings</a>
         {% else %}
-        <span class="shrink-0 opacity-80">Ask an administrator to configure a provider.</span>
+        {# No opacity on this text: text-warning-emphasis is 5.6:1 on the notice tint, and opacity-80 drops it to about 3.8:1, under the 4.5:1 AA minimum. #}
+        <span class="shrink-0">Ask an administrator to configure a provider.</span>
         {% endif %}
 </div>
 {% endif %}
@@ -166,7 +173,7 @@
         railOpen: (localStorage.getItem('archie_chat_rail') ?? (window.innerWidth >= 1280 ? 'open' : 'closed')) === 'open'
     }"
      x-init="$watch('railOpen', (v) => localStorage.setItem('archie_chat_rail', v ? 'open' : 'closed'))"
-     class="flex h-[calc(100vh-4rem)] flex-col bg-background -mx-4 -my-6">
+     class="flex min-h-0 flex-1 flex-col bg-background -mx-4">
     <!-- Header: one control row, chrome before content stops here -->
     <header class="border-b px-4 lg:px-6 py-3 bg-background">
         <!-- Dynamic domain icon/title kept off-screen: JS (updateDomainUI /
@@ -915,6 +922,7 @@
         </div>
 
     </div>
+</div>
 </div>
 
 {# Create Solution Modal — MUST be outside overflow-hidden containers (CLAUDE.md rule) #}

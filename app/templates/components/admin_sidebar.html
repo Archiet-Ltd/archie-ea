@@ -48,10 +48,17 @@ DEPENDENCIES:
       though the scrim (which had no such static class to fight) opens fine.
       The object-map form below removes that class every time it recomputes,
       not only when it thinks it changed something.
+
+      shadow-lg is a key in the same map for the same reason it is not in the
+      static class: the drawer is parked at -translate-x-full, so a permanent
+      shadow on the parked panel bleeds ~12px into the viewport as a grey
+      band down the left edge of every page below lg. It is drawn only while
+      the drawer is open.
     #}
     :class="{
         'translate-x-0': $store.sidebar.open,
         '-translate-x-full': !$store.sidebar.open,
+        'shadow-lg': $store.sidebar.open,
         'sidebar-collapsed': $store.sidebar.collapsed
     }"
     :style="{ width: $store.sidebar.collapsed ? '4rem' : '16rem' }"
@@ -65,7 +72,7 @@ DEPENDENCIES:
       handler nobody could have tested in a normal engine stayed live.
     #}
     @click.away="!isDesktop && ($store.sidebar.open = false)"
-    class="fixed inset-y-0 left-0 z-50 bg-card border-r border-border lg:translate-x-0 lg:static flex flex-col h-screen shadow-lg lg:shadow-none transition-all duration-200 ease-in-out"
+    class="fixed inset-y-0 left-0 z-50 bg-card border-r border-border lg:translate-x-0 lg:static flex flex-col h-screen lg:shadow-none transition-all duration-200 ease-in-out"
 >
     <!-- Sidebar Header -->
     <div class="flex items-center justify-between h-16 px-4 border-b border-border flex-shrink-0">

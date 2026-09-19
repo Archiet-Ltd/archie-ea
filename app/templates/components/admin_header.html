@@ -2,7 +2,7 @@
 
 {% set resolved_page_guide_context = page_guide_context | default({'enabled': false, 'supported': false}, true) %}
 <header id="admin-header"
-        class="flex items-center justify-between h-16 px-6 bg-background border-b border-border">
+        class="flex shrink-0 items-center justify-between h-16 px-6 bg-background border-b border-border">
     <div class="flex items-center gap-4">
         <!-- Mobile sidebar open trigger lives in layouts/admin_base.html
              ("Global mobile sidebar opener") — it x-shows only while the sidebar is
