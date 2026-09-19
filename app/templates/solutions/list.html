@@ -149,12 +149,12 @@
             Showing {{ pagination.total }} solution{{ 's' if pagination.total != 1 else '' }}
             · Page {{ pagination.page }} of {{ pagination.pages }}
             {# S-01: never assert completeness while withholding rows. If the
-               default view hid empty draft shells, say so and offer the way to
-               see them, rather than leaving "Page 1 of 1" to imply this is all
+               default view hid archived rows or empty draft shells, say so and
+               offer the way to see them (?status=all), rather than leaving "Page 1 of 1" to imply this is all
                there is. #}
             {% if hidden_by_default_filter %}
-            · <a href="{{ url_for('solution_design.list_solutions', status='draft') }}"
-                 class="text-warning-emphasis hover:underline font-medium">{{ hidden_by_default_filter }} empty draft{{ 's' if hidden_by_default_filter != 1 else '' }} hidden</a>
+            · <a href="{{ url_for('solution_design.list_solutions', status='all') }}"
+                 class="text-warning-emphasis hover:underline font-medium">{{ hidden_by_default_filter }} archived or empty solution{{ 's' if hidden_by_default_filter != 1 else '' }} hidden &mdash; show all</a>
             {% endif %}
           </span>
         </div>

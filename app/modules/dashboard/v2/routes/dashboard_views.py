@@ -1007,7 +1007,11 @@ def _assemble_health_scorecard_metrics():
     total_solutions = None
     try:
         from app.models.solution_models import Solution as SolutionModel
-        solutions_q = SolutionModel.query.with_entities(SolutionModel.adm_phase).all()
+        from app.services.solution_visibility import accessible_solutions
+
+        # The same population the Solutions list starts from, so this tile and that list cannot
+        # disagree (UX_IA_REVIEW.md finding 2). It used to count every row, whoever owned it.
+        solutions_q = accessible_solutions(current_user).query.with_entities(SolutionModel.adm_phase).all()
         total_solutions = len(solutions_q)
         maturity_scores = []
         for (phase,) in solutions_q:

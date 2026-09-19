@@ -1035,48 +1035,25 @@ def list_solutions():
             ws_filter = status_filter
             status_filter = ""
 
+        # "all" is not a stored status: it means every solution this user may open, archived rows and
+        # empty shells included. It used to filter on status == 'all', which matches nothing, so the
+        # one control that says "show me everything" showed nothing (UX_IA_REVIEW.md finding 2).
+        include_hidden = status_filter == "all"
+        if include_hidden:
+            status_filter = ""
+
         # PLT-019: BU scope resolution ────────────────────────────────────────
         # If the user has a business unit set (PLT-018), filter solutions whose
         # business_domain contains the BU actor name. Admin can pass ?bu=all to bypass.
-        bu_filter_active = False
-        bu_name = None
-        show_all_override = False
-        _user_bu_id = getattr(current_user, "business_unit_id", None)  # model-safety-ok
-        _bu_all_requested = request.args.get("bu", "").strip().lower() == "all"
-        if _bu_all_requested and hasattr(current_user, "is_admin") and current_user.is_admin():
-            show_all_override = True
-        elif _user_bu_id:
-            try:
-                from app.models.business_layer import BusinessActor as _BusinessActor
-                _bu_actor = db.session.get(_BusinessActor, _user_bu_id)
-                if _bu_actor:
-                    bu_name = _bu_actor.name
-                    bu_filter_active = True
-            except Exception as _bu_exc:
-                logger.warning(
-                    "PLT-019: could not resolve business_unit_id=%s for solutions: %s",
-                    _user_bu_id, _bu_exc,
-                )
+        # One definition of "the solutions this user may open", shared with the health scorecard so the
+        # dashboard's "Total Solutions" and this list cannot disagree (app/services/solution_visibility.py).
+        from app.services.solution_visibility import accessible_solutions
 
-        # Build base query — admins and review-role personas see all solutions;
-        # solution architects and below see only their own.
-        _can_see_all = (
-            (hasattr(current_user, 'is_admin') and current_user.is_admin())
-            or (hasattr(current_user, 'can_vote_arb') and current_user.can_vote_arb())
-            or (hasattr(current_user, 'can_manage_portfolio') and current_user.can_manage_portfolio())
-            or getattr(current_user, 'enterprise_role', None) in ('enterprise_architect', 'cto', 'platform_admin')
+        _scope = accessible_solutions(
+            current_user, bu_all_requested=request.args.get("bu", "").strip().lower() == "all"
         )
-        if _can_see_all:
-            query = Solution.query.filter(~Solution.name.like("[DELETED]%"))
-        else:
-            query = Solution.query.filter_by(created_by_id=current_user.id).filter(~Solution.name.like("[DELETED]%"))
-
-        # PLT-019: Apply BU domain scope filter
-        if bu_filter_active and not show_all_override and bu_name:
-            _safe_bu = bu_name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            query = query.filter(
-                Solution.business_domain.ilike(f"%{_safe_bu}%", escape="\\")
-            )
+        query = _scope.query
+        bu_filter_active, bu_name, show_all_override = _scope.bu_filter_active, _scope.bu_name, _scope.show_all_override
 
         # ENT-023: Compute stats on accessible set BEFORE search/status/domain filters
         # Single GROUP BY query instead of 4 separate COUNTs
@@ -1107,7 +1084,7 @@ def list_solutions():
         # Apply status filter
         if status_filter:
             query = query.filter(Solution.status == status_filter)
-        elif not search:
+        elif not search and not include_hidden:
             # Default: exclude only archived solutions and empty draft shells.
             #
             # S-01 (17 Aug 2026 QA addendum): "empty" was judged on description
@@ -1213,7 +1190,7 @@ def list_solutions():
         # rows. Report how many the default filter hid so the count on screen is
         # honest about being filtered.
         hidden_by_default_filter = 0
-        if not status_filter and not search:
+        if not status_filter and not search and not include_hidden:
             try:
                 _visible_ids = {s_.id for s_ in _ordered.with_entities(Solution.id).all()}
                 _accessible = _base.with_entities(Solution.id).all()
