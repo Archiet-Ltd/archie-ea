@@ -24,10 +24,19 @@ def measure(rows, monkeypatch):
             return [(row,) for row in rows]
 
     monkeypatch.setattr(models, "Solution", SimpleNamespace(query=Query(), adm_phase="phase"))
+    # The tile counts what the user may open (app.services.solution_visibility). This test is about
+    # phase classification, so the same fake rows are handed back through that seam.
+    import app.services.solution_visibility as visibility
+
+    monkeypatch.setattr(visibility, "accessible_solutions", lambda user: SimpleNamespace(query=Query()))
     tree = ast.parse((ROOT / "app/modules/dashboard/v2/routes/dashboard_views.py").read_text(encoding="utf-8"))
     body = next(n.body for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_assemble_health_scorecard_metrics")
     start = next(i for i, n in enumerate(body) if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "_adm_phase_pct" for t in n.targets))
-    ns = {"logger": logging.getLogger(__name__), "db": SimpleNamespace(session=SimpleNamespace(rollback=lambda: None))}
+    ns = {
+        "logger": logging.getLogger(__name__),
+        "db": SimpleNamespace(session=SimpleNamespace(rollback=lambda: None)),
+        "current_user": SimpleNamespace(id=1),
+    }
     exec(compile(ast.Module(body=body[start:-1], type_ignores=[]), "health-scorecard-production", "exec"), ns)
     return {key: ns[key] for key in ("avg_maturity", "total_solutions", "adm_distribution")}
 
