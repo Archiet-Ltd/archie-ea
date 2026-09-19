@@ -1795,13 +1795,14 @@ def test_journey_g_no_overflow_no_console_errors_no_native_dialogs(
 def test_journey_g_axe_has_no_serious_or_critical_findings(
     browser, live_server, seeded, home_conditions, label, width, height
 ):
-    """§15 G: axe WCAG 2.1 A/AA at both viewports, on both ARB paths."""
+    """§15 G: axe WCAG 2.2 AA (A and AA tags) at both viewports, on both ARB paths."""
     axe_module = pytest.importorskip(
         "axe_playwright_python.sync_playwright",
         reason="axe-playwright-python not installed",
     )
     axe = axe_module.Axe()
-    tags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
+    # Deliberately mirrors TAGS in test_accessibility_audit.py; a test there fails if the two drift.
+    tags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
     blocking = {"critical", "serious"}
 
     findings = {}
@@ -1846,13 +1847,13 @@ def test_journey_g_axe_has_no_serious_or_critical_findings(
     }
     unexpected = serious - known
     assert not unexpected, (
-        "%d NEW serious/critical WCAG 2.1 AA violation(s) on the ARB "
+        "%d NEW serious/critical WCAG 2.2 AA violation(s) on the ARB "
         "governance path at %dpx:\n  %s"
         % (len(unexpected), width, "\n  ".join(sorted(unexpected)))
     )
     if serious:
         pytest.xfail(
-            "ARB-UI-6 (measured, this run): %d serious/critical WCAG 2.1 AA "
+            "ARB-UI-6 (measured, this run): %d serious/critical WCAG 2.2 AA "
             "violation(s) on the ARB governance path at %dpx:\n  %s\n"
             "The `label` critical is an unlabelled form control on the review "
             "page - the single largest defect class this engagement already "

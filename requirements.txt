@@ -223,4 +223,4 @@ stripe>=9.0.0
 # COM-013: PostHog product analytics — no existing analytics library in codebase
 posthog>=3.0.0
 defusedxml>=0.7.1                 # untrusted XML (ArchiMate uploads, SAML) - blocks entity expansion
-axe-playwright-python>=0.1.4      # WCAG 2.1 AA audit in tests/smoke
+axe-playwright-python==0.1.8      # WCAG 2.2 AA audit in tests/smoke; pinned to an axe-core bundle that carries target-size

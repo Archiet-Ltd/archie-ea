@@ -369,8 +369,11 @@ against it, not against an ad hoc login script.
   reach it, not just a bespoke one-off smoke test living outside the matrix.
 - `tests/smoke/test_archetype_journeys.py` — per-persona primary-journey walkthroughs.
   A new primary journey for an existing persona extends this file.
-- `tests/smoke/test_accessibility_audit.py` — axe-core, WCAG 2.1 AA, ratcheted
-  against `tests/smoke/a11y_baseline.json`.
+- `tests/smoke/test_accessibility_audit.py` — axe-core, WCAG 2.2 AA as a
+  build-and-test standard (not a conformance claim), ratcheted against
+  `tests/smoke/a11y_baseline.json`. Once a browser is available it fails, not
+  skips, when `axe-playwright-python` is missing or its bundled axe-core lacks
+  the `target-size` rule; it does not replace manual assistive-technology testing.
 - `tests/smoke/test_visual_regression.py` — pixel-diff against committed PNGs in
   `tests/smoke/visual_baselines/`, ratcheted the same way (0.5% diff tolerance for
   antialiasing noise). Added 13 Sep 2026 after the ARB status-chart and AI-chat
@@ -535,7 +538,7 @@ not assume a green local run means a green CI run:
 |---|---|
 | `secret-scan` | gitleaks over **full history** (so a bad commit is expensive to undo — stage files individually) |
 | `security-sast` | bandit, ratcheted via `scripts/ci/bandit_gate.py` against `.bandit-baseline.json` |
-| `smoke` | Playwright browser journeys, one per archetype (`tests/smoke/`), a WCAG 2.1 AA axe-core audit ratcheted against `tests/smoke/a11y_baseline.json`, and an authorisation matrix |
+| `smoke` | Playwright browser journeys, one per archetype (`tests/smoke/`), a WCAG 2.2 AA axe-core audit ratcheted against `tests/smoke/a11y_baseline.json`, and an authorisation matrix |
 | `dependency-audit` | `pip-audit` ratcheted against `scripts/ci/dependency_baseline.json` |
 | `db-gates` | also emits a CycloneDX SBOM from the *installed* environment |
 
