@@ -26,6 +26,7 @@ from app import db
 from app.models.application_capability import ApplicationCapabilityMapping
 from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_capability import UnifiedCapability
+from app.modules.my_applications.services import has_assigned_owner
 from app.security.import_decorators import with_import_security
 from app.utils.pagination import safe_int_arg
 
@@ -434,10 +435,10 @@ def application_list():
         # ARCH-106: Data Quality banner used to hardcode "Owner: 0/N" and
         # "Vendor: 0/N" — literal zeros, not computed from any data. Count real
         # owner-assigned and vendor-assigned applications instead.
-        owner_assigned_count = _stats_base.filter(
-            ApplicationComponent.business_owner.isnot(None),
-            ApplicationComponent.business_owner != "",
-        ).count()
+        # An application counts as having an assigned owner when a business owner is
+        # recorded on it or an application manager is assigned to it; the second half
+        # is the same ownership the My Applications screens count for a user.
+        owner_assigned_count = _stats_base.filter(has_assigned_owner()).count()
         vendor_assigned_count = _stats_base.filter(
             db.or_(
                 db.and_(

@@ -9,7 +9,7 @@ ADR Reference: docs/adr/0011-application-manager-persona.md
 
 from datetime import date
 
-from flask import render_template
+from flask import render_template, request
 from flask_login import current_user, login_required
 
 from app.decorators import requires_application_owner
@@ -25,9 +25,15 @@ from . import my_applications_bp
 # "every page route returned 500" that got this module disabled on 2026-06-11.
 from .services import (
     get_application_health_summary,
+    get_owned_applications,
     get_ownership_summary,
     get_user_applications,
 )
+
+# Rows the dashboard's My Applications panel lists before it points at the full
+# list; the list page shows the same applications, 20 to a page.
+DASHBOARD_PANEL_ROWS = 10
+LIST_PAGE_SIZE = 20
 
 
 def get_owned_apps():
@@ -41,15 +47,11 @@ def get_owned_apps():
     and a cross-record disclosure. The templates agree: they read
     application_type, business_criticality, lifecycle_status and hosting_type,
     which are ApplicationComponent fields.
+
+    The definition of "owned by this user" lives in services.py and is shared by
+    every count and list on these pages.
     """
-    # tenant-scoping-ok: self-lookup, filtered by the authenticated user's own id.
-    ownership = ApplicationOwner.query.filter_by(user_id=current_user.id).all()
-    app_ids = [o.application_id for o in ownership]
-
-    if not app_ids:
-        return []
-
-    return ApplicationComponent.query.filter(ApplicationComponent.id.in_(app_ids)).all()
+    return get_owned_applications(current_user.id)
 
 
 @my_applications_bp.route("/")
@@ -57,28 +59,13 @@ def get_owned_apps():
 @requires_application_owner
 def dashboard():
     """Application manager dashboard - overview of owned applications."""
-    apps = get_owned_apps()
-
-    # Calculate stats
-    total = len(apps)
-    by_status = {}
-    for app in apps:
-        status = getattr(app, 'lifecycle_status', None) or getattr(app, 'status', 'unknown') or 'unknown'
-        by_status[status] = by_status.get(status, 0) + 1
-
-    # Health breakdown (using lifecycle or health status if available)
-    healthy = sum(1 for a in apps if getattr(a, 'health_status', None) == 'healthy')
-    at_risk = sum(1 for a in apps if getattr(a, 'health_status', None) == 'at_risk')
-    critical = sum(1 for a in apps if getattr(a, 'health_status', None) == 'critical')
+    # Total Apps, the health tiles and the panel rows are all read from the one
+    # ownership definition in services.py, so they cannot contradict each other.
+    recent_apps, _ = get_user_applications(current_user.id, per_page=DASHBOARD_PANEL_ROWS)
 
     return render_template(
         "my_applications/dashboard.html",
-        apps=apps,
-        total=total,
-        by_status=by_status,
-        healthy=healthy,
-        at_risk=at_risk,
-        critical=critical,
+        recent_apps=recent_apps,
         ownership_summary=get_ownership_summary(current_user.id),
         health_summary=get_application_health_summary(current_user.id),
     )
@@ -95,15 +82,33 @@ def app_list():
     # and was written for this template; the inline get_owned_apps() above returns
     # ApplicationComponent rows, so every card raised UndefinedError on
     # item.application and the page 500'd as soon as the user owned anything.
-    apps, total = get_user_applications(current_user.id)
+    #
+    # The ownership-type tabs, the search box and the pager on that template all
+    # send query parameters; the route used to ignore them, so every tab showed the
+    # same list whatever its count said.
+    ownership_type = request.args.get("type")
+    if ownership_type not in ApplicationOwner.OWNERSHIP_TYPES:
+        ownership_type = None
+    search = (request.args.get("search") or "").strip()
+    page = max(request.args.get("page", 1, type=int) or 1, 1)
+
+    apps, total = get_user_applications(
+        current_user.id,
+        ownership_type=ownership_type,
+        search=search or None,
+        page=page,
+        per_page=LIST_PAGE_SIZE,
+    )
 
     return render_template(
         "my_applications/app_list.html",
         apps=apps,
-        # The template renders a count alongside the cards. get_user_applications
-        # returns it as the second element precisely so the page does not have to
-        # re-count a paginated result.
+        # Rows matching the selected tab and search; the pager reads it. The page
+        # subtitle and the "All" tab read ownership_summary.total instead.
         total=total,
+        page=page,
+        ownership_type=ownership_type,
+        search=search,
         # Template reads ownership_summary.{primary,backup,technical,business,
         # total} - the exact shape get_ownership_summary() has always returned.
         ownership_summary=get_ownership_summary(current_user.id),
