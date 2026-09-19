@@ -22,15 +22,19 @@
         description='Analyze the ripple effects of changes across the enterprise architecture.'
     ) }}
             <div class="flex items-center gap-3">
+                {# Secondary until an analysis exists, so the page's own action ("Analyze Impact") leads;
+                   they take the primary style once there is a report to act on. #}
                 <button type="button" 
                     @click="$dispatch('open-impact-scenario-comparison.window')"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-primary-foreground font-medium rounded-lg transition-colors" aria-label="Open">
+                    :class="analysisResult ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'"
+                    class="inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors" aria-label="Open">
                     <i data-lucide="git-compare" class="h-4 w-4" aria-hidden="true"></i>
                     Compare Scenarios
                 </button>
                 <button type="button" 
                     @click="$dispatch('open-initiative-change-request-modal')"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-primary-foreground font-medium rounded-lg transition-colors" aria-label="Open">
+                    :class="analysisResult ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'"
+                    class="inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors" aria-label="Open">
                     <i data-lucide="git-branch" class="h-4 w-4" aria-hidden="true"></i>
                     Create Change Request
                 </button>
@@ -50,14 +54,16 @@
                 <div class="space-y-4">
                     <div class="space-y-2">
                         <label class="text-sm font-medium">Architecture Layer</label>
-                        <select x-model="selectedType" @change="searchQuery = ''; searchResults = []; selectedElement = null;"
+                        <select x-model="selectedType" @change="layerChanged()" aria-describedby="impact-layer-help"
                             class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Architecture Layer">
+                            <option value="">All layers</option>
                             <option value="Application">Application Layer</option>
                             <option value="Business">Business Layer</option>
                             <option value="Technology">Technology Layer</option>
                             <option value="Strategy">Strategy Layer</option>
                             <option value="Motivation">Motivation Layer</option>
                         </select>
+                        <p id="impact-layer-help" class="text-xs text-muted-foreground" x-text="layerHelp()">Search below covers every layer. Choose one to narrow it.</p>
                     </div>
                     <div class="space-y-2">
                         <label class="text-sm font-medium">Search Element</label>
@@ -72,11 +78,23 @@
                                 <button type="button" @click="selectElement(item)"
                                     class="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground text-sm transition-colors border-b last:border-0" aria-label="Action">
                                     <span x-text="item.name"></span>
-                                    <span class="text-xs text-muted-foreground block"
-                                        x-text="(item.element_type || '') + (item.description ? ' — ' + item.description.substring(0, 40) + '...' : '')"></span>
+                                    <span class="text-xs text-muted-foreground block" x-text="rowDetail(item)"></span>
                                 </button>
                             </template>
                         </div>
+                        <p x-show="searchNote" x-cloak class="text-xs text-muted-foreground" x-text="searchNote"></p>
+                        <div x-show="emptyMessage" x-cloak role="status" class="text-sm text-muted-foreground">
+                            <span x-text="emptyMessage"></span>
+                            <template x-for="entry in otherLayers" :key="entry.key">
+                                <span>
+                                    <span x-text="entry.lead"></span>
+                                    <button type="button" x-show="entry.selectValue" x-cloak @click="showLayer(entry)"
+                                        class="font-medium text-primary underline underline-offset-2" x-text="matchLabel(entry)"></button>
+                                    <span x-show="!entry.selectValue" x-cloak x-text="matchLabel(entry)"></span>
+                                </span>
+                            </template>
+                        </div>
+                        <p x-show="searchError" x-cloak role="alert" class="text-sm text-destructive" x-text="searchError"></p>
                     </div>
                     <div class="space-y-2">
                         <label class="text-sm font-medium">Change Type</label>
@@ -90,8 +108,9 @@
                     </div>
                     <button type="button" @click="performAnalysis" :disabled="!selectedElement || loading"
                         class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2" aria-label="Action">
-                        <i data-lucide="play" class="mr-2 h-4 w-4" x-show="!loading" x-cloak></i>
-                        <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="loading" x-cloak></i>
+                        {# x-show sits on a wrapper, not on the <i>: Lucide swaps each <i> for an <svg> and the binding is lost. #}
+                        <span x-show="!loading" x-cloak class="mr-2 inline-flex"><i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i></span>
+                        <span x-show="loading" x-cloak class="mr-2 inline-flex"><i data-lucide="loader-2" class="h-4 w-4 animate-spin" aria-hidden="true"></i></span>
                         Analyze Impact
                     </button>
                 </div>
@@ -294,13 +313,33 @@
 </div>
 
 <script>
-    /* Map dropdown value → ArchiMate CRUD layer for search API */
+    /* Map dropdown value → ArchiMate layer key. The layer is an optional narrowing of a
+       search that always runs: the empty value ("All layers") sends no layer at all. */
     const LAYER_MAP = {
         'Application': 'application',
         'Business': 'business',
         'Technology': 'technology',
         'Strategy': 'strategy',
         'Motivation': 'motivation'
+    };
+
+    /* The picker reads the product's canonical element search, the same index the
+       composer and the other element pickers use. It used to read the layer-scoped
+       listing, which filters ArchiMate rows by a CamelCase type list, so an element
+       stored as application_component (snake_case) was never returned. The limit is
+       the endpoint's own cap of 200: the list is name-ordered and the global search
+       returns a handful of the same rows, so a smaller limit could leave one of its
+       hits off the list. */
+    const IMPACT_PICKER_ENDPOINT = '/archimate/api/elements/search';
+    const IMPACT_PICKER_LIMIT = 200;
+    const IMPACT_LAYER_LABELS = {
+        application: 'Application Layer',
+        business: 'Business Layer',
+        technology: 'Technology Layer',
+        strategy: 'Strategy Layer',
+        motivation: 'Motivation Layer',
+        physical: 'Physical Layer',
+        implementation: 'Implementation and Migration Layer'
     };
 
     /* Registered as a top-level (window) factory and referenced as
@@ -324,9 +363,14 @@
        fails the build if the bare-name form comes back. */
     function impactAnalysis() {
         return {
-            selectedType: 'Application',
+            selectedType: '',
             searchQuery: '',
             searchResults: [],
+            searchSeq: 0,
+            searchNote: '',
+            searchError: '',
+            emptyMessage: '',
+            otherLayers: [],
             selectedElement: null,
             changeType: 'MODIFY',
             loading: false,
@@ -346,40 +390,151 @@
                 }
             },
 
+            /* Readable form of a type or layer name, whichever spelling it is stored
+               in: application_component and ApplicationComponent both read
+               "Application Component". */
+            typeLabel(type) {
+                if (!type) return '';
+                return String(type)
+                    .replace(/[_-]+/g, ' ')
+                    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+                    .replace(/\s+/g, ' ').trim()
+                    .replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); })
+                    .replace(/ (Of|And|Or)\b/g, function (w) { return w.toLowerCase(); });
+            },
+
+            /* Both spellings compare equal: business_capability, BusinessCapability. */
+            typeHas(d, word) {
+                return String((d && d.type) || '').toLowerCase().replace(/[^a-z0-9]/g, '').indexOf(word) >= 0;
+            },
+
+            layerKey(raw) {
+                const key = String(raw || '').trim().toLowerCase();
+                return key.indexOf('implementation') === 0 ? 'implementation' : key;
+            },
+
+            layerLabel(raw) {
+                const key = this.layerKey(raw);
+                return IMPACT_LAYER_LABELS[key] || (key ? this.typeLabel(key) + ' Layer' : '');
+            },
+
+            /* The select value ("Application") for a layer key, or '' when the select has no such layer. */
+            layerOption(raw) {
+                const key = this.layerKey(raw);
+                return Object.keys(LAYER_MAP).filter(function (v) { return LAYER_MAP[v] === key; })[0] || '';
+            },
+
+            layerHelp() {
+                return this.selectedType
+                    ? 'Search below is limited to the ' + this.layerLabel(LAYER_MAP[this.selectedType]) + '.'
+                    : 'Search below covers every layer. Choose one to narrow it.';
+            },
+
+            rowDetail(item) {
+                const parts = [this.layerLabel(item.layer), this.typeLabel(item.type)].filter(Boolean);
+                const desc = (item.description || '').trim();
+                let line = parts.join(' · ');
+                if (desc) {
+                    line += (line ? ' — ' : '') + (desc.length > 40 ? desc.substring(0, 40) + '...' : desc);
+                }
+                return line;
+            },
+
+            matchLabel(entry) {
+                const n = entry.count + (entry.capped ? '+' : '');
+                return n + (entry.count === 1 && !entry.capped ? ' match in the ' : ' matches in the ') + entry.label;
+            },
+
+            clearFeedback() {
+                this.searchNote = '';
+                this.searchError = '';
+                this.emptyMessage = '';
+                this.otherLayers = [];
+            },
+
+            layerChanged() {
+                /* The layer narrows the search; it does not discard what was typed or chosen. */
+                this.searchElements();
+            },
+
+            showLayer(entry) {
+                if (!entry || !entry.selectValue) return;
+                this.selectedType = entry.selectValue;
+                this.searchElements();
+            },
+
+            async fetchElements(text, layer) {
+                /* layer is sent only when the persona chose one, and only ever narrows the result. */
+                const params = { q: text, limit: IMPACT_PICKER_LIMIT };
+                if (layer) params.layer = layer;
+                const payload = await Platform.fetch.get(IMPACT_PICKER_ENDPOINT, params, { silent: true });
+                if (!payload || !Array.isArray(payload.data)) {
+                    throw new Error('Unexpected element search response');
+                }
+                return payload.data;
+            },
+
             async searchElements() {
-                if (this.searchQuery.length < 2) {
+                const text = this.searchQuery.trim();
+                const seq = ++this.searchSeq;   /* an answer to an older search is ignored */
+                this.clearFeedback();
+                if (text.length < 2) {
                     this.searchResults = [];
                     return;
                 }
 
+                /* The id in these rows is an archimate_elements id, which is what
+                   /strategic/api/impact-analysis reads as element_id. */
+                const layer = LAYER_MAP[this.selectedType] || '';
                 try {
-                    /* source=architecture is required, not a preference. The
-                       endpoint returns BOTH a "portfolio" row (id =
-                       application_components.id) and an "architecture" row
-                       (id = archimate_elements.id) for the same element, and
-                       /strategic/api/impact-analysis reads element_id as an
-                       archimate_elements id. Picking the portfolio row therefore
-                       addressed a DIFFERENT element -- in a shared database,
-                       usually another tenant's -- and the architect was shown a
-                       foreign dependency graph for their own application. It
-                       also removes the duplicate name in the picker. */
-                    const layer = LAYER_MAP[this.selectedType] || 'application';
-                    let data = await Platform.fetch.get(
-                        '/architecture/api/layer/' + layer + '/elements?search=' +
-                        encodeURIComponent(this.searchQuery) +
-                        '&source=architecture&per_page=8'
-                    );
-                    this.searchResults = (data.elements || []).slice(0, 8);
+                    const rows = await this.fetchElements(text, layer);
+                    if (seq !== this.searchSeq) return;
+                    this.searchResults = rows;
+                    if (rows.length >= IMPACT_PICKER_LIMIT) {
+                        this.searchNote = 'Showing the first ' + IMPACT_PICKER_LIMIT + ' matches. Type more of the name to narrow the list.';
+                    }
+                    if (rows.length === 0) {
+                        await this.explainNoMatch(text, layer, seq);
+                    }
                 } catch (e) {
+                    if (seq !== this.searchSeq) return;
                     Platform.log.error('Search failed', e);
                     this.searchResults = [];
+                    this.searchError = 'Element search is unavailable right now. Try again in a moment.';
                 }
+            },
+
+            /* Say where the words were looked for and, when a layer was chosen, which
+               other layers hold matches. */
+            async explainNoMatch(text, layer, seq) {
+                const self = this;
+                let elsewhere = [];
+                if (layer) {
+                    const all = await this.fetchElements(text, '');
+                    if (seq !== this.searchSeq) return;
+                    const capped = all.length >= IMPACT_PICKER_LIMIT;
+                    const counts = {};
+                    all.forEach(function (row) {
+                        const key = self.layerKey(row.layer);
+                        counts[key] = (counts[key] || 0) + 1;
+                    });
+                    elsewhere = Object.keys(counts).map(function (key) {
+                        return { key: key, count: counts[key], capped: capped, label: key ? self.layerLabel(key) : 'unassigned layer',
+                                 selectValue: self.layerOption(key), lead: '' };
+                    }).sort(function (a, b) { return b.count - a.count || a.label.localeCompare(b.label); });
+                    elsewhere.forEach(function (entry, i) { entry.lead = i > 0 ? ', ' : ''; });
+                }
+                this.otherLayers = elsewhere;
+                this.emptyMessage = "No elements match '" + text + "' " +
+                    (elsewhere.length ? 'in the ' + this.layerLabel(layer) + '.' : 'in any layer.');
             },
 
             selectElement(item) {
                 this.selectedElement = item;
                 this.searchQuery = item.name;
+                this.searchSeq++;   /* a search still in flight must not reopen the list */
                 this.searchResults = [];
+                this.clearFeedback();
             },
 
             async performAnalysis() {
@@ -390,7 +545,7 @@
                 try {
                     const raw = await Platform.fetch.post('/strategic/api/impact-analysis', {
                         element_id: this.selectedElement.id,
-                        element_type: this.selectedType,
+                        element_type: this.layerOption(this.selectedElement.layer),
                         change_type: this.changeType
                     });
 
@@ -402,12 +557,8 @@
                     this.analysisResult = {
                         severity: raw.risk_level || 'LOW',
                         summary: this._buildSummary(raw, direct, indirect),
-                        impacted_capabilities: allDeps.filter(function(d) {
-                            return (d.type || '').indexOf('Capability') >= 0 || (d.type || '').indexOf('Business') >= 0;
-                        }),
-                        impacted_processes: allDeps.filter(function(d) {
-                            return (d.type || '').indexOf('Process') >= 0 || (d.type || '').indexOf('Service') >= 0;
-                        }),
+                        impacted_capabilities: allDeps.filter(d => this.typeHas(d, 'capability') || this.typeHas(d, 'business')),
+                        impacted_processes: allDeps.filter(d => this.typeHas(d, 'process') || this.typeHas(d, 'service')),
                         estimated_risk_cost: (raw.estimated_financial_risk === null || raw.estimated_financial_risk === undefined) ? null : raw.estimated_financial_risk,
                         dependencies: direct.map(function(d, i) {
                             return { id: d.id || i, name: d.name, type: d.type, relationship: 'Level ' + d.level + ' dependency', criticality: d.criticality, app_name: d.app_name };
@@ -513,6 +664,8 @@
 
 {{ impact_scenario_comparison_modal() }}
 
+{# The card sits outside the space-y-8 wrapper above, so it carries that wrapper's gap itself. #}
+<div class="mt-8">
 {{ llm_recommendations(
     dashboard='impact_analysis',
     context_data={
@@ -526,6 +679,7 @@
         'dependencies': {}
     }
 ) }}
+</div>
 
 {% from 'components/initiative_modal.html' import initiative_modal %}
 
