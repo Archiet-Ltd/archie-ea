@@ -127,8 +127,8 @@
         <h2 class="text-base font-semibold text-foreground mb-4">Review Status Overview</h2>
         {% if dashboard_data.metrics.total_items > 0 %}
         <div class="flex items-center gap-6 flex-wrap">
-            <div class="flex-1 min-w-[200px]">
-                <canvas id="arbStatusChart" height="160"></canvas>
+            <div class="relative h-48 flex-1 min-w-[200px]">
+                <canvas id="arbStatusChart"></canvas>
             </div>
             <div class="space-y-2 text-sm min-w-[180px]">
                 <div class="flex items-center gap-2">

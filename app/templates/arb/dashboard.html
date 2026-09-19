@@ -110,8 +110,8 @@
         </div>
         {% if dashboard_data.metrics.total_items > 0 %}
         <div class="flex flex-wrap items-center gap-6">
-            <div class="min-w-[200px] flex-1">
-                <canvas id="arbStatusChart" height="160" aria-label="Review status distribution chart" role="img"></canvas>
+            <div class="relative h-48 min-w-[200px] flex-1">
+                <canvas id="arbStatusChart" aria-label="Review status distribution chart" role="img"></canvas>
             </div>
             <dl class="min-w-[200px] space-y-2 text-sm">
                 <div class="flex items-center gap-2">
@@ -154,49 +154,20 @@
 {% block extra_head_js %}{% set _typed = typed_queue | default(none) %}
 {% if _typed and _typed.state != 'failed' %}
 <script src="/static/vendor/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/arb/status_chart.js') }}"></script>
 <script>
 (function () {
   // This block renders in extra_head_js, which sits inside <head> --
   // #arbStatusChart lives in the body and does not exist yet when this
-  // script runs synchronously. Without the DOMContentLoaded wrap,
-  // getElementById returns null every time (not just the documented
-  // zero-reviews case below), `if (!ctx) return;` fires silently with no
-  // console error, and the "Review status" card renders as dead whitespace
-  // with only the legend numbers floating in it. Found 11 Sep 2026 in a
-  // visual-design pass on production.
+  // script runs synchronously, so construction waits for DOMContentLoaded.
+  // Colours and sizing live in js/arb/status_chart.js: canvas cannot resolve
+  // CSS variables, so segment colours are read from the computed tokens there.
   document.addEventListener('DOMContentLoaded', function () {
-    const ctx = document.getElementById('arbStatusChart');
-    if (!ctx) return;
-    const pending = {{ dashboard_data.metrics.pending_items | int }};
-    const approved = {{ dashboard_data.metrics.approved_items | int }};
-    const rejected = {{ dashboard_data.metrics.rejected_items | int }};
-    const total = {{ dashboard_data.metrics.total_items | int }};
-    const other = Math.max(0, total - pending - approved - rejected);
-    new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: ['Pending / In Review', 'Approved', 'Rejected', 'Other'],
-        datasets: [{
-          data: [pending, approved, rejected, other],
-          backgroundColor: [
-            'hsl(var(--warning))',
-            'hsl(var(--success))',
-            'hsl(var(--destructive))',
-            'hsl(var(--muted-foreground))'
-          ],
-          borderWidth: 2,
-          borderColor: 'transparent'
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: item => ` ${item.label}: ${item.raw}` } }
-        },
-        cutout: '65%'
-      }
+    ArbStatusChart.render(document.getElementById('arbStatusChart'), {
+      pending: {{ dashboard_data.metrics.pending_items | int }},
+      approved: {{ dashboard_data.metrics.approved_items | int }},
+      rejected: {{ dashboard_data.metrics.rejected_items | int }},
+      total: {{ dashboard_data.metrics.total_items | int }}
     });
   });
 })();
@@ -210,46 +181,18 @@
 </script>
 <script src="{{ url_for('static', filename='js/arb/dashboard.js') }}"></script>
 <script src="/static/vendor/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/arb/status_chart.js') }}"></script>
 <script>
 (function () {
-  // Status breakdown donut chart (PH-011-06). The template only renders this
-  // canvas when dashboard_data.metrics.total_items > 0 -- an empty_state
-  // renders server-side instead when there is nothing to chart, so an
-  // absent canvas here is meant to be the zero-reviews case. But this
-  // script lives in extra_head_js (inside <head>), and #arbStatusChart is
-  // in the body -- without the DOMContentLoaded wrap, getElementById
-  // returns null on EVERY load regardless of review count, so `if (!ctx)
-  // return;` fires silently and the chart never renders. Found 11 Sep 2026
-  // in a visual-design pass on production (dead whitespace where the
-  // donut should be, legend numbers floating with nothing to illustrate).
+  // Status breakdown donut chart (PH-011-06). extra_head_js renders inside <head>,
+  // before #arbStatusChart exists, so construction waits for DOMContentLoaded.
+  // Colours and sizing live in js/arb/status_chart.js (canvas cannot resolve CSS variables).
   document.addEventListener('DOMContentLoaded', function () {
-    const ctx = document.getElementById('arbStatusChart');
-    if (!ctx) return;
-    const pending = {{ dashboard_data.metrics.pending_items | int }};
-    const approved = {{ dashboard_data.metrics.approved_items | int }};
-    const rejected = {{ dashboard_data.metrics.rejected_items | int }};
-    const total = {{ dashboard_data.metrics.total_items | int }};
-    const other = Math.max(0, total - pending - approved - rejected);
-    new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: ['Pending / In Review', 'Approved', 'Rejected', 'Other'],
-        datasets: [{
-          data: [pending, approved, rejected, other],
-          backgroundColor: ['#f59e0b', '#10b981', '#ef4444', '#9ca3af'],
-          borderWidth: 2,
-          borderColor: 'transparent',
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}` } }
-        },
-        cutout: '65%'
-      }
+    ArbStatusChart.render(document.getElementById('arbStatusChart'), {
+      pending: {{ dashboard_data.metrics.pending_items | int }},
+      approved: {{ dashboard_data.metrics.approved_items | int }},
+      rejected: {{ dashboard_data.metrics.rejected_items | int }},
+      total: {{ dashboard_data.metrics.total_items | int }}
     });
   });
 })();
