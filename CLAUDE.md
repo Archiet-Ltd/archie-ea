@@ -374,6 +374,9 @@ against it, not against an ad hoc login script.
   `tests/smoke/a11y_baseline.json`. Once a browser is available it fails, not
   skips, when `axe-playwright-python` is missing or its bundled axe-core lacks
   the `target-size` rule; it does not replace manual assistive-technology testing.
+  Its tag set is shared: the ARB governance and transformation room journeys run
+  axe with the same list, and a static test keeps every axe run under
+  `tests/smoke/` on it.
 - `tests/smoke/test_visual_regression.py` — pixel-diff against committed PNGs in
   `tests/smoke/visual_baselines/`, ratcheted the same way (0.5% diff tolerance for
   antialiasing noise). Added 13 Sep 2026 after the ARB status-chart and AI-chat

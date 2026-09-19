@@ -22,9 +22,18 @@ That is why a tag set that says 2.2 is not enough on its own. Naming `wcag22aa`
 against an axe-core that predates the rule selects nothing and reports "no 2.2
 violations" for a check that never ran. So this module reads the bundled axe-core
 version at run time and prints it, and fails if `target-size` is not in the
-loaded rule list. It likewise FAILS, rather than skips, when axe-playwright-python
-is not installed: a skipped test reports as passed, which would let a CI run say
-"no accessibility violations" when no accessibility check ran at all.
+loaded rule list. Once a browser is available it likewise FAILS, rather than
+skips, when axe-playwright-python is not installed (with no browser the whole
+tier skips, as tests/smoke/conftest.py arranges): a skipped test reports as
+passed, which would let a CI run say "no accessibility violations" when no
+accessibility check ran at all.
+
+A clean `target-size` result is narrower than it sounds. The rule also passes a
+target smaller than 24 by 24 pixels when enough clear space surrounds it, and
+every audited page carries such targets (small links measuring 32 by 16, for
+instance), so "clean" does not mean every target is 24 by 24. The audited tenant
+also holds only a handful of records, so long lists and busy states are not
+exercised. Both are left to manual review.
 
 Gated as a ratchet against an accepted baseline, like the bandit and dependency
 gates, for the same reason: a check that fails on day one gets disabled on day
@@ -57,19 +66,22 @@ AXE_MODULE = "axe_playwright_python.sync_playwright"
 
 BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "a11y_baseline.json")
 
-# The audit's second copy of the tag list lives in another file, inside the ARB
-# governance journey. test_arb_journey_tag_set_mirrors_the_audit_tag_set reads it
-# from source so the two cannot drift apart silently.
-ARB_JOURNEY = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "test_typed_arb_governance_journey.py")
-ARB_JOURNEY_TEST = "test_journey_g_axe_has_no_serious_or_critical_findings"
+SMOKE_DIR = os.path.dirname(os.path.abspath(__file__))
+THIS_MODULE = os.path.splitext(os.path.basename(__file__))[0]
 
-# WCAG 2.2 Level AA, with Level A - the level the approved design commits to, as
-# a build-and-test standard rather than a conformance claim. 2.2 includes 2.1, so
+# WCAG 2.2 Level AA, with Level A - the level the product's design targets, as a
+# build-and-test standard rather than a conformance claim. 2.2 includes 2.1, so
 # the four 2.1 tags stay and `wcag22aa` is added. EN 301 549 v4.1.1 adopts 2.2 but
 # is not yet the legal reference (v3.2.1 remains so until v4.1.1 is cited in the
 # Official Journal of the European Union): that is context, not the reason for
 # the move.
+#
+# Three files run axe with this tag set: this module, the ARB governance journey
+# (which keeps its own copy of the list) and the transformation room journeys
+# (which import TAGS). The last two assert on serious and critical findings
+# directly, with no baseline, so changing this list changes what they enforce as
+# well. test_every_axe_run_in_tests_smoke_uses_the_audit_tag_set keeps every axe
+# run under tests/smoke on exactly this list.
 TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
 
 # What the `wcag22aa` tag exists to add: rule id -> the tag it must carry. A rule
@@ -80,15 +92,18 @@ REQUIRED_RULES = {"target-size": "wcag22aa"}
 # The four places axe reports a rule it ran; a rule in none of them did not run.
 RESULT_KINDS = ("violations", "passes", "incomplete", "inapplicable")
 
-# Every accepted baseline entry must say when it was accepted and why. The date
-# is checked as a real date; the reason must be a sentence, not a placeholder.
+# Every accepted baseline entry must carry a dated one-line reason. The date must
+# be a real date and not in the future; the reason must be at least ten
+# characters and contain letters, which rejects placeholders such as "...". The
+# wording of the reason is not judged beyond that.
 NOTE_FORMAT = re.compile(r"^(\d{4}-\d{2}-\d{2}): (\S.{9,})$")
 BASELINE_COMMENT = (
     "Accepted axe-core violations per page under the WCAG 2.2 AA tag set "
-    "(wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa). Every entry is a real, "
+    "(wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa). An entry here is a real, "
     "unfixed failure against that tag set, not a statement that the page is "
-    "accessible, and each carries its acceptance date and a one-line reason in "
-    "accepted_notes. Regenerate with SMOKE_A11Y_UPDATE_BASELINE=1.")
+    "accessible. Each entry must be explained by a dated one-line reason under "
+    "accepted_notes (page, then rule: 'YYYY-MM-DD: reason'); the test suite "
+    "rejects an entry without one. Regenerate with SMOKE_A11Y_UPDATE_BASELINE=1.")
 
 # One representative page per archetype, signed in as that archetype.
 #
@@ -317,23 +332,132 @@ def audited(axe_module, axe_engine, browser, live_server, seeded):
     return results
 
 
-def _tags_declared_in_arb_journey():
-    """The literal `tags = [...]` inside the ARB governance journey's axe test."""
-    with open(ARB_JOURNEY, encoding="utf-8") as fh:
-        tree = ast.parse(fh.read())
-    found = []
-    for func in ast.walk(tree):
-        if isinstance(func, ast.FunctionDef) and func.name == ARB_JOURNEY_TEST:
-            for node in ast.walk(func):
-                if (isinstance(node, ast.Assign)
-                        and any(isinstance(t, ast.Name) and t.id == "tags"
-                                for t in node.targets)):
-                    found.append(ast.literal_eval(node.value))
-    assert len(found) == 1, (
-        "expected exactly one `tags = [...]` assignment in %s, found %d - the "
-        "mirror check cannot run, which must not read as a pass"
-        % (ARB_JOURNEY_TEST, len(found)))
-    return found[0]
+def _dict_value(node, key):
+    """The value expression stored under the string constant `key` in a dict literal."""
+    for k, v in zip(node.keys, node.values):
+        if isinstance(k, ast.Constant) and k.value == key:
+            return v
+    return None
+
+
+def _imports_the_audit_module(tree):
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if (node.module or "").split(".")[-1] == THIS_MODULE:
+                return True
+            if any(a.name == THIS_MODULE for a in node.names):
+                return True
+        elif isinstance(node, ast.Import):
+            if any(a.name.split(".")[-1] == THIS_MODULE for a in node.names):
+                return True
+    return False
+
+
+def _candidate_tag_lists(expr, tree):
+    """The literal tag lists an axe `values` expression can hold, or None if unreadable.
+
+    Reads a list literal, this module's own TAGS (imported, or reached through the
+    imported module), or a plain variable that is assigned list literals in the
+    same file. Anything else is unreadable, and the caller treats that as a failure.
+    """
+    if isinstance(expr, (ast.List, ast.Tuple)):
+        if all(isinstance(e, ast.Constant) and isinstance(e.value, str) for e in expr.elts):
+            return [[e.value for e in expr.elts]]
+        return None
+    if isinstance(expr, ast.Attribute):
+        return [TAGS] if expr.attr == "TAGS" and _imports_the_audit_module(tree) else None
+    if not isinstance(expr, ast.Name):
+        return None
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.ImportFrom)
+                and (node.module or "").split(".")[-1] == THIS_MODULE
+                and any(a.name == "TAGS" and (a.asname or a.name) == expr.id
+                        for a in node.names)):
+            return [TAGS]
+    lists = []
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == expr.id for t in node.targets)):
+            found = (_candidate_tag_lists(node.value, tree)
+                     if isinstance(node.value, (ast.List, ast.Tuple)) else None)
+            if found is None:
+                return None
+            lists.extend(found)
+    return lists or None
+
+
+def _is_axe_constructor(node):
+    """True for `Axe(...)` and `something.Axe(...)`."""
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    return ((isinstance(func, ast.Name) and func.id == "Axe")
+            or (isinstance(func, ast.Attribute) and func.attr == "Axe"))
+
+
+def _run_only_dicts(node):
+    """Every dict literal at or under `node` that carries a "runOnly" key."""
+    return [d for d in ast.walk(node)
+            if isinstance(d, ast.Dict) and _dict_value(d, "runOnly") is not None]
+
+
+def _names_a_run_only_dict(arg, tree):
+    """True when `arg` is a variable assigned a dict literal carrying "runOnly"."""
+    return isinstance(arg, ast.Name) and any(
+        isinstance(n, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == arg.id for t in n.targets)
+        and isinstance(n.value, ast.Dict)
+        and _dict_value(n.value, "runOnly") is not None
+        for n in ast.walk(tree))
+
+
+def _axe_runs_in_source(source):
+    """[(line, tag lists or None)] for every axe run in `source` that names tags.
+
+    None means the tag list could not be read: a run with no runOnly option, or a
+    tag list that is not a list literal, TAGS or a variable holding list literals.
+    The caller treats that as a failure, because a list this check cannot see is
+    one it cannot vouch for.
+    """
+    tree = ast.parse(source)
+    runs = []
+    for options in _run_only_dicts(tree):
+        run_only = _dict_value(options, "runOnly")
+        values = _dict_value(run_only, "values") if isinstance(run_only, ast.Dict) else None
+        runs.append((options.lineno,
+                     None if values is None else _candidate_tag_lists(values, tree)))
+    axe_names = {t.id for node in ast.walk(tree)
+                 if isinstance(node, ast.Assign) and _is_axe_constructor(node.value)
+                 for t in node.targets if isinstance(t, ast.Name)}
+    for call in ast.walk(tree):
+        if not (isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
+                and call.func.attr == "run"):
+            continue
+        receiver = call.func.value
+        if not (_is_axe_constructor(receiver)
+                or (isinstance(receiver, ast.Name) and receiver.id in axe_names)):
+            continue
+        arguments = list(call.args) + [kw.value for kw in call.keywords]
+        if _run_only_dicts(call) or any(_names_a_run_only_dict(a, tree) for a in arguments):
+            continue                          # its tag list was read above
+        runs.append((call.lineno, None))
+    return runs
+
+
+def _axe_runs_in_tests_smoke():
+    """{file relative to tests/smoke: axe runs found there}, for every .py beneath it."""
+    runs = {}
+    for root, dirs, files in os.walk(SMOKE_DIR):
+        dirs[:] = [d for d in dirs if d != "__pycache__"]
+        for name in sorted(files):
+            if not name.endswith(".py"):
+                continue
+            path = os.path.join(root, name)
+            with open(path, encoding="utf-8") as fh:
+                found = _axe_runs_in_source(fh.read())
+            if found:
+                runs[os.path.relpath(path, SMOKE_DIR).replace(os.sep, "/")] = found
+    return runs
 
 
 def test_audit_tag_set_is_wcag22_aa_and_keeps_wcag21():
@@ -343,39 +467,156 @@ def test_audit_tag_set_is_wcag22_aa_and_keeps_wcag21():
         "narrowing it to avoid a finding is not an accepted way to go green")
 
 
-def test_arb_journey_tag_set_mirrors_the_audit_tag_set():
-    """The ARB journey carries its own copy of the tag list; keep it identical."""
-    assert _tags_declared_in_arb_journey() == TAGS, (
-        "%s audits a different tag set from this module - update it to match TAGS"
-        % ARB_JOURNEY_TEST)
+def test_every_axe_run_in_tests_smoke_uses_the_audit_tag_set():
+    """Every axe run under tests/smoke audits exactly TAGS.
+
+    Three files run axe today: this module, the ARB governance journey (which
+    keeps its own copy of the list) and the transformation room journeys (which
+    import TAGS). The last two assert on serious and critical findings directly,
+    with no baseline, so a stale list in either audits a different standard
+    without anything going red. Needs no browser: it reads the test sources.
+    """
+    runs = _axe_runs_in_tests_smoke()
+    assert THIS_MODULE + ".py" in runs, (
+        "the walk did not find this module's own axe runs, so it is not reading "
+        "tests/smoke - which must not read as a pass")
+    problems = []
+    for name, entries in sorted(runs.items()):
+        for line, candidates in entries:
+            if candidates is None:
+                problems.append(
+                    "%s:%d: an axe run whose tag list this check cannot read (pass a "
+                    "runOnly tag list written as a list literal, TAGS, or a variable "
+                    "assigned a list literal)" % (name, line))
+                continue
+            for candidate in candidates:
+                if candidate != TAGS:
+                    problems.append("%s:%d: audits %s, not the audit's %s"
+                                    % (name, line, candidate, TAGS))
+    assert not problems, (
+        "%d axe run(s) under tests/smoke do not use the audit's tag set:\n  %s"
+        % (len(problems), "\n  ".join(problems)))
+
+
+def test_the_axe_walker_reads_a_stale_list_literal_in_a_run():
+    source = ('Axe().run(page, options={"runOnly": '
+              '{"type": "tag", "values": ["wcag2a", "wcag21aa"]}})')
+    assert _axe_runs_in_source(source) == [(1, [["wcag2a", "wcag21aa"]])]
+
+
+def test_the_axe_walker_reads_variables_and_the_imported_tag_list():
+    source = ("from .test_accessibility_audit import TAGS\n"
+              "old = ['wcag2a']\n"
+              "axe = axe_module.Axe()\n"
+              "axe.run(page, options={'runOnly': {'type': 'tag', 'values': old}})\n"
+              "axe.run(page, options={'runOnly': {'type': 'tag', 'values': TAGS}})\n")
+    assert sorted(_axe_runs_in_source(source)) == [(4, [["wcag2a"]]), (5, [TAGS])]
+
+
+@pytest.mark.parametrize("source", [
+    "Axe().run(page)",
+    "axe = Axe()\naxe.run(page, options=build_options())",
+    'Axe().run(page, options={"runOnly": {"type": "tag", "values": build_tags()}})',
+    'Axe().run(page, options={"runOnly": {"type": "tag"}})',
+])
+def test_the_axe_walker_flags_runs_whose_tag_list_it_cannot_read(source):
+    assert any(candidates is None for _line, candidates in _axe_runs_in_source(source))
+
+
+def test_the_axe_walker_ignores_runs_that_are_not_axe():
+    assert _axe_runs_in_source('subprocess.run(["git", "status"])\nserver.run(port=1)') == []
+
+
+def _note_problem(note):
+    """Why `note` is not a dated one-line reason, or None if it is."""
+    if not isinstance(note, str):
+        return "the note is missing or is not text"
+    match = NOTE_FORMAT.match(note)
+    if not match:
+        return ("not of the form 'YYYY-MM-DD: reason' with a reason of at least ten "
+                "characters")
+    try:
+        accepted_on = datetime.date.fromisoformat(match.group(1))
+    except ValueError:
+        return "%s is not a real date" % match.group(1)
+    if accepted_on > datetime.date.today():
+        return "the date %s is in the future" % match.group(1)
+    if not re.search(r"[^\W\d_]", match.group(2)):
+        return "the reason contains no letters"
+    return None
+
+
+def _baseline_note_problems(data):
+    """Every problem with the baseline's per-entry notes, as readable strings."""
+    accepted = data.get("accepted", {})
+    notes = data.get("accepted_notes", {})
+    if not isinstance(accepted, dict):
+        return ["'accepted' is not an object of page -> {rule: count}"]
+    if not isinstance(notes, dict):
+        return ["'accepted_notes' is not an object of page -> {rule: note}"]
+    problems = ["accepted_notes[%r] is not an object of rule -> note" % path
+                for path, page_notes in sorted(notes.items())
+                if not isinstance(page_notes, dict)]
+    for path, rules in sorted(accepted.items()):
+        if not isinstance(rules, dict):
+            problems.append("%s: its accepted entry is not an object of rule -> count" % path)
+            continue
+        page_notes = notes.get(path, {})
+        if not isinstance(page_notes, dict):
+            continue                          # reported above
+        for rule in sorted(rules):
+            problem = _note_problem(page_notes.get(rule))
+            if problem:
+                problems.append("%s: %s - %s" % (path, rule, problem))
+    return problems
 
 
 def test_every_accepted_baseline_entry_carries_a_date_and_a_reason():
-    """An accepted violation with no date and no reason is not acceptable.
+    """An accepted violation with no dated reason is not acceptable.
 
     Needs no browser: it reads the committed baseline. `accepted_notes` maps
     page -> rule -> "YYYY-MM-DD: one-line reason" and is preserved across
     regeneration, so a rerun of the baseline writer cannot quietly drop it.
     """
-    data = _load_baseline_file()
-    notes = data.get("accepted_notes", {})
-    problems = []
-    for path, rules in sorted(data.get("accepted", {}).items()):
-        for rule in sorted(rules):
-            note = notes.get(path, {}).get(rule, "")
-            match = NOTE_FORMAT.match(note)
-            try:
-                if not match:
-                    raise ValueError("no 'YYYY-MM-DD: reason' note")
-                datetime.date.fromisoformat(match.group(1))
-            except ValueError:
-                problems.append("%s: %s (note: %r)" % (path, rule, note))
+    problems = _baseline_note_problems(_load_baseline_file())
     assert not problems, (
-        "%d accepted baseline entr%s no acceptance date and reason. Add "
+        "%d problem(s) with the baseline's accepted entries. Each entry needs "
         "accepted_notes[page][rule] = 'YYYY-MM-DD: what it is and why it is "
         "accepted rather than fixed now':\n  %s"
-        % (len(problems), "y has" if len(problems) == 1 else "ies have",
-           "\n  ".join(problems)))
+        % (len(problems), "\n  ".join(problems)))
+
+
+@pytest.mark.parametrize("note", [
+    None,
+    42,
+    "",
+    "no date at all, just a reason",
+    "2026-09-19: short",
+    "2026-09-19: ..........",
+    "2026-09-19: 1234567890 ---",
+    "2026-02-30: an otherwise reasonable explanation",
+    (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+    + ": an otherwise reasonable explanation",
+])
+def test_a_baseline_note_without_a_real_dated_reason_is_rejected(note):
+    assert _note_problem(note) is not None
+
+
+def test_a_dated_reason_is_accepted():
+    today = datetime.date.today().isoformat()
+    assert _note_problem(today + ": small icon buttons; fix scheduled with the toolbar work") is None
+
+
+@pytest.mark.parametrize("data", [
+    {"accepted": {"/p": {"r": 1}}, "accepted_notes": {"/p": "not an object"}},
+    {"accepted": {"/p": {"r": 1}}, "accepted_notes": {"/p": {"r": ["not text"]}}},
+    {"accepted": {"/p": {"r": 1}}, "accepted_notes": []},
+    {"accepted": {"/p": []}},
+    {"accepted": []},
+    {"accepted": {}, "accepted_notes": {"/p": 3}},
+])
+def test_malformed_baseline_notes_are_reported_rather_than_raised(data):
+    assert _baseline_note_problems(data)
 
 
 def test_the_rule_set_carries_the_wcag22_rules(axe_engine):
@@ -385,6 +626,36 @@ def test_the_rule_set_carries_the_wcag22_rules(axe_engine):
     can tell which rule set produced a given result. Run with -s to see it.
     """
     _require_rule_set(axe_engine)
+
+
+def _engine_with(rules):
+    return {"axe_core": "0.0.0-test", "package": "test", "rules": rules}
+
+
+def test_the_required_rules_name_target_size_under_the_wcag22_tag():
+    assert REQUIRED_RULES.get("target-size") == "wcag22aa"
+
+
+def test_a_rule_list_without_target_size_is_a_problem():
+    problems = _rule_set_problems(_engine_with({"color-contrast": ["wcag2aa"]}))
+    assert len(problems) == 1
+    assert "predates" in problems[0] and "target-size" in problems[0]
+
+
+def test_a_target_size_rule_without_the_wcag22_tag_is_a_problem():
+    problems = _rule_set_problems(_engine_with({"target-size": ["cat.sensory-and-visual-cues"]}))
+    assert len(problems) == 1
+    assert "not tagged wcag22aa" in problems[0]
+
+
+def test_a_rule_list_with_target_size_under_the_wcag22_tag_is_fine():
+    assert _rule_set_problems(_engine_with({"target-size": ["wcag22aa", "wcag258"]})) == []
+
+
+def test_a_rule_set_problem_fails_the_run_and_a_clean_rule_set_does_not():
+    with pytest.raises(pytest.fail.Exception):
+        _require_rule_set(_engine_with({}))
+    _require_rule_set(_engine_with({"target-size": ["wcag22aa"]}))
 
 
 def test_the_tag_set_flags_a_seeded_small_target(axe_module, browser):

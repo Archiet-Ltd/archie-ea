@@ -1,5 +1,5 @@
 {
-  "_comment": "Accepted axe-core violations per page under the WCAG 2.2 AA tag set (wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa). Every entry is a real, unfixed failure against that tag set, not a statement that the page is accessible, and each carries its acceptance date and a one-line reason in accepted_notes. Regenerate with SMOKE_A11Y_UPDATE_BASELINE=1.",
+  "_comment": "Accepted axe-core violations per page under the WCAG 2.2 AA tag set (wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa). An entry here is a real, unfixed failure against that tag set, not a statement that the page is accessible. Each entry must be explained by a dated one-line reason under accepted_notes (page, then rule: 'YYYY-MM-DD: reason'); the test suite rejects an entry without one. Regenerate with SMOKE_A11Y_UPDATE_BASELINE=1.",
   "accepted": {
     "/ai-chat": {},
     "/applications/": {},
