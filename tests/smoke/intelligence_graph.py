@@ -48,6 +48,23 @@ def seed_impact_graph(org_id, noun_prefix="Ledgerpay"):
         second = serves(gateway, ops)
         serves(service, portal)
 
+        component = ApplicationComponent(
+            name="Payments gateway app %s" % suffix, organization_id=org_id,
+            archimate_element_id=gateway.id,
+        )
+        db.session.add(component)
+        db.session.commit()
+        unit = OrganizationUnit(name="Payments Platform %s" % suffix)
+        db.session.add(unit)
+        db.session.commit()
+        db.session.add(ApplicationOwnership(
+            application_id=component.id, organization_unit_id=unit.id,
+            ownership_type="Business Owner",
+        ))
+        db.session.commit()
+
+        # The worked-out connection goes in last: writing to an element or a
+        # relationship marks any connection worked out over it as out of date.
         db.session.add(DerivedRelationship(
             organization_id=org_id,
             source_element_id=service.id,
@@ -62,21 +79,6 @@ def seed_impact_graph(org_id, noun_prefix="Ledgerpay"):
             engine_version="1.0",
             computed_at=datetime.datetime.utcnow(),
             stale=False,
-        ))
-        db.session.commit()
-
-        component = ApplicationComponent(
-            name="%s Gateway component" % noun, organization_id=org_id,
-            archimate_element_id=gateway.id,
-        )
-        db.session.add(component)
-        db.session.commit()
-        unit = OrganizationUnit(name="Payments Platform %s" % suffix)
-        db.session.add(unit)
-        db.session.commit()
-        db.session.add(ApplicationOwnership(
-            application_id=component.id, organization_unit_id=unit.id,
-            ownership_type="Business Owner",
         ))
         db.session.commit()
 
