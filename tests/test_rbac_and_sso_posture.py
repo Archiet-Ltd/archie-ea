@@ -11,11 +11,13 @@ cross-tenant IDOR — 0 vulnerable. This file covers what that audit did not:
      app/utils/decorators.py's admin_required) is exercised across all
      three tiers against a representative gated route, not just asserted
      to exist by reading the decorator source.
-  2. SSO posture — app/auth/sso.py is a real, non-trivial OIDC/SAML
-     implementation (Azure AD, Okta, generic SAML 2.0), gated by
-     SSO_ENABLED / the sso_authentication FeatureFlag. Its dormant-by-default
-     behaviour is pinned here: with the flag off, SSO fails closed rather
-     than silently accepting requests.
+  2. SSO posture — app/auth/sso.py is a real, non-trivial OIDC
+     implementation (Azure AD, Okta), gated by SSO_ENABLED / the
+     sso_authentication FeatureFlag. Its dormant-by-default behaviour is
+     pinned here: with the flag off, SSO fails closed rather than silently
+     accepting requests. The application registers no SAML sign-in route and
+     the service has no SAML assertion method; both are asserted from the URL
+     map and the class, not from a response code.
   3. SCIM posture — grepped for across the entire app/ tree (case-insensitive,
      "scim" appears nowhere except as a substring of unrelated vendor JS
      filenames). There is no SCIM provisioning endpoint, no SCIM schema
@@ -167,10 +169,9 @@ def test_platform_admin_only_route_rejects_a_mere_org_admin(app, db_session, rba
 
 
 def test_sso_service_is_a_real_implementation_not_a_stub():
-    """Pin what SSO actually is here: a real OIDC + SAML 2.0 client (Azure
-    AD, Okta, generic SAML), not a stub or a TODO. Guards against a future
-    refactor silently degrading it to a stub while tests keep passing on
-    method presence alone.
+    """Pin what SSO actually is here: a real OIDC client (Azure AD, Okta),
+    not a stub or a TODO. Guards against a future refactor silently degrading
+    it to a stub while tests keep passing on method presence alone.
     """
     from app.auth.sso import SSOService
 
@@ -197,32 +198,86 @@ def test_sso_disabled_by_default_fails_closed(app):
     assert svc.providers == {}, "a disabled SSOService must not carry provider config forward"
 
 
-def test_sso_routes_404_when_disabled(app):
-    """Whatever routes app/auth/sso.py's blueprint exposes must not be
-    reachable while SSO is disabled — a 404, not a redirect into a
-    half-configured OIDC flow.
-    """
-    if app.config.get("SSO_ENABLED", False):
-        pytest.skip("SSO_ENABLED is true in this environment's config")
+# The single registered rule that names SAML: the per-organisation callback
+# (app/modules/auth/sso_routes.py). It is the explicit refusal for an
+# organisation whose SSO configuration says SAML: it answers 501 to every
+# request, reads no assertion and signs nobody in. Any other rule that names
+# SAML, in its path or its endpoint, is a SAML sign-in route and must not exist.
+_SAML_REFUSAL = ("/auth/sso/callback/saml", "sso.sso_callback_saml")
 
-    client = app.test_client()
-    candidates = [
-        "/auth/sso/login/azure",
-        "/auth/sso/login/okta",
-        "/auth/saml/login",
-        "/auth/saml/acs",
-    ]
-    reachable = []
-    for path in candidates:
-        resp = client.get(path)
-        if resp.status_code not in (404,):
-            reachable.append((path, resp.status_code))
 
-    assert not reachable, (
-        f"SSO route(s) responded with something other than 404 while "
-        f"SSO_ENABLED is false: {reachable} — a disabled SSO surface must "
-        "fail closed"
+def _saml_rules(url_map):
+    """(path, endpoint) of every rule that names SAML, read from a URL map."""
+    return sorted(
+        (rule.rule, rule.endpoint)
+        for rule in url_map.iter_rules()
+        if "saml" in rule.rule.lower() or "saml" in rule.endpoint.lower()
     )
+
+
+def test_no_saml_sign_in_route_is_registered(app):
+    """The application's URL map holds no SAML sign-in route.
+
+    Asserted over the registered rules, so it cannot pass against a path that
+    was never registered, and it does not infer anything from a 404. The only
+    rule that may name SAML is the per-organisation refusal.
+    """
+    assert _saml_rules(app.url_map) == [_SAML_REFUSAL], (
+        "the URL map must hold exactly one SAML-named rule, the per-organisation "
+        f"refusal {_SAML_REFUSAL}; found {_saml_rules(app.url_map)}"
+    )
+
+
+def test_the_per_organisation_saml_callback_only_refuses(app):
+    """The one SAML-named rule is a GET-only refusal that answers 501."""
+    rules = [rule for rule in app.url_map.iter_rules() if rule.endpoint == _SAML_REFUSAL[1]]
+    assert len(rules) == 1 and rules[0].rule == _SAML_REFUSAL[0]
+    assert rules[0].methods - {"HEAD", "OPTIONS"} == {"GET"}, (
+        "the per-organisation SAML callback must not accept a POST"
+    )
+
+    resp = app.test_client().get(_SAML_REFUSAL[0])
+    assert resp.status_code == 501
+    assert "error" in resp.get_json()
+
+
+@pytest.mark.parametrize("module_path,blueprint_name", [
+    ("app.modules.account.routes.account_routes", "account_bp"),
+    ("app.modules.account.v2.routes.account_routes", "account_bp_v2"),
+])
+def test_each_account_route_module_registers_no_saml_rule(module_path, blueprint_name):
+    """Neither account route module adds a SAML rule.
+
+    The application registers one of the two, chosen by USE_ACCOUNT_GUARDRAILS,
+    so the running URL map only ever shows one. Each blueprint is registered on
+    its own scratch application here and its rules read from that URL map.
+    """
+    import importlib
+
+    from flask import Flask
+
+    blueprint = getattr(importlib.import_module(module_path), blueprint_name)
+    scratch = Flask(f"scratch_{blueprint_name}")
+    scratch.register_blueprint(blueprint, url_prefix="/account")
+
+    registered = [str(rule) for rule in scratch.url_map.iter_rules()]
+    assert "/account/login" in registered, "the scratch URL map did not pick up the account routes"
+    assert _saml_rules(scratch.url_map) == []
+
+
+def test_sso_service_has_no_saml_assertion_method():
+    """SSOService carries no SAML or assertion-consuming method or attribute."""
+    import inspect
+
+    from app.auth.sso import SSOService
+
+    named = [
+        name
+        for name in (*dir(SSOService), *vars(SSOService()))
+        if "saml" in name.lower() or "assertion" in name.lower()
+    ]
+    assert not named, f"SSOService must not carry SAML members, found {named}"
+    assert "urn:oasis:names:tc:saml" not in inspect.getsource(SSOService).lower()
 
 
 # ---------------------------------------------------------------------------
