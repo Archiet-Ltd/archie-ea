@@ -53,6 +53,24 @@ def _csrf_headers(client):
     return {"X-CSRFToken": match.group(1)}
 
 
+def _anonymous_get(app, path):
+    """GET as a visitor who has no session at all.
+
+    ``db_session`` keeps one application context open for the whole test, so the
+    user flask_login resolved for the previous request would otherwise still be
+    cached on ``g`` and applied to this request. The session policy would then
+    treat the visitor as that user, find no session id in the visitor's cookie
+    and redirect to the login page, which a real anonymous request never sees.
+    """
+    from flask import g, has_app_context
+
+    if has_app_context():
+        for cached in ("_login_user", "_current_user", "current_org_id", "current_org"):
+            if hasattr(g, cached):
+                delattr(g, cached)
+    return app.test_client().get(path)
+
+
 def _make_capability(db_session, name, *, assessed_on=None, current=None, target=None):
     """Seed a capability. Call inside ``with tenant_ctx(org.id):`` so the
     before_flush hook stamps organization_id from the tenant context."""
@@ -290,8 +308,7 @@ def test_owner_creates_then_revokes_a_link(app, db_session, make_org, login_as):
     assert link.organization_id == org.id
     assert link.created_by_id == user.id
 
-    anonymous = app.test_client()
-    assert anonymous.get(f"/shared/{token}").status_code == 200
+    assert _anonymous_get(app, f"/shared/{token}").status_code == 200
 
     login_as(client, user)
     revoked = client.post(
@@ -299,7 +316,7 @@ def test_owner_creates_then_revokes_a_link(app, db_session, make_org, login_as):
     )
     assert revoked.status_code == 200
 
-    assert app.test_client().get(f"/shared/{token}").status_code == 404
+    assert _anonymous_get(app, f"/shared/{token}").status_code == 404
 
 
 def test_owner_routes_require_login(app):
