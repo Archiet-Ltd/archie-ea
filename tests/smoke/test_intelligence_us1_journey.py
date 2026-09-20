@@ -1061,7 +1061,9 @@ def test_a_recalculation_already_running_reads_as_a_plain_line(page, live_server
     _ask_in_bare_tenant(page, live_server, bare_tenant)
     page.wait_for_selector("[data-ask-row]")
     page.get_by_role("button", name="Work them out now").click()
-    line = page.get_by_text("A recalculation is already running. Try again shortly.")
+    # Both notices carry the button and its line; only the one that is showing counts.
+    line = page.locator("[data-not-computed-notice]").get_by_text(
+        "A recalculation is already running. Try again shortly.")
     line.wait_for(state="visible")
     expect(page.get_by_text("We haven't worked out the indirect connections for your model yet.")).to_be_visible()
     assert page.locator("[data-ask-row]").count() == 1
