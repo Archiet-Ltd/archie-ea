@@ -39,6 +39,12 @@ INTENTIONALLY_GLOBAL = {
     "Subscription": "billing is administered platform-side",
     "UsageEvent": "metering is aggregated platform-side",
     "OrgRole": "role definitions are resolved during authorisation setup",
+    "UserSession": (
+        "a session row is looked up by sid on every authenticated request, before "
+        "a tenant context exists, and revocation on logout or password change must "
+        "reach the row regardless of the tenant filter; every query is keyed by "
+        "sid or user_id and organization_id is kept for attribution only"
+    ),
     # Child rows reached only through a TenantMixin parent, which scopes them.
     "ApplicationCapabilityMapping": "reached via ApplicationComponent, which is scoped",
     "ApplicationVersioning": "reached via ApplicationComponent, which is scoped",
