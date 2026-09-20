@@ -148,7 +148,7 @@
             if (width < 40) return;
             drawnWidth = width;
             var plan = layout(current, width);
-            canvas.style.height = plan.height + 'px';
+            if (canvas.style.height !== plan.height + 'px') canvas.style.height = plan.height + 'px';
             svg.attr('width', width).attr('height', plan.height).attr('viewBox', '0 0 ' + width + ' ' + plan.height);
             defs();
 
@@ -242,8 +242,12 @@
 
         var observer = null;
         if (global.ResizeObserver) {
+            // Redraw on the next frame, not inside the observer callback: the drawing
+            // sets the height of the element being observed, and doing that in the
+            // callback makes the browser report a resize loop.
             observer = new global.ResizeObserver(function () {
-                if (current && Math.floor(canvas.clientWidth) !== drawnWidth) draw();
+                if (!current || Math.floor(canvas.clientWidth) === drawnWidth) return;
+                global.requestAnimationFrame(draw);
             });
             observer.observe(canvas);
         }
