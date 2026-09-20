@@ -264,12 +264,8 @@ def _rows(page):
 
 
 def _row_for(page, name, kind=None):
-    rows = _rows(page).filter(has=page.get_by_role("heading", name=name, exact=True))
-    if kind == "derived":
-        rows = rows.filter(has_text="We worked this out")
-    elif kind == "explicit":
-        rows = rows.filter(has_not_text="We worked this out")
-    return rows
+    rows = page.locator("[data-ask-row]" + ('[data-kind="%s"]' % kind if kind else ""))
+    return rows.filter(has=page.get_by_role("heading", name=name, exact=True))
 
 
 def _impact_api(page, base, element_id, **params):

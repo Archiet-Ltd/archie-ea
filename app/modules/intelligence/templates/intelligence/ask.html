@@ -58,7 +58,7 @@
         {{ impact_states("state === 'loading'") }}
         <ul class="space-y-3" x-show="state === 'ready'" x-cloak>
             <template x-for="row in rows" :key="row.key">
-                <li class="rounded-lg border border-border bg-card p-4" data-ask-row>
+                <li class="rounded-lg border border-border bg-card p-4" data-ask-row :data-kind="row.derived ? 'derived' : 'explicit'">
                     <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
                         <h3 class="min-w-0 break-words text-base font-semibold text-foreground">{{ element_name('row.name') }}</h3>
                         <div class="flex flex-wrap items-center gap-x-6 gap-y-1">

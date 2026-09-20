@@ -25,7 +25,7 @@
         </thead>
         <tbody>
             <template x-for="row in rows" :key="row.key">
-                <tr class="border-t border-border align-top" data-map-row :data-edge-row="row.key">
+                <tr class="border-t border-border align-top" data-map-row :data-edge-row="row.key" :data-kind="row.derived ? 'derived' : 'explicit'">
                     <td class="px-4 py-2 text-foreground">{{ element_name('row.fromName') }}</td>
                     <td class="px-4 py-2 text-foreground" x-text="row.relationType"></td>
                     <td class="px-4 py-2 text-foreground">{{ element_name('row.name') }}</td>
