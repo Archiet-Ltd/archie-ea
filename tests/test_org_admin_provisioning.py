@@ -75,6 +75,19 @@ def provisioning(monkeypatch):
             rows.append(SimpleNamespace(kind='org_role', organization_id=org_id,
                                         user_id=user_id, role=role, granted_by=granted_by_id))
 
+    class SessionRegistry:
+        """Stands in for the login and server-side session step of registration.
+
+        The real one needs a request, a cookie session and the sessions table;
+        this seam only records who was logged in and requires that the owner
+        was already committed at that point.
+        """
+
+        @staticmethod
+        def login_and_register(user, remember=False):
+            assert session.commits == 1, 'Login must follow the committed owner'
+            logged_in.append(user)
+
     db = SimpleNamespace(session=session)
     modules = {
         'manage': dict(app=SimpleNamespace(app_context=nullcontext), db=db),
@@ -84,6 +97,7 @@ def provisioning(monkeypatch):
         'app.models.organization': dict(Organization=Organization),
         'app.models.org_role': dict(OrgRole=OrgRole),
         'app.extensions': dict(db=db),
+        'app.services': dict(session_registry=SessionRegistry),
         'app.flask_email': dict(send_email=lambda *args, **kwargs: pytest.fail('No email expected')),
         'flask_login': dict(login_user=lambda user: logged_in.append(user), logout_user=lambda: None),
     }
