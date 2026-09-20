@@ -353,7 +353,8 @@ def test_the_picker_asks_for_no_layer_type_or_vocabulary_term():
     # read an element's layer from the answer to place it on the map; that is
     # a value shown, never one collected.)
     assert not re.search(r"layer|archimate_type|vocabulary", _code(_scripts()["picker.js"]), re.I)
-    assert not re.search(r"layer", _templates()["_entity_picker.html"], re.I)
+    picker_markup = re.sub(r"\{#.*?#\}", "", _templates()["_entity_picker.html"], flags=re.S)
+    assert not re.search(r"layer|<select", picker_markup, re.I)
     core = _scripts()["core.js"]
     call = re.search(r"Platform\.fetch\.get\(SEARCH_URL, (\{[^}]*\})", core)
     assert call and set(re.findall(r"(\w+):", call.group(1))) == {"q", "limit"}
