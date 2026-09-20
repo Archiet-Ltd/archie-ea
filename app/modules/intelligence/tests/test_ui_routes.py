@@ -41,6 +41,12 @@ def _scripts() -> dict[str, str]:
     return {p.name: _text_of(p) for p in sorted(SCRIPT_DIR.glob("*.js"))}
 
 
+def _code(source: str) -> str:
+    """A script with its comments removed, for checks about what it does."""
+    source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
+    return re.sub(r"(?m)//[^\n]*$", "", source)
+
+
 def _everything() -> dict[str, str]:
     files = {f"templates/{n}": t for n, t in _templates().items()}
     files.update({f"js/{n}": t for n, t in _scripts().items()})
@@ -343,8 +349,10 @@ def test_only_the_archimate_element_search_endpoint_is_used_and_nothing_layer_sc
 def test_the_picker_asks_for_no_layer_type_or_vocabulary_term():
     for name, source in _templates().items():
         assert "<select" not in source, name
-    for name in ("picker.js", "ask.js", "twin_map.js"):
-        assert not re.search(r"layer|archimate_type|vocabulary", _scripts()[name], re.I), name
+    # The picker and the search request carry only what was typed. (The pages
+    # read an element's layer from the answer to place it on the map; that is
+    # a value shown, never one collected.)
+    assert not re.search(r"layer|archimate_type|vocabulary", _code(_scripts()["picker.js"]), re.I)
     assert not re.search(r"layer", _templates()["_entity_picker.html"], re.I)
     core = _scripts()["core.js"]
     call = re.search(r"Platform\.fetch\.get\(SEARCH_URL, (\{[^}]*\})", core)
@@ -506,7 +514,7 @@ def test_the_hop_depth_control_is_a_native_range_input_from_one_to_five():
 
 def test_the_page_scripts_are_top_level_factories_not_alpine_data_registrations():
     for name in ("ask.js", "twin_map.js"):
-        source = _scripts()[name]
+        source = _code(_scripts()[name])
         assert "Alpine.data(" not in source, name
     assert "window.askSurface = askSurface;" in _scripts()["ask.js"]
     assert "window.twinMapSurface = twinMapSurface;" in _scripts()["twin_map.js"]
