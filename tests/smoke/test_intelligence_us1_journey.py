@@ -25,7 +25,7 @@ import pytest
 from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
-from .intelligence_graph import seed_impact_graph
+from .intelligence_graph import mark_derived_stale, seed_impact_graph
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -635,7 +635,7 @@ def test_every_control_is_at_least_24_by_24_css_pixels(page, live_server, seeded
     _wait_for_map(page)
     measurements["Hop depth slider"] = _measure(page.locator("#twin-hop-depth"))
     measurements["Worked-out toggle"] = _measure(page.locator("#twin-show-derived"))
-    measurements["Details (rail)"] = _measure(page.locator("#twin-rail-toggle"))
+    measurements["Selected element (rail)"] = _measure(page.locator("#twin-rail-toggle"))
     nodes = page.locator("[data-graph-nodes] button")
     for index in range(nodes.count()):
         measurements["Map element %d" % (index + 1)] = _measure(nodes.nth(index))
@@ -754,7 +754,7 @@ def test_focus_is_never_obscured_by_the_drawer_or_the_side_panel(
     expect(last).to_have_attribute("aria-pressed", "true")
     assert page.locator("button[data-node][aria-pressed=true]").count() == 1
 
-    # And back again with the Details control: the selection is where it was.
+    # And back again with the panel's own control: the selection is where it was.
     page.locator("#twin-rail-toggle").focus()
     page.keyboard.press("Enter")
     expect(page.locator("#twin-rail")).to_be_visible()
@@ -793,11 +793,14 @@ def test_the_drawer_is_named_by_the_element_and_kind_and_returns_focus(
     page.locator("#drawer-provenance [role=dialog]").wait_for(state="hidden")
     page.wait_for_function("(el) => document.activeElement === el", arg=opener.element_handle())
 
-    # The same drawer for a worked-out connection, named the same way.
+    # The same drawer for a worked-out connection, named for what is true of it: the
+    # element and "Worked out", never "Measured".
     derived = _row_for(page, graph["names"]["ops"], "derived")
     derived.get_by_role("button", name="Why?").click()
-    named = page.get_by_role("dialog", name=re.compile(re.escape(graph["names"]["ops"])))
+    named = page.get_by_role(
+        "dialog", name=re.compile("^" + re.escape(graph["names"]["ops"]) + r"\s+Worked out$"))
     named.wait_for(state="visible")
+    assert "Measured" not in page.locator("#drawer-title-provenance").inner_text()
     expect(page.locator("#drawer-provenance [data-plain-terms]")).to_be_visible()
 
 
@@ -1161,3 +1164,304 @@ def test_a_row_the_answer_cannot_name_shows_the_absence_and_no_invented_sentence
     assert "We worked this out because" not in dialog.inner_text()
     expect(dialog.get_by_text("Not recorded").first).to_be_visible()
     assert "Last worked out" in dialog.inner_text()
+
+
+# --- a model that has gone out of date ------------------------------------------
+
+STALE_LINE = re.compile(r"Last worked out .+ — may be out of date\.")
+
+
+@pytest.fixture
+def stale_tenant(live_server):
+    """A fresh organisation whose one worked-out connection has gone out of date.
+
+    It is made stale the way the product makes it stale: a person edits a relationship
+    the connection was worked out from, and the invalidation listener marks it. One per
+    test, in an organisation of its own, because asking for the connections to be worked
+    out again rewrites every worked-out connection in the organisation it runs in."""
+    import datetime
+
+    from app import create_app, db
+    from app.models.organization import Organization
+    from app.models.user import Role, User
+
+    app = create_app("testing")
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        Role.insert_roles()
+        org = Organization(name="Stale Org %s" % suffix, slug="stale-%s" % suffix)
+        db.session.add(org)
+        db.session.commit()
+        user = User(
+            email="stale.%s@example.com" % suffix, first_name="Stale", last_name="Tenant",
+            organization_id=org.id, enterprise_role="solution_architect", confirmed=True,
+            onboarding_completed_at=datetime.datetime.utcnow(),
+        )
+        user.role = Role.query.filter_by(name="Architect").one()
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.commit()
+        org_id, email = org.id, user.email
+    stale_graph = seed_impact_graph(org_id, "Stalepay")
+    stored = mark_derived_stale(stale_graph)
+    stale_graph.update(email=email, stored=stored)
+    return stale_graph
+
+
+def _stale_answer(page, base, graph, include_stale):
+    return _impact_api(page, base, graph["service"], include_stale="true" if include_stale else "false")
+
+
+def _ask_about_stale(page, base, stale):
+    _login(page, base, stale["email"])
+    _dismiss_first_run(page)
+    _open_ask(page, base)
+    page.locator("#ask-question-impact").click()
+    _type_and_wait(page, "ask", stale["noun"])
+    with page.expect_request(lambda r: "/api/v1/intelligence/impact/" in r.url) as asked:
+        _pick_by_click(page, "ask", stale["names"]["service"])
+    page.wait_for_selector("[data-ask-row]")
+    return asked.value
+
+
+def test_the_tenant_really_is_stale_the_way_the_product_makes_it_stale(
+    page, live_server, stale_tenant
+):
+    """Ground truth for the tests below, read from the stored row and from the endpoint:
+    the edit alone set stale, its time and its reason; an answer that does not ask for
+    out-of-date connections leaves the worked-out one out and says the state is stale;
+    one that asks for them holds it, marked."""
+    stored = stale_tenant["stored"]
+    assert stored["stale"] is True
+    assert stored["stale_since"] is not None
+    assert stored["stale_reason"] == "relationship_updated"
+
+    _login(page, live_server, stale_tenant["email"])
+    without = _stale_answer(page, live_server, stale_tenant, include_stale=False)
+    assert without["summary"]["derivation_state"] == "stale"
+    assert without["summary"]["derived_count"] == 0
+    assert without["summary"]["explicit_count"] == 3
+    assert [r for r in without["rows"] if r["relation"]["kind"] == "derived"] == []
+
+    held = _stale_answer(page, live_server, stale_tenant, include_stale=True)
+    derived = [r for r in held["rows"] if r["relation"]["kind"] == "derived"]
+    assert held["summary"]["derived_count"] == 1 and held["summary"]["stale_count"] == 1
+    assert len(derived) == 1 and derived[0]["relation"]["stale"] is True
+
+
+def test_ask_still_shows_a_stale_connection_marked_with_a_notice_and_an_action(
+    page, live_server, stale_tenant
+):
+    """The page asks for out-of-date connections, so the worked-out one is on the page:
+    on its row with a clock and "Last worked out ... may be out of date.", in the
+    drawer the same way, under a notice with the recalculation button. Working them
+    out again brings back a current connection and takes the notice away."""
+    names = stale_tenant["names"]
+    request = _ask_about_stale(page, live_server, stale_tenant)
+    assert "include_derived=true" in request.url and "include_stale=true" in request.url
+
+    assert _rows(page).count() == 4
+    derived = _row_for(page, names["ops"], "derived")
+    expect(derived).to_have_count(1)
+    expect(derived.get_by_label("Last worked out")).to_have_count(1)
+    assert STALE_LINE.search(derived.inner_text())
+
+    notice = page.locator("[data-stale-notice]")
+    expect(notice).to_be_visible()
+    assert notice.get_attribute("role") == "status"
+    expect(notice).to_contain_text("The connections we worked out may be out of date.")
+    expect(notice.get_by_label("Last worked out")).to_have_count(1)
+    button = notice.get_by_role("button", name="Work them out now")
+    expect(button).to_be_visible()
+    expect(page.locator("[data-not-computed-notice]")).to_be_hidden()
+
+    # Nothing is hidden from the count: it names every connection on the page.
+    expect(page.locator("#ask-question-panel-impact [role=status]")).to_have_text(
+        "4 connections for %s" % names["service"])
+
+    # The drawer says the same, and is named for what is true of the connection.
+    derived.get_by_role("button", name="Why?").click()
+    dialog = page.get_by_role(
+        "dialog", name=re.compile("^" + re.escape(names["ops"]) + r"\s+Worked out$"))
+    dialog.wait_for(state="visible")
+    expect(dialog.locator("[data-plain-terms]")).to_be_visible()
+    served = next(
+        r["relation"]["plain_terms"]
+        for r in _stale_answer(page, live_server, stale_tenant, include_stale=True)["rows"]
+        if r["relation"]["kind"] == "derived")
+    assert dialog.locator("[data-plain-terms]").inner_text() == served
+    assert STALE_LINE.search(dialog.inner_text())
+    expect(dialog.get_by_label("Last worked out")).to_have_count(1)
+    page.keyboard.press("Escape")
+    dialog.wait_for(state="hidden")
+
+    # The action: it posts the tenant scope, then asks again.
+    with page.expect_request(
+        lambda r: r.method == "POST" and r.url.endswith("/api/v1/intelligence/derivation/recompute")
+    ) as posted:
+        with page.expect_request(lambda r: "/api/v1/intelligence/impact/" in r.url) as again:
+            button.click()
+    assert json.loads(posted.value.post_data) == {"scope": "tenant"}
+    assert "include_stale=true" in again.value.url
+    expect(page.locator("[data-stale-notice]")).to_be_hidden()
+    current = _row_for(page, names["ops"], "derived")
+    expect(current).to_have_count(1)
+    assert "may be out of date" not in current.inner_text()
+    # Focus did not fall back to the top of the page.
+    page.wait_for_function("() => document.activeElement.id === 'ask-results-heading'")
+
+
+def test_twin_map_still_draws_a_stale_connection_marked_and_the_table_agrees(
+    page, live_server, stale_tenant
+):
+    """On the map the stale connection is drawn dashed with a badge that says it may be
+    out of date, listed in the table as "Worked out, may be out of date", and the two
+    agree edge for edge; the notice and the action are there."""
+    names = stale_tenant["names"]
+    _login(page, live_server, stale_tenant["email"])
+    _dismiss_first_run(page)
+    _open_twin_map(page, live_server, stale_tenant["service"])
+    _wait_for_map(page)
+
+    assert _drawn_edges(page) == _listed_edges(page)
+    assert len(_drawn_edges(page)) == 4
+    assert page.locator("svg path[data-kind=derived]").count() == 1
+    assert page.locator("svg path[data-kind=derived]").get_attribute("stroke-dasharray") in ("5,5", "5, 5")
+    badge = page.locator("svg g.intel-badge")
+    assert badge.count() == 1
+    assert badge.locator("text").text_content() == "Worked out, may be out of date"
+    assert badge.locator("[aria-label='Last worked out']").count() == 1
+
+    kinds = page.eval_on_selector_all(
+        "[data-map-row]", "els => els.map(e => [e.getAttribute('data-kind'), e.children[3].innerText.trim()])")
+    assert sorted(kinds) == [["derived", "Worked out, may be out of date"], ["explicit", "Explicit"],
+                             ["explicit", "Explicit"], ["explicit", "Explicit"]]
+    expect(page.locator("table[data-map-table] caption")).to_have_text(
+        "Connections for %s: 4 things, 4 connections" % names["service"])
+    expect(page.locator("#twin-picker-input").locator("xpath=ancestor::section//*[@role='status']")).to_have_text(
+        "4 connections for %s" % names["service"])
+    derived_row = page.locator("[data-map-row][data-kind=derived]")
+    expect(derived_row.get_by_label("Last worked out")).to_have_count(1)
+
+    notice = page.locator("[data-stale-notice]")
+    expect(notice).to_be_visible()
+    expect(notice).to_contain_text("The connections we worked out may be out of date.")
+    expect(notice.get_by_role("button", name="Work them out now")).to_be_visible()
+
+    derived_row.get_by_role("button", name="Why?").click()
+    dialog = page.get_by_role(
+        "dialog", name=re.compile("^" + re.escape(names["ops"]) + r"\s+Worked out$"))
+    dialog.wait_for(state="visible")
+    assert STALE_LINE.search(dialog.inner_text())
+    page.keyboard.press("Escape")
+    dialog.wait_for(state="hidden")
+
+    # With worked-out connections switched off the page asks without them, the table and
+    # the map still agree, and the notice about the model stays.
+    page.locator("#twin-show-derived").focus()
+    with page.expect_request(lambda r: "include_derived=false" in r.url and "/impact/" in r.url):
+        page.keyboard.press("Space")
+    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 3")
+    assert _drawn_edges(page) == _listed_edges(page) and len(_drawn_edges(page)) == 3
+    expect(page.locator("[data-stale-notice]")).to_be_visible()
+
+    # Recalculating from the map brings the current connection back and clears the notice.
+    page.locator("#twin-show-derived").check()
+    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
+    with page.expect_request(
+        lambda r: r.method == "POST" and r.url.endswith("/api/v1/intelligence/derivation/recompute")
+    ):
+        page.locator("[data-stale-notice]").get_by_role("button", name="Work them out now").click()
+    expect(page.locator("[data-stale-notice]")).to_be_hidden()
+    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
+    assert _drawn_edges(page) == _listed_edges(page)
+    expect(page.locator("[data-map-row][data-kind=derived] [aria-label='Last worked out']")).to_be_hidden()
+    expect(page.locator("svg g.intel-badge text")).to_have_text("Worked out")
+    page.wait_for_function("() => document.activeElement.id === 'twin-map-heading'")
+
+
+def _without_worked_out(route):
+    """Answer as the endpoint does when out-of-date connections are not asked for: the
+    real answer, with its worked-out rows taken out and its state left as stale."""
+    response = route.fetch()
+    body = response.json()
+    data = body["data"]
+    data["rows"] = [r for r in data["rows"] if r["relation"]["kind"] != "derived"]
+    data["summary"]["derived_count"] = 0
+    data["summary"]["stale_count"] = 0
+    data["summary"]["derivation_state"] = "stale"
+    route.fulfill(response=response, body=json.dumps(body))
+
+
+def test_an_answer_that_leaves_worked_out_connections_out_says_so_in_its_counts(
+    page, live_server, stale_tenant
+):
+    """Supplement, for an answer the page's own request no longer produces: if an answer
+    is stale and lists no worked-out connection, the notice says they are not shown and
+    neither the count on Ask nor the caption on the map pretends the list is complete."""
+    names = stale_tenant["names"]
+    _login(page, live_server, stale_tenant["email"])
+    _dismiss_first_run(page)
+    page.route("**/api/v1/intelligence/impact/**", _without_worked_out)
+
+    _open_ask(page, live_server)
+    page.locator("#ask-question-impact").click()
+    _type_and_wait(page, "ask", stale_tenant["noun"])
+    _pick_by_click(page, "ask", names["service"])
+    page.wait_for_selector("[data-ask-row]")
+    assert _rows(page).count() == 3
+    notice = page.locator("[data-stale-notice]")
+    expect(notice).to_contain_text("Some connections we worked out are not shown because they may be out of date.")
+    expect(notice.get_by_role("button", name="Work them out now")).to_be_visible()
+    expect(page.locator("#ask-question-panel-impact [role=status]")).to_have_text(
+        "3 connections for %s, worked-out connections not shown" % names["service"])
+
+    _open_twin_map(page, live_server, stale_tenant["service"])
+    _wait_for_map(page)
+    expect(page.locator("table[data-map-table] caption")).to_have_text(
+        "Connections for %s: 4 things, 3 connections, worked-out connections not shown" % names["service"])
+    expect(page.locator("[data-stale-notice]")).to_contain_text("are not shown because they may be out of date")
+
+
+# --- what the picker's status region says --------------------------------------
+
+
+def test_the_status_region_counts_results_after_typing_and_connections_after_choosing(
+    page, live_server, bare_tenant
+):
+    """Two different messages, each with its own singular: "1 result for ..." while
+    typing, then "1 connection for ..." once an element is chosen. Never "1 results"."""
+    _login(page, live_server, bare_tenant["email"])
+    _dismiss_first_run(page)
+    _open_ask(page, live_server)
+    page.locator("#ask-question-impact").click()
+    box = page.locator("#ask-picker-input")
+    status = page.locator("#ask-question-panel-impact [role=status]")
+
+    box.press_sequentially(bare_tenant["head_name"], delay=15)
+    page.wait_for_selector("#ask-picker-listbox [role=option]")
+    expect(status).to_have_text("1 result for %s" % bare_tenant["head_name"])
+    page.keyboard.press("ArrowDown")
+    page.keyboard.press("Enter")
+    page.wait_for_selector("[data-ask-row]")
+    expect(status).to_have_text("1 connection for %s" % bare_tenant["head_name"])
+
+    box.fill("")
+    box.press_sequentially(bare_tenant["noun"], delay=15)
+    page.wait_for_selector("#ask-picker-listbox [role=option]")
+    expect(status).to_have_text("2 results for %s" % bare_tenant["noun"])
+
+
+def test_the_map_panel_control_is_named_for_the_panel_not_as_a_second_disclosure(
+    page, live_server, seeded, graph
+):
+    """The control that collapses the side panel carries the panel's own name, so it is
+    not read as a second "show more" next to "Full detail"."""
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    _open_twin_map(page, live_server, graph["service"])
+    _wait_for_map(page)
+    toggle = page.get_by_role("button", name="Selected element")
+    expect(toggle).to_have_count(1)
+    assert toggle.get_attribute("id") == "twin-rail-toggle"
+    assert page.get_by_role("button", name="Details").count() == 0
+    expect(page.locator("#twin-rail")).to_have_attribute("aria-label", "Selected element")

@@ -52,7 +52,7 @@ import re
 import pytest
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
-from .intelligence_graph import seed_impact_graph
+from .intelligence_graph import mark_derived_stale, seed_impact_graph
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -144,6 +144,12 @@ INTELLIGENCE_STATES = [
     ("solution_architect", "Ask, provenance drawer open", "ask-drawer"),
     ("enterprise_architect", "Twin map, with the map and its table", "map"),
     ("enterprise_architect", "Twin map, provenance drawer open", "map-drawer"),
+    # The same again for a model whose worked-out connection has gone out of date: the
+    # notice and its button, the marked rows and badge, and the drawer over a stale row.
+    ("solution_architect", "Ask, out-of-date model", "ask-stale"),
+    ("solution_architect", "Ask, out-of-date model, provenance drawer open", "ask-stale-drawer"),
+    ("enterprise_architect", "Twin map, out-of-date model", "map-stale"),
+    ("enterprise_architect", "Twin map, out-of-date model, provenance drawer open", "map-stale-drawer"),
 ]
 
 # An impact level at which a violation is not negotiable: these block a user
@@ -390,6 +396,8 @@ def audited_intelligence_states(axe_module, axe_engine, browser, live_server, se
     """Run axe on the states of Ask and Twin map that need data or a click to reach."""
     _require_rule_set(axe_engine)
     graph = seed_impact_graph(seeded["ids"]["org"], "Auditpay")
+    stale_graph = seed_impact_graph(seeded["ids"]["org"], "Auditstale")
+    assert mark_derived_stale(stale_graph)["stale"] is True
     axe = axe_module.Axe()
     results = _AuditResults()
     for archetype, label, kind in INTELLIGENCE_STATES:
@@ -399,7 +407,8 @@ def audited_intelligence_states(axe_module, axe_engine, browser, live_server, se
         page = ctx.new_page()
         try:
             _login(page, live_server, seeded["emails"][archetype])
-            _reach_intelligence_state(page, live_server, graph, kind)
+            _reach_intelligence_state(
+                page, live_server, stale_graph if "stale" in kind else graph, kind)
             report = axe.run(page, options={"runOnly": {"type": "tag", "values": TAGS}})
             data = report.response if hasattr(report, "response") else report
             results[label] = {

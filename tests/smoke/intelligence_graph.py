@@ -91,3 +91,34 @@ def seed_impact_graph(org_id, noun_prefix="Ledgerpay"):
             owner=unit.name,
         )
     return out
+
+
+def mark_derived_stale(graph):
+    """Make the worked-out connection out of date the way the product does it.
+
+    A person edits one of the relationships the connection was worked out from; the
+    invalidation listener on the session then marks it stale in the same flush
+    (stale, the time, and the reason). Nothing here writes those columns: the edit
+    does, so the state is the one a real model would be in.
+
+    Returns the stored row's staleness so a test can confirm it is genuine.
+    """
+    from app import create_app, db
+    from app.models import ArchiMateRelationship
+    from app.modules.intelligence.models.derived_relationship import DerivedRelationship
+
+    app = create_app("testing")
+    with app.app_context():
+        relationship = ArchiMateRelationship.query.filter_by(
+            source_id=graph["service"], target_id=graph["gateway"]
+        ).one()
+        relationship.description = "Reviewed by the platform team"
+        db.session.commit()
+        row = DerivedRelationship.query.filter_by(
+            source_element_id=graph["service"], target_element_id=graph["ops"]
+        ).one()
+        return {
+            "stale": row.stale,
+            "stale_since": row.stale_since,
+            "stale_reason": row.stale_reason,
+        }
