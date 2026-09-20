@@ -181,6 +181,12 @@ jobs:
           python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
           flask --app manage init-db
           flask --app manage reconcile-schema
+      # The schema deploy applies this migration after reconcile-schema in every
+      # environment. Without the unique provenance index the write-time projection
+      # into unified_capabilities is skipped by design, so the tests that exercise
+      # that projection would fail or skip here on a schema production never has.
+      - name: Apply the capability provenance migration
+        run: flask --app manage apply-unified-capability-provenance-migration
       - name: Run non-smoke tests with coverage and route verification
         # route_verification.json is ignored execution evidence. Delete any
         # stale copy, create it from this job's non-smoke pytest run, then
