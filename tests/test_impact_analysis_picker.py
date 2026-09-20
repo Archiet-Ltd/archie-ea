@@ -1,14 +1,22 @@
 """Impact Analysis: the element picker finds elements by name, whatever layer or type spelling.
 
-Before this change the page searched ``/architecture/api/layer/<layer>/elements`` with a layer chosen
-first. That listing keeps only ArchiMate rows whose ``type`` is in a CamelCase list
-(``ApplicationComponent``), so an element stored as ``application_component`` was never returned,
-although Ctrl+K (``/api/sidebar/search``) returned it. Two fixture elements, "Smoke impact source" and
-"Smoke impact target", were visible in the global search and missing from the picker.
+The page used to search ``/architecture/api/layer/<layer>/elements`` with a layer chosen first. That
+listing keeps only ArchiMate rows whose ``type`` is in a CamelCase list (``ApplicationComponent``), so an
+element stored as ``application_component`` was never returned, although Ctrl+K
+(``/api/sidebar/search``) returned it.
 
 The picker now calls the canonical element search, ``GET /archimate/api/elements/search``, with the
 layer as an optional narrowing. These tests read the request the page really sends (its endpoint and
 limit are declared in the rendered page), so a page that goes back to a layer-scoped listing fails them.
+
+What the picker matches: an element's name, the way the global search does. The old listing also matched
+words in an element's description; the picker no longer does, on purpose.
+
+How many it lists: at most the page's limit, in name order. Any text that matches that many elements or
+fewer lists every match, so the picker then contains every ArchiMate element the global search returns
+for the same text on the same tenant. A text that matches more lists the first ones by name and the page
+says so (the browser tests cover the note). The global search reads ``%`` and ``_`` as wildcards and the
+picker matches them literally, so the comparison is made on texts without them.
 """
 
 from __future__ import annotations
@@ -88,7 +96,7 @@ def test_picker_uses_the_canonical_element_search_not_a_layer_listing(
     endpoint, limit, html = _picker_request(client, login_as, user)
 
     assert endpoint == "/archimate/api/elements/search"
-    assert limit == 200, "the canonical endpoint's own cap; a smaller limit can drop a global-search hit"
+    assert limit == 50, "each keystroke asks for at most this many rows"
     script = html[html.index("function impactAnalysis()"):html.index("window.impactAnalysis = impactAnalysis;")]
     assert "/architecture/api/layer/" not in script, "the picker must not read the layer-scoped listing"
     # "All layers" is the default, and it sends no layer at all.
@@ -156,11 +164,11 @@ def test_elements_stored_under_either_type_spelling_are_both_found(
         )
 
 
-def test_picker_lists_every_archimate_element_the_global_search_returns(
+def test_picker_lists_every_archimate_element_the_global_search_returns_when_the_matches_fit_the_limit(
     app, db_session, make_org, client, login_as
 ):
-    """For any text of two or more characters, picker rows across layers contain the global search's
-    ArchiMate element group on the same tenant.
+    """For a text of two or more characters that matches no more than the page's limit, the picker rows
+    across layers contain the global search's ArchiMate element group on the same tenant.
 
     The global search returns at most five of these, unordered; the elements below give it more than
     five matches in mixed layers and spellings so the assertion is not satisfied by a short list.
@@ -200,3 +208,75 @@ def test_picker_lists_every_archimate_element_the_global_search_returns(
     assert {c.id for c in created} <= {
         r["id"] for r in _picker_rows(client, login_as, user, endpoint, limit, f"Global {tag}")
     }
+
+
+def test_a_text_matching_exactly_the_limit_lists_every_match_including_the_global_search_hits(
+    app, db_session, make_org, client, login_as
+):
+    org = make_org("impact-picker-at-limit")
+    user = _make_user(db_session, org)
+    tag = uuid.uuid4().hex[:6]
+    endpoint, limit, _ = _picker_request(client, login_as, user)
+    layers = ("application", "business", "technology", "strategy", "motivation")
+    created = [
+        _element(db_session, org, f"Fit {tag} {n:03d}", "application_component" if n % 2 else "ApplicationComponent",
+                 layers[n % len(layers)])
+        for n in range(limit)
+    ]
+
+    rows = _picker_rows(client, login_as, user, endpoint, limit, f"Fit {tag}")
+    assert {r["id"] for r in rows} == {c.id for c in created}, "every one of the %d matches must be listed" % limit
+
+    global_ids = _global_element_ids(client, login_as, user, f"Fit {tag}")
+    assert global_ids, "the comparison would be vacuous: the global search returned no element"
+    assert global_ids <= {r["id"] for r in rows}
+
+
+def test_a_text_matching_more_than_the_limit_lists_the_first_ones_by_name(
+    app, db_session, make_org, client, login_as
+):
+    """Above the limit the list is capped, exactly, and is the head of the name order."""
+    org = make_org("impact-picker-over-limit")
+    user = _make_user(db_session, org)
+    tag = uuid.uuid4().hex[:6]
+    endpoint, limit, _ = _picker_request(client, login_as, user)
+    # Zero-padded numbers give one name order under any database collation.
+    names = [f"Over {tag} {n:03d}" for n in range(limit + 11)]
+    for name in names:
+        _element(db_session, org, name, "application_component", "application")
+
+    rows = _picker_rows(client, login_as, user, endpoint, limit, f"Over {tag}")
+    assert len(rows) == limit
+    assert [r["name"] for r in rows] == sorted(names)[:limit]
+
+    # A narrower text goes back under the limit and lists all of its matches.
+    narrow = _picker_rows(client, login_as, user, endpoint, limit, f"Over {tag} 05")
+    assert [r["name"] for r in narrow] == [n for n in sorted(names) if n.startswith(f"Over {tag} 05")]
+
+
+def test_percent_underscore_and_backslash_can_be_matched_literally(
+    app, db_session, make_org, client, login_as
+):
+    """The page escapes backslash, percent and underscore before it asks; the database's default LIKE
+    escape is the backslash, so the escaped text finds exactly the element that spells it and no
+    look-alike. The unescaped text is a wildcard pattern, which is why the page escapes it."""
+    bs = chr(92)  # one backslash
+    org = make_org("impact-picker-literal")
+    user = _make_user(db_session, org)
+    tag = uuid.uuid4().hex[:6]
+    endpoint, limit, _ = _picker_request(client, login_as, user)
+    underscore = _element(db_session, org, f"W{tag}_Billing", "application_component", "application")
+    look_alike = _element(db_session, org, f"W{tag}XBilling", "application_component", "application")
+    percent = _element(db_session, org, f"Rate {tag} 50% off", "application_component", "application")
+    other_percent = _element(db_session, org, f"Rate {tag} 500 off", "application_component", "application")
+    backslash = _element(db_session, org, f"Path {tag} A{bs}B", "application_component", "application")
+
+    def ids(text):
+        return {r["id"] for r in _picker_rows(client, login_as, user, endpoint, limit, text)}
+
+    assert ids(f"W{tag}{bs}_Billing") == {underscore.id}
+    assert ids(f"W{tag}_Billing") == {underscore.id, look_alike.id}, "unescaped, _ is a wildcard"
+    assert ids(f"Rate {tag} 50{bs}%") == {percent.id}
+    assert ids(f"Rate {tag} 50%") == {percent.id, other_percent.id}, "unescaped, % is a wildcard"
+    assert ids(f"Path {tag} A{bs}{bs}B") == {backslash.id}
+    assert ids(f"{bs}_{bs}_") == set(), "two escaped underscores match no name with two underscores in a row"

@@ -326,12 +326,13 @@
     /* The picker reads the product's canonical element search, the same index the
        composer and the other element pickers use. It used to read the layer-scoped
        listing, which filters ArchiMate rows by a CamelCase type list, so an element
-       stored as application_component (snake_case) was never returned. The limit is
-       the endpoint's own cap of 200: the list is name-ordered and the global search
-       returns a handful of the same rows, so a smaller limit could leave one of its
-       hits off the list. */
+       stored as application_component (snake_case) was never returned. The search
+       matches on the element's name, as the global search does. The list is
+       name-ordered and holds at most IMPACT_PICKER_LIMIT rows: any text that matches
+       that many elements or fewer lists every one of them; a text that matches more
+       lists the first ones by name and the page says so. */
     const IMPACT_PICKER_ENDPOINT = '/archimate/api/elements/search';
-    const IMPACT_PICKER_LIMIT = 200;
+    const IMPACT_PICKER_LIMIT = 50;
     const IMPACT_LAYER_LABELS = {
         application: 'Application Layer',
         business: 'Business Layer',
@@ -440,9 +441,20 @@
                 return line;
             },
 
+            /* "1 match in the Technology Layer". When the search that produced the
+               counts stopped at the limit, the counts are a floor, not a total. */
             matchLabel(entry) {
-                const n = entry.count + (entry.capped ? '+' : '');
-                return n + (entry.count === 1 && !entry.capped ? ' match in the ' : ' matches in the ') + entry.label;
+                const noun = entry.count === 1 ? ' match in the ' : ' matches in the ';
+                if (entry.capped) {
+                    return (entry.first ? 'At least ' : 'at least ') + entry.count + noun + entry.label;
+                }
+                return entry.count + noun + entry.label;
+            },
+
+            /* The search matches text literally: % and _ are wildcards to the database
+               and a backslash is its escape character, so each is escaped. */
+            literalText(text) {
+                return String(text).replace(/[\\%_]/g, '\\$&');
             },
 
             clearFeedback() {
@@ -452,20 +464,33 @@
                 this.otherLayers = [];
             },
 
+            /* A chosen element that the layer now in the select excludes is dropped, with
+               the report that described it, so the screen and the Analyze button agree. */
+            dropSelectionOutsideLayer() {
+                const layer = LAYER_MAP[this.selectedType] || '';
+                if (!layer || !this.selectedElement || this.loading) return;
+                if (this.layerKey(this.selectedElement.layer) === layer) return;
+                this.selectedElement = null;
+                this.analysisResult = null;
+                this.analysisError = null;
+            },
+
             layerChanged() {
-                /* The layer narrows the search; it does not discard what was typed or chosen. */
+                /* The layer narrows the search; it does not discard what was typed. */
+                this.dropSelectionOutsideLayer();
                 this.searchElements();
             },
 
             showLayer(entry) {
                 if (!entry || !entry.selectValue) return;
                 this.selectedType = entry.selectValue;
+                this.dropSelectionOutsideLayer();
                 this.searchElements();
             },
 
             async fetchElements(text, layer) {
                 /* layer is sent only when the persona chose one, and only ever narrows the result. */
-                const params = { q: text, limit: IMPACT_PICKER_LIMIT };
+                const params = { q: this.literalText(text), limit: IMPACT_PICKER_LIMIT };
                 if (layer) params.layer = layer;
                 const payload = await Platform.fetch.get(IMPACT_PICKER_ENDPOINT, params, { silent: true });
                 if (!payload || !Array.isArray(payload.data)) {
@@ -522,7 +547,7 @@
                         return { key: key, count: counts[key], capped: capped, label: key ? self.layerLabel(key) : 'unassigned layer',
                                  selectValue: self.layerOption(key), lead: '' };
                     }).sort(function (a, b) { return b.count - a.count || a.label.localeCompare(b.label); });
-                    elsewhere.forEach(function (entry, i) { entry.lead = i > 0 ? ', ' : ''; });
+                    elsewhere.forEach(function (entry, i) { entry.lead = i > 0 ? ', ' : ''; entry.first = i === 0; });
                 }
                 this.otherLayers = elsewhere;
                 this.emptyMessage = "No elements match '" + text + "' " +
@@ -545,7 +570,7 @@
                 try {
                     const raw = await Platform.fetch.post('/strategic/api/impact-analysis', {
                         element_id: this.selectedElement.id,
-                        element_type: this.layerOption(this.selectedElement.layer),
+                        element_type: this.selectedType,
                         change_type: this.changeType
                     });
 
