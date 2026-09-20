@@ -130,7 +130,7 @@ AUDIT = [
     ("cto", "/dashboard/overview"),
     ("enterprise_architect", "/ai-chat"),
     # Ask and Twin map join the list at zero accepted violations. They are never
-    # baselined: a finding on either is fixed, not recorded. Their states with data
+    # baselined: a violation on either is fixed, not recorded. Their states with data
     # and with the provenance drawer open are audited separately, below.
     ("solution_architect", "/intelligence/ask"),
     ("enterprise_architect", "/intelligence/twin-map"),

@@ -298,7 +298,7 @@ def test_unreadable_counts_never_read_as_an_empty_workspace(
 # --- what a person reads ----------------------------------------------------
 
 # Page copy is written for the people who use the page. It carries no status
-# label (an upper-case tag such as a review stamp) and no placeholder wording.
+# label (an upper-case tag such as a status stamp) and no placeholder wording.
 STATUS_LABELS = re.compile(r"\b(?:VERIFIED|UNVERIFIED|TBC|TODO)\b|(?i:to be confirmed)")
 # ...and nothing that reads as a file, a path, a hash or a tracker id.
 FORBIDDEN_SHAPES = re.compile(
