@@ -60,9 +60,9 @@ class _StubApp:
 
 
 def test_register_mounts_exactly_the_api_and_ui_blueprints():
-    """T-003 (brief item 14, NFR-8): the API blueprint carries every route under
-    ``/api/v1/intelligence``; the only other blueprint is the UI one, which
-    serves the two pages under ``/intelligence`` and no route under ``/api/``.
+    """The API blueprint carries every route under ``/api/v1/intelligence``; the
+    only other blueprint is the UI one, which serves the two pages under
+    ``/intelligence`` and no route under ``/api/``.
 
     T-004 added a third route (API-1, US-1 impact) to this SAME blueprint --
     see docs/buckets/t004-us1-impact-endpoint/tasks/00-verification-notes.md
