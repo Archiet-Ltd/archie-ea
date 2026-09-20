@@ -22,6 +22,8 @@ import uuid
 
 import pytest
 
+from playwright.sync_api import expect
+
 from .conftest import PAGE_TIMEOUT, PASSWORD
 from .intelligence_graph import seed_impact_graph
 
@@ -166,6 +168,26 @@ def _open_twin_map(page, base, element_id=None):
     _ready(page, "twinMapSurface")
 
 
+def _wait_for_map(page):
+    """The map is drawn: its connections exist (a perfectly vertical line has no width, so
+    it is attached rather than "visible" to the browser) and its elements can be seen."""
+    page.wait_for_selector("svg .intel-edge", state="attached")
+    page.wait_for_selector("[data-graph-nodes] button", state="visible")
+
+
+def _settled(page, selector):
+    """The element has slid fully into the window: its right edge is inside the viewport."""
+    page.wait_for_function(
+        """(sel) => {
+            const el = document.querySelector(sel);
+            if (!el) return false;
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.left >= 0 && r.right <= innerWidth + 0.5;
+        }""",
+        arg=selector,
+    )
+
+
 def _dismiss_first_run(page):
     try:
         page.eval_on_selector_all("[x-show='showOnboarding']", "els => els.forEach(e => e.remove())")
@@ -275,10 +297,10 @@ def test_a_first_time_user_gets_an_answer_from_a_typed_noun_and_can_ask_why(
 
     # Full detail is collapsed, opens in place, and holds the technical terms.
     toggle = dialog.locator("[data-full-detail-toggle]")
-    assert toggle.get_attribute("aria-expanded") == "false"
+    expect(toggle).to_have_attribute("aria-expanded", "false")
     url_before = page.url
     toggle.click()
-    assert toggle.get_attribute("aria-expanded") == "true"
+    expect(toggle).to_have_attribute("aria-expanded", "true")
     assert page.url == url_before
     assert len(page.context.pages) == 1
     detail = dialog.locator("[data-full-detail-region]")
@@ -294,12 +316,12 @@ def test_a_first_time_user_gets_an_answer_from_a_typed_noun_and_can_ask_why(
     _row_for(page, names["gateway"], "explicit").get_by_role("link", name="View on twin map").click()
     page.wait_for_url(re.compile(r"/intelligence/twin-map\?element=%s$" % graph["gateway"]))
     _ready(page, "twinMapSurface")
-    page.wait_for_selector("svg .intel-edge")
+    _wait_for_map(page)
     assert page.locator("[data-map-row]").count() >= 1
 
     # The map centred on the Service, then hop depth and the worked-out toggle.
     _open_twin_map(page, live_server, graph["service"])
-    page.wait_for_selector("svg .intel-edge")
+    _wait_for_map(page)
     assert page.locator("svg path[data-kind=derived]").count() == 1
     assert page.locator("svg path[data-kind=explicit]").count() == 3
     assert page.locator("[data-map-row]").count() == 4
@@ -339,7 +361,7 @@ def test_the_derived_edge_is_dashed_and_badged_and_explicit_edges_are_solid(
         assert solid.nth(index).get_attribute("stroke-dasharray") is None
     badges = page.locator("svg g.intel-badge")
     assert badges.count() == 1
-    assert badges.locator("text").inner_text() == "Worked out"
+    assert badges.locator("text").text_content() == "Worked out"
     # No colour of its own: every fill and stroke comes from a token class.
     assert page.locator("svg [style*='#'], svg [fill^='#'], svg [stroke^='#']").count() == 0
 
@@ -436,7 +458,7 @@ def test_the_picker_is_an_aria_combobox_and_works_from_the_keyboard(
     box = page.locator("#ask-picker-input")
     assert box.get_attribute("role") == "combobox"
     assert box.get_attribute("aria-autocomplete") == "list"
-    assert box.get_attribute("aria-expanded") == "false"
+    expect(box).to_have_attribute("aria-expanded", "false")
     listbox_id = box.get_attribute("aria-controls")
     listbox = page.locator("#" + listbox_id)
     assert listbox.get_attribute("role") == "listbox"
@@ -445,7 +467,7 @@ def test_the_picker_is_an_aria_combobox_and_works_from_the_keyboard(
 
     box.press_sequentially(graph["noun"], delay=15)
     page.wait_for_selector("#%s [role=option]" % listbox_id)
-    assert box.get_attribute("aria-expanded") == "true"
+    expect(box).to_have_attribute("aria-expanded", "true")
     options = listbox.locator("[role=option]")
     assert options.count() == 4
     ids = [options.nth(i).get_attribute("id") for i in range(4)]
@@ -474,17 +496,17 @@ def test_the_picker_is_an_aria_combobox_and_works_from_the_keyboard(
     assert options.nth(0).get_attribute("aria-selected") == "true"
 
     page.keyboard.press("Escape")
-    assert box.get_attribute("aria-expanded") == "false"
-    assert not listbox.is_visible()
+    expect(box).to_have_attribute("aria-expanded", "false")
+    expect(listbox).to_be_hidden()
     assert box.input_value() == graph["noun"]
     assert _focus_is_on(page, box)
 
     # Enter on the active option chooses it.
     page.keyboard.press("ArrowDown")
-    assert box.get_attribute("aria-expanded") == "true"
+    expect(box).to_have_attribute("aria-expanded", "true")
     page.keyboard.press("Enter")
     page.wait_for_selector("[data-ask-row]")
-    assert box.get_attribute("aria-expanded") == "false"
+    expect(box).to_have_attribute("aria-expanded", "false")
 
 
 # --- the whole journey by keyboard alone ---------------------------
@@ -507,7 +529,7 @@ def test_the_whole_journey_by_keyboard_alone(page, live_server, seeded, graph):
     page.keyboard.press("Enter")
     _tab_until(page, lambda s: s["id"] == "ask-question-impact", "the question")
     page.keyboard.press("Enter")
-    assert _focus(page)["id"] == "ask-picker-input"
+    page.wait_for_function("document.activeElement.id === 'ask-picker-input'")
     _assert_focus_is_visible(_focus(page), "the picker")
 
     page.keyboard.type(graph["noun"], delay=25)
@@ -539,7 +561,7 @@ def test_the_whole_journey_by_keyboard_alone(page, live_server, seeded, graph):
     # Escape closes it and focus is back on the exact control that opened it.
     page.keyboard.press("Escape")
     page.locator("#drawer-provenance [role=dialog]").wait_for(state="hidden")
-    assert page.evaluate("document.activeElement === window.__opener")
+    page.wait_for_function("document.activeElement === window.__opener")
     _assert_focus_is_visible(_focus(page), "the opener after closing the drawer")
 
     # On to the Twin map through the row's link.
@@ -547,7 +569,7 @@ def test_the_whole_journey_by_keyboard_alone(page, live_server, seeded, graph):
     page.keyboard.press("Enter")
     page.wait_for_url(re.compile(r"/intelligence/twin-map\?element=\d+$"))
     _ready(page, "twinMapSurface")
-    page.wait_for_selector("svg .intel-edge")
+    _wait_for_map(page)
 
     # Hop depth: arrows, Home and End, no pointer.
     _tab_until(page, lambda s: s["id"] == "twin-hop-depth", "the hop depth control")
@@ -610,7 +632,7 @@ def test_every_control_is_at_least_24_by_24_css_pixels(page, live_server, seeded
     page.keyboard.press("Escape")
 
     _open_twin_map(page, live_server, graph["service"])
-    page.wait_for_selector("svg .intel-edge")
+    _wait_for_map(page)
     measurements["Hop depth slider"] = _measure(page.locator("#twin-hop-depth"))
     measurements["Worked-out toggle"] = _measure(page.locator("#twin-show-derived"))
     measurements["Details (rail)"] = _measure(page.locator("#twin-rail-toggle"))
@@ -636,7 +658,7 @@ def test_the_hop_depth_slider_works_without_dragging(page, live_server, seeded, 
     value is announced politely."""
     _login(page, live_server, seeded["emails"]["solution_architect"])
     _open_twin_map(page, live_server, graph["service"])
-    page.wait_for_selector("svg .intel-edge")
+    _wait_for_map(page)
     slider = page.get_by_role("slider", name="Hop depth")
     assert slider.count() == 1
     assert page.locator("#twin-hop-depth").evaluate("el => el.tagName + el.type") == "INPUTrange"
@@ -671,12 +693,15 @@ def test_the_hop_depth_slider_works_without_dragging(page, live_server, seeded, 
 
 
 def _uncovered(page, locator):
-    """The focused control is what sits at its own centre, so nothing covers it."""
+    """The focused control is what sits at its own centre, so nothing covers it.
+    Returns True, or a description of what is on top instead."""
     return page.evaluate(
         """(el) => {
             const r = el.getBoundingClientRect();
             const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-            return !!top && (top === el || el.contains(top) || top.contains(el));
+            if (!!top && (top === el || el.contains(top) || top.contains(el))) return true;
+            return "covered by " + (top ? top.tagName + "." + String(top.className && top.className.baseVal !== undefined ? top.className.baseVal : top.className).slice(0, 80) : "nothing")
+              + " at " + [r.left, r.top, r.width, r.height].map(Math.round).join(",") + " for " + el.tagName + ":" + (el.innerText || el.id || "").slice(0, 30);
         }""",
         locator.element_handle(),
     )
@@ -698,17 +723,18 @@ def test_focus_is_never_obscured_by_the_drawer_or_the_side_panel(
     dialog = page.locator("#drawer-provenance [role=dialog]")
     dialog.wait_for(state="visible")
     page.wait_for_function("!!document.activeElement.closest('#drawer-provenance [role=dialog]')")
+    _settled(page, "#drawer-provenance [role=dialog]")
     for _ in range(6):
         state = _focus(page)
         assert state["inDialog"], "focus left the open drawer: %r" % state
-        assert _uncovered(page, page.locator(":focus"))
+        assert _uncovered(page, page.locator(":focus")) is True
         page.keyboard.press("Tab")
     page.keyboard.press("Escape")
     dialog.wait_for(state="hidden")
 
     _open_twin_map(page, live_server, graph["service"])
-    page.wait_for_selector("svg .intel-edge")
-    assert page.locator("#twin-rail").is_visible()
+    _wait_for_map(page)
+    expect(page.locator("#twin-rail")).to_be_visible()
     canvas = _measure(page.locator("[data-twin-canvas]"))
     assert canvas["width"] >= 600, "the map is narrower than 600 CSS pixels: %r" % canvas
 
@@ -717,22 +743,22 @@ def test_focus_is_never_obscured_by_the_drawer_or_the_side_panel(
     last_id = last.get_attribute("data-node")
     reached = _tab_until(page, lambda s: s["node"] == last_id, "the last map element")
     assert reached["ring"] and reached["inViewport"]
-    assert _uncovered(page, last)
+    assert _uncovered(page, last) is True
 
     # Choose it, then close the side panel with Escape from that element.
     page.keyboard.press("Enter")
-    assert last.get_attribute("aria-pressed") == "true"
+    expect(last).to_have_attribute("aria-pressed", "true")
     page.keyboard.press("Escape")
-    assert not page.locator("#twin-rail").is_visible()
+    expect(page.locator("#twin-rail")).to_be_hidden()
     assert _focus(page)["node"] == last_id
-    assert last.get_attribute("aria-pressed") == "true"
+    expect(last).to_have_attribute("aria-pressed", "true")
     assert page.locator("button[data-node][aria-pressed=true]").count() == 1
 
     # And back again with the Details control: the selection is where it was.
     page.locator("#twin-rail-toggle").focus()
     page.keyboard.press("Enter")
-    assert page.locator("#twin-rail").is_visible()
-    assert last.get_attribute("aria-pressed") == "true"
+    expect(page.locator("#twin-rail")).to_be_visible()
+    expect(last).to_have_attribute("aria-pressed", "true")
 
 
 # --- the drawer is named, escapable, and gives focus back -------------
@@ -761,18 +787,18 @@ def test_the_drawer_is_named_by_the_element_and_kind_and_returns_focus(
     assert page.locator("#drawer-provenance [role=dialog]").get_attribute("aria-labelledby") == "drawer-title-provenance"
     assert page.locator("#drawer-provenance [role=dialog]").get_attribute("aria-modal") == "true"
     # An explicit connection carries no sentence, and none is invented.
-    assert page.locator("#drawer-provenance [data-plain-terms]").is_visible() is False
+    expect(page.locator("#drawer-provenance [data-plain-terms]")).to_be_hidden()
 
     page.keyboard.press("Escape")
     page.locator("#drawer-provenance [role=dialog]").wait_for(state="hidden")
-    assert page.evaluate("(el) => document.activeElement === el", opener.element_handle())
+    page.wait_for_function("(el) => document.activeElement === el", arg=opener.element_handle())
 
     # The same drawer for a worked-out connection, named the same way.
     derived = _row_for(page, graph["names"]["ops"], "derived")
     derived.get_by_role("button", name="Why?").click()
     named = page.get_by_role("dialog", name=re.compile(re.escape(graph["names"]["ops"])))
     named.wait_for(state="visible")
-    assert page.locator("#drawer-provenance [data-plain-terms]").is_visible()
+    expect(page.locator("#drawer-provenance [data-plain-terms]")).to_be_visible()
 
 
 # --- the map has a real text equivalent -----------------------------
@@ -795,13 +821,13 @@ def test_the_map_table_lists_every_edge_the_graph_draws_and_no_others(
     picture, and moves with the hop depth and the worked-out toggle."""
     _login(page, live_server, seeded["emails"]["solution_architect"])
     _open_twin_map(page, live_server, graph["service"])
-    page.wait_for_selector("svg .intel-edge")
+    _wait_for_map(page)
     names = graph["names"]
 
     # No control anywhere on the page swaps the picture for the table.
     assert page.get_by_role("button", name=re.compile(r"table|list|text", re.I)).count() == 0
     table = page.locator("table[data-map-table]")
-    assert table.is_visible()
+    expect(table).to_be_visible()
     payload = _impact_api(page, live_server, graph["service"])
     assert len(payload["rows"]) == 4
     assert page.locator("[data-map-row]").count() == 4
@@ -906,7 +932,7 @@ def test_technical_detail_appears_only_inside_full_detail(page, live_server, see
     assert page.evaluate(LEVEL_THREE, technical) == []
     _row_for(page, graph["names"]["ops"], "derived").locator("[data-full-detail-toggle]").click()
     region = _row_for(page, graph["names"]["ops"], "derived").locator("[data-full-detail-region]")
-    assert region.is_visible()
+    expect(region).to_be_visible()
     inside = region.inner_text()
     for value in ("BusinessActor", "serving-through-serving", "0.82", "1.0", "business"):
         assert value in inside
@@ -915,7 +941,7 @@ def test_technical_detail_appears_only_inside_full_detail(page, live_server, see
 
     # Same on the map, with the drawer open as well.
     _open_twin_map(page, live_server, graph["service"])
-    page.wait_for_selector("svg .intel-edge")
+    _wait_for_map(page)
     assert page.evaluate(LEVEL_THREE, technical) == []
     page.locator("[data-map-row][data-kind=derived]").get_by_role("button", name="Why?").click()
     page.locator("#drawer-provenance [role=dialog]").wait_for(state="visible")
@@ -933,7 +959,7 @@ def test_an_empty_workspace_says_so_and_leads_to_setup(path, page, live_server, 
     page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     _dismiss_first_run(page)
     main = page.locator("main")
-    assert main.get_by_role("heading", name="Nothing is modelled yet").is_visible()
+    expect(main.get_by_role("heading", name="Nothing is modelled yet")).to_be_visible()
     assert "Add your systems and teams, and this is where you will ask questions about them." in main.inner_text()
     assert main.get_by_role("combobox").count() == 0
     text = main.inner_text()
@@ -986,15 +1012,15 @@ def test_missing_owner_missing_health_and_no_derivation_read_as_three_distinct_r
     health = row.get_by_label("Health: Not recorded yet")
     assert health.count() == 1 and "Not recorded yet" in health.inner_text()
     banner = page.get_by_text("We haven't worked out the indirect connections for your model yet.")
-    assert banner.is_visible()
-    assert page.get_by_role("button", name="Work them out now").is_visible()
+    expect(banner).to_be_visible()
+    expect(page.get_by_role("button", name="Work them out now")).to_be_visible()
     # No zero stands in for an absent value anywhere in the results.
     cells = page.eval_on_selector_all(
         "#ask-results *", "els => els.filter(e => e.children.length === 0)"
         ".map(e => e.textContent.trim()).filter(t => t === '0' || t === '0%')")
     assert cells == []
     # No badge on these pages is an icon on its own: each carries its words.
-    badges = page.locator("#ask-results span:has(> i[data-lucide]), #ask-results span:has(> svg)")
+    badges = page.locator("#ask-results span.rounded-md:has(> svg), #ask-results span.rounded-md:has(> i[data-lucide])")
     for index in range(badges.count()):
         badge = badges.nth(index)
         if badge.is_visible():
@@ -1008,7 +1034,7 @@ def test_not_computed_is_a_state_with_a_working_action(page, live_server, bare_t
     page.wait_for_selector("[data-ask-row]")
     sentence = "We haven't worked out the indirect connections for your model yet."
     banner = page.locator("[role=status]", has_text=sentence)
-    assert banner.is_visible()
+    expect(banner).to_be_visible()
     assert banner.inner_text().strip() != "0"
 
     with page.expect_request(
@@ -1033,7 +1059,7 @@ def test_a_recalculation_already_running_reads_as_a_plain_line(page, live_server
     page.get_by_role("button", name="Work them out now").click()
     line = page.get_by_text("A recalculation is already running. Try again shortly.")
     line.wait_for(state="visible")
-    assert page.get_by_text("We haven't worked out the indirect connections for your model yet.").is_visible()
+    expect(page.get_by_text("We haven't worked out the indirect connections for your model yet.")).to_be_visible()
     assert page.locator("[data-ask-row]").count() == 1
 
 
@@ -1052,7 +1078,7 @@ def test_the_results_are_busy_while_asking_and_errors_are_announced(
     page.route("**/api/v1/intelligence/impact/**", lambda route: held.append(route))
     _pick_by_click(page, "ask", graph["names"]["service"])
     page.wait_for_function("document.querySelector('#ask-results').getAttribute('aria-busy') === 'true'")
-    assert page.get_by_text("Tracing the impact chain…").first.is_visible()
+    expect(page.get_by_text("Tracing the impact chain…").first).to_be_visible()
     assert page.locator("#ask-results [role=status]").count() >= 1
     held[0].continue_()
     page.wait_for_selector("[data-ask-row]")
@@ -1130,7 +1156,7 @@ def test_a_row_the_answer_cannot_name_shows_the_absence_and_no_invented_sentence
     dialog = page.locator("#drawer-provenance [role=dialog]")
     dialog.wait_for(state="visible")
     assert dialog.locator("[data-plain-terms]").count() == 1
-    assert not dialog.locator("[data-plain-terms]").is_visible()
+    expect(dialog.locator("[data-plain-terms]")).to_be_hidden()
     assert "We worked this out because" not in dialog.inner_text()
-    assert dialog.get_by_text("Not recorded").first.is_visible()
+    expect(dialog.get_by_text("Not recorded").first).to_be_visible()
     assert "Last worked out" in dialog.inner_text()
