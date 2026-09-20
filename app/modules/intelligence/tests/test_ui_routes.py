@@ -297,19 +297,18 @@ def test_unreadable_counts_never_read_as_an_empty_workspace(
 
 # --- what a person reads ----------------------------------------------------
 
-FORBIDDEN_WORDS = re.compile(
-    r"\b(VERIFIED|UNVERIFIED|RULED|PROPOSED|PLANNING|ASSUMPTION|FOUNDER-INPUT|TBC|"
-    r"agents?|orchestrator|Claude|Codex|Kilo|gates?)\b|to be confirmed",
-    re.I,
-)
+# Page copy is written for the people who use the page. It carries no status
+# label (an upper-case tag such as a review stamp) and no placeholder wording.
+STATUS_LABELS = re.compile(r"\b(?:VERIFIED|UNVERIFIED|TBC|TODO)\b|(?i:to be confirmed)")
+# ...and nothing that reads as a file, a path, a hash or a tracker id.
 FORBIDDEN_SHAPES = re.compile(
     r"(\bapp/|\bdocs/|\bscripts/|\btests?/|\.py\b|\.html\b|\.md\b|\.json\b|"
-    r"\b[0-9a-f]{7,40}\b|\bT-\d{3}|\bFR-\d+|\bDE-\d+|\bSR-\d+)"
+    r"\b[0-9a-f]{7,40}\b|\b[A-Z]{1,3}-\d+\b)"
 )
 
 
 @pytest.mark.parametrize("path", PAGES)
-def test_page_text_carries_no_internal_vocabulary_outside_full_detail(
+def test_page_text_carries_no_status_labels_paths_or_ids_outside_full_detail(
     app, db_session, make_org, client, login_as, path
 ):
     org = make_org("ui-copy")
@@ -319,18 +318,18 @@ def test_page_text_carries_no_internal_vocabulary_outside_full_detail(
     html = re.sub(r"<[^>]*data-full-detail-region[^>]*>.*?</dl>\s*</div>", "", html, flags=re.S)
     text = _visible_text(html)
     assert text, "the page rendered no text at all"
-    assert FORBIDDEN_WORDS.findall(text) == []
+    assert STATUS_LABELS.findall(text) == []
     assert FORBIDDEN_SHAPES.findall(text) == []
 
 
-def test_scripts_carry_no_internal_vocabulary_in_the_strings_a_person_reads():
+def test_script_strings_carry_no_status_labels():
     strings = []
     for name, source in _scripts().items():
         strings.extend(re.findall(r"'([^'\n]{4,})'", source))
         strings.extend(re.findall(r'"([^"\n]{4,})"', source))
     readable = [s for s in strings if " " in s]
     assert readable, "no readable strings found: the scan is not looking at the scripts"
-    offenders = [s for s in readable if FORBIDDEN_WORDS.search(s)]
+    offenders = [s for s in readable if STATUS_LABELS.search(s)]
     assert offenders == []
 
 

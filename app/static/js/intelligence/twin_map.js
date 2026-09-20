@@ -111,7 +111,11 @@ function twinMapSurface() {
             this.remember(elementId);
 
             var self = this;
-            this.$nextTick(function () {
+            // A microtask, queued after the one Alpine uses to update the table:
+            // both land in the same task, so nothing can observe the table and
+            // the drawing showing different connections. Alpine's own next-tick
+            // waits a whole task, which left a gap between the two.
+            queueMicrotask(function () {
                 self.ensureDrawing();
                 if (controller && self.hasGraph) {
                     controller.render(self.model, self.selectedId, self.pathFor(self.selectedId));

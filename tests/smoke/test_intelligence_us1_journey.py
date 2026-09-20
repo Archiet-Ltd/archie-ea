@@ -230,7 +230,7 @@ def _ask_about(page, base, graph):
     """The whole first half of the journey with the mouse: sidebar, card, typing, choosing."""
     page.goto(base + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     _dismiss_first_run(page)
-    page.get_by_role("link", name="Ask a question").click()
+    page.get_by_test_id("sidebar").get_by_role("link", name="Ask a question").click()
     page.wait_for_url(re.compile(r"/intelligence/ask$"))
     _ready(page, "askSurface")
     page.locator("#ask-question-impact").click()
@@ -330,16 +330,16 @@ def test_a_first_time_user_gets_an_answer_from_a_typed_noun_and_can_ask_why(
     slider.focus()
     with page.expect_request(lambda r: "max_depth=1" in r.url and "/impact/" in r.url):
         page.keyboard.press("Home")
-    page.wait_for_function("document.querySelectorAll('[data-map-row]').length === 2")
+    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 2")
     assert page.locator("svg path[data-kind=derived]").count() == 0
     with page.expect_request(lambda r: "max_depth=5" in r.url and "/impact/" in r.url):
         page.keyboard.press("End")
-    page.wait_for_function("document.querySelectorAll('[data-map-row]').length === 4")
+    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
 
     toggle_box = page.locator("#twin-show-derived")
     with page.expect_request(lambda r: "include_derived=false" in r.url and "/impact/" in r.url):
         toggle_box.uncheck()
-    page.wait_for_function("document.querySelectorAll('[data-map-row]').length === 3")
+    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 3")
     assert page.locator("svg path[data-kind=derived]").count() == 0
     with page.expect_request(lambda r: "include_derived=true" in r.url and "/impact/" in r.url):
         toggle_box.check()
@@ -529,7 +529,7 @@ def test_the_whole_journey_by_keyboard_alone(page, live_server, seeded, graph):
     page.keyboard.press("Enter")
     _tab_until(page, lambda s: s["id"] == "ask-question-impact", "the question")
     page.keyboard.press("Enter")
-    page.wait_for_function("document.activeElement.id === 'ask-picker-input'")
+    page.wait_for_function("() => document.activeElement.id === 'ask-picker-input'")
     _assert_focus_is_visible(_focus(page), "the picker")
 
     page.keyboard.type(graph["noun"], delay=25)
@@ -550,7 +550,7 @@ def test_the_whole_journey_by_keyboard_alone(page, live_server, seeded, graph):
     page.evaluate("window.__opener = document.activeElement")
     page.keyboard.press("Enter")
     page.locator("#drawer-provenance [role=dialog]").wait_for(state="visible")
-    page.wait_for_function("!!document.activeElement.closest('#drawer-provenance [role=dialog]')")
+    page.wait_for_function("() => !!document.activeElement.closest('#drawer-provenance [role=dialog]')")
     _assert_focus_is_visible(_focus(page), "the drawer")
 
     # Tab inside the drawer to Full detail and open it.
@@ -561,7 +561,7 @@ def test_the_whole_journey_by_keyboard_alone(page, live_server, seeded, graph):
     # Escape closes it and focus is back on the exact control that opened it.
     page.keyboard.press("Escape")
     page.locator("#drawer-provenance [role=dialog]").wait_for(state="hidden")
-    page.wait_for_function("document.activeElement === window.__opener")
+    page.wait_for_function("() => document.activeElement === window.__opener")
     _assert_focus_is_visible(_focus(page), "the opener after closing the drawer")
 
     # On to the Twin map through the row's link.
@@ -722,7 +722,7 @@ def test_focus_is_never_obscured_by_the_drawer_or_the_side_panel(
     _rows(page).first.get_by_role("button", name="Why?").click()
     dialog = page.locator("#drawer-provenance [role=dialog]")
     dialog.wait_for(state="visible")
-    page.wait_for_function("!!document.activeElement.closest('#drawer-provenance [role=dialog]')")
+    page.wait_for_function("() => !!document.activeElement.closest('#drawer-provenance [role=dialog]')")
     _settled(page, "#drawer-provenance [role=dialog]")
     for _ in range(6):
         state = _focus(page)
@@ -859,23 +859,23 @@ def test_the_map_table_lists_every_edge_the_graph_draws_and_no_others(
     page.locator("#twin-hop-depth").focus()
     with page.expect_request(lambda r: "max_depth=1" in r.url and "/impact/" in r.url):
         page.keyboard.press("Home")
-    page.wait_for_function("document.querySelectorAll('[data-map-row]').length === 2")
+    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 2")
     assert _drawn_edges(page) == _listed_edges(page) and len(_drawn_edges(page)) == 2
     assert page.locator("table[data-map-table] caption").inner_text() == (
         "Connections for %s: 3 things, 2 connections" % names["service"])
     with page.expect_request(lambda r: "max_depth=3" in r.url and "/impact/" in r.url):
         page.keyboard.press("ArrowRight")
         page.keyboard.press("ArrowRight")
-    page.wait_for_function("document.querySelectorAll('[data-map-row]').length === 4")
+    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
 
     # The worked-out toggle does the same.
     with page.expect_request(lambda r: "include_derived=false" in r.url and "/impact/" in r.url):
         page.locator("#twin-show-derived").uncheck()
-    page.wait_for_function("document.querySelectorAll('[data-map-row]').length === 3")
+    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 3")
     assert _drawn_edges(page) == _listed_edges(page) and len(_drawn_edges(page)) == 3
     assert page.locator("[data-map-row][data-kind=derived]").count() == 0
     page.locator("#twin-show-derived").check()
-    page.wait_for_function("document.querySelectorAll('[data-map-row]').length === 4")
+    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
 
     # Each row's Why? opens the same drawer.
     derived_row = page.locator("[data-map-row][data-kind=derived]")
@@ -892,8 +892,9 @@ def test_the_map_table_lists_every_edge_the_graph_draws_and_no_others(
         has=page.get_by_role("cell", name=names["gateway"], exact=True).nth(0)
     ).get_by_role("button", name="Centre on this").first.click()
     page.wait_for_function(
-        "document.querySelector('table[data-map-table] caption').textContent.startsWith('Connections for %s')"
-        % names["gateway"])
+        "(name) => document.querySelector('table[data-map-table] caption')"
+        ".textContent.startsWith('Connections for ' + name)",
+        arg=names["gateway"])
 
 
 # --- technical detail lives only inside Full detail -------------------
@@ -1077,7 +1078,7 @@ def test_the_results_are_busy_while_asking_and_errors_are_announced(
     held = []
     page.route("**/api/v1/intelligence/impact/**", lambda route: held.append(route))
     _pick_by_click(page, "ask", graph["names"]["service"])
-    page.wait_for_function("document.querySelector('#ask-results').getAttribute('aria-busy') === 'true'")
+    page.wait_for_function("() => document.querySelector('#ask-results').getAttribute('aria-busy') === 'true'")
     expect(page.get_by_text("Tracing the impact chain…").first).to_be_visible()
     assert page.locator("#ask-results [role=status]").count() >= 1
     held[0].continue_()
