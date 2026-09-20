@@ -1,0 +1,42 @@
+{# The element picker used by Ask and Twin map: one text input and nothing else.
+
+   An ARIA 1.2 combobox with a listbox popup. Focus stays on the input; the
+   highlighted option is tracked with aria-activedescendant. It searches the
+   element endpoint the rest of the product already uses, sends only what was
+   typed, and never asks for a layer, a type or a vocabulary term. It reads its
+   state and methods from the picker object of the page component around it. #}
+{% from 'components/provenance.html' import provenance_badge %}
+
+{% macro entity_picker(prefix) %}
+<div class="space-y-2">
+    <div class="relative">
+        <input type="text" id="{{ prefix }}-picker-input" x-ref="pickerInput"
+               role="combobox" aria-autocomplete="list"
+               aria-expanded="false" :aria-expanded="open ? 'true' : 'false'"
+               aria-controls="{{ prefix }}-picker-listbox"
+               :aria-activedescendant="activeId"
+               aria-label="Type a team, service or system name"
+               placeholder="Type a team, service or system name"
+               autocomplete="off" spellcheck="false"
+               x-model="term" @input="onInput()" @keydown="onKeydown($event)" @blur="close()"
+               class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+        <ul id="{{ prefix }}-picker-listbox" role="listbox" aria-label="Matching names"
+            x-show="open" x-cloak
+            class="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-border bg-popover py-1 text-popover-foreground shadow-md">
+            <template x-for="(option, index) in options" :key="option.id">
+                <li role="option" :id="optionId(option)"
+                    :aria-selected="index === activeIndex ? 'true' : 'false'"
+                    :class="index === activeIndex ? 'bg-accent text-accent-foreground' : ''"
+                    @mousedown.prevent @click="choose(option)"
+                    class="cursor-pointer px-3 py-2 text-sm">
+                    <span x-text="option.name"></span>
+                </li>
+            </template>
+        </ul>
+    </div>
+    <div class="flex min-h-6 items-center gap-2 text-sm text-muted-foreground">
+        <span x-show="searchFailed" x-cloak>{{ provenance_badge('unavailable') }}</span>
+        <p role="status" aria-live="polite" aria-atomic="true" x-text="statusText"></p>
+    </div>
+</div>
+{% endmacro %}

@@ -1,0 +1,40 @@
+{# The states an impact answer can be in besides "here are the rows": loading,
+   could not answer, nothing recorded, and derivation not yet worked out.
+
+   Ask and Twin map show the same four, so they are written once. The
+   empty_state and skeleton macros already carry role="status" (announced
+   without any help from here), so they are not wrapped in a second status
+   region. `loading_when` is the Alpine expression that shows the skeleton. #}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/provenance.html' import provenance_badge %}
+{% from 'components/skeleton.html' import skeleton_list %}
+
+{% macro impact_states(loading_when) %}
+<div x-show="{{ loading_when }}" x-cloak class="space-y-3">
+    <p class="text-sm text-muted-foreground">Tracing the impact chain…</p>
+    {{ skeleton_list(rows=4) }}
+</div>
+
+<div x-show="state === 'error'" x-cloak role="status" class="rounded-lg border border-border bg-card p-6">
+    <div class="flex flex-wrap items-center gap-3">
+        {{ provenance_badge('unavailable') }}
+        <p class="text-sm text-foreground">We could not answer that just now.</p>
+    </div>
+</div>
+
+<div x-show="state === 'empty'" x-cloak>
+    {{ empty_state(icon='search', title='Nothing is recorded as depending on this yet', description='We found no connections from this one. Nothing is missing — there is simply nothing recorded here yet.') }}
+</div>
+
+<div x-show="notComputed" x-cloak role="status" class="rounded-lg border border-border bg-muted/30 p-4">
+    <p class="text-sm text-foreground">We haven't worked out the indirect connections for your model yet.</p>
+    <div class="mt-3 flex flex-wrap items-center gap-3">
+        <button type="button" @click="recomputeNow()" :disabled="recomputing"
+                class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50">
+            Work them out now
+        </button>
+        <span x-show="recomputeFailed" x-cloak>{{ provenance_badge('unavailable') }}</span>
+        <p x-show="recomputeLine" x-cloak class="text-sm text-foreground" x-text="recomputeLine"></p>
+    </div>
+</div>
+{% endmacro %}

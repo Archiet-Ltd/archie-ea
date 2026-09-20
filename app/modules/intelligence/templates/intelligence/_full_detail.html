@@ -1,0 +1,93 @@
+{# "Full detail": the one place technical detail is disclosed.
+
+   Every surface that shows a connection -- an Ask row, the Twin map panel and
+   the provenance drawer -- reveals its technical detail through this single
+   control: collapsed until asked, in place, at the bottom right, never a page,
+   a tab or a second pattern. This macro is defined once and called from exactly
+   those three places.
+
+   `entry` names two Alpine expressions:
+     detail  the detail model of the row or panel (built in the browser from the
+             answer's own payload)
+     uid     a unique suffix for the region's id
+
+   The ArchiMate type, the layer, the rule, the raw confidence, the chain, the
+   depth, when it was worked out, the engine version and the derived record all
+   live in here and nowhere else on a page. #}
+{% from 'components/provenance.html' import provenance_badge %}
+
+{% macro full_detail(entry) %}
+<div class="mt-3 flex flex-col items-end" x-data="{ open: false }">
+    <button type="button" data-full-detail-toggle
+            class="inline-flex h-8 items-center gap-1 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            aria-expanded="false"
+            :aria-expanded="open ? 'true' : 'false'"
+            :aria-controls="'full-detail-' + {{ entry.uid }}"
+            @click="open = !open">
+        Full detail
+        <span class="inline-flex transition-transform" :class="open ? 'rotate-180' : ''"><i data-lucide="chevron-down" class="h-4 w-4" aria-hidden="true"></i></span>
+    </button>
+    <div :id="'full-detail-' + {{ entry.uid }}" data-full-detail-region x-show="open" x-cloak
+         class="mt-2 w-full rounded-md border border-border bg-muted/30 p-3">
+        <dl class="space-y-2 text-sm">
+            <div class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                <dt class="text-muted-foreground">ArchiMate type</dt>
+                <dd class="min-w-0 break-words text-foreground">
+                    <span x-show="{{ entry.detail }}.type" x-text="{{ entry.detail }}.type"></span>
+                    <span x-show="!{{ entry.detail }}.type">{{ provenance_badge('missing') }}</span>
+                </dd>
+            </div>
+            <div class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                <dt class="text-muted-foreground">Layer</dt>
+                <dd class="min-w-0 text-foreground">
+                    <span x-show="{{ entry.detail }}.layer"
+                          class="inline-flex items-center rounded-md border border-border bg-background px-2 py-0.5 text-xs font-medium"
+                          x-text="{{ entry.detail }}.layer"></span>
+                    <span x-show="!{{ entry.detail }}.layer">{{ provenance_badge('missing') }}</span>
+                </dd>
+            </div>
+            <div x-show="{{ entry.detail }}.depth != null" class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                <dt class="text-muted-foreground">Depth</dt>
+                <dd class="text-foreground" x-text="{{ entry.detail }}.depth"></dd>
+            </div>
+            <div x-show="{{ entry.detail }}.chain.length > 0" class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                <dt class="text-muted-foreground">Chain</dt>
+                <dd class="min-w-0 text-foreground">
+                    <ol class="flex flex-wrap items-center gap-x-1 gap-y-1" aria-label="Chain">
+                        <template x-for="(link, position) in {{ entry.detail }}.chain" :key="position">
+                            <li class="inline-flex items-center gap-1">
+                                <span x-show="position > 0" aria-hidden="true">&rarr;</span>
+                                <span x-show="link" x-text="link"></span>
+                                <span x-show="!link">{{ provenance_badge('missing') }}</span>
+                            </li>
+                        </template>
+                    </ol>
+                </dd>
+            </div>
+            <div x-show="{{ entry.detail }}.derived" class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                <dt class="text-muted-foreground">Rule</dt>
+                <dd class="min-w-0 break-words font-mono text-xs text-foreground" x-text="{{ entry.detail }}.ruleId"></dd>
+            </div>
+            <div x-show="{{ entry.detail }}.derived" class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                <dt class="text-muted-foreground">Confidence</dt>
+                <dd class="text-foreground">
+                    <span x-show="{{ entry.detail }}.confidence != null" x-text="{{ entry.detail }}.confidence"></span>
+                    <span x-show="{{ entry.detail }}.confidence == null">{{ provenance_badge('missing') }}</span>
+                </dd>
+            </div>
+            <div x-show="{{ entry.detail }}.derived" class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                <dt class="text-muted-foreground">Worked out at</dt>
+                <dd class="min-w-0 break-words text-foreground" x-text="{{ entry.detail }}.computedAt"></dd>
+            </div>
+            <div x-show="{{ entry.detail }}.derived" class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                <dt class="text-muted-foreground">Engine version</dt>
+                <dd class="min-w-0 break-words text-foreground" x-text="{{ entry.detail }}.engineVersion"></dd>
+            </div>
+            <div x-show="{{ entry.detail }}.derived" class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                <dt class="text-muted-foreground">Derived record</dt>
+                <dd class="text-foreground" x-text="{{ entry.detail }}.derivedId"></dd>
+            </div>
+        </dl>
+    </div>
+</div>
+{% endmacro %}

@@ -1,0 +1,56 @@
+{# Small pieces the Ask rows, the Twin map panel and the Twin map table share.
+   Each macro renders inside an Alpine x-for or x-show scope and takes the
+   Alpine expression it reads, never a value: the rows are built in the browser
+   from one answer, so the markup has to point at the row, not hold it. #}
+{% from 'components/provenance.html' import provenance_badge %}
+
+{# An element's name, or the absence treatment when the answer does not carry it.
+   Never a blank and never a bare id. #}
+{% macro element_name(name) %}
+<span x-show="{{ name }}" x-text="{{ name }}"></span>
+<span x-show="!{{ name }}">{{ provenance_badge('missing') }}</span>
+{% endmacro %}
+
+{# Owner, or the absence treatment. The group carries the accessible name, so a
+   screen reader hears "Owner: Not recorded" whichever way the cell reads. #}
+{% macro owner_field(name) %}
+<div role="group" class="flex items-center gap-1.5 text-sm" :aria-label="'Owner: ' + ({{ name }} || 'Not recorded')">
+    <span class="text-xs text-muted-foreground" aria-hidden="true">Owner</span>
+    <span x-show="{{ name }}" class="font-medium text-foreground" x-text="{{ name }}"></span>
+    <span x-show="!{{ name }}">{{ provenance_badge('missing') }}</span>
+</div>
+{% endmacro %}
+
+{# The impact answer carries no health or maturity signal for an element, so this
+   field reads "not recorded yet" -- never a word the data does not support. #}
+{% macro health_field() %}
+<div role="group" aria-label="Health: Not recorded yet" class="flex items-center gap-1.5 text-sm">
+    <span class="text-xs text-muted-foreground" aria-hidden="true">Health</span>
+    <span class="inline-flex items-center gap-1 text-muted-foreground">
+        <i data-lucide="circle-slash" class="h-3 w-3" aria-hidden="true"></i>Not recorded yet
+    </span>
+</div>
+{% endmacro %}
+
+{# The line under a connection nobody drew. It is text with an icon, never colour alone. #}
+{% macro derived_note(derived) %}
+<p x-show="{{ derived }}" x-cloak class="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+    <i data-lucide="waypoints" class="h-4 w-4" aria-hidden="true"></i>
+    We worked this out — nobody drew it directly.
+</p>
+{% endmacro %}
+
+{# Staleness rides a clock icon plus text, not colour. `line` is the sentence built
+   from the row's own timestamp, or null when the row is current. #}
+{% macro stale_line(line) %}
+<p x-show="{{ line }}" x-cloak class="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+    <span role="img" aria-label="Last worked out" class="inline-flex"><i data-lucide="clock" class="h-4 w-4" aria-hidden="true"></i></span>
+    <span x-text="{{ line }}"></span>
+</p>
+{% endmacro %}
+
+{# The one control that opens the provenance drawer. #}
+{% macro why_button(key) %}
+<button type="button" @click="openWhy({{ key }})"
+        class="inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Why?</button>
+{% endmacro %}

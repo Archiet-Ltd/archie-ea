@@ -1,0 +1,24 @@
+{# Shows the "nothing is modelled yet" state instead of the page body when the
+   workspace really is empty, and the body otherwise.
+
+   "Empty" is read from the per-tenant counts the shell already computes
+   (nav_counts) and nothing else. It is shown only when those counts are present
+   AND were computed: the counts processor answers a failure with all zeros, so
+   the route reports separately whether they could be read
+   (workspace_counts_available), and an unreadable count never reads as an empty
+   workspace. When the counts are absent the ordinary body is shown. #}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% macro workspace_gate(home_url) %}
+{% set counts = nav_counts if nav_counts is defined else none %}
+{% if counts is mapping
+      and workspace_counts_available is not sameas false
+      and ((counts.get('applications', 0) or 0)
+         + (counts.get('elements', 0) or 0)
+         + (counts.get('capabilities', 0) or 0)
+         + (counts.get('vendors', 0) or 0)) == 0 %}
+{{ empty_state(icon='layers', title='Nothing is modelled yet', description='Add your systems and teams, and this is where you will ask questions about them.', cta_text='Set up your workspace', cta_href=home_url) }}
+{% else %}
+{{ caller() }}
+{% endif %}
+{% endmacro %}

@@ -1,0 +1,41 @@
+{# The provenance drawer: the one place either page explains why a connection is
+   on the screen. Every "Why?" opens it and no surface builds an explanation of
+   its own.
+
+   It reads the `drawer` object of the page component it sits inside, which is
+   filled from the answer already on the page. The heading carries the element's
+   name and the kind badge together so the dialog is named; it is the drawer
+   component's own aria-labelledby target. #}
+{% from 'components/drawer.html' import drawer with context %}
+{% from 'components/provenance.html' import provenance_badge %}
+{% from 'components/skeleton.html' import skeleton_text %}
+{% from 'intelligence/_full_detail.html' import full_detail with context %}
+{% from 'intelligence/_parts.html' import stale_line with context %}
+
+{% macro provenance_drawer() %}
+{% set drawer_title %}<span class="inline-flex flex-wrap items-center gap-2"><span x-text="drawer.heading"></span><span x-show="drawer.kind === 'measured'" x-cloak>{{ provenance_badge('measured') }}</span><span x-show="drawer.kind === 'missing'" x-cloak>{{ provenance_badge('missing') }}</span><span x-show="drawer.kind === 'unavailable'" x-cloak>{{ provenance_badge('unavailable') }}</span></span>{% endset %}
+{% call drawer(id='provenance', title=drawer_title) %}
+<div class="space-y-4" data-provenance-body>
+    <div x-show="drawer.state === 'loading'" x-cloak>
+        {{ skeleton_text(lines=3) }}
+    </div>
+
+    <div x-show="drawer.state === 'unavailable'" x-cloak role="status">
+        <p class="text-sm text-foreground">We could not answer that just now.</p>
+    </div>
+
+    <div x-show="drawer.state === 'ready'" x-cloak class="space-y-4">
+        <section x-show="drawer.plainTerms" x-cloak aria-labelledby="drawer-plain-terms-heading">
+            <h3 id="drawer-plain-terms-heading" class="text-sm font-semibold text-foreground">In plain terms</h3>
+            <p class="mt-1 text-sm text-foreground" data-plain-terms x-text="drawer.plainTerms"></p>
+        </section>
+        {{ stale_line('drawer.staleLine') }}
+        <template x-for="token in [drawer.opened]" :key="token">
+            <div>
+                {{ full_detail({'detail': 'drawer.detail', 'uid': "'drawer'"}) }}
+            </div>
+        </template>
+    </div>
+</div>
+{% endcall %}
+{% endmacro %}

@@ -1,0 +1,85 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'intelligence/_workspace_gate.html' import workspace_gate with context %}
+{% from 'intelligence/_entity_picker.html' import entity_picker with context %}
+{% from 'intelligence/_impact_states.html' import impact_states with context %}
+{% from 'intelligence/_parts.html' import element_name, owner_field, health_field, derived_note, stale_line, why_button with context %}
+{% from 'intelligence/_full_detail.html' import full_detail with context %}
+{% from 'intelligence/_provenance_drawer.html' import provenance_drawer with context %}
+
+{% block title %}Ask{% endblock %}
+
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/drawer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/ask.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+{% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+{# Release 2 appends its questions here; only the impact question has an answer today. #}
+{% set questions = [
+    {'key': 'impact', 'before': 'What breaks if', 'blank': '___', 'after': 'fails or is under-resourced?'}
+] %}
+{% macro _ps_actions() %}
+<a href="{{ url_for('intelligence_ui.twin_map') }}"
+   class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+    <i data-lucide="network" class="mr-2 h-4 w-4" aria-hidden="true"></i>Twin map
+</a>
+{% endmacro %}
+<div class="p-6 space-y-6" x-data="askSurface()" data-twin-map-url="{{ url_for('intelligence_ui.twin_map') }}">
+    {{ page_shell(
+        title='Ask',
+        subtitle='Ask a plain business question about what you depend on and what could go wrong.',
+        breadcrumb=[('Home', home_url), ('Ask', none)],
+        actions_caller=_ps_actions
+    ) }}
+
+    {% call workspace_gate(home_url) %}
+    {% for question in questions %}
+    <section class="rounded-xl border border-border bg-card p-6" data-question="{{ question.key }}">
+        <button type="button" id="ask-question-{{ question.key }}"
+                class="flex w-full items-center justify-between gap-3 rounded-md text-left text-lg font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                aria-expanded="false" :aria-expanded="questionOpen ? 'true' : 'false'"
+                aria-controls="ask-question-panel-{{ question.key }}"
+                @click="toggleQuestion()">
+            <span>{{ question.before }} <span class="font-semibold tracking-widest text-primary underline">{{ question.blank }}</span> {{ question.after }}</span>
+            <span class="inline-flex shrink-0 transition-transform" :class="questionOpen ? 'rotate-180' : ''"><i data-lucide="chevron-down" class="h-5 w-5" aria-hidden="true"></i></span>
+        </button>
+        <div id="ask-question-panel-{{ question.key }}" x-show="questionOpen" x-cloak class="mt-4">
+            {{ entity_picker('ask') }}
+        </div>
+    </section>
+    {% endfor %}
+
+    <div id="ask-results" aria-busy="false" :aria-busy="busy ? 'true' : 'false'" x-show="state !== 'idle'" x-cloak class="space-y-4">
+        <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        {{ impact_states("state === 'loading'") }}
+        <ul class="space-y-3" x-show="state === 'ready'" x-cloak>
+            <template x-for="row in rows" :key="row.key">
+                <li class="rounded-lg border border-border bg-card p-4" data-ask-row>
+                    <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+                        <h3 class="min-w-0 break-words text-base font-semibold text-foreground">{{ element_name('row.name') }}</h3>
+                        <div class="flex flex-wrap items-center gap-x-6 gap-y-1">
+                            {{ health_field() }}
+                            {{ owner_field('row.ownerName') }}
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap items-center gap-3">
+                        {{ derived_note('row.derived') }}
+                        {{ why_button('row.key') }}
+                        <a :href="twinMapHref(row)"
+                           class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">View on twin map</a>
+                    </div>
+                    <div class="mt-2">{{ stale_line('row.staleLine') }}</div>
+                    {{ full_detail({'detail': 'row.detail', 'uid': 'row.key'}) }}
+                </li>
+            </template>
+        </ul>
+    </div>
+
+    {{ provenance_drawer() }}
+    {% endcall %}
+</div>
+{% endblock %}

@@ -1,12 +1,12 @@
 """Intelligence module (Four Intelligences extension) — DE-1..DE-18, sdd-v2.md AA-1.
 
-``register(app)`` is the one place later tasks attach their pieces: the API
-blueprint and the ORM invalidation hook (T-003), the UI blueprint (T-004).
+``register(app)`` is the one place this module attaches its pieces: the ORM
+invalidation hook and the API blueprint, then the UI blueprint that serves the
+Ask and Twin map pages.
 
-T-001 mounts nothing. Derivation Runner (DE-1) computes and returns a
-``DerivationResult`` but writes nothing, so there is no route, template or
-table for this module to register yet — sdd-v2.md OA-5: L0 ships before any
-query surface.
+The derivation runner itself mounts nothing: it computes and returns a
+``DerivationResult``. Everything a person can open lives in the two blueprints
+registered below.
 """
 
 from __future__ import annotations
@@ -15,10 +15,10 @@ from __future__ import annotations
 def register(app) -> None:
     """Register the intelligence module's blueprints and event hooks.
 
-    T-003 adds the ORM invalidation hook (DE-3) and the API blueprint
-    (DE-4, the recompute + provenance-expansion routes); T-004 adds the UI
-    blueprint. Both non-fatal: a failure here degrades this one feature, not
-    the whole app (CLAUDE.md "Blueprints register non-fatally").
+    The ORM invalidation hook (DE-3), the API blueprint (the recompute,
+    provenance-expansion, impact and yield routes) and the UI blueprint (the
+    Ask and Twin map pages) each register in their own ``try`` so that a
+    failure in one degrades that one feature, not the whole app.
     """
     try:
         from app.modules.intelligence.services.invalidation import (
@@ -38,6 +38,15 @@ def register(app) -> None:
     except Exception:
         app.logger.exception(
             "[MODULE] intelligence: API blueprint registration failed"
+        )
+
+    try:
+        from app.modules.intelligence.routes.ui import intelligence_ui
+
+        app.register_blueprint(intelligence_ui)
+    except Exception:
+        app.logger.exception(
+            "[MODULE] intelligence: UI blueprint registration failed"
         )
 
 
