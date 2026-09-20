@@ -67,6 +67,10 @@
                 <div class="text-sm text-muted-foreground">Not assessed</div>
             </div>
             <div class="text-3xl font-bold">{{ health_summary.unknown }}</div>
+            {% if health_summary.unknown > 0 %}
+            <a href="{{ url_for('my_applications.health_overview') }}#not-assessed"
+               class="mt-2 inline-block py-1 text-sm text-primary hover:underline">Record a health status</a>
+            {% endif %}
         </div>
     </div>
 

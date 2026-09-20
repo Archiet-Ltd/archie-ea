@@ -379,6 +379,157 @@ def test_the_dashboard_health_tiles_count_recorded_status_not_lifecycle(db_sessi
     assert tiles == [0, 0, 1, 2]
 
 
+RECORD_TILE_LINK = "Record a health status"
+RECORD_ROW_LINK = "Record health status"
+
+
+def _owned_with_health(db_session, org, manager, statuses):
+    """Own one application per entry of ``statuses`` (a recorded status, or None)."""
+    owned = []
+    for index, health in enumerate(statuses):
+        application = _make_app(db_session, org, f"Recorded {index}", "operational", health_status=health)
+        _own(db_session, org, manager, application, "primary")
+        owned.append(application)
+    return owned
+
+
+def _links_named(soup, text):
+    return [a for a in soup.find_all("a") if " ".join(a.get_text().split()) == text]
+
+
+def _health_intro(soup):
+    heading = soup.find("h2", string=lambda s: s and s.strip() == "Recorded health status")
+    return " ".join(heading.find_next("p").get_text().split())
+
+
+def test_the_dashboard_not_assessed_tile_offers_a_way_to_record_a_status(db_session, make_org, client, login_as):
+    org = make_org("own-numbers-tile-link")
+    manager = _make_user(db_session, org, "application_manager", "tilelink")
+    _owned_with_health(db_session, org, manager, ["healthy", None, None])
+
+    dash = _soup(_get(client, login_as, manager, "/my-applications/"))
+
+    links = _links_named(dash, RECORD_TILE_LINK)
+    assert len(links) == 1
+    assert links[0]["href"] == "/my-applications/health#not-assessed"
+    # It sits in the Not assessed tile, beside the number the existing readers use.
+    tile = dash.find("div", string=lambda s: s and s.strip() == "Not assessed").find_parent("div", class_="rounded-lg")
+    assert links[0] in tile.find_all("a")
+    assert _tile(dash, "Not assessed") == 2
+    assert [_tile(dash, label) for label in ("Healthy", "At Risk", "Critical")] == [1, 0, 0]
+    # The link reaches the group it names, and the group is on the page it points at.
+    health = _soup(_get(client, login_as, manager, "/my-applications/health"))
+    assert health.find(id="not-assessed") is not None
+
+
+def test_the_dashboard_has_no_record_link_when_everything_is_recorded_or_nothing_is_owned(
+    db_session, make_org, client, login_as
+):
+    org = make_org("own-numbers-no-tile-link")
+    manager = _make_user(db_session, org, "application_manager", "notilelink")
+    empty_manager = _make_user(db_session, org, "application_manager", "emptytilelink")
+    _owned_with_health(db_session, org, manager, ["healthy", "at_risk", "critical"])
+
+    dash = _soup(_get(client, login_as, manager, "/my-applications/"))
+    assert _tile(dash, "Not assessed") == 0
+    assert _links_named(dash, RECORD_TILE_LINK) == []
+
+    dash = _soup(_get(client, login_as, empty_manager, "/my-applications/"))
+    assert _tile(dash, "Total Apps") == 0
+    assert _links_named(dash, RECORD_TILE_LINK) == []
+
+
+def test_each_not_assessed_row_links_to_the_health_field_of_its_own_edit_form(
+    db_session, make_org, client, login_as
+):
+    org = make_org("own-numbers-row-links")
+    manager = _make_user(db_session, org, "application_manager", "rowlinks")
+    applications = _owned_with_health(db_session, org, manager, ["healthy", "at_risk", "critical", None, None])
+    unrecorded = applications[3:]
+
+    page = _soup(_get(client, login_as, manager, "/my-applications/health"))
+
+    group = page.find(id="not-assessed")
+    assert group is not None, "the Not assessed group has no anchor"
+    assert group.find("h2").get_text(strip=True) == "Not assessed (2)"
+    row_links = [a for a in group.find_all("a") if a.get("href", "").endswith("#health_status")]
+    assert [a["href"] for a in row_links] == [
+        f"/my-applications/app/{application.id}/edit#health_status" for application in unrecorded
+    ]
+    for link, application in zip(row_links, unrecorded):
+        # Visible text is the same on every row; the name only reaches assistive technology.
+        assert link.find(string=True, recursive=False).strip() == RECORD_ROW_LINK
+        assert "sr-only" in link.find("span")["class"]
+        assert " ".join(link.get_text().split()) == f"{RECORD_ROW_LINK} for {application.name}"
+    # The existing link on each row is still there.
+    assert len([a for a in group.find_all("a") if a.get_text(strip=True) == "View"]) == 2
+    # Nothing outside the Not assessed group offers it: three recorded rows, none has one.
+    assert len([a for a in page.find_all("a") if a.get("href", "").endswith("#health_status")]) == 2
+    # The group caption is unchanged.
+    assert "Applications with no health status recorded" in group.get_text()
+
+
+def test_the_health_page_says_how_many_are_recorded_and_how_to_record_the_rest(
+    db_session, make_org, client, login_as
+):
+    sentence_end = (
+        "To record a status, choose Record health status beside an application in the Not assessed list, "
+        "or generate a suggestion under AI health assessment and apply it in the edit form."
+    )
+    org = make_org("own-numbers-intro")
+    one = _make_user(db_session, org, "application_manager", "introone")
+    several = _make_user(db_session, org, "application_manager", "introseveral")
+    all_recorded = _make_user(db_session, org, "application_manager", "introrecorded")
+    nothing_owned = _make_user(db_session, org, "application_manager", "intronone")
+    _owned_with_health(db_session, org, one, [None])
+    _owned_with_health(db_session, org, several, ["healthy", None, None])
+    _owned_with_health(db_session, org, all_recorded, ["healthy", "critical"])
+
+    intro = _health_intro(_soup(_get(client, login_as, one, "/my-applications/health")))
+    assert f"Health status is recorded for 0 of your 1 application. {sentence_end}" in intro
+    # The existing sentences stay, and the new one is appended to them.
+    assert intro.startswith("Each application is counted under the health status recorded on it.")
+
+    intro = _health_intro(_soup(_get(client, login_as, several, "/my-applications/health")))
+    assert f"Health status is recorded for 1 of your 3 applications. {sentence_end}" in intro
+
+    for user in (all_recorded, nothing_owned):
+        page = _soup(_get(client, login_as, user, "/my-applications/health"))
+        assert "Health status is recorded for" not in " ".join(page.get_text().split())
+        assert page.find(id="not-assessed") is None
+        assert [a for a in page.find_all("a") if a.get("href", "").endswith("#health_status")] == []
+
+
+def test_the_record_link_opens_an_edit_form_whose_health_field_reads_not_assessed(
+    db_session, make_org, client, login_as
+):
+    org = make_org("own-numbers-edit-target")
+    manager = _make_user(db_session, org, "application_manager", "edittarget")
+    other = _make_user(db_session, org, "application_manager", "edittargetother")
+    unrecorded, recorded = _owned_with_health(db_session, org, manager, [None, "at_risk"])
+
+    health = _soup(_get(client, login_as, manager, "/my-applications/health"))
+    href = next(a["href"] for a in health.find(id="not-assessed").find_all("a") if a["href"].endswith("#health_status"))
+    assert href == f"/my-applications/app/{unrecorded.id}/edit#health_status"
+
+    response = _get(client, login_as, manager, href.split("#")[0])
+    assert response.status_code == 200
+    select = _soup(response).find("select", id="health_status")
+    assert select is not None, "the fragment has nothing to land on"
+    assert select.find("option", selected=True) is None
+    assert select.find("option")["value"] == ""
+    assert select.find("option").get_text(strip=True) == "Not assessed"
+
+    # An application that has a status opens with it chosen instead.
+    select = _soup(_get(client, login_as, manager, f"/my-applications/app/{recorded.id}/edit")).find(
+        "select", id="health_status"
+    )
+    assert select.find("option", selected=True)["value"] == "at_risk"
+
+    # Someone who does not own it is not offered the form.
+    assert _get(client, login_as, other, f"/my-applications/app/{unrecorded.id}/edit").status_code == 404
+
+
 def test_the_portfolio_banner_says_what_it_counts(db_session, make_org, client, login_as):
     """Named business owners with no assignment rows count, and the wording says why."""
     org = make_org("own-numbers-named")

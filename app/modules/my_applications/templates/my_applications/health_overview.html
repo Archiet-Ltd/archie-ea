@@ -25,6 +25,12 @@
         <p class="text-sm text-muted-foreground mt-1">
             Each application is counted under the health status recorded on it. Not assessed means no health
             status has been recorded on the application.
+            {% if health_summary.unknown > 0 %}
+            Health status is recorded for {{ health_summary.total - health_summary.unknown }} of your
+            {{ health_summary.total }} application{{ '' if health_summary.total == 1 else 's' }}. To record a status,
+            choose Record health status beside an application in the Not assessed list, or generate a suggestion
+            under AI health assessment and apply it in the edit form.
+            {% endif %}
         </p>
     </div>
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
@@ -288,7 +294,7 @@
 
         <!-- Not assessed Applications -->
         {% if unknown %}
-        <div class="bg-card border border-border rounded-lg overflow-hidden">
+        <div id="not-assessed" class="bg-card border border-border rounded-lg overflow-hidden">
             <div class="bg-muted/50 px-6 py-4 border-b border-border">
                 <div class="flex items-center gap-3">
                     <i data-lucide="help-circle" class="w-5 h-5 text-muted-foreground"></i>
@@ -315,6 +321,8 @@
                             </span>
                             <a href="{{ url_for('my_applications.app_detail', app_id=item.id) }}"
                                class="text-primary hover:underline text-sm">View</a>
+                            <a href="{{ url_for('my_applications.app_edit', app_id=item.id) }}#health_status"
+                               class="text-primary hover:underline text-sm">Record health status<span class="sr-only"> for {{ item.name }}</span></a>
                         </div>
                     </div>
                 </div>
