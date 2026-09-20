@@ -51,7 +51,7 @@
         {{ impact_states("state === 'loading' && !hasGraph") }}
 
         <section x-show="hasGraph" x-cloak class="space-y-4" aria-labelledby="twin-map-heading">
-            <h2 id="twin-map-heading" class="text-lg font-semibold text-foreground">Map</h2>
+            <h2 id="twin-map-heading" x-ref="mapHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Map</h2>
 
             <div class="flex flex-wrap items-center gap-x-8 gap-y-3">
                 <div class="flex items-center gap-3">
@@ -71,7 +71,7 @@
                         aria-expanded="true" :aria-expanded="railOpen ? 'true' : 'false'"
                         aria-controls="twin-rail" @click="toggleRail()"
                         class="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-                    <i data-lucide="panel-right" class="h-4 w-4" aria-hidden="true"></i>Details
+                    <i data-lucide="panel-right" class="h-4 w-4" aria-hidden="true"></i>Selected element
                 </button>
             </div>
             <div role="status" aria-live="polite" aria-atomic="true" class="sr-only" x-text="depthAnnouncement"></div>
@@ -82,7 +82,7 @@
                     <div data-graph-nodes class="absolute inset-0" @keydown.escape="closeRailFromNode()"></div>
                 </div>
 
-                <aside id="twin-rail" x-show="railOpen" x-cloak aria-label="Selected item"
+                <aside id="twin-rail" x-show="railOpen" x-cloak aria-label="Selected element"
                        class="min-w-0 space-y-4 self-start rounded-lg border border-border bg-card p-4">
                     <template x-if="panel">
                         <div class="space-y-3">

@@ -34,6 +34,9 @@ function twinMapSurface() {
         caption: '',
         depthAnnouncement: '',
         notComputed: false,
+        stale: false,
+        withheld: false,
+        staleNotice: '',
         recomputing: false,
         recomputeLine: '',
         recomputeFailed: false,
@@ -73,6 +76,8 @@ function twinMapSurface() {
             this.busy = true;
             this.state = 'loading';
             this.notComputed = false;
+            this.stale = false;
+            this.withheld = false;
             this.syncDrawer();
             var payload;
             try {
@@ -93,12 +98,17 @@ function twinMapSurface() {
 
             this.rows = Intelligence.buildRows(payload, elementId);
             this.model = Intelligence.buildGraph(this.rows, payload, elementId);
-            this.notComputed = (payload.summary || {}).derivation_state === 'not_computed' && this.rows.length > 0;
+            var answer = Intelligence.answerState(payload, this.rows, this.includeDerived);
+            this.notComputed = answer.notComputed;
+            this.stale = answer.stale;
+            this.withheld = answer.withheld;
+            this.staleNotice = answer.notice;
             var centreName = Intelligence.nameOf(payload.elements || {}, elementId);
             if (options && options.nameTheInput && centreName && !this.term) this.term = centreName;
-            this.caption = (centreName ? 'Connections for ' + centreName + ': ' : 'Connections: ') +
-                this.model.nodes.length + ' things, ' + this.model.edges.length + ' connections';
-            this.statusText = this.rows.length + ' results for ' + (this.term.trim() || centreName || '');
+            this.caption = Intelligence.captionText(
+                centreName, this.model.nodes.length, this.model.edges.length, answer.withheld);
+            this.statusText = Intelligence.connectionsText(
+                this.rows.length, centreName || this.term.trim(), answer.withheld);
 
             if (this.selectedId === null || !findNode(this.model, this.selectedId)) {
                 this.selectedId = elementId;
@@ -264,6 +274,7 @@ function twinMapSurface() {
             }
             this.recomputing = false;
             await this.load({});
+            Intelligence.keepPlace(this.$refs.mapHeading, this.stale || this.notComputed);
         }
     });
 }

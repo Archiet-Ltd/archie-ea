@@ -18,6 +18,9 @@ function askSurface() {
         centreId: null,
         rows: [],
         notComputed: false,
+        stale: false,
+        withheld: false,
+        staleNotice: '',
         twinMapUrl: '',
         recomputing: false,
         recomputeLine: '',
@@ -50,15 +53,21 @@ function askSurface() {
             this.busy = true;
             this.state = 'loading';
             this.notComputed = false;
+            this.stale = false;
+            this.withheld = false;
             this.syncDrawer();
             try {
                 var payload = await Intelligence.fetchImpact(elementId, { maxDepth: 3, includeDerived: true });
                 if (seq !== this._loadSeq) return;
-                var summary = payload.summary || {};
                 this.rows = Intelligence.buildRows(payload, elementId);
-                this.notComputed = summary.derivation_state === 'not_computed' && this.rows.length > 0;
+                var answer = Intelligence.answerState(payload, this.rows, true);
+                this.notComputed = answer.notComputed;
+                this.stale = answer.stale;
+                this.withheld = answer.withheld;
+                this.staleNotice = answer.notice;
                 this.state = this.rows.length ? 'ready' : 'empty';
-                this.statusText = this.rows.length + ' results for ' + this.term.trim();
+                var name = Intelligence.nameOf(payload.elements || {}, elementId) || this.term.trim();
+                this.statusText = Intelligence.connectionsText(this.rows.length, name, answer.withheld);
             } catch (err) {
                 if (seq !== this._loadSeq) return;
                 this.rows = [];
@@ -87,10 +96,7 @@ function askSurface() {
             }
             this.recomputing = false;
             await this.load(this.centreId);
-            var heading = this.$refs.resultsHeading;
-            if (heading && (!document.activeElement || document.activeElement === document.body)) {
-                heading.focus();
-            }
+            Intelligence.keepPlace(this.$refs.resultsHeading, this.stale || this.notComputed);
         }
     });
 }

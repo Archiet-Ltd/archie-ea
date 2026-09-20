@@ -491,7 +491,8 @@ def test_derived_edges_are_dashed_and_badged_and_explicit_edges_are_solid():
     graph = _scripts()["graph.js"]
     assert "var DASH = '5,5'" in graph
     assert re.search(r"stroke-dasharray.*d\.edge\.kind === 'derived' \? DASH : null", graph)
-    assert "'Worked out'" in graph
+    assert "Intelligence.WORKED_OUT" in graph
+    assert "var WORKED_OUT = 'Worked out';" in _code(_scripts()["core.js"])
 
 
 def test_the_map_text_is_written_with_text_never_html():
@@ -622,3 +623,76 @@ def test_the_accessibility_audit_this_work_extends_checks_wcag_22_and_fails_rath
     assert '("enterprise_architect", "/intelligence/twin-map")' in source
     baseline = (REPO_ROOT / "tests" / "smoke" / "a11y_baseline.json").read_text(encoding="utf-8")
     assert "/intelligence/" not in baseline
+
+
+# --- a model that has gone out of date; what a worked-out row is called ------------
+
+
+def test_worked_out_connections_are_asked_for_together_with_out_of_date_ones():
+    """Wherever the pages ask for worked-out connections they ask for the ones that
+    have gone out of date too; without that the answer leaves them out and only its
+    summary says so."""
+    core = _code(_scripts()["core.js"])
+    request = re.search(r"Platform\.fetch\.get\(IMPACT_URL \+ elementId, (\{.*?\})", core, re.S)
+    assert request, "the impact request was not found"
+    assert re.search(r"include_derived:\s*options\.includeDerived", request.group(1))
+    assert re.search(r"include_stale:\s*options\.includeDerived", request.group(1))
+    # Both pages go through that one request.
+    for name in ("ask.js", "twin_map.js"):
+        assert "Intelligence.fetchImpact(" in _code(_scripts()[name]), name
+
+
+def test_an_out_of_date_answer_gets_a_notice_that_is_text_and_a_clock_with_the_action():
+    states = _templates()["_impact_states.html"]
+    notice = re.search(r"<div x-show=\"stale\"[^>]*data-stale-notice.*?</div>\s*(?=\{% endmacro|<div|$)", states, re.S)
+    assert notice, "the out-of-date notice is missing"
+    assert 'role="status"' in notice.group(0)
+    assert 'data-lucide="clock"' in notice.group(0)
+    assert 'x-text="staleNotice"' in notice.group(0)
+    # The same action as the not-worked-out state, from one definition.
+    assert len(re.findall(r"\{\{ recompute_action\(\) \}\}", states)) == 2
+    assert len(re.findall(r"Work them out now", states)) == 1
+    for name in ("ask.js", "twin_map.js"):
+        source = _code(_scripts()[name])
+        assert "answerState(" in source and "this.stale = answer.stale" in source, name
+
+
+def test_the_row_kind_in_the_drawer_title_is_true_of_the_row_and_adds_no_badge_kind():
+    drawer = _code(_scripts()["drawer.js"])
+    assert re.search(r"drawer\.kind = row\.name === null \? 'missing' : \(row\.derived \? 'derived' : 'measured'\)", drawer)
+    title = _templates()["_provenance_drawer.html"]
+    assert re.search(r"drawer\.kind === 'derived'.*?data-lucide=\"waypoints\".*?>Worked out</span>", title, re.S)
+    # The title words for a worked-out row are plain markup; the provenance badge
+    # macro is only ever called with the four kinds it already has.
+    kinds = set()
+    for name, source in _templates().items():
+        kinds.update(re.findall(r"provenance_badge\('([a-z]+)'\)", source))
+    assert kinds <= {"measured", "missing", "unavailable"}, kinds
+    assert "provenance_badge('derived')" not in title
+
+
+def test_the_map_badge_and_table_say_when_a_worked_out_connection_may_be_out_of_date():
+    graph = _code(_scripts()["graph.js"])
+    assert "WORKED_OUT_STALE" in graph and "GLYPH_CLOCK" in graph
+    core = _code(_scripts()["core.js"])
+    assert "var WORKED_OUT_STALE = 'Worked out, may be out of date';" in core
+    table = _templates()["_map_table.html"]
+    assert "stale_clock('row.stale')" in table and 'x-text="row.kindLabel"' in table
+
+
+def test_the_status_region_reads_results_for_a_search_and_connections_for_a_choice():
+    core = _code(_scripts()["core.js"])
+    assert "' result' : ' results'" in core
+    assert "' connection' : ' connections'" in core
+    assert "resultsText(this.options.length, typed)" in _code(_scripts()["picker.js"])
+    for name in ("ask.js", "twin_map.js"):
+        source = _code(_scripts()[name])
+        assert "connectionsText(" in source, name
+        assert "results for" not in source, name
+
+
+def test_the_side_panel_control_is_named_for_the_panel():
+    twin = _templates()["twin_map.html"]
+    assert re.search(r'id="twin-rail-toggle".*?Selected element\s*</button>', twin, re.S)
+    assert 'aria-label="Selected element"' in twin
+    assert ">Details<" not in twin and "Details</button>" not in twin

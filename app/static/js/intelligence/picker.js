@@ -71,7 +71,7 @@
                 }
                 if (seq !== this._searchSeq) return;
                 this.options = found.slice(0, 10);
-                this.statusText = this.options.length + ' results for ' + typed;
+                this.statusText = global.Intelligence.resultsText(this.options.length, typed);
                 this.open = this.options.length > 0;
                 this.setActive(-1);
             },

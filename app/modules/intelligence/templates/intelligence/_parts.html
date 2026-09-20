@@ -49,6 +49,12 @@
 </p>
 {% endmacro %}
 
+{# The clock that marks a worked-out connection as possibly out of date. Icon and
+   accessible name only; the words sit beside it wherever it is used. #}
+{% macro stale_clock(stale) %}
+<span x-show="{{ stale }}" x-cloak role="img" aria-label="Last worked out" class="inline-flex shrink-0 align-middle"><i data-lucide="clock" class="h-4 w-4" aria-hidden="true"></i></span>
+{% endmacro %}
+
 {# The one control that opens the provenance drawer. #}
 {% macro why_button(key) %}
 <button type="button" @click="openWhy({{ key }})"

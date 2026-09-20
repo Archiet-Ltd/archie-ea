@@ -18,6 +18,12 @@
 
     var ERROR_LINE = 'We could not answer that just now.';
     var BUSY_LINE = 'A recalculation is already running. Try again shortly.';
+    var STALE_NOTICE = 'The connections we worked out may be out of date.';
+    var WITHHELD_NOTICE = 'Some connections we worked out are not shown because they may be out of date.';
+    var WITHHELD_SUFFIX = ', worked-out connections not shown';
+    var WORKED_OUT = 'Worked out';
+    var WORKED_OUT_STALE = 'Worked out, may be out of date';
+    var STALE_UNDATED = 'May be out of date.';
 
     /* The six bands of the map, top to bottom, keyed by the canonical layer
        value the impact answer carries. The plain word is what a person reads;
@@ -40,9 +46,14 @@
         });
     }
 
+    /* Wherever worked-out connections are asked for, connections that have gone
+       out of date are asked for too. Without that the answer leaves them out and
+       only says so in its summary, and the person would see fewer connections
+       with no way to know. */
     function fetchImpact(elementId, options) {
         return Platform.fetch.get(IMPACT_URL + elementId, {
             include_derived: options.includeDerived ? 'true' : 'false',
+            include_stale: options.includeDerived ? 'true' : 'false',
             max_depth: options.maxDepth,
             with_owner: 'true'
         }, { silent: true }).then(function (resp) {
@@ -75,6 +86,17 @@
         }
     }
 
+    /* After the notice that held the recalculation button is gone, put focus on
+       the page's own heading so it does not fall back to the top of the page. Only
+       when focus is still on that button (or nowhere), and only when the notice has
+       gone: a person who has moved on, or a notice that is still there, is left alone. */
+    function keepPlace(heading, noticeStillShown) {
+        if (!heading || noticeStillShown) return;
+        var active = document.activeElement;
+        var onButton = active && active.hasAttribute && active.hasAttribute('data-recompute-button');
+        if (onButton || !active || active === document.body) heading.focus();
+    }
+
     function failureStatus(err) {
         return err && typeof err.status === 'number' ? err.status : null;
     }
@@ -88,6 +110,23 @@
 
     function pluralThings(count) {
         return count === 1 ? '1 thing' : count + ' things';
+    }
+
+    /* What the picker's status region says after a search: how many matches. */
+    function resultsText(count, term) {
+        return count + (count === 1 ? ' result' : ' results') + ' for ' + term;
+    }
+
+    /* What it says after an element is chosen: how many connections it has. When
+       worked-out connections were left out of the answer, the message says so. */
+    function connectionsText(count, name, withheld) {
+        return count + (count === 1 ? ' connection' : ' connections') + ' for ' + name +
+            (withheld ? WITHHELD_SUFFIX : '');
+    }
+
+    function captionText(name, nodes, edges, withheld) {
+        return (name ? 'Connections for ' + name + ': ' : 'Connections: ') +
+            nodes + ' things, ' + edges + ' connections' + (withheld ? WITHHELD_SUFFIX : '');
     }
 
     // ── payload -> models ─────────────────────────────────────────────────
@@ -153,12 +192,12 @@
             fromName: nameOf(elements, fromId),
             name: nameOf(elements, row.element_id),
             derived: derived,
-            kindLabel: derived ? 'Worked out' : 'Explicit',
+            kindLabel: derived ? (stale ? WORKED_OUT_STALE : WORKED_OUT) : 'Explicit',
             relationType: relation.type,
             depth: relation.depth,
             ownerName: owner && owner.name ? owner.name : null,
             stale: stale,
-            staleLine: stale && computed ? 'Last worked out ' + computed + ' — may be out of date.' : null,
+            staleLine: stale ? (computed ? 'Last worked out ' + computed + ' \u2014 may be out of date.' : STALE_UNDATED) : null,
             plainTerms: typeof relation.plain_terms === 'string' && relation.plain_terms ? relation.plain_terms : null,
             detail: detailOf(row, elements)
         };
@@ -179,6 +218,30 @@
         });
         rows.sort(rankRows);
         return rows;
+    }
+
+    /* Whether the answer holds connections that may be out of date, and whether
+       any worked-out connections were left out of it altogether.
+
+       The answer reports its own derivation state. A stale state, or any row
+       marked stale, gets a notice. Worked-out connections count as left out when
+       they were asked for and the answer is stale yet lists none, or when the
+       summary counts more stale rows than worked-out rows (which it cannot when
+       the answer is complete, so this only fires on an answer that is not). */
+    function answerState(payload, rows, includeDerived) {
+        var summary = payload.summary || {};
+        var derivedShown = rows.filter(function (r) { return r.derived; }).length;
+        var staleShown = rows.filter(function (r) { return r.stale; }).length;
+        var stale = summary.derivation_state === 'stale' || staleShown > 0;
+        var withheld = includeDerived === true && (
+            (summary.derivation_state === 'stale' && derivedShown === 0) ||
+            (typeof summary.stale_count === 'number' && summary.stale_count > derivedShown));
+        return {
+            stale: stale,
+            withheld: withheld,
+            notice: withheld ? WITHHELD_NOTICE : STALE_NOTICE,
+            notComputed: summary.derivation_state === 'not_computed' && rows.length > 0
+        };
     }
 
     /* The map as nodes and edges, built from the same rows the table lists, so
@@ -210,6 +273,7 @@
                 from: row.fromId,
                 to: row.elementId,
                 kind: row.derived ? 'derived' : 'explicit',
+                stale: row.stale,
                 type: row.relationType,
                 depth: row.depth
             };
@@ -228,9 +292,16 @@
         recompute: recompute,
         timeText: timeText,
         refreshIcons: refreshIcons,
+        keepPlace: keepPlace,
         failureStatus: failureStatus,
         bandFor: bandFor,
         pluralThings: pluralThings,
+        resultsText: resultsText,
+        connectionsText: connectionsText,
+        captionText: captionText,
+        answerState: answerState,
+        WORKED_OUT: WORKED_OUT,
+        WORKED_OUT_STALE: WORKED_OUT_STALE,
         elementEntry: elementEntry,
         nameOf: nameOf,
         emptyDetail: emptyDetail,

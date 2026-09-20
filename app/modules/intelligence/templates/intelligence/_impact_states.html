@@ -9,6 +9,18 @@
 {% from 'components/provenance.html' import provenance_badge %}
 {% from 'components/skeleton.html' import skeleton_list %}
 
+{# The recalculation button and what it can say back: shared by the two notices. #}
+{% macro recompute_action() %}
+<div class="mt-3 flex flex-wrap items-center gap-3">
+    <button type="button" data-recompute-button @click="recomputeNow()" :disabled="recomputing"
+            class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50">
+        Work them out now
+    </button>
+    <span x-show="recomputeFailed" x-cloak>{{ provenance_badge('unavailable') }}</span>
+    <p x-show="recomputeLine" x-cloak class="text-sm text-foreground" x-text="recomputeLine"></p>
+</div>
+{% endmacro %}
+
 {% macro impact_states(loading_when) %}
 <div x-show="{{ loading_when }}" x-cloak class="space-y-3">
     <p class="text-sm text-muted-foreground">Tracing the impact chain…</p>
@@ -26,15 +38,19 @@
     {{ empty_state(icon='search', title='Nothing is recorded as depending on this yet', description='We found no connections from this one. Nothing is missing — there is simply nothing recorded here yet.') }}
 </div>
 
-<div x-show="notComputed" x-cloak role="status" class="rounded-lg border border-border bg-muted/30 p-4">
+<div x-show="notComputed" x-cloak role="status" data-not-computed-notice class="rounded-lg border border-border bg-muted/30 p-4">
     <p class="text-sm text-foreground">We haven't worked out the indirect connections for your model yet.</p>
-    <div class="mt-3 flex flex-wrap items-center gap-3">
-        <button type="button" @click="recomputeNow()" :disabled="recomputing"
-                class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50">
-            Work them out now
-        </button>
-        <span x-show="recomputeFailed" x-cloak>{{ provenance_badge('unavailable') }}</span>
-        <p x-show="recomputeLine" x-cloak class="text-sm text-foreground" x-text="recomputeLine"></p>
-    </div>
+    {{ recompute_action() }}
+</div>
+
+{# Worked-out connections that have gone out of date, or that were left out of the
+   answer because of it. Text and a clock, never colour alone, with the same action
+   as the state above. #}
+<div x-show="stale" x-cloak role="status" data-stale-notice class="rounded-lg border border-border bg-muted/30 p-4">
+    <p class="flex items-start gap-2 text-sm text-foreground">
+        <span role="img" aria-label="Last worked out" class="mt-0.5 inline-flex shrink-0"><i data-lucide="clock" class="h-4 w-4" aria-hidden="true"></i></span>
+        <span x-text="staleNotice"></span>
+    </p>
+    {{ recompute_action() }}
 </div>
 {% endmacro %}

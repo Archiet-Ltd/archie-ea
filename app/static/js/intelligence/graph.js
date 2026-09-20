@@ -47,6 +47,18 @@
     var NODE_CLASS = 'absolute flex items-center justify-center rounded-md border-2 bg-background px-2 text-xs text-foreground shadow-sm ' +
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background';
 
+    /* The two glyphs drawn beside the badge text, on the same 24 by 24 grid as the
+       icons the rest of the page uses: the connected-dots mark for "worked out"
+       (the same one the drawer title and the Ask rows carry) and a clock for
+       "may be out of date". */
+    var GLYPH_WORKED_OUT = [
+        ['circle', { cx: 12, cy: 4.5, r: 2.5 }], ['path', { d: 'm10.2 6.3-3.9 3.9' }],
+        ['circle', { cx: 4.5, cy: 12, r: 2.5 }], ['path', { d: 'M7 12h10' }],
+        ['circle', { cx: 19.5, cy: 12, r: 2.5 }], ['path', { d: 'm13.8 17.7 3.9-3.9' }],
+        ['circle', { cx: 12, cy: 19.5, r: 2.5 }]
+    ];
+    var GLYPH_CLOCK = [['circle', { cx: 12, cy: 12, r: 10 }], ['polyline', { points: '12 6 12 12 16 14' }]];
+
     function byDepthThenName(a, b) {
         if (a.depth !== b.depth) return (a.depth || 0) - (b.depth || 0);
         return String(a.name || '').localeCompare(String(b.name || ''));
@@ -110,6 +122,51 @@
             mx: (sx + tx) / 2,
             my: mid
         };
+    }
+
+    function drawGlyph(group, parts, x, label) {
+        var glyph = group.append('g')
+            .attr('transform', 'translate(' + x + ',-6) scale(0.5)')
+            .attr('fill', 'none').attr('class', 'stroke-muted-foreground')
+            .attr('stroke-width', 2).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round');
+        if (label) {
+            glyph.attr('role', 'img').attr('aria-label', label);
+            glyph.append('title').text(label);
+        }
+        parts.forEach(function (part) {
+            var shape = glyph.append(part[0]);
+            Object.keys(part[1]).forEach(function (key) { shape.attr(key, part[1][key]); });
+        });
+    }
+
+    /* The badge on a worked-out connection: words plus a mark, never colour alone.
+       A connection that may be out of date says so in the same badge. Rebuilt on
+       every draw because the same connection can go from current to out of date
+       and back without changing its key. */
+    function drawBadge(edgeGroup, d) {
+        var badge = edgeGroup.selectAll('g.intel-badge').data(d.edge.kind === 'derived' ? [d] : []);
+        badge.exit().remove();
+        badge = badge.enter().append('g').attr('class', 'intel-badge').merge(badge);
+        if (badge.empty()) return;
+        badge.selectAll('*').remove();
+        var stale = d.edge.stale === true;
+        var label = stale ? global.Intelligence.WORKED_OUT_STALE : global.Intelligence.WORKED_OUT;
+        badge.append('title').text(stale ? 'Worked out \u2014 may be out of date' : 'Worked out \u2014 nobody drew it directly');
+        var box = badge.append('rect').attr('rx', 4).attr('height', 20).attr('y', -10)
+            .attr('class', 'fill-background stroke-muted-foreground');
+        var text = badge.append('text').attr('class', 'fill-foreground text-xs').attr('y', 4).text(label);
+        var textWidth = text.node().getComputedTextLength() || label.length * 6.2;
+        var glyphs = stale ? 2 : 1;
+        var width = 8 + glyphs * 16 + textWidth + 8;
+        var x = -width / 2 + 8;
+        box.attr('x', -width / 2).attr('width', width);
+        drawGlyph(badge, GLYPH_WORKED_OUT, x);
+        x += 16;
+        if (stale) {
+            drawGlyph(badge, GLYPH_CLOCK, x, 'Last worked out');
+            x += 16;
+        }
+        text.attr('x', x);
     }
 
     /* Draws into `canvas`, which holds [data-graph-svg] (the drawing, inside the
@@ -178,13 +235,9 @@
             var edgeSel = svg.selectAll('g.intel-edge').data(edgeData, function (d) { return d.edge.key; });
             var edgeEnter = edgeSel.enter().append('g').attr('class', 'intel-edge');
             edgeEnter.append('path').attr('fill', 'none');
-            var badge = edgeEnter.filter(function (d) { return d.edge.kind === 'derived'; }).append('g').attr('class', 'intel-badge');
-            badge.append('title').text('Worked out — nobody drew it directly');
-            badge.append('rect').attr('rx', 4).attr('class', 'fill-background stroke-muted-foreground')
-                .attr('width', 74).attr('height', 20).attr('x', -37).attr('y', -10);
-            badge.append('text').attr('class', 'fill-foreground text-xs').attr('text-anchor', 'middle').attr('y', 4).text('Worked out');
             edgeSel.exit().remove();
             var edgeAll = edgeEnter.merge(edgeSel);
+            edgeAll.each(function (d) { drawBadge(d3.select(this), d); });
             edgeAll.attr('data-kind', function (d) { return d.edge.kind; })
                 .attr('data-edge', function (d) { return d.edge.key; });
             edgeAll.select('path')

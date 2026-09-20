@@ -6,7 +6,7 @@
    worked-out connections, so it lists every connection the drawing shows and no
    others. Each row opens the same provenance drawer as everywhere else and can
    centre the map on its target. Ordinary table markup, reachable by keyboard. #}
-{% from 'intelligence/_parts.html' import element_name, owner_field, why_button with context %}
+{% from 'intelligence/_parts.html' import element_name, owner_field, why_button, stale_clock with context %}
 
 {% macro map_table() %}
 <div class="overflow-x-auto rounded-lg border border-border bg-card">
@@ -29,7 +29,7 @@
                     <td class="px-4 py-2 text-foreground">{{ element_name('row.fromName') }}</td>
                     <td class="px-4 py-2 text-foreground" x-text="row.relationType"></td>
                     <td class="px-4 py-2 text-foreground">{{ element_name('row.name') }}</td>
-                    <td class="px-4 py-2 text-foreground" x-text="row.kindLabel"></td>
+                    <td class="px-4 py-2 text-foreground"><span class="inline-flex items-center gap-1.5">{{ stale_clock('row.stale') }}<span x-text="row.kindLabel"></span></span></td>
                     <td class="px-4 py-2 text-foreground" x-text="row.depth"></td>
                     <td class="px-4 py-2">{{ owner_field('row.ownerName') }}</td>
                     <td class="px-4 py-2">
