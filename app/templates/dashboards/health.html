@@ -13,11 +13,14 @@
     ) }}
 
     {# ── Health Score — the composite this page is named for. One line, not a
-       card: the value and format are the ones the dashboard shows. ───────── #}
+       card: the value and format are the ones the dashboard shows, and the
+       components named are the ones the score was actually weighted from. ── #}
+    {% set basis = health_basis|default({}) %}
     <p class="-mt-3 text-sm text-muted-foreground" data-testid="health-score-line">
         Health Score
         <strong class="ml-1 text-2xl font-bold tabular-nums text-foreground" data-testid="health-score-value">{{ health_score_text|default('—') }}</strong>
-        <span class="ml-1">out of 100, weighted from phase maturity, risk posture, capability coverage and governance</span>
+        {% if basis.weighted_from %}<span class="ml-1">out of 100, weighted from {{ basis.weighted_from }}.</span>{% endif %}
+        {% if basis.not_measured %}<span class="ml-1" data-testid="health-score-not-measured">Not measured: {{ basis.not_measured }}.</span>{% endif %}
     </p>
 
     {# ── AI Executive Briefing (advisory) ─────────────────────────────────── #}

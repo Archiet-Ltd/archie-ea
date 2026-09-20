@@ -1033,18 +1033,23 @@ def health_scorecard():
     from app.modules.dashboard.v2.services.executive_dashboard_service import (
         ExecutiveDashboardService,
         format_health_score,
+        health_score_basis,
     )
 
     metrics = _assemble_health_scorecard_metrics()
+    health_score = None
+    unavailable = None
     try:
-        health_score = ExecutiveDashboardService()._get_health_score()["composite_score"]
+        health = ExecutiveDashboardService()._get_health_score()
+        health_score = health["composite_score"]
+        unavailable = health["unavailable_components"]
     except Exception as exc:
         logger.warning("health_scorecard: health score unavailable: %s", exc)
         db.session.rollback()
-        health_score = None
     return render_template(
         "dashboards/health.html",
         health_score_text=format_health_score(health_score),
+        health_basis=health_score_basis(health_score, unavailable),
         **metrics,
     )
 

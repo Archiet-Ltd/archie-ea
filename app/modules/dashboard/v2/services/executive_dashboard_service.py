@@ -28,6 +28,46 @@ def format_health_score(score):
     return f"{float(score):.1f}"
 
 
+# The four components of the health score, in the order the Overview shows them,
+# with the plain-words name each carries in a sentence.
+HEALTH_COMPONENT_NAMES = (
+    ("phase_maturity", "phase maturity"),
+    ("risk_posture", "risk posture"),
+    ("capability_coverage", "capability coverage"),
+    ("governance", "governance"),
+)
+
+
+def _join_names(names):
+    if len(names) > 1:
+        return ", ".join(names[:-1]) + " and " + names[-1]
+    return names[0]
+
+
+def health_score_basis(score, unavailable):
+    """What the health score was weighted from, and what it could not use.
+
+    ``unavailable`` is the list of components the score could not measure, as
+    ``_get_health_score`` returns it (``None`` when the score could not be
+    computed at all, in which case nothing is claimed either way). The score is
+    re-weighted over the components that were measured, so the components named
+    as its basis are exactly those not in ``unavailable``, and only when there is
+    a score.
+
+    Returns ``{"weighted_from": "phase maturity", "not_measured": "risk posture,
+    capability coverage and governance"}``; either value is ``None`` when it does
+    not apply.
+    """
+    if unavailable is None:
+        return {"weighted_from": None, "not_measured": None}
+    measured = [name for key, name in HEALTH_COMPONENT_NAMES if key not in unavailable]
+    missing = [name for key, name in HEALTH_COMPONENT_NAMES if key in unavailable]
+    return {
+        "weighted_from": _join_names(measured) if score is not None and measured else None,
+        "not_measured": _join_names(missing) if missing else None,
+    }
+
+
 class ExecutiveDashboardService:
     """Aggregates cross-domain metrics into a single executive summary."""
 

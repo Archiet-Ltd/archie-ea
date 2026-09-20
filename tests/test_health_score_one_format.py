@@ -235,3 +235,178 @@ def test_soft_deleted_solutions_are_left_out_of_both_maturity_figures(
     assert "37%" in _tile_text(scorecard, "Avg Solution Maturity")
     overview = _page(client, login_as, user, "/dashboard/overview")
     assert "100.0%" in _tile_text(overview, "Phase Maturity")
+
+
+def _health_block_tile(soup, label):
+    """Text of the tile in the Overview's Architecture Health block with this label."""
+    for node in soup.find_all("p", string=lambda value: value and value.strip() == label):
+        return " ".join(node.parent.get_text().split())
+    raise AssertionError(f"no Architecture Health tile labelled {label!r}")
+
+
+def _score_line(soup):
+    return " ".join(soup.find(attrs={"data-testid": "health-score-line"}).get_text().split())
+
+
+def _force_health_score(monkeypatch, composite, components):
+    """Make the score service answer with a chosen composite and component set."""
+    from app.modules.dashboard.v2.services.executive_dashboard_service import ExecutiveDashboardService
+
+    def answer(self):
+        return {
+            "composite_score": composite,
+            "components": components,
+            "unavailable_components": sorted(key for key, value in components.items() if value is None),
+        }
+
+    monkeypatch.setattr(ExecutiveDashboardService, "_get_health_score", answer)
+
+
+ALL_COMPONENTS = ("phase_maturity", "risk_posture", "capability_coverage", "governance")
+
+
+def _components(**measured):
+    return {key: measured.get(key) for key in ALL_COMPONENTS}
+
+
+def test_the_scorecard_names_only_what_the_score_was_weighted_from(db_session, tenant_ctx, client, login_as):
+    """Three solutions and nothing else to measure: the score is phase maturity alone,
+    and the scorecard says so, in the same words the Overview block uses for its dashes."""
+    user = _seed(db_session, tenant_ctx, "basis-fixture", ["C", "F", "C"])
+
+    scorecard = _page(client, login_as, user, "/dashboard/health")
+    assert _score_line(scorecard) == (
+        "Health Score 100.0 out of 100, weighted from phase maturity. "
+        "Not measured: risk posture, capability coverage and governance."
+    )
+
+    overview = _page(client, login_as, user, "/dashboard/overview")
+    for label in ("Risk Posture", "Capability Coverage", "Governance"):
+        assert _health_block_tile(overview, label) == f"{label} {EM_DASH}", label
+    assert "100.0%" in _health_block_tile(overview, "Phase Maturity")
+
+
+@pytest.mark.parametrize(
+    "slug,composite,components,line",
+    [
+        pytest.param(
+            "all",
+            72.5,
+            _components(phase_maturity=50.0, risk_posture=80.0, capability_coverage=90.0, governance=100.0),
+            "Health Score 72.5 out of 100, weighted from phase maturity, risk posture, capability coverage "
+            "and governance.",
+            id="all four measured",
+        ),
+        pytest.param(
+            "two",
+            59.0,
+            _components(phase_maturity=50.0, risk_posture=80.0),
+            "Health Score 59.0 out of 100, weighted from phase maturity and risk posture. "
+            "Not measured: capability coverage and governance.",
+            id="two measured",
+        ),
+        pytest.param(
+            "capability",
+            40.0,
+            _components(capability_coverage=40.0),
+            "Health Score 40.0 out of 100, weighted from capability coverage. "
+            "Not measured: phase maturity, risk posture and governance.",
+            id="one measured, not phase maturity",
+        ),
+        pytest.param(
+            "withheld",
+            None,
+            _components(governance=100.0),
+            f"Health Score {EM_DASH} Not measured: phase maturity, risk posture and capability coverage.",
+            id="too little measured to score",
+        ),
+        pytest.param(
+            "none",
+            None,
+            _components(),
+            f"Health Score {EM_DASH} Not measured: phase maturity, risk posture, capability coverage and governance.",
+            id="nothing measured",
+        ),
+    ],
+)
+def test_the_scorecard_line_follows_the_components_that_were_measured(
+    db_session, tenant_ctx, client, login_as, monkeypatch, slug, composite, components, line
+):
+    user = _seed(db_session, tenant_ctx, "basis-" + slug, ["C", "F", "C"])
+    _force_health_score(monkeypatch, composite, components)
+
+    scorecard = _page(client, login_as, user, "/dashboard/health")
+
+    assert _score_line(scorecard) == line
+    assert ("Not measured" in line) == (scorecard.find(attrs={"data-testid": "health-score-not-measured"}) is not None)
+
+
+def test_the_scorecard_claims_nothing_about_a_score_it_could_not_compute(
+    db_session, tenant_ctx, client, login_as, monkeypatch
+):
+    from app.modules.dashboard.v2.services.executive_dashboard_service import ExecutiveDashboardService
+
+    user = _seed(db_session, tenant_ctx, "basis-fails", ["C", "F", "C"])
+
+    def unavailable(self):
+        raise RuntimeError("score store unavailable")
+
+    monkeypatch.setattr(ExecutiveDashboardService, "_get_health_score", unavailable)
+
+    scorecard = _page(client, login_as, user, "/dashboard/health")
+    assert _score_line(scorecard) == f"Health Score {EM_DASH}"
+
+
+# What the average of ADM phase progress is for a tenant whose solutions all sit in
+# one phase. Phase D at 50% and phase H at 100% are the two figures the tile's own
+# definition quotes; the others are the figures the scorecard renders for them.
+PROGRESS_BY_PHASE = [("A", 12), ("B", 25), ("C", 37), ("D", 50), ("E", 62), ("F", 75), ("G", 87), ("H", 100)]
+
+
+@pytest.mark.parametrize("phase,progress", PROGRESS_BY_PHASE, ids=[phase for phase, _ in PROGRESS_BY_PHASE])
+def test_avg_solution_maturity_for_a_tenant_wholly_in_one_phase(
+    db_session, tenant_ctx, client, login_as, phase, progress
+):
+    user = _seed(db_session, tenant_ctx, "ladder-" + phase.lower(), [phase, phase])
+
+    scorecard = _page(client, login_as, user, "/dashboard/health")
+
+    tile = _tile_text(scorecard, "Avg Solution Maturity")
+    assert tile.startswith(f"Avg Solution Maturity {progress}%"), tile
+
+
+def test_avg_solution_maturity_is_the_mean_of_the_phases_it_is_shown_for(
+    db_session, tenant_ctx, client, login_as
+):
+    """One solution in phase D (50%) and one in phase H (100%) average to 75%."""
+    user = _seed(db_session, tenant_ctx, "ladder-mean", ["D", "H"])
+
+    scorecard = _page(client, login_as, user, "/dashboard/health")
+
+    assert _tile_text(scorecard, "Avg Solution Maturity").startswith("Avg Solution Maturity 75%")
+
+
+@pytest.mark.parametrize(
+    "composite,shown",
+    [
+        # Each of these prints differently as a plain number and through the
+        # formatter; every screen must read the formatter's value.
+        (99.949999, "99.9"),
+        (99.95, "100.0"),
+        (66.66666, "66.7"),
+    ],
+)
+def test_every_screen_reads_the_formatted_score_not_the_plain_number(
+    db_session, tenant_ctx, client, login_as, monkeypatch, composite, shown
+):
+    assert str(composite) != shown
+    user = _seed(db_session, tenant_ctx, "formatter-" + shown.replace(".", "-"), ["C", "F", "C"])
+    _force_health_score(monkeypatch, composite, _components(phase_maturity=composite))
+
+    assert _score_on_every_screen(client, login_as, user) == {
+        "overview tab": shown,
+        "executive summary": shown,
+        "cto card": shown,
+        "cfo card": shown,
+        "health scorecard": shown,
+    }

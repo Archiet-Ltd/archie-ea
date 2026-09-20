@@ -57,3 +57,93 @@ def test_health_phase_denominator_uses_only_recorded_valid_phases(db_session, te
         assert result["components"]["phase_maturity"] == want
         assert result["composite_score"] == want
         assert ("phase_maturity" in result["unavailable_components"]) == (want is None)
+
+
+def _add_solutions(org, phases, name="Phase observation"):
+    """Add one solution per phase value, keeping each value exactly as given."""
+    for index, phase in enumerate(phases):
+        solution = Solution(name=f"{name} {index}", organization_id=org.id, adm_phase=phase)
+        db.session.add(solution)
+        db.session.flush()
+        # Preserve the value (or SQL NULL) even if the model gains a Python default.
+        solution.adm_phase = phase
+    db.session.flush()
+
+
+@pytest.mark.parametrize("slug,phases,phase_maturity,avg_maturity", [
+    # A lower-case or padded value is the phase it spells. Read literally, the
+    # first two would be unclassified and only the A would count: 0.0 and 12.
+    ("mixed-case", ["c", " c ", "A"], 66.7, 29),
+    ("padded", [" d", "a", "A"], 33.3, 25),
+])
+def test_imported_spellings_of_a_phase_count_as_that_phase(
+    db_session, tenant_ctx, slug, phases, phase_maturity, avg_maturity
+):
+    from sqlalchemy import text
+
+    from app.modules.dashboard.v2.routes.dashboard_views import _assemble_health_scorecard_metrics
+    from app.modules.dashboard.v2.services.executive_dashboard_service import ExecutiveDashboardService
+
+    org = _org(db_session, "normalisation-" + slug)
+    with tenant_ctx(org.id):
+        _add_solutions(org, phases)
+        stored = db.session.execute(
+            text("SELECT adm_phase FROM solutions WHERE organization_id = :org"), {"org": org.id}
+        ).scalars().all()
+        assert sorted(stored) == sorted(phases), "the values must reach the query as written"
+
+        assert ExecutiveDashboardService()._get_health_score()["components"]["phase_maturity"] == phase_maturity
+        metrics = _assemble_health_scorecard_metrics()
+        assert metrics["avg_maturity"] == avg_maturity
+        assert metrics["total_solutions"] == len(phases)
+        assert metrics["adm_distribution"].get("Unclassified", 0) == 0
+
+
+def test_the_phase_read_is_one_grouped_count(db_session, tenant_ctx):
+    """However many solutions there are, the read returns one row per distinct phase value."""
+    from sqlalchemy import event
+
+    from app.modules.dashboard.v2.services.solution_phase_measures import recorded_phase_summary
+
+    org = _org(db_session, "grouped-read")
+    phases = ["A"] * 6 + ["C"] * 4 + [None] * 3 + ["f"] * 2
+    with tenant_ctx(org.id):
+        _add_solutions(org, phases)
+        reads = []
+
+        def record(conn, cursor, statement, parameters, context, executemany):
+            reads.append((statement, cursor.rowcount))
+
+        connection = db.session.connection()
+        event.listen(connection, "after_cursor_execute", record)
+        try:
+            summary = recorded_phase_summary()
+        finally:
+            event.remove(connection, "after_cursor_execute", record)
+
+    solution_reads = [(statement, rows) for statement, rows in reads if "FROM solutions" in statement]
+    assert len(solution_reads) == 1
+    statement, rows = solution_reads[0]
+    assert "GROUP BY" in statement.upper()
+    assert rows == 4, "one row for each of A, C, f and no recorded phase, not one per solution"
+    assert summary["total"] == len(phases)
+    assert summary["counts"]["A"] == 6
+    assert summary["counts"]["C"] == 4
+    assert summary["counts"]["F"] == 2
+    assert summary["unclassified"] == 3
+
+
+def test_the_phase_read_counts_only_the_callers_organisation(db_session, make_org, tenant_ctx):
+    from app.modules.dashboard.v2.services.solution_phase_measures import recorded_phase_summary
+
+    mine = make_org("phase-read-mine")
+    theirs = make_org("phase-read-theirs")
+    with tenant_ctx(theirs.id):
+        _add_solutions(theirs, ["A"] * 6, name="Other organisation")
+    with tenant_ctx(mine.id):
+        _add_solutions(mine, ["C", "C"], name="Own")
+        summary = recorded_phase_summary()
+
+    assert summary["total"] == 2
+    assert summary["counts"]["C"] == 2
+    assert summary["counts"]["A"] == 0

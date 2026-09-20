@@ -15,6 +15,8 @@ one outside A-H, belongs to neither measure: it is counted as unclassified
 rather than being read as phase A.
 """
 
+from collections import Counter
+
 from app import db
 
 ADM_PHASES = "ABCDEFGH"
@@ -28,39 +30,48 @@ ADM_PHASE_PROGRESS_PCT = {
 }
 
 
-def summarise_phases(phases):
-    """Count raw ``adm_phase`` values by normalised phase.
+def summarise_phase_counts(rows):
+    """Classify ``(raw adm_phase, number of solutions)`` pairs by normalised phase.
 
     Returns ``{"counts": {"A": n, ...}, "unclassified": n, "total": n}``.
-    ``total`` includes the unclassified solutions; the counts do not.
+    ``total`` includes the unclassified solutions; the counts do not. Values are
+    normalised here, once, so imported spellings such as ``" c "`` land on phase C.
     """
     counts = {phase: 0 for phase in ADM_PHASES}
     unclassified = 0
     total = 0
-    for raw in phases:
-        total += 1
+    for raw, number in rows:
+        number = int(number or 0)
+        total += number
         phase = (raw or "").strip().upper()
         if phase in counts:
-            counts[phase] += 1
+            counts[phase] += number
         else:
-            unclassified += 1
+            unclassified += number
     return {"counts": counts, "unclassified": unclassified, "total": total}
+
+
+def summarise_phases(phases):
+    """Count raw ``adm_phase`` values by normalised phase (one value per solution)."""
+    return summarise_phase_counts(Counter(phases).items())
 
 
 def recorded_phase_summary():
     """Phase summary for the current organisation's live solutions.
 
-    Reads through the tenant-scoped session, and leaves out solutions whose
-    name carries the soft-delete prefix, as the solutions list does.
+    One grouped count, however many solutions there are. Reads through the
+    tenant-scoped session, and leaves out solutions whose name carries the
+    soft-delete prefix, as the solutions list does.
     """
     from app.models.solution_models import Solution
 
     rows = (
-        db.session.query(Solution.adm_phase)
+        db.session.query(Solution.adm_phase, db.func.count(Solution.id))
         .filter(~Solution.name.like("[DELETED]%"))
+        .group_by(Solution.adm_phase)
         .all()
     )
-    return summarise_phases(phase for (phase,) in rows)
+    return summarise_phase_counts(rows)
 
 
 def share_in_advanced_phases(summary):

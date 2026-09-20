@@ -108,12 +108,14 @@ def test_executive_summary_formats_missing_value_without_hiding_measured_zero():
     ([" A ", "B", None], 0.0),
 ])
 def test_phase_component_counts_only_valid_normalized_observations(phases, want):
-    """The Health Score's phase component is the shared phase summary's share in
-    phase C or later: only recorded, valid phases supply the denominator, and an
-    imported value is normalised before it is classified.
+    """The arithmetic of the phase component on raw phase values: only recorded,
+    valid phases supply the denominator, and a value is normalised before it is
+    classified.
 
-    The PostgreSQL integration cases separately run the same inputs through the
-    real query.
+    This runs the shared classification and share functions on a list of values.
+    It does not touch the database read; the PostgreSQL cases in
+    test_dashboard_health_integration.py run the real query, including cases where
+    normalising a value changes the answer.
     """
     from app.modules.dashboard.v2.services.solution_phase_measures import (
         share_in_advanced_phases,
