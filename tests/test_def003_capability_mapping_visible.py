@@ -61,6 +61,43 @@ def _make_user(db_session, make_org, label):
     return user.id, org
 
 
+def _unified_capability_id(db_session, business_cap, org, **fields):
+    """Id of the unified_capabilities row that stands for ``business_cap``.
+
+    Where the provenance index exists, creating the business capability already
+    projects its unified row in the same flush, and a second row with the same
+    provenance violates the unique index. Use that row; only on a database
+    without the index does nothing project it, and then it is created here.
+    """
+    from sqlalchemy import text
+
+    from app.models.unified_capability import UnifiedCapability
+
+    projected = db_session.execute(
+        text(
+            "SELECT id FROM unified_capabilities "
+            "WHERE source_table = 'business_capability' AND source_id = :sid"
+        ),
+        {"sid": str(business_cap.id)},
+    ).scalar()
+    if projected is not None:
+        return projected
+
+    unified_cap = UnifiedCapability(
+        name=business_cap.name,
+        code=f"BC-{business_cap.id}",
+        level=1,
+        scope="tenant",
+        organization_id=org.id,
+        source_table="business_capability",
+        source_id=str(business_cap.id),
+        **fields,
+    )
+    db_session.add(unified_cap)
+    db_session.flush()
+    return unified_cap.id
+
+
 def test_mapping_created_only_in_unified_store_is_visible_on_detail_page(
     app, db_session, make_org
 ):
@@ -72,7 +109,6 @@ def test_mapping_created_only_in_unified_store_is_visible_on_detail_page(
     from app.models.unified_application_capability_mapping import (
         UnifiedApplicationCapabilityMapping,
     )
-    from app.models.unified_capability import UnifiedCapability
 
     user_id, org = _make_user(db_session, make_org, "visible")
 
@@ -91,21 +127,12 @@ def test_mapping_created_only_in_unified_store_is_visible_on_detail_page(
     db_session.add(business_cap)
     db_session.flush()
 
-    unified_cap = UnifiedCapability(
-        name=business_cap.name,
-        code=f"BC-{business_cap.id}",
-        level=1,
-        scope="tenant",
-        organization_id=org.id,
-        source_table="business_capability",
-        source_id=str(business_cap.id),
-        category="Test Category",
+    unified_capability_id = _unified_capability_id(
+        db_session, business_cap, org, category="Test Category"
     )
-    db_session.add(unified_cap)
-    db_session.flush()
 
     mapping = UnifiedApplicationCapabilityMapping(
-        unified_capability_id=unified_cap.id,
+        unified_capability_id=unified_capability_id,
         application_component_id=app_obj.id,
         support_level="primary",
         coverage_percentage=75,
@@ -137,7 +164,6 @@ def test_legacy_and_unified_mappings_for_the_same_capability_do_not_duplicate(
     from app.models.unified_application_capability_mapping import (
         UnifiedApplicationCapabilityMapping,
     )
-    from app.models.unified_capability import UnifiedCapability
 
     user_id, org = _make_user(db_session, make_org, "dedup")
 
@@ -164,20 +190,10 @@ def test_legacy_and_unified_mappings_for_the_same_capability_do_not_duplicate(
     )
     db_session.add(legacy_mapping)
 
-    unified_cap = UnifiedCapability(
-        name=business_cap.name,
-        code=f"BC-{business_cap.id}",
-        level=1,
-        scope="tenant",
-        organization_id=org.id,
-        source_table="business_capability",
-        source_id=str(business_cap.id),
-    )
-    db_session.add(unified_cap)
-    db_session.flush()
+    unified_capability_id = _unified_capability_id(db_session, business_cap, org)
 
     unified_mapping = UnifiedApplicationCapabilityMapping(
-        unified_capability_id=unified_cap.id,
+        unified_capability_id=unified_capability_id,
         application_component_id=app_obj.id,
         support_level="primary",
     )
