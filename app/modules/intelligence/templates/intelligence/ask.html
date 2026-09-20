@@ -47,7 +47,7 @@
             <span>{{ question.before }} <span class="font-semibold tracking-widest text-primary underline">{{ question.blank }}</span> {{ question.after }}</span>
             <span class="inline-flex shrink-0 transition-transform" :class="questionOpen ? 'rotate-180' : ''"><i data-lucide="chevron-down" class="h-5 w-5" aria-hidden="true"></i></span>
         </button>
-        <div id="ask-question-panel-{{ question.key }}" x-show="questionOpen" x-cloak class="mt-4">
+        <div id="ask-question-panel-{{ question.key }}" hidden :hidden="!questionOpen" class="mt-4">
             {{ entity_picker('ask') }}
         </div>
     </section>
