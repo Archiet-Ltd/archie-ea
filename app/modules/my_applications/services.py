@@ -22,16 +22,20 @@ def _ownership_rows(
     """The one definition of "an application this user owns".
 
     An application is owned by a user when at least one ownership row names that
-    user for it and the application itself is visible in the user's tenant. One
-    application can carry several rows for the same user (primary and technical,
-    say); it is still one application. Every number and every list on the My
-    Applications screens is derived from this function, so no two of them can
-    disagree; has_assigned_owner() below reads the same store for the portfolio.
+    user for it, the row belongs to the same organisation as the user, and the
+    application itself is visible in the user's tenant. One application can carry
+    several rows for the same user (primary and technical, say); it is still one
+    application. Every number and every list on the My Applications screens is
+    derived from this function, so no two of them can disagree; has_assigned_owner()
+    below applies the same organisation rule for the portfolio.
 
     Returns (ownership rows whose application is visible, {id: application}).
     """
     # tenant-scoping-ok: self-lookup, filtered by the authenticated user's own id.
-    query = ApplicationOwner.query.filter(ApplicationOwner.user_id == user_id)
+    query = ApplicationOwner.query.join(User, User.id == ApplicationOwner.user_id).filter(
+        ApplicationOwner.user_id == user_id,
+        ApplicationOwner.organization_id == User.organization_id,
+    )
     if ownership_type:
         query = query.filter(ApplicationOwner.ownership_type == ownership_type)
     rows = query.all()
@@ -83,11 +87,16 @@ def has_assigned_owner(organization_id: int):
 
 
 def _search_clause(search: str):
-    """Match applications whose name or description contains the search text."""
-    term = f"%{search}%"
+    """Match applications whose name or description contains the search text.
+
+    The text is matched literally: a backslash, percent sign or underscore in it
+    stands for itself rather than acting as a pattern character.
+    """
+    escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    term = f"%{escaped}%"
     return or_(
-        ApplicationComponent.name.ilike(term),
-        ApplicationComponent.description.ilike(term),
+        ApplicationComponent.name.ilike(term, escape="\\"),
+        ApplicationComponent.description.ilike(term, escape="\\"),
     )
 
 
@@ -118,6 +127,10 @@ def get_user_applications(
     app_query = app_query.order_by(ApplicationComponent.name.asc())
 
     total = app_query.count()
+    # A page past the end is served as the last page; the offset is only ever
+    # computed from a page that exists.
+    last_page = max(1, -(-total // per_page))
+    page = min(max(page, 1), last_page)
     apps = app_query.offset((page - 1) * per_page).limit(per_page).all()
 
     # Build ownership lookup. An application held under several types is shown

@@ -15,6 +15,7 @@ from flask_login import current_user, login_required
 from app.decorators import requires_application_owner
 from app.models.application_owner import ApplicationOwner
 from app.models.application_portfolio import ApplicationComponent
+from app.utils.pagination import safe_int_arg
 
 from . import my_applications_bp
 
@@ -34,6 +35,8 @@ from .services import (
 # list; the list page shows the same applications, 20 to a page.
 DASHBOARD_PANEL_ROWS = 10
 LIST_PAGE_SIZE = 20
+# Upper bound on a requested page number, so an absurd value stays a small integer.
+LIST_MAX_PAGE = 1_000_000
 
 
 def get_owned_apps():
@@ -90,24 +93,21 @@ def app_list():
     if ownership_type not in ApplicationOwner.OWNERSHIP_TYPES:
         ownership_type = None
     search = (request.args.get("search") or "").strip()
-    page = max(request.args.get("page", 1, type=int) or 1, 1)
+    page = safe_int_arg("page", 1, minimum=1, maximum=LIST_MAX_PAGE)
 
-    def load(page_number):
-        return get_user_applications(
-            current_user.id,
-            ownership_type=ownership_type,
-            search=search or None,
-            page=page_number,
-            per_page=LIST_PAGE_SIZE,
-        )
-
-    apps, total = load(page)
+    # A page past the end (a stale bookmark, or an assignment removed while the
+    # list was open) is served as the last page rather than an empty one; the
+    # service clamps it before it queries, so no oversized offset reaches the
+    # database.
+    apps, total = get_user_applications(
+        current_user.id,
+        ownership_type=ownership_type,
+        search=search or None,
+        page=page,
+        per_page=LIST_PAGE_SIZE,
+    )
     last_page = max(1, -(-total // LIST_PAGE_SIZE))
-    if page > last_page:
-        # A page past the end (a stale bookmark, or an assignment removed while
-        # the list was open) serves the last page rather than an empty one.
-        page = last_page
-        apps, total = load(page)
+    page = min(page, last_page)
 
     owned = get_ownership_summary(current_user.id)
     return render_template(

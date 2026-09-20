@@ -280,10 +280,15 @@ def test_a_page_past_the_end_serves_the_last_page(db_session, make_org, client, 
     assert "You don't have any applications assigned to you yet" not in text
     assert "No applications found" not in text
 
-    # Odd page values fall back to a real page as well.
-    for value in ("0", "-4", "abc"):
+    # Odd page values fall back to a real page as well, however large they are:
+    # the values around the largest offset PostgreSQL accepts, and far beyond it.
+    for value in (
+        "0", "-4", "abc", "1.5",
+        "461168601842738791", "461168601842738792", str(2**63), str(10**20), str(10**40),
+    ):
         page = _soup(_get(client, login_as, manager, f"/my-applications/list?page={value}"))
         assert len(_list_rows(page)) == 3, value
+        assert "(3 total)" in " ".join(page.get_text().split()), value
 
 
 def test_a_page_past_the_end_of_several_pages_serves_the_last_with_a_way_back(db_session, make_org, client, login_as):
@@ -433,3 +438,75 @@ def test_tab_counts_and_subtitle_follow_an_active_search(db_session, make_org, c
     for name in ("Primary", "Backup"):
         selected = _soup(_get(client, login_as, manager, f"/my-applications/list?search=Riverbed&type={name.lower()}"))
         assert len(_list_rows(selected)) == tabs[name]
+
+
+def _row_names(soup):
+    """Names of the application cards on a list page."""
+    return sorted(h.get_text(strip=True) for h in soup.find_all("h3") if h.get("class") == ["font-medium"])
+
+
+def test_an_ownership_row_of_another_organisation_counts_on_neither_side(db_session, make_org, client, login_as):
+    """A row whose organisation differs from its user's is ignored by the screens and the banner alike."""
+    org_a = make_org("own-numbers-mismatch-a")
+    org_b = make_org("own-numbers-mismatch-b")
+    portfolio = _make_user(db_session, org_a, "portfolio_manager", "mismatchportfolio")
+    manager = _make_user(db_session, org_a, "application_manager", "mismatchmanager")
+    stranger = _make_user(db_session, org_b, "application_manager", "mismatchstranger")
+
+    genuine = _make_app(db_session, org_a, "Genuine", "active")
+    row_elsewhere = _make_app(db_session, org_a, "Row elsewhere", "active")
+    user_elsewhere = _make_app(db_session, org_a, "User elsewhere", "active")
+    _make_app(db_session, org_a, "Unowned", "active")
+
+    _own(db_session, org_a, manager, genuine, "primary")
+    # The manager and the application are in this organisation, the row is not.
+    _own(db_session, org_b, manager, row_elsewhere, "primary")
+    # The row and the application are in this organisation, the user is not.
+    _own(db_session, org_a, stranger, user_elsewhere, "primary")
+
+    dash = _soup(_get(client, login_as, manager, "/my-applications/"))
+    assert _tile(dash, "Total Apps") == 1
+    assert len(_panel_rows(dash)) == 1
+    listing = _soup(_get(client, login_as, manager, "/my-applications/list"))
+    assert _tabs(listing)["All"] == 1
+    assert len(_list_rows(listing)) == 1
+
+    outsider = _soup(_get(client, login_as, stranger, "/my-applications/"))
+    assert _tile(outsider, "Total Apps") == 0
+
+    # The banner counts the same single application, so the two sides agree.
+    banner = _soup(_get(client, login_as, portfolio, "/applications/"))
+    assert _portfolio_banner(banner) == (1, 4)
+
+
+def test_search_text_is_matched_literally(db_session, make_org, client, login_as):
+    """%, _ and a backslash in a search term stand for themselves, not for patterns."""
+    org = make_org("own-numbers-literal")
+    manager = _make_user(db_session, org, "application_manager", "literal")
+    names = {
+        "percent": "Save 50% today",
+        "percent_decoy": "Save 50 today",
+        "underscore": "Batch_job runner",
+        "underscore_decoy": "BatchXjob runner",
+        "backslash": "Share\\drive",
+        "backslash_decoy": "Sharedrive",
+    }
+    apps = {key: _make_app(db_session, org, name, "active") for key, name in names.items()}
+    for a in apps.values():
+        _own(db_session, org, manager, a, "primary")
+
+    def search(term):
+        from urllib.parse import quote
+
+        page = _soup(_get(client, login_as, manager, "/my-applications/list?search=" + quote(term, safe="")))
+        return _row_names(page), _tabs(page)["All"]
+
+    for term, key in (("%", "percent"), ("50%", "percent"), ("_", "underscore"), ("h_j", "underscore"), ("\\", "backslash")):
+        rows, count = search(term)
+        assert count == 1, term
+        assert len(rows) == 1 and rows[0].startswith(names[key]), (term, rows)
+
+    # Text with no pattern characters still matches as a substring.
+    rows, count = search("runner")
+    assert count == 2
+    assert len(rows) == 2
