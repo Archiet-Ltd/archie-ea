@@ -417,3 +417,326 @@ def test_the_derived_edge_is_dashed_and_badged_and_explicit_edges_are_solid(
     assert badges.locator("text").inner_text() == "Worked out"
     # No colour of its own: every fill and stroke comes from a token class.
     assert page.locator("svg [style*='#'], svg [fill^='#'], svg [stroke^='#']").count() == 0
+
+
+# --- keyboard and focus helpers ---------------------------------------------
+
+RECORD_POINTER = """
+(() => {
+  const note = (type) => {
+    try {
+      const seen = JSON.parse(sessionStorage.getItem('__pointer') || '[]');
+      seen.push(type);
+      sessionStorage.setItem('__pointer', JSON.stringify(seen));
+    } catch (e) { /* recording only */ }
+  };
+  ['pointerdown', 'mousedown', 'mouseup', 'touchstart'].forEach((type) =>
+    window.addEventListener(type, () => note(type), true));
+})();
+"""
+
+DESCRIBE_FOCUS = """
+() => {
+  const a = document.activeElement;
+  if (!a || a === document.body) return null;
+  const r = a.getBoundingClientRect();
+  const cs = getComputedStyle(a);
+  const ring = (cs.boxShadow && cs.boxShadow !== 'none') ||
+    (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0);
+  return {
+    tag: a.tagName, id: a.id, role: a.getAttribute('role'),
+    text: (a.innerText || a.value || '').trim().slice(0, 80),
+    label: a.getAttribute('aria-label'),
+    node: a.getAttribute('data-node'),
+    fullDetail: a.hasAttribute('data-full-detail-toggle'),
+    inTable: !!a.closest('table[data-map-table]'),
+    inDialog: !!a.closest('#drawer-provenance [role=dialog]'),
+    visible: r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none',
+    focusVisible: a.matches(':focus-visible'),
+    ring: !!ring,
+    inViewport: r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth,
+  };
+}
+"""
+
+
+def _focus(page):
+    return page.evaluate(DESCRIBE_FOCUS)
+
+
+def _assert_focus_is_visible(state, where):
+    assert state is not None, "focus is on nothing at: %s" % where
+    assert state["visible"], "focus landed on a hidden element at %s: %r" % (where, state)
+    assert state["focusVisible"] and state["ring"], (
+        "no visible focus indicator at %s: %r" % (where, state))
+
+
+def _press(page, key, where):
+    page.keyboard.press(key)
+    if key in ("Tab", "Shift+Tab"):
+        _assert_focus_is_visible(_focus(page), where)
+
+
+def _tab_until(page, matches, where, limit=140):
+    """Press Tab until the focused control satisfies `matches`, checking every stop."""
+    for _ in range(limit):
+        _press(page, "Tab", where)
+        state = _focus(page)
+        if matches(state):
+            return state
+    raise AssertionError("never reached %s by Tab in %d presses; last stop: %r" % (
+        where, limit, _focus(page)))
+
+
+def _measure(locator):
+    box = locator.bounding_box()
+    assert box is not None, "control is not rendered"
+    return {"width": round(box["width"], 1), "height": round(box["height"], 1),
+            "x": box["x"], "y": box["y"]}
+
+
+# --- item 26: the picker is an ARIA 1.2 combobox ----------------------------
+
+
+def test_the_picker_is_an_aria_combobox_and_works_from_the_keyboard(
+    page, live_server, seeded, graph
+):
+    """The input is the combobox and keeps focus; the options are a listbox; the active
+    option is tracked with aria-activedescendant; Escape closes and leaves the typed
+    text; a polite status region says how many matches came back."""
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    _open_ask(page, live_server)
+    page.locator("#ask-question-impact").click()
+
+    box = page.locator("#ask-picker-input")
+    assert box.get_attribute("role") == "combobox"
+    assert box.get_attribute("aria-autocomplete") == "list"
+    assert box.get_attribute("aria-expanded") == "false"
+    listbox_id = box.get_attribute("aria-controls")
+    listbox = page.locator("#" + listbox_id)
+    assert listbox.get_attribute("role") == "listbox"
+    assert box.get_attribute("aria-label") == "Type a team, service or system name"
+    assert box.get_attribute("placeholder") == "Type a team, service or system name"
+
+    box.press_sequentially(graph["noun"], delay=15)
+    page.wait_for_selector("#%s [role=option]" % listbox_id)
+    assert box.get_attribute("aria-expanded") == "true"
+    options = listbox.locator("[role=option]")
+    assert options.count() == 4
+    ids = [options.nth(i).get_attribute("id") for i in range(4)]
+    assert all(ids) and len(set(ids)) == 4
+
+    status = page.locator("#ask-question-panel-impact [role=status]")
+    assert status.inner_text() == "4 results for %s" % graph["noun"]
+    assert status.get_attribute("aria-live") == "polite"
+    assert status.get_attribute("aria-atomic") == "true"
+
+    def active():
+        return box.get_attribute("aria-activedescendant")
+
+    assert not active()
+    page.keyboard.press("ArrowDown")
+    assert active() == ids[0]
+    page.keyboard.press("ArrowDown")
+    assert active() == ids[1]
+    page.keyboard.press("ArrowUp")
+    assert active() == ids[0]
+    page.keyboard.press("End")
+    assert active() == ids[3]
+    page.keyboard.press("Home")
+    assert active() == ids[0]
+    assert _focus_is_on(page, box), "DOM focus left the input"
+    assert options.nth(0).get_attribute("aria-selected") == "true"
+
+    page.keyboard.press("Escape")
+    assert box.get_attribute("aria-expanded") == "false"
+    assert not listbox.is_visible()
+    assert box.input_value() == graph["noun"]
+    assert _focus_is_on(page, box)
+
+    # Enter on the active option chooses it.
+    page.keyboard.press("ArrowDown")
+    assert box.get_attribute("aria-expanded") == "true"
+    page.keyboard.press("Enter")
+    page.wait_for_selector("[data-ask-row]")
+    assert box.get_attribute("aria-expanded") == "false"
+
+
+# --- item 25: the whole journey by keyboard alone ---------------------------
+
+
+def test_the_whole_journey_by_keyboard_alone(page, live_server, seeded, graph):
+    """Nothing here is a pointer event: page loads, Tab, arrows, Home, End, Enter, Space,
+    Escape and typing. Focus is visible at every stop and never on a hidden element, and
+    a recorder in the page confirms no pointer event fired."""
+    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    page.add_init_script(RECORD_POINTER)
+    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    _ready(page, "askSurface")
+    _dismiss_first_run(page)
+    page.evaluate("sessionStorage.removeItem('__pointer')")
+
+    # The skip link is the first stop and moves focus to the page content.
+    _press(page, "Tab", "the skip link")
+    assert _focus(page)["text"] == "Skip to main content"
+    page.keyboard.press("Enter")
+    _tab_until(page, lambda s: s["id"] == "ask-question-impact", "the question")
+    page.keyboard.press("Enter")
+    assert _focus(page)["id"] == "ask-picker-input"
+    _assert_focus_is_visible(_focus(page), "the picker")
+
+    page.keyboard.type(graph["noun"], delay=25)
+    page.wait_for_selector("#ask-picker-listbox [role=option]")
+    wanted = graph["names"]["service"]
+    for _ in range(10):
+        page.keyboard.press("ArrowDown")
+        active = page.locator("#ask-picker-input").get_attribute("aria-activedescendant")
+        if page.locator("#" + active).inner_text().strip() == wanted:
+            break
+    else:
+        raise AssertionError("ArrowDown never reached %r" % wanted)
+    page.keyboard.press("Enter")
+    page.wait_for_selector("[data-ask-row]")
+
+    # A row's Why? opens the drawer; focus moves into it.
+    _tab_until(page, lambda s: s["text"] == "Why?", "a row's Why?")
+    page.evaluate("window.__opener = document.activeElement")
+    page.keyboard.press("Enter")
+    page.locator("#drawer-provenance [role=dialog]").wait_for(state="visible")
+    page.wait_for_function("!!document.activeElement.closest('#drawer-provenance [role=dialog]')")
+    _assert_focus_is_visible(_focus(page), "the drawer")
+
+    # Tab inside the drawer to Full detail and open it.
+    _tab_until(page, lambda s: s["fullDetail"], "Full detail in the drawer", limit=12)
+    page.keyboard.press("Enter")
+    page.locator("#drawer-provenance [data-full-detail-region]").wait_for(state="visible")
+
+    # Escape closes it and focus is back on the exact control that opened it.
+    page.keyboard.press("Escape")
+    page.locator("#drawer-provenance [role=dialog]").wait_for(state="hidden")
+    assert page.evaluate("document.activeElement === window.__opener")
+    _assert_focus_is_visible(_focus(page), "the opener after closing the drawer")
+
+    # On to the Twin map through the row's link.
+    _tab_until(page, lambda s: s["text"] == "View on twin map", "View on twin map")
+    page.keyboard.press("Enter")
+    page.wait_for_url(re.compile(r"/intelligence/twin-map\?element=\d+$"))
+    _ready(page, "twinMapSurface")
+    page.wait_for_selector("svg .intel-edge")
+
+    # Hop depth: arrows, Home and End, no pointer.
+    _tab_until(page, lambda s: s["id"] == "twin-hop-depth", "the hop depth control")
+    with page.expect_request(lambda r: "max_depth=1" in r.url and "/impact/" in r.url):
+        page.keyboard.press("Home")
+    assert page.locator("#twin-hop-depth").input_value() == "1"
+    page.keyboard.press("ArrowRight")
+    assert page.locator("#twin-hop-depth").input_value() == "2"
+    with page.expect_request(lambda r: "max_depth=5" in r.url and "/impact/" in r.url):
+        page.keyboard.press("End")
+    assert page.locator("#twin-hop-depth").input_value() == "5"
+
+    # The worked-out toggle is a checkbox: Space flips it and re-asks.
+    _tab_until(page, lambda s: s["id"] == "twin-show-derived", "the worked-out toggle")
+    with page.expect_request(lambda r: "include_derived=false" in r.url and "/impact/" in r.url):
+        page.keyboard.press("Space")
+    with page.expect_request(lambda r: "include_derived=true" in r.url and "/impact/" in r.url):
+        page.keyboard.press("Space")
+
+    # A map element is reachable and selectable, and so is the table.
+    _tab_until(page, lambda s: bool(s["node"]), "a map element")
+    page.keyboard.press("Enter")
+    assert page.locator("button[data-node][aria-pressed=true]").count() == 1
+    _tab_until(page, lambda s: s["inTable"], "the map table")
+    assert page.evaluate("JSON.parse(sessionStorage.getItem('__pointer') || '[]')") == [], (
+        "a pointer event fired during a keyboard-only journey")
+
+
+# --- item 27: target size ---------------------------------------------------
+
+
+def _record(measurements):
+    folder = os.environ.get("T004B_EVIDENCE_DIR")
+    print("[target-size] " + json.dumps(measurements, sort_keys=True))
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, "target-size.json"), "w", encoding="utf-8") as fh:
+            json.dump(measurements, fh, indent=2, sort_keys=True)
+
+
+def test_every_control_is_at_least_24_by_24_css_pixels(page, live_server, seeded, graph):
+    """Measured in the browser on the rendered controls, and recorded. Each one meets
+    the size itself; none relies on the spacing exception."""
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    measurements = {}
+    _open_ask(page, live_server)
+    page.locator("#ask-question-impact").click()
+    _type_and_wait(page, "ask", graph["noun"])
+    _pick_by_click(page, "ask", graph["names"]["service"])
+    page.wait_for_selector("[data-ask-row]")
+    row = _row_for(page, graph["names"]["gateway"], "explicit")
+    measurements["Why? (Ask row)"] = _measure(row.get_by_role("button", name="Why?"))
+    measurements["Full detail (Ask row)"] = _measure(row.locator("[data-full-detail-toggle]"))
+    measurements["View on twin map"] = _measure(row.get_by_role("link", name="View on twin map"))
+    row.get_by_role("button", name="Why?").click()
+    dialog = page.locator("#drawer-provenance [role=dialog]")
+    dialog.wait_for(state="visible")
+    measurements["Close drawer"] = _measure(dialog.get_by_role("button", name="Close drawer"))
+    measurements["Full detail (drawer)"] = _measure(dialog.locator("[data-full-detail-toggle]"))
+    page.keyboard.press("Escape")
+
+    _open_twin_map(page, live_server, graph["service"])
+    page.wait_for_selector("svg .intel-edge")
+    measurements["Hop depth slider"] = _measure(page.locator("#twin-hop-depth"))
+    measurements["Worked-out toggle"] = _measure(page.locator("#twin-show-derived"))
+    measurements["Details (rail)"] = _measure(page.locator("#twin-rail-toggle"))
+    nodes = page.locator("[data-graph-nodes] button")
+    for index in range(nodes.count()):
+        measurements["Map element %d" % (index + 1)] = _measure(nodes.nth(index))
+    first = page.locator("[data-map-row]").first
+    measurements["Why? (table row)"] = _measure(first.get_by_role("button", name="Why?"))
+    measurements["Centre on this"] = _measure(first.get_by_role("button", name="Centre on this"))
+    measurements["Full detail (rail)"] = _measure(page.locator("#twin-rail [data-full-detail-toggle]"))
+    _record(measurements)
+
+    small = {name: m for name, m in measurements.items()
+             if m["width"] < MIN_TARGET or m["height"] < MIN_TARGET}
+    assert not small, "controls under %dx%d CSS pixels: %r" % (MIN_TARGET, MIN_TARGET, small)
+
+
+# --- item 28: the slider needs no dragging ----------------------------------
+
+
+def test_the_hop_depth_slider_works_without_dragging(page, live_server, seeded, graph):
+    """A native range input: keys and a single click set it, it has a name, and the new
+    value is announced politely."""
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    _open_twin_map(page, live_server, graph["service"])
+    page.wait_for_selector("svg .intel-edge")
+    slider = page.get_by_role("slider", name="Hop depth")
+    assert slider.count() == 1
+    assert page.locator("#twin-hop-depth").evaluate("el => el.tagName + el.type") == "INPUTrange"
+    live = page.locator("[role=status][aria-live=polite]", has_text=re.compile(r"^Hop depth: \d$"))
+
+    slider.focus()
+    page.keyboard.press("Home")
+    assert slider.input_value() == "1"
+    page.keyboard.press("ArrowRight")
+    assert slider.input_value() == "2"
+    page.keyboard.press("ArrowUp")
+    assert slider.input_value() == "3"
+    page.keyboard.press("ArrowLeft")
+    assert slider.input_value() == "2"
+    page.keyboard.press("ArrowDown")
+    assert slider.input_value() == "1"
+    page.keyboard.press("End")
+    assert slider.input_value() == "5"
+    assert live.count() == 1
+    assert live.get_attribute("aria-atomic") == "true"
+    assert live.inner_text() == "Hop depth: 5"
+
+    # One click on the track, no drag: the value moves to where the click landed.
+    box = slider.bounding_box()
+    with page.expect_request(lambda r: "/impact/" in r.url and "max_depth=" in r.url):
+        page.mouse.click(box["x"] + box["width"] * 0.2, box["y"] + box["height"] / 2)
+    assert int(slider.input_value()) < 5
+    assert live.inner_text() == "Hop depth: %s" % slider.input_value()
