@@ -52,6 +52,7 @@ import re
 import pytest
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
+from .intelligence_graph import seed_impact_graph
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -128,6 +129,21 @@ AUDIT = [
     ("business_architect", "/capability-map/"),
     ("cto", "/dashboard/overview"),
     ("enterprise_architect", "/ai-chat"),
+    # Ask and Twin map join the list at zero accepted violations. They are never
+    # baselined: a finding on either is fixed, not recorded. Their states with data
+    # and with the provenance drawer open are audited separately, below.
+    ("solution_architect", "/intelligence/ask"),
+    ("enterprise_architect", "/intelligence/twin-map"),
+]
+
+# The states of the two new surfaces that a plain page load cannot reach: the answer
+# on Ask, the map with its table on Twin map, and the provenance drawer open (with
+# "Full detail" expanded, because that is where the technical detail lives) over each.
+INTELLIGENCE_STATES = [
+    ("solution_architect", "Ask, with an answer", "ask"),
+    ("solution_architect", "Ask, provenance drawer open", "ask-drawer"),
+    ("enterprise_architect", "Twin map, with the map and its table", "map"),
+    ("enterprise_architect", "Twin map, provenance drawer open", "map-drawer"),
 ]
 
 # An impact level at which a violation is not negotiable: these block a user
@@ -327,6 +343,70 @@ def audited(axe_module, axe_engine, browser, live_server, seeded):
                 for rule in REQUIRED_RULES
             }
             results.engine_versions.add((data.get("testEngine") or {}).get("version"))
+        finally:
+            ctx.close()
+    return results
+
+
+def _wait_for_component(page, factory):
+    page.wait_for_function(
+        "(f) => { const el = document.querySelector('[x-data=\"' + f + '()\"]');"
+        " return !!(el && el._x_dataStack); }",
+        arg=factory,
+    )
+
+
+def _reach_intelligence_state(page, base, graph, kind):
+    if kind.startswith("ask"):
+        page.goto(base + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _wait_for_component(page, "askSurface")
+        page.click("#ask-question-impact")
+        page.press("#ask-picker-input", "Control+a")
+        page.locator("#ask-picker-input").press_sequentially(graph["noun"], delay=15)
+        page.wait_for_selector("#ask-picker-listbox [role=option]")
+        page.locator("#ask-picker-listbox [role=option]",
+                     has_text=graph["names"]["service"]).click()
+        page.wait_for_selector("[data-ask-row]")
+        opener = page.locator("[data-ask-row][data-kind=derived]").get_by_role("button", name="Why?")
+    else:
+        page.goto(base + "/intelligence/twin-map?element=%s" % graph["service"],
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _wait_for_component(page, "twinMapSurface")
+        page.wait_for_selector("svg .intel-edge")
+        opener = page.locator("[data-map-row][data-kind=derived]").get_by_role("button", name="Why?")
+    if kind.endswith("-drawer"):
+        opener.click()
+        dialog = page.locator("#drawer-provenance [role=dialog]")
+        dialog.wait_for(state="visible")
+        dialog.locator("[data-full-detail-toggle]").click()
+        dialog.locator("[data-full-detail-region]").wait_for(state="visible")
+    # Let transitions settle so contrast is read from the final colours.
+    page.wait_for_timeout(600)
+
+
+@pytest.fixture(scope="module")
+def audited_intelligence_states(axe_module, axe_engine, browser, live_server, seeded):
+    """Run axe on the states of Ask and Twin map that need data or a click to reach."""
+    _require_rule_set(axe_engine)
+    graph = seed_impact_graph(seeded["ids"]["org"], "Auditpay")
+    axe = axe_module.Axe()
+    results = _AuditResults()
+    for archetype, label, kind in INTELLIGENCE_STATES:
+        ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+        ctx.set_default_timeout(PAGE_TIMEOUT)
+        ctx.set_default_navigation_timeout(PAGE_TIMEOUT)
+        page = ctx.new_page()
+        try:
+            _login(page, live_server, seeded["emails"][archetype])
+            _reach_intelligence_state(page, live_server, graph, kind)
+            report = axe.run(page, options={"runOnly": {"type": "tag", "values": TAGS}})
+            data = report.response if hasattr(report, "response") else report
+            results[label] = {
+                v["id"]: _violation_evidence(v) for v in data.get("violations", [])
+            }
+            results.evaluated[label] = {
+                r["id"] for kind_name in RESULT_KINDS for r in data.get(kind_name, [])
+            }
         finally:
             ctx.close()
     return results
@@ -782,6 +862,31 @@ def test_the_audit_actually_ran(audited, axe_engine):
             "the %r rule is in the loaded rule list but axe reported nothing for it "
             "on %s - the tag set did not select it, so a clean result there says "
             "nothing about it" % (rule, ", ".join(unevaluated)))
+
+
+def test_ask_and_twin_map_are_audited_and_carry_no_accepted_violations(audited):
+    """Both pages are in the audited list, were audited, and hold nothing in the
+    baseline: they start at zero and stay there."""
+    accepted = _load_baseline()
+    for path in ("/intelligence/ask", "/intelligence/twin-map"):
+        assert path in {p for _a, p in AUDIT}, "%s is missing from the audited list" % path
+        assert path in audited, "%s was not audited" % path
+        assert path not in accepted, "%s must never be baselined" % path
+        assert audited[path] == {}, "%s has violations: %r" % (path, audited[path])
+
+
+def test_the_states_of_ask_and_twin_map_have_no_violations(audited_intelligence_states):
+    """The answer on Ask, the map with its table, and the provenance drawer open with
+    "Full detail" expanded over each: zero violations under the audit's tag set, and
+    the 2.2 target-size rule was evaluated on every one. Never baselined."""
+    states = audited_intelligence_states
+    assert set(states) == {label for _a, label, _k in INTELLIGENCE_STATES}
+    accepted = _load_baseline()
+    for label, violations in sorted(states.items()):
+        assert label not in accepted
+        assert violations == {}, "%s has violations: %r" % (label, violations)
+        assert "target-size" in states.evaluated[label], (
+            "the target-size rule did not run on %r, so a clean result says nothing" % label)
 
 
 def test_write_baseline_when_asked(audited):
