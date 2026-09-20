@@ -116,10 +116,11 @@ def graph(seeded, live_server):
     return out
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def bare_tenant(live_server):
-    """A second organisation with two connected elements, no owner and no worked-out
-    connections, for the states that depend on something being absent."""
+    """A fresh organisation with two connected elements, no owner and no worked-out
+    connections, for the states that depend on something being absent. One per test:
+    asking for the connections to be worked out changes the tenant it runs in."""
     from app import create_app, db
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
     from app.models.organization import Organization
@@ -298,7 +299,7 @@ def _focus_is_on(page, locator):
     )
 
 
-# --- item 1, 9, 21-23: the journey with a pointer ---------------------------
+# --- the journey with a pointer ---------------------------
 
 
 @pytest.mark.parametrize("persona", ["solution_architect", "enterprise_architect"])
@@ -495,7 +496,7 @@ def _measure(locator):
             "x": box["x"], "y": box["y"]}
 
 
-# --- item 26: the picker is an ARIA 1.2 combobox ----------------------------
+# --- the picker is an ARIA 1.2 combobox ----------------------------
 
 
 def test_the_picker_is_an_aria_combobox_and_works_from_the_keyboard(
@@ -562,7 +563,7 @@ def test_the_picker_is_an_aria_combobox_and_works_from_the_keyboard(
     assert box.get_attribute("aria-expanded") == "false"
 
 
-# --- item 25: the whole journey by keyboard alone ---------------------------
+# --- the whole journey by keyboard alone ---------------------------
 
 
 def test_the_whole_journey_by_keyboard_alone(page, live_server, seeded, graph):
@@ -651,7 +652,7 @@ def test_the_whole_journey_by_keyboard_alone(page, live_server, seeded, graph):
         "a pointer event fired during a keyboard-only journey")
 
 
-# --- item 27: target size ---------------------------------------------------
+# --- target size ---------------------------------------------------
 
 
 def _record(measurements):
@@ -703,7 +704,7 @@ def test_every_control_is_at_least_24_by_24_css_pixels(page, live_server, seeded
     assert not small, "controls under %dx%d CSS pixels: %r" % (MIN_TARGET, MIN_TARGET, small)
 
 
-# --- item 28: the slider needs no dragging ----------------------------------
+# --- the slider needs no dragging ----------------------------------
 
 
 def test_the_hop_depth_slider_works_without_dragging(page, live_server, seeded, graph):
@@ -740,3 +741,472 @@ def test_the_hop_depth_slider_works_without_dragging(page, live_server, seeded, 
         page.mouse.click(box["x"] + box["width"] * 0.2, box["y"] + box["height"] / 2)
     assert int(slider.input_value()) < 5
     assert live.inner_text() == "Hop depth: %s" % slider.input_value()
+
+
+# --- focus is never obscured ----------------------------------------
+
+
+def _uncovered(page, locator):
+    """The focused control is what sits at its own centre, so nothing covers it."""
+    return page.evaluate(
+        """(el) => {
+            const r = el.getBoundingClientRect();
+            const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            return !!top && (top === el || el.contains(top) || top.contains(el));
+        }""",
+        locator.element_handle(),
+    )
+
+
+def test_focus_is_never_obscured_by_the_drawer_or_the_side_panel(
+    page, live_server, seeded, graph
+):
+    """With the drawer open, focus is inside it and uncovered. On the map, the last
+    element's focus ring is fully visible; closing the side panel from a map element
+    moves neither the focus nor the selection."""
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    _open_ask(page, live_server)
+    page.locator("#ask-question-impact").click()
+    _type_and_wait(page, "ask", graph["noun"])
+    _pick_by_click(page, "ask", graph["names"]["service"])
+    page.wait_for_selector("[data-ask-row]")
+    _rows(page).first.get_by_role("button", name="Why?").click()
+    dialog = page.locator("#drawer-provenance [role=dialog]")
+    dialog.wait_for(state="visible")
+    page.wait_for_function("!!document.activeElement.closest('#drawer-provenance [role=dialog]')")
+    for _ in range(6):
+        state = _focus(page)
+        assert state["inDialog"], "focus left the open drawer: %r" % state
+        assert _uncovered(page, page.locator(":focus"))
+        page.keyboard.press("Tab")
+    page.keyboard.press("Escape")
+    dialog.wait_for(state="hidden")
+
+    _open_twin_map(page, live_server, graph["service"])
+    page.wait_for_selector("svg .intel-edge")
+    assert page.locator("#twin-rail").is_visible()
+    canvas = _measure(page.locator("[data-twin-canvas]"))
+    assert canvas["width"] >= 600, "the map is narrower than 600 CSS pixels: %r" % canvas
+
+    page.locator("#twin-hop-depth").focus()
+    last = page.locator("[data-graph-nodes] button").last
+    last_id = last.get_attribute("data-node")
+    reached = _tab_until(page, lambda s: s["node"] == last_id, "the last map element")
+    assert reached["ring"] and reached["inViewport"]
+    assert _uncovered(page, last)
+
+    # Choose it, then close the side panel with Escape from that element.
+    page.keyboard.press("Enter")
+    assert last.get_attribute("aria-pressed") == "true"
+    page.keyboard.press("Escape")
+    assert not page.locator("#twin-rail").is_visible()
+    assert _focus(page)["node"] == last_id
+    assert last.get_attribute("aria-pressed") == "true"
+    assert page.locator("button[data-node][aria-pressed=true]").count() == 1
+
+    # And back again with the Details control: the selection is where it was.
+    page.locator("#twin-rail-toggle").focus()
+    page.keyboard.press("Enter")
+    assert page.locator("#twin-rail").is_visible()
+    assert last.get_attribute("aria-pressed") == "true"
+
+
+# --- the drawer is named, escapable, and gives focus back -------------
+
+
+def test_the_drawer_is_named_by_the_element_and_kind_and_returns_focus(
+    page, live_server, seeded, graph
+):
+    """The dialog's accessible name carries the element name and the kind badge; Escape
+    closes it; focus returns to the very control that opened it."""
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    _open_ask(page, live_server)
+    page.locator("#ask-question-impact").click()
+    _type_and_wait(page, "ask", graph["noun"])
+    _pick_by_click(page, "ask", graph["names"]["service"])
+    page.wait_for_selector("[data-ask-row]")
+
+    gateway = _row_for(page, graph["names"]["gateway"], "explicit")
+    opener = gateway.get_by_role("button", name="Why?")
+    opener.click()
+    dialog = page.get_by_role("dialog", name=re.compile(re.escape(graph["names"]["gateway"]) + r".*Measured"))
+    dialog.wait_for(state="visible")
+    title = page.locator("#drawer-title-provenance")
+    assert graph["names"]["gateway"] in title.inner_text()
+    assert "Measured" in title.inner_text()
+    assert page.locator("#drawer-provenance [role=dialog]").get_attribute("aria-labelledby") == "drawer-title-provenance"
+    assert page.locator("#drawer-provenance [role=dialog]").get_attribute("aria-modal") == "true"
+    # An explicit connection carries no sentence, and none is invented.
+    assert page.locator("#drawer-provenance [data-plain-terms]").is_visible() is False
+
+    page.keyboard.press("Escape")
+    page.locator("#drawer-provenance [role=dialog]").wait_for(state="hidden")
+    assert page.evaluate("(el) => document.activeElement === el", opener.element_handle())
+
+    # The same drawer for a worked-out connection, named the same way.
+    derived = _row_for(page, graph["names"]["ops"], "derived")
+    derived.get_by_role("button", name="Why?").click()
+    named = page.get_by_role("dialog", name=re.compile(re.escape(graph["names"]["ops"])))
+    named.wait_for(state="visible")
+    assert page.locator("#drawer-provenance [data-plain-terms]").is_visible()
+
+
+# --- the map has a real text equivalent -----------------------------
+
+
+def _drawn_edges(page):
+    return sorted(page.eval_on_selector_all(
+        "svg g.intel-edge", "els => els.map(e => e.getAttribute('data-edge'))"))
+
+
+def _listed_edges(page):
+    return sorted(page.eval_on_selector_all(
+        "[data-map-row]", "els => els.map(e => e.getAttribute('data-edge-row'))"))
+
+
+def test_the_map_table_lists_every_edge_the_graph_draws_and_no_others(
+    page, live_server, seeded, graph
+):
+    """The table is on the page with no toggle, is built from the same answer as the
+    picture, and moves with the hop depth and the worked-out toggle."""
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    _open_twin_map(page, live_server, graph["service"])
+    page.wait_for_selector("svg .intel-edge")
+    names = graph["names"]
+
+    # No control anywhere on the page swaps the picture for the table.
+    assert page.get_by_role("button", name=re.compile(r"table|list|text", re.I)).count() == 0
+    table = page.locator("table[data-map-table]")
+    assert table.is_visible()
+    payload = _impact_api(page, live_server, graph["service"])
+    assert len(payload["rows"]) == 4
+    assert page.locator("[data-map-row]").count() == 4
+    assert _drawn_edges(page) == _listed_edges(page)
+    assert len(_drawn_edges(page)) == 4
+
+    caption = table.locator("caption").inner_text()
+    assert caption == "Connections for %s: 4 things, 4 connections" % names["service"]
+    graph_label = page.locator("[data-graph-svg]")
+    assert graph_label.get_attribute("role") == "img"
+    assert names["service"] in graph_label.get_attribute("aria-label")
+    assert "4 things, 4 connections" in graph_label.get_attribute("aria-label")
+
+    kinds = page.eval_on_selector_all(
+        "[data-map-row]", "els => els.map(e => [e.getAttribute('data-kind'), e.children[3].innerText.trim()])")
+    assert sorted(kinds) == [["derived", "Worked out"], ["explicit", "Explicit"],
+                             ["explicit", "Explicit"], ["explicit", "Explicit"]]
+    every_target = {names["gateway"], names["portal"], names["ops"]}
+    targets = page.eval_on_selector_all(
+        "[data-map-row]", "els => els.map(e => e.children[2].innerText.trim())")
+    assert set(targets) == every_target
+    sources = page.eval_on_selector_all(
+        "[data-map-row]", "els => els.map(e => e.children[0].innerText.trim())")
+    assert set(sources) <= {names["service"], names["gateway"]}
+    # The centre is named in the caption; every other element is in a Source or Target cell.
+    assert (set(sources) | set(targets)) | {names["service"]} == set(names.values())
+
+    # Hop depth changes the picture and the table together.
+    page.locator("#twin-hop-depth").focus()
+    with page.expect_request(lambda r: "max_depth=1" in r.url and "/impact/" in r.url):
+        page.keyboard.press("Home")
+    page.wait_for_function("document.querySelectorAll('[data-map-row]').length === 2")
+    assert _drawn_edges(page) == _listed_edges(page) and len(_drawn_edges(page)) == 2
+    assert page.locator("table[data-map-table] caption").inner_text() == (
+        "Connections for %s: 3 things, 2 connections" % names["service"])
+    with page.expect_request(lambda r: "max_depth=3" in r.url and "/impact/" in r.url):
+        page.keyboard.press("ArrowRight")
+        page.keyboard.press("ArrowRight")
+    page.wait_for_function("document.querySelectorAll('[data-map-row]').length === 4")
+
+    # The worked-out toggle does the same.
+    with page.expect_request(lambda r: "include_derived=false" in r.url and "/impact/" in r.url):
+        page.locator("#twin-show-derived").uncheck()
+    page.wait_for_function("document.querySelectorAll('[data-map-row]').length === 3")
+    assert _drawn_edges(page) == _listed_edges(page) and len(_drawn_edges(page)) == 3
+    assert page.locator("[data-map-row][data-kind=derived]").count() == 0
+    page.locator("#twin-show-derived").check()
+    page.wait_for_function("document.querySelectorAll('[data-map-row]').length === 4")
+
+    # Each row's Why? opens the same drawer.
+    derived_row = page.locator("[data-map-row][data-kind=derived]")
+    derived_row.get_by_role("button", name="Why?").click()
+    dialog = page.locator("#drawer-provenance [role=dialog]")
+    dialog.wait_for(state="visible")
+    assert page.locator("#drawer-provenance [data-plain-terms]").inner_text() == next(
+        row["relation"]["plain_terms"] for row in payload["rows"] if row["relation"]["kind"] == "derived")
+    page.keyboard.press("Escape")
+    dialog.wait_for(state="hidden")
+
+    # A row can re-centre the map on its target.
+    page.locator("[data-map-row][data-kind=explicit]").filter(
+        has=page.get_by_role("cell", name=names["gateway"], exact=True).nth(0)
+    ).get_by_role("button", name="Centre on this").first.click()
+    page.wait_for_function(
+        "document.querySelector('table[data-map-table] caption').textContent.startsWith('Connections for %s')"
+        % names["gateway"])
+
+
+# --- technical detail lives only inside Full detail -------------------
+
+LEVEL_THREE = """
+(values) => {
+  const scope = document.querySelector('main');
+  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+  const found = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    const text = node.textContent;
+    if (!text.trim()) continue;
+    const el = node.parentElement;
+    if (el.closest('script, style')) continue;
+    if (el.closest('[data-full-detail-region]')) continue;
+    for (const value of values) {
+      if (text.includes(value)) found.push([value, text.trim().slice(0, 80)]);
+    }
+  }
+  return found;
+}
+"""
+
+
+def test_technical_detail_appears_only_inside_full_detail(page, live_server, seeded, graph):
+    """The ArchiMate type, rule, raw confidence, engine version and the time a
+    connection was worked out are on the page, and only inside a Full detail region."""
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    _open_ask(page, live_server)
+    page.locator("#ask-question-impact").click()
+    _type_and_wait(page, "ask", graph["noun"])
+    _pick_by_click(page, "ask", graph["names"]["service"])
+    page.wait_for_selector("[data-ask-row]")
+    technical = ["BusinessActor", "ApplicationComponent", "serving-through-serving", "0.82"]
+    assert page.evaluate(LEVEL_THREE, technical) == []
+    _row_for(page, graph["names"]["ops"], "derived").locator("[data-full-detail-toggle]").click()
+    region = _row_for(page, graph["names"]["ops"], "derived").locator("[data-full-detail-region]")
+    assert region.is_visible()
+    inside = region.inner_text()
+    for value in ("BusinessActor", "serving-through-serving", "0.82", "1.0", "business"):
+        assert value in inside
+    assert re.search(r"\d{4}-\d{2}-\d{2}T", inside), "the time it was worked out is missing"
+    assert page.evaluate(LEVEL_THREE, technical + ["1.0"]) == []
+
+    # Same on the map, with the drawer open as well.
+    _open_twin_map(page, live_server, graph["service"])
+    page.wait_for_selector("svg .intel-edge")
+    assert page.evaluate(LEVEL_THREE, technical) == []
+    page.locator("[data-map-row][data-kind=derived]").get_by_role("button", name="Why?").click()
+    page.locator("#drawer-provenance [role=dialog]").wait_for(state="visible")
+    assert page.evaluate(LEVEL_THREE, technical) == []
+
+
+# --- the empty workspace ---------------------------------------------
+
+
+@pytest.mark.parametrize("path", ["/intelligence/ask", "/intelligence/twin-map"])
+def test_an_empty_workspace_says_so_and_leads_to_setup(path, page, live_server, empty_tenant):
+    """Nothing modelled: the page shows the setup state in place of the picker, its
+    button lands on the guided setup, and nothing mentions connectors or onboarding."""
+    _login(page, live_server, empty_tenant["email"])
+    page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    _dismiss_first_run(page)
+    main = page.locator("main")
+    assert main.get_by_role("heading", name="Nothing is modelled yet").is_visible()
+    assert "Add your systems and teams, and this is where you will ask questions about them." in main.inner_text()
+    assert main.get_by_role("combobox").count() == 0
+    text = main.inner_text()
+    assert not re.search(r"connector|onboarding", text, re.I)
+    assert page.locator("main a[href*='onboarding']").count() == 0
+    button = main.get_by_role("link", name="Set up your workspace")
+    assert button.get_attribute("href") == "/dashboard/overview"
+    button.click()
+    page.wait_for_url(re.compile(r"/dashboard/overview"))
+    page.wait_for_selector("text=Set up your workspace")
+
+
+@pytest.mark.parametrize("path", ["/intelligence/ask", "/intelligence/twin-map"])
+def test_a_populated_workspace_shows_the_picker_and_no_setup_state(
+    path, page, live_server, seeded, graph
+):
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    main = page.locator("main")
+    assert "Nothing is modelled yet" not in main.inner_text()
+    assert main.get_by_text("Set up your workspace").count() == 0
+    if path.endswith("/ask"):
+        page.wait_for_selector("#ask-question-impact")
+    else:
+        page.wait_for_selector("#twin-picker-input")
+
+
+# --- absence, the not-worked-out state, busy and error states -
+
+
+def _ask_in_bare_tenant(page, live_server, bare):
+    _login(page, live_server, bare["email"])
+    _dismiss_first_run(page)
+    _open_ask(page, live_server)
+    page.locator("#ask-question-impact").click()
+    _type_and_wait(page, "ask", bare["noun"])
+    _pick_by_click(page, "ask", bare["head_name"])
+
+
+def test_missing_owner_missing_health_and_no_derivation_read_as_three_distinct_reasons(
+    page, live_server, bare_tenant
+):
+    """A tenant with no owner, no health signal and nothing worked out shows three
+    different statements, each as text a screen reader reads, and not a zero."""
+    _ask_in_bare_tenant(page, live_server, bare_tenant)
+    page.wait_for_selector("[data-ask-row]")
+    row = _rows(page).first
+    owner = row.get_by_label("Owner: Not recorded")
+    assert owner.count() == 1 and "Not recorded" in owner.inner_text()
+    health = row.get_by_label("Health: Not recorded yet")
+    assert health.count() == 1 and "Not recorded yet" in health.inner_text()
+    banner = page.get_by_text("We haven't worked out the indirect connections for your model yet.")
+    assert banner.is_visible()
+    assert page.get_by_role("button", name="Work them out now").is_visible()
+    # No zero stands in for an absent value anywhere in the results.
+    cells = page.eval_on_selector_all(
+        "#ask-results *", "els => els.filter(e => e.children.length === 0)"
+        ".map(e => e.textContent.trim()).filter(t => t === '0' || t === '0%')")
+    assert cells == []
+    # No badge on these pages is an icon on its own: each carries its words.
+    badges = page.locator("#ask-results span:has(> i[data-lucide]), #ask-results span:has(> svg)")
+    for index in range(badges.count()):
+        badge = badges.nth(index)
+        if badge.is_visible():
+            assert badge.inner_text().strip(), "an icon-only badge is on the page"
+
+
+def test_not_computed_is_a_state_with_a_working_action(page, live_server, bare_tenant):
+    """The sentence and a working button, never a zero or a blank. The button posts the
+    tenant scope, then the page asks again; a 409 reads as the stated line."""
+    _ask_in_bare_tenant(page, live_server, bare_tenant)
+    page.wait_for_selector("[data-ask-row]")
+    sentence = "We haven't worked out the indirect connections for your model yet."
+    banner = page.locator("[role=status]", has_text=sentence)
+    assert banner.is_visible()
+    assert banner.inner_text().strip() != "0"
+
+    with page.expect_request(
+        lambda r: r.method == "POST" and r.url.endswith("/api/v1/intelligence/derivation/recompute")
+    ) as posted:
+        with page.expect_request(lambda r: "/api/v1/intelligence/impact/" in r.url and r.method == "GET") as requery:
+            page.get_by_role("button", name="Work them out now").click()
+    assert json.loads(posted.value.post_data) == {"scope": "tenant"}
+    assert requery.value.url.split("?")[0].endswith("/impact/%s" % bare_tenant["head"])
+
+
+def test_a_recalculation_already_running_reads_as_a_plain_line(page, live_server, bare_tenant):
+    """A 409 from the recompute shows the stated sentence and invents nothing."""
+    page.route(
+        "**/api/v1/intelligence/derivation/recompute",
+        lambda route: route.fulfill(
+            status=409, content_type="application/json",
+            body=json.dumps({"success": False, "error": "locked", "code": "RECOMPUTE_LOCKED"})),
+    )
+    _ask_in_bare_tenant(page, live_server, bare_tenant)
+    page.wait_for_selector("[data-ask-row]")
+    page.get_by_role("button", name="Work them out now").click()
+    line = page.get_by_text("A recalculation is already running. Try again shortly.")
+    line.wait_for(state="visible")
+    assert page.get_by_text("We haven't worked out the indirect connections for your model yet.").is_visible()
+    assert page.locator("[data-ask-row]").count() == 1
+
+
+def test_the_results_are_busy_while_asking_and_errors_are_announced(
+    page, live_server, seeded, graph
+):
+    """aria-busy is true while an answer is on its way and false after; a failed answer
+    reads as a plain sentence beside the could-not-measure badge inside a status region;
+    an answer with no rows says nothing is recorded; nothing invented fills any of them."""
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    _open_ask(page, live_server)
+    page.locator("#ask-question-impact").click()
+    _type_and_wait(page, "ask", graph["noun"])
+
+    held = []
+    page.route("**/api/v1/intelligence/impact/**", lambda route: held.append(route))
+    _pick_by_click(page, "ask", graph["names"]["service"])
+    page.wait_for_function("document.querySelector('#ask-results').getAttribute('aria-busy') === 'true'")
+    assert page.get_by_text("Tracing the impact chain…").first.is_visible()
+    assert page.locator("#ask-results [role=status]").count() >= 1
+    held[0].continue_()
+    page.wait_for_selector("[data-ask-row]")
+    assert page.locator("#ask-results").get_attribute("aria-busy") == "false"
+    page.unroute("**/api/v1/intelligence/impact/**")
+
+    # A failed answer.
+    page.route(
+        "**/api/v1/intelligence/impact/**",
+        lambda route: route.fulfill(status=500, content_type="application/json",
+                                    body=json.dumps({"success": False, "error": "down"})),
+    )
+    page.locator("#ask-picker-input").fill("")
+    page.locator("#ask-picker-input").press_sequentially(graph["noun"], delay=15)
+    page.wait_for_selector("#ask-picker-listbox [role=option]")
+    page.locator("#ask-picker-listbox [role=option]", has_text=graph["names"]["service"]).click()
+    failure = page.locator("#ask-results [role=status]", has_text="We could not answer that just now.")
+    failure.wait_for(state="visible")
+    assert "Could not measure" in failure.inner_text()
+    assert page.locator("[data-ask-row]").count() == 0
+    page.unroute("**/api/v1/intelligence/impact/**")
+
+    # An element nothing depends on.
+    page.locator("#ask-picker-input").fill("")
+    page.locator("#ask-picker-input").press_sequentially(graph["noun"], delay=15)
+    page.wait_for_selector("#ask-picker-listbox [role=option]")
+    page.locator("#ask-picker-listbox [role=option]", has_text=graph["names"]["portal"]).click()
+    empty = page.locator("#ask-results [role=status]", has_text="Nothing is recorded as depending on this yet")
+    empty.wait_for(state="visible")
+    assert "We found no connections from this one." in empty.inner_text()
+
+
+def test_a_row_the_answer_cannot_name_shows_the_absence_and_no_invented_sentence(
+    page, live_server, seeded, graph
+):
+    """An element missing from the answer's name map shows "Not recorded", never a bare
+    id or a blank; a derived row with no sentence shows none; a stale row says when it was
+    last worked out with a clock and words."""
+    _login(page, live_server, seeded["emails"]["solution_architect"])
+    body = {
+        "success": True,
+        "data": {
+            "rows": [{
+                "element_id": 987654,
+                "relation": {
+                    "kind": "derived", "type": "Serving", "depth": 2, "rule_id": "test-rule",
+                    "chain": [], "chain_elements": [1, 987654], "confidence": None,
+                    "provenance": "derivation", "computed_at": "2026-01-02T10:30:00",
+                    "stale": True, "derived_id": 77, "engine_version": "1.0", "plain_terms": None,
+                },
+                "owner": None, "reason": "no_ownership_recorded",
+            }],
+            "summary": {"explicit_count": 0, "derived_count": 1, "stale_count": 1,
+                        "derivation_state": "stale", "latency_ms": 1},
+            "reasons": [], "elements": {},
+        },
+        "meta": {},
+    }
+    page.route("**/api/v1/intelligence/impact/**",
+               lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(body)))
+    _open_ask(page, live_server)
+    page.locator("#ask-question-impact").click()
+    _type_and_wait(page, "ask", graph["noun"])
+    _pick_by_click(page, "ask", graph["names"]["service"])
+    row = page.locator("[data-ask-row]")
+    row.wait_for(state="visible")
+    heading = row.get_by_role("heading")
+    assert "987654" not in row.inner_text()
+    assert heading.inner_text().strip() == "Not recorded"
+    assert row.get_by_label("Last worked out").count() == 1
+    assert "Last worked out 2 Jan 2026" in row.inner_text()
+    assert "may be out of date." in row.inner_text()
+
+    row.get_by_role("button", name="Why?").click()
+    dialog = page.locator("#drawer-provenance [role=dialog]")
+    dialog.wait_for(state="visible")
+    assert dialog.locator("[data-plain-terms]").count() == 1
+    assert not dialog.locator("[data-plain-terms]").is_visible()
+    assert "We worked this out because" not in dialog.inner_text()
+    assert dialog.get_by_text("Not recorded").first.is_visible()
+    assert "Last worked out" in dialog.inner_text()
