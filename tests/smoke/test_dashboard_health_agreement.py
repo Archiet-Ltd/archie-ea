@@ -26,13 +26,11 @@ def test_dashboard_health_values_agree_after_tab_switch_and_reload(browser, live
             summary = cto.locator("div").filter(has=page.get_by_role("heading", name="Executive Summary", exact=True)).last
             label = summary.get_by_text("Health Score", exact=True)
             expect(label).to_be_visible(timeout=PAGE_TIMEOUT)
-            # Jinja preserves a float's .0; the executive fragment deliberately
-            # uses browser-localized numbers (100.0 -> 100 in English). Compare
-            # the same numeric value in that presentation, not raw spellings.
-            summary_score = page.evaluate("score => Number(score).toLocaleString()", score)
-            expect(label.locator("..").locator("p").last).to_have_text(summary_score)
+            # One value in one format: the executive fragment renders the string
+            # the API sends, and the card beneath it the same string.
+            expect(label.locator("..").locator("p").last).to_have_text(score)
             card_score = cto.locator('a[href="/dashboard/health"] [data-slot="card-title"]')
             expect(card_score).to_be_visible()
-            expect(card_score).to_have_text(score + "/100")
+            expect(card_score).to_have_text(score)
     finally:
         page.close()

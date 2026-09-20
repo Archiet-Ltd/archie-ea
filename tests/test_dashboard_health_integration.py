@@ -32,7 +32,8 @@ def test_dashboard_and_executive_api_agree_for_known_phase_portfolio(db_session,
     assert float(match.group(1)) == 50.0
     summary = client.get("/dashboard/api/executive-summary")
     assert summary.status_code == 200
-    assert summary.get_json()["data"]["Health Score"] == 50.0
+    # The executive summary carries the score as the string the cards show.
+    assert summary.get_json()["data"]["Health Score"] == match.group(1) == "50.0"
 
 
 @pytest.mark.parametrize("phases,want", [

@@ -194,7 +194,7 @@
                     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                         <div class="rounded-lg border border-border bg-background p-3">
                             <p class="text-xs text-muted-foreground">Health Score</p>
-                            <p class="text-lg font-bold text-foreground" data-testid="health-score-value">{{ health_score if health_score is not none else "—" }}</p>
+                            <p class="text-lg font-bold text-foreground" data-testid="health-score-value">{{ health_score_text|default("—") }}</p>
                         </div>
                         {% for key, label in [
                             ('phase_maturity', 'Phase Maturity'),
@@ -207,6 +207,9 @@
                         <div class="rounded-lg border border-border bg-background p-3">
                             <p class="text-xs text-muted-foreground">{{ label }}</p>
                             <p class="text-lg font-bold text-foreground">{{ (val ~ "%") if val is not none else "—" }}</p>
+                            {% if key == 'phase_maturity' %}
+                            <p class="mt-1 text-xs text-muted-foreground">Share of solutions with a recorded ADM phase that are in phase C or later</p>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -490,7 +493,7 @@
 
 <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {{ metrics_card(title='Applications', value=(metrics.applications or 0)|string, icon='package', description='In portfolio', href='/applications/') }}
-                {{ metrics_card(title='Health Score', value=(health_score|string ~ '/100') if health_score is not none else '—', icon='heart-pulse', description='Architecture health', href='/dashboard/health') }}
+                {{ metrics_card(title='Health Score', value=health_score_text|default('—'), value_testid='cto-health-score-value', icon='heart-pulse', description='Architecture health', href='/dashboard/health') }}
                 {{ metrics_card(title='Solutions', value=(nav_stats.solutions or 0)|string, icon='puzzle', description='Active designs', href='/solutions/') }}
                 {{ metrics_card(title='ArchiMate', value=(nav_stats.elements or 0)|string, icon='boxes', description='Elements catalogued', href='/architecture/dashboard') }}
             </div>
@@ -541,7 +544,7 @@
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {{ metrics_card(title='Applications', value=(metrics.applications or 0)|string, icon='package', description='In portfolio', href='/applications/') }}
                 {{ metrics_card(title='Vendors', value=(metrics.vendors or 0)|string, icon='building', description='Vendor organizations', href='/applications/vendors') }}
-                {{ metrics_card(title='Health Score', value=(health_score|string ~ '/100') if health_score is not none else '—', icon='heart-pulse', description='Architecture health', href='/dashboard/health') }}
+                {{ metrics_card(title='Health Score', value=health_score_text|default('—'), value_testid='cfo-health-score-value', icon='heart-pulse', description='Architecture health', href='/dashboard/health') }}
                 {{ metrics_card(title='Solutions', value=(nav_stats.solutions or 0)|string, icon='puzzle', description='Active designs', href='/solutions/') }}
             </div>
             {% call card.card() %}

@@ -128,8 +128,8 @@ def estate(db_session, make_org):
     other = _make_user(db_session, org, "application_manager", "other")
     portfolio = _make_user(db_session, org, "portfolio_manager", "portfolio")
 
-    a = _make_app(db_session, org, "Payments", "active")
-    b = _make_app(db_session, org, "Ledger", "sunset")
+    a = _make_app(db_session, org, "Payments", "active", health_status="healthy")
+    b = _make_app(db_session, org, "Ledger", "sunset", health_status="at_risk")
     c = _make_app(db_session, org, "Portal", "operational")
     d = _make_app(db_session, org, "Elsewhere", "active")
     e = _make_app(db_session, org, "Orphan", "active")
@@ -322,12 +322,23 @@ def test_a_tab_with_no_rows_does_not_say_nothing_is_assigned(db_session, make_or
     assert "assigned to you yet" not in text
 
 
-def test_the_health_page_tiles_add_up_and_say_what_they_count(db_session, make_org, client, login_as):
-    """Healthy, At Risk, Critical and Not assessed sum to Total, and each block says what it counts."""
+def test_the_health_page_tiles_and_list_count_the_same_recorded_status(db_session, make_org, client, login_as):
+    """Healthy, At Risk, Critical and Not assessed sum to Total, and the list groups agree with the tiles.
+
+    Health is the status recorded on each application. The lifecycle stage is a
+    different fact: it is shown on each row under its own name and never decides a
+    count.
+    """
     org = make_org("own-numbers-health")
     manager = _make_user(db_session, org, "application_manager", "health")
-    for name, lifecycle in (("Live", "active"), ("Fading", "sunset"), ("Gone", "retired"), ("Odd", "operational"), ("Blank", None)):
-        _own(db_session, org, manager, _make_app(db_session, org, name, lifecycle), "primary")
+    for name, lifecycle, health in (
+        ("Live", "retired", "healthy"),  # lifecycle says retired; the recorded health is what counts
+        ("Fading", "active", "at_risk"),
+        ("Gone", "operational", "critical"),
+        ("Odd", "active", "great"),  # outside the vocabulary: not assessed
+        ("Blank", None, None),
+    ):
+        _own(db_session, org, manager, _make_app(db_session, org, name, lifecycle, health_status=health), "primary")
 
     page = _soup(_get(client, login_as, manager, "/my-applications/health"))
     total = _tile(page, "Total")
@@ -336,14 +347,36 @@ def test_the_health_page_tiles_add_up_and_say_what_they_count(db_session, make_o
     assert sum(tiles) == total
     assert tiles == [1, 1, 1, 2]
 
+    # The list under the tiles groups the same applications the same way.
+    groups = {}
+    for heading in page.find_all("h2"):
+        match = re.fullmatch(r"(Critical|At Risk|Healthy|Not assessed) \((\d+)\)", " ".join(heading.get_text().split()))
+        if match:
+            groups[match.group(1)] = int(match.group(2))
+    assert groups == {"Healthy": 1, "At Risk": 1, "Critical": 1, "Not assessed": 2}
+
     text = " ".join(page.get_text().split())
-    # The tiles are counted from the lifecycle stage; the grouped list from the
-    # health status recorded on each application. The page says both.
-    assert "By lifecycle stage" in text
-    assert "Healthy is active or production" in text
+    assert "Recorded health status" in text
+    assert "counted under the health status recorded on it" in text
     assert "By recorded health status" in text
     assert "listed under the health status recorded on it" in text
     assert "Applications with no health status recorded" in text
+    assert "By lifecycle stage" not in text
+    assert "Unknown Status" not in text
+    # Lifecycle appears under its own name, and a missing one is not invented.
+    assert "Lifecycle: retired" in text
+    assert "Lifecycle: not set" in text
+
+
+def test_the_dashboard_health_tiles_count_recorded_status_not_lifecycle(db_session, make_org, client, login_as):
+    org = make_org("own-numbers-dash-health")
+    manager = _make_user(db_session, org, "application_manager", "dashhealth")
+    for name, lifecycle, health in (("One", "active", None), ("Two", "sunset", None), ("Three", "retired", "critical")):
+        _own(db_session, org, manager, _make_app(db_session, org, name, lifecycle, health_status=health), "primary")
+
+    dash = _soup(_get(client, login_as, manager, "/my-applications/"))
+    tiles = [_tile(dash, label) for label in ("Healthy", "At Risk", "Critical", "Not assessed")]
+    assert tiles == [0, 0, 1, 2]
 
 
 def test_the_portfolio_banner_says_what_it_counts(db_session, make_org, client, login_as):

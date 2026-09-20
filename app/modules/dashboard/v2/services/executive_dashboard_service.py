@@ -11,6 +11,22 @@ from app import db
 
 logger = logging.getLogger(__name__)
 
+# What a screen shows for a measure that has no value.
+MISSING_VALUE = "—"
+
+
+def format_health_score(score):
+    """The one display format for the composite health score.
+
+    One decimal place exactly as measured (``66.7``, ``100.0``), or an em dash
+    when the score could not be computed. Every screen that shows the score
+    renders it through this function, so two screens cannot spell one value two
+    ways.
+    """
+    if score is None:
+        return MISSING_VALUE
+    return f"{float(score):.1f}"
+
 
 class ExecutiveDashboardService:
     """Aggregates cross-domain metrics into a single executive summary."""
@@ -169,7 +185,8 @@ class ExecutiveDashboardService:
         """Compute a composite architecture health score (0-100).
 
         Weighted average of:
-        - Phase maturity (40%): % of solutions past Phase B
+        - Phase maturity (40%): share of solutions with a recorded phase
+          that are in phase C or later
         - Risk posture (30%): inverse of high/critical risk ratio
         - Capability coverage (20%): % L1 capabilities with application mapping
         - Governance (10%): ARB presence, timeliness and approval rate
@@ -188,29 +205,18 @@ class ExecutiveDashboardService:
         """
         scores = {}
 
-        # Phase maturity: % of solutions in Phase C or later.
+        # Phase maturity: share of solutions in phase C or later.
         # Only recorded, valid phases supply a denominator. NULL/invalid phase
         # does not mean Phase A, nor a measured failure to progress past Phase B.
-        # Match the scorecard/pipeline's normalization of imported phase values.
+        # The Health Scorecard's average solution maturity reads the same
+        # solutions through the same phase summary.
         try:
-            from app.models.solution_models import Solution
+            from app.modules.dashboard.v2.services.solution_phase_measures import (
+                recorded_phase_summary,
+                share_in_advanced_phases,
+            )
 
-            phase = db.func.upper(db.func.trim(Solution.adm_phase))
-            total = (
-                db.session.query(db.func.count(Solution.id))
-                .filter(phase.in_(list("ABCDEFGH")))
-                .scalar()
-            ) or 0
-            if total > 0:
-                advanced_phases = ["C", "D", "E", "F", "G", "H"]
-                advanced = (
-                    db.session.query(db.func.count(Solution.id))
-                    .filter(phase.in_(advanced_phases))
-                    .scalar()
-                ) or 0
-                scores["phase_maturity"] = round((advanced / total) * 100, 1)
-            else:
-                scores["phase_maturity"] = None
+            scores["phase_maturity"] = share_in_advanced_phases(recorded_phase_summary())
         except Exception:
             logger.exception("health score: phase maturity could not be measured")
             scores["phase_maturity"] = None

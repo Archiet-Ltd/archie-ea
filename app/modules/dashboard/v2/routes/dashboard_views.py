@@ -46,6 +46,9 @@ def overview():
     from app.models.business_capabilities import BusinessCapability
     from app.models.user import User
     from app.models.vendor.vendor_organization import VendorOrganization
+    from app.modules.dashboard.v2.services.executive_dashboard_service import (
+        format_health_score,
+    )
 
     metrics = {
         "applications": 0,
@@ -679,6 +682,7 @@ def overview():
         lifecycle_distribution=lifecycle_distribution,
         solution_pipeline=solution_pipeline,
         health_score=health_score,
+        health_score_text=format_health_score(health_score),
         health_components=health_components,
         enterprise_role=enterprise_role,
         data_coverage=data_coverage,
@@ -985,31 +989,23 @@ def _assemble_health_scorecard_metrics():
         logger.warning("health_scorecard: ArchiMateElement unavailable: %s", exc)
 
     # 4. ADM phase distribution and average maturity
-    _adm_phase_pct = {"A": 12, "B": 25, "C": 37, "D": 50, "E": 62, "F": 75, "G": 87, "H": 100}
+    # Read through the same phase summary as the Health Score's phase maturity,
+    # so the two maturity figures count the same solutions.
+    from app.modules.dashboard.v2.services.solution_phase_measures import (
+        average_phase_progress,
+        recorded_phase_summary,
+    )
+
     adm_distribution = {p: 0 for p in "ABCDEFGH"}
     avg_maturity = None
     total_solutions = None
     try:
-        from app.models.solution_models import Solution as SolutionModel
-        # R2-5 (round-3 refuter fix): the solutions list excludes soft-deleted
-        # "[DELETED] ..." rows from its org_total (solution_design_routes.py),
-        # so this tile must exclude them too or the two screens report
-        # different answers to "how many solutions exist" for the same org.
-        solutions_q = (
-            SolutionModel.query.filter(~SolutionModel.name.like("[DELETED]%"))
-            .with_entities(SolutionModel.adm_phase)
-            .all()
-        )
-        total_solutions = len(solutions_q)
-        maturity_scores = []
-        for (phase,) in solutions_q:
-            p = (phase or "").strip().upper()
-            if p not in _adm_phase_pct:
-                p = "Unclassified"
-            adm_distribution[p] = adm_distribution.get(p, 0) + 1
-            if p in _adm_phase_pct:
-                maturity_scores.append(_adm_phase_pct[p])
-        avg_maturity = round(sum(maturity_scores) / len(maturity_scores)) if maturity_scores else None
+        phase_summary = recorded_phase_summary()
+        total_solutions = phase_summary["total"]
+        adm_distribution.update(phase_summary["counts"])
+        if phase_summary["unclassified"]:
+            adm_distribution["Unclassified"] = phase_summary["unclassified"]
+        avg_maturity = average_phase_progress(phase_summary)
     except Exception as exc:
         adm_distribution = None
         total_solutions = None
@@ -1034,8 +1030,23 @@ def _assemble_health_scorecard_metrics():
 def health_scorecard():
     """Architecture Health Scorecard — real metrics from SolutionRisk, ARBReviewItem,
     ArchiMateElement and Solution ADM phase distribution."""
+    from app.modules.dashboard.v2.services.executive_dashboard_service import (
+        ExecutiveDashboardService,
+        format_health_score,
+    )
+
     metrics = _assemble_health_scorecard_metrics()
-    return render_template("dashboards/health.html", **metrics)
+    try:
+        health_score = ExecutiveDashboardService()._get_health_score()["composite_score"]
+    except Exception as exc:
+        logger.warning("health_scorecard: health score unavailable: %s", exc)
+        db.session.rollback()
+        health_score = None
+    return render_template(
+        "dashboards/health.html",
+        health_score_text=format_health_score(health_score),
+        **metrics,
+    )
 
 
 @dashboard_bp_v2.route("/api/ai-executive-briefing", methods=["POST"])

@@ -25,6 +25,7 @@ from . import my_applications_bp
 # raised jinja2.UndefinedError, which is almost certainly the real cause of the
 # "every page route returned 500" that got this module disabled on 2026-06-11.
 from .services import (
+    application_health_status,
     get_application_health_summary,
     get_owned_applications,
     get_ownership_summary,
@@ -167,11 +168,7 @@ def health_overview():
     }
 
     for app in apps:
-        health = getattr(app, 'health_status', None) or 'unknown'
-        if health in by_health:
-            by_health[health].append(app)
-        else:
-            by_health['unknown'].append(app)
+        by_health[application_health_status(app)].append(app)
 
     return render_template(
         "my_applications/health_overview.html",

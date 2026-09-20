@@ -52,7 +52,7 @@ def test_health_card_browser_assertion_uses_rendered_value_element():
     env = Environment(loader=FileSystemLoader(root / "app/templates"), autoescape=True)
     rendered = env.from_string(
         "{% from 'components/metrics_card.html' import metrics_card %}"
-        "{{ metrics_card(title='Health Score', value='100.0/100', "
+        "{{ metrics_card(title='Health Score', value='100.0', "
         "description='Architecture health', href='/dashboard/health') }}"
     ).render()
     with sync_playwright() as playwright:
@@ -62,8 +62,8 @@ def test_health_card_browser_assertion_uses_rendered_value_element():
             page.set_content(rendered)
             score = page.locator('a[href="/dashboard/health"] [data-slot="card-title"]')
             expect(score).to_be_visible()
-            expect(score).to_have_text("100.0/100")
-            assert score.inner_text().strip() == "100.0/100"
+            expect(score).to_have_text("100.0")
+            assert score.inner_text().strip() == "100.0"
         finally:
             browser.close()
 
@@ -77,6 +77,8 @@ def test_empty_portfolio_has_no_measured_health_components(monkeypatch):
         def scalar(self):
             return 0
     monkeypatch.setattr(module, "db", SimpleNamespace(func=func, session=SimpleNamespace(query=lambda *args: EmptyQuery())))
+    from app.modules.dashboard.v2.services import solution_phase_measures as phase_measures
+    monkeypatch.setattr(phase_measures, "recorded_phase_summary", lambda: phase_measures.summarise_phases([]))
     monkeypatch.setattr(module.ExecutiveDashboardService, "_get_capability_coverage",
                         lambda self: {"percentage": None})
     result = module.ExecutiveDashboardService()._get_health_score()
@@ -105,38 +107,17 @@ def test_executive_summary_formats_missing_value_without_hiding_measured_zero():
     ([" c ", "C", None], 100.0),
     ([" A ", "B", None], 0.0),
 ])
-def test_phase_component_queries_only_valid_normalized_observations(phases, want):
-    """Run real ORM query construction; substitute only scalar DB execution.
+def test_phase_component_counts_only_valid_normalized_observations(phases, want):
+    """The Health Score's phase component is the shared phase summary's share in
+    phase C or later: only recorded, valid phases supply the denominator, and an
+    imported value is normalised before it is classified.
 
-    The PostgreSQL integration cases separately execute these predicates in DB.
-    This small adapter evaluates the generated SQLAlchemy IN/function tree so
-    omitting the WHERE or normalization changes the actual returned counts.
+    The PostgreSQL integration cases separately run the same inputs through the
+    real query.
     """
-    from sqlalchemy import func
-    from sqlalchemy.orm import Query
-    from sqlalchemy.sql.functions import Function
+    from app.modules.dashboard.v2.services.solution_phase_measures import (
+        share_in_advanced_phases,
+        summarise_phases,
+    )
 
-    def value(expression, phase):
-        if isinstance(expression, Function):
-            operand = value(list(expression.clauses)[0], phase)
-            if operand is None:
-                return None
-            return {"upper": str.upper, "trim": str.strip}[expression.name](operand)
-        assert expression.name == "adm_phase"
-        return phase
-
-    class FixtureQuery(Query):
-        def scalar(self):
-            predicate = self.whereclause
-            if predicate is None:
-                return len(phases)
-            return sum(value(predicate.left, phase) in predicate.right.value for phase in phases)
-
-    source = Path(__file__).resolve().parents[1] / "app/modules/dashboard/v2/services/executive_dashboard_service.py"
-    tree = ast.parse(source.read_text(encoding="utf-8"))
-    method = next(node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "_get_health_score")
-    phase_block = next(node for node in method.body if isinstance(node, ast.Try))
-    namespace = {"scores": {}, "logger": logging.getLogger(__name__),
-                 "db": SimpleNamespace(func=func, session=SimpleNamespace(query=lambda *columns: FixtureQuery(columns)))}
-    exec(compile(ast.Module(body=[phase_block], type_ignores=[]), str(source), "exec"), namespace)
-    assert namespace["scores"]["phase_maturity"] == want
+    assert share_in_advanced_phases(summarise_phases(phases)) == want

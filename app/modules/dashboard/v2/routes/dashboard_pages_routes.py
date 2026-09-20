@@ -1285,11 +1285,16 @@ def resolve_validation_conflict(app_id):
 def api_executive_summary():
     """FRAG-035: Get executive dashboard summary.
 
-    Returns a flat dict of numeric scalars so the dashboard template can
-    render each value with x-text without '[object Object]' artefacts.
+    Returns a flat dict of scalars so the dashboard template can render each
+    value with x-text without '[object Object]' artefacts. The Health Score is
+    the string the other screens show for it, so the executive summary cannot
+    spell the same score differently from the cards beside it.
     """
     try:
-        from app.modules.dashboard.v2.services.executive_dashboard_service import ExecutiveDashboardService
+        from app.modules.dashboard.v2.services.executive_dashboard_service import (
+            ExecutiveDashboardService,
+            format_health_score,
+        )
         service = ExecutiveDashboardService()
         summary = service.get_executive_summary()
         health = summary.get("architecture_health", {})
@@ -1301,8 +1306,9 @@ def api_executive_summary():
         # and a 0 the reader cannot distinguish from a real zero is worse than no
         # number at all (CLAUDE.md). These serialise to JSON null; the dashboard
         # renders null as an em dash.
+        health_score = health.get("composite_score")
         flat = {
-            "Health Score": health.get("composite_score"),
+            "Health Score": None if health_score is None else format_health_score(health_score),
             "Solutions": portfolio.get("solutions"),
             "Applications": portfolio.get("applications"),
             "ArchiMate Elements": portfolio.get("archimate_elements"),

@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 from sqlalchemy import and_, or_, select
 
 from app.models.application_owner import ApplicationOwner
-from app.models.application_portfolio import ApplicationComponent
+from app.models.application_portfolio import APPLICATION_HEALTH_STATUSES, ApplicationComponent
 from app.models.user import User
 
 
@@ -182,8 +182,21 @@ def get_ownership_summary(user_id: int, search: Optional[str] = None) -> Dict[st
     return summary
 
 
+def application_health_status(application) -> str:
+    """The health of an application: the status recorded on it.
+
+    One of ``healthy``, ``at_risk`` or ``critical``, or ``unknown`` when nothing
+    is recorded (or the recorded value is outside that vocabulary). The health
+    tiles and the grouped list on the health page both read it, so a count and
+    the rows under it cannot disagree. Lifecycle stage is a different fact and is
+    never read as health.
+    """
+    status = getattr(application, "health_status", None)
+    return status if status in APPLICATION_HEALTH_STATUSES else "unknown"
+
+
 def get_application_health_summary(user_id: int) -> Dict[str, any]:
-    """Get health summary for user's applications."""
+    """Count the user's applications by their recorded health status."""
     _, visible = _ownership_rows(user_id)
     apps = list(visible.values())
 
@@ -194,19 +207,8 @@ def get_application_health_summary(user_id: int) -> Dict[str, any]:
         "critical": 0,
         "unknown": 0,
     }
-
     for app in apps:
-        # Determine health based on available fields
-        # This is a simplified health check - real implementation would use more factors
-        lifecycle = getattr(app, 'lifecycle_status', None)
-        if lifecycle in ['active', 'production']:
-            summary["healthy"] += 1
-        elif lifecycle in ['sunset', 'retiring']:
-            summary["at_risk"] += 1
-        elif lifecycle in ['decommissioned', 'retired']:
-            summary["critical"] += 1
-        else:
-            summary["unknown"] += 1
+        summary[application_health_status(app)] += 1
 
     return summary
 
