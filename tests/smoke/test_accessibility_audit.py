@@ -51,6 +51,8 @@ import re
 
 import pytest
 
+from playwright.sync_api import expect
+
 from .conftest import PAGE_TIMEOUT, PASSWORD
 from .intelligence_graph import mark_derived_stale, seed_impact_graph
 
@@ -362,11 +364,16 @@ def _wait_for_component(page, factory):
     )
 
 
+def _open_question(page):
+    page.click("#ask-question-impact")
+    expect(page.locator("#ask-picker-input")).to_be_focused()
+
+
 def _reach_intelligence_state(page, base, graph, kind):
     if kind.startswith("ask"):
         page.goto(base + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _wait_for_component(page, "askSurface")
-        page.click("#ask-question-impact")
+        _open_question(page)
         page.press("#ask-picker-input", "Control+a")
         page.locator("#ask-picker-input").press_sequentially(graph["noun"], delay=15)
         page.wait_for_selector("#ask-picker-listbox [role=option]")

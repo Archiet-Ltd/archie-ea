@@ -162,6 +162,13 @@ def _open_ask(page, base):
     _ready(page, "askSurface")
 
 
+def _open_question(page):
+    """Open the question card and wait until the picker holds focus, so that what
+    follows is typed into the input rather than into whatever had focus before."""
+    page.locator("#ask-question-impact").click()
+    expect(page.locator("#ask-picker-input")).to_be_focused()
+
+
 def _open_twin_map(page, base, element_id=None):
     url = base + "/intelligence/twin-map" + ("?element=%s" % element_id if element_id else "")
     page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -233,7 +240,7 @@ def _ask_about(page, base, graph):
     page.get_by_test_id("sidebar").get_by_role("link", name="Ask a question").click()
     page.wait_for_url(re.compile(r"/intelligence/ask$"))
     _ready(page, "askSurface")
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
     _type_and_wait(page, "ask", graph["noun"])
     _pick_by_click(page, "ask", graph["names"]["service"])
     page.wait_for_selector("[data-ask-row]")
@@ -453,7 +460,7 @@ def test_the_picker_is_an_aria_combobox_and_works_from_the_keyboard(
     text; a polite status region says how many matches came back."""
     _login(page, live_server, seeded["emails"]["solution_architect"])
     _open_ask(page, live_server)
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
 
     box = page.locator("#ask-picker-input")
     assert box.get_attribute("role") == "combobox"
@@ -509,6 +516,59 @@ def test_the_picker_is_an_aria_combobox_and_works_from_the_keyboard(
     expect(box).to_have_attribute("aria-expanded", "false")
 
 
+# --- opening the question moves focus to the picker ----------------
+
+
+def test_opening_the_question_moves_focus_to_the_picker_while_a_request_is_running(
+    page, live_server, seeded
+):
+    """A request in flight starts the loading bar, and the bar's transition holds back
+    the callbacks the page queues for its next update. Opening the question in that
+    window must still put the cursor in the picker: the card is shown in the same update
+    that opens it, so the input can take focus whenever the focus call runs."""
+    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    _open_ask(page, live_server)
+    _dismiss_first_run(page)
+    expect(page.locator("[x-show='$store.loading.active']")).to_be_hidden()
+
+    page.evaluate("""async () => {
+        Alpine.store('loading').start();
+        // the bar's transition begins within these three microtasks
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+        const question = document.getElementById('ask-question-impact');
+        question.focus();
+        // open it inside the frame in which that transition is running
+        await new Promise((done) => requestAnimationFrame(() => { question.click(); done(); }));
+    }""")
+    try:
+        expect(page.locator("#ask-question-impact")).to_have_attribute("aria-expanded", "true")
+        expect(page.locator("#ask-picker-input")).to_be_focused()
+    finally:
+        page.evaluate("Alpine.store('loading').stop()")
+
+
+def test_typing_straight_after_opening_the_question_loses_nothing(
+    page, live_server, seeded, graph
+):
+    """When the page is slow to draw, the first characters typed after opening the
+    question must still reach the picker: none of them goes to the button (a space
+    there would close the card again). No frame is drawn during the test, so the
+    card is on screen only if the update that opened it showed it."""
+    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    _open_ask(page, live_server)
+    _dismiss_first_run(page)
+    page.evaluate("""() => {
+        window.requestAnimationFrame = () => 0;
+    }""")
+
+    page.locator("#ask-question-impact").click()
+    box = page.locator("#ask-picker-input")
+    box.press_sequentially(graph["noun"], delay=5)
+
+    expect(box).to_have_value(graph["noun"])
+    expect(page.locator("#ask-question-impact")).to_have_attribute("aria-expanded", "true")
+
+
 # --- the whole journey by keyboard alone ---------------------------
 
 
@@ -529,7 +589,7 @@ def test_the_whole_journey_by_keyboard_alone(page, live_server, seeded, graph):
     page.keyboard.press("Enter")
     _tab_until(page, lambda s: s["id"] == "ask-question-impact", "the question")
     page.keyboard.press("Enter")
-    page.wait_for_function("() => document.activeElement.id === 'ask-picker-input'")
+    expect(page.locator("#ask-picker-input")).to_be_focused()
     _assert_focus_is_visible(_focus(page), "the picker")
 
     page.keyboard.type(graph["noun"], delay=25)
@@ -616,7 +676,7 @@ def test_every_control_is_at_least_24_by_24_css_pixels(page, live_server, seeded
     _login(page, live_server, seeded["emails"]["solution_architect"])
     measurements = {}
     _open_ask(page, live_server)
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
     _type_and_wait(page, "ask", graph["noun"])
     _pick_by_click(page, "ask", graph["names"]["service"])
     page.wait_for_selector("[data-ask-row]")
@@ -715,7 +775,7 @@ def test_focus_is_never_obscured_by_the_drawer_or_the_side_panel(
     moves neither the focus nor the selection."""
     _login(page, live_server, seeded["emails"]["solution_architect"])
     _open_ask(page, live_server)
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
     _type_and_wait(page, "ask", graph["noun"])
     _pick_by_click(page, "ask", graph["names"]["service"])
     page.wait_for_selector("[data-ask-row]")
@@ -771,7 +831,7 @@ def test_the_drawer_is_named_by_the_element_and_kind_and_returns_focus(
     closes it; focus returns to the very control that opened it."""
     _login(page, live_server, seeded["emails"]["solution_architect"])
     _open_ask(page, live_server)
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
     _type_and_wait(page, "ask", graph["noun"])
     _pick_by_click(page, "ask", graph["names"]["service"])
     page.wait_for_selector("[data-ask-row]")
@@ -928,7 +988,7 @@ def test_technical_detail_appears_only_inside_full_detail(page, live_server, see
     connection was worked out are on the page, and only inside a Full detail region."""
     _login(page, live_server, seeded["emails"]["solution_architect"])
     _open_ask(page, live_server)
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
     _type_and_wait(page, "ask", graph["noun"])
     _pick_by_click(page, "ask", graph["names"]["service"])
     page.wait_for_selector("[data-ask-row]")
@@ -998,7 +1058,7 @@ def _ask_in_bare_tenant(page, live_server, bare):
     _login(page, live_server, bare["email"])
     _dismiss_first_run(page)
     _open_ask(page, live_server)
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
     _type_and_wait(page, "ask", bare["noun"])
     _pick_by_click(page, "ask", bare["head_name"])
 
@@ -1077,7 +1137,7 @@ def test_the_results_are_busy_while_asking_and_errors_are_announced(
     an answer with no rows says nothing is recorded; nothing invented fills any of them."""
     _login(page, live_server, seeded["emails"]["solution_architect"])
     _open_ask(page, live_server)
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
     _type_and_wait(page, "ask", graph["noun"])
 
     held = []
@@ -1146,7 +1206,7 @@ def test_a_row_the_answer_cannot_name_shows_the_absence_and_no_invented_sentence
     page.route("**/api/v1/intelligence/impact/**",
                lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(body)))
     _open_ask(page, live_server)
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
     _type_and_wait(page, "ask", graph["noun"])
     _pick_by_click(page, "ask", graph["names"]["service"])
     row = page.locator("[data-ask-row]")
@@ -1218,7 +1278,7 @@ def _ask_about_stale(page, base, stale):
     _login(page, base, stale["email"])
     _dismiss_first_run(page)
     _open_ask(page, base)
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
     _type_and_wait(page, "ask", stale["noun"])
     with page.expect_request(lambda r: "/api/v1/intelligence/impact/" in r.url) as asked:
         _pick_by_click(page, "ask", stale["names"]["service"])
@@ -1407,7 +1467,7 @@ def test_an_answer_that_leaves_worked_out_connections_out_says_so_in_its_counts(
     page.route("**/api/v1/intelligence/impact/**", _without_worked_out)
 
     _open_ask(page, live_server)
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
     _type_and_wait(page, "ask", stale_tenant["noun"])
     _pick_by_click(page, "ask", names["service"])
     page.wait_for_selector("[data-ask-row]")
@@ -1436,11 +1496,12 @@ def test_the_status_region_counts_results_after_typing_and_connections_after_cho
     _login(page, live_server, bare_tenant["email"])
     _dismiss_first_run(page)
     _open_ask(page, live_server)
-    page.locator("#ask-question-impact").click()
+    _open_question(page)
     box = page.locator("#ask-picker-input")
     status = page.locator("#ask-question-panel-impact [role=status]")
 
     box.press_sequentially(bare_tenant["head_name"], delay=15)
+    expect(box).to_have_value(bare_tenant["head_name"])
     page.wait_for_selector("#ask-picker-listbox [role=option]")
     expect(status).to_have_text("1 result for %s" % bare_tenant["head_name"])
     page.keyboard.press("ArrowDown")
