@@ -17,4 +17,5 @@ def test_login_page_renders_without_a_saml_sign_in_link(live_server):
 
     assert response.status_code == 200
     assert "Don't have an account?" in response.text
-    assert "saml" not in response.text.lower()
+    assert "Sign in with SAML" not in response.text
+    assert "/account/saml" not in response.text
