@@ -532,3 +532,94 @@ def test_the_shipped_macros_are_the_named_ones_with_the_right_keywords():
     for call in re.findall(r"empty_state\((.*?)\) \}\}", joined, re.S):
         assert "headline=" not in call and "body=" not in call
     assert "animate-spin" not in joined and "loader" not in joined
+
+
+# --- what the pages are built on ----------------------------------------------
+
+
+def _element(db_session, org_id, name, layer="application", kind="ApplicationComponent"):
+    from app.models import ArchiMateElement
+
+    row = ArchiMateElement(name=name, type=kind, layer=layer, organization_id=org_id)
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def _relationship(db_session, org_id, source, target):
+    from app.models import ArchiMateRelationship
+
+    row = ArchiMateRelationship(
+        source_id=source.id, target_id=target.id, type="Serving", organization_id=org_id
+    )
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def test_the_impact_answer_carries_the_names_and_derived_fields_the_pages_read(
+    app, db_session, make_org, client, login_as
+):
+    """The pages read four things from the impact answer and invent none of them:
+    an element map whose entries hold exactly id, name, type and layer, and on a
+    worked-out row its record id, engine version and sentence."""
+    import datetime
+
+    from app.modules.intelligence.models.derived_relationship import DerivedRelationship
+
+    org = make_org("ui-contract")
+    user = _user(db_session, org.id)
+    a = _element(db_session, org.id, "Alpha")
+    b = _element(db_session, org.id, "Beta", layer="business", kind="BusinessActor")
+    c = _element(db_session, org.id, "Gamma", layer="technology", kind="Node")
+    first = _relationship(db_session, org.id, a, b)
+    second = _relationship(db_session, org.id, b, c)
+    db_session.add(DerivedRelationship(
+        organization_id=org.id, source_element_id=a.id, target_element_id=c.id,
+        derived_type="Serving", rule_id="serving-through-serving",
+        chain=[first.id, second.id], chain_element_ids=[a.id, b.id, c.id], depth=2,
+        confidence=0.82, provenance="derivation", engine_version="1.0",
+        computed_at=datetime.datetime.utcnow(), stale=False,
+    ))
+    db_session.flush()
+
+    login_as(client, user)
+    response = client.get(
+        f"/api/v1/intelligence/impact/{a.id}?include_derived=true&max_depth=3&with_owner=true"
+    )
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert set(data) >= {"rows", "summary", "reasons", "elements"}
+    assert set(data["elements"]) == {str(a.id), str(b.id), str(c.id)}
+    for entry in data["elements"].values():
+        assert set(entry) == {"id", "name", "type", "layer"}
+    assert data["elements"][str(b.id)] == {
+        "id": b.id, "name": "Beta", "type": "BusinessActor", "layer": "business",
+    }
+
+    derived = [r for r in data["rows"] if r["relation"]["kind"] == "derived"]
+    explicit = [r for r in data["rows"] if r["relation"]["kind"] == "explicit"]
+    assert len(derived) == 1 and len(explicit) == 2
+    relation = derived[0]["relation"]
+    assert isinstance(relation["derived_id"], int)
+    assert relation["engine_version"] == "1.0"
+    assert relation["plain_terms"].startswith("We worked this out because")
+    for row in explicit:
+        assert row["relation"]["derived_id"] is None
+        assert row["relation"]["engine_version"] is None
+        assert row["relation"]["plain_terms"] is None
+
+
+def test_the_accessibility_audit_this_work_extends_checks_wcag_22_and_fails_rather_than_skips():
+    """The pages are added to an audit that reads the 2.2 tag set and refuses to skip:
+    without both, a clean result there would say nothing."""
+    source = (REPO_ROOT / "tests" / "smoke" / "test_accessibility_audit.py").read_text(encoding="utf-8")
+    tags = re.search(r"^TAGS = \[(.*?)\]", source, re.M | re.S)
+    assert tags and '"wcag22aa"' in tags.group(1)
+    assert not re.search(r"^(?!\s*#).*importorskip\(", source, re.M)
+    assert re.search(r"def axe_module\(browser\):.*?pytest\.fail\(", source, re.S)
+    assert '"target-size": "wcag22aa"' in source
+    assert '("solution_architect", "/intelligence/ask")' in source
+    assert '("enterprise_architect", "/intelligence/twin-map")' in source
+    baseline = (REPO_ROOT / "tests" / "smoke" / "a11y_baseline.json").read_text(encoding="utf-8")
+    assert "/intelligence/" not in baseline

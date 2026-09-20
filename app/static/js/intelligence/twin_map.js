@@ -39,17 +39,25 @@ function twinMapSurface() {
         recomputeFailed: false,
 
         init() {
-            if (window.d3 && window.IntelligenceGraph) {
-                var self = this;
-                controller = window.IntelligenceGraph.create(this.$refs.canvas, {
-                    onSelect: function (id) { self.selectNode(id); }
-                });
-            }
+            var self = this;
             var initial = parseInt(this.$el.getAttribute('data-initial-element'), 10);
-            if (!isNaN(initial)) {
-                this.centreId = initial;
-                this.load({ nameTheInput: true });
-            }
+            if (isNaN(initial)) return;
+            // Wait a tick: the elements inside the component are set up after
+            // the component itself, and the first draw needs them.
+            this.$nextTick(function () {
+                self.centreId = initial;
+                self.load({ nameTheInput: true });
+            });
+        },
+
+        /* The drawing is set up the first time it is needed, when the elements
+           it draws into exist. */
+        ensureDrawing() {
+            if (controller || !window.d3 || !window.IntelligenceGraph || !this.$refs.canvas) return;
+            var self = this;
+            controller = window.IntelligenceGraph.create(this.$refs.canvas, {
+                onSelect: function (id) { self.selectNode(id); }
+            });
         },
 
         onSelect(option) {
@@ -104,6 +112,7 @@ function twinMapSurface() {
 
             var self = this;
             this.$nextTick(function () {
+                self.ensureDrawing();
                 if (controller && self.hasGraph) {
                     controller.render(self.model, self.selectedId, self.pathFor(self.selectedId));
                 }
