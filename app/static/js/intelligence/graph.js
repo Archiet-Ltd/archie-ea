@@ -218,6 +218,12 @@
                 .style('width', plan.nodeW + 'px')
                 .style('height', NODE_H + 'px')
                 .attr('title', function (d) { return d.name || null; });
+            // Tab order follows the picture: top band first, left to right.
+            nodeAll.sort(function (a, b) {
+                var pa = plan.positions[a.id];
+                var pb = plan.positions[b.id];
+                return (pa.y - pb.y) || (pa.x - pb.x);
+            });
             nodeAll.select('span.intel-node-name').text(function (d) { return d.name || 'Not recorded'; });
             nodeAll.select('span.intel-node-centre').text(function (d) { return d.id === current.centreId ? ' (centre of the map)' : ''; });
             paint();

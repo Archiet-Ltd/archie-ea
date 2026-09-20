@@ -59,8 +59,10 @@ class _StubApp:
         self.blueprints[bp.name] = bp
 
 
-def test_register_mounts_exactly_the_intelligence_api_blueprint():
-    """T-003 (brief item 14, NFR-8): exactly one blueprint, no more.
+def test_register_mounts_exactly_the_api_and_ui_blueprints():
+    """T-003 (brief item 14, NFR-8): the API blueprint carries every route under
+    ``/api/v1/intelligence``; the only other blueprint is the UI one, which
+    serves the two pages under ``/intelligence`` and no route under ``/api/``.
 
     T-004 added a third route (API-1, US-1 impact) to this SAME blueprint --
     see docs/buckets/t004-us1-impact-endpoint/tasks/00-verification-notes.md
@@ -73,7 +75,7 @@ def test_register_mounts_exactly_the_intelligence_api_blueprint():
 
     stub = _StubApp()
     register(stub)
-    assert set(stub.blueprints.keys()) == {"intelligence_api"}
+    assert set(stub.blueprints.keys()) == {"intelligence_api", "intelligence_ui"}
 
     bp = stub.blueprints["intelligence_api"]
     # Blueprint.deferred_functions holds the registration callables, not the
@@ -92,7 +94,7 @@ def test_registration_succeeds_when_module_is_importable():
     stub = _StubApp()
     _register_intelligence(stub)
 
-    assert set(stub.blueprints.keys()) == {"intelligence_api"}
+    assert set(stub.blueprints.keys()) == {"intelligence_api", "intelligence_ui"}
     assert any("intelligence" in msg.lower() for msg in stub.logger.infos)
 
 

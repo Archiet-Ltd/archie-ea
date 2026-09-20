@@ -102,6 +102,15 @@
         return entry && entry.name ? entry.name : null;
     }
 
+    /* What "Full detail" reads before any row has been chosen. Always an object
+       so the expressions that read it never meet a null. */
+    function emptyDetail() {
+        return {
+            derived: false, type: null, layer: null, ruleId: null, confidence: null,
+            chain: [], depth: null, computedAt: null, engineVersion: null, derivedId: null
+        };
+    }
+
     /* The detail a person can open under "Full detail". It is a plain copy of
        what the payload carries; nothing is worked out or filled in here. */
     function detailOf(row, elements) {
@@ -224,6 +233,7 @@
         pluralThings: pluralThings,
         elementEntry: elementEntry,
         nameOf: nameOf,
+        emptyDetail: emptyDetail,
         detailOf: detailOf,
         rowModel: rowModel,
         buildRows: buildRows,

@@ -26,7 +26,7 @@
                 heading: '',
                 plainTerms: null,
                 staleLine: null,
-                detail: null,
+                detail: global.Intelligence.emptyDetail(),
                 forKey: null
             },
 
@@ -57,7 +57,7 @@
                     drawer.heading = UNAVAILABLE_HEADING;
                     drawer.plainTerms = null;
                     drawer.staleLine = null;
-                    drawer.detail = null;
+                    drawer.detail = global.Intelligence.emptyDetail();
                     return;
                 }
                 drawer.state = 'ready';

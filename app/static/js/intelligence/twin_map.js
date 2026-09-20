@@ -195,7 +195,7 @@ function twinMapSurface() {
                     : Intelligence.pluralThings(dependents) + (dependents === 1 ? ' depends' : ' depend') + ' on this',
                 detail: row !== null
                     ? row.detail
-                    : { derived: false, type: node.type, layer: node.layer, chain: [], depth: null }
+                    : Object.assign(Intelligence.emptyDetail(), { type: node.type, layer: node.layer })
             };
         },
 

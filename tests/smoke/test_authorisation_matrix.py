@@ -47,6 +47,14 @@ POLICY = {
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
     "/ai-chat":                set(ARCHETYPES),
+    # Ask and Twin map: both pages carry @login_required and no role gate, so
+    # every archetype is expected to reach them. Stating that in two rows is
+    # what makes a role gate added later show up here as a row change, and what
+    # keeps them in test_no_archetype_reaches_another_personas_section_
+    # unauthenticated below. The data they show is fenced per tenant by the
+    # impact endpoint they read, not by the page.
+    "/intelligence/ask":       set(ARCHETYPES),
+    "/intelligence/twin-map":  set(ARCHETYPES),
     # ArchiMate OEF import (dogfood-import-fixes, Task 01): the route carries
     # only @login_required -- no role gate at all -- despite update_existing
     # being able to overwrite elements across the whole enterprise model, per
