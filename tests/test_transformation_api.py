@@ -365,6 +365,9 @@ def test_transformation_api_real_intake_replays_and_rejects_changed_digest(
     org = _make_org(session, cleanup_org_ids, "replay")
     owner = _make_user(session, org)
     session.commit()
+    # Read while the instance is still attached: the session is removed between
+    # requests below and a committed instance cannot be refreshed once detached.
+    org_id = org.id
     login_as(client, owner)
     command_key = f"programme-intake-{uuid.uuid4().hex}"
 
@@ -394,7 +397,7 @@ def test_transformation_api_real_intake_replays_and_rejects_changed_digest(
     db.session.remove()
     assert (
         db.session.query(StrategicInitiative)
-        .filter_by(organization_id=org.id, record_kind="transformation_programme")
+        .filter_by(organization_id=org_id, record_kind="transformation_programme")
         .count()
         == 1
     )
@@ -1148,6 +1151,9 @@ def test_transformation_api_rejects_server_owned_identity_and_status(
     org = _make_org(session, cleanup_org_ids, "owned-fields")
     owner = _make_user(session, org)
     session.commit()
+    # Read while the instance is still attached: the session is removed between
+    # requests below and a committed instance cannot be refreshed once detached.
+    org_id = org.id
     login_as(client, owner)
 
     legitimate = _intake(owner.id)
@@ -1170,7 +1176,7 @@ def test_transformation_api_rejects_server_owned_identity_and_status(
     payload = _intake(owner.id)
     payload.update(
         {
-            "organization_id": org.id,
+            "organization_id": org_id,
             "created_by_id": owner.id,
             "status": "approved",
             "roles": ["platform_admin"],

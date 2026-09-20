@@ -434,6 +434,9 @@ def committed_execution_scope(app):
                 "soc2_audit_log",
                 "roles",
                 "users",
+                # Authenticated requests look their session up here, so a login
+                # made against this schema needs the table.
+                "user_sessions",
                 "strategic_initiatives",
                 "programme_workstreams",
                 "programme_role_assignments",
