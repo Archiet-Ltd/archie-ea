@@ -417,7 +417,7 @@ def unconfirmed():
 
 
 # ---------------------------------------------------------------------------
-# SSO / SAML stubs — feature-flag gated, 404 when not configured
+# SSO routes — feature-flag gated, 404 when not configured
 # ---------------------------------------------------------------------------
 
 def _sso_enabled():
@@ -519,7 +519,7 @@ def sso_callback(provider):
         flash("SSO provider did not return an email address.", "error")
         return redirect(url_for("account.login"))
 
-    # tenant-scoping-ok: pre-auth SSO/SAML callback, no org context yet --
+    # tenant-scoping-ok: pre-auth SSO callback, no org context yet --
     # User.email is globally unique.
     user = User.query.filter_by(email=email).first()
     if user is None:
@@ -535,97 +535,3 @@ def sso_callback(provider):
     session_registry.login_and_register(user)
     audit_logger.log("sso_login", user_id=user.id, detail=f"provider={provider}")
     return redirect(url_for("main.index"))
-
-
-def _saml_available():
-    """Return True when SAML is configured and the SSO feature flag is on."""
-    try:
-        from app.auth.sso import sso_service
-        return sso_service.is_saml_enabled()
-    except Exception:
-        return False
-
-
-@account_bp_v2.route("/saml/login")
-@timed_route
-def saml_login():
-    """Initiate SAML 2.0 SSO — redirect user to IdP with SAMLRequest."""
-    from flask import abort, current_app
-
-    if not _saml_available():
-        abort(404)
-
-    try:
-        from app.auth.sso import sso_service
-        redirect_url = sso_service.build_saml_authn_request_url()
-    except Exception as exc:
-        current_app.logger.error("SAML login initiation failed: %s", exc)
-        flash("SAML SSO is not available. Please contact your administrator.", "error")
-        return redirect(url_for("account.login"))
-
-    return redirect(redirect_url)
-
-
-@account_bp_v2.route("/saml/acs", methods=["POST"])
-@timed_route
-def saml_acs():
-    """SAML Assertion Consumer Service — process IdP response."""
-    from flask import abort, current_app
-
-    if not _saml_available():
-        abort(404)
-
-    try:
-        from app.auth.sso import sso_service
-        user_attrs = sso_service.process_saml_response(request.form.get("SAMLResponse", ""))
-    except Exception as exc:
-        current_app.logger.error("SAML ACS failed: %s", exc)
-        flash("SAML authentication failed.", "error")
-        return redirect(url_for("account.login"))
-
-    from app import db
-    from app.models import User
-    from app.services import session_registry
-
-    email = user_attrs.get("email")
-    if not email:
-        flash("SAML response did not contain an email.", "error")
-        return redirect(url_for("account.login"))
-
-    # tenant-scoping-ok: pre-auth SSO/SAML callback, no org context yet --
-    # User.email is globally unique.
-    user = User.query.filter_by(email=email).first()
-    if user is None:
-        user = User(
-            email=email,
-            first_name=user_attrs.get("first_name", ""),
-            last_name=user_attrs.get("last_name", ""),
-            confirmed=True,
-        )
-        db.session.add(user)
-        db.session.commit()
-
-    session_registry.login_and_register(user)
-    audit_logger.log("saml_login", user_id=user.id)
-    return redirect(url_for("main.index"))
-
-
-@account_bp_v2.route("/saml/metadata")
-@timed_route
-def saml_metadata():
-    """Serve SP SAML metadata XML for IdP configuration."""
-    from flask import abort, current_app, make_response
-
-    if not _saml_available():
-        abort(404)
-
-    try:
-        from app.auth.sso import sso_service
-        xml = sso_service.get_sp_metadata()
-    except Exception as exc:
-        current_app.logger.error("SAML metadata generation failed: %s", exc)
-        abort(500)
-
-    resp = make_response(xml)
-    resp.headers["Content-Type"] = "application/xml"
-    return resp

@@ -109,7 +109,7 @@ def login():
 
             auth_audit.record_login_failure(form.email.data)
             flash("Invalid email or password.", "form-error")
-    # Gather configured SSO / SAML providers for the login page buttons
+    # Gather configured SSO providers for the login page buttons
     from app.auth.sso import sso_service
 
     oidc_providers = []
@@ -122,7 +122,6 @@ def login():
         "account/login.html",
         form=form,
         sso_providers=oidc_providers,
-        saml_enabled=sso_service.is_saml_enabled(),
     )
 
 
@@ -543,106 +542,3 @@ def sso_callback(provider):
 
     flash("Successfully signed in via SSO.", "success")
     return redirect(url_for("main.index"))
-
-
-# =========================================================================
-# SAML 2.0 Routes (PLT-030)
-# Coexists with OIDC SSO routes above.  Feature-flagged behind the same
-# FeatureFlag(key='sso_authentication') + SAML_IDP_SSO_URL config.
-# =========================================================================
-
-
-def _saml_available():
-    """Return True when SAML is configured and the SSO feature flag is on."""
-    from app.auth.sso import sso_service
-
-    return sso_service.is_saml_enabled()
-
-
-@account_bp.route("/saml/login")
-def saml_login():
-    """Initiate SAML 2.0 SSO — redirect user to IdP with SAMLRequest.
-
-    GET /account/saml/login
-    """
-    from flask import abort, current_app
-
-    from app.auth.sso import SSOError, sso_service
-
-    if not _saml_available():
-        abort(404)
-
-    try:
-        redirect_url = sso_service.build_saml_authn_request_url()
-    except SSOError as exc:
-        current_app.logger.error("SAML login initiation failed: %s", exc)
-        flash("SAML SSO is not available. Please contact your administrator.", "error")
-        return redirect(url_for("account.login"))
-
-    return redirect(redirect_url)
-
-
-@account_bp.route("/saml/acs", methods=["POST"])
-def saml_acs():
-    """SAML Assertion Consumer Service — receive SAML Response from IdP.
-
-    POST /account/saml/acs
-    The IdP posts a base64-encoded SAMLResponse form field here after
-    authenticating the user.
-    """
-    from flask import abort, current_app
-
-    from app.auth.sso import SSOError, sso_service
-
-    if not _saml_available():
-        abort(404)
-
-    saml_response = request.form.get("SAMLResponse", "")
-    if not saml_response:
-        _log.warning("SAML ACS called with no SAMLResponse field")
-        flash("SAML authentication failed: missing response. Please try again.", "error")
-        return redirect(url_for("account.login"))
-
-    try:
-        user = sso_service.handle_saml_callback(saml_response)
-    except SSOError as exc:
-        current_app.logger.error("SAML ACS error: %s", exc)
-        flash("SAML authentication failed. Please try again or contact your administrator.", "error")
-        return redirect(url_for("account.login"))
-
-    # Establish Flask-Login session
-    from app.services import session_registry
-
-    session_registry.login_and_register(user, remember=True)
-
-    # Honor RelayState redirect when present and safe
-    relay_state = request.form.get("RelayState", "")
-    next_url = url_for("main.index")
-    if relay_state and relay_state.startswith("/") and not relay_state.startswith("//"):
-        next_url = relay_state
-
-    flash("Successfully signed in via SAML SSO.", "success")
-    return redirect(next_url)
-
-
-@account_bp.route("/saml/metadata")
-def saml_metadata():
-    """Return SP (Service Provider) SAML metadata XML.
-
-    GET /account/saml/metadata
-    IdP administrators import this XML to configure the trust relationship.
-    """
-    from flask import Response, abort, current_app
-
-    from app.auth.sso import SSOError, sso_service
-
-    if not _saml_available():
-        abort(404)
-
-    try:
-        xml = sso_service.build_sp_metadata_xml()
-    except SSOError as exc:
-        current_app.logger.error("SAML metadata generation failed: %s", exc)
-        abort(500)
-
-    return Response(xml, mimetype="application/samlmetadata+xml")

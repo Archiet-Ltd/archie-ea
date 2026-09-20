@@ -172,8 +172,8 @@
                         </a>
                     </div>
 
-                    {# SSO / SAML login options — shown only when configured #}
-                    {% if sso_providers or saml_enabled %}
+                    {# SSO login options — shown only when configured #}
+                    {% if sso_providers %}
                     <div class="mt-6">
                         <div class="relative">
                             <div class="absolute inset-0 flex items-center">
@@ -190,12 +190,6 @@
                                 {{ provider.name }}
                             </a>
                             {% endfor %}
-                            {% if saml_enabled %}
-                            <a href="{{ url_for('account.saml_login') }}"
-                               class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 w-full">
-                                Sign in with SAML SSO
-                            </a>
-                            {% endif %}
                         </div>
                     </div>
                     {% endif %}

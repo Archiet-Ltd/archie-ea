@@ -29,7 +29,7 @@ def main():
     routes = [r.strip() for r in open(ROUTES_FILE) if r.strip()]
     # login and dashboard pages we don't want to count as "redirected to login"
     login_paths = ("/account/login", "/account/register", "/account/reset-password",
-                   "/account/unconfirmed", "/account/confirm-account", "/account/saml")
+                   "/account/unconfirmed", "/account/confirm-account")
 
     with sync_playwright() as p:
         b = p.chromium.launch(headless=True)

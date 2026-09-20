@@ -272,7 +272,7 @@ class Config:
     CELERY_ENABLE_UTC = True
 
     # SSO / Enterprise Identity (S0-01)
-    # Supports Azure AD, Okta (OIDC) and any SAML 2.0 IdP (PLT-030).
+    # Supports Azure AD and Okta (OIDC).
     # Feature-flagged: SSO routes only active when FeatureFlag(key='sso_authentication') is enabled.
     SSO_PROVIDERS = {
         "azure": {
@@ -293,21 +293,6 @@ class Config:
             "client_kwargs": {"scope": "openid email profile"},
         },
     }
-
-    # SAML 2.0 IdP configuration (PLT-030)
-    # Set SAML_IDP_SSO_URL + SAML_SP_ENTITY_ID to enable SAML alongside OIDC.
-    # Supported IdPs: ADFS, PingFederate, Shibboleth, Okta (SAML), Azure AD (SAML).
-    # Routes registered at /account/saml/login, /account/saml/acs, /account/saml/metadata.
-    SAML_IDP_SSO_URL = os.environ.get("SAML_IDP_SSO_URL", "")
-    # IdP Entity ID / Issuer URI (validated against Assertion Issuer element)
-    SAML_IDP_ENTITY_ID = os.environ.get("SAML_IDP_ENTITY_ID", "")
-    # IdP X.509 signing certificate — PEM body without -----BEGIN/END----- headers.
-    # Required for production signature validation (via xmlsec / python3-saml).
-    SAML_IDP_CERT = os.environ.get("SAML_IDP_CERT", "")
-    # SP Entity ID — typically the platform's base URL
-    SAML_SP_ENTITY_ID = os.environ.get("SAML_SP_ENTITY_ID", "")
-    # SP ACS URL — leave empty to auto-derive from url_for('account.saml_acs')
-    SAML_SP_ACS_URL = os.environ.get("SAML_SP_ACS_URL", "")
 
     # Internationalization (S2-01) — date/number/currency formatting
     # Full string translation (gettext) is Phase 2.
