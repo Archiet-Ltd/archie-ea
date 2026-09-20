@@ -352,7 +352,13 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # reconstructed from history (the exact link-by-link arithmetic in the comments
 # above has a small pre-existing drift this fix does not attempt to unwind):
 # platform_admin currently renders 30 links. Raising 28 -> 30 to match.
-SIDEBAR_LINK_BUDGET = 30
+#
+# The Ask page's front door ("Ask a question", _ASK_LINK below) is one link in
+# every persona's My work, so platform_admin renders one more: 30 -> 31. The
+# page is the entry point of the impact question for every persona and has no
+# other route in; the Twin map is reached from the Ask page and has no link of
+# its own, so this is the only link the two pages add.
+SIDEBAR_LINK_BUDGET = 31
 
 _ZONE_TITLES = {
     "home": "Home",
@@ -388,6 +394,11 @@ def _link(label, endpoint, icon, requires=None, query_params=None):
         d["query_params"] = query_params
     return d
 
+
+# The way in to the Ask page, first in every persona's My work so it sits in the
+# same place for everyone. One shared definition: the label, endpoint and icon
+# cannot drift apart between personas.
+_ASK_LINK = _link("Ask a question", "intelligence_ui.ask", "search")
 
 _HOME_LINKS = [
     _link("Dashboard Overview", "dashboard.overview", "layout-dashboard"),
@@ -750,7 +761,7 @@ def _build_zones(role: str) -> List[Dict]:
     )
     zones = [
         _zone("home", _HOME_LINKS),
-        _zone("my_work", _MY_WORK_LINKS[role]),
+        _zone("my_work", [_ASK_LINK] + _MY_WORK_LINKS[role]),
         _zone("library", library_links),
     ]
     if role in _BOARD_ROLES:

@@ -58,7 +58,7 @@ def _all_links(role):
     return links
 
 
-def test_sidebar_link_budget_is_30():
+def test_sidebar_link_budget_is_31():
     """Raised 25 -> 26 in the Task 3 fix round (coordinator review of the
     sidebar rewrite): platform_admin's two review-mandated admin-zone links
     (Salesforce Integration, Power Platform) alone render exactly 25 visible
@@ -85,8 +85,13 @@ def test_sidebar_link_budget_is_30():
     Phase 0 CI audit (fix/phase0-ci-and-audit): raised 28 -> 30 — see
     role_access.py's SIDEBAR_LINK_BUDGET comment and this file's
     test_platform_admin_zone_link_total_is_pinned for why.
+
+    Raised 30 -> 31: "Ask a question" is one new link in every persona's My
+    work, and platform_admin renders it like everyone else. The rendered-link
+    test asserts the count EQUALS this number, so the ceiling moves with the
+    link rather than leaving slack that does not exist.
     """
-    assert SIDEBAR_LINK_BUDGET == 30
+    assert SIDEBAR_LINK_BUDGET == 31
 
 
 def test_every_role_is_defined():
@@ -136,6 +141,24 @@ def test_every_endpoint_is_a_dotted_string():
             assert "." in endpoint, f"{role} link {link!r} endpoint is not dotted"
 
 
+def test_ask_link_is_first_in_every_personas_my_work_and_is_the_same_link():
+    """One front door to the Ask page, in the same place for every persona."""
+    for role in SIDEBAR_ZONES:
+        my_work = next(z for z in SIDEBAR_ZONES[role] if z["zone"] == "my_work")["links"]
+        assert my_work[0] == {
+            "label": "Ask a question",
+            "endpoint": "intelligence_ui.ask",
+            "icon": "search",
+        }, f"{role}: the Ask link is not first in My work"
+        assert [l["endpoint"] for l in _all_links(role)].count("intelligence_ui.ask") == 1
+
+
+def test_twin_map_has_no_sidebar_link_of_its_own():
+    """The Twin map is reached from the Ask page; it does not spend a second link."""
+    for role in SIDEBAR_ZONES:
+        assert "intelligence_ui.twin_map" not in [l["endpoint"] for l in _all_links(role)]
+
+
 def _my_work_labels(role):
     for zone in SIDEBAR_ZONES[role]:
         if zone["zone"] == "my_work":
@@ -148,6 +171,7 @@ def test_solution_architect_my_work_membership():
     a real, working route reachable from nowhere in the sidebar. Coordinator
     review of the sidebar rewrite; membership amended accordingly."""
     assert _my_work_labels(ROLE_SOLUTION_ARCHITECT) == [
+        "Ask a question",
         "Architecture Journey",
         "Solutions",
         "AI Chat",
@@ -170,6 +194,7 @@ def test_enterprise_architect_my_work_membership():
     Coordinator review of the sidebar rewrite; membership amended
     accordingly."""
     assert _my_work_labels(ROLE_ENTERPRISE_ARCHITECT) == [
+        "Ask a question",
         "Transformation programmes",
         # BA-A3 (21 Aug 2026): "Business Architecture" is deliberately absent
         # here — this role renders 26 links, exactly the sidebar_links ratchet
@@ -203,6 +228,7 @@ def test_enterprise_architect_my_work_membership():
 
 def test_cto_my_work_membership():
     assert _my_work_labels(ROLE_CTO) == [
+        "Ask a question",
         # 31 Aug 2026: main.capability_roadmap is the CTO's own planning
         # surface and was linked from nowhere. It belongs first -- it is the
         # screen this persona opens to answer "what are we doing next".
@@ -242,6 +268,7 @@ def test_business_architect_my_work_membership():
     link had removed frameworks_overview from every sidebar zone, regressing the
     S-11 finding above — the full suite caught it; the targeted runs did not."""
     assert _my_work_labels(ROLE_BUSINESS_ARCHITECT) == [
+        "Ask a question",
         "Architecture Journey",
         "Capability Map",
         "Capability Maturity",
@@ -272,6 +299,7 @@ def test_business_architect_my_work_membership():
 def test_portfolio_manager_my_work_membership():
     """S-11 remainder: Consolidation List was directory-only."""
     assert _my_work_labels(ROLE_PORTFOLIO_MANAGER) == [
+        "Ask a question",
         "Portfolio",
         "Rationalization",
         "Vendors",
@@ -287,6 +315,7 @@ def test_procurement_my_work_membership():
     working routes reachable from nowhere in the sidebar. Overview goes
     first per the coordinator's review of the sidebar rewrite."""
     assert _my_work_labels(ROLE_PROCUREMENT) == [
+        "Ask a question",
         "Overview",
         "Vendors",
         "Contracts",
@@ -304,6 +333,7 @@ def test_application_manager_my_work_membership():
     list — see app/modules/my_applications/routes.py:get_owned_apps — and
     was reachable from nowhere in the sidebar."""
     assert _my_work_labels(ROLE_APPLICATION_MANAGER) == [
+        "Ask a question",
         "My Applications",
         "Applications",
         "Rationalization",
@@ -355,8 +385,12 @@ def test_platform_admin_zone_link_total_is_pinned():
     without updating either — caught by CI's `Tests` job, not by review.
     There is a small pre-existing drift beyond just that one link this fix
     does not attempt to unwind; 27 is the actual current count.
+
+    27 -> 28: "Ask a question" added to every persona's My work, platform_admin
+    included. It is the only link the Ask and Twin map pages add; the Twin map
+    is reached from the Ask page.
     """
-    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 27
+    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 28
 
 
 def test_platform_admin_collapsed_sidebar_icons_are_unambiguous():

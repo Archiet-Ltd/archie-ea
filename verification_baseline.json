@@ -2,6 +2,7 @@
   "_comment": "Ratchet baselines for scripts/verify.py. Lowering a number is routine (run --update-baseline after a cleanup). Raising one is a deliberate regression and must be justified in review.",
   "_note": "updated 2026-09-02: sidebar_links 25 -> 27 is a CORRECTED MEASUREMENT, not link growth — audit F-11 changed the admin-zone predicate from is_platform_admin (which the check's stub evaluated falsy, hiding the zone: platform_admin measured 16) to user.is_admin() (what @admin_required enforces); an Administrator platform_admin now renders 27, within SIDEBAR_LINK_BUDGET 28. No link definitions were added. shell_conformance 3 remains.",
   "_note2": "updated 2026-09-17: evidence_contract 29 -> 30 for merge 424162db (PR #20, fix/model-class-deduplication). The substantive commit (9cfe2af6) carries real same-commit test coverage (tests/test_fast_init_model_tenancy.py, tests/test_outcome_tenancy.py -- 33 passed, 0 failed, red-then-green demonstrated per commit body) but used a prose 'Regression:' line instead of the literal 'Evidence:' keyword the gate scans for, and the merge commit itself (424162db) carries no trailer of its own. Rewriting already-pushed main history to fix the wording was judged not worth a force-push; accepted as one unit of debt rather than silently ignored. Future commits on this bucket's pattern should use a literal 'Evidence:' trailer to avoid tripping this gate.",
+  "_note3": "updated 2026-09-20: sidebar_links 27 -> 28 is real link growth, not a corrected measurement. The Ask page has one front door, \"Ask a question\", first in every persona's My work, so platform_admin (the worst case) renders one more. The Twin map has no link of its own and is reached from the Ask page. SIDEBAR_LINK_BUDGET moves 30 -> 31 with it.",
   "ratchets": {
     "undefined_names": 0,
     "redefinitions": 0,
@@ -14,7 +15,7 @@
     "broken_surfaces": 0,
     "dynamic_link_prefixes": 0,
     "fetch_guards": 0,
-    "sidebar_links": 27,
+    "sidebar_links": 28,
     "nav_coverage": 0,
     "design_tokens_extended": 0,
     "shell_conformance": 3,
