@@ -13,7 +13,7 @@
 {% from 'intelligence/_parts.html' import stale_line with context %}
 
 {% macro provenance_drawer() %}
-{% set drawer_title %}<span class="inline-flex flex-wrap items-center gap-2"><span x-text="drawer.heading"></span><span x-show="drawer.kind === 'measured'" x-cloak>{{ provenance_badge('measured') }}</span><span x-show="drawer.kind === 'missing'" x-cloak>{{ provenance_badge('missing') }}</span><span x-show="drawer.kind === 'unavailable'" x-cloak>{{ provenance_badge('unavailable') }}</span></span>{% endset %}
+{% set drawer_title %}<span class="inline-flex flex-wrap items-center gap-2"><span x-text="drawer.heading"></span><span x-show="drawer.kind === 'measured'" x-cloak>{{ provenance_badge('measured') }}</span><span x-show="drawer.kind === 'derived'" x-cloak class="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"><i data-lucide="waypoints" class="h-3 w-3" aria-hidden="true"></i>Worked out</span><span x-show="drawer.kind === 'missing'" x-cloak>{{ provenance_badge('missing') }}</span><span x-show="drawer.kind === 'unavailable'" x-cloak>{{ provenance_badge('unavailable') }}</span></span>{% endset %}
 {% call drawer(id='provenance', title=drawer_title) %}
 <div class="space-y-4" data-provenance-body>
     <div x-show="drawer.state === 'loading'" x-cloak>

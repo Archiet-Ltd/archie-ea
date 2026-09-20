@@ -13,7 +13,7 @@
 (function (global) {
     'use strict';
 
-    var LOADING_HEADING = 'Tracing the impact chain…';
+    var LOADING_HEADING = 'Tracing the impact chain\u2026';
     var UNNAMED_HEADING = 'Name not available';
     var UNAVAILABLE_HEADING = 'Detail not available';
 
@@ -61,7 +61,10 @@
                     return;
                 }
                 drawer.state = 'ready';
-                drawer.kind = row.name === null ? 'missing' : 'measured';
+                // The kind in the title says what is true of this row: a connection
+                // somebody drew is measured, one worked out from others is worked
+                // out, and a row that cannot be named is not recorded.
+                drawer.kind = row.name === null ? 'missing' : (row.derived ? 'derived' : 'measured');
                 drawer.heading = row.name === null ? UNNAMED_HEADING : row.name;
                 drawer.plainTerms = row.plainTerms;
                 drawer.staleLine = row.staleLine;
