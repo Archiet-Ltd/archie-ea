@@ -166,6 +166,96 @@
       </div>
     </section>
 
+    {# ── Technical profile ── #}
+    <section class="rounded-xl border border-border bg-card p-6 space-y-4">
+      <h2 class="text-lg font-semibold">Technical profile</h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="cloud_provider" class="block text-sm font-medium mb-1">Cloud Provider</label>
+          <input type="text" id="cloud_provider" name="cloud_provider" value="{{ application.cloud_provider or '' }}"
+                 placeholder="e.g. AWS, Azure, GCP, On-Prem"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="deployment_region" class="block text-sm font-medium mb-1">Deployment Region</label>
+          <input type="text" id="deployment_region" name="deployment_region" value="{{ application.deployment_region or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="database_platforms" class="block text-sm font-medium mb-1">Database Platforms</label>
+          <input type="text" id="database_platforms" name="database_platforms" value="{{ application.database_platforms or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="programming_languages" class="block text-sm font-medium mb-1">Programming Languages</label>
+          <input type="text" id="programming_languages" name="programming_languages" value="{{ application.programming_languages or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="integration_methods" class="block text-sm font-medium mb-1">Integration Methods</label>
+          <input type="text" id="integration_methods" name="integration_methods" value="{{ application.integration_methods or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="authentication_method" class="block text-sm font-medium mb-1">Authentication Method</label>
+          <input type="text" id="authentication_method" name="authentication_method" value="{{ application.authentication_method or '' }}"
+                 placeholder="e.g. OAuth2, SAML, LDAP, API Key"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="container_image" class="block text-sm font-medium mb-1">Container Image</label>
+          <input type="text" id="container_image" name="container_image" value="{{ application.container_image or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="kubernetes_namespace" class="block text-sm font-medium mb-1">Kubernetes Namespace</label>
+          <input type="text" id="kubernetes_namespace" name="kubernetes_namespace" value="{{ application.kubernetes_namespace or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="version_control_url" class="block text-sm font-medium mb-1">Version Control URL</label>
+          <input type="text" id="version_control_url" name="version_control_url" value="{{ application.version_control_url or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="main_branch" class="block text-sm font-medium mb-1">Main Branch</label>
+          <input type="text" id="main_branch" name="main_branch" value="{{ application.main_branch or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+      </div>
+    </section>
+
+    {# ── Compliance and notes ── #}
+    <section class="rounded-xl border border-border bg-card p-6 space-y-4">
+      <h2 class="text-lg font-semibold">Compliance and notes</h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="compliance_requirements" class="block text-sm font-medium mb-1">Compliance Requirements</label>
+          <input type="text" id="compliance_requirements" name="compliance_requirements" value="{{ application.compliance_requirements or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="security_certifications" class="block text-sm font-medium mb-1">Security Certifications</label>
+          <input type="text" id="security_certifications" name="security_certifications" value="{{ application.security_certifications or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+      </div>
+
+      <div>
+        <label for="notes" class="block text-sm font-medium mb-1">Notes</label>
+        <textarea id="notes" name="notes" rows="3"
+                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">{{ application.notes or '' }}</textarea>
+      </div>
+
+      <div>
+        <label for="assessment_notes" class="block text-sm font-medium mb-1">Assessment Notes</label>
+        <textarea id="assessment_notes" name="assessment_notes" rows="3"
+                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">{{ application.assessment_notes or '' }}</textarea>
+      </div>
+    </section>
+
     {# ── Actions ── #}
     <div class="flex items-center justify-between pt-2">
       <a href="{{ url_for('unified_applications.application_detail', id=application.id) }}"

@@ -370,20 +370,20 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
     application_services = Column(
         db.Text
     )  # JSON: [{name, type, description, endpoints}]
-    application_functions_text = Column(db.Text)  # Comma-separated text of functions
+    application_functions_text = Column(db.Text)  # unrendered-field-ok: legacy comma-separated mirror of business_functions (JSON array), which is what fact_sheet.html/edit.html render
     imported_apqc_codes = Column(db.Text)  # JSON: [process_codes]
 
     # Abacus integration fields
     external_id = Column(db.String(255), unique=True, index=True)  # External system ID
     abacus_source = Column(db.Boolean, default=False)  # Whether sourced from Abacus
     last_sync_from_abacus = Column(db.DateTime)  # Last sync timestamp
-    abacus_properties = Column(db.JSON)  # Additional properties from Abacus
+    abacus_properties = Column(db.JSON)  # unrendered-field-ok: raw unstructured sync payload, not a business-user-facing field; abacus_source/last_sync_from_abacus already show the sync state that matters to a reader
     confidence_score = Column(db.Float)  # AI confidence in mapping
 
     # Power Platform CoE integration
     data_source = Column(db.String(50), nullable=True)        # 'power_platform_coe', 'abacus', 'manual'
     source_identifier = Column(db.String(255), nullable=True)  # external GUID for dedup (Power App GUID)
-    provenance = Column(db.JSON, nullable=True)                # API response snapshot for audit trail
+    provenance = Column(db.JSON, nullable=True)                # unrendered-field-ok: raw API response snapshot for audit/debugging, not a business-user-facing field; data_source/source_identifier already show what matters to a reader
 
     # Timestamps
     created_at = Column(db.DateTime, default=datetime.utcnow)

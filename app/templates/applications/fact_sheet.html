@@ -121,6 +121,22 @@
       {{ drow('Business domain', app.business_domain) }}
       {{ drow('Vendor', app.vendor_name) }}
     </dl>
+    {% if app.tags %}
+    <p class="text-xs text-muted-foreground mt-3 mb-1.5">Tags</p>
+    <div class="flex flex-wrap gap-1.5">
+      {% for tag in app.tags %}
+      <span class="text-xs text-foreground bg-muted border border-border rounded px-2 py-0.5">{{ tag }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endcall %}
+
+    {% call panel('Purpose & notes', 'file-text') %}
+    <dl>
+      {{ drow('Business purpose', app.business_purpose) }}
+      {{ drow('Notes', app.notes) }}
+      {{ drow('Assessment notes', app.assessment_notes) }}
+    </dl>
     {% endcall %}
 
     {% call panel('Technology', 'cpu') %}
@@ -131,6 +147,18 @@
       {{ drow('Cloud provider', app.cloud_provider) }}
       {{ drow('Deployment region', app.deployment_region) }}
       {{ drow('Technology age', (app.technology_age_years ~ ' yrs') if app.technology_age_years is not none else none) }}
+      {{ drow('Database platforms', app.database_platforms) }}
+      {{ drow('Programming languages', app.programming_languages) }}
+      {{ drow('Integration methods', app.integration_methods) }}
+    </dl>
+    {% endcall %}
+
+    {% call panel('Deployment', 'server') %}
+    <dl>
+      {{ drow('Version control URL', app.version_control_url) }}
+      {{ drow('Main branch', app.main_branch) }}
+      {{ drow('Container image', app.container_image) }}
+      {{ drow('Kubernetes namespace', app.kubernetes_namespace) }}
     </dl>
     {% endcall %}
 
@@ -142,6 +170,8 @@
       {{ drow('Availability target', (app.availability_target ~ '%') if app.availability_target is not none else none) }}
       {{ drow('SLA availability', (app.sla_availability_percentage ~ '%') if app.sla_availability_percentage is not none else none) }}
       {{ drow('Compliance', app.compliance_requirements) }}
+      {{ drow('Security certifications', app.security_certifications) }}
+      {{ drow('Authentication method', app.authentication_method) }}
     </dl>
     {% endcall %}
 
