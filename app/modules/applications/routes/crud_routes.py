@@ -758,6 +758,21 @@ def application_edit(id):
                 "integration_pattern",
                 "authentication_method",
                 "data_classification",
+                # Technical profile / compliance / notes fields the edit form
+                # gained alongside the fact sheet that already displayed
+                # them -- the form having the input was not enough on its
+                # own; this loop never named any of these, so a submitted
+                # value was silently dropped.
+                "deployment_region",
+                "database_platforms",
+                "integration_methods",
+                "container_image",
+                "kubernetes_namespace",
+                "main_branch",
+                "compliance_requirements",
+                "security_certifications",
+                "notes",
+                "assessment_notes",
             ]
             for field in optional_fields:
                 value = request.form.get(field)

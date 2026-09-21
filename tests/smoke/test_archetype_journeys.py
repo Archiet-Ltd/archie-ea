@@ -346,6 +346,40 @@ def test_procurement_completes_a_contract_and_licence(page, live_server, seeded)
     assert "Violation" in body, "the breach is counted but not listed"
 
 
+def test_application_edit_and_fact_sheet_render_the_technical_profile_fields(page, live_server, seeded):
+    """Technical/compliance ApplicationComponent fields (cloud provider,
+    deployment region, container image, kubernetes namespace, version
+    control URL, main branch, notes, assessment notes, ...) were real
+    columns the model declared but neither the edit form nor the fact
+    sheet ever rendered -- the unrendered-model-fields gate's first
+    real finding. Set one on the edit form, confirm it persists after
+    reload, and confirm the fact sheet (the "single source of truth"
+    read view) shows it too, not just the form that wrote it."""
+    import uuid
+
+    _login(page, live_server, seeded["emails"]["application_manager"])
+    app_id = seeded["ids"]["application"]
+    region = "smoke-region-%s" % uuid.uuid4().hex[:8]
+
+    _visit(page, live_server, "/applications/%d/edit" % app_id)
+    assert page.locator("#deployment_region").count() == 1, \
+        "the Technical profile section did not render on the edit form"
+    assert page.locator("#notes").count() == 1, \
+        "the Compliance and notes section did not render on the edit form"
+    page.fill("#deployment_region", region)
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+        page.get_by_role("button", name="Save Changes", exact=True).click()
+    page.wait_for_timeout(500)
+
+    _visit(page, live_server, "/applications/%d/edit" % app_id)
+    assert page.input_value("#deployment_region") == region, \
+        "deployment_region did not persist after reload"
+
+    _visit(page, live_server, "/applications/%d/fact-sheet" % app_id)
+    assert region in page.inner_text("body"), \
+        "the fact sheet's Deployment panel did not show the value just saved on the edit form"
+
+
 def test_application_manager_maintains_an_owned_application(page, live_server, seeded):
     """Set health on an owned application and see it reach the health overview."""
     _login(page, live_server, seeded["emails"]["application_manager"])
