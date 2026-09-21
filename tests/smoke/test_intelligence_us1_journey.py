@@ -1385,61 +1385,267 @@ def test_twin_map_still_draws_a_stale_connection_marked_and_the_table_agrees(
     _open_twin_map(page, live_server, stale_tenant["service"])
     _wait_for_map(page)
 
-    assert _drawn_edges(page) == _listed_edges(page)
-    assert len(_drawn_edges(page)) == 4
-    assert page.locator("svg path[data-kind=derived]").count() == 1
-    assert page.locator("svg path[data-kind=derived]").get_attribute("stroke-dasharray") in ("5,5", "5, 5")
-    badge = page.locator("svg g.intel-badge")
-    assert badge.count() == 1
-    assert badge.locator("text").text_content() == "Worked out, may be out of date"
-    assert badge.locator("[aria-label='Last worked out']").count() == 1
+    # Observe this context only, after authentication and the initial map load.
+    # No extra protocol calls are inserted between the original drawer/key actions.
+    import time
+    from urllib.parse import parse_qsl, urlencode, urlsplit
 
-    kinds = page.eval_on_selector_all(
-        "[data-map-row]", "els => els.map(e => [e.getAttribute('data-kind'), e.children[3].innerText.trim()])")
-    assert sorted(kinds) == [["derived", "Worked out, may be out of date"], ["explicit", "Explicit"],
-                             ["explicit", "Explicit"], ["explicit", "Explicit"]]
-    expect(page.locator("table[data-map-table] caption")).to_have_text(
-        "Connections for %s: 4 things, 4 connections" % names["service"])
-    expect(page.locator("#twin-picker-input").locator("xpath=ancestor::section//*[@role='status']")).to_have_text(
-        "4 connections for %s" % names["service"])
-    derived_row = page.locator("[data-map-row][data-kind=derived]")
-    expect(derived_row.get_by_label("Last worked out")).to_have_count(1)
+    context = page.context
+    browser_name = context.browser.browser_type.name
+    artifact_dir = os.path.join(os.path.dirname(__file__), "_artifacts")
+    artifact_name = "us1-stale-map-keyboard-" + browser_name
+    evidence = {
+        "boundary": "after login and initial map setup; before drawer interaction",
+        "trace_options": {"screenshots": False, "snapshots": False, "sources": False},
+        "focus_callback_origin": "unavailable; focus methods are not wrapped",
+        "limits": {"dom_events": 240, "requests": 80, "page_errors": 20, "evidence_errors": 20},
+        "requests": [], "page_errors": [], "evidence_errors": [],
+        "dropped": {"requests": 0, "page_errors": 0, "evidence_errors": 0},
+        "dom": "unavailable", "trace": "unavailable",
+        "started_at_ms": int(time.time() * 1000),
+    }
+    listeners = []
+    trace_started = False
+    test_error = None
 
-    notice = page.locator("[data-stale-notice]")
-    expect(notice).to_be_visible()
-    expect(notice).to_contain_text("The connections we worked out may be out of date.")
-    expect(notice.get_by_role("button", name="Work them out now")).to_be_visible()
+    def append_bounded(key, item, limit):
+        if len(evidence[key]) == limit:
+            evidence[key].pop(0)
+            evidence["dropped"][key] += 1
+        evidence[key].append(item)
 
-    derived_row.get_by_role("button", name="Why?").click()
-    dialog = page.get_by_role(
-        "dialog", name=re.compile("^" + re.escape(names["ops"]) + r"\s+Worked out$"))
-    dialog.wait_for(state="visible")
-    assert STALE_LINE.search(dialog.inner_text())
-    page.keyboard.press("Escape")
-    dialog.wait_for(state="hidden")
+    def evidence_error(stage, error):
+        # Exception messages may contain request or page data; keep only the type.
+        append_bounded("evidence_errors", {
+            "stage": stage, "type": type(error).__name__[:80],
+        }, 20)
 
-    # With worked-out connections switched off the page asks without them, the table and
-    # the map still agree, and the notice about the model stays.
-    page.locator("#twin-show-derived").focus()
-    with page.expect_request(lambda r: "include_derived=false" in r.url and "/impact/" in r.url):
-        page.keyboard.press("Space")
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 3")
-    assert _drawn_edges(page) == _listed_edges(page) and len(_drawn_edges(page)) == 3
-    expect(page.locator("[data-stale-notice]")).to_be_visible()
+    def observe_request(kind, request, status=None):
+        try:
+            parts = urlsplit(request.url)
+            if not re.fullmatch(
+                r"/api/v1/intelligence/(?:impact/[0-9]+/?|derivation/recompute/?)", parts.path
+            ):
+                return
+            # Relative URL only: no origin/userinfo, arbitrary query values or fragments.
+            query = []
+            for key, value in parse_qsl(parts.query[:2048], keep_blank_values=True, max_num_fields=32):
+                if key in ("include_derived", "include_stale", "with_owner", "max_depth"):
+                    safe = (value in ("true", "false") if key != "max_depth"
+                            else bool(re.fullmatch(r"[0-9]{1,3}", value)))
+                    query.append((key, value if safe else "unavailable"))
+            failure = request.failure if kind == "requestfailed" else None
+            append_bounded("requests", {
+                "at_ms": int(time.time() * 1000), "event": kind,
+                "request_id": id(request),
+                "url": (parts.path + ("?" + urlencode(query) if query else ""))[:512],
+                "method": request.method if re.fullmatch(r"[A-Z]{1,16}", request.method) else "unavailable",
+                "status": status,
+                "failure": failure if failure and re.fullmatch(r"(?:net::)?[A-Z_]{1,80}", failure) else (
+                    "unavailable" if kind == "requestfailed" else None),
+            }, 80)
+        except Exception as error:
+            evidence_error("request-observer", error)
 
-    # Recalculating from the map brings the current connection back and clears the notice.
-    page.locator("#twin-show-derived").check()
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
-    with page.expect_request(
-        lambda r: r.method == "POST" and r.url.endswith("/api/v1/intelligence/derivation/recompute")
-    ):
-        page.locator("[data-stale-notice]").get_by_role("button", name="Work them out now").click()
-    expect(page.locator("[data-stale-notice]")).to_be_hidden()
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
-    assert _drawn_edges(page) == _listed_edges(page)
-    expect(page.locator("[data-map-row][data-kind=derived] [aria-label='Last worked out']")).to_be_hidden()
-    expect(page.locator("svg g.intel-badge text")).to_have_text("Worked out")
-    page.wait_for_function("() => document.activeElement.id === 'twin-map-heading'")
+    def observe_page_error(error):
+        # A page error's free-form message/stack can echo input; retain its category only.
+        name = getattr(error, "name", None)
+        append_bounded("page_errors", {
+            "at_ms": int(time.time() * 1000),
+            "name": name if name in ("Error", "TypeError", "ReferenceError", "SyntaxError",
+                                     "RangeError", "URIError", "EvalError", "AggregateError") else "unavailable",
+            "message": "omitted", "stack": "omitted",
+        }, 20)
+
+    try:
+        os.makedirs(artifact_dir, exist_ok=True)
+        # Native action timing only: DOM/network snapshots could retain cookies,
+        # headers, bodies and input values. The allowlisted JSON supplies state.
+        context.tracing.start(screenshots=False, snapshots=False, sources=False)
+        trace_started = True
+        for event, callback in (
+            ("request", lambda r: observe_request("request", r)),
+            ("requestfinished", lambda r: observe_request("requestfinished", r)),
+            ("requestfailed", lambda r: observe_request("requestfailed", r)),
+            ("response", lambda r: observe_request("response", r.request, r.status)),
+            ("pageerror", observe_page_error),
+        ):
+            page.on(event, callback)
+            listeners.append((event, callback))
+        page.evaluate("""() => {
+            const limit = 240;
+            const events = [];
+            let dropped = 0;
+            let errors = 0;
+            const identity = el => {
+                if (!(el instanceof Element)) return 'unavailable';
+                const row = el.closest('[data-map-row]');
+                return {
+                    tag: el.tagName.slice(0, 40), id: el.id.slice(0, 80),
+                    role: (el.getAttribute('role') || '').slice(0, 40),
+                    rowKind: row ? (row.getAttribute('data-kind') || '').slice(0, 40) : null,
+                    inDrawer: !!el.closest('#drawer-provenance'),
+                };
+            };
+            const read = fn => {
+                try {
+                    const value = fn();
+                    if (value === null || typeof value === 'boolean') return value;
+                    if (typeof value === 'number' && Number.isFinite(value)) return value;
+                    return 'unavailable';
+                } catch (_) { return 'unavailable'; }
+            };
+            const component = (el, key) => {
+                const stack = el && el._x_dataStack;
+                return stack && stack.find(data => Object.prototype.hasOwnProperty.call(data, key));
+            };
+            const state = () => {
+                const box = document.getElementById('twin-show-derived');
+                const root = box && box.closest('[x-data]');
+                const drawer = document.getElementById('drawer-provenance');
+                return {
+                    active: identity(document.activeElement),
+                    checkbox: box ? {
+                        checked: box.checked, disabled: box.disabled,
+                        inert: !!box.closest('[inert]'),
+                    } : 'unavailable',
+                    includeDerived: read(() => component(root, 'includeDerived').includeDerived),
+                    centreId: read(() => component(root, 'centreId').centreId),
+                    busy: read(() => component(root, 'busy').busy),
+                    recomputing: read(() => component(root, 'recomputing').recomputing),
+                    drawerOpen: read(() => component(drawer, 'drawerOpen').drawerOpen),
+                    modalOpen: read(() => window.Platform.modal.isOpen('drawer-provenance')),
+                    drawerHidden: drawer ? drawer.hidden : 'unavailable',
+                };
+            };
+            const initial = state();
+            const record = event => {
+                if (event.type.startsWith('key') && ![' ', 'Escape', 'Tab'].includes(event.key)) return;
+                if (['input', 'change'].includes(event.type) && event.target.id !== 'twin-show-derived') return;
+                try {
+                    if (events.length === limit) { events.shift(); dropped++; }
+                    events.push({
+                        at_ms: Date.now(), event_ms: event.timeStamp, event: event.type,
+                        phase: event.eventPhase, target: identity(event.target),
+                        relatedTarget: identity(event.relatedTarget),
+                        key: event.type.startsWith('key') ? (event.key === ' ' ? 'Space' : event.key) : null,
+                        defaultPrevented: event.defaultPrevented, ...state(),
+                    });
+                } catch (_) { errors++; }
+            };
+            const types = ['focusin', 'focusout', 'keydown', 'keyup', 'input', 'change'];
+            window.__staleMapEvidence = {
+                finish: () => {
+                    for (const type of types) {
+                        document.removeEventListener(type, record, true);
+                        document.removeEventListener(type, record, false);
+                    }
+                    delete window.__staleMapEvidence;
+                    return {initial, final: state(), events, dropped, errors, limit};
+                },
+            };
+            // Capture and bubble expose the checkbox/model before and after change handlers.
+            for (const type of types) {
+                document.addEventListener(type, record, {capture: true, passive: true});
+                document.addEventListener(type, record, {capture: false, passive: true});
+            }
+        }""")
+        assert _drawn_edges(page) == _listed_edges(page)
+        assert len(_drawn_edges(page)) == 4
+        assert page.locator("svg path[data-kind=derived]").count() == 1
+        assert page.locator("svg path[data-kind=derived]").get_attribute("stroke-dasharray") in ("5,5", "5, 5")
+        badge = page.locator("svg g.intel-badge")
+        assert badge.count() == 1
+        assert badge.locator("text").text_content() == "Worked out, may be out of date"
+        assert badge.locator("[aria-label='Last worked out']").count() == 1
+
+        kinds = page.eval_on_selector_all(
+            "[data-map-row]", "els => els.map(e => [e.getAttribute('data-kind'), e.children[3].innerText.trim()])")
+        assert sorted(kinds) == [["derived", "Worked out, may be out of date"], ["explicit", "Explicit"],
+                                 ["explicit", "Explicit"], ["explicit", "Explicit"]]
+        expect(page.locator("table[data-map-table] caption")).to_have_text(
+            "Connections for %s: 4 things, 4 connections" % names["service"])
+        expect(page.locator("#twin-picker-input").locator("xpath=ancestor::section//*[@role='status']")).to_have_text(
+            "4 connections for %s" % names["service"])
+        derived_row = page.locator("[data-map-row][data-kind=derived]")
+        expect(derived_row.get_by_label("Last worked out")).to_have_count(1)
+
+        notice = page.locator("[data-stale-notice]")
+        expect(notice).to_be_visible()
+        expect(notice).to_contain_text("The connections we worked out may be out of date.")
+        expect(notice.get_by_role("button", name="Work them out now")).to_be_visible()
+
+        derived_row.get_by_role("button", name="Why?").click()
+        dialog = page.get_by_role(
+            "dialog", name=re.compile("^" + re.escape(names["ops"]) + r"\s+Worked out$"))
+        dialog.wait_for(state="visible")
+        assert STALE_LINE.search(dialog.inner_text())
+        page.keyboard.press("Escape")
+        dialog.wait_for(state="hidden")
+
+        # With worked-out connections switched off the page asks without them, the table and
+        # the map still agree, and the notice about the model stays.
+        page.locator("#twin-show-derived").focus()
+        with page.expect_request(lambda r: "include_derived=false" in r.url and "/impact/" in r.url):
+            page.keyboard.press("Space")
+        page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 3")
+        assert _drawn_edges(page) == _listed_edges(page) and len(_drawn_edges(page)) == 3
+        expect(page.locator("[data-stale-notice]")).to_be_visible()
+
+        # Recalculating from the map brings the current connection back and clears the notice.
+        page.locator("#twin-show-derived").check()
+        page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
+        with page.expect_request(
+            lambda r: r.method == "POST" and r.url.endswith("/api/v1/intelligence/derivation/recompute")
+        ):
+            page.locator("[data-stale-notice]").get_by_role("button", name="Work them out now").click()
+        expect(page.locator("[data-stale-notice]")).to_be_hidden()
+        page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
+        assert _drawn_edges(page) == _listed_edges(page)
+        expect(page.locator("[data-map-row][data-kind=derived] [aria-label='Last worked out']")).to_be_hidden()
+        expect(page.locator("svg g.intel-badge text")).to_have_text("Worked out")
+        page.wait_for_function("() => document.activeElement.id === 'twin-map-heading'")
+    except BaseException as error:
+        test_error = error
+        raise
+    finally:
+        # Every cleanup is attempted while the existing fixture's context is alive.
+        try:
+            evidence["dom"] = page.evaluate("""() => window.__staleMapEvidence
+                ? window.__staleMapEvidence.finish() : 'unavailable'""")
+            if evidence["dom"] == "unavailable" or evidence["dom"]["errors"]:
+                evidence_error("dom-observer", RuntimeError())
+        except Exception as error:
+            evidence_error("dom-cleanup", error)
+        for event, callback in listeners:
+            try:
+                page.remove_listener(event, callback)
+            except Exception as error:
+                evidence_error("listener-cleanup", error)
+        if trace_started:
+            try:
+                context.tracing.stop_chunk(path=os.path.join(artifact_dir, artifact_name + ".zip"))
+                evidence["trace"] = "saved"
+            except Exception as error:
+                evidence_error("trace-save", error)
+            finally:
+                try:
+                    context.tracing.stop()
+                except Exception as error:
+                    evidence_error("trace-stop", error)
+        evidence["finished_at_ms"] = int(time.time() * 1000)
+        evidence["test_failed"] = test_error is not None
+        try:
+            with open(os.path.join(artifact_dir, artifact_name + ".json"), "w", encoding="utf-8") as output:
+                json.dump(evidence, output, indent=2)
+        except Exception as error:
+            evidence_error("json-save", error)
+        if evidence["evidence_errors"]:
+            message = "Stale-map evidence incomplete: " + json.dumps(evidence["evidence_errors"])
+            if test_error is not None:
+                test_error.add_note(message)
+            else:
+                raise AssertionError(message)
 
 
 def _without_worked_out(route):

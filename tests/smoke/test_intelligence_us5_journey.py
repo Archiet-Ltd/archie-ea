@@ -1302,7 +1302,21 @@ def test_a_model_above_the_size_limit_says_so_without_a_findings_action_or_numbe
     assert "status" not in snapshot and "Could not measure" not in snapshot, snapshot
     assert "link" not in snapshot
     assert row.locator("[role=status]:visible").count() == 0
-    _shot(page.locator("main"), "figures-with-the-model-check-too-large")
+    capture = "figures-with-the-model-check-too-large-%dx900" % width
+    _shot(page, capture, full_content=True)
+    # The expanded capture restores the viewport. Scroll the real row in the
+    # ordinary shell, then prove it fits before recording the natural viewport.
+    row.scroll_into_view_if_needed()
+    expect(row).to_be_in_viewport(ratio=1)
+    assert page.viewport_size == {"width": width, "height": 900}
+    assert row.evaluate("""el => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && r.left >= 0 && r.top >= 0 &&
+            r.right <= window.innerWidth && r.bottom <= window.innerHeight &&
+            el.scrollWidth <= el.clientWidth &&
+            document.documentElement.scrollWidth <= window.innerWidth;
+    }""")
+    _shot(page, capture + "-result-viewport", full_page=False)
 
 
 # Every answer the model check can give, drawn on the page, in exactly the words the row is specified to
