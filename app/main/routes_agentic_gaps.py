@@ -9,7 +9,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-from flask import jsonify, render_template, request
+from flask import jsonify, request
 from werkzeug.exceptions import HTTPException
 from flask_login import current_user, login_required
 
@@ -24,13 +24,6 @@ from .views import main
 from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
-
-
-@main.route("/agentic-gaps")
-@login_required
-def agentic_gaps_ui():
-    """UI for Agentic Gap Implementation."""
-    return render_template("main/agentic_gaps.html")
 
 
 @main.route("/api/agentic-gaps/implement-all", methods=["POST"])

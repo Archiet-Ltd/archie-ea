@@ -194,7 +194,6 @@ _MORE_TOOLS = [
     # Added here rather than triaged individually against a persona zone —
     # this file is exactly the designed overflow valve for "real route, no
     # natural zone owner yet" per its own module docstring.
-    ("Agentic Gaps", "main.agentic_gaps_ui", "search"),
     ("Application Management", "application_management", "layout-dashboard"),
     ("Architecture Assistant", "architect_ui.architecture_assistant", "bot"),
     ("Model Registry", "dynamic_dashboards.model_registry_index", "database"),

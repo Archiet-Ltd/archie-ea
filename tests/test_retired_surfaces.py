@@ -4,9 +4,9 @@ buyer question it answers on its own.
 /application-management/ is a 302 alias onto the Application Management
 dashboard the Applications list already covers under its own name; it keeps
 answering the redirect this release, it just stops being offered a second
-time in the modules directory and global search. Agentic Gaps was a
-template-only page for a feature the roadmap now designs a different way; its
-route, template and script are gone outright.
+time in the modules directory and global search. The other surface here was
+a template-only page for a feature the roadmap now designs a different way;
+its route, template and script are gone outright.
 """
 
 from __future__ import annotations
@@ -81,3 +81,29 @@ def test_application_management_url_map_has_exactly_one_rule(app):
         if rule.rule == "/application-management/"
     ]
     assert len(rules) == 1, f"expected exactly one rule, found {rules}"
+
+
+# ---------------------------------------------------------------------------
+# The other retired surface: gone outright, not just hidden.
+# ---------------------------------------------------------------------------
+
+
+def test_agent_implementation_endpoint_is_gone(app):
+    assert "main.agentic_gaps_ui" not in app.view_functions
+
+
+def test_agent_implementation_old_path_answers_404(app, db_session, org, client, login_as):
+    user = _make_user(db_session, org)
+    login_as(client, user)
+
+    response = client.get("/agentic-gaps")
+    assert response.status_code == 404
+
+
+def test_modules_page_contains_neither_retired_label(app, db_session, org, client, login_as):
+    user = _make_user(db_session, org)
+    login_as(client, user)
+
+    html = client.get("/modules").get_data(as_text=True)
+    assert "Application Management" not in html
+    assert "Agentic Gaps" not in html
