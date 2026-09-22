@@ -9,23 +9,6 @@ from flask import Flask
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Application Management Page
-# ---------------------------------------------------------------------------
-
-
-def _register_application_management(app):
-    """Register /application-management/ route for modal hosting."""
-    from flask import redirect, url_for
-    from flask_login import login_required
-
-    @app.route("/application-management/")
-    @login_required
-    def application_management():
-        """Application management page - redirects to dashboard."""
-        return redirect(url_for("application_mgmt.dashboard"))
-
-
 def init_inline_routes(app: Flask, config_name: str):
     """Register routes that live directly on the app object."""
     from app.extensions import csrf, db

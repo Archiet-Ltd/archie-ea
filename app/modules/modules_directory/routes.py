@@ -236,6 +236,7 @@ _NOT_RENDERED = {
     "dashboard.index": "302 -> Dashboard Overview",
     "unified_duplicate.enterprise_dashboard": "302 -> Duplicate Detection",
     "architect_ui.roadmap_builder": "302 -> Roadmaps",
+    "application_management": "302 -> Applications dashboard",
 }
 
 _ZONE_ORDER = ["home", "my_work", "library", "governance", "admin"]
