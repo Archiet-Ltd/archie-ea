@@ -12,9 +12,9 @@
     {# ARCH-108: config.APP_NAME is not a real Flask config key, so any route
        that leaves this block undefined rendered an empty <title> — the
        accessible page name screen readers announce on navigation, gone.
-       "Entelim" is the literal wordmark used everywhere else in chrome
+       "A.R.C.H.I.E." is the literal wordmark used everywhere else in chrome
        (components/admin_header.html, account/login.html). #}
-    <title>{% block title %}{{ config.APP_NAME }}{% endblock %}</title>
+    <title>{% block title %}A.R.C.H.I.E.{% endblock %}</title>
     <script>
         // Auth state — guards API calls in sidebar.js
         window.__userAuthenticated = {{ current_user.is_authenticated | tojson }};
@@ -112,7 +112,7 @@
         <button type="button" x-show="!isDesktop && !$store.sidebar.open" x-cloak
                 @click.stop="$store.sidebar.open = true"
                 :aria-expanded="$store.sidebar.open ? 'true' : 'false'"
-                class="fixed top-4 left-4 z-30 lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-input bg-background text-foreground shadow-sm hover:bg-accent transition-colors"
+                class="fixed top-4 left-4 z-[60] lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-input bg-background text-foreground shadow-sm hover:bg-accent transition-colors"
                 aria-controls="admin-sidebar"
                 aria-label="Open sidebar">
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -213,84 +213,20 @@
             showOnboarding: !localStorage.getItem('archie_onboarding_ts'),
             step: 1,
             selectedRole: '{{ current_user.enterprise_role or 'solution_architect' }}',
-            roleCards: {
-                solution_architect: [
-                    {icon: 'compass', title: 'Architecture Journey', desc: 'Walk through TOGAF ADM phases with guided steps', href: '/architecture-journey/'},
-                    {icon: 'wrench', title: 'Solutions', desc: 'Create and manage solution architecture documents', href: '/solutions/'},
-                    {icon: 'pen-tool', title: 'ArchiMate Composer', desc: 'Build architecture diagrams visually', href: '/archimate/composer'},
-                ],
-                enterprise_architect: [
-                    {icon: 'package', title: 'Application Portfolio', desc: 'View and manage all applications in the estate', href: '/applications/'},
-                    {icon: 'map', title: 'Capability Map', desc: 'Explore business capability landscape', href: '/capability-map/'},
-                    {icon: 'table', title: 'ArchiMate Elements', desc: 'Browse and manage architecture elements', href: '/architecture/dashboard'},
-                ],
-                business_architect: [
-                    {icon: 'map', title: 'Capability Map', desc: 'Explore the business capability landscape', href: '/capability-map/'},
-                    {icon: 'git-branch', title: 'Value Streams', desc: 'Map end-to-end value delivery and its stages', href: '/value-streams/'},
-                    {icon: 'package', title: 'Application Portfolio', desc: 'See which applications support each capability', href: '/applications/'},
-                ],
-                arb_member: [
-                    {icon: 'shield-check', title: 'ARB Dashboard', desc: 'Review pending architecture decisions', href: '/arb/dashboard'},
-                    {icon: 'wrench', title: 'Solutions', desc: 'Browse solution designs under review', href: '/solutions/'},
-                    {icon: 'git-branch', title: 'ARB Sessions', desc: 'View all governance review sessions', href: '/arb/sessions'},
-                ],
-                portfolio_manager: [
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Analyse application portfolio for optimization', href: '/dashboard/rationalization'},
-                    {icon: 'building-2', title: 'Vendor Dashboard', desc: 'Manage vendor relationships', href: '/vendors/'},
-                    {icon: 'package', title: 'Applications', desc: 'Browse the full application portfolio', href: '/applications/'},
-                ],
-                platform_admin: [
-                    {icon: 'building-2', title: 'Organizations', desc: 'Set up tenant organizations', href: '/admin/organizations'},
-                    {icon: 'users', title: 'Users', desc: 'Manage platform users and roles', href: '/admin/users'},
-                    {icon: 'key', title: 'API Settings', desc: 'Configure LLM and integration keys', href: '/admin/api-settings'},
-                ],
-                cto: [
-                    {icon: 'layout-dashboard', title: 'Architecture Health', desc: 'Monitor portfolio health and strategic alignment', href: '/dashboard/overview'},
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Application lifecycle and consolidation pipeline', href: '/dashboard/rationalization'},
-                    {icon: 'wrench', title: 'Solutions', desc: 'Track solutions from design to approval', href: '/solutions/'},
-                ],
-                application_manager: [
-                    {icon: 'package', title: 'Application Portfolio', desc: 'Manage all applications in the estate', href: '/applications/'},
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Analyse portfolio for consolidation opportunities', href: '/dashboard/rationalization'},
-                    {icon: 'building-2', title: 'Vendor Dashboard', desc: 'Track vendor relationships and contracts', href: '/vendors/'},
-                ],
-                procurement: [
-                    {icon: 'building-2', title: 'Vendor Dashboard', desc: 'Review vendor relationships and spend', href: '/vendors/'},
-                    {icon: 'package', title: 'Application Portfolio', desc: 'See which applications are in use', href: '/applications/'},
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Identify consolidation and cost-saving opportunities', href: '/dashboard/rationalization'},
-                ],
-            },
-            primaryCTA: {
-                solution_architect: {label: 'Start Architecture Journey', href: '/architecture-journey/'},
-                enterprise_architect: {label: 'View Application Portfolio', href: '/applications/'},
-                business_architect: {label: 'Open the Capability Map', href: '/capability-map/'},
-                arb_member: {label: 'Go to ARB Dashboard', href: '/arb/dashboard'},
-                portfolio_manager: {label: 'Open Rationalization', href: '/dashboard/rationalization'},
-                platform_admin: {label: 'Manage Organizations', href: '/admin/organizations'},
-                cto: {label: 'View Architecture Health', href: '/dashboard/overview'},
-                application_manager: {label: 'View Application Portfolio', href: '/applications/'},
-                procurement: {label: 'Go to Vendor Dashboard', href: '/vendors/'},
-                security_architect: {label: 'Open Regulatory Compliance', href: '/dashboard/compliance'},
-                data_architect: {label: 'Open Data Architecture', href: '/architecture/data-architecture'},
-            },
-            roleLabels: {
-                solution_architect: 'Solution Architect',
-                enterprise_architect: 'Enterprise Architect',
-                business_architect: 'Business Architect',
-                arb_member: 'ARB Member',
-                portfolio_manager: 'Portfolio Manager',
-                cto: 'CTO / CIO',
-                application_manager: 'Application Manager',
-                procurement: 'Procurement',
-                platform_admin: 'Platform Admin',
-                security_architect: 'Security Architect',
-                data_architect: 'Data Architect',
-            },
+            {% include 'partials/_role_personalization_js.html' %}
             /* Promise chain, not async/await: Alpine attribute expressions are
                evaluated by the CSP-safe interpreter (app/static/js/csp/csp-evaluator.js),
                which cannot parse `async` and throws on `await`. */
-            persistOnboarding() {
+            completeOnboarding() {
                 const self = this;
+                // Best-effort persist: the localStorage timestamp below is what actually
+                // suppresses the onboarding modal on future visits, so a failed server
+                // persist just means the role card personalization may not fully apply
+                // until it succeeds later. Dismissal therefore happens on BOTH paths.
+                const dismiss = function () {
+                    localStorage.setItem('archie_onboarding_ts', Date.now().toString());
+                    self.showOnboarding = false;
+                };
                 const _f = (window.Platform && window.Platform.fetch) || window.apiFetch || fetch;
                 const csrfMeta = document.querySelector('meta[name=csrf-token]');
                 return Promise.resolve()
@@ -300,24 +236,16 @@
                             headers: {'Content-Type': 'application/json', 'X-CSRFToken': (csrfMeta && csrfMeta.content) || ''},
                             body: JSON.stringify({enterprise_role: self.selectedRole}),
                         });
-                    });
-            },
-            dismissOnboarding() {
-                localStorage.setItem('archie_onboarding_ts', Date.now().toString());
-                this.showOnboarding = false;
-            },
-            completeOnboarding() {
-                const self = this;
-                return this.persistOnboarding()
-                    .then(function () { self.dismissOnboarding(); })
-                    .catch(function () { self.dismissOnboarding(); });
+                    })
+                    .then(dismiss)
+                    .catch(dismiss);
             }
         }"
         x-show="showOnboarding" x-cloak
-        class="fixed inset-0 z-[200] flex items-start sm:items-center justify-center bg-black/60 p-4 overflow-y-auto"
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
         @keydown.escape.window="completeOnboarding()"
         @keydown.enter.prevent>
-        <div class="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        <div class="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-lg overflow-hidden"
              @click.away="completeOnboarding()">
             {# Step 1: Welcome + Role Selection #}
             <div x-show="step === 1" class="p-8 space-y-6">
@@ -325,12 +253,12 @@
                     <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                         <i data-lucide="layout-dashboard" class="h-6 w-6 text-primary" aria-hidden="true"></i>
                     </div>
-                    <h2 class="text-xl font-bold text-foreground">Welcome to {{ config.APP_NAME }}</h2>
+                    <h2 class="text-xl font-bold text-foreground">Welcome to A.R.C.H.I.E.</h2>
                     <p class="text-sm text-muted-foreground">Your enterprise architecture platform. Let's personalize your experience.</p>
                 </div>
                 <div>
                     <label class="text-sm font-medium text-foreground mb-3 block">What's your role?</label>
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div class="space-y-2">
                         <template x-for="(label, key) in roleLabels" :key="key">
                             <label class="flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors"
                                    :class="selectedRole === key ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'">
@@ -366,7 +294,7 @@
                 </div>
                 <div class="flex gap-3">
                     <button type="button" @click="step = 1" class="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent transition-colors">Back</button>
-                    <button type="button" @click="persistOnboarding().then(function() { step = 3; })" class="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">Continue</button>
+                    <button type="button" @click="step = 3" class="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">Continue</button>
                 </div>
             </div>
             {# Step 3: You're all set #}
@@ -378,12 +306,12 @@
                     <h2 class="text-xl font-bold text-foreground">You're all set!</h2>
                     <p class="text-sm text-muted-foreground">Your workspace has been personalized. You can always change your role in Settings.</p>
                 </div>
-                <button type="button" @click="dismissOnboarding(); window.location.href = (primaryCTA[selectedRole]?.href || '/dashboard/overview')"
+                <button type="button" @click="completeOnboarding(); window.location.href = (primaryCTA[selectedRole]?.href || '/dashboard/overview')"
                         class="inline-flex items-center justify-center w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">
                     <span x-text="primaryCTA[selectedRole]?.label || 'Go to Dashboard'"></span>
                     <i data-lucide="arrow-right" class="h-4 w-4 ml-2" aria-hidden="true"></i>
                 </button>
-                <button type="button" @click="dismissOnboarding()"
+                <button type="button" @click="completeOnboarding()"
                         class="text-xs text-muted-foreground hover:text-foreground transition-colors">
                     Skip for now
                 </button>
@@ -411,9 +339,6 @@
             if (el) { try { this.steps = JSON.parse(el.textContent); } catch(_) { /* swallow-ok: defensive parse of our own server-rendered step JSON; a malformed block hides the optional guide button rather than breaking page init, and the user never asked for the guide */ } }
             const saved = parseInt(localStorage.getItem(this.storageKey) || '0');
             this.currentIndex = (saved < this.steps.length) ? saved : 0;
-            if (this.steps.length > 0) {
-                document.getElementById('main-content')?.classList.add('pb-20');
-            }
         },
         get currentStep() { return this.steps[this.currentIndex] || null; },
         next() {
@@ -431,7 +356,7 @@
         <button type="button" id="guided-mode-trigger"
                 x-show="steps.length > 0" x-cloak
                 @click="open = !open"
-                class="fixed bottom-6 right-6 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90 transition-opacity"
+                class="fixed bottom-6 right-6 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90 transition-opacity"
                 title="Guided walkthrough"
                 aria-label="Open guided walkthrough">
             <i data-lucide="help-circle" class="h-5 w-5" aria-hidden="true"></i>
@@ -444,7 +369,7 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100 translate-x-0"
              x-transition:leave-end="opacity-0 translate-x-4"
-             class="fixed bottom-20 right-6 z-30 w-80 rounded-xl border border-border bg-card shadow-xl"
+             class="fixed bottom-20 right-6 z-40 w-80 rounded-xl border border-border bg-card shadow-xl"
              @keydown.escape.window="exit()">
             <div class="flex items-center justify-between border-b border-border px-4 py-3">
                 <span class="text-sm font-semibold text-foreground">Guided Walkthrough</span>

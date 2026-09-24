@@ -46,15 +46,25 @@ def verify_file_access(file_org_id):
     Returns True if access is allowed, False otherwise.
     Platform admins can access all files.
     """
+    from flask import has_request_context
     from flask_login import current_user
 
-    # No tenant context (CLI, background) — allow
-    if not hasattr(g, "current_org_id") or g.current_org_id is None:
+    # Outside a request (CLI, background jobs) there is no tenant context to
+    # enforce against, so access is allowed. Inside a request the checks below
+    # fail closed.
+    if not has_request_context():
         return True
 
-    # Platform admins can access all files
+    # Platform admins can access all files, even without a tenant context.
     if getattr(current_user, "is_platform_admin", False):
         return True
+
+    # Inside a request, fail closed: a caller without a tenant context, or a
+    # file without an owning organisation, cannot be authorised.
+    if not hasattr(g, "current_org_id") or g.current_org_id is None:
+        return False
+    if file_org_id is None:
+        return False
 
     # Same org — allow
     return g.current_org_id == file_org_id

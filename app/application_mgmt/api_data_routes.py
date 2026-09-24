@@ -8,7 +8,7 @@ import json
 import os
 from datetime import datetime
 
-from flask import current_app, flash, jsonify, request  # dead-code-ok
+from flask import current_app, flash, g, jsonify, request  # dead-code-ok
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
@@ -129,11 +129,24 @@ def analyze_document_for_application(application_id):
 
         if document_id:
             # Analyze existing document
-            # tenant-scoping-ok: cross-org access is closed by the
-            # application_component_id check immediately below, which
-            # rejects any document not FK-scoped to this (org-scoped)
-            # application_id.
-            document = ApplicationDocument.query.get_or_404(document_id)
+            query = ApplicationDocument.query.filter_by(id=document_id)
+            if not getattr(current_user, "is_platform_admin", False):
+                query = query.filter_by(organization_id=g.current_org_id)
+            document = query.first()
+
+            if not document:
+                return jsonify({"error": "Document not found."}), 404
+
+            # Tenant isolation: verify the document belongs to the caller's
+            # organisation. The query above skips the organisation filter for
+            # platform administrators, who can reach any document;
+            # verify_file_access provides a second line of defence, including
+            # unrestricted access for platform admins.
+            from app.middleware.tenant_files import verify_file_access
+
+            if not verify_file_access(document.organization_id):
+                return jsonify({"error": "Access denied."}), 403
+
             if document.application_component_id != application_id:
                 return jsonify(
                     {"error": "Document does not belong to this application"}

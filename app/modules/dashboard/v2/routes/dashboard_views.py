@@ -744,19 +744,17 @@ def api_overview_chart():
 @timed_route
 @login_required
 def api_onboarding_complete():
-    """PLT-040: Mark user onboarding as complete, optionally update enterprise_role."""
-    import datetime
+    """PLT-040: Mark user onboarding as complete, optionally update enterprise_role.
+
+    Called by the retired first-login modal (layouts/admin_base.html), kept
+    as a safety net there. Shares its write with the five-screen flow's own
+    onboarding.finish/onboarding.skip via completion.mark_complete -- one
+    valid-role set, not a second copy that can drift (this endpoint's own
+    copy had quietly dropped business_architect)."""
+    from app.modules.onboarding.services import completion
 
     data = request.get_json(silent=True) or {}
-    new_role = data.get("enterprise_role")
-    valid_roles = {
-        "solution_architect", "enterprise_architect",
-        "arb_member", "portfolio_manager", "platform_admin",
-        "cto", "application_manager", "procurement",
-    }
-    if new_role and new_role in valid_roles:
-        current_user.enterprise_role = new_role
-    current_user.onboarding_completed_at = datetime.datetime.utcnow()
+    completion.mark_complete(current_user, data.get("enterprise_role"))
     try:
         db.session.commit()
     except Exception as exc:

@@ -84,6 +84,26 @@
     </div>
     {% endif %}
 
+    {# ── Workspace setup prompt — shown until onboarding_completed_at is set.
+       Needed here, not just inside the five-screen flow itself: an account
+       whose workspace already holds data skips dashboard.overview's redirect
+       into that flow outright (see the view function's own gating comment),
+       so without this it would never see role choice, key features or admin
+       setup at all. data-testid pinned by tests/test_dashboard_modes.py. #}
+    {% if not current_user.onboarding_completed_at %}
+    <div data-testid="workspace-setup-prompt"
+         class="flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5">
+        <p class="text-sm text-foreground min-w-0">
+            <span class="font-medium">Finish setting up your workspace</span>
+            <span class="text-muted-foreground"> — role, key features and AI provider setup.</span>
+        </p>
+        <a href="{{ url_for('onboarding.workspace_setup') }}"
+           class="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+            Set up now <i data-lucide="arrow-right" class="h-3 w-3" aria-hidden="true"></i>
+        </a>
+    </div>
+    {% endif %}
+
     {% if mode == 'guided' %}
     {# ══════════════════════════════════════════════════════════════════════
        GUIDED MODE — sparse org: a setup journey, not a failing report card.

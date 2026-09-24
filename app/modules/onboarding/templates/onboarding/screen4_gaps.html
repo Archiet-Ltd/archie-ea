@@ -124,12 +124,24 @@
 
     <div class="border-t border-border pt-6">
         <h2 class="text-sm font-semibold text-foreground mb-2">Review</h2>
+        {% if pending_review_count %}
+        <a href="{{ url_for('onboarding.review') }}"
+           class="flex items-center justify-between rounded-lg border border-border p-3 hover:border-primary/30 transition-colors">
+            <span class="text-sm text-foreground">
+                {{ pending_review_count }} suggestion{{ 's' if pending_review_count != 1 else '' }} waiting for you to confirm or dismiss
+            </span>
+            <i data-lucide="arrow-right" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
+        </a>
+        {% else %}
         {{ empty_state(
             icon='inbox',
             title='Nothing to review yet',
-            description='Connect a source, or tell us more above.',
+            description="When we read your website, what we find appears here for you to confirm.",
+            cta_text='Open Review',
+            cta_href=url_for('onboarding.review'),
             padding='py-8'
         ) }}
+        {% endif %}
     </div>
 
     <a href="{{ url_for('onboarding.twin') }}"

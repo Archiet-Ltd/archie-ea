@@ -1,0 +1,59 @@
+{% extends 'layouts/admin_base.html' %}
+{% block title %}Workspace setup — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div x-data="{
+        selectedRole: {{ (current_user.enterprise_role or 'solution_architect') | tojson | forceescape }},
+        {% include 'partials/_role_personalization_js.html' %}
+        saving: false,
+        savedMessage: '',
+        save() {
+            this.saving = true;
+            this.savedMessage = '';
+            window.Platform.fetch('{{ url_for('onboarding.api_role') }}', {
+                method: 'POST',
+                body: {enterprise_role: this.selectedRole},
+                silent: true,
+            }).then(() => {
+                this.saving = false;
+                this.savedMessage = 'Saved.';
+            }).catch(() => {
+                this.saving = false;
+                this.savedMessage = 'Could not save just now — try again.';
+            });
+        }
+    }"
+    class="max-w-3xl mx-auto p-6 space-y-6">
+    <div class="space-y-1">
+        <h1 class="text-xl font-bold text-foreground">Workspace setup</h1>
+        <p class="text-sm text-muted-foreground">
+            Everything you set up when you joined {{ config.APP_NAME }}, in one place — come back here
+            whenever you want to change it.
+        </p>
+    </div>
+
+    <div class="bg-card rounded-2xl border border-border shadow-sm p-6 space-y-6">
+        {% include 'onboarding/_workspace_setup_fields.html' %}
+
+        <div class="flex items-center gap-3">
+            <button type="button" @click="save()" :disabled="saving"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium
+                           bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-6 py-2
+                           disabled:opacity-50 disabled:pointer-events-none">
+                <span x-show="!saving">Save</span>
+                <span x-show="saving" x-cloak>Saving…</span>
+            </button>
+            <p x-show="savedMessage" x-cloak x-text="savedMessage" class="text-sm text-muted-foreground" role="status"></p>
+        </div>
+    </div>
+
+    <div class="bg-card rounded-2xl border border-border shadow-sm p-6 space-y-3">
+        <h2 class="text-sm font-semibold text-foreground">Company details</h2>
+        <p class="text-sm text-muted-foreground">
+            Stage, size, industry and your website are set up on the
+            <a href="{{ url_for('onboarding.company') }}" class="text-primary hover:underline">Bring your company</a>
+            screen — the same one you saw during onboarding.
+        </p>
+    </div>
+</div>
+{% endblock %}
