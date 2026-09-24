@@ -48,15 +48,27 @@
             <div class="rounded-lg border border-border p-3 space-y-2"
                  :class="(gap.assigned_to || gap.accepted_reason) ? 'opacity-60' : ''">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                    <div>
+                    <div class="space-y-1">
                         <p class="text-sm font-medium text-foreground" x-text="gap.label"></p>
-                        <p class="text-xs text-muted-foreground" x-show="!gap.assigned_to && !gap.accepted_reason">Expected at your stage</p>
-                        <p class="text-xs text-muted-foreground" x-show="gap.assigned_to" x-cloak>
-                            Assigned to <span x-text="gap.assigned_to && gap.assigned_to.assignee"></span>
-                        </p>
-                        <p class="text-xs text-muted-foreground" x-show="gap.accepted_reason" x-cloak>
-                            Accepted — <span x-text="gap.accepted_reason && gap.accepted_reason.reason"></span>
-                        </p>
+                        {# Coverage chips (onboarding-redesign-v3 §5): recorded / worked out /
+                           expected at your stage, plus accepted — same visual pattern as
+                           components/provenance.html's coverage_badge macro (Alpine-rendered
+                           here, since a gap's state changes client-side after Assign/Accept
+                           without a reload; the macro is the source of truth for the classes). #}
+                        <span x-show="!gap.assigned_to && !gap.accepted_reason"
+                              class="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            <i data-lucide="circle-dashed" class="h-3 w-3" aria-hidden="true"></i>Expected at your stage
+                        </span>
+                        <span x-show="gap.assigned_to" x-cloak
+                              class="inline-flex items-center gap-1 rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-xs font-medium text-success-emphasis">
+                            <i data-lucide="check-circle-2" class="h-3 w-3" aria-hidden="true"></i>Recorded
+                            <span x-show="gap.assigned_to" x-text="'— ' + (gap.assigned_to && gap.assigned_to.assignee)"></span>
+                        </span>
+                        <span x-show="gap.accepted_reason" x-cloak
+                              class="inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis">
+                            <i data-lucide="clock" class="h-3 w-3" aria-hidden="true"></i>Accepted
+                            <span x-show="gap.accepted_reason" x-text="'— ' + (gap.accepted_reason && gap.accepted_reason.reason)"></span>
+                        </span>
                     </div>
                     <div class="flex gap-2 shrink-0" x-show="!gap.assigned_to && !gap.accepted_reason">
                         <button type="button" @click="assigning = (assigning === gap.gap_id + ':assign' ? null : gap.gap_id + ':assign')"
@@ -93,11 +105,29 @@
     {% endif %}
 
     <div class="border-t border-border pt-6">
+        <div class="flex items-center justify-between gap-3 rounded-lg border border-border p-4">
+            <div>
+                <p class="text-sm font-medium text-foreground">Can't answer something yet?</p>
+                <p class="text-xs text-muted-foreground">
+                    Tell us more in five short, optional sections —
+                    <span>{{ tell_us_more_done }} of {{ tell_us_more_total }} done</span>.
+                </p>
+            </div>
+            <a href="{{ url_for('onboarding.tell_us_more_hub') }}"
+               class="inline-flex shrink-0 items-center justify-center rounded-md text-xs font-medium
+                      border border-input bg-background hover:bg-accent h-8 px-3">
+                Tell us more
+                <i data-lucide="arrow-right" class="h-3 w-3 ml-1.5" aria-hidden="true"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="border-t border-border pt-6">
         <h2 class="text-sm font-semibold text-foreground mb-2">Review</h2>
         {{ empty_state(
             icon='inbox',
             title='Nothing to review yet',
-            description='Connect a source or tell us more.',
+            description='Connect a source, or tell us more above.',
             padding='py-8'
         ) }}
     </div>

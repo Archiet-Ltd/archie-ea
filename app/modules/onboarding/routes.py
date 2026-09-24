@@ -24,7 +24,7 @@ from app import db
 from app.models.organization import Organization
 from app.utils.api_response import success_response
 
-from .services import profile, stage_gaps
+from .services import profile, stage_gaps, tell_us_more
 
 onboarding_bp = Blueprint("onboarding", __name__, template_folder="templates")
 
@@ -174,10 +174,14 @@ def gaps():
         gap["gap_id"] = gap_id
         gap["accepted_reason"] = accepted.get(gap_id)
         gap["assigned_to"] = assigned.get(gap_id)
+    statuses = tell_us_more.section_statuses(org)
+    tell_us_more_done = sum(1 for v in statuses.values() if v == "saved")
     return render_template(
         "onboarding/screen4_gaps.html",
         stage_label=_STAGE_LABELS.get(stage, stage),
         gaps=all_gaps,
+        tell_us_more_done=tell_us_more_done,
+        tell_us_more_total=len(statuses),
     )
 
 
@@ -220,6 +224,61 @@ def gap_action(gap_id: str):
 @login_required
 def twin():
     return render_template("onboarding/screen5_twin.html")
+
+
+@onboarding_bp.route("/tell-us-more")
+@login_required
+def tell_us_more_hub():
+    """The five short, optional sections (onboarding-redesign-v3 §3), reached
+    from Screen 4's gaps, Screen 5 ("can't answer yet"), and the dashboard's
+    module directory. Progress persists per organisation and can be resumed
+    from here at any time."""
+    org = _current_org()
+    statuses = tell_us_more.section_statuses(org)
+    sections = [
+        {
+            "key": s["key"],
+            "title": s["title"],
+            "unlock_line": s["unlock_line"],
+            "status": statuses[s["key"]],
+        }
+        for s in tell_us_more.SECTIONS
+    ]
+    return render_template("onboarding/tell_us_more_hub.html", sections=sections)
+
+
+@onboarding_bp.route("/tell-us-more/<section_key>", methods=["GET", "POST"])
+@login_required
+def tell_us_more_section(section_key: str):
+    org = _current_org()
+    sec = tell_us_more.section(section_key)
+    if sec is None:
+        return jsonify({"success": False, "error": "unknown_section"}), 404
+
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        action = data.get("action")
+        if action == "save":
+            tell_us_more.save_section(org, section_key, data.get("answers") or {})
+        elif action == "skip":
+            tell_us_more.skip_section(org, section_key)
+        else:
+            return jsonify({"success": False, "error": "invalid_action"}), 400
+        return success_response({
+            "next": url_for("onboarding.tell_us_more_hub"),
+            "section": section_key,
+            "action": action,
+        })
+
+    statuses = tell_us_more.section_statuses(org)
+    return render_template(
+        "onboarding/tell_us_more_section.html",
+        section=sec,
+        answers=tell_us_more.answers_for(org, section_key),
+        status=statuses[section_key],
+        section_index=[s["key"] for s in tell_us_more.SECTIONS].index(section_key) + 1,
+        section_count=len(tell_us_more.SECTIONS),
+    )
 
 
 @onboarding_bp.route("/finish", methods=["POST"])

@@ -72,5 +72,10 @@
         <span x-show="submitting" x-cloak>Setting up…</span>
         <i data-lucide="arrow-right" class="h-4 w-4 ml-2" aria-hidden="true" x-show="!submitting"></i>
     </button>
+
+    <p class="text-center text-xs text-muted-foreground">
+        Can't answer yet —
+        <a href="{{ url_for('onboarding.tell_us_more_hub') }}" class="font-medium text-primary underline-offset-4 hover:underline">tell us more</a>
+    </p>
 </div>
 {% endblock %}
