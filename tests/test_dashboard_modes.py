@@ -21,6 +21,7 @@ other adopter of this pattern in the suite.
 """
 
 from __future__ import annotations
+import datetime
 
 import uuid
 
@@ -78,7 +79,7 @@ def _make_user(db_session, make_org, label, enterprise_role="platform_admin", ad
         first_name="Dash",
         last_name="Tester",
         organization_id=org.id,
-        confirmed=True,
+        confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),
         enterprise_role=enterprise_role,
         is_org_admin=True,
     )
@@ -459,7 +460,7 @@ def test_invite_step_ignores_other_orgs_users(app, db_session, make_org):
             first_name="Crowd",
             last_name="Tester",
             organization_id=org_b.id,
-            confirmed=True,
+            confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),
             enterprise_role="platform_admin",
         )
         db_session.add(crowd_user)

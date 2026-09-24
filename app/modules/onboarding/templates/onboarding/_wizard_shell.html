@@ -1,0 +1,28 @@
+{# Shared shell for the five onboarding screens: a step indicator plus a
+   centred card. Extended by each screen, never inlined per-screen. #}
+{% extends 'layouts/base.html' %}
+
+{% block title %}{{ step_title | default('Getting started') }} — A.R.C.H.I.E.{% endblock %}
+
+{# layouts/base.html does not load the platform core; the screens call
+   Platform.fetch, so load the same bundle every other signed-in layout does. #}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/bundles/core-admin.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10">
+    <div class="w-full max-w-2xl">
+        <div class="flex items-center justify-center gap-2 mb-8" role="progressbar"
+             aria-valuemin="1" aria-valuemax="5" aria-valuenow="{{ step_number | default(1) }}"
+             aria-label="Onboarding step {{ step_number | default(1) }} of 5">
+            {% for n in range(1, 6) %}
+            <div class="h-1.5 rounded-full transition-colors {{ 'w-10 bg-primary' if n <= (step_number | default(1)) else 'w-6 bg-muted' }}"></div>
+            {% endfor %}
+        </div>
+        <div class="bg-card rounded-2xl border border-border shadow-lg overflow-hidden">
+            {% block wizard_content %}{% endblock %}
+        </div>
+    </div>
+</div>
+{% endblock %}

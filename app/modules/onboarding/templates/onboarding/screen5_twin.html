@@ -1,0 +1,76 @@
+{% extends 'onboarding/_wizard_shell.html' %}
+{% set step_title = 'Your twin' %}
+{% set step_number = 5 %}
+
+{% block wizard_content %}
+<div x-data="{
+        selectedRole: '{{ current_user.enterprise_role or 'solution_architect' }}',
+        roleLabels: {
+            solution_architect: 'Solution Architect',
+            enterprise_architect: 'Enterprise Architect',
+            business_architect: 'Business Architect',
+            arb_member: 'ARB Member',
+            portfolio_manager: 'Portfolio Manager',
+            cto: 'CTO / CIO',
+            application_manager: 'Application Manager',
+            procurement: 'Procurement',
+            platform_admin: 'Platform Admin',
+        },
+        primaryCTA: {
+            solution_architect: {label: 'Start Architecture Journey', href: '/architecture-journey/'},
+            enterprise_architect: {label: 'View Application Portfolio', href: '/applications/'},
+            business_architect: {label: 'Open the Capability Map', href: '/capability-map/'},
+            arb_member: {label: 'Go to ARB Dashboard', href: '/arb/dashboard'},
+            portfolio_manager: {label: 'Open Rationalization', href: '/dashboard/rationalization'},
+            platform_admin: {label: 'Manage Organizations', href: '/admin/organizations'},
+            cto: {label: 'View Architecture Health', href: '/dashboard/overview'},
+            application_manager: {label: 'View Application Portfolio', href: '/applications/'},
+            procurement: {label: 'Go to Vendor Dashboard', href: '/vendors/'},
+        },
+        submitting: false,
+        finish() {
+            this.submitting = true;
+            window.Platform.fetch('{{ url_for('onboarding.finish') }}', {
+                method: 'POST',
+                body: {enterprise_role: this.selectedRole},
+                silent: true,
+            }).then(data => {
+                const href = (data && data.data && data.data.next) || (this.primaryCTA[this.selectedRole] || {}).href || '/dashboard/overview';
+                window.location.href = href;
+            }).catch(() => { window.location.href = '/dashboard/overview'; });
+        }
+    }"
+    class="p-8 space-y-6">
+    <div class="text-center space-y-2">
+        <div class="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center mx-auto">
+            <i data-lucide="check-circle-2" class="h-6 w-6 text-success" aria-hidden="true"></i>
+        </div>
+        <h1 class="text-lg font-bold text-foreground">Your twin is started</h1>
+        <p class="text-sm text-muted-foreground max-w-md mx-auto">
+            It grows as you add more — every answer here becomes part of it. One last thing:
+            what's your role, so we can put the right screen first?
+        </p>
+    </div>
+
+    <div>
+        <div class="space-y-2">
+            <template x-for="(label, key) in roleLabels" :key="key">
+                <label class="flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors"
+                       :class="selectedRole === key ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'">
+                    <input type="radio" name="twin_role" :value="key" x-model="selectedRole" class="accent-primary">
+                    <span class="text-sm font-medium text-foreground" x-text="label"></span>
+                </label>
+            </template>
+        </div>
+    </div>
+
+    <button type="button" @click="finish()" :disabled="submitting"
+            class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium
+                   bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2
+                   disabled:opacity-50 disabled:pointer-events-none">
+        <span x-show="!submitting" x-text="(primaryCTA[selectedRole] || {}).label || 'Go to Dashboard'"></span>
+        <span x-show="submitting" x-cloak>Setting up…</span>
+        <i data-lucide="arrow-right" class="h-4 w-4 ml-2" aria-hidden="true" x-show="!submitting"></i>
+    </button>
+</div>
+{% endblock %}

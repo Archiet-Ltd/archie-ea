@@ -1,0 +1,51 @@
+{% extends 'onboarding/_wizard_shell.html' %}
+{% set step_title = 'First question' %}
+{% set step_number = 3 %}
+
+{% block wizard_content %}
+<div x-data="{
+        answer: {{ (current.first_question_answer or '') | tojson | forceescape }},
+        submitting: false,
+        go(skip) {
+            this.submitting = true;
+            window.Platform.fetch('{{ url_for('onboarding.first_question') }}', {
+                method: 'POST',
+                body: {answer: skip ? '' : this.answer},
+                silent: true,
+            }).then(data => {
+                this.submitting = false;
+                if (data && data.success && data.data && data.data.next) {
+                    window.location.href = data.data.next;
+                }
+            }).catch(() => { this.submitting = false; });
+        }
+    }"
+    class="p-8 space-y-6">
+    <div class="space-y-1">
+        <h1 class="text-lg font-bold text-foreground">One thing you're trying to achieve</h1>
+        <p class="text-sm text-muted-foreground">
+            In a sentence or two — what's the main thing you want out of the next few months? This
+            seeds your first driver; you can add more later. Entirely optional.
+        </p>
+    </div>
+    <textarea x-model="answer" rows="4" maxlength="1000"
+              placeholder="e.g. Get our first ten paying customers without the product falling over"
+              class="flex w-full rounded-md border border-input bg-transparent px-3 py-2
+                     text-sm shadow-sm transition-colors placeholder:text-muted-foreground
+                     focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+    <div class="flex gap-3">
+        <button type="button" @click="go(true)" :disabled="submitting"
+                class="rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2
+                       disabled:opacity-50 disabled:pointer-events-none">
+            Skip
+        </button>
+        <button type="button" @click="go(false)" :disabled="submitting"
+                class="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium
+                       bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2
+                       disabled:opacity-50 disabled:pointer-events-none">
+            <span x-show="!submitting">Continue</span>
+            <span x-show="submitting" x-cloak>Saving…</span>
+        </button>
+    </div>
+</div>
+{% endblock %}

@@ -85,6 +85,7 @@ _MORE_TOOLS = [
     # code comment: reached from an Ask result, kept out of the sidebar
     # budget) -- this is its one findable home. "network" matches the icon
     # already used for the Twin map button inside ask.html.
+    ("Getting started", "onboarding.index", "rocket"),
     ("Twin Map", "intelligence_ui.twin_map", "network"),
     ("Stakeholder Map", "stakeholder_map.stakeholder_map_page", "users"),
     ("Capability Health", "strategic.capability_health", "heart-pulse"),

@@ -29,6 +29,7 @@ Follows the ``client.get(...)`` + session-login pattern already proven in
 """
 
 from __future__ import annotations
+import datetime
 
 import uuid
 
@@ -66,7 +67,7 @@ def _make_user(db_session, make_org, label, password="Sup3rSecret!23"):
         first_name="Header",
         last_name="Tester",
         organization_id=org.id,
-        confirmed=True,
+        confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),
         enterprise_role="enterprise_architect",
     )
     user.password = password
@@ -89,7 +90,7 @@ def test_header_role_badge_shows_the_persona_not_admin_or_user(app, db_session, 
     user = User(
         email=f"header-cto-{suffix}@example.com",
         first_name="Badge", last_name="Tester",
-        organization_id=org.id, confirmed=True,
+        organization_id=org.id, confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),
         enterprise_role="cto",
     )
     user.password = "Sup3rSecret!23"

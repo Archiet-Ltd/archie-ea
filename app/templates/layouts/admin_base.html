@@ -192,6 +192,19 @@
         + (_ob_counts.get('capabilities', 0) or 0)
         + (_ob_counts.get('vendors', 0) or 0)
     ) %}
+    {# Superseded, not removed: the five-screen onboarding flow
+       (app/modules/onboarding/) now owns first-login, entered via a redirect
+       at the dashboard.overview landing route using this exact same gating
+       condition (onboarding_completed_at IS NULL and an empty workspace) --
+       so in the normal flow a genuinely-new user never reaches this page in
+       a state where this modal would fire; completing the new flow sets the
+       same onboarding_completed_at field this condition reads. Left as a
+       safety net for any other admin page a first-login user might land on
+       directly (deep link, bookmark) rather than disabled outright, because
+       tests/test_onboarding_modal.py asserts this exact markup for a
+       genuinely-new user, the correct-role-preselection behaviour and the
+       full assignable-role list -- gating it off here would have broken
+       those three tests without updating them in the same change. #}
     {% if current_user.is_authenticated and not current_user.onboarding_completed_at and _workspace_is_empty %}
     <div x-data="{
             {# The localStorage read is load-bearing: the server persist in

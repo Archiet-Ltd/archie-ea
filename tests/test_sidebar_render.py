@@ -16,6 +16,7 @@ Follows the `client.get(...)` + session-login pattern already proven in
 
 from __future__ import annotations
 
+import datetime
 import re
 import uuid
 
@@ -59,6 +60,7 @@ def _make_logged_in_client(app, db_session, make_org, role, label):
         last_name="Tester",
         organization_id=org.id,
         confirmed=True,
+        onboarding_completed_at=datetime.datetime.utcnow(),
         enterprise_role=role,
         # get_sidebar_zones() filters the Admin zone on the real
         # `is_platform_admin` boolean (defaults False), not on

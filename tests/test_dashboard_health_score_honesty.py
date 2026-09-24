@@ -10,6 +10,7 @@ down. A reader cannot tell "we measured your risk posture and it is zero" from
 Per CLAUDE.md: a 0 that means "not computed" is indistinguishable from a measured
 zero; use None, rendered as an em dash.
 """
+import datetime
 import re
 
 from app import db
@@ -30,7 +31,7 @@ def _user(org, tag):
         first_name="H",
         last_name="S",
         organization_id=org.id,
-        confirmed=True,  # else before_request bounces to /account/unconfirmed
+        confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),  # else before_request bounces to /account/unconfirmed
         # The health hero is inside `{% if role != 'platform_admin' %}`, and a
         # seeded user defaults to platform_admin — so without this the assertions
         # run against a page that never rendered the number under test.
