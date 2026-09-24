@@ -36,6 +36,7 @@ itsdangerous>=2.1.0,<3.0.0
 MarkupSafe>=2.1.0,<3.0.0
 email-validator>=2.0.0
 PyYAML>=6.0,<7.0.0
+markdown>=3.7,<4.0.0              # public content pages (Markdown → HTML)
 beautifulsoup4>=4.12.0           # HTML parsing (required to boot)
 faiss-cpu>=1.7.4                 # vector index for semantic search (required to boot)
 sentence-transformers>=2.2.0     # local embeddings for semantic search (required to boot)

@@ -175,12 +175,105 @@ def robots_txt():
 
 @main.route("/sitemap.xml")
 def sitemap_xml():
-    """Serve sitemap.xml for SEO"""
-    return send_from_directory("static", "sitemap.xml")
+    """Serve sitemap.xml for SEO — generated from public content pages."""
+    from app.services.public_pages import load_all_pages
+
+    pages = load_all_pages()
+    base_url = "https://entelim.org"
+    urls = []
+    for p in pages:
+        urls.append(
+            f"  <url><loc>{base_url}{p.url}</loc></url>"
+        )
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
+    from flask import Response
+    return Response(xml, mimetype="application/xml")
 
 
-# NOTE: /health route removed — canonical version is global_health_check
-# in app/_bootstrap/routes.py (CSRF-exempt, Redis + DB + memory checks).
+@main.route("/llms.txt")
+def llms_txt():
+    """Serve llms.txt listing every public content page."""
+    from app.services.public_pages import load_all_pages
+
+    pages = load_all_pages()
+    base_url = "https://entelim.org"
+    lines = ["# Entelim"]
+    lines.append("")
+    lines.append(
+        "> Entelim is the open-source Enterprise Intelligence Model: "
+        "enter your website address and see your company."
+    )
+    lines.append("")
+    for p in pages:
+        lines.append(f"- [{p.title}]({base_url}{p.url})")
+    text = "\n".join(lines) + "\n"
+    from flask import Response
+    return Response(text, mimetype="text/plain")
+
+
+# ============================================================================
+# PUBLIC CONTENT PAGES
+# ============================================================================
+
+
+@main.route("/vision")
+def public_vision():
+    """The vision / home narrative page."""
+    from app.services.public_pages import build_jsonld, load_page
+
+    page = load_page("vision")
+    if page is None:
+        from flask import abort
+        abort(404)
+    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+
+
+@main.route("/modules/<slug>")
+def public_module(slug):
+    """A module content page."""
+    from app.services.public_pages import build_jsonld, load_page
+
+    page = load_page("module", slug=slug)
+    if page is None:
+        from flask import abort
+        abort(404)
+    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+
+
+@main.route("/use-cases/<slug>")
+def public_use_case(slug):
+    """A function-per-segment content page."""
+    from app.services.public_pages import build_jsonld, load_page
+
+    page = load_page("function-per-segment", slug=slug)
+    if page is None:
+        from flask import abort
+        abort(404)
+    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+
+
+@main.route("/vs/<slug>")
+def public_comparison(slug):
+    """A comparison content page."""
+    from app.services.public_pages import build_jsonld, load_page
+
+    page = load_page("comparison", slug=slug)
+    if page is None:
+        from flask import abort
+        abort(404)
+    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+
+
+@main.route("/how-archiet-runs-on-entelim")
+def public_dogfood():
+    """The dogfood / proof story page."""
+    from app.services.public_pages import build_jsonld, load_page
+
+    page = load_page("dogfood")
+    if page is None:
+        from flask import abort
+        abort(404)
+    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 
 # ============================================================================
