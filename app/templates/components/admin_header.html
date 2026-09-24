@@ -2,12 +2,15 @@
 
 {% set resolved_page_guide_context = page_guide_context | default({'enabled': false, 'supported': false}, true) %}
 <header id="admin-header"
-        class="flex items-center justify-between h-16 px-6 bg-background border-b border-border">
+        class="sticky top-0 z-30 flex items-center justify-between h-16 px-6 bg-background border-b border-border">
     <div class="flex items-center gap-4">
         <!-- Mobile sidebar open trigger lives in layouts/admin_base.html
              ("Global mobile sidebar opener") — it x-shows only while the sidebar is
              closed, so a second always-visible trigger here rendered on top of it
              (ARCH-103: two hamburgers stacked when the sidebar was closed on mobile). -->
+
+        <!-- Reserve space for the mobile sidebar opener below lg breakpoint -->
+        <div class="lg:hidden w-10 h-10" aria-hidden="true"></div>
 
         <!-- Desktop sidebar collapse trigger (shadcn SidebarTrigger pattern) -->
         <button type="button" x-data

@@ -143,3 +143,92 @@ def test_onboarding_overlay_is_hidden_once_the_workspace_has_data(make_user, app
         "the first-run overlay rendered over a populated workspace, where it "
         "will silently swallow the user's first click"
     )
+
+
+# ── T-UI-1: app shell overlay fixes ────────────────────────────────────────
+
+
+def test_onboarding_panel_has_scroll_and_max_height_classes(app, make_user):
+    """The onboarding panel must carry max-h and overflow-y-auto so it fits
+    the viewport at 390x844 and scrolls when the role list overflows."""
+    html = _render_base(app, make_user(None))
+
+    # The panel (the card inside the fixed overlay) must be scrollable
+    assert "max-h-[calc(100dvh-2rem)]" in html, (
+        "onboarding panel missing max-h constraint; will be clipped at small viewports"
+    )
+    assert "overflow-y-auto" in html, (
+        "onboarding panel missing overflow-y-auto; content below the fold is unreachable"
+    )
+
+
+def test_onboarding_step_3_persists_before_showing(app, make_user):
+    """Entering step 3 must call persistOnboarding() before showing the
+    'You're all set!' screen, so the modal does not reappear after navigation
+    even if the user never clicks a button on step 3."""
+    html = _render_base(app, make_user(None))
+
+    # The step 2 Continue button must call persistOnboarding().then(...) before
+    # setting step = 3, so the server persist happens on entry to step 3.
+    # Match the @click attribute specifically, not the method definition.
+    assert re.search(r'@click="persistOnboarding\(\)\.then\(', html), (
+        "step 2 Continue button must call persistOnboarding().then(...) in its @click attribute"
+    )
+    # Step 3's CTA must use dismissOnboarding (not completeOnboarding) since
+    # persistence already happened on entry.
+    assert 'dismissOnboarding()' in html, (
+        "step 3 buttons must use dismissOnboarding(), not completeOnboarding()"
+    )
+    assert "You're all set!" in html or "You&#39;re all set!" in html, (
+        "step 3 copy must be present"
+    )
+
+
+def test_phone_opener_z_index_below_backdrop(app, make_user):
+    """The phone sidebar opener (z-30) must sit below the mobile sidebar
+    backdrop (z-40) so it never draws over content or modal backdrops."""
+    html = _render_base(app, make_user(None))
+
+    # The opener button must have z-30, not z-[60]
+    assert 'z-30' in html, (
+        "phone opener z-index must be 30, below the backdrop's 40"
+    )
+    # The backdrop must still be z-40
+    assert 'z-40' in html, (
+        "mobile sidebar backdrop must remain at z-40"
+    )
+    # The opener must NOT carry z-[60] any more
+    assert 'z-[60]' not in html, (
+        "phone opener must not use z-[60]; it draws over content and modals"
+    )
+
+
+def test_help_button_z_index_below_overlays(app, make_user):
+    """The help button must sit at z-30, below every overlay (backdrop z-40,
+    drawer z-50, modal z-[100])."""
+    html = _render_base(app, make_user(None))
+
+    # The guided-mode trigger must be present
+    assert 'guided-mode-trigger' in html, (
+        "guided mode trigger must be present in the template"
+    )
+    # The trigger button must carry z-30, not z-40
+    trigger_match = re.search(r'id="guided-mode-trigger".*?class="([^"]*)"', html, re.DOTALL)
+    assert trigger_match, "guided-mode-trigger element not found with class attribute"
+    trigger_classes = trigger_match.group(1)
+    assert 'z-30' in trigger_classes, (
+        f"guided-mode-trigger must use z-30, got classes: {trigger_classes}"
+    )
+    assert 'z-40' not in trigger_classes, (
+        f"guided-mode-trigger must not use z-40, got classes: {trigger_classes}"
+    )
+    # The panel must also carry z-30, not z-40
+    panel_match = re.search(r'id="guided-mode-panel".*?class="([^"]*)"', html, re.DOTALL)
+    assert panel_match, "guided-mode-panel element not found with class attribute"
+    panel_classes = panel_match.group(1)
+    assert 'z-30' in panel_classes, (
+        f"guided-mode-panel must use z-30, got classes: {panel_classes}"
+    )
+    assert 'z-40' not in panel_classes, (
+        f"guided-mode-panel must not use z-40, got classes: {panel_classes}"
+    )
