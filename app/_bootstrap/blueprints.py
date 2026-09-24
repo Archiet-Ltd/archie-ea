@@ -572,6 +572,26 @@ def _register_always_on_apis(app, csrf):
 
     app.register_blueprint(api_v1_bp)
     app.logger.info("[BLUEPRINT] API v1 registered at /api/v1")
+
+    # OAuth 2.1 authorization server — the provider side of authlib
+    # (the client side is already in app/modules/account/ for SSO).
+    # CSRF-exempt: the /oauth/token endpoint is called by OAuth clients
+    # with a Bearer token or no session cookie at all.
+    from app.modules.oauth_provider import oauth_provider_bp, oauth_metadata_bp
+
+    app.register_blueprint(oauth_provider_bp)
+    app.logger.info("[BLUEPRINT] OAuth provider registered at /oauth")
+    app.register_blueprint(oauth_metadata_bp)
+    app.logger.info("[BLUEPRINT] OAuth metadata registered at /.well-known")
+    _csrf_exempt_blueprint(app, oauth_provider_bp)
+    _csrf_exempt_blueprint(app, oauth_metadata_bp)
+
+    # MCP Streamable HTTP endpoint — the read-only lens tools
+    from app.modules.mcp import mcp_bp
+
+    app.register_blueprint(mcp_bp)
+    app.logger.info("[BLUEPRINT] MCP endpoint registered at /mcp")
+    _csrf_exempt_blueprint(app, mcp_bp)
     
     # api_v1 blueprint is NOT CSRF-exempt. Audited 2026-08-18 (finding A-04/ARCH-051/C-10):
     # every route under app/api/v1/ authenticates with @login_required (the browser
