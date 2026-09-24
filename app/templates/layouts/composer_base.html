@@ -8,14 +8,7 @@
 <head>
     {% include 'partials/_head.html' %}
     <title>{% block title %}{{ config.APP_NAME }}{% endblock %}</title>
-    <script>
-        (function() {
-            let stored = localStorage.getItem('theme');
-            if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            }
-        })();
-    </script>
+    {# Theme init script moved to partials/_head.html — one implementation for both layouts. #}
     {# Accessibility CSS: loaded once via partials/_head.html (asset_url filter) — do not re-include here (ARCH-061) #}
     <style>[x-cloak] { display: none !important; }</style>
     {% block extra_css %}{% endblock %}
@@ -139,14 +132,7 @@
                 stop()  { this.count = Math.max(0, this.count - 1); if (this.count === 0) this.active = false; }
             });
 
-            Alpine.store('theme', {
-                dark: document.documentElement.classList.contains('dark'),
-                toggle() {
-                    this.dark = !this.dark;
-                    document.documentElement.classList.toggle('dark', this.dark);
-                    localStorage.setItem('theme', this.dark ? 'dark' : 'light');
-                }
-            });
+            /* Theme store moved to partials/_head.html — one implementation for both layouts. */
 
             /* Modal store is defined in admin_base and ui/modal.js; do not redefine here. */
 

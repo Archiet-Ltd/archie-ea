@@ -4,8 +4,43 @@
     id='',
     checked=false,
     disabled=false,
-    class=''
+    class='',
+    bind_checked='',
+    on_click='',
+    span_only=false,
+    aria_label=''
 ) %}
+{% if span_only %}
+<span 
+    {% if id %}id="{{ id }}"{% endif %}
+    :data-state="{{ bind_checked }} ? 'checked' : 'unchecked'"
+    class="peer inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors bg-muted-foreground data-[state=checked]:bg-primary {{ class }}">
+    <span 
+        :class="{{ bind_checked }} ? 'translate-x-5' : 'translate-x-0'"
+        class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+    ></span>
+</span>
+{% elif bind_checked %}
+<button 
+    type="button"
+    role="switch"
+    {% if id %}id="{{ id }}"{% endif %}
+    {% if disabled %}disabled{% endif %}
+    data-state="{{ 'checked' if checked else 'unchecked' }}"
+    @click="{{ on_click }}"
+    :aria-checked="{{ bind_checked }}"
+    :data-state="{{ bind_checked }} ? 'checked' : 'unchecked'"
+    class="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 bg-muted-foreground data-[state=checked]:bg-primary {{ class }}"
+  aria-label="{{ aria_label if aria_label else 'Toggle' }}">
+    <span 
+        :class="{{ bind_checked }} ? 'translate-x-5' : 'translate-x-0'"
+        class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+    ></span>
+    {% if name %}
+    <input type="hidden" name="{{ name }}" :value="{{ bind_checked }}" />
+    {% endif %}
+</button>
+{% else %}
 <button 
     type="button"
     role="switch"
@@ -17,8 +52,8 @@
     @click="checked = !checked"
     :aria-checked="checked"
     :data-state="checked ? 'checked' : 'unchecked'"
-    class="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input {{ class }}"
- aria-label="Action">
+    class="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 bg-muted-foreground data-[state=checked]:bg-primary {{ class }}"
+  aria-label="{{ aria_label if aria_label else 'Toggle' }}">
     <span 
         :class="checked ? 'translate-x-5' : 'translate-x-0'"
         class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
@@ -27,4 +62,5 @@
     <input type="hidden" name="{{ name }}" :value="checked" />
     {% endif %}
 </button>
+{% endif %}
 {% endmacro %}

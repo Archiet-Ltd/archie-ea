@@ -1,6 +1,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+<!-- Theme init: apply dark class before first paint to prevent flash.
+     Moved from composer_base.html so both layouts share one implementation. -->
+<script>
+    (function() {
+        var stored = localStorage.getItem('theme');
+        if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+    })();
+</script>
+
 <!-- Alpine.js x-cloak: prevent flash of unstyled content -->
 <style>[x-cloak] { display: none !important; }</style>
 
@@ -70,6 +81,8 @@
   // Add $screen magic property to Alpine.js for responsive breakpoint detection
   // This plugin adds $screen('lg'), $screen('md'), etc. to match Tailwind breakpoints
   document.addEventListener('alpine:init', () => {
+    // Add $screen magic property to Alpine.js for responsive breakpoint detection
+    // This plugin adds $screen('lg'), $screen('md'), etc. to match Tailwind breakpoints
     Alpine.magic('screen', () => {
       // Tailwind breakpoints: sm: 640px, md: 768px, lg: 1024px, xl: 1280px, 2xl: 1536px
       const breakpoints = {
@@ -89,6 +102,17 @@
         }
         return window.matchMedia(query).matches;
       };
+    });
+
+    // Theme store — one implementation for both admin_base and composer_base layouts.
+    // Moved from composer_base.html so the dark-theme toggle works on every page.
+    Alpine.store('theme', {
+        dark: document.documentElement.classList.contains('dark'),
+        toggle() {
+            this.dark = !this.dark;
+            document.documentElement.classList.toggle('dark', this.dark);
+            localStorage.setItem('theme', this.dark ? 'dark' : 'light');
+        }
     });
   });
 </script>
