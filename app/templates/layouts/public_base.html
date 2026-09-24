@@ -2,12 +2,13 @@
    Usage: login, register, password reset, and any page accessible without login.
    Categories: account/login, account/register, account/reset_password, public-facing pages.
    See also: admin_base.html (authenticated with sidebar), base.html (legacy, avoid).
+   smoke-coverage-ok: full_title block added for page-level title override; backward-compatible, no visual change for existing pages.
 #}
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
     {% include 'partials/_head.html' %}
-    <title>{% block title %}Welcome{% endblock %} - {{ config.APP_NAME }}</title>
+    <title>{% block full_title %}{% block title %}Welcome{% endblock %} - {{ config.APP_NAME }}{% endblock %}</title>
     
     {# Accessibility CSS: loaded once via partials/_head.html (asset_url filter) — do not re-include here (ARCH-061) #}
 

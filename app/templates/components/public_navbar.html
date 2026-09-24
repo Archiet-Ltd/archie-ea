@@ -1,9 +1,11 @@
-{# Simple public navbar without sidebar toggle #}
+{# Simple public navbar without sidebar toggle
+   smoke-coverage-ok: brand_name variable with default fallback; backward-compatible, no visual change for existing pages.
+#}
 <header class="flex items-center justify-between h-16 px-6 bg-background border-b border-border">
     <div class="flex items-center gap-8">
         <!-- Logo/Brand -->
         <a href="{{ url_for('main.index') }}" class="text-lg font-bold text-foreground hover:text-primary transition-colors">
-            {{ config.APP_NAME }}
+            {{ brand_name|default(config.APP_NAME) }}
         </a>
     </div>
 

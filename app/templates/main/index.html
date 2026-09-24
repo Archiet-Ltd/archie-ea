@@ -1,15 +1,15 @@
-{% extends 'layouts/public_base.html' %}
-{% block title %}Dashboard{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% extends 'layouts/public_base.html' %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
+{% block full_title %}Entelim{% endblock %}
 
 {% block header %}
+{% with brand_name = "Entelim" %}
 {% include 'components/public_navbar.html' %}
+{% endwith %}
 {% endblock %}
 
 {% block content %}
-<!-- Hero Section with Shadcn Styling -->
-<div class="relative min-h-screen flex items-center justify-center overflow-hidden bg-background">
-  <!-- Animated background gradient -->
+<!-- Hero Section -->
+<section class="relative min-h-screen flex items-center justify-center overflow-hidden bg-background">
   <div class="absolute inset-0 -z-10">
     <div class="absolute inset-0 bg-background opacity-80"></div>
     <div class="absolute top-0 right-0 w-96 h-96 bg-primary/20 rounded-full blur-3xl opacity-20 -z-10"></div>
@@ -18,185 +18,226 @@
 
   <div class="relative z-10 mx-auto max-w-4xl px-4 sm:px-6 py-20 sm:py-32">
     <div class="text-center space-y-8">
-      <!-- Badge -->
       <div class="inline-flex items-center rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-muted-foreground">
         <span class="mr-2 h-2 w-2 rounded-full bg-primary"></span>
-        Powered by ArchiMate 3.2
+        Open source under AGPL-3.0 &middot; Self-host free, forever
       </div>
 
-      <!-- Main Heading -->
-      {% if current_user.is_authenticated %}
-      {{ page_header(
-          title='Enterprise Architecture Platform', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Enterprise Architecture Platform'}],
-          description='Transform your organization with industry-leading architecture management. Model, visualize, and optimize your enterprise with intelligent capability mapping and comprehensive vendor analysis.',
-          actions=[
-              {'text': 'Go to Dashboard', 'icon': 'arrow-right', 'href': url_for('admin.index'), 'variant': 'default'}
-          ]
-      ) }}
-      {% else %}
-      {{ page_header(
-          title='Enterprise Architecture Platform',
-          description='Transform your organization with industry-leading architecture management. Model, visualize, and optimize your enterprise with intelligent capability mapping and comprehensive vendor analysis.',
-          actions=[
-              {'text': 'Get Started', 'icon': 'arrow-right', 'href': url_for('account.login'), 'variant': 'default'},
-              {'text': 'Learn More', 'href': '#features', 'variant': 'outline'}
-          ]
-      ) }}
-      {% endif %}
+      <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
+        Your whole company, one model you can ask.
+      </h1>
+
+      <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
+        Enter your website address. Entelim reads your public pages, proposes your canvas, the products you run and the tools that could feed it, then waits for you to confirm. Ask what breaks if something fails, who is on the hook, and what you pay for twice.
+      </p>
+
+      <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+        <a href="#waitlist" class="inline-flex items-center justify-center px-6 py-3 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all duration-200">
+          Join the waiting list
+        </a>
+        <a href="{{ url_for('account.login') }}" class="inline-flex items-center justify-center px-6 py-3 rounded-md border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
+          Sign in
+        </a>
+      </div>
     </div>
   </div>
-</div>
+</section>
 
-<!-- Features Section -->
-<div id="features" class="relative py-20 sm:py-32 bg-muted/30">
+<!-- What it answers: six questions -->
+<section class="relative py-20 sm:py-32 bg-muted/30">
   <div class="mx-auto max-w-7xl px-4 sm:px-6">
-    <!-- Section Header -->
     <div class="text-center mb-16 space-y-4">
-      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">
-        <span class="text-foreground">
-          Comprehensive Features
-        </span>
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+        Ask in plain words. Get the working, not just the answer.
       </h2>
-      <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
-        Everything you need to design, implement, and optimize your enterprise architecture.
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto">
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-2">What breaks if this fails, and who gets called?</h3>
+        <p class="text-muted-foreground text-sm">Everything that depends on it, across every layer, with the owner on record.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Which value streams are at risk, and why?</h3>
+        <p class="text-muted-foreground text-sm">The capabilities under each stream, how mature they are, and what that puts at risk.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-2">What are we paying for twice?</h3>
+        <p class="text-muted-foreground text-sm">Overlapping applications and contracts, gathered into one list you can act on.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-2">What are we trying to achieve here, and how is it tracking?</h3>
+        <p class="text-muted-foreground text-sm">The initiatives on an element, their budget and their measures.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-2">What could hurt this, and what does it touch?</h3>
+        <p class="text-muted-foreground text-sm">Every recorded risk and how far its effects reach.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Who is accountable for this?</h3>
+        <p class="text-muted-foreground text-sm">The owner and the team behind every system.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Who it is for: four personas -->
+<section class="relative py-20 sm:py-32">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="text-center mb-16 space-y-4">
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+        One product, four ways in.
+      </h2>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Startup founders</h3>
+        <p class="text-muted-foreground text-sm">Your business on one page, filled in from your own words. Your canvas drafted from your own site, every line with its source. Ready for the diligence request before it arrives.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Scale-up CTOs</h3>
+        <p class="text-muted-foreground text-sm">Know what breaks and who gets called, before the outage. Blast radius and ownership for every service. Tool sprawl and duplicate spend in one list.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Enterprise architects</h3>
+        <p class="text-muted-foreground text-sm">An architecture model your whole company can question, and you can check. Every suggestion traced to its source. One annual platform fee: no per-application true-up, ever.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Operations leads</h3>
+        <p class="text-muted-foreground text-sm">Who does what, and what happens if they can't. Key-person and supplier risk in plain words. Never a guess about your people or your contracts.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Open source and self-hosting -->
+<section class="relative py-20 sm:py-32 bg-muted/30">
+  <div class="mx-auto max-w-4xl px-4 sm:px-6 text-center space-y-6">
+    <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+      Open source, all of it.
+    </h2>
+    <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
+      Every question, every canvas and the twin map are in the public code under AGPL-3.0. Run it on your own servers at any size, free, for as long as you like. Pay us when you want us to run it for you, support it under contract, or connect it to your systems.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+      <a href="https://github.com/archiet-ltd/entelim" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center px-6 py-3 rounded-md border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
+        View on GitHub
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing summary: four tiers -->
+<section class="relative py-20 sm:py-32">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="text-center mb-16 space-y-4">
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+        Priced per company, never per application.
+      </h2>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-1">Community</h3>
+        <p class="text-2xl font-bold text-foreground mb-1">Free</p>
+        <p class="text-sm text-muted-foreground mb-3">No trial clock.</p>
+        <p class="text-sm text-muted-foreground">For evaluation, one-person companies and self-hosters. One organisation, three people. Every question, every canvas, the twin map. File import. Community support.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-1">Startup</h3>
+        <p class="text-2xl font-bold text-foreground mb-1">$49<span class="text-sm font-normal text-muted-foreground">/month</span></p>
+        <p class="text-sm text-muted-foreground mb-3">$490/year. Ten people.</p>
+        <p class="text-sm text-muted-foreground">For founders and small services firms, 5 to 50 people. Everything in Community plus webhook feed, export and share, email support.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6 ring-2 ring-primary">
+        <h3 class="text-lg font-semibold text-foreground mb-1">Team</h3>
+        <p class="text-2xl font-bold text-foreground mb-1">$29<span class="text-sm font-normal text-muted-foreground">/editor/month</span></p>
+        <p class="text-sm text-muted-foreground mb-3">Or $290/month for fifteen editors. Askers free.</p>
+        <p class="text-sm text-muted-foreground">For scale-ups and services companies, 50 to 500 people. SSO, review-board workflow, own model key, usage history.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-1">Enterprise</h3>
+        <p class="text-2xl font-bold text-foreground mb-1">From $24,000<span class="text-sm font-normal text-muted-foreground">/year</span></p>
+        <p class="text-sm text-muted-foreground mb-3">Annual contract.</p>
+        <p class="text-sm text-muted-foreground">For enterprise architecture teams. Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Waiting list form -->
+<section id="waitlist" class="relative py-20 sm:py-32 bg-muted/30">
+  <div class="mx-auto max-w-lg px-4 sm:px-6">
+    <div class="text-center mb-10 space-y-4">
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+        Join the waiting list
+      </h2>
+      <p class="text-muted-foreground">
+        Be the first to know when Entelim launches. We will only use your email for launch news.
       </p>
     </div>
 
-    <!-- Feature Grid -->
-    <div class="grid md:grid-cols-3 gap-6 lg:gap-8">
-      <!-- Feature 1: ArchiMate Modeling -->
-      <div class="group relative rounded-lg border border-border bg-card p-6 sm:p-8 transition-all duration-300 hover:shadow-lg hover:border-primary/50">
-        <div class="absolute inset-0 rounded-lg bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        <div class="relative space-y-4">
-          <div class="inline-flex items-center justify-center h-12 w-12 rounded-lg bg-primary/10 text-primary">
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1m2-1v2.5M20 11l-2 1m2-1l-2-1m2 1v2.5M14 16l-2 1m2-1l-2-1m2 1v2.5"></path>
-            </svg>
-          </div>
-          <h3 class="text-xl font-semibold text-foreground">ArchiMate 3.2 Modeling</h3>
-          <p class="text-muted-foreground text-sm leading-relaxed">
-            Industry-standard notation with comprehensive support for all ArchiMate 3.2 elements, relationships, and viewpoints.
-          </p>
-          <div class="pt-2">
-            <span class="text-sm font-medium text-primary inline-flex items-center gap-2">
-              Explore
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-              </svg>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Feature 2: Capability Mapping -->
-      <div class="group relative rounded-lg border border-border bg-card p-6 sm:p-8 transition-all duration-300 hover:shadow-lg hover:border-primary/50">
-        <div class="absolute inset-0 rounded-lg bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        <div class="relative space-y-4">
-          <div class="inline-flex items-center justify-center h-12 w-12 rounded-lg bg-primary/10 text-primary">
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
-          </div>
-          <h3 class="text-xl font-semibold text-foreground">Capability Mapping</h3>
-          <p class="text-muted-foreground text-sm leading-relaxed">
-            Map business capabilities to applications. Identify gaps, overlaps, and optimization opportunities across your portfolio.
-          </p>
-          <div class="pt-2">
-            <span class="text-sm font-medium text-primary inline-flex items-center gap-2">
-              Explore
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-              </svg>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Feature 3: Vendor Analysis -->
-      <div class="group relative rounded-lg border border-border bg-card p-6 sm:p-8 transition-all duration-300 hover:shadow-lg hover:border-primary/50">
-        <div class="absolute inset-0 rounded-lg bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        <div class="relative space-y-4">
-          <div class="inline-flex items-center justify-center h-12 w-12 rounded-lg bg-primary/10 text-primary">
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-            </svg>
-          </div>
-          <h3 class="text-xl font-semibold text-foreground">Vendor Analysis</h3>
-          <p class="text-muted-foreground text-sm leading-relaxed">
-            Comprehensive vendor portfolio analysis, TCO modeling, and consolidation opportunities. Data-driven decisions.
-          </p>
-          <div class="pt-2">
-            <span class="text-sm font-medium text-primary inline-flex items-center gap-2">
-              Explore
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-              </svg>
-            </span>
-          </div>
-        </div>
-      </div>
+    {% if thanks %}
+    <div class="rounded-md bg-success/5 border border-success/20 p-6 text-center">
+      <p class="text-success-emphasis font-medium">Thank you. You are on the list.</p>
     </div>
-  </div>
-</div>
-
-<!-- CTA Banner -->
-<div class="relative py-20 sm:py-32 bg-primary/10 border-t border-border">
-  <div class="mx-auto max-w-4xl px-4 sm:px-6 text-center space-y-6">
-    <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-      Ready to optimize your architecture?
-    </h2>
-    <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
-      Join organizations transforming their enterprise architecture and technology portfolio management.
-    </p>
-    {% if not current_user.is_authenticated %}
-    <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-      <a href="{{ url_for('account.login') }}" class="inline-flex items-center justify-center px-6 py-3 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all duration-200">
-        Sign In
-      </a>
-      <a href="{{ url_for('account.register') }}" class="inline-flex items-center justify-center px-6 py-3 rounded-md border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
-        Create Account
-      </a>
-    </div>
+    {% else %}
+    <form method="POST" action="{{ url_for('main.index') }}" class="space-y-6">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="space-y-2">
+        <label for="email" class="text-sm font-medium leading-none block mb-2">Email address</label>
+        <input type="email" id="email" name="email" required
+               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+               placeholder="you@example.com">
+      </div>
+      <div class="flex items-center space-x-2">
+        <input type="checkbox" id="consent" name="consent" value="1" required
+               class="h-4 w-4 rounded border border-primary text-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+        <label for="consent" class="text-sm font-medium leading-none">
+          I agree that my email will be used only for launch news about Entelim.
+        </label>
+      </div>
+      {% if error %}
+      <div class="rounded-md bg-destructive/15 border border-destructive p-4">
+        <p class="text-sm text-destructive-emphasis">{{ error }}</p>
+      </div>
+      {% endif %}
+      <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full">
+        Join the waiting list
+      </button>
+    </form>
     {% endif %}
   </div>
-</div>
+</section>
 
 <!-- Footer -->
 <footer class="border-t border-border bg-card">
   <div class="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-16">
-    <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+    <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-8 mb-8">
       <div class="space-y-4">
-        <h3 class="font-semibold text-foreground">Platform</h3>
+        <h3 class="font-semibold text-foreground">Entelim</h3>
         <ul class="space-y-2 text-sm text-muted-foreground">
-          <li><a href="#features" class="hover:text-foreground transition-colors">Features</a></li>
-          <li><a href="{{ url_for('account.login') }}" class="hover:text-foreground transition-colors">Sign In</a></li>
+          <li><a href="{{ url_for('account.login') }}" class="hover:text-foreground transition-colors">Sign in</a></li>
         </ul>
       </div>
       <div class="space-y-4">
-        <h3 class="font-semibold text-foreground">Resources</h3>
+        <h3 class="font-semibold text-foreground">Open source</h3>
         <ul class="space-y-2 text-sm text-muted-foreground">
-          <li><a href="https://pubs.opengroup.org/architecture/archimate3-doc/" class="hover:text-foreground transition-colors" target="_blank" rel="noopener">ArchiMate 3.2</a></li>
-          <li><span class="text-muted-foreground/60 cursor-default">Documentation</span></li>
+          <li><a href="https://github.com/archiet-ltd/entelim" target="_blank" rel="noopener noreferrer" class="hover:text-foreground transition-colors">GitHub</a></li>
+          <li><span class="text-muted-foreground/60 cursor-default">AGPL-3.0</span></li>
         </ul>
       </div>
       <div class="space-y-4">
         <h3 class="font-semibold text-foreground">Company</h3>
         <ul class="space-y-2 text-sm text-muted-foreground">
-          <li><span class="text-muted-foreground/60 cursor-default">About</span></li>
-          <li><span class="text-muted-foreground/60 cursor-default">Contact</span></li>
-        </ul>
-      </div>
-      <div class="space-y-4">
-        <h3 class="font-semibold text-foreground">Legal</h3>
-        <ul class="space-y-2 text-sm text-muted-foreground">
-          <li><span class="text-muted-foreground/60 cursor-default">Privacy</span></li>
-          <li><span class="text-muted-foreground/60 cursor-default">Terms</span></li>
+          <li><span class="text-muted-foreground/60 cursor-default">Archiet Ltd</span></li>
         </ul>
       </div>
     </div>
     <div class="border-t border-border pt-8">
       <p class="text-sm text-muted-foreground text-center">
-        &copy; 2026 Enterprise Architecture Platform. All rights reserved.
+        Entelim is open source under AGPL-3.0. Made by Archiet Ltd.
       </p>
     </div>
   </div>

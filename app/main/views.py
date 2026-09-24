@@ -1,7 +1,11 @@
+import csv
+import io
 import json
 
+from email_validator import EmailNotValidError, validate_email
 from flask import (
     Blueprint,
+    Response,
     current_app,
     jsonify,
     redirect,
@@ -15,10 +19,11 @@ from flask_login import current_user, login_required
 from app import db
 
 # Import capability framework blueprint
-from app.decorators import admin_required
+from app.core.auth.decorators import admin_required
 from app.main.capability_framework_routes import capability_framework_bp
 from app.main.framework_management_routes import framework_management_bp
 from app.models.business_capabilities import BusinessCapability
+from app.services.rate_limiter import rate_limit
 from app.services.vendor_analysis.capability_based_vendor_selector import (
     CapabilityBasedVendorSelector,
 )
@@ -30,11 +35,72 @@ main.register_blueprint(capability_framework_bp)
 main.register_blueprint(framework_management_bp)
 
 
-@main.route("/")
+@main.route("/", methods=["GET", "POST"])
+@rate_limit(10, "1m", methods=("POST",))
 def index():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard.overview"))
-    return render_template("main/index.html")
+
+    thanks = False
+    error = None
+
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        consent = request.form.get("consent")
+
+        if not email:
+            error = "Please enter an email address."
+        elif not consent:
+            error = "You must agree that your email will be used only for launch news."
+        else:
+            try:
+                valid = validate_email(email, check_deliverability=False)
+                email = valid.normalized
+            except EmailNotValidError:
+                error = "Please enter a valid email address."
+                return render_template("main/index.html", thanks=False, error=error)
+
+            from app.models.waitlist_signup import WaitlistSignup
+
+            existing = WaitlistSignup.query.filter_by(email=email).first()
+            if existing is None:
+                signup = WaitlistSignup(
+                    email=email,
+                    source="home_page",
+                    consent_text="Email used only for launch news about Entelim.",
+                )
+                db.session.add(signup)
+                db.session.commit()
+            thanks = True
+
+    return render_template("main/index.html", thanks=thanks, error=error)
+
+
+@main.route("/admin/waitlist.csv")
+@login_required
+@admin_required
+def waitlist_csv():
+    """Export the waiting list as CSV. Admin only."""
+    from app.models.waitlist_signup import WaitlistSignup
+
+    rows = (
+        WaitlistSignup.query
+        .order_by(WaitlistSignup.created_at.desc())
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["email", "created_at", "source", "consent_text"])
+    for row in rows:
+        writer.writerow([row.email, row.created_at.isoformat(), row.source, row.consent_text])
+
+    csv_content = output.getvalue()
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=waitlist.csv"},
+    )
 
 
 @main.route("/login")

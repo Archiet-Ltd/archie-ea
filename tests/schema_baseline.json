@@ -53371,6 +53371,28 @@
     "nullable": true
    }
   },
+  "waitlist_signups": {
+   "consent_text": {
+    "has_default": false,
+    "nullable": false
+   },
+   "created_at": {
+    "has_default": true,
+    "nullable": false
+   },
+   "email": {
+    "has_default": false,
+    "nullable": false
+   },
+   "id": {
+    "has_default": true,
+    "nullable": false
+   },
+   "source": {
+    "has_default": true,
+    "nullable": true
+   }
+  },
   "webhook_deliveries": {
    "attempt_count": {
     "has_default": true,
