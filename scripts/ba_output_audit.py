@@ -121,10 +121,40 @@ def sidebar_blob() -> str:
     return "\n".join(parts)
 
 
+def dark_blob() -> str:
+    """The label, endpoint and resolved URL for every entry
+    app/modules/modules_directory/routes.py's `_DARK` names, in the same
+    shape `sidebar_blob()` emits.
+
+    A page this audit's pattern matches is not a navigation gap merely
+    because `unreachable_count()` cannot find its own string in a persona's
+    sidebar -- a broad output pattern like output 5's also matches that
+    page's own `/create` or `/api/...` sibling routes, which are real routes
+    too and were never individually in any sidebar either, dark or not. What
+    changed for a page in `_DARK` is a written, deliberate product decision
+    to stop advertising it, not an accidental navigation regression; this
+    blob is unioned into the coverage check specifically so that decision
+    reads as accounted for, not as a fresh S-11-style defect. The `IN NAV`
+    column in `main()`'s table intentionally does NOT read this blob: it
+    reports the plain, current fact (in a sidebar or not), which for a dark
+    page is genuinely "NO".
+    """
+    from app.modules.modules_directory.routes import _DARK, _MORE_TOOLS
+
+    urls = endpoint_urls()
+    labels = {endpoint: label for label, endpoint, _icon in _MORE_TOOLS}
+    parts = [
+        f"{labels.get(endpoint, '')} {endpoint} {urls.get(endpoint, '')}"
+        for endpoint in _DARK
+    ]
+    return "\n".join(parts)
+
+
 def unreachable_count() -> int:
-    """Outputs that have routes but appear in no persona's sidebar."""
+    """Outputs that have a route but appear in no persona's sidebar and are
+    not accounted for by `_DARK`."""
     routes = collect_routes()
-    nav = sidebar_blob()
+    nav = sidebar_blob() + "\n" + dark_blob()
     missing = 0
     for _label, pat in OUTPUTS:
         rx = re.compile(pat, re.I)
@@ -159,11 +189,11 @@ def main() -> int:
     print("\nlegend: REACHABLE = blueprints registered / blueprints owning those routes")
     print("        IN NAV    = the output is referenced anywhere nav is built")
 
-    sidebar = sidebar_blob()
+    coverage = sidebar_blob() + "\n" + dark_blob()
     orphans = [
         label for label, pat in OUTPUTS
         if any(re.search(pat, path, re.I) for _bp, path, _f in routes)
-        and not re.search(pat, sidebar, re.I)
+        and not re.search(pat, coverage, re.I)
     ]
     print(f"\nnav-coverage gate: {len(orphans)} outputs have routes but no sidebar link")
     for label in orphans:

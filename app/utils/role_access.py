@@ -358,7 +358,18 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # page is the entry point of the impact question for every persona and has no
 # other route in; the Twin map is reached from the Ask page and has no link of
 # its own, so this is the only link the two pages add.
-SIDEBAR_LINK_BUDGET = 31
+#
+# Sidebar diet (22 Sep 2026): four real pages that no segment's day-to-day
+# work asks for today (Architecture Journey, Data Architecture, Data Lineage,
+# Tech Radar) came out of every zone that carried them; each stays reachable
+# by its own URL. platform_admin, still the persona carrying the most zone
+# links, loses its one occurrence (Architecture Journey): 28 zone links ->
+# 27, and the rendered sidebar (zone links + the header logo + the footer
+# All-modules fallback + the footer logout link, the constant 3 this constant
+# has tracked since the Phase 0 CI audit note above) drops the same one,
+# 31 -> 30. Lowering the budget to match rather than leaving slack a future
+# regression could hide behind.
+SIDEBAR_LINK_BUDGET = 30
 
 _ZONE_TITLES = {
     "home": "Home",
@@ -482,7 +493,6 @@ _ADMIN_LINKS = [
 # asserted exactly by tests/test_sidebar_budgets.py.
 _MY_WORK_LINKS = {
     ROLE_SOLUTION_ARCHITECT: [
-        _link("Architecture Journey", "architecture_journey.index", "compass"),
         _link("Solutions", "solution_design.list_solutions", "wrench"),
         _link("AI Chat", "unified_ai_chat.index", "message-square"),
         _link("ADM Kanban", "adm_kanban_view.index", "kanban"),
@@ -552,14 +562,6 @@ _MY_WORK_LINKS = {
         _link("Impact Analysis", "strategic.impact_analysis", "crosshair"),
         _link("Capability Health", "strategic.capability_health", "activity"),
         _link("Duplicate Detection", "unified_duplicate.simple_dashboard", "copy"),
-        # ARCH-123 / ARCH-124 (QA register closure, 18 Aug 2026): the Data
-        # Architect and Technical Architect personas the register flagged as
-        # underserved are folded into enterprise_architect here — there is no
-        # dedicated role for either yet. Data Architecture already existed
-        # (models + dashboard) but was reachable from nowhere in the
-        # sidebar; Tech Radar is new. Both are now linked.
-        _link("Data Architecture", "data_architecture.data_architecture_dashboard", "workflow"),
-        _link("Tech Radar", "tech_radar.index", "radar"),
     ],
     ROLE_CTO: [
         # A CTO with no route to a roadmap from their own sidebar. Found
@@ -576,13 +578,6 @@ _MY_WORK_LINKS = {
         # (TCO coverage, cost tiers, rationalization posture) that no persona's
         # sidebar linked to. Given to the two roles whose job it is.
         _link("Portfolio KPIs", "dashboard_pages.rationalization_scorecard", "gauge"),
-        # Level 10 walkthrough, 30 Aug 2026: the radar is the CTO's technology
-        # direction instrument, and /technology/radar/classify names "cto" in
-        # its own require_roles list -- so the persona was authorised to set
-        # adopt/trial/assess/hold and had no link to the page from anywhere in
-        # its sidebar. 28 nav links on the CTO dashboard, none of them this.
-        # Finding a page by grepping the source is not finding it.
-        _link("Tech Radar", "tech_radar.index", "radar"),
     ],
     ROLE_BUSINESS_ARCHITECT: [
         # BA-A1/A2. This persona had 4 links against a budget of 27 while
@@ -592,12 +587,6 @@ _MY_WORK_LINKS = {
         # and strategy-to-execution were not built. They are; 350 routes serve
         # them. Nothing below is a new page — every endpoint already ships and
         # is already in another persona's zones.
-        #
-        # BA-A3. The front door, deliberately first: the persona's problem was
-        # never that a page was missing, it was that twelve outputs were spread
-        # over five generic zones with no page that presents them as one
-        # practice. /business-architecture is that page.
-        _link("Architecture Journey", "architecture_journey.index", "compass"),
         _link("Capability Map", "capability_map.index", "map"),
         # Points at the heatmap, NOT frameworks_overview. That was the only
         # maturity link this persona had, it is labelled "Frameworks" rather
@@ -620,16 +609,12 @@ _MY_WORK_LINKS = {
         _link("Capability Health", "strategic.capability_health", "activity"),
         # Same link and icon as enterprise_architect's.
         _link("Impact Analysis", "strategic.impact_analysis", "crosshair"),
-        _link("Data Architecture", "data_architecture.data_architecture_dashboard", "database"),
-        # NAV-1 (27 Aug 2026, nav-coverage gate 4 -> 0). Three of Iain's twelve
-        # business-architecture outputs had working routes and no sidebar link
-        # anywhere, in any persona — which is why an evaluating architect read
-        # them as absent. All three land on pages that already ship; none is new.
+        # NAV-1 (27 Aug 2026, nav-coverage gate 4 -> 0). Two of Iain's twelve
+        # business-architecture outputs below had working routes and no
+        # sidebar link anywhere, in any persona — which is why an evaluating
+        # architect read them as absent. Both land on pages that already
+        # ship; neither is new.
         #
-        # Output 5, Information/data maps: field-level lineage over the
-        # DataObject catalogue. Distinct from "Data Architecture" above (the
-        # domain/steward dashboard) — this is the map itself.
-        _link("Data Lineage", "data_architecture.data_lineage_view", "git-fork"),
         # Output 6, Strategy-to-execution: the motivation layer — drivers,
         # goals, outcomes, principles, requirements — is the ArchiMate backbone
         # that connects strategy to the work packages already linked above.
@@ -703,12 +688,6 @@ _MY_WORK_LINKS = {
     ROLE_PLATFORM_ADMIN: [
         _link("Solutions", "solution_design.list_solutions", "wrench"),
         _link("Portfolio", "portfolio.index", "briefcase"),
-        # BA-A3. platform_admin is the default enterprise_role for every user
-        # who has not picked one during onboarding (see the column comment in
-        # app/models/user.py), so a page that exists only for the two architect
-        # roles is invisible to most real accounts. Rendered total for this
-        # role goes 25 -> 26, still under SIDEBAR_LINK_BUDGET (27).
-        _link("Architecture Journey", "architecture_journey.index", "compass"),
     ],
     # Promoted from charter-only, 31 Aug 2026. The blueprint scores a Security
     # Viewpoint as one of its fifteen sections and nobody owned it; every link
@@ -741,17 +720,16 @@ _MY_WORK_LINKS = {
         _link("Compliance", "application_mgmt.compliance_frameworks_dashboard",
               "clipboard-check"),
         _link("Applications", "unified_applications.application_list", "list"),
-        _link("Data Architecture", "data_architecture.data_architecture_dashboard", "database"),
         _link("Traceability Matrix", "architect_ui.traceability_matrix", "git-compare"),
-        _link("Tech Radar", "tech_radar.index", "radar"),
         _link("Interface Register", "interface_register.index", "cable"),
     ],
     # ARCH-123 folded this into enterprise_architect with the note "no dedicated
     # role for either yet". These three surfaces ship and are the whole of the
     # persona's remit, so the fold is now unnecessary rather than pragmatic.
+    # Data Architecture and Data Lineage no longer render in any zone (no
+    # segment's day-to-day work asks their question yet); both stay reachable
+    # by their own URL for this persona, same as every other role.
     ROLE_DATA_ARCHITECT: [
-        _link("Data Architecture", "data_architecture.data_architecture_dashboard", "database"),
-        _link("Data Lineage", "data_architecture.data_lineage_view", "git-fork"),
         _link("Data Stewardship", "solution_design.data_stewardship", "shield"),
         _link("ArchiMate Model", "archimate_crud.dashboard", "boxes"),
         _link("Applications", "unified_applications.application_list", "list"),

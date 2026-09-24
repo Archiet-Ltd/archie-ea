@@ -57,7 +57,7 @@ def _link_visible(endpoint: str, requires: str | None = None) -> bool:
     `link_requires_satisfied()` (role_access.py) is the single shared predicate
     `get_sidebar_zones()` itself uses, so this page and the sidebar never disagree.
     """
-    if endpoint in _NOT_RENDERED:
+    if endpoint in _NOT_RENDERED or endpoint in _DARK:
         return False
     if not link_requires_satisfied(current_user, requires):
         return False
@@ -140,13 +140,10 @@ _MORE_TOOLS = [
     ("Agentic Gaps", "main.agentic_gaps_ui", "search"),
     ("Application Management", "application_management", "layout-dashboard"),
     ("Architecture Assistant", "architect_ui.architecture_assistant", "bot"),
-    ("Model Registry", "dynamic_dashboards.model_registry_index", "database"),
     ("Business Case", "business_case.index", "briefcase"),
     ("Business Model", "business_model.index", "layout-dashboard"),
-    ("EA Workflows", "main.ea_workflows_dashboard", "git-merge"),
     ("Framework Config", "framework_config_ui.framework_config_dashboard", "settings"),
     ("Framework Management", "main.framework_management.dashboard", "settings"),
-    ("Hybrid Mapping Dashboard", "main.hybrid_mapping_dashboard", "map"),
     ("Industry APQC", "industry_apqc.industry_apqc_dashboard", "layers"),
     ("Integration Workflows", "integration.workflow_dashboard", "git-branch"),
     ("Market Intelligence", "architect_ui.market_intelligence", "trending-up"),
@@ -155,11 +152,25 @@ _MORE_TOOLS = [
     # pointing at this same endpoint - listed once there rather than twice.
     ("Product Roadmap", "roadmap_outcome.product_roadmap_page", "map"),
     ("Risk Register", "risk.risk_register", "alert-triangle"),
-    ("Usage Analytics", "usage_analytics.analytics_root", "bar-chart-3"),
     ("Vendor ArchiMate Analysis", "main.vendor_archimate_analysis", "building"),
     ("Integrations", "main.integrations", "cloud"),
     ("ArchiMate Roadmap", "main.archimate_roadmap", "map"),
     ("Enterprise Dashboard", "enterprise.enterprise_dashboard", "layout-dashboard"),
+    # Sidebar diet (22 Sep 2026): the eight endpoints _DARK (below) names.
+    # Real rows, with their real labels, the same shape as every other row in
+    # this list -- not synthesized elsewhere from the reason text, which is
+    # for a human reading _DARK, not for display. _link_visible (below)
+    # suppresses every one of these from rendering here and from search,
+    # exactly the way it already suppresses _NOT_RENDERED; restoring one to
+    # view is deleting its entry from _DARK, nothing here.
+    ("Architecture Journey", "architecture_journey.index", "compass"),
+    ("Hybrid Mapping Dashboard", "main.hybrid_mapping_dashboard", "map"),
+    ("Data Architecture", "data_architecture.data_architecture_dashboard", "database"),
+    ("Data Lineage", "data_architecture.data_lineage_view", "git-fork"),
+    ("Tech Radar", "tech_radar.index", "radar"),
+    ("EA Workflows", "main.ea_workflows_dashboard", "git-merge"),
+    ("Model Registry", "dynamic_dashboards.model_registry_index", "database"),
+    ("Usage Analytics", "usage_analytics.analytics_root", "bar-chart-3"),
 ]
 
 # Endpoints present in _MORE_TOOLS / SIDEBAR_ZONES that must never be rendered
@@ -178,6 +189,30 @@ _NOT_RENDERED = {
     "dashboard.index": "302 -> Dashboard Overview",
     "unified_duplicate.enterprise_dashboard": "302 -> Duplicate Detection",
     "architect_ui.roadmap_builder": "302 -> Roadmaps",
+}
+
+# Real, working pages, still reachable by their own URL only, that no
+# persona's sidebar zone points at any more, because no segment's day-to-day
+# work asks the question they answer today. Reachable by URL only -- no other
+# page in the product links to one of these; a claimed in-app deep link
+# belongs in its own brief once one is actually built, not in this reason
+# string. Each still has a real row, under its real label, in _MORE_TOOLS
+# above (see the comment there); `_link_visible` (below) is what actually
+# suppresses that row from rendering and from search, the same way it
+# already suppresses `_NOT_RENDERED` — so `all_module_links()` keeps knowing
+# every one of these routes exists (the discoverability audit and the
+# URL-map cross-check both read it), while `visible_module_links()` -- and so
+# this page and search -- drops them. A later change can put one back in a
+# zone; nothing about the route, template or data behind it changes here.
+_DARK = {
+    "architecture_journey.index": "a second guided front door; onboarding already covers that job",
+    "main.hybrid_mapping_dashboard": "capability-vendor-application mapping statistics nobody asks for today",
+    "data_architecture.data_architecture_dashboard": "model counts by tier nobody asks for today",
+    "data_architecture.data_lineage_view": "derived lineage; reachable by URL only, no in-app link to it",
+    "tech_radar.index": "technology rings; reachable by URL only, no in-app link to it",
+    "main.ea_workflows_dashboard": "a workflow-engine dashboard nobody asks for today",
+    "dynamic_dashboards.model_registry_index": "developer tooling behind the platform, not a persona page",
+    "usage_analytics.analytics_root": "shows nothing while usage tracking stays off",
 }
 
 _ZONE_ORDER = ["home", "my_work", "library", "governance", "admin"]

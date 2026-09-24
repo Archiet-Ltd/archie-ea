@@ -62,10 +62,6 @@ NAV_PAGES = {
         "/dashboard/rationalization/scorecard",
         "Executive Rationalization Scorecard",
     ),
-    "data_architecture.data_architecture_dashboard": (
-        "/architecture/data-architecture",
-        "Data Architecture Dashboard",
-    ),
     "main.capability_roadmap": ("/capability-roadmap", "Enterprise Capability Roadmap"),
     "main.settings": ("/settings", "System Settings"),
     # NAV-1: the sidebar used to name solution_prompt_admin.
@@ -89,6 +85,22 @@ NAV_REDIRECTS = {
     # "Motivation Model" (business_architect). The motivation layer is a view
     # mode of the ArchiMate element browser, not a page of its own.
     "architect_ui.motivation_view": ("/architecture/motivation", "layer=motivation"),
+}
+
+# Sidebar diet (22 Sep 2026): Data Architecture came out of every persona
+# zone that carried it (see app/modules/modules_directory/routes.py's
+# _DARK), so it no longer belongs in NAV_PAGES above -- test_every_endpoint_
+# covered_here_is_still_in_a_sidebar would fail the moment it is not in one.
+# The page still renders its own real content for a user who has the
+# address, which is exactly what test_sidebar_page_renders_its_own_content
+# proves for NAV_PAGES; this is the same proof for a page that is
+# deliberately no longer sidebar-reachable, kept out of the sidebar
+# cross-check on purpose.
+DARK_PAGES = {
+    "data_architecture.data_architecture_dashboard": (
+        "/architecture/data-architecture",
+        "Data Architecture Dashboard",
+    ),
 }
 
 
@@ -196,6 +208,29 @@ def test_sidebar_redirect_lands_where_it_claims(
     assert target_fragment in location, (
         f"{endpoint} ({url}) redirected to {location!r}, which does not carry "
         f"{target_fragment!r} — the link would land the user on the wrong view"
+    )
+
+
+@pytest.mark.parametrize(
+    "endpoint,url,marker",
+    [(ep, url, marker) for ep, (url, marker) in sorted(DARK_PAGES.items())],
+)
+def test_dark_page_still_renders_its_own_content(app, db_session, endpoint, url, marker):
+    """No sidebar link reaches this page any more, but a user who has the
+    address still gets the real page, not a stub or an error."""
+    user = _make_user(db_session)
+    client = app.test_client()
+    _login(client, user.id)
+
+    resp = client.get(url, follow_redirects=True)
+
+    assert resp.status_code == 200, (
+        f"{endpoint} ({url}) returned {resp.status_code} for a logged-in user"
+    )
+    body = resp.get_data(as_text=True)
+    assert marker in body, (
+        f"{endpoint} ({url}) returned 200 but did not render its own page: "
+        f"{marker!r} is absent."
     )
 
 

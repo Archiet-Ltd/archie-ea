@@ -134,10 +134,13 @@ def test_security_architect_can_inspect_but_not_change_governance_gates(app, cli
 
 
 def test_a_data_architect_can_reach_the_data_layer_they_steward(app, client):
-    """Data architecture, lineage and stewardship are this persona's remit."""
+    """Data architecture, lineage and stewardship are this persona's remit.
+
+    Neither page renders in any sidebar today (no segment's day-to-day work
+    asks their question yet), so what still applies is that both stay
+    reachable by their own URL for this persona rather than 403ing a role
+    nobody added to the guards."""
     from app import db
-    from app.models.user import User
-    from app.utils.role_access import get_sidebar_zones
 
     with app.app_context():
         org_id = make_org(db, "DataArch")
@@ -145,22 +148,8 @@ def test_a_data_architect_can_reach_the_data_layer_they_steward(app, client):
             db, org_id, "data", enterprise_role="data_architect",
             role_name="Architect",
         )
-        user = db.session.get(User, architect_id)
-        labels = {
-            link["label"]
-            for zone in get_sidebar_zones(user)
-            for link in zone["links"]
-        }
-
-    for expected in ("Data Architecture", "Data Lineage"):
-        assert expected in labels, (
-            "%r is missing from the data architect's sidebar: %s"
-            % (expected, sorted(labels))
-        )
 
     login(client, architect_id)
-    # And the pages actually serve for them, rather than 403ing a new role
-    # nobody added to the guards.
     for path in ("/architecture/data-architecture", "/architecture/data-lineage"):
         response = client.get(path)
         assert response.status_code == 200, (

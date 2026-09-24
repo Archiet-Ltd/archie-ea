@@ -120,26 +120,40 @@ def test_s11_register_routes_still_exist(app):
 
 
 def test_s11_register_routes_are_discoverable(app):
-    """Every route the register named is reachable from at least one role's
-    SIDEBAR_ZONES or the /modules All-modules directory's curated list.
+    """Every route the register named is genuinely reachable from at least
+    one role's rendered sidebar or the /modules All-modules directory's
+    rendered rows -- not merely known to `all_module_links()`, which also
+    carries every `_DARK` entry so `test_no_orphan_module_root` below does
+    not report each one a brand-new orphan. That looser set is the wrong
+    measure here: it would let a route go quietly unreachable (a real S-11
+    regression) as long as `_MORE_TOOLS` still names it.
 
     A path can carry more than one rule (e.g. GET list + POST create on the
     same URL) — reachable if ANY GET-serving endpoint on that exact path is
-    linked, not just whichever rule url_map happens to expose first.
+    genuinely linked, not just whichever rule url_map happens to expose
+    first. A route whose only matching rules are all in `_DARK` is not
+    counted as unreachable either: that is a written, deliberate product
+    decision to stop advertising it, not an accidental navigation gap.
     """
+    from app.modules.modules_directory.routes import _DARK
+
     rules_by_path: dict[str, list] = {}
     for r in app.url_map.iter_rules():
         if "GET" in r.methods:
             rules_by_path.setdefault(r.rule, []).append(r)
-    linked = _all_linked_endpoints(app)
+    linked = _all_linked_endpoints(app) - set(_DARK)
 
     unreachable = []
     for path in _S11_REGISTER_RULES:
         rules = rules_by_path.get(path)
         if not rules:
             continue  # covered, and failed, by the existence test above
-        if not any(rule.endpoint in linked for rule in rules):
-            unreachable.append((path, [r.endpoint for r in rules]))
+        endpoints = {rule.endpoint for rule in rules}
+        if endpoints & linked:
+            continue
+        if endpoints & set(_DARK):
+            continue  # a deliberately dark page, not an S-11-style regression
+        unreachable.append((path, sorted(endpoints)))
 
     assert not unreachable, (
         "S-11 register routes with no sidebar link and no /modules directory "

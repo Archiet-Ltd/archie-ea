@@ -60,7 +60,7 @@ def _all_links(role):
     return links
 
 
-def test_sidebar_link_budget_is_31():
+def test_sidebar_link_budget_is_30():
     """Raised 25 -> 26 in the Task 3 fix round (coordinator review of the
     sidebar rewrite): platform_admin's two review-mandated admin-zone links
     (Salesforce Integration, Power Platform) alone render exactly 25 visible
@@ -92,8 +92,16 @@ def test_sidebar_link_budget_is_31():
     work, and platform_admin renders it like everyone else. The rendered-link
     test asserts the count EQUALS this number, so the ceiling moves with the
     link rather than leaving slack that does not exist.
+
+    Lowered 31 -> 30 (sidebar diet, 22 Sep 2026): Architecture Journey, Data
+    Architecture, Data Lineage and Tech Radar came out of every zone that
+    carried them — each stays reachable by its own URL, none by a sidebar
+    click. platform_admin, still the persona carrying the most zone links,
+    loses its one occurrence (Architecture Journey): 28 zone links -> 27, and
+    the rendered sidebar (zone links + the constant 3 non-zone chrome links
+    above) drops the same one.
     """
-    assert SIDEBAR_LINK_BUDGET == 31
+    assert SIDEBAR_LINK_BUDGET == 30
 
 
 def test_every_role_is_defined():
@@ -174,7 +182,6 @@ def test_solution_architect_my_work_membership():
     review of the sidebar rewrite; membership amended accordingly."""
     assert _my_work_labels(ROLE_SOLUTION_ARCHITECT) == [
         "Ask a question",
-        "Architecture Journey",
         "Solutions",
         "AI Chat",
         "ADM Kanban",
@@ -183,14 +190,14 @@ def test_solution_architect_my_work_membership():
         # TO the board. Adding it closed a handoff that stopped mid-journey.
         "Review Board",
         "Programmes",
-        # SAP S/4HANA Interface Register (Task 02, round 3 fix): a 7th
+        # SAP S/4HANA Interface Register (Task 02, round 3 fix): a new
         # my_work link was added at role_access.py:469; this test asserted
         # exact equality and had gone red on main until this line was added.
         "Interface Register",
         # Reported problem: the platform's own "analyse the ripple effects of a
         # change" feature was reachable only from the 83-item All-modules page, so an architect
         # with no training had no discoverable path to it. Impact analysis is a primary job for
-        # this persona. This is the 8th link, one past the spec table's "3-7"; the spec now says so.
+        # this persona.
         "Impact Analysis",
     ]
 
@@ -224,12 +231,6 @@ def test_enterprise_architect_my_work_membership():
         "Impact Analysis",
         "Capability Health",
         "Duplicate Detection",
-        # ARCH-123 / ARCH-124 (QA register closure, 18 Aug 2026): Data
-        # Architecture (existing, previously undiscoverable) and Tech Radar
-        # (new), folded into enterprise_architect's My work since there is
-        # no dedicated Data Architect / Technical Architect role yet.
-        "Data Architecture",
-        "Tech Radar",
     ]
 
 
@@ -247,11 +248,6 @@ def test_cto_my_work_membership():
         # NAV-1: nav-coverage output 9 (KPI/metric dashboards) had routes but
         # no sidebar link in any persona.
         "Portfolio KPIs",
-        # Level 10 walkthrough, 30 Aug 2026: the radar is the CTO's technology
-        # direction instrument and /technology/radar/classify names "cto" in
-        # its own require_roles list -- the persona was authorised to set the
-        # rings and had no link to the page from anywhere.
-        "Tech Radar",
     ]
 
 
@@ -276,7 +272,6 @@ def test_business_architect_my_work_membership():
     S-11 finding above — the full suite caught it; the targeted runs did not."""
     assert _my_work_labels(ROLE_BUSINESS_ARCHITECT) == [
         "Ask a question",
-        "Architecture Journey",
         "Capability Map",
         "Capability Maturity",
         "Capability Frameworks",
@@ -288,12 +283,9 @@ def test_business_architect_my_work_membership():
         "Traceability Matrix",
         "Capability Health",
         "Impact Analysis",  # Same link and icon as enterprise_architect
-        "Data Architecture",
-        # NAV-1 (27 Aug 2026): nav-coverage outputs 5, 6 and 10 — information/
-        # data maps, strategy-to-execution and products & services — all had
-        # working routes and no sidebar link in any persona. Every one of these
-        # endpoints already shipped.
-        "Data Lineage",
+        # NAV-1 (27 Aug 2026): nav-coverage outputs 6 and 10 — strategy-to-
+        # execution and products & services — had working routes and no
+        # sidebar link in any persona. Both endpoints already shipped.
         "Motivation Model",
         "Products & Services",
         # Wave 4 nav audit: organization.routes' own docstring claimed this was
@@ -397,8 +389,12 @@ def test_platform_admin_zone_link_total_is_pinned():
     27 -> 28: "Ask a question" added to every persona's My work, platform_admin
     included. It is the only link the Ask and Twin map pages add; the Twin map
     is reached from the Ask page.
+
+    Sidebar diet (22 Sep 2026): 28 -> 27. "Architecture Journey" came out of
+    this zone along with every other zone that carried it — the page stays
+    reachable by its own URL, not by a sidebar click.
     """
-    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 28
+    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 27
 
 
 def test_platform_admin_collapsed_sidebar_icons_are_unambiguous():
