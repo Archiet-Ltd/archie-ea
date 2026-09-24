@@ -156,6 +156,20 @@
                             {% endif %}
                             {{ item.text }}
                         </a>
+                    {% elif item.data_action %}
+                        <button
+                            type="button"
+                            data-action="{{ item.data_action }}"
+                            @click="menuOpen = false"
+                            class="w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors {{ item_variants.get(item.variant, item_variants['default']) }} {% if loop.first %}rounded-t-lg{% endif %} {% if loop.last %}rounded-b-lg{% endif %} {{ item.class|default('') }}"
+                            role="menuitem"
+                            {% if item.disabled %}disabled class="opacity-50 cursor-not-allowed"{% endif %}
+                         aria-label="Open">
+                            {% if item.icon %}
+                            <i data-lucide="{{ item.icon }}" class="w-4 h-4" aria-hidden="true"></i>
+                            {% endif %}
+                            {{ item.text }}
+                        </button>
                     {% elif item.onclick %}
                         <button
                             type="button"

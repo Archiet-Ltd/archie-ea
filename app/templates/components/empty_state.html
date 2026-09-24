@@ -4,7 +4,8 @@
    Features:
    - Icon/illustration support
    - Title and description
-   - Optional CTA button
+   - Optional primary CTA button (filled)
+   - Optional secondary CTA button (outline)
    - Consistent styling
    
    Usage:
@@ -18,6 +19,18 @@
        cta_onclick='openApplicationImportModal()',
        cta_icon='plus'
    ) }}
+
+   With secondary CTA:
+   {{ empty_state(
+       icon='eye-off',
+       title='Your draft is waiting',
+       description='Untitled drafts stay out of this list.',
+       cta_text='Show drafts',
+       cta_href=url_for('solution_design.list_solutions', status='draft'),
+       secondary_cta_text='New Solution',
+       secondary_cta_onclick='startSolution()',
+       secondary_cta_icon='plus'
+   ) }}
 #}
 
 {% macro empty_state(
@@ -29,6 +42,12 @@
     cta_href=None,
     cta_method='get',
     cta_icon=None,
+    secondary_cta_text=None,
+    secondary_cta_onclick=None,
+    secondary_cta_href=None,
+    secondary_cta_icon=None,
+    heading_testid=None,
+    description_testid=None,
     class='',
     padding='py-12'
 ) %}
@@ -39,13 +58,13 @@
     </div>
 
     <!-- Title -->
-    <h3 class="mt-4 text-lg font-medium text-foreground">
+    <h3 class="mt-4 text-lg font-medium text-foreground"{% if heading_testid %} data-testid="{{ heading_testid }}"{% endif %}>
         {{ title }}
     </h3>
 
     <!-- Description -->
     {% if description %}
-    <p class="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+    <p class="mt-2 text-sm text-muted-foreground max-w-md mx-auto"{% if description_testid %} data-testid="{{ description_testid }}"{% endif %}>
         {{ description }}
     </p>
     {% endif %}
@@ -82,6 +101,29 @@
             <i data-lucide="{{ cta_icon }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>
             {% endif %}
             {{ cta_text }}
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# Secondary CTA Button (outline) #}
+    {% if secondary_cta_text %}
+    <div class="mt-3">
+        {% if secondary_cta_href %}
+        <a href="{{ secondary_cta_href }}"
+           class="inline-flex items-center px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors">
+            {% if secondary_cta_icon %}
+            <i data-lucide="{{ secondary_cta_icon }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>
+            {% endif %}
+            {{ secondary_cta_text }}
+        </a>
+        {% elif secondary_cta_onclick %}
+        <button type="button" @click="{{ secondary_cta_onclick }}"
+                class="inline-flex items-center px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors" aria-label="{{ secondary_cta_text }}">
+            {% if secondary_cta_icon %}
+            <i data-lucide="{{ secondary_cta_icon }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>
+            {% endif %}
+            {{ secondary_cta_text }}
         </button>
         {% endif %}
     </div>

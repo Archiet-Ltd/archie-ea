@@ -105,3 +105,105 @@ def test_solutions_list_status_all_returns_rows_for_the_owner(browser, live_serv
 
     body_text = page.locator("body").inner_text()
     assert "Get started by creating your first solution" not in body_text
+
+
+def test_empty_state_copy_matches_design(browser, live_server):
+    """The empty state (when org has no solutions at all) must use the
+    approved copy: 'No solutions yet' heading and
+    'Create a solution to start its architecture blueprint.' description."""
+    import uuid
+    from app import create_app, db
+    from app.models.organization import Organization
+    from app.models.user import Role, User
+
+    app = create_app("testing")
+    suffix = uuid.uuid4().hex[:8]
+    with app.app_context():
+        Role.insert_roles()
+        org = Organization(name="Empty Org %s" % suffix, slug="empty-%s" % suffix)
+        db.session.add(org)
+        db.session.commit()
+        user = User(
+            email="empty.%s@example.com" % suffix, first_name="Empty", last_name="Tenant",
+            organization_id=org.id, enterprise_role="solution_architect", confirmed=True,
+        )
+        user.role = Role.query.filter_by(name="Architect").one()
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.commit()
+        email = user.email
+
+    page = browser.new_page()
+    _login(page, live_server, email)
+    page.goto(live_server + "/solutions/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+
+    heading = page.locator('[data-testid="solutions-empty-state-heading"]')
+    assert heading.count() > 0, "empty-state heading must be present"
+    heading_text = heading.inner_text()
+    assert "No solutions yet" in heading_text, (
+        f"empty state must read 'No solutions yet', got: {heading_text!r}"
+    )
+    body_text = page.locator("body").inner_text()
+    assert "Create a solution to start its architecture blueprint." in body_text, (
+        "empty state description must be present"
+    )
+
+
+def test_hidden_draft_state_copy_matches_design(browser, live_server):
+    """When the only hidden rows are the default filter's empty drafts,
+    the disclosure must use the approved copy: 'Your draft is waiting'
+    and 'Untitled drafts stay out of this list until they have a problem
+    statement.'
+
+    Creates a fresh org with a single draft solution that has no
+    description, so the default shell filter hides it and the
+    hidden-draft state renders unconditionally."""
+    import uuid
+    from app import create_app, db
+    from app.models.organization import Organization
+    from app.models.solution_models import Solution
+    from app.models.user import Role, User
+
+    import datetime
+
+    app = create_app("testing")
+    suffix = uuid.uuid4().hex[:8]
+    with app.app_context():
+        Role.insert_roles()
+        org = Organization(name="Hidden Draft Org %s" % suffix, slug="hidden-draft-%s" % suffix)
+        db.session.add(org)
+        db.session.commit()
+        user = User(
+            email="hidden-draft.%s@example.com" % suffix, first_name="Hidden", last_name="Draft",
+            organization_id=org.id, enterprise_role="solution_architect", confirmed=True,
+            onboarding_completed_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        user.role = Role.query.filter_by(name="Architect").one()
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.commit()
+        # Create a draft solution with no description — this is exactly what
+        # the default shell filter hides, triggering the hidden-draft state.
+        solution = Solution(
+            name="Hidden draft %s" % suffix,
+            description=None,
+            organization_id=org.id,
+            created_by_id=user.id,
+            status="draft",
+            governance_status="draft",
+        )
+        db.session.add(solution)
+        db.session.commit()
+        email = user.email
+
+    page = browser.new_page()
+    _login(page, live_server, email)
+    page.goto(live_server + "/solutions/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+
+    body_text = page.locator("body").inner_text()
+    assert "Your draft is waiting" in body_text, (
+        "hidden-draft state must render 'Your draft is waiting' heading"
+    )
+    assert "Untitled drafts stay out of this list" in body_text, (
+        "hidden-draft state must render the disclosure copy"
+    )

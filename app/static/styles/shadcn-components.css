@@ -71,6 +71,19 @@
     right: 0;
 }
 
+/* Sticky last-column edge: left border + shadow so the scrolled boundary is
+   visible rather than cutting mid-word with no cue. Scoped to .solutions-table
+   so other tables in the product are unaffected. */
+#main-content .overflow-x-auto table.solutions-table thead th:last-child {
+    border-left: 1px solid hsl(var(--border));
+    box-shadow: -4px 0 8px -4px hsl(var(--foreground) / 0.12);
+}
+
+#main-content .overflow-x-auto table.solutions-table tbody td:last-child {
+    border-left: 1px solid hsl(var(--border));
+    box-shadow: -4px 0 8px -4px hsl(var(--foreground) / 0.08);
+}
+
 /* H3 (2 Sep 2026 UI/UX audit): when a table's own overflow-x-auto container sits
    inside a flex child with no min-width:0, the flex child can't shrink below the
    table's intrinsic width, so the browser can't compute a correct scroll boundary --
