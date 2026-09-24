@@ -375,6 +375,9 @@ else:
         DerivedRelationship,
     )
 
+    # Reference packs: global, tenant-free vendor/capability content
+    from .reference_pack import ReferencePack  # noqa: F401
+
     # T-005 (D7): derivation run-record store (DE-11) — the only producer of
     # "did derivation run for this tenant, when, and how long did it take".
     from app.modules.intelligence.models.derivation_run import (  # noqa: F401

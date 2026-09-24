@@ -1,0 +1,2252 @@
+pack_key: mendix
+pack_version: '1.0'
+vendor: Mendix
+product: Mendix Low-Code Application Platform
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about Mendix Low-Code Application Platform are taken from Mendix's public product
+  documentation, read on 2026-09-23; product, module and service names are used as names only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run Mendix Low-Code Application Platform?
+- key: platform
+  question: Do you run the Mendix Low-Code Application Platform platform components (hosting, integration,
+    data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Low-Code Application Platform
+  description: Mendix Low-Code Application Platform, the core application component of the Mendix pack.
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-low-code-application-platform
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: Mendix Runtime Server Primary
+  description: Mendix Runtime Server Primary
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-runtime-server-primary
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Mendix Runtime Server Secondary
+  description: Mendix Runtime Server Secondary
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-runtime-server-secondary
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: PostgreSQL Primary Database
+  description: PostgreSQL Primary Database
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.postgresql-primary-database
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: PostgreSQL Replica Database
+  description: PostgreSQL Replica Database
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.postgresql-replica-database
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Mendix Studio Pro Workstation
+  description: Mendix Studio Pro Workstation
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-studio-pro-workstation
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Mendix Cloud Portal
+  description: Mendix Cloud Portal
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-cloud-portal
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Build Server
+  description: Build Server
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.build-server
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Mendix Load Balancer
+  description: Distributes traffic across runtime instances
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-load-balancer
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: CDN Edge Nodes
+  description: Content delivery network for static assets
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.cdn-edge-nodes
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: API Gateway Appliance
+  description: Manages external API access
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.api-gateway-appliance
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Web Application Firewall
+  description: Protects applications from web attacks
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.web-application-firewall
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Mobile Device Manager
+  description: Manages mobile app deployments
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mobile-device-manager
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Mendix Runtime
+  description: Mendix Runtime
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-runtime
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Mendix Studio Pro
+  description: Mendix Studio Pro
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-studio-pro
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Java Runtime Environment
+  description: Java Runtime Environment
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.java-runtime-environment
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: PostgreSQL
+  description: PostgreSQL
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.postgresql
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Nginx
+  description: Nginx
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.nginx
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Docker Engine
+  description: Docker Engine
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.docker-engine
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Kubernetes
+  description: Kubernetes
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.kubernetes
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Mendix Native Mobile Builder
+  description: Mendix Native Mobile Builder
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-native-mobile-builder
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Node.js
+  description: Node.js
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.node-js
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix Runtime Service
+  description: Executes Mendix applications
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-runtime-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix Data Hub
+  description: Central data discovery and integration
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-data-hub
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix Model API
+  description: Programmatic model manipulation
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-model-api
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix SSO Service
+  description: Single sign-on for all apps
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-sso-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix Cloud Portal API
+  description: Platform management API
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-cloud-portal-api
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix App Store
+  description: Component and module marketplace
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-app-store
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix Build Service
+  description: Automated application builds
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-build-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix Deploy API
+  description: Application deployment automation
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-deploy-api
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix Feedback Widget Service
+  description: In-app feedback collection
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-feedback-widget-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix Mobile Services
+  description: Native mobile app services
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-mobile-services
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix Analytics
+  description: Application performance insights
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-analytics
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix Workflow Engine
+  description: Business process automation
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-workflow-engine
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix AI Bot Service
+  description: Conversational AI integration
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-ai-bot-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mendix Email Service
+  description: Email delivery service
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-email-service
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Mendix App Package (.mda)
+  description: Mendix App Package (.mda)
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-app-package-mda
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Mendix Project File (.mpr)
+  description: Mendix Project File (.mpr)
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-project-file-mpr
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Custom Java Module (.jar)
+  description: Custom Java Module (.jar)
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.custom-java-module-jar
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Mendix Widget Package
+  description: Mendix Widget Package
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-widget-package
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Mendix Module Package
+  description: Mendix Module Package
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-module-package
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Container Image
+  description: Container Image
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.container-image
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Database Backup
+  description: Database Backup
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.database-backup
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Mendix Production Network
+  description: Mendix Production Network
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.mendix-production-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Database Replication Network
+  description: Database Replication Network
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.database-replication-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Internet Gateway
+  description: Internet Gateway
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.internet-gateway
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: VPN Connection
+  description: VPN Connection
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.vpn-connection
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: CDN Network
+  description: CDN Network
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: technology.cdn-network
+  module_keys:
+  - platform
+- type: Capability
+  layer: strategy
+  name: Visual Application Development
+  description: Drag-and-drop application modeling with visual IDE
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.visual-application-development
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Multi-Experience Development
+  description: Single model for web, mobile, and progressive web apps
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.multi-experience-development
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Collaborative Development
+  description: Team collaboration with version control and branching
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.collaborative-development
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: API-First Integration
+  description: Built-in REST, SOAP, OData API consumption and publishing
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.api-first-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Data Modeling & Management
+  description: Visual data modeling with automated database schema generation
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.data-modeling-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Workflow Automation
+  description: Visual workflow designer with BPMN support
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.workflow-automation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: UI/UX Design System
+  description: Responsive design with Atlas UI framework
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.ui-ux-design-system
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Microservices Architecture
+  description: Container-based deployment with microservices patterns
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.microservices-architecture
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: DevOps & CI/CD
+  description: Automated build, test, and deployment pipelines
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.devops-ci-cd
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Cloud-Native Deployment
+  description: Multi-cloud and on-premise deployment options
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.cloud-native-deployment
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Application Lifecycle Management
+  description: Complete ALM from dev to production
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.application-lifecycle-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Security & Compliance
+  description: Built-in security controls and compliance frameworks
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.security-compliance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Analytics & Monitoring
+  description: Real-time application performance monitoring
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.analytics-monitoring
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Extensibility & Custom Code
+  description: Java and JavaScript extension points
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.extensibility-custom-code
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Data Integration Hub
+  description: Centralized data catalog and OData services
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.data-integration-hub
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: AI & Machine Learning Integration
+  description: Pre-built AI services and ML model integration
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.ai-machine-learning-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Mobile App Development
+  description: Native iOS and Android app generation
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.mobile-app-development
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Citizen Developer Enablement
+  description: Low-code tools for business users
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.citizen-developer-enablement
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Enterprise Marketplace
+  description: App Store for reusable components and modules
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.enterprise-marketplace
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Multi-Tenancy Support
+  description: SaaS application development capabilities
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: strategy.multi-tenancy-support
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Application Development Service
+  description: Build custom enterprise applications
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.application-development-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: API Management Service
+  description: Publish and consume REST/SOAP APIs
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.api-management-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Data Integration Service
+  description: Connect and integrate data sources
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.data-integration-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Mobile App Delivery
+  description: Deploy native mobile applications
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.mobile-app-delivery
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Workflow Automation Service
+  description: Automate business processes
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.workflow-automation-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: User Experience Design
+  description: Create responsive user interfaces
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.user-experience-design
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Platform Administration
+  description: Manage Mendix environments
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.platform-administration
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Application Monitoring
+  description: Monitor app performance and health
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.application-monitoring
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Security Management
+  description: Manage authentication and authorization
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.security-management
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Development Training
+  description: Train developers on Mendix platform
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.development-training
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Application Development Process
+  description: End-to-end app creation workflow
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.application-development-process
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: API Integration Process
+  description: Connect external systems via APIs
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.api-integration-process
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Mobile App Deployment
+  description: Build and deploy mobile apps
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.mobile-app-deployment
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: DevOps Pipeline
+  description: Continuous integration and deployment
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.devops-pipeline
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Platform Governance
+  description: Manage platform standards and compliance
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.platform-governance
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: User Feedback Loop
+  description: Collect and act on user feedback
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.user-feedback-loop
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Mendix Application
+  description: Deployable application package
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.mendix-application
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Data Model
+  description: Entity and relationship definitions
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.data-model
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Microflow
+  description: Business logic workflow
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.microflow
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Page
+  description: User interface definition
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.page
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: API Service
+  description: Published or consumed API
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.api-service
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Module
+  description: Reusable application component
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.module
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: User Role
+  description: Security role definition
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.user-role
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Environment
+  description: Deployment environment (dev/test/prod)
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.environment
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Build Package
+  description: Deployable artifact
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: business.build-package
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Runtime
+  description: Application execution engine
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-runtime
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Studio Pro
+  description: Professional development IDE
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-studio-pro
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Studio
+  description: Web-based development IDE
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-studio
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Model Server
+  description: Model version control and collaboration
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-model-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Build Server
+  description: Application packaging and deployment
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-build-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Client
+  description: Frontend application framework
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-client
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Mobile Client
+  description: Native mobile runtime
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-mobile-client
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Data Hub
+  description: Data catalog and OData services
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-data-hub
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix SSO Service
+  description: Single sign-on platform
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-sso-service
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Feedback Widget
+  description: In-app feedback collection
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-feedback-widget
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix App Store Service
+  description: Component distribution
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-app-store-service
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Deploy API
+  description: Application deployment automation
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-deploy-api
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Cloud Portal
+  description: Platform administration
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-cloud-portal
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mendix Database
+  description: Application data storage
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mendix-database
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Runtime API
+  description: Application runtime services
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.runtime-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Model API
+  description: Model manipulation API
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.model-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Deploy API
+  description: Deployment management
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.deploy-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Build API
+  description: Application build service
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.build-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Data Hub Catalog API
+  description: Data discovery and consumption
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.data-hub-catalog-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SSO Authentication API
+  description: Single sign-on service
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.sso-authentication-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Feedback API
+  description: User feedback collection
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.feedback-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: App Store API
+  description: Component marketplace
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.app-store-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Metrics API
+  description: Application performance metrics
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.metrics-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Mobile Build API
+  description: Native mobile builds
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.mobile-build-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: REST API Interface
+  description: REST API Interface
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.rest-api-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: OData Interface
+  description: OData Interface
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.odata-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: SOAP Interface
+  description: SOAP Interface
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.soap-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: WebSocket Interface
+  description: WebSocket Interface
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.websocket-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Database Interface
+  description: Database Interface
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.database-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: File Interface
+  description: File Interface
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.file-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Email Interface
+  description: Email Interface
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.email-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Push Notification Interface
+  description: Push Notification Interface
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.push-notification-interface
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Entity Instance
+  description: Entity Instance
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.entity-instance
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: User Account
+  description: User Account
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.user-account
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Session Data
+  description: Session Data
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.session-data
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: File Document
+  description: File Document
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.file-document
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Audit Log
+  description: Audit Log
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.audit-log
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Application Model
+  description: Application Model
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.application-model
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Build Package
+  description: Build Package
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.build-package
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Metrics Data
+  description: Metrics Data
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.metrics-data
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Feedback Item
+  description: Feedback Item
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: application.feedback-item
+  module_keys:
+  - core
+- type: Facility
+  layer: physical
+  name: AWS us-east - 1
+  description: Primary cloud region
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.aws-us-east-1
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: AWS eu-west - 1
+  description: European cloud region
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.aws-eu-west-1
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Corporate Data Center
+  description: On-premise development environment
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.corporate-data-center
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Runtime Containers
+  description: Runtime Containers
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.runtime-containers
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Database Instances
+  description: Database Instances
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.database-instances
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Load Balancers
+  description: Load Balancers
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.load-balancers
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Developer Workstations
+  description: Developer Workstations
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.developer-workstations
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Build Servers
+  description: Build Servers
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.build-servers
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Corporate WAN
+  description: Corporate WAN
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.corporate-wan
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: AWS Direct Connect
+  description: AWS Direct Connect
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.aws-direct-connect
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Internet Gateway
+  description: Internet Gateway
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.internet-gateway
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: CDN
+  description: CDN
+  mandatory: true
+  source_urls:
+  - https://www.mendix.com/low-code-platform/
+  element_key: physical.cdn
+  module_keys:
+  - platform
+relationships:
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-runtime
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-studio-pro
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-studio
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-model-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-build-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-client
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-mobile-client
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-data-hub
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-sso-service
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-feedback-widget
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-app-store-service
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-deploy-api
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-cloud-portal
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.mendix-database
+  type: composition
+  module_keys:
+  - core
+- source_key: application.mendix-cloud-portal
+  target_key: business.platform-administration
+  type: serving
+  module_keys:
+  - core
+- source_key: technology.mendix-runtime
+  target_key: application.mendix-runtime
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-studio-pro
+  target_key: application.mendix-studio-pro
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-studio-pro
+  target_key: application.mendix-studio
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.java-runtime-environment
+  target_key: application.mendix-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.postgresql
+  target_key: application.mendix-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.nginx
+  target_key: application.mendix-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.docker-engine
+  target_key: application.mendix-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.kubernetes
+  target_key: application.mendix-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-native-mobile-builder
+  target_key: application.mendix-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.node-js
+  target_key: application.mendix-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-runtime-server-primary
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-runtime-server-secondary
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.postgresql-primary-database
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.postgresql-replica-database
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-studio-pro-workstation
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-cloud-portal
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.build-server
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-load-balancer
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.cdn-edge-nodes
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.api-gateway-appliance
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.web-application-firewall
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mobile-device-manager
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-runtime-service
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-data-hub
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-model-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-sso-service
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-cloud-portal-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-app-store
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-build-service
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-deploy-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-feedback-widget-service
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-mobile-services
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-analytics
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-workflow-engine
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-ai-bot-service
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-email-service
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mendix-runtime-server-primary
+  target_key: technology.mendix-app-package-mda
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.mendix-runtime-server-primary
+  target_key: technology.mendix-project-file-mpr
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.mendix-runtime-server-primary
+  target_key: technology.custom-java-module-jar
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.mendix-runtime-server-primary
+  target_key: technology.mendix-widget-package
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.mendix-runtime-server-primary
+  target_key: technology.mendix-module-package
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.mendix-runtime-server-primary
+  target_key: technology.container-image
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.mendix-runtime-server-primary
+  target_key: technology.database-backup
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.mendix-production-network
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.database-replication-network
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.internet-gateway
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.vpn-connection
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.cdn-network
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.visual-application-development
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.multi-experience-development
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.collaborative-development
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.api-first-integration
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.data-modeling-management
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.workflow-automation
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.ui-ux-design-system
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.microservices-architecture
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.devops-ci-cd
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.cloud-native-deployment
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.application-lifecycle-management
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.security-compliance
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.analytics-monitoring
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.extensibility-custom-code
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.data-integration-hub
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.ai-machine-learning-integration
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.mobile-app-development
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.citizen-developer-enablement
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.enterprise-marketplace
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.multi-tenancy-support
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.application-development-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.api-management-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.data-integration-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.mobile-app-delivery
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.workflow-automation-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.user-experience-design
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.application-monitoring
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.security-management
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.development-training
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.application-development-process
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.api-integration-process
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.mobile-app-deployment
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.devops-pipeline
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.platform-governance
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: business.user-feedback-loop
+  type: association
+  module_keys:
+  - core
+- source_key: business.mendix-application
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.data-model
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.microflow
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.page
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.api-service
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.module
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.user-role
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.environment
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.build-package
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.runtime-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.model-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.deploy-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.build-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.data-hub-catalog-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.sso-authentication-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.feedback-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.app-store-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.metrics-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.mobile-build-api
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.rest-api-interface
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.odata-interface
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.soap-interface
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.websocket-interface
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.database-interface
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.file-interface
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.email-interface
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.push-notification-interface
+  target_key: application.mendix-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.entity-instance
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.user-account
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.session-data
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.file-document
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.audit-log
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.application-model
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.build-package
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.metrics-data
+  type: association
+  module_keys:
+  - core
+- source_key: application.mendix-low-code-application-platform
+  target_key: application.feedback-item
+  type: association
+  module_keys:
+  - core
+- source_key: physical.aws-us-east-1
+  target_key: technology.mendix-runtime-server-primary
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.aws-eu-west-1
+  target_key: technology.mendix-runtime-server-primary
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.corporate-data-center
+  target_key: technology.mendix-runtime-server-primary
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.runtime-containers
+  target_key: technology.mendix-runtime-server-primary
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.database-instances
+  target_key: technology.mendix-runtime-server-primary
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.load-balancers
+  target_key: technology.mendix-runtime-server-primary
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.developer-workstations
+  target_key: technology.mendix-runtime-server-primary
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.build-servers
+  target_key: technology.mendix-runtime-server-primary
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.corporate-wan
+  target_key: physical.runtime-containers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.aws-direct-connect
+  target_key: physical.runtime-containers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.internet-gateway
+  target_key: physical.runtime-containers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.cdn
+  target_key: physical.runtime-containers
+  type: association
+  module_keys:
+  - platform
+integrations: []
+capability_mappings: []

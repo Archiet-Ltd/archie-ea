@@ -1522,7 +1522,7 @@ class VendorArchiMateTemplate(db.Model):
     links an SAP or Microsoft product, Entelim can auto-populate the correct
     Technology layer elements without fuzzy search.
 
-    Populated by: flask seed-vendor-templates
+    Populated by: flask reference-packs load
     Used by: VendorTemplateService.populate_from_vendor()
     """
 

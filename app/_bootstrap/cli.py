@@ -209,6 +209,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"\u26a0\ufe0f  Failed to register vendor ArchiMate template seed CLI: {e}")
 
+    # Reference packs: global pack content loader CLI command
+    try:
+        from app.commands import reference_packs
+        reference_packs.init_app(app)
+        app.logger.info("\u2705 Reference packs CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"\u26a0\ufe0f  Failed to register reference packs CLI: {e}")
+
     # Vendor seed column migration (add spec_data_seed to vendor_archimate_templates)
     try:
         from app.commands.add_vendor_seed_column import init_app as init_vendor_seed_col

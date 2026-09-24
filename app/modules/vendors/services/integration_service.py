@@ -5,7 +5,6 @@ Consolidates:
 - vendor_process_mapping_service (VendorProcessMappingService)
 - unified_vendor_process_service (UnifiedVendorProcessService)
 - vendor_capability_link_service (VendorCapabilityLinkService)
-- vendor_archimate_sync_service (VendorArchiMateSync)
 - vendor_product_archimate_generator (VendorProductArchiMateGenerator)
 - apqc_vendor_archimate_service (APQCVendorArchiMateService)
 - vendor_deployment_service (VendorDeploymentService)
@@ -28,12 +27,6 @@ except ImportError:
 from app.modules.vendors.services.vendor_capability_link_service import (  # noqa: F401
     LinkResult,
     VendorCapabilityLinkService,
-)
-
-from app.modules.vendors.services.vendor_archimate_sync_service import (  # noqa: F401
-    VendorArchiMateSync,
-    sync_all_vendor_templates,
-    sync_vendor_template_to_archimate,
 )
 
 from app.modules.vendors.services.vendor_product_archimate_generator import (  # noqa: F401

@@ -1,0 +1,2479 @@
+pack_key: ge-proficy
+pack_version: '1.0'
+vendor: GE Digital
+product: GE Proficy Manufacturing Intelligence Suite
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about GE Proficy Manufacturing Intelligence Suite are taken from GE Digital's
+  public product documentation, read on 2026-09-23; product, module and service names are used as names
+  only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run GE Proficy Manufacturing Intelligence Suite?
+- key: platform
+  question: Do you run the GE Proficy Manufacturing Intelligence Suite platform components (hosting, integration,
+    data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: GE Proficy Manufacturing Intelligence Suite
+  description: GE Proficy Manufacturing Intelligence Suite, the core application component of the GE Digital
+    pack.
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.ge-proficy-manufacturing-intelligence-suite
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: Proficy HMI/SCADA Server
+  description: Proficy HMI/SCADA Server
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-hmi-scada-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Proficy Historian Server
+  description: Proficy Historian Server
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-historian-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Proficy Operations Hub Server
+  description: Proficy Operations Hub Server
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-operations-hub-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Proficy Manufacturing Execution Server
+  description: Proficy Manufacturing Execution Server
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-manufacturing-execution-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Proficy Plant Applications Server
+  description: Proficy Plant Applications Server
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-plant-applications-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SQL Server Database Primary
+  description: SQL Server Database Primary
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.sql-server-database-primary
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SQL Server Database Secondary
+  description: SQL Server Database Secondary
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.sql-server-database-secondary
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Proficy OPC UA Gateway
+  description: Proficy OPC UA Gateway
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-opc-ua-gateway
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Historian Archive Server
+  description: Historian Archive Server
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.historian-archive-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: IIS Web Server
+  description: IIS Web Server
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.iis-web-server
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: GE RX3i PLC
+  description: Process control PLCs
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.ge-rx3i-plc
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Emerson DeltaV DCS
+  description: Distributed control system
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.emerson-deltav-dcs
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Industrial Ethernet Switches
+  description: Ruggedized plant network
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.industrial-ethernet-switches
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Operator HMI Panels
+  description: Touchscreen operator interfaces
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.operator-hmi-panels
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Mobile Tablets
+  description: Portable operator devices
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.mobile-tablets
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Proficy iFIX HMI/SCADA
+  description: Proficy iFIX HMI/SCADA
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-ifix-hmi-scada
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Proficy Historian
+  description: Proficy Historian
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-historian
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Proficy Operations Hub
+  description: Proficy Operations Hub
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-operations-hub
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Proficy Manufacturing Execution Systems
+  description: Proficy Manufacturing Execution Systems
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-manufacturing-execution-systems
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Proficy Plant Applications
+  description: Proficy Plant Applications
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-plant-applications
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Proficy Workflow
+  description: Proficy Workflow
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-workflow
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Proficy CSense
+  description: Proficy CSense
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.proficy-csense
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: SQL Server
+  description: SQL Server
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.sql-server
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IIS
+  description: IIS
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.iis
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: OPC UA Server
+  description: OPC UA Server
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.opc-ua-server
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Windows Server
+  description: Windows Server
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.windows-server
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: RabbitMQ
+  description: RabbitMQ
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.rabbitmq
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: iFIX SCADA Service
+  description: Real-time process visualization and control
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.ifix-scada-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Historian Data Collection Service
+  description: High-speed industrial data collection
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.historian-data-collection-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Historian Archive Service
+  description: Long-term time-series data storage
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.historian-archive-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Operations Hub Service
+  description: Web-based HMI and dashboards
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.operations-hub-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: MES Production Service
+  description: Production execution and tracking
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.mes-production-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Plant Applications Service
+  description: Manufacturing intelligence and KPIs
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.plant-applications-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Workflow Engine Service
+  description: Electronic procedures and workflows
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.workflow-engine-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: CSense AI Service
+  description: Predictive analytics and optimization
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.csense-ai-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OPC UA Gateway Service
+  description: Equipment connectivity
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.opc-ua-gateway-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Alarm Management Service
+  description: Intelligent alarm handling
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.alarm-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Downtime Tracking Service
+  description: Production loss analysis
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.downtime-tracking-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OEE Calculation Service
+  description: Real-time OEE metrics
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.oee-calculation-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Data API Service
+  description: REST API for external integration
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.data-api-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Security Service
+  description: User authentication and authorization
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.security-service
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: iFIX Display Files
+  description: iFIX Display Files
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.ifix-display-files
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Historical Data Archive
+  description: Historical Data Archive
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.historical-data-archive
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Operations Hub Dashboards
+  description: Operations Hub Dashboards
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.operations-hub-dashboards
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: MES Production Recipes
+  description: MES Production Recipes
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.mes-production-recipes
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Plant Applications Reports
+  description: Plant Applications Reports
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.plant-applications-reports
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Workflow Procedures
+  description: Workflow Procedures
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.workflow-procedures
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: CSense AI Models
+  description: CSense AI Models
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.csense-ai-models
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: SQL Database Backup
+  description: SQL Database Backup
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.sql-database-backup
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Plant Ethernet Network
+  description: Plant Ethernet Network
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.plant-ethernet-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Control Network
+  description: Control Network
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.control-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: DMZ Network
+  description: DMZ Network
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.dmz-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Corporate WAN
+  description: Corporate WAN
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.corporate-wan
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Internet Gateway
+  description: Internet Gateway
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: technology.internet-gateway
+  module_keys:
+  - platform
+- type: Capability
+  layer: strategy
+  name: Plant-Wide SCADA
+  description: Comprehensive process visualization and control
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.plant-wide-scada
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Industrial Historian
+  description: High-speed time-series data collection and storage
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.industrial-historian
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Manufacturing Operations Management
+  description: Production execution and tracking
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.manufacturing-operations-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Manufacturing Intelligence
+  description: Real-time KPIs and analytics
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.manufacturing-intelligence
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: OEE Management
+  description: Overall equipment effectiveness tracking
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.oee-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Downtime Tracking
+  description: Production loss analysis and root cause
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.downtime-tracking
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Quality Management
+  description: SPC and quality tracking
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.quality-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Alarm Management
+  description: Intelligent alarm handling and rationalization
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.alarm-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Electronic Procedures
+  description: Digital work instructions and workflows
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.electronic-procedures
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Predictive Analytics
+  description: AI/ML-based predictions and optimization
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.predictive-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Energy Management
+  description: Energy consumption tracking and optimization
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.energy-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Asset Performance
+  description: Equipment reliability and maintenance
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.asset-performance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Production Scheduling
+  description: Schedule management and tracking
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.production-scheduling
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Material Tracking
+  description: Material consumption and genealogy
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.material-tracking
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Batch Management
+  description: Recipe management and batch execution
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.batch-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Continuous Process Control
+  description: Real-time process control and optimization
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.continuous-process-control
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Mobile Operations
+  description: Mobile access to production data
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.mobile-operations
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: ERP Integration
+  description: Bidirectional ERP connectivity
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.erp-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Compliance Management
+  description: Regulatory compliance and audit trails
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.compliance-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Web-Based Visualization
+  description: Modern web HMI and dashboards
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.web-based-visualization
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Demand-Driven Production
+  description: Pull-based production signaling from demand
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.demand-driven-production
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Warehouse Automation Integration
+  description: AGV, AS/RS, and automated storage integration
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.warehouse-automation-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Logistics Integration
+  description: TMS integration for outbound logistics
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.logistics-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Quality Cost Analysis
+  description: Cost of quality (COPQ) tracking and analysis
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.quality-cost-analysis
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Training & Competency Management
+  description: Operator training records and certification
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.training-competency-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Environmental Health & Safety
+  description: Safety incident tracking, OSHA compliance
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.environmental-health-safety
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Production Simulation
+  description: What-if scenario modeling for production planning
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.production-simulation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Customer Promise Date Management
+  description: ATP/CTP for customer delivery commitments
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.customer-promise-date-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Multi-Enterprise Collaboration
+  description: Partner/supplier collaboration portal
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.multi-enterprise-collaboration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Circular Economy Tracking
+  description: Product return, refurbishment, recycling tracking
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: strategy.circular-economy-tracking
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Process Control Service
+  description: Real-time SCADA control
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.process-control-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Data Historian Service
+  description: Industrial data collection
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.data-historian-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Production Tracking Service
+  description: Track production orders
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.production-tracking-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: OEE Reporting Service
+  description: Equipment effectiveness metrics
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.oee-reporting-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Analytics Service
+  description: Manufacturing intelligence
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.analytics-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Alarm Management Service
+  description: Intelligent alarming
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.alarm-management-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Quality Management Service
+  description: SPC and quality tracking
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.quality-management-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Downtime Analysis Service
+  description: Production loss tracking
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.downtime-analysis-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Electronic Procedures Service
+  description: Digital work instructions
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.electronic-procedures-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: ERP Integration Service
+  description: SAP/Oracle integration
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.erp-integration-service
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Continuous Process Monitoring
+  description: 24/7 process control and visualization
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.continuous-process-monitoring
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Production Order Execution
+  description: Execute production orders on plant floor
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.production-order-execution
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: OEE Calculation
+  description: Real-time equipment effectiveness tracking
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.oee-calculation
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Downtime Management
+  description: Track and analyze production losses
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.downtime-management
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Alarm Response
+  description: Respond to process alarms
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.alarm-response
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Predictive Analytics
+  description: AI-driven asset predictions
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.predictive-analytics
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Production Order
+  description: Manufacturing work order
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.production-order
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Historical Data
+  description: Time-series process data
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.historical-data
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Alarm
+  description: Process alarm event
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.alarm
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Downtime Event
+  description: Production loss event
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.downtime-event
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: OEE Record
+  description: Equipment effectiveness calculation
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.oee-record
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Quality Result
+  description: Quality inspection result
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.quality-result
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Electronic Procedure
+  description: Digital work instruction
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.electronic-procedure
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Predictive Alert
+  description: AI-generated alert
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: business.predictive-alert
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: iFIX SCADA Server
+  description: Real-time process control engine
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.ifix-scada-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: iFIX Client Workstations
+  description: Operator interface clients
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.ifix-client-workstations
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Proficy Historian Collector
+  description: High-speed data collection
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.proficy-historian-collector
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Proficy Historian Server
+  description: Time-series database
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.proficy-historian-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Operations Hub Web Server
+  description: Modern web HMI
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.operations-hub-web-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: MES Production Module
+  description: Production execution
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.mes-production-module
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Plant Applications Server
+  description: Manufacturing intelligence engine
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.plant-applications-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Workflow Engine
+  description: Electronic procedures
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.workflow-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: CSense Analytics Engine
+  description: Machine learning platform
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.csense-analytics-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: OPC UA Gateway
+  description: Equipment connectivity
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.opc-ua-gateway
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SQL Server Database
+  description: Relational database
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.sql-server-database
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: IIS Web Server
+  description: Web application hosting
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.iis-web-server
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: iFIX Data Server API
+  description: Real-time data access
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.ifix-data-server-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Historian REST API
+  description: Historical data queries
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.historian-rest-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Operations Hub API
+  description: Web HMI services
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.operations-hub-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: MES API
+  description: Production operations API
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.mes-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Plant Applications API
+  description: Analytics and KPI API
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.plant-applications-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Workflow API
+  description: Electronic procedures API
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.workflow-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: CSense API
+  description: Predictive analytics API
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.csense-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: OPC UA Service
+  description: Standard OPC connectivity
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.opc-ua-service
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Alarm API
+  description: Alarm management API
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.alarm-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Integration API
+  description: ERP integration services
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.integration-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: REST API
+  description: REST API
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.rest-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: SOAP Interface
+  description: SOAP Interface
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.soap-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: OPC DA Interface
+  description: OPC DA Interface
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.opc-da-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: OPC UA Interface
+  description: OPC UA Interface
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.opc-ua-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Database Interface
+  description: Database Interface
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.database-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: File Interface
+  description: File Interface
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.file-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Message Queue
+  description: Message Queue
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.message-queue
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Process Tag
+  description: Process Tag
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.process-tag
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Historical Data
+  description: Historical Data
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.historical-data
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Production Record
+  description: Production Record
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.production-record
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Alarm History
+  description: Alarm History
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.alarm-history
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Downtime Event
+  description: Downtime Event
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.downtime-event
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: OEE Record
+  description: OEE Record
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.oee-record
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Quality Record
+  description: Quality Record
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.quality-record
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Electronic Procedure Execution
+  description: Electronic Procedure Execution
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.electronic-procedure-execution
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Predictive Model
+  description: Predictive Model
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: application.predictive-model
+  module_keys:
+  - core
+- type: Facility
+  layer: physical
+  name: Plant 1 Data Center
+  description: Primary plant control room and data center
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.plant-1-data-center
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Plant 2 Data Center
+  description: Secondary plant data center
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.plant-2-data-center
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Corporate Data Center
+  description: Enterprise historian and analytics
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.corporate-data-center
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: AWS Cloud Region
+  description: Cloud analytics and Manufacturing Data Cloud
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.aws-cloud-region
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: DR Site
+  description: Disaster recovery data center
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.dr-site
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Proficy SCADA Servers
+  description: Proficy SCADA Servers
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.proficy-scada-servers
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Proficy Historian Servers
+  description: Proficy Historian Servers
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.proficy-historian-servers
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: SQL Server Database Cluster
+  description: SQL Server Database Cluster
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.sql-server-database-cluster
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Operator HMI Panels
+  description: Operator HMI Panels
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.operator-hmi-panels
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Industrial Network Switches
+  description: Industrial Network Switches
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.industrial-network-switches
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Plant Ethernet Network
+  description: Plant Ethernet Network
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.plant-ethernet-network
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Control Network VLAN
+  description: Control Network VLAN
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.control-network-vlan
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Corporate WAN
+  description: Corporate WAN
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.corporate-wan
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: AWS DirectConnect
+  description: AWS DirectConnect
+  mandatory: true
+  source_urls:
+  - https://www.ge.com/digital/applications/manufacturing-execution-systems
+  element_key: physical.aws-directconnect
+  module_keys:
+  - platform
+relationships:
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.ifix-scada-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.ifix-client-workstations
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.proficy-historian-collector
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.proficy-historian-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.operations-hub-web-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.mes-production-module
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.plant-applications-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.workflow-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.csense-analytics-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.opc-ua-gateway
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.sql-server-database
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.iis-web-server
+  type: composition
+  module_keys:
+  - core
+- source_key: technology.proficy-ifix-hmi-scada
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-historian
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-operations-hub
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-manufacturing-execution-systems
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-plant-applications
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-workflow
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-csense
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sql-server
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.iis
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.opc-ua-server
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.windows-server
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.rabbitmq
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-hmi-scada-server
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-historian-server
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-operations-hub-server
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-manufacturing-execution-server
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-plant-applications-server
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sql-server-database-primary
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sql-server-database-secondary
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-opc-ua-gateway
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.historian-archive-server
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.iis-web-server
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ge-rx3i-plc
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.emerson-deltav-dcs
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.industrial-ethernet-switches
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.operator-hmi-panels
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mobile-tablets
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ifix-scada-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.historian-data-collection-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.historian-archive-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.operations-hub-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mes-production-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.plant-applications-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.workflow-engine-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.csense-ai-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.opc-ua-gateway-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.alarm-management-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.downtime-tracking-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.oee-calculation-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.data-api-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.security-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.proficy-hmi-scada-server
+  target_key: technology.ifix-display-files
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.proficy-hmi-scada-server
+  target_key: technology.historical-data-archive
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.proficy-hmi-scada-server
+  target_key: technology.operations-hub-dashboards
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.proficy-hmi-scada-server
+  target_key: technology.mes-production-recipes
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.proficy-hmi-scada-server
+  target_key: technology.plant-applications-reports
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.proficy-hmi-scada-server
+  target_key: technology.workflow-procedures
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.proficy-hmi-scada-server
+  target_key: technology.csense-ai-models
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.proficy-hmi-scada-server
+  target_key: technology.sql-database-backup
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.plant-ethernet-network
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.control-network
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.dmz-network
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.corporate-wan
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.internet-gateway
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.plant-wide-scada
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.industrial-historian
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.manufacturing-operations-management
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.manufacturing-intelligence
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.oee-management
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.downtime-tracking
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.quality-management
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.alarm-management
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.electronic-procedures
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.predictive-analytics
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.energy-management
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.asset-performance
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.production-scheduling
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.material-tracking
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.batch-management
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.continuous-process-control
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.mobile-operations
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.erp-integration
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.compliance-management
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.web-based-visualization
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.demand-driven-production
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.warehouse-automation-integration
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.logistics-integration
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.quality-cost-analysis
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.training-competency-management
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.environmental-health-safety
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.production-simulation
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.customer-promise-date-management
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.multi-enterprise-collaboration
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.circular-economy-tracking
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.process-control-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.data-historian-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.production-tracking-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.oee-reporting-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.analytics-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.alarm-management-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.quality-management-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.downtime-analysis-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.electronic-procedures-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.erp-integration-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.continuous-process-monitoring
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.production-order-execution
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.oee-calculation
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.downtime-management
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.alarm-response
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: business.predictive-analytics
+  type: association
+  module_keys:
+  - core
+- source_key: business.production-order
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.historical-data
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.alarm
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.downtime-event
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.oee-record
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.quality-result
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.electronic-procedure
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.predictive-alert
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.ifix-data-server-api
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.historian-rest-api
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.operations-hub-api
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.mes-api
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.plant-applications-api
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.workflow-api
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.csense-api
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.opc-ua-service
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.alarm-api
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.integration-api
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.rest-api
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.soap-interface
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.opc-da-interface
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.opc-ua-interface
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.database-interface
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.file-interface
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.message-queue
+  target_key: application.ge-proficy-manufacturing-intelligence-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.process-tag
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.historical-data
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.production-record
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.alarm-history
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.downtime-event
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.oee-record
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.quality-record
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.electronic-procedure-execution
+  type: association
+  module_keys:
+  - core
+- source_key: application.ge-proficy-manufacturing-intelligence-suite
+  target_key: application.predictive-model
+  type: association
+  module_keys:
+  - core
+- source_key: physical.plant-1-data-center
+  target_key: technology.proficy-hmi-scada-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.plant-2-data-center
+  target_key: technology.proficy-hmi-scada-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.corporate-data-center
+  target_key: technology.proficy-hmi-scada-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.aws-cloud-region
+  target_key: technology.proficy-hmi-scada-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.dr-site
+  target_key: technology.proficy-hmi-scada-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.proficy-scada-servers
+  target_key: technology.proficy-hmi-scada-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.proficy-historian-servers
+  target_key: technology.proficy-hmi-scada-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.sql-server-database-cluster
+  target_key: technology.proficy-hmi-scada-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.operator-hmi-panels
+  target_key: technology.proficy-hmi-scada-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.industrial-network-switches
+  target_key: technology.proficy-hmi-scada-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.plant-ethernet-network
+  target_key: physical.proficy-scada-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.control-network-vlan
+  target_key: physical.proficy-scada-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.corporate-wan
+  target_key: physical.proficy-scada-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.aws-directconnect
+  target_key: physical.proficy-scada-servers
+  type: association
+  module_keys:
+  - platform
+integrations: []
+capability_mappings: []

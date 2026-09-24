@@ -1,4 +1,5 @@
 {% extends "layouts/admin_base.html" %}
+{# smoke-coverage-ok: one-line CLI hint text corrected to name the current command; no interactive behaviour changed #}
 {% from 'components/page_header.html' import page_header %}
 
 {% block title %}Vendor ArchiMate Templates{% endblock %}
@@ -70,7 +71,7 @@
             <i data-lucide="layers" class="w-8 h-8 text-muted-foreground" aria-hidden="true"></i>
         </div>
         <h3 class="text-lg font-semibold text-foreground mb-2">No Vendor ArchiMate Templates</h3>
-        <p class="text-muted-foreground mb-4">Seed them with <code class="px-1.5 py-0.5 rounded bg-muted text-foreground">flask seed-vendor-templates</code> to auto-populate Technology-layer elements when linking SAP or Microsoft products.</p>
+        <p class="text-muted-foreground mb-4">Seed them with <code class="px-1.5 py-0.5 rounded bg-muted text-foreground">flask reference-packs load</code> to auto-populate Technology-layer elements when linking SAP or Microsoft products.</p>
     </div>
     {% endif %}
 </div>

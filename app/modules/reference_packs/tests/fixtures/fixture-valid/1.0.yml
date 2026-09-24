@@ -1,0 +1,36 @@
+pack_key: fixture-valid
+pack_version: "1.0"
+vendor: Fixture Vendor
+product: Fixture Product
+product_edition: ""
+segment_tags: []
+industry_tags: []
+attribution_text: "Facts about Fixture Product are taken from Fixture Vendor's public product documentation, read on 2026-09-23; product, module and service names are used as names only."
+trademark_line: "Product and company names are the property of their respective owners; no affiliation or endorsement is implied."
+modules:
+  - {key: core, question: "Do you run Fixture Product?"}
+elements:
+  - element_key: application.fixture-core
+    type: ApplicationComponent
+    name: Fixture Core
+    description: "The core application component of the fixture product, used only by this test suite."
+    layer: application
+    module_keys: [core]
+    mandatory: true
+    profile: null
+    properties: {}
+    source_urls: ["https://fixture.invalid/product"]
+  - element_key: business.fixture-service
+    type: BusinessService
+    name: Fixture Service
+    description: "A business service the fixture product supports, used only by this test suite."
+    layer: business
+    module_keys: [core]
+    mandatory: true
+    profile: null
+    properties: {}
+    source_urls: ["https://fixture.invalid/product"]
+relationships:
+  - {source_key: application.fixture-core, target_key: business.fixture-service, type: serving, module_keys: [core]}
+integrations: []
+capability_mappings: []
