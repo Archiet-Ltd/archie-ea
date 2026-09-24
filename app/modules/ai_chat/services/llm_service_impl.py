@@ -57,6 +57,7 @@ import time
 from datetime import datetime, timedelta
 from typing import (
     Any,
+    Callable,
     Dict,
     List,
     Optional,
@@ -1950,6 +1951,271 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 logger.error(f"Error running LLM middleware validation: {e}")
 
         return response_text, interaction
+
+    @staticmethod
+    def _call_llm_with_tools(
+        provider: str,
+        model: str,
+        api_key: str,
+        system_prompt: str,
+        messages: list,
+        tools: list,
+        stream: bool = False,
+        base_url: str = None,
+        user_id: Optional[int] = None,
+        org_id: Optional[int] = None,
+        emit: Optional[Callable] = None,
+    ) -> dict:
+        """Call an LLM with tool schemas, through the budget/scrub/meter guards.
+
+        Every model call the AI chat's tool loop makes passes the same budget
+        pre-flight, prompt scrub and usage metering as every other model call.
+
+        Returns a normalised dict:
+          {"text": str|None, "tool_calls": list, "usage": {"input_tokens": int,
+           "output_tokens": int, "cost": float}}
+        """
+        # Scrub the system prompt and every user-role message content.
+        scrubbed_system = _scrub_prompt(system_prompt)
+        scrubbed_messages = []
+        for msg in messages:
+            m = dict(msg)
+            if m.get("role") == "user":
+                content = m.get("content")
+                if isinstance(content, str):
+                    m["content"] = _scrub_prompt(content)
+                elif isinstance(content, list):
+                    m["content"] = [
+                        dict(c, content=_scrub_prompt(c["content"])
+                             if isinstance(c.get("content"), str) else c.get("content"))
+                        for c in content
+                    ]
+            scrubbed_messages.append(m)
+
+        # Budget pre-flight: estimate tokens from serialised messages.
+        serialised = json.dumps(scrubbed_messages, default=str)
+        estimated_tokens = len(serialised) // 4 + len(scrubbed_system) // 4
+        cost_tracker = LLMCostTracker()
+        try:
+            allowed, budget_message = cost_tracker.check_budget_before_call(
+                user_id=user_id, estimated_tokens=estimated_tokens
+            )
+        except Exception:
+            allowed, budget_message = True, None
+        if not allowed:
+            raise ValueError(f"Budget limit exceeded: {budget_message}")
+
+        # Call the provider with tools.
+        if provider == "anthropic":
+            result = LLMService._call_anthropic_tool_loop(
+                model, api_key, scrubbed_system, scrubbed_messages, tools, stream, emit
+            )
+        else:
+            result = LLMService._call_openai_compat_tool_loop(
+                model, api_key, scrubbed_system, scrubbed_messages, tools,
+                stream=stream, base_url=base_url, emit=emit,
+            )
+
+        usage = result.get("usage", {})
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+        cost = usage.get("cost", 0.0)
+
+        # Record a usage event so every model call in the loop is metered.
+        if org_id is not None:
+            try:
+                from app.services.usage_metering_service import UsageMeteringService
+                UsageMeteringService.record(
+                    org_id=org_id,
+                    user_id=user_id,
+                    event_type="llm_tool_call",
+                    resource_type="ai_chat",
+                    metadata={
+                        "provider": provider,
+                        "model": model,
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "cost_usd": cost,
+                    },
+                )
+            except Exception:
+                logger.warning("Failed to record usage event for tool-loop call", exc_info=True)
+
+        return result
+
+    @staticmethod
+    def _call_anthropic_tool_loop(
+        model: str,
+        api_key: str,
+        system_prompt: str,
+        messages: list,
+        tools: list,
+        stream: bool = False,
+        emit: Optional[Callable] = None,
+    ) -> dict:
+        """Call Anthropic with tool schemas and return normalised result."""
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=api_key, timeout=90.0)
+        max_tokens = 8192 if "sonnet" in model or "opus" in model else 4096
+
+        if stream:
+            with client.messages.stream(
+                model=model,
+                max_tokens=max_tokens,
+                system=[{"type": "text", "text": system_prompt,
+                         "cache_control": {"type": "ephemeral"}}],
+                messages=messages,
+                tools=tools,
+                tool_choice={"type": "auto"},
+            ) as s:
+                for _text in s.text_stream:
+                    if emit:
+                        emit({"type": "token", "text": _text})
+                final = s.get_final_message()
+            response = final
+        else:
+            response = client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                system=[{"type": "text", "text": system_prompt,
+                         "cache_control": {"type": "ephemeral"}}],
+                messages=messages,
+                tools=tools,
+                tool_choice={"type": "auto"},
+            )
+
+        text = None
+        tool_calls = []
+        for block in response.content:
+            if block.type == "tool_use":
+                tool_calls.append({
+                    "id": block.id,
+                    "name": block.name,
+                    "arguments": block.input,
+                })
+            elif block.type == "text":
+                text = block.text
+
+        input_tokens = getattr(response.usage, "input_tokens", 0)
+        output_tokens = getattr(response.usage, "output_tokens", 0)
+        cache_read = getattr(response.usage, "cache_read_input_tokens", 0)
+        cache_create = getattr(response.usage, "cache_creation_input_tokens", 0)
+
+        from app.modules.ai_chat.services.model_defaults import price_for
+        pricing = price_for(model)
+        regular_input = input_tokens - cache_create - cache_read
+        cost = (
+            (regular_input / 1000.0 * pricing["input"])
+            + (cache_create / 1000.0 * pricing["input"] * 1.25)
+            + (cache_read / 1000.0 * pricing["input"] * 0.10)
+            + (output_tokens / 1000.0 * pricing["output"])
+        )
+
+        return {
+            "text": text,
+            "tool_calls": tool_calls,
+            "raw": response,
+            "usage": {"input_tokens": input_tokens, "output_tokens": output_tokens, "cost": cost},
+        }
+
+    @staticmethod
+    def _call_openai_compat_tool_loop(
+        model: str,
+        api_key: str,
+        system_prompt: str,
+        messages: list,
+        tools: list,
+        stream: bool = False,
+        base_url: str = None,
+        emit: Optional[Callable] = None,
+    ) -> dict:
+        """Call an OpenAI-compatible provider with tool schemas."""
+        from openai import OpenAI
+
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
+        full_messages = [{"role": "system", "content": system_prompt}] + list(messages)
+        _token_limit = 8192 if ("gpt-4" in model or "gpt-5" in model) else 4096
+
+        if stream:
+            text_acc = ""
+            tool_calls_acc: dict = {}
+            with client.chat.completions.create(
+                model=model,
+                messages=full_messages,
+                tools=tools,
+                tool_choice="auto",
+                temperature=0.0,
+                max_completion_tokens=_token_limit,
+                stream=True,
+            ) as s:
+                for chunk in s:
+                    delta = chunk.choices[0].delta
+                    if delta.content:
+                        text_acc += delta.content
+                        if emit:
+                            emit({"type": "token", "text": delta.content})
+                    if delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            idx = tc.index
+                            if idx not in tool_calls_acc:
+                                tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}
+                            if tc.id:
+                                tool_calls_acc[idx]["id"] = tc.id
+                            if tc.function and tc.function.name:
+                                tool_calls_acc[idx]["name"] += tc.function.name
+                            if tc.function and tc.function.arguments:
+                                tool_calls_acc[idx]["arguments"] += tc.function.arguments
+            tool_calls = []
+            for idx in sorted(tool_calls_acc.keys()):
+                tc = tool_calls_acc[idx]
+                try:
+                    arguments = json.loads(tc["arguments"]) if tc["arguments"] else {}
+                except json.JSONDecodeError:
+                    arguments = {}
+                tool_calls.append({"id": tc["id"], "name": tc["name"], "arguments": arguments})
+            return {
+                "text": text_acc or None,
+                "tool_calls": tool_calls,
+                "raw": None,
+                "usage": {"input_tokens": 0, "output_tokens": 0, "cost": 0.0},
+            }
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=full_messages,
+            tools=tools,
+            tool_choice="auto",
+            temperature=0.0,
+            max_completion_tokens=_token_limit,
+        )
+
+        msg = response.choices[0].message
+        tool_calls = []
+        if msg.tool_calls:
+            for tc in msg.tool_calls:
+                tool_calls.append({
+                    "id": tc.id,
+                    "name": tc.function.name,
+                    "arguments": json.loads(tc.function.arguments),
+                })
+
+        input_tokens = getattr(response.usage, "prompt_tokens", 0)
+        output_tokens = getattr(response.usage, "completion_tokens", 0)
+
+        from app.modules.ai_chat.services.model_defaults import price_for
+        pricing = price_for(model)
+        cost = (
+            (input_tokens / 1000.0 * pricing["input"])
+            + (output_tokens / 1000.0 * pricing["output"])
+        )
+
+        return {
+            "text": msg.content,
+            "tool_calls": tool_calls,
+            "raw": response,
+            "usage": {"input_tokens": input_tokens, "output_tokens": output_tokens, "cost": cost},
+        }
 
     @staticmethod
     @retry_on_transient_error(max_attempts=3, min_wait=2, max_wait=10)

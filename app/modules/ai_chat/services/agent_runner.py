@@ -527,6 +527,23 @@ class AgentRunner:
                     stream=stream_mode,
                     base_url=base_url,
                 )
+            except ValueError as e:
+                err_msg = str(e)
+                if "Budget limit exceeded" in err_msg or "budget" in err_msg.lower():
+                    logger.warning("AgentRunner: budget exhausted for user_id=%s", self.user_id)
+                    return {
+                        "response": (
+                            "The monthly AI usage budget has been reached. "
+                            "Please contact your administrator to increase the budget, "
+                            "or try again next month."
+                        ),
+                        "actions_taken": actions_taken,
+                        "required_actions": required_actions,
+                        "pending_approvals": pending_approvals,
+                        "sources": sources,
+                        "error": err_msg,
+                    }
+                return self._fallback(f"LLM call failed: {e}")
             except Exception as e:
                 logger.exception("AgentRunner LLM call failed (iteration %d)", iteration)
                 return self._fallback(f"LLM call failed: {e}")
@@ -741,168 +758,29 @@ class AgentRunner:
         base_url: str = None,
     ) -> dict:
         """
-        Call the LLM with tool schemas.  Returns normalised dict:
-          {"text": str|None, "tool_calls": list, "raw": raw_response}
+        Call the LLM with tool schemas through the model service's guards.
+
+        Routes through LLMService._call_llm_with_tools so every model call in
+        the loop passes the same budget pre-flight, prompt scrub and usage
+        metering as every other model call.
         """
-        if provider == "anthropic":
-            if stream:
-                return self._call_anthropic_streaming(model, api_key, system_prompt, messages, tools)
-            return self._call_anthropic(model, api_key, system_prompt, messages, tools)
-        else:
-            if stream:
-                return self._call_openai_streaming(model, api_key, system_prompt, messages, tools, base_url=base_url)
-            return self._call_openai(model, api_key, system_prompt, messages, tools, base_url=base_url)
+        from app.modules.ai_chat.services.llm_service_impl import LLMService
+        from flask import g
 
-    def _call_anthropic(self, model, api_key, system_prompt, messages, tools) -> dict:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=api_key, timeout=90.0)
-        max_tokens = 8192 if "sonnet" in model or "opus" in model else 4096
-
-        response = client.messages.create(
+        org_id = getattr(g, "current_org_id", None)
+        return LLMService._call_llm_with_tools(
+            provider=provider,
             model=model,
-            max_tokens=max_tokens,
-            system=[
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
+            api_key=api_key,
+            system_prompt=system_prompt,
             messages=messages,
             tools=tools,
-            tool_choice={"type": "auto"},
+            stream=stream,
+            base_url=base_url,
+            user_id=self.user_id,
+            org_id=org_id,
+            emit=self._emit if stream else None,
         )
-
-        text = None
-        tool_calls = []
-        for block in response.content:
-            if block.type == "tool_use":
-                tool_calls.append({
-                    "id": block.id,
-                    "name": block.name,
-                    "arguments": block.input,
-                })
-            elif block.type == "text":
-                text = block.text
-
-        return {"text": text, "tool_calls": tool_calls, "raw": response}
-
-    def _call_anthropic_streaming(self, model, api_key, system_prompt, messages, tools) -> dict:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=api_key, timeout=90.0)
-        max_tokens = 8192 if "sonnet" in model or "opus" in model else 4096
-
-        with client.messages.stream(
-            model=model,
-            max_tokens=max_tokens,
-            system=[
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=messages,
-            tools=tools,
-            tool_choice={"type": "auto"},
-        ) as stream:
-            for text in stream.text_stream:
-                self._emit({"type": "token", "text": text})
-            final = stream.get_final_message()
-
-        text = None
-        tool_calls = []
-        for block in final.content:
-            if block.type == "tool_use":
-                tool_calls.append({
-                    "id": block.id,
-                    "name": block.name,
-                    "arguments": block.input,
-                })
-            elif block.type == "text":
-                text = block.text
-
-        return {"text": text, "tool_calls": tool_calls, "raw": final}
-
-    def _call_openai(self, model, api_key, system_prompt, messages, tools, base_url=None) -> dict:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
-        full_messages = [{"role": "system", "content": system_prompt}] + messages
-
-        # Newer OpenAI models (o1, o3, gpt-5.x) require max_completion_tokens; all other models
-        # accept it too (it supersedes the deprecated max_tokens parameter).
-        _token_limit = 8192 if ("gpt-4" in model or "gpt-5" in model) else 4096
-        response = client.chat.completions.create(
-            model=model,
-            messages=full_messages,
-            tools=tools,
-            tool_choice="auto",
-            temperature=0.0,
-            max_completion_tokens=_token_limit,
-        )
-
-        msg = response.choices[0].message
-        tool_calls = []
-        if msg.tool_calls:
-            for tc in msg.tool_calls:
-                tool_calls.append({
-                    "id": tc.id,
-                    "name": tc.function.name,
-                    "arguments": json.loads(tc.function.arguments),
-                })
-
-        return {"text": msg.content, "tool_calls": tool_calls, "raw": response}
-
-    def _call_openai_streaming(self, model, api_key, system_prompt, messages, tools, base_url=None) -> dict:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
-        full_messages = [{"role": "system", "content": system_prompt}] + messages
-
-        text_acc = ""
-        tool_calls_acc: dict = {}
-
-        # Newer OpenAI models (o1, o3, gpt-5.x) require max_completion_tokens.
-        _token_limit = 8192 if ("gpt-4" in model or "gpt-5" in model) else 4096
-        with client.chat.completions.create(
-            model=model,
-            messages=full_messages,
-            tools=tools,
-            tool_choice="auto",
-            temperature=0.0,
-            max_completion_tokens=_token_limit,
-            stream=True,
-        ) as stream:
-            for chunk in stream:
-                delta = chunk.choices[0].delta
-                if delta.content:
-                    text_acc += delta.content
-                    self._emit({"type": "token", "text": delta.content})
-                if delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        idx = tc.index
-                        if idx not in tool_calls_acc:
-                            tool_calls_acc[idx] = {"id": "", "name": "", "arguments": ""}
-                        if tc.id:
-                            tool_calls_acc[idx]["id"] = tc.id
-                        if tc.function and tc.function.name:
-                            tool_calls_acc[idx]["name"] += tc.function.name
-                        if tc.function and tc.function.arguments:
-                            tool_calls_acc[idx]["arguments"] += tc.function.arguments
-
-        tool_calls = []
-        for idx in sorted(tool_calls_acc.keys()):
-            tc = tool_calls_acc[idx]
-            try:
-                arguments = json.loads(tc["arguments"]) if tc["arguments"] else {}
-            except json.JSONDecodeError:
-                arguments = {}
-            tool_calls.append({"id": tc["id"], "name": tc["name"], "arguments": arguments})
-
-        return {"text": text_acc or None, "tool_calls": tool_calls, "raw": None}
 
     # ------------------------------------------------------------------ #
     # Message history management                                          #
@@ -971,20 +849,12 @@ class AgentRunner:
     def _should_queue(schema: dict, auto_execute: bool) -> bool:
         """True if a tool call must be queued for confirmation, not executed now.
 
-        Two independent reasons, either one is sufficient:
+        Every write tool queues an approval row regardless of the auto-execute
+        setting.  Two independent reasons, either one is sufficient:
           - tier == "approve": always queued. These are destructive/significant
-            regardless of the write-approval gate, and unaffected by
-            auto_execute either way (update_application_status,
-            submit_for_arb_review, generate_blueprint_narrative).
-          - mutates is True and auto_execute is False: the write-approval gate
-            itself. A read tool (mutates False, e.g. find_applications,
-            query_capability_gaps) is never queued by this rule - gating reads
-            would put every search behind a confirmation prompt, which is the
-            failure mode toggle_auto_execute's docstring warned against before
-            'mutates' existed on the registry.
-
-        Pure and schema-driven so it can be exhaustively unit-tested without a
-        DB, an LLM, or a Flask request/session.
+            regardless of the write-approval gate.
+          - mutates is True: always queued.  No write tool runs without an
+            approval row until the founder decides otherwise.
 
         Fails CLOSED on an unclassified tool. TOOL_SCHEMA_BY_NAME.get(name, {})
         in the run loop below hands this {} for any tool name the registry does
@@ -1001,7 +871,7 @@ class AgentRunner:
         mutates = schema.get("mutates")
         if mutates is None:
             return True
-        return bool(mutates) and not auto_execute
+        return bool(mutates)
 
     def _queue_approval(self, tc: "ToolCall") -> int:
         """Write a pending AIChatCRUDApproval record and return its ID."""
