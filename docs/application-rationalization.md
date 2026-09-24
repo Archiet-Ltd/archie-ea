@@ -92,9 +92,9 @@ framework can rationalize on data that doesn't exist.
 - **Big-bang scope** — rationalize a domain at a time and show wins.
 - **No capability map** — without it, you can't see redundancy, which is the biggest prize.
 
-## How Archie helps (optional)
+## How Entelim helps (optional)
 
-[Archie](https://github.com/Anioko/archie-ea) maintains the application portfolio,
+[Entelim](https://github.com/Anioko/archie-ea) maintains the application portfolio,
 capability mappings, and dependencies in one model, so disposition scoring and
 duplicate-detection run against live data rather than a stale spreadsheet — and the
 resulting changes flow through the same ARB governance workflow.

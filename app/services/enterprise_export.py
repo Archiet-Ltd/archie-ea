@@ -180,7 +180,7 @@ class EnterpriseExportService:
             '       xsi:schemaLocation="http://www.opengroup.org/xsd/archimate/3.0/ http://www.opengroup.org/xsd/archimate/3_1/archimate3_Diagram.xsd"',
             f'       identifier="archie-export-{datetime.utcnow().strftime("%Y%m%d-%H%M%S")}"',
             '       version="3.2">',
-            '  <name>A.R.C.H.I.E. Architecture Export</name>',
+            '  <name>Entelim Architecture Export</name>',
             '  <elements>'
         ]
         

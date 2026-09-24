@@ -1,13 +1,13 @@
-# Archie
+# Entelim
 
-> Archie is an open-source, AI-native enterprise architecture platform for TOGAF 9.2
+> Entelim is an open-source, AI-native enterprise architecture platform for TOGAF 9.2
 > and ArchiMate 3.2. It models an application portfolio, runs an AI-assisted
 > solution-design journey, and governs designs through an Architecture Review Board
 > (ARB). Self-hosted Flask and PostgreSQL, AGPL-3.0, with a commercial licence
 > available.
 
 Not to be confused with **Archi** (archimatetool.com), a desktop ArchiMate *diagram*
-editor. Archie is a multi-user web platform: portfolio, capabilities, value streams,
+editor. Entelim is a multi-user web platform: portfolio, capabilities, value streams,
 vendors, an ARB workflow and an AI architect. People searching for an open-source
 LeanIX or Ardoq alternative are usually looking for this category.
 

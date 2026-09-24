@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Record the persona-driven demo walkthrough (see docs/demo-script.md).
 
-Drives a running, seeded Archie instance with Playwright's record_video and
+Drives a running, seeded Entelim instance with Playwright's record_video and
 injects an on-screen caption bar (persona + action), chapter title cards and a
 synthetic cursor (Playwright's video can't capture the OS cursor).
 
@@ -148,7 +148,7 @@ def main():
 
         try:
             goto("/", 1200)
-            title("A.R.C.H.I.E.", "Open-source, AI-native enterprise architecture<br>TOGAF 9.2 &middot; ArchiMate 3.2 &middot; AGPL-3.0", 3200)
+            title("Entelim", "Open-source, AI-native enterprise architecture<br>TOGAF 9.2 &middot; ArchiMate 3.2 &middot; AGPL-3.0", 3200)
             cap("Get started", "Self-host the whole platform with one docker compose up")
             wander([(500, 420), (900, 480)])
             page.goto(BASE + "/account/login", wait_until="domcontentloaded")

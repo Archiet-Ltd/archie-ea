@@ -1,5 +1,5 @@
 """
-A.R.C.H.I.E. Production Gunicorn Configuration (S2-03)
+Entelim Production Gunicorn Configuration (S2-03)
 
 Usage:
     gunicorn -c gunicorn.conf.py manage:app
@@ -86,7 +86,7 @@ limit_request_field_size = 8190
 
 def on_starting(server):
     """Called just before the master process is initialized."""
-    server.log.info("A.R.C.H.I.E. starting with %d workers", server.app.cfg.workers)
+    server.log.info("Entelim starting with %d workers", server.app.cfg.workers)
 
 
 def _rss_mb() -> "float | None":

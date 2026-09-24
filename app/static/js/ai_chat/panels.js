@@ -388,7 +388,7 @@
         const contextEl = document.getElementById('domain-context');
         const descEl = document.getElementById('context-description');
         const lines = [
-            'A.R.C.H.I.E. Context Log',
+            'Entelim Context Log',
             'Exported: ' + new Date().toISOString(),
             '---',
             'Domain: ' + (document.getElementById('domain-selector')?.value || 'global'),

@@ -6,7 +6,7 @@ Open Exchange (OEF) export uses — into one more interchange format:
 
 * Mermaid     — a ``flowchart`` for markdown / wikis / PRs.
 * Lucidchart  — a native ``.lucid`` ZIP (document.json in Lucid Standard Import
-                format) that re-opens in Lucid AND round-trips back into ARCHIE.
+                format) that re-opens in Lucid AND round-trips back into Entelim.
 * Archi       — the Archi tool's native ``.archimate`` model XML.
 
 All three preserve element names, ArchiMate types, relationships, and (where the
@@ -173,7 +173,7 @@ def to_lucid_document(vp: Dict[str, Any]) -> Dict[str, Any]:
 
     document = {
         "version": 1,
-        "title": vp.get("viewpoint_name", "ARCHIE Export"),
+        "title": vp.get("viewpoint_name", "Entelim Export"),
         "product": "lucidchart",
         "pages": [{
             "id": "page-1",
@@ -235,7 +235,7 @@ def to_archi(vp: Dict[str, Any]) -> str:
             f"{{{_XSI_NS}}}schemaLocation": (
                 f"{_ARCHI_NS} http://www.archimatetool.com/archimate/archimate.xsd"
             ),
-            "name": vp.get("viewpoint_name", "ARCHIE Model"),
+            "name": vp.get("viewpoint_name", "Entelim Model"),
             "id": "model-1",
             "version": "5.0.0",
         },

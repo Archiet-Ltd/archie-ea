@@ -45,7 +45,7 @@ def _init_stripe() -> None:
 from app import db
 
 class BillingService:
-    """Stripe billing operations for A.R.C.H.I.E. organizations."""
+    """Stripe billing operations for Entelim organizations."""
 
     # Price IDs map — override via env vars or extend for live keys
     PLAN_PRICE_IDS = {

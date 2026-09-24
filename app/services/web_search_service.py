@@ -33,7 +33,7 @@ def search_context(question: str, max_results: int = 3) -> List[Dict]:
             "https://api.duckduckgo.com/",
             params={"q": query, "format": "json", "no_html": "1", "skip_disambig": "1"},
             timeout=5,
-            headers={"User-Agent": "ARCHIE-EA-Platform/1.0"},
+            headers={"User-Agent": "Entelim-Platform/1.0"},
         )
         if resp.status_code == 200:
             data = resp.json()

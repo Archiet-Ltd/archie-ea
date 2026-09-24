@@ -101,7 +101,7 @@ class TOGAFDeliverableExportService:
 
     def _build_branded_header(self, elements, styles, title, phase_label, timestamp):
         """Add branded title page elements."""
-        elements.append(Paragraph("A.R.C.H.I.E.", styles["BrandTitle"]))
+        elements.append(Paragraph("Entelim", styles["BrandTitle"]))
         elements.append(
             Paragraph(
                 f"Enterprise Architecture Platform — {phase_label}",
@@ -123,7 +123,7 @@ class TOGAFDeliverableExportService:
         elements.append(Spacer(1, 30))
         elements.append(
             Paragraph(
-                f"<i>{CONFIDENTIALITY_NOTICE} | A.R.C.H.I.E. Platform</i>",
+                f"<i>{CONFIDENTIALITY_NOTICE} | Entelim Platform</i>",
                 ParagraphStyle(
                     "Footer",
                     parent=styles["Normal"],

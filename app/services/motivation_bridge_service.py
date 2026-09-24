@@ -1,7 +1,7 @@
 """
 Motivation Bridge Service
 
-Bridges the two disconnected motivation-layer worlds in Archie:
+Bridges the two disconnected motivation-layer worlds in Entelim:
 
   1. Enterprise motivation entities (Driver, Goal, Outcome, Principle) that
      live in app/models/motivation.py + app/models/models.py, auto-feed the

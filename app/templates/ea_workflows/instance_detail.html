@@ -2298,7 +2298,7 @@ function deliverablesPanel() {
             const blob = new Blob([JSON.stringify(_wfRunData, null, 2)], { type: 'application/json' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `archie-review-${_wfRunData.id}.json`;
+            a.download = `entelim-review-${_wfRunData.id}.json`;
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
         },
         exportCSV() {
@@ -2309,7 +2309,7 @@ function deliverablesPanel() {
             const blob = new Blob([rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')], { type: 'text/csv' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `archie-review-${_wfRunData.id}.csv`;
+            a.download = `entelim-review-${_wfRunData.id}.csv`;
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
         },
         copyShareLink() {

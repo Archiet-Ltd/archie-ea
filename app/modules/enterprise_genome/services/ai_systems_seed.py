@@ -5,7 +5,7 @@ An AI system *is* an ``ArchiMateElement`` (CLAUDE.md: "the field IS the element"
 in ``custom_properties['ai_system']`` — idempotent on name, so re-seeding an
 existing org updates the profile in place rather than duplicating it.
 
-``seed_archie_copilot`` models Archie's OWN AI copilot, honestly:
+``seed_archie_copilot`` models Entelim's OWN AI copilot, honestly:
 
   * provider/model come from ``DEFAULT_MODELS['anthropic']`` — the same default
     the copilot itself falls back to — not an aspirational guess;
@@ -34,7 +34,7 @@ from .ai_system_profile import (
     build_custom_properties,
 )
 
-ARCHIE_COPILOT_NAME = "Archie AI Copilot"
+ARCHIE_COPILOT_NAME = "Entelim AI Copilot"
 
 
 def register_ai_system(
@@ -98,7 +98,7 @@ def register_ai_system(
 
 
 def seed_archie_copilot(session, org_id: int):
-    """Model Archie's own AI copilot as a governed, human-in-loop AI system."""
+    """Model Entelim's own AI copilot as a governed, human-in-loop AI system."""
     return register_ai_system(
         session,
         org_id,

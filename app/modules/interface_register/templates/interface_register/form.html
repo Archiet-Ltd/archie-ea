@@ -1,7 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 
-{% block title %}{% if interface %}Edit {{ interface.name }}{% else %}New interface{% endif %} — A.R.C.H.I.E.{% endblock %}
+{% block title %}{% if interface %}Edit {{ interface.name }}{% else %}New interface{% endif %} — {{ config.APP_NAME }}{% endblock %}
 
 {% block content %}
 <div class="flex-1 overflow-auto p-6" x-data="interfaceComponentPicker()">

@@ -227,7 +227,7 @@ td {{ padding: 8px 12px; border: 1px solid #e2e8f0; }}
             html += f"<tr><td>{escape(app.name)}</td><td>{score.overall_health_score}</td><td>{score.disposition_action or '—'}</td><td>{float(score.estimated_annual_savings or 0):,.0f}</td></tr>\n"
 
         html += f"""</table>
-<div class="footer">Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')} by A.R.C.H.I.E. Platform</div>
+<div class="footer">Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')} by Entelim Platform</div>
 </body></html>"""
 
         return html.encode("utf-8")

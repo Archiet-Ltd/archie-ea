@@ -374,7 +374,7 @@ class GenomePerfectorService:
             if isinstance(bb, dict):
                 build_buy_summary += f"  - {bb.get('element', '')}: {bb.get('build_buy', '')}\n"
 
-        return f"""You are a senior enterprise solution architect perfecting an Architectural Genome JSON before code generation on the A.R.C.H.I.E. platform. Your job is to ensure every section is complete enough to generate production-grade code.
+        return f"""You are a senior enterprise solution architect perfecting an Architectural Genome JSON before code generation on the Entelim platform. Your job is to ensure every section is complete enough to generate production-grade code.
 
 RULES:
 1. NEVER remove or contradict user-confirmed values

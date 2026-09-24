@@ -1,10 +1,10 @@
 @echo off
-REM A.R.C.H.I.E. Platform - Quick Start Script for Windows
+REM Entelim Platform - Quick Start Script for Windows
 REM ========================================================
 
 echo.
 echo ===============================================
-echo  A.R.C.H.I.E. Platform - Starting...
+echo  Entelim Platform - Starting...
 echo ===============================================
 echo.
 

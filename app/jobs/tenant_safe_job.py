@@ -2,7 +2,7 @@
 
 WHY THIS FILE EXISTS
 ====================
-Multi-tenancy in Archie is enforced *implicitly*, by two SQLAlchemy event
+Multi-tenancy in Entelim is enforced *implicitly*, by two SQLAlchemy event
 listeners in ``app/middleware/tenant_isolation.py`` that key off
 ``flask.g.current_org_id``:
 

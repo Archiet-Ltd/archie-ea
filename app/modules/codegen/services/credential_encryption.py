@@ -1,4 +1,4 @@
-"""Fernet symmetric encryption for credentials stored in ARCHIE's database.
+"""Fernet symmetric encryption for credentials stored in Entelim's database.
 
 Used by:
 - SolutionInstance.database_url_encrypted (Phase 1)

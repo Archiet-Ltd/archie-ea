@@ -79,7 +79,7 @@ class WorkflowToN8nCompiler:
                     connections[from_name]["main"][0].append({"node": to_name})
 
         return {
-            "name": workflow_def.get("name", "ARCHIE Workflow"),
+            "name": workflow_def.get("name", "Entelim Workflow"),
             "nodes": nodes,
             "connections": connections,
             "settings": {"executionOrder": "v1"},

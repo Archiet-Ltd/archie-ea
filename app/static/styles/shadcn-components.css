@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   shadcn-components.css — Global component normalization for A.R.C.H.I.E.
+   shadcn-components.css — Global component normalization for Entelim
 
    - Scoped to #main-content for tables (avoids sidebar/header conflicts)
    - Uses only CSS custom properties from shadcn_tokens.css (never raw colours)

@@ -3808,7 +3808,7 @@ def power_platform_discover():
         row.jira_url or "", row.jira_email or "", row.api_key or ""
     )
 
-    # Annotate with ARCHIE link status
+    # Annotate with Entelim link status
     linked_ids = {
         r.source_identifier
         for r in ApplicationComponent.query.filter(

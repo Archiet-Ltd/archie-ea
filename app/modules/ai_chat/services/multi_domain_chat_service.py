@@ -6267,7 +6267,7 @@ Instructions:
                     f"{portfolio.get('total_vendors', 0)} vendors\n"
                 )
 
-            prompt = f"""You are an Intelligent Search Assistant for an Enterprise Architecture platform (A.R.C.H.I.E.).
+            prompt = f"""You are an Intelligent Search Assistant for an Enterprise Architecture platform (Entelim).
 The user is searching for information across the organisation's architecture portfolio.
 
 USER SEARCH QUERY: {message}
@@ -6366,7 +6366,7 @@ Instructions:
 
             # Build a system instruction mentioning the attached diagram
             system_instruction = (
-                "You are A.R.C.H.I.E., an AI Architecture Assistant specialising in "
+                "You are Entelim, an AI Architecture Assistant specialising in "
                 "enterprise architecture (TOGAF 9.2, ArchiMate 3.2). "
                 "The user has attached an architecture diagram for analysis. "
                 "Describe the diagram contents, identify architectural elements, "
@@ -6595,7 +6595,7 @@ Instructions:
                     if _apps:
                         blast_radius_block = self._compute_capability_blast_radius(_apps[0])
 
-            prompt = f"""You are A.R.C.H.I.E., an AI Architecture Assistant for Enterprise Architecture. You have deep knowledge of TOGAF, ArchiMate 3.2, and the organisation's live portfolio data.
+            prompt = f"""You are Entelim, an AI Architecture Assistant for Enterprise Architecture. You have deep knowledge of TOGAF, ArchiMate 3.2, and the organisation's live portfolio data.
 
 USER QUESTION: {message}
 

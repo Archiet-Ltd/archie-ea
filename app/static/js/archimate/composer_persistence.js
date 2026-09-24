@@ -989,7 +989,7 @@ let ComposerPersistence = (function() {
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = '10px Inter, sans-serif';
                 ctx.textAlign = 'right';
-                ctx.fillText('A.R.C.H.I.E.', vw - 12, vh + titleHeight + 12);
+                ctx.fillText('Entelim', vw - 12, vh + titleHeight + 12);
 
                 canvas.toBlob(function(pngBlob) {
                     let a = document.createElement('a');
@@ -1127,7 +1127,7 @@ let ComposerPersistence = (function() {
 
                     doc.setFontSize(8);
                     doc.setTextColor(148, 163, 184);
-                    doc.text('A.R.C.H.I.E.', margin, footerTop + 4);
+                    doc.text('Entelim', margin, footerTop + 4);
                     doc.text(
                         'Elements: ' + self.graph.getElements().length +
                         '   Relationships: ' + self.graph.getLinks().length,
@@ -1446,7 +1446,7 @@ let ComposerPersistence = (function() {
 
             try {
                 let pptx = new PptxGenJS();
-                pptx.author = 'A.R.C.H.I.E.';
+                pptx.author = 'Entelim';
                 pptx.company = 'Enterprise Architecture';
                 pptx.subject = self.activeViewpointName || 'Architecture Diagram';
                 pptx.title = self.activeViewpointName || 'Architecture Diagram';
@@ -1502,7 +1502,7 @@ let ComposerPersistence = (function() {
                     x: 0.8, y: 3.0, w: 8.4, h: 1.8, valign: 'top', paraSpaceAfter: 6,
                 });
                 /* Branding */
-                slide1.addText('A.R.C.H.I.E. Enterprise Architecture Platform', {
+                slide1.addText('Entelim Enterprise Architecture Platform', {
                     x: 0.8, y: 4.9, w: 8.4, h: 0.4,
                     fontSize: 10, color: '94A3B8', fontFace: 'Segoe UI',
                 });
@@ -1910,7 +1910,7 @@ let ComposerPersistence = (function() {
                 let col = i % cols;
                 let row = Math.floor(i / cols);
                 // Prefer the source layout when the export carried geometry
-                // (Standard Import boundingBox / ARCHIE round-trip); otherwise
+                // (Standard Import boundingBox / Entelim round-trip); otherwise
                 // fall back to a grid (auto-arranged below when relationships exist).
                 let hasGeom = Number.isFinite(el.x) && Number.isFinite(el.y);
                 let x = hasGeom ? el.x : 40 + col * 240;
@@ -1995,7 +1995,7 @@ let ComposerPersistence = (function() {
                 _toast(
                     'warning',
                     usedHierarchicalLayout
-                        ? 'Layout fidelity warning: Lucidchart geometry was unavailable, so ARCHIE applied a hierarchical flow layout.'
+                        ? 'Layout fidelity warning: Lucidchart geometry was unavailable, so Entelim applied a hierarchical flow layout.'
                         : 'Layout fidelity warning: Lucidchart geometry was unavailable, so imported content was auto-arranged.'
                 );
                 self.statusText = lucidNotationPreserved
@@ -2100,7 +2100,7 @@ let ComposerPersistence = (function() {
                 refs.warningList.innerHTML = '';
                 if (!warnings.length) {
                     let okItem = document.createElement('li');
-                    okItem.textContent = 'ARCHIE imported the diagram without unresolved warnings.';
+                    okItem.textContent = 'Entelim imported the diagram without unresolved warnings.';
                     refs.warningList.appendChild(okItem);
                 } else {
                     warnings.forEach(function(warning) {
@@ -2252,7 +2252,7 @@ let ComposerPersistence = (function() {
             let self = this;
             let refs = self._lucidchartModalRefs();
             if (!refs.status || !refs.list) return;
-            self._setLucidchartStatus('loading', 'Checking workspace connection', 'ARCHIE is loading Lucidchart documents for this organization.');
+            self._setLucidchartStatus('loading', 'Checking workspace connection', 'Entelim is loading Lucidchart documents for this organization.');
             refs.authHint && refs.authHint.classList.add('hidden');
             refs.list.innerHTML = '<div class="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">Loading workspace documents…</div>';
 
@@ -2268,7 +2268,7 @@ let ComposerPersistence = (function() {
                 self._renderLucidchartDocuments(data.documents || []);
             })
             .catch(function(err) {
-                self._setLucidchartStatus('error', 'Workspace load failed', 'ARCHIE could not load Lucidchart documents right now.');
+                self._setLucidchartStatus('error', 'Workspace load failed', 'Entelim could not load Lucidchart documents right now.');
                 _toast('error', (err && err.data && err.data.error) || ('Lucidchart load error: ' + (err.message || '')));
             });
         },
@@ -2293,7 +2293,7 @@ let ComposerPersistence = (function() {
             let refs = self._lucidchartModalRefs();
             self._setLucidchartBusy(true);
             self._resetLucidchartImportSummary();
-            self._setLucidchartStatus('loading', 'Importing workspace document', 'ARCHIE is converting the selected Lucidchart document into the composer canvas.');
+            self._setLucidchartStatus('loading', 'Importing workspace document', 'Entelim is converting the selected Lucidchart document into the composer canvas.');
             Platform.fetch.post('/archimate/api/lucidchart/import/' + encodeURIComponent(documentId), null, { silent: true })
             .then(function(data) {
                 if (data.needs_auth) {
@@ -2309,7 +2309,7 @@ let ComposerPersistence = (function() {
                 self._setLucidchartBusy(false);
             })
             .catch(function(err) {
-                self._setLucidchartStatus('error', 'Workspace import failed', 'ARCHIE could not import the selected Lucidchart document.');
+                self._setLucidchartStatus('error', 'Workspace import failed', 'Entelim could not import the selected Lucidchart document.');
                 _toast('error', (err && err.data && err.data.error) || ('Lucidchart import error: ' + (err.message || '')));
                 self._setLucidchartBusy(false);
             });
@@ -2327,7 +2327,7 @@ let ComposerPersistence = (function() {
 
             self._setLucidchartBusy(true);
             self._resetLucidchartImportSummary();
-            self._setLucidchartStatus('loading', 'Uploading Lucid export', 'ARCHIE is converting the selected export into the composer canvas.');
+            self._setLucidchartStatus('loading', 'Uploading Lucid export', 'Entelim is converting the selected export into the composer canvas.');
 
             let formData = new FormData();
             formData.append('file', file);
@@ -2342,7 +2342,7 @@ let ComposerPersistence = (function() {
                 self._setLucidchartBusy(false);
             })
             .catch(function(err) {
-                self._setLucidchartStatus('error', 'Upload import failed', 'ARCHIE could not import the selected Lucid export.');
+                self._setLucidchartStatus('error', 'Upload import failed', 'Entelim could not import the selected Lucid export.');
                 _toast('error', (err && err.data && err.data.error) || ('Lucidchart upload error: ' + (err.message || '')));
                 self._setLucidchartBusy(false);
             });

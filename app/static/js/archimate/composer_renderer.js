@@ -840,8 +840,8 @@ let ComposerRenderer = (function() {
         else                               { ShapeClass = joint.shapes.archimate.Node; }
 
         /* 17 Aug 2026 composer skin request: the accent stripe and translucent
-           icon backing box are Archie's own "SaaS card" polish, not part of the
-           ArchiMate 3.2 visual notation — real Archi/BiZZdesign/Sparx renders
+           icon backing box are Entelim's own "SaaS card" polish, not part of the
+           ArchiMate 3.2 visual notation — real ArchiMate editor renders
            are a single flat-coloured element with a crisp border and the type
            icon sitting directly on the fill. accentBar is hidden (opacity 0,
            not removed from markup, to avoid touching 5 shapes' selector lists);

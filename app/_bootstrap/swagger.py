@@ -53,7 +53,7 @@ def init_swagger(app):
         "swagger_ui": True,
         "specs_route": "/apidocs/",
         "validation": False,
-        "title": "A.R.C.H.I.E. Enterprise Architecture API",
+        "title": "Entelim Enterprise Architecture API",
         "description": "RESTful API for TOGAF 9.2 / ArchiMate 3.2 Enterprise Architecture Management",
         "version": "1.0.0",
         "contact": {"name": "API Support", "email": "support@example.com"},
@@ -62,7 +62,7 @@ def init_swagger(app):
     swagger_template = {
         "swagger": "2.0",
         "info": {
-            "title": "A.R.C.H.I.E. Enterprise Architecture API",
+            "title": "Entelim Enterprise Architecture API",
             "description": "RESTful API for TOGAF 9.2 / ArchiMate 3.2 Enterprise Architecture Management",
             "version": "1.0.0",
             "contact": {"name": "API Support", "email": "support@example.com"},

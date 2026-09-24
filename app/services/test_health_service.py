@@ -437,7 +437,7 @@ class TestAlertService:
                             'short': True
                         }
                     ],
-                    'footer': 'ARCHIE Test Health Dashboard',
+                    'footer': 'Entelim Test Health Dashboard',
                     'ts': int(datetime.utcnow().timestamp())
                 }]
             }

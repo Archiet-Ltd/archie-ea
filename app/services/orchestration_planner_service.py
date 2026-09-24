@@ -6,7 +6,7 @@ with explicit phase gating and rollback signals. Converts a goal statement into
 a step-by-step execution plan grounded in the current platform state.
 
 Design philosophy:
-  - Each step is a concrete ARCHIE tool call or manual action.
+  - Each step is a concrete Entelim tool call or manual action.
   - Dependencies are explicit: step N cannot start until step N-1 criteria pass.
   - Plan is persisted as solution metadata for re-entry across sessions.
   - Phase gates check real DB state, not assumptions.
@@ -24,7 +24,7 @@ class PlanStep:
     step_number: int
     title: str
     description: str
-    tool_call: Optional[str] = None  # Name of ARCHIE tool to invoke
+    tool_call: Optional[str] = None  # Name of Entelim tool to invoke
     tool_args_template: Optional[dict] = None
     depends_on: List[int] = field(default_factory=list)
     gate_check: str = ""  # SQL/condition description to verify completion
@@ -117,7 +117,7 @@ class OrchestrationPlannerService:
                 gate_check="At least one finding in the scan report OR clean-core score confirmed",
                 phase="A", estimated_effort="low"),
             PlanStep(3, "Create SAP RISE Transformation Programme",
-                "Create a programme in ARCHIE to track all SAP clean-core remediation work.",
+                "Create a programme in Entelim to track all SAP clean-core remediation work.",
                 tool_call="create_solution",
                 tool_args_template={"name": "SAP RISE Clean-Core Remediation", "solution_type": "Migration",
                                     "business_domain": "technology"},
@@ -202,7 +202,7 @@ class OrchestrationPlannerService:
     def _plan_solution_design(self, goal: str, solution_id: Optional[int]) -> tuple:
         steps = [
             PlanStep(1, "Create Solution Record",
-                "Create the solution in ARCHIE with name, domain, and type.",
+                "Create the solution in Entelim with name, domain, and type.",
                 tool_call="create_solution",
                 gate_check="Solution created and has an ID",
                 phase="A", estimated_effort="low"),
@@ -298,7 +298,7 @@ class OrchestrationPlannerService:
     def _plan_programme_setup(self, goal: str, solution_id: Optional[int]) -> tuple:
         steps = [
             PlanStep(1, "Create Programme Record",
-                "Create the transformation programme in ARCHIE.",
+                "Create the transformation programme in Entelim.",
                 tool_call="create_solution",
                 tool_args_template={"solution_type": "Platform"},
                 gate_check="Programme record created",

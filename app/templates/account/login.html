@@ -34,7 +34,7 @@
 
 {# Split-screen login: branded panel (left) + credential form (right).
    No second <main> landmark — public_base.html already provides one.
-   Brand-panel colours come from the scoped <style> block below: ARCHIE's
+   Brand-panel colours come from the scoped <style> block below: Entelim's
    purged Tailwind build does NOT include slate-950 / these slate shades,
    so relying on those utility classes rendered the panel white-on-white. #}
 <div class="grid min-h-screen lg:grid-cols-2" aria-labelledby="login-title">
@@ -50,7 +50,7 @@
                 <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                     <i data-lucide="layout-grid" class="h-5 w-5"></i>
                 </span>
-                <span class="login-brand__wordmark text-lg font-bold tracking-[0.18em]">A.R.C.H.I.E.</span>
+                <span class="login-brand__wordmark text-lg font-bold tracking-[0.18em]">Entelim</span>
             </div>
         </div>
 
@@ -81,7 +81,7 @@
                 <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                     <i data-lucide="layout-grid" class="h-4 w-4"></i>
                 </span>
-                <span class="text-base font-bold tracking-[0.18em] text-foreground">A.R.C.H.I.E.</span>
+                <span class="text-base font-bold tracking-[0.18em] text-foreground">Entelim</span>
             </div>
 
             <div class="rounded-xl border bg-card text-card-foreground shadow-sm">

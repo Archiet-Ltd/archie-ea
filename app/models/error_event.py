@@ -1,6 +1,6 @@
 """ErrorEvent — aggregated server + client error telemetry.
 
-Archie had zero error-tracking of any kind before this: a WARNING/ERROR log
+Entelim had zero error-tracking of any kind before this: a WARNING/ERROR log
 line went to stdout and nowhere else, and a JS exception in a user's browser
 was invisible unless that user reported it. Silent degradation (a route
 raising for every caller, a JS bug breaking one persona's page) had no signal

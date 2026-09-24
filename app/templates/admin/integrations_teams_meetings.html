@@ -7,7 +7,7 @@
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
     {{ page_header(
         title='Teams Meeting Intelligence',
-        description='Subscribe to Microsoft Teams meeting transcripts via Graph API. A.R.C.H.I.E. analyses transcripts after meetings end and creates governance signals from architectural decisions and risks.',
+        description='Subscribe to Microsoft Teams meeting transcripts via Graph API. Entelim analyses transcripts after meetings end and creates governance signals from architectural decisions and risks.',
         breadcrumbs=[
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Admin', 'href': url_for('admin.index')},
@@ -144,7 +144,7 @@
         <div class="px-6 py-5">
             <ol class="space-y-3 text-sm text-muted-foreground list-decimal list-inside">
                 <li>A Teams meeting ends — Microsoft Graph fires a <code class="text-xs bg-muted px-1 py-0.5 rounded">callRecord</code> change notification to the Notification URL above.</li>
-                <li>A.R.C.H.I.E. fetches the meeting transcript via Graph API (<code class="text-xs bg-muted px-1 py-0.5 rounded">OnlineMeetingTranscript.Read.All</code>).</li>
+                <li>Entelim fetches the meeting transcript via Graph API (<code class="text-xs bg-muted px-1 py-0.5 rounded">OnlineMeetingTranscript.Read.All</code>).</li>
                 <li>The AI Architect analyses the transcript against the live portfolio (850+ apps) and extracts: architectural decisions, application names, risk mentions, and follow-up actions.</li>
                 <li>Findings are pushed as in-app notifications to enterprise architects and platform admins — no polling required.</li>
             </ol>

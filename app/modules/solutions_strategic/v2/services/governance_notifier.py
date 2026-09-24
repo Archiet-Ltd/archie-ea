@@ -154,12 +154,12 @@ class GovernanceNotifier:
             html = (
                 f"<h2>{escape(source_label)}: {len(flagged)} finding(s) need attention</h2>"
                 f"<ul>{items}</ul>"  # raw-html-ok: items is built entirely from escape()'d parts above
-                f"<p><a href=\"{escape(url)}\">Open in A.R.C.H.I.E.</a></p>"
+                f"<p><a href=\"{escape(url)}\">Open in Entelim</a></p>"
             )
             # degrades to logging if SMTP is unconfigured — never raises
             return bool(_safe_send_email(
                 current_app._get_current_object(),
-                f"[A.R.C.H.I.E.] {source_label}: {len(flagged)} finding(s) need attention",
+                f"[Entelim] {source_label}: {len(flagged)} finding(s) need attention",
                 recipients, html,
             ))
         except Exception as exc:

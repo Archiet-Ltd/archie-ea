@@ -200,9 +200,9 @@ function workflowDesigner() {
         /* Platform.fetch (core/03-fetch.js) is this application's HTTP wrapper:
            it returns the PARSED body, serialises a plain-object body, injects
            CSRF, and rejects on a non-ok response. The previous code called
-           `ARCHIE.fetch`/`ARCHIE.toast` — no such global has ever existed in
+           `Entelim.fetch`/`Entelim.toast` — no such global has ever existed in
            this codebase — so every request and every toast on this page threw
-           "ARCHIE is not defined" and the designer could not load templates,
+           "Entelim is not defined" and the designer could not load templates,
            save, or compile. */
         _loadTemplates: function() {
             let self = this;

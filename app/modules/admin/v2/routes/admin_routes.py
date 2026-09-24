@@ -5732,7 +5732,7 @@ def power_platform_discover():
     client_secret = row.api_key or ""
     apps = PowerPlatformCoeService.discover_apps(tenant_id, client_id, client_secret)
 
-    # Annotate with ARCHIE link status (same as v1)
+    # Annotate with Entelim link status (same as v1)
     from app.models.application_portfolio import ApplicationComponent
     linked_ids = {
         r.source_identifier

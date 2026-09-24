@@ -7,7 +7,7 @@
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8" x-data="salesforceIntegration()">
     {{ page_header(
         title='Salesforce Org Discovery',
-        description='Scan a Salesforce org for Lightning apps and installed AppExchange packages, and import them into the ARCHIE application portfolio — optionally straight into a Transformation Programme baseline.',
+        description='Scan a Salesforce org for Lightning apps and installed AppExchange packages, and import them into the Entelim application portfolio — optionally straight into a Transformation Programme baseline.',
         breadcrumbs=[
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Admin', 'href': url_for('admin.index')},
@@ -84,7 +84,7 @@
 
         <div x-cloak x-show="discovered.length" class="px-6 py-4 grid grid-cols-3 gap-4 border-b border-border">
             <div><p class="text-xs text-muted-foreground uppercase">Total found</p><p class="text-xl font-bold" x-text="stats.total"></p></div>
-            <div><p class="text-xs text-muted-foreground uppercase">Already in ARCHIE</p><p class="text-xl font-bold" x-text="stats.linked"></p></div>
+            <div><p class="text-xs text-muted-foreground uppercase">Already in Entelim</p><p class="text-xl font-bold" x-text="stats.linked"></p></div>
             <div><p class="text-xs text-muted-foreground uppercase">Ungoverned</p><p class="text-xl font-bold text-warning" x-text="stats.ungoverned"></p></div>
         </div>
 
@@ -109,7 +109,7 @@
                             <td class="px-4 py-2">
                                 <span :class="a.status === 'linked' ? 'bg-success/10 text-success-emphasis border-success/30' : 'bg-muted text-muted-foreground border-border'"
                                       class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"
-                                      x-text="a.status === 'linked' ? 'In ARCHIE' : 'Unregistered'"></span>
+                                      x-text="a.status === 'linked' ? 'In Entelim' : 'Unregistered'"></span>
                             </td>
                         </tr>
                     </template>
@@ -210,7 +210,7 @@
                     });
                     if (!ok) { this._notify('error', d.error || 'Import failed'); return; }
                     this._notify('ok',
-                        'Imported ' + d.imported + ' · already in ARCHIE ' + d.already_exists +
+                        'Imported ' + d.imported + ' · already in Entelim ' + d.already_exists +
                         ' · failed ' + d.failed +
                         (d.linked_to_programme ? (' · linked to programme ' + d.linked_to_programme) : ''));
                     await this.discover();

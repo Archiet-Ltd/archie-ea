@@ -36,7 +36,7 @@ def _refresh_token_on_401(method):
 
 
 class ServiceNowConnectorService:
-    """Bidirectional connector between A.R.C.H.I.E. and a ServiceNow instance."""
+    """Bidirectional connector between Entelim and a ServiceNow instance."""
 
     def __init__(self):
         self._token: str | None = None

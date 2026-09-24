@@ -20,7 +20,7 @@ from typing import Dict, List, Optional
 
 # rapidfuzz (MIT), not fuzzywuzzy (GPL-2.0-only). fuzzywuzzy and its
 # python-Levenshtein speedup are GPL-2.0, which cannot be sublicensed under
-# Archie's commercial licence — see docs/adr/0006. rapidfuzz is API-compatible
+# Entelim's commercial licence — see docs/adr/0006. rapidfuzz is API-compatible
 # for the functions used here; it returns a float where fuzzywuzzy returned
 # int(round(...)), so call sites round to keep scores identical.
 from rapidfuzz import fuzz

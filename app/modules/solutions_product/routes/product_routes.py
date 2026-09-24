@@ -1076,7 +1076,7 @@ def test_webhook(solution_id, webhook_id):
         "event": "test",
         "solution_id": solution_id,
         "timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-        "message": "This is a test webhook from A.R.C.H.I.E.",
+        "message": "This is a test webhook from Entelim",
     }
 
     success = svc._fire_single_webhook(webhook, test_payload)

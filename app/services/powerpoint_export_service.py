@@ -223,7 +223,7 @@ class PowerPointExportService:
         lp = ltf.paragraphs[0]
         lp.alignment = PP_ALIGN.LEFT
         lrun = lp.add_run()
-        lrun.text = "Solution Architecture Blueprint — A.R.C.H.I.E. Platform"
+        lrun.text = "Solution Architecture Blueprint — Entelim Platform"
         lrun.font.size = Pt(11)
         lrun.font.color.rgb = _NEAR_WHITE
 

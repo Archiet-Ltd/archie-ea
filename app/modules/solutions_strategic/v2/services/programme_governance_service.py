@@ -328,7 +328,7 @@ class ProgrammeGovernanceService:
           - clean-core score below the programme target
           - baseline estate changed (systems appeared/disappeared)
 
-        When ``ai_review`` is True (PROG-013, the landscape-import path), ARCHIE
+        When ``ai_review`` is True (PROG-013, the landscape-import path), Entelim
         also runs the conformance + data-stewardship reviewers the moment the
         estate lands and persists a compact result on snapshot.ai_review — the
         "AI on contact" review. Off by default so manual/scheduled snapshots stay

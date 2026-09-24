@@ -40,7 +40,7 @@ GENOME_VERSION = "2.0.0"
 # no distinct data layer — data_object is application-layer, the rest are
 # business-layer — so the slice is a *logical* projection, per 02_schema.md §2.3.
 #
-# Archie stores element `type` inconsistently: both snake_case ("data_object")
+# Entelim stores element `type` inconsistently: both snake_case ("data_object")
 # and ArchiMate CamelCase ("DataObject") occur in the same table. We normalise
 # to snake_case for matching so both are caught.
 DATA_OBJECT_TYPES = frozenset(

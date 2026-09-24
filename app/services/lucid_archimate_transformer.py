@@ -382,7 +382,7 @@ class LucidArchiMateTransformer:
                     element["custom_properties"]["lucid_parent_id"] = declared_parent
                 if geometry:
                     # Source layout available (e.g. Standard Import boundingBox or
-                    # an ARCHIE round-trip export) — preserve it so the composer
+                    # an Entelim round-trip export) — preserve it so the composer
                     # places elements exactly where they were, no auto-arrange.
                     element.update(geometry)
                 elements.append(element)
@@ -877,7 +877,7 @@ class LucidArchiMateTransformer:
     def _shape_geometry(shape: Dict[str, Any]) -> Dict[str, int]:
         """Extract {x, y, w, h} from a shape when the export carries layout.
 
-        Sources, in order: ``boundingBox`` (Lucid Standard Import / ARCHIE
+        Sources, in order: ``boundingBox`` (Lucid Standard Import / Entelim
         round-trip exports, keys x/y/w/h or x/y/width/height), then top-level
         x/y(+width/height). Returns {} when no usable position exists — never
         fabricates coordinates.

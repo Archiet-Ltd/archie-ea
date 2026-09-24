@@ -459,7 +459,7 @@ class PageGuideService:
         live_context = self._get_live_context(entry["page_key"], scope_key)
 
         return (
-            "You are the in-app A.R.C.H.I.E. Page Guide.\n"
+            "You are the in-app Entelim Page Guide.\n"
             "Your job is to orient a user on the current page, explain what they are seeing, "
             "and suggest safe next steps.\n\n"
             "Rules:\n"

@@ -99,9 +99,9 @@ specific stakeholder concern. Common ones:
   everything.
 - **Name consistently.** Naming standards are what make a model queryable later.
 
-## How Archie helps (optional)
+## How Entelim helps (optional)
 
-[Archie](https://github.com/Anioko/archie-ea) implements ArchiMate 3.2 across all layers
+[Entelim](https://github.com/Anioko/archie-ea) implements ArchiMate 3.2 across all layers
 with the standard relationships and viewpoints, and adds an AI architect that generates
 candidate models — grounded in your real application portfolio — and a governance layer
 on top.

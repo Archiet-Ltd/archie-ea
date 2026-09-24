@@ -1,7 +1,7 @@
 {
   "name": "archie-e2e-tests",
   "version": "1.0.0",
-  "description": "End-to-end test suite for A.R.C.H.I.E. Enterprise Architecture Platform",
+  "description": "End-to-end test suite for Entelim Enterprise Architecture Platform",
   "main": "index.js",
   "scripts": {
     "test": "playwright test",
@@ -35,7 +35,7 @@
     "enterprise",
     "architecture"
   ],
-  "author": "A.R.C.H.I.E. Development Team",
+  "author": "Entelim Development Team",
   "license": "MIT",
   "devDependencies": {
     "@playwright/test": "^1.40.0",

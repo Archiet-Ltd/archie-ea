@@ -505,14 +505,14 @@
 
         </div>
 
-        {# ── Deploy to ARCHIE Cloud ── #}
+        {# ── Deploy to Entelim Cloud ── #}
         <div x-show="(codegenResult && codegenResult.files) || hasGeneratedFiles" x-cloak
              class="bg-card border border-border rounded-lg p-6 space-y-4">
 
             {# Idle — ready to deploy #}
             <template x-if="!deployStatus || deployStatus === 'idle'">
                 <div class="text-center space-y-3">
-                    <h3 class="text-base font-semibold text-foreground">Deploy to ARCHIE Cloud</h3>
+                    <h3 class="text-base font-semibold text-foreground">Deploy to Entelim Cloud</h3>
                     <p class="text-sm text-muted-foreground max-w-md mx-auto">
                         Launch your application with a live URL, API documentation, and a PostgreSQL database — no setup required.
                     </p>

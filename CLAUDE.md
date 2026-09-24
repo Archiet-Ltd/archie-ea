@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Archie is an AGPL-3.0 enterprise architecture platform (TOGAF 9.2 / ArchiMate 3.2): application
+Entelim is an AGPL-3.0 enterprise architecture platform (TOGAF 9.2 / ArchiMate 3.2): application
 portfolio, capability/value-stream modelling, an AI-assisted solution-design journey, and an
 Architecture Review Board (ARB) governance workflow. Flask + Jinja2 + PostgreSQL, server-rendered,
 with Tailwind/shadcn tokens and Alpine.js on the front end.
@@ -754,7 +754,7 @@ map is in `DESIGN.md`. A plain textarea is not an acceptable substitute — the 
 - **No `console.log` in shipped templates/JS**, no stray `print()` in request handlers. User-facing
   notifications go through `Platform.toast`, never native `alert()`/`confirm()`.
 - **Null display:** em dash (`—`), never `0` or blank. Currency via `window.currencyManager.format()`.
-- **Never invent data.** Archie is a system of record: a screen that fabricates a plausible
+- **Never invent data.** Entelim is a system of record: a screen that fabricates a plausible
   value when the real one is missing is worse than one showing nothing, because the user
   cannot tell the difference and acts on it. Concretely — no fake fallback in a `catch`
   (render the error), no literal metric passed to `render_template` that looks computed

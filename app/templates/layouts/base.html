@@ -13,9 +13,9 @@
   {% include 'partials/_head.html' %}
   {# F-05: this legacy layout had no <title> tag at all — worse than the
      empty-fallback bug fixed in admin_base.html (ARCH-108), because no
-     block existed here to leave undefined. Same "A.R.C.H.I.E." fallback
+     block existed here to leave undefined. Same "Entelim" fallback
      as admin_base.html/public_base.html for consistency. #}
-  <title>{% block title %}A.R.C.H.I.E.{% endblock %}</title>
+  <title>{% block title %}{{ config.APP_NAME }}{% endblock %}</title>
   {# Any templates that extend this template can set custom_head_tags to add scripts to their page #}
   {% block custom_head_tags %}{% endblock %}
 </head>

@@ -323,7 +323,7 @@ def generate_openapi_spec(app) -> Dict[str, Any]:
         'info': {
             'title': 'Flask Enterprise Architecture API',
             'description': '''
-Enterprise Architecture Management API for A.R.C.H.I.E. platform.
+Enterprise Architecture Management API for the Entelim platform.
 
 This API provides comprehensive endpoints for:
 - Application portfolio management

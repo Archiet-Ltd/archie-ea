@@ -7,7 +7,7 @@ COPY . .
 FROM base AS build
 ARG BACKEND_URL=http://localhost:8000
 ENV BACKEND_URL=${BACKEND_URL}
-# Empty basePath: direct Docker access works at /; ARCHIE iframe proxy passes NEXT_PUBLIC_BASE_PATH="/apps/{id}"
+# Empty basePath: direct Docker access works at /; Entelim iframe proxy passes NEXT_PUBLIC_BASE_PATH="/apps/{id}"
 ARG NEXT_PUBLIC_BASE_PATH=""
 ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
 RUN npm run build

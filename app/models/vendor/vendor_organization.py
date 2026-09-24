@@ -1519,7 +1519,7 @@ class VendorArchiMateTemplate(db.Model):
     Canonical vendor→ArchiMate element mapping.
 
     Provides deterministic, versioned vendor templates so that when an architect
-    links an SAP or Microsoft product, A.R.C.H.I.E. can auto-populate the correct
+    links an SAP or Microsoft product, Entelim can auto-populate the correct
     Technology layer elements without fuzzy search.
 
     Populated by: flask seed-vendor-templates

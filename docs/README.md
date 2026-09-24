@@ -1,7 +1,7 @@
-# Archie Docs — Enterprise Architecture Guides
+# Entelim Docs — Enterprise Architecture Guides
 
 Practical, vendor-neutral guides for enterprise architects, written by the team behind
-**[Archie](https://github.com/Anioko/archie-ea)** — the open-source enterprise
+**[Entelim](https://github.com/Anioko/archie-ea)** — the open-source enterprise
 architecture platform (TOGAF 9.2 · ArchiMate 3.2).
 
 ## Guides
@@ -18,7 +18,7 @@ architecture platform (TOGAF 9.2 · ArchiMate 3.2).
   the landscape, and where an open-source platform fits.
 
 > These guides are framework guidance you can apply with any tool. Where a guide shows
-> *how Archie does it*, that part is optional — the practice stands on its own.
+> *how Entelim does it*, that part is optional — the practice stands on its own.
 
 ---
 *Maintained alongside [github.com/Anioko/archie-ea](https://github.com/Anioko/archie-ea).

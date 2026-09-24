@@ -9,7 +9,7 @@ Phase 1.5 of the Blueprint-to-Code pipeline. Generates:
 - Developer onboarding bundle (examples, mock server script)
 
 Every generated artifact includes x-archimate-source traceability linking
-back to the governed architecture element in A.R.C.H.I.E.
+back to the governed architecture element in Entelim
 """
 import hashlib
 import logging
@@ -581,7 +581,7 @@ class SolutionSpecGenerator:
             ("info", OrderedDict([
                 ("title", f"{sol.name} API"),
                 ("description", (
-                    f"Auto-generated API contract from A.R.C.H.I.E. solution blueprint.\n\n"
+                    f"Auto-generated API contract from Entelim solution blueprint.\n\n"
                     f"**Solution:** {sol.name}\n"
                     f"**ADM Phase:** {sol.adm_phase or 'A'}\n"
                     f"**Governance Status:** {sol.governance_status or 'draft'}\n"

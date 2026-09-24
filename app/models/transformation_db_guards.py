@@ -3732,7 +3732,7 @@ def _render_guard_sql(connection, create_sql: str, quoted_schema: str) -> str:
             "  * On PostgreSQL 12 or older, or wherever it is missing, run "
             "this once as a superuser against the target database:" "\n"
             "        CREATE EXTENSION IF NOT EXISTS pgcrypto;" "\n"
-            "Archie tried to create the extension itself and could not, "
+            "Entelim tried to create the extension itself and could not, "
             "which usually means the connecting role lacks permission."
         )
     preparer = connection.dialect.identifier_preparer

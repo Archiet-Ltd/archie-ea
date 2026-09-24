@@ -163,7 +163,7 @@ class MigrationPackager:
 
 ## Overview
 
-This is a self-contained deployment package exported from the ARCHIE Platform.
+This is a self-contained deployment package exported from the Entelim Platform.
 It includes all application code, deployment configs, migration scripts, and
 documentation needed to run this solution on your own infrastructure.
 
@@ -201,7 +201,7 @@ pytest tests/ -v
 ```
 
 ---
-*Exported from ARCHIE Platform*
+*Exported from Entelim Platform*
 """
 
     def _export_n8n_workflows(self, solution_id: int) -> dict:

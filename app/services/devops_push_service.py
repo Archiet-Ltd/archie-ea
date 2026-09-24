@@ -154,7 +154,7 @@ class DevOpsPushService:
                 json={
                     "title": f"[arch] Generated artefacts — solution #{solution_id}",
                     "body": (
-                        f"Generated artefacts from the A.R.C.H.I.E. architecture blueprint.\n\n"
+                        f"Generated artefacts from the Entelim architecture blueprint.\n\n"
                         f"**Blueprint:** {blueprint_url}\n\n"
                         f"This pull request was opened automatically by the Code Workbench."
                     ),
@@ -283,7 +283,7 @@ class DevOpsPushService:
             pr_payload = {
                 "title": f"[arch] Generated artefacts — solution #{solution_id}",
                 "description": (
-                    f"Generated artefacts from the A.R.C.H.I.E. architecture blueprint.\n\n"
+                    f"Generated artefacts from the Entelim architecture blueprint.\n\n"
                     f"Blueprint: {blueprint_url}"
                 ),
                 "sourceRefName": f"refs/heads/{branch_name}",

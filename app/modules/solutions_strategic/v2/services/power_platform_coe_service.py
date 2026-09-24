@@ -207,11 +207,11 @@ class PowerPlatformCoeService:
 
     @classmethod
     def import_apps(cls, app_ids: list, discovered: list, user_id: int) -> dict:
-        """Create ApplicationComponent records for each app_id not already in ARCHIE.
+        """Create ApplicationComponent records for each app_id not already in Entelim.
 
         Returns {"imported": N, "already_exists": M, "failed": F}.
         Idempotent — skips apps where source_identifier matches.
-        Queues ARBAuditLog for apps without an ARCHIE owner.
+        Queues ARBAuditLog for apps without an Entelim owner.
         """
         from app.models.application_portfolio import ApplicationComponent
         from app.models.architecture_review_board import ARBAuditLog
@@ -266,7 +266,7 @@ class PowerPlatformCoeService:
                         action="coe_import_ungoverned",
                         action_description=(
                             f"Power App '{app_rec.name}' imported from CoE — "
-                            "no owner in ARCHIE. Requires assignment."
+                            "no owner in Entelim. Requires assignment."
                         ),
                         user_id=user_id,
                         new_value={"source": "power_platform_coe", "original_id": app_id},

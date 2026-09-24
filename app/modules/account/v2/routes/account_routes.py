@@ -130,7 +130,7 @@ def register():
             email=form.email.data,
             password=form.password.data,
         ))
-        flash("Account created successfully. Welcome to A.R.C.H.I.E.!", "success")
+        flash(f"Account created successfully. Welcome to {current_app.config['APP_NAME']}!", "success")
         return redirect(url_for("main.index"))
     return render_template("account/register.html", form=form)
 

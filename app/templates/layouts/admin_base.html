@@ -12,9 +12,9 @@
     {# ARCH-108: config.APP_NAME is not a real Flask config key, so any route
        that leaves this block undefined rendered an empty <title> — the
        accessible page name screen readers announce on navigation, gone.
-       "A.R.C.H.I.E." is the literal wordmark used everywhere else in chrome
+       "Entelim" is the literal wordmark used everywhere else in chrome
        (components/admin_header.html, account/login.html). #}
-    <title>{% block title %}A.R.C.H.I.E.{% endblock %}</title>
+    <title>{% block title %}{{ config.APP_NAME }}{% endblock %}</title>
     <script>
         // Auth state — guards API calls in sidebar.js
         window.__userAuthenticated = {{ current_user.is_authenticated | tojson }};
@@ -312,7 +312,7 @@
                     <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                         <i data-lucide="layout-dashboard" class="h-6 w-6 text-primary" aria-hidden="true"></i>
                     </div>
-                    <h2 class="text-xl font-bold text-foreground">Welcome to A.R.C.H.I.E.</h2>
+                    <h2 class="text-xl font-bold text-foreground">Welcome to {{ config.APP_NAME }}</h2>
                     <p class="text-sm text-muted-foreground">Your enterprise architecture platform. Let's personalize your experience.</p>
                 </div>
                 <div>

@@ -120,7 +120,7 @@ def enrich_vendor(vendor_name):
     except Exception as e:
         # External enrichment providers (G2 Crowd, Crunchbase, etc.) being
         # unreachable/unconfigured is a service-availability condition, not a
-        # bug in Archie - 503 says so instead of masquerading as a 500.
+        # bug in Entelim - 503 says so instead of masquerading as a 500.
         logger.error(f"Vendor enrichment failed for {vendor_name}: {e}")
         return (
             jsonify(

@@ -40,7 +40,7 @@ def _schedule_node(cron: str) -> dict:
 
 
 def _push_node(target_api_url: str, connector_type: str) -> dict:
-    """Standard push-to-ARCHIE node used by all workflows."""
+    """Standard push-to-Entelim node used by all workflows."""
     return {
         "name": "Push",
         "type": "n8n-nodes-base.httpRequest",
@@ -96,7 +96,7 @@ def _build_salesforce_workflow(connector_type, credentials, object_mappings, tar
         _transform_node(connector_type),
         _push_node(target_api_url, connector_type),
     ]
-    return _wrap_workflow(f"ARCHIE Sync: {connector_type}", nodes, {
+    return _wrap_workflow(f"Entelim Sync: {connector_type}", nodes, {
         "Schedule": {"main": [[{"node": "Fetch"}]]},
         "Fetch": {"main": [[{"node": "Transform"}]]},
         "Transform": {"main": [[{"node": "Push"}]]},
@@ -128,7 +128,7 @@ def _build_sap_workflow(connector_type, credentials, object_mappings, target_api
         _transform_node(connector_type),
         _push_node(target_api_url, connector_type),
     ]
-    return _wrap_workflow(f"ARCHIE Sync: {connector_type}", nodes, {
+    return _wrap_workflow(f"Entelim Sync: {connector_type}", nodes, {
         "Schedule": {"main": [[{"node": "Fetch"}]]},
         "Fetch": {"main": [[{"node": "Transform"}]]},
         "Transform": {"main": [[{"node": "Push"}]]},
@@ -160,7 +160,7 @@ def _build_servicenow_workflow(connector_type, credentials, object_mappings, tar
         _transform_node(connector_type),
         _push_node(target_api_url, connector_type),
     ]
-    return _wrap_workflow(f"ARCHIE Sync: {connector_type}", nodes, {
+    return _wrap_workflow(f"Entelim Sync: {connector_type}", nodes, {
         "Schedule": {"main": [[{"node": "Fetch"}]]},
         "Fetch": {"main": [[{"node": "Transform"}]]},
         "Transform": {"main": [[{"node": "Push"}]]},
@@ -189,7 +189,7 @@ def _build_jira_workflow(connector_type, credentials, object_mappings, target_ap
         _transform_node(connector_type),
         _push_node(target_api_url, connector_type),
     ]
-    return _wrap_workflow(f"ARCHIE Sync: {connector_type}", nodes, {
+    return _wrap_workflow(f"Entelim Sync: {connector_type}", nodes, {
         "Schedule": {"main": [[{"node": "Fetch"}]]},
         "Fetch": {"main": [[{"node": "Transform"}]]},
         "Transform": {"main": [[{"node": "Push"}]]},
@@ -217,7 +217,7 @@ def _build_sharepoint_workflow(connector_type, credentials, object_mappings, tar
         _transform_node(connector_type),
         _push_node(target_api_url, connector_type),
     ]
-    return _wrap_workflow(f"ARCHIE Sync: {connector_type}", nodes, {
+    return _wrap_workflow(f"Entelim Sync: {connector_type}", nodes, {
         "Schedule": {"main": [[{"node": "Fetch"}]]},
         "Fetch": {"main": [[{"node": "Transform"}]]},
         "Transform": {"main": [[{"node": "Push"}]]},
@@ -244,7 +244,7 @@ def _build_google_sheets_workflow(connector_type, credentials, object_mappings, 
         _transform_node(connector_type),
         _push_node(target_api_url, connector_type),
     ]
-    return _wrap_workflow(f"ARCHIE Sync: {connector_type}", nodes, {
+    return _wrap_workflow(f"Entelim Sync: {connector_type}", nodes, {
         "Schedule": {"main": [[{"node": "Fetch"}]]},
         "Fetch": {"main": [[{"node": "Transform"}]]},
         "Transform": {"main": [[{"node": "Push"}]]},
@@ -275,7 +275,7 @@ def _build_postgresql_workflow(connector_type, credentials, object_mappings, tar
         _transform_node(connector_type),
         _push_node(target_api_url, connector_type),
     ]
-    return _wrap_workflow(f"ARCHIE Sync: {connector_type}", nodes, {
+    return _wrap_workflow(f"Entelim Sync: {connector_type}", nodes, {
         "Schedule": {"main": [[{"node": "Fetch"}]]},
         "Fetch": {"main": [[{"node": "Transform"}]]},
         "Transform": {"main": [[{"node": "Push"}]]},
@@ -302,7 +302,7 @@ def _build_slack_workflow(connector_type, credentials, object_mappings, target_a
         _transform_node(connector_type),
         _push_node(target_api_url, connector_type),
     ]
-    return _wrap_workflow(f"ARCHIE Sync: {connector_type}", nodes, {
+    return _wrap_workflow(f"Entelim Sync: {connector_type}", nodes, {
         "Schedule": {"main": [[{"node": "Fetch"}]]},
         "Fetch": {"main": [[{"node": "Transform"}]]},
         "Transform": {"main": [[{"node": "Push"}]]},
@@ -330,7 +330,7 @@ def _build_teams_workflow(connector_type, credentials, object_mappings, target_a
         _transform_node(connector_type),
         _push_node(target_api_url, connector_type),
     ]
-    return _wrap_workflow(f"ARCHIE Sync: {connector_type}", nodes, {
+    return _wrap_workflow(f"Entelim Sync: {connector_type}", nodes, {
         "Schedule": {"main": [[{"node": "Fetch"}]]},
         "Fetch": {"main": [[{"node": "Transform"}]]},
         "Transform": {"main": [[{"node": "Push"}]]},
@@ -353,7 +353,7 @@ def _build_generic_workflow(connector_type, credentials, object_mappings, target
         _transform_node(connector_type),
         _push_node(target_api_url, connector_type),
     ]
-    return _wrap_workflow(f"ARCHIE Sync: {connector_type}", nodes, {
+    return _wrap_workflow(f"Entelim Sync: {connector_type}", nodes, {
         "Schedule": {"main": [[{"node": "Fetch"}]]},
         "Fetch": {"main": [[{"node": "Transform"}]]},
         "Transform": {"main": [[{"node": "Push"}]]},

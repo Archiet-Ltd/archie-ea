@@ -808,7 +808,7 @@ ELEMENT_SPECS: Dict[str, dict] = {
     #                                                                    #
     # These four are the ones an EA tool is most often told to skip, and #
     # the checker offers an `ai-layer-ok` hatch for exactly that. Not    #
-    # taken here, for a product-specific reason: Archie already carries  #
+    # taken here, for a product-specific reason: Entelim already carries  #
     # manufacturing-specific fields (`manufacturing_capabilities`,       #
     # `shop_floor_system`), so the estates it is being pointed at are    #
     # precisely those where an OT/IT boundary — a PLC on a line, a       #

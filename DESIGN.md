@@ -1,4 +1,4 @@
-# DESIGN.md — A.R.C.H.I.E. Design System
+# DESIGN.md — Entelim Design System
 
 > **For AI agents:** Read this file before editing any template or UI file.
 > This describes the complete design system used by this Flask + Tailwind CSS + shadcn/ui + Alpine.js application.

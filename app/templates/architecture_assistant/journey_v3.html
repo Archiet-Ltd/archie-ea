@@ -158,12 +158,12 @@
             <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             Saved
         </div>
-        {# Ask A.R.C.H.I.E. button — opens the chat panel #}
+        {# Ask Entelim button — opens the chat panel #}
         <button type="button" @click="$dispatch('blueprint-chat-toggle')"
                 class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-colors shrink-0"
-                title="Ask A.R.C.H.I.E. to add drivers, goals, elements, or run inference">
+                title="Ask Entelim to add drivers, goals, elements, or run inference">
             <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
-            Ask A.R.C.H.I.E.
+            Ask Entelim
         </button>
     </div>
 
@@ -244,7 +244,7 @@
 
 {% block modals %}
 {% if solution_id %}
-{# ── A.R.C.H.I.E. Chat panel — reuses blueprint_chat component ── #}
+{# ── Entelim Chat panel — reuses blueprint_chat component ── #}
 <div
     x-data="blueprintChat()"
     data-solution-id="{{ solution_id }}"
@@ -278,7 +278,7 @@
         x-transition:leave-end="translate-x-full"
         class="fixed inset-y-0 right-0 w-full sm:w-[420px] bg-card border-l border-border shadow-2xl z-50 flex flex-col"
         style="display:none"
-        aria-label="A.R.C.H.I.E. Architecture Assistant">
+        aria-label="Entelim Architecture Assistant">
 
         {# Header #}
         <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -287,7 +287,7 @@
                     <i data-lucide="sparkles" class="w-3.5 h-3.5" aria-hidden="true"></i>
                 </span>
                 <div>
-                    <p class="text-sm font-semibold text-foreground leading-none">A.R.C.H.I.E.</p>
+                    <p class="text-sm font-semibold text-foreground leading-none">Entelim</p>
                     <p class="text-xs text-muted-foreground mt-0.5" x-text="solutionName || 'Architecture Assistant'"></p>
                 </div>
             </div>

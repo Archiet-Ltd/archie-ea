@@ -103,7 +103,7 @@ else:
 
 
 class Config:
-    APP_NAME = os.environ.get("APP_NAME", "A.R.C.H.I.E.")
+    APP_NAME = os.environ.get("APP_NAME", "Entelim")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     if not SECRET_KEY:
         import secrets

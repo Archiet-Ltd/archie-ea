@@ -843,7 +843,7 @@ TOOL_SCHEMAS = [
             "Build a multi-step architecture execution plan for a goal. "
             "Selects the right template (SAP transformation, rationalization, solution design, "
             "data governance, programme setup) and returns an ordered list of steps, each with "
-            "the ARCHIE tool to call, dependency on previous steps, and a gate-check condition. "
+            "the Entelim tool to call, dependency on previous steps, and a gate-check condition. "
             "USE when the user says 'help me plan', 'what are the steps to', 'sequence this work', "
             "or asks how to execute a transformation, design, or programme. Read-only."
         ),
@@ -870,7 +870,7 @@ TOOL_SCHEMAS = [
             "Check configured infrastructure endpoints for reachability. "
             "Probes: Abacus API connector, LLM API endpoints, integration pattern URLs. "
             "Returns up/down status per endpoint, latency, and a delta summary of what's "
-            "modelled in ARCHIE vs what's actually reachable. "
+            "modelled in Entelim vs what's actually reachable. "
             "USE when the user asks about connectivity, 'is X reachable?', infrastructure health, "
             "or wants to know if configured integrations are live. Read-only."
         ),

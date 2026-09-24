@@ -18,7 +18,7 @@ from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship, A
 # name in RELATIONSHIP_TYPES is a single lowercase word, so .capitalize()
 # round-trips correctly without a second hardcoded name list. A tool that
 # actually validates the XSD (Archi) rejects the lowercase form even though
-# Archie's own importer tolerates it by lowercasing again on the way back in.
+# Entelim's own importer tolerates it by lowercasing again on the way back in.
 _PASCAL_CASE_REL_TYPES: dict[str, str] = {t: t.capitalize() for t in RELATIONSHIP_TYPES}
 
 
@@ -290,7 +290,7 @@ class ArchiMateOEFService:
 
         # <organizations> — O-02: folder structure was previously dropped entirely on
         # export, so a re-imported model lost all layer/folder grouping. Group exported
-        # elements by ArchiMate layer, which is the only folder structure Archie itself
+        # elements by ArchiMate layer, which is the only folder structure Entelim itself
         # tracks server-side (there is no separate user-defined folder tree to preserve).
         layer_groups: dict[str, list] = {}
         for elem in elements:

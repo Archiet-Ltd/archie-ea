@@ -119,7 +119,7 @@ def test_copilot_card_retains_guidance_and_chat_action(render_card):
     card = page.locator('#fixture > div')
     assert_neutral_card(page, card)
     expect(card).to_contain_text('Recorded guidance')
-    expect(card.get_by_role('button', name='Ask A.R.C.H.I.E.')).to_be_visible()
+    expect(card.get_by_role('button', name='Ask Entelim')).to_be_visible()
 
 
 def test_enriched_brief_retains_status_and_start_over(render_card):

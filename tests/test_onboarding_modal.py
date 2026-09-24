@@ -1,7 +1,7 @@
 """The onboarding modal must not interrogate a user who already has a role.
 
 Found by driving a real browser: signing in as the SG Tadley business architect
-put a "Welcome to A.R.C.H.I.E. — What's your role?" modal over the dashboard.
+put a "Welcome to Entelim — What's your role?" modal over the dashboard.
 Three things were wrong with that, in ascending order of severity:
 
   1. It blocks the first screen of the product for a user who is not onboarding.

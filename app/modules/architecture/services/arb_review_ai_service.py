@@ -1,6 +1,6 @@
 """ARB review pre-brief — AI assist for the reviewer side of the workflow.
 
-Archie already lets a submitter draft an ARB submission with AI. A reviewer
+Entelim already lets a submitter draft an ARB submission with AI. A reviewer
 opening a review gets nothing today: no pre-brief, no conflict surfacing, no
 draft disposition. This service assembles a strictly-real context (the
 review item's own fields, its linked Solution, its linked ADR, and this

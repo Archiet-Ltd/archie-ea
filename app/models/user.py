@@ -25,7 +25,7 @@ ROLE_PLATFORM_ADMIN = "platform_admin"
 # of its fifteen sections, and no persona owned it. A governance artefact the
 # product grades with nobody accountable for it is the same defect shape as an
 # ARB decision with no visible decider -- which this codebase has been fixing
-# all week. TOGAF 9.2, which Archie implements, names the role.
+# all week. TOGAF 9.2, which Entelim implements, names the role.
 #
 # data_architect: /architecture/data-architecture, data lineage and data
 # stewardship all ship and were reachable only inside enterprise_architect's
@@ -173,7 +173,7 @@ class User(UserMixin, db.Model):
     primary_concern = db.Column(db.Text)
     primary_frameworks = db.Column(db.Text)  # JSON array as string
     onboarding_completed_at = db.Column(db.DateTime)
-    # Dashboard "Welcome to A.R.C.H.I.E." one-line banner, dismissed once per
+    # Dashboard "Welcome to Entelim" one-line banner, dismissed once per
     # user, forever (shell-wave-1 Task 5). Deliberately separate from
     # onboarding_completed_at: that column is set by /dashboard/api/
     # onboarding-complete, which also rewrites enterprise_role -- reusing it for
