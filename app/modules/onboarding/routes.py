@@ -284,7 +284,12 @@ def tell_us_more_section(section_key: str):
     statuses = tell_us_more.section_statuses(org)
     return render_template(
         "onboarding/tell_us_more_section.html",
-        section=sec,
+        # The compliance section's standards come back grouped into
+        # recommended / common / other for this organisation (Archiet's own
+        # grouping, over the region/industry Screen 2 already collected).
+        # Every other section is the same static definition either function
+        # returns.
+        section=tell_us_more.section_for_org(org, section_key),
         answers=tell_us_more.answers_for(org, section_key),
         status=statuses[section_key],
         section_index=[s["key"] for s in tell_us_more.SECTIONS].index(section_key) + 1,

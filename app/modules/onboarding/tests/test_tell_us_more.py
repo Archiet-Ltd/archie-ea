@@ -58,14 +58,14 @@ def test_save_section_persists_answers_and_marks_saved(app, db_session, make_org
 
     org = make_org("tum-save")
     tell_us_more.save_section(org, "how_you_work", {
-        "frameworks_in_use": ["agile", "devops", "not_a_real_framework"],
+        "frameworks_in_use": ["agile-methodology", "devops-practices", "not_a_real_framework"],
     })
 
     progress = tell_us_more.read_progress(org)
     assert progress["sections"]["how_you_work"]["status"] == "saved"
-    assert progress["answers"]["how_you_work"]["frameworks_in_use"] == ["agile", "devops"], (
-        "an option outside the known list must be dropped, not stored"
-    )
+    assert progress["answers"]["how_you_work"]["frameworks_in_use"] == [
+        "agile-methodology", "devops-practices",
+    ], "an option outside the known list must be dropped, not stored"
 
 
 def test_skip_section_marks_skipped_and_saves_no_answers(app, db_session, make_org):
@@ -83,12 +83,12 @@ def test_skip_never_downgrades_an_already_saved_section(app, db_session, make_or
     from app.modules.onboarding.services import tell_us_more
 
     org = make_org("tum-no-downgrade")
-    tell_us_more.save_section(org, "how_you_work", {"frameworks_in_use": ["agile"]})
+    tell_us_more.save_section(org, "how_you_work", {"frameworks_in_use": ["agile-methodology"]})
     tell_us_more.skip_section(org, "how_you_work")
 
     progress = tell_us_more.read_progress(org)
     assert progress["sections"]["how_you_work"]["status"] == "saved"
-    assert progress["answers"]["how_you_work"]["frameworks_in_use"] == ["agile"]
+    assert progress["answers"]["how_you_work"]["frameworks_in_use"] == ["agile-methodology"]
 
 
 def test_section_statuses_lists_all_five_in_order(app, db_session, make_org):
@@ -120,9 +120,9 @@ def test_clean_answers_status_list_drops_unknown_standard_and_status(app, db_ses
     from app.modules.onboarding.services import tell_us_more
 
     cleaned = tell_us_more.clean_answers("compliance", {
-        "standards": {"gdpr": "partly", "made_up_standard": "fully", "iso27001": "not_a_status"},
+        "standards": {"gdpr": "partial", "made_up_standard": "full", "iso27001": "not_a_status"},
     })
-    assert cleaned["standards"] == {"gdpr": "partly"}
+    assert cleaned["standards"] == {"gdpr": "partial"}
 
 
 # ---------------------------------------------------------------------------
@@ -169,7 +169,9 @@ def test_save_and_continue_persists_and_returns_the_hub(app, db_session, make_or
 
     resp = client.post(
         "/onboarding/tell-us-more/how_you_work",
-        json={"action": "save", "answers": {"frameworks_in_use": ["agile", "okr"]}},
+        json={"action": "save", "answers": {
+            "frameworks_in_use": ["agile-methodology", "okr-objectives-key-results"],
+        }},
     )
 
     assert resp.status_code == 200, resp.get_data(as_text=True)
@@ -177,7 +179,9 @@ def test_save_and_continue_persists_and_returns_the_hub(app, db_session, make_or
 
     from app.modules.onboarding.services import tell_us_more
     db_session.refresh(org)
-    assert tell_us_more.answers_for(org, "how_you_work")["frameworks_in_use"] == ["agile", "okr"]
+    assert tell_us_more.answers_for(org, "how_you_work")["frameworks_in_use"] == [
+        "agile-methodology", "okr-objectives-key-results",
+    ]
 
 
 def test_skip_advances_without_persisting_answers(app, db_session, make_org, client, login_as):
@@ -261,19 +265,21 @@ def test_another_organisation_cannot_write_over_the_first_organisations_answer(
     org_a, _ = _logged_in(db_session, make_org, client, login_as, "tenant-write-a")
     client.post(
         "/onboarding/tell-us-more/how_you_work",
-        json={"action": "save", "answers": {"frameworks_in_use": ["agile"]}},
+        json={"action": "save", "answers": {"frameworks_in_use": ["agile-methodology"]}},
     )
 
     org_b, _ = _logged_in(db_session, make_org, client, login_as, "tenant-write-b")
     client.post(
         "/onboarding/tell-us-more/how_you_work",
-        json={"action": "save", "answers": {"frameworks_in_use": ["okr"]}},
+        json={"action": "save", "answers": {"frameworks_in_use": ["okr-objectives-key-results"]}},
     )
 
     from app.modules.onboarding.services import tell_us_more
     db_session.refresh(org_a)
     db_session.refresh(org_b)
-    assert tell_us_more.answers_for(org_a, "how_you_work")["frameworks_in_use"] == ["agile"], (
-        "organisation B's save must not have touched organisation A's row"
-    )
-    assert tell_us_more.answers_for(org_b, "how_you_work")["frameworks_in_use"] == ["okr"]
+    assert tell_us_more.answers_for(org_a, "how_you_work")["frameworks_in_use"] == [
+        "agile-methodology",
+    ], "organisation B's save must not have touched organisation A's row"
+    assert tell_us_more.answers_for(org_b, "how_you_work")["frameworks_in_use"] == [
+        "okr-objectives-key-results",
+    ]

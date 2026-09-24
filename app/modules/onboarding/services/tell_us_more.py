@@ -18,11 +18,23 @@ is a known gap the Accountability lens already withdrew itself over — see
 reason_codes.py's ``ownership_reader_not_built``); writing a fresh onboarding
 answer into either would either add a tenant-isolation bug this brief did not
 scope in fixing, or require exactly the kind of new schema work the reuse
-rule asks to avoid when an existing store already fits. The five sections'
-option lists (frameworks, standards, transformation templates, build
-questions) are this module's own small constants, not the vendor pack /
-reference-architecture system in srs-v4-onboarding-and-reference-packs.md —
-that is a separate, much larger piece of work than this flow.
+rule asks to avoid when an existing store already fits.
+
+The five sections' option lists (frameworks, standards, transformation
+templates, implementation types) are no longer this module's own constants.
+They are Archiet's own organisation-setup reference data, lifted unchanged
+into ``app/seed_data/onboarding/`` and read here through ``reference_data.py``
+— see that module's docstring and ``SOURCES.md`` beside the data files. This
+is row 6 ("Lift") of the Archiet-onboarding-reuse study: the same lists,
+Archiet's own five-step maturity scale, and Archiet's own recommended /
+common / other grouping by region and industry.
+
+Saving a section no longer only stores the answer here: ``workspace_setup.py``
+turns it into the organisation's own records in the model (a Risk per chosen
+compliance standard, a capability per framework or build answer, a programme
+per transformation template) so answering sets up the workspace rather than
+only recording a preference. See that module's docstring for what each answer
+becomes and where it is idempotent.
 """
 from __future__ import annotations
 
@@ -30,7 +42,7 @@ import datetime
 
 from app.models.organization import Organization
 
-from . import profile
+from . import profile, reference_data, workspace_setup
 
 _KEY = "tell_us_more"
 
@@ -38,60 +50,24 @@ _MAX_TEXT = 300
 _MAX_PEOPLE = 30
 _MAX_NAME = 200
 
-FRAMEWORKS = [
-    {"key": "cobit2019", "label": "COBIT 2019"},
-    {"key": "itil_v4", "label": "ITIL v4"},
-    {"key": "iso27001", "label": "ISO 27001"},
-    {"key": "nist_csf", "label": "NIST CSF"},
-    {"key": "togaf", "label": "TOGAF"},
-    {"key": "safe", "label": "SAFe"},
-    {"key": "agile", "label": "Agile"},
-    {"key": "devops", "label": "DevOps"},
-    {"key": "lean_six_sigma", "label": "Lean Six Sigma"},
-    {"key": "okr", "label": "OKR"},
-]
+FRAMEWORKS = reference_data.frameworks()
 
-STANDARD_STATUS_OPTIONS = [
-    {"key": "not_started", "label": "Not started"},
-    {"key": "planning", "label": "Planning"},
-    {"key": "partly", "label": "Partly"},
-    {"key": "mostly", "label": "Mostly"},
-    {"key": "fully", "label": "Fully"},
-]
+STANDARD_STATUS_OPTIONS = reference_data.MATURITY_STATUS_OPTIONS
 
-# A starting list, not the region/industry recommendation engine
-# (onboarding-intake-v1 §1's compliance-standards.json rule) — that is a
-# solution-architect-scoped piece of the reference-pack work, out of scope
-# here. Grouping only distinguishes what most organisations meet first.
+# The flat list, every standard, used to validate a save (a standard chosen
+# from any group is equally valid). Grouping into recommended / common /
+# other is a presentation concern computed at render time from the org's
+# already-answered industry — see ``section_for_org`` below — not part of
+# this validation list.
 STANDARDS = [
-    {"key": "gdpr", "label": "GDPR / data protection", "group": "recommended"},
-    {"key": "iso27001", "label": "ISO 27001", "group": "recommended"},
-    {"key": "soc2", "label": "SOC 2", "group": "common"},
-    {"key": "pci_dss", "label": "PCI DSS", "group": "common"},
-    {"key": "hipaa", "label": "HIPAA", "group": "other"},
-    {"key": "nist_csf", "label": "NIST CSF", "group": "other"},
+    {"key": s["id"], "label": s["name"]} for s in reference_data.compliance_standards()
 ]
 
-TRANSFORMATION_TEMPLATES = [
-    {"key": "crm", "label": "CRM"},
-    {"key": "erp", "label": "ERP"},
-    {"key": "data_platform", "label": "Data platform"},
-    {"key": "cloud_migration", "label": "Cloud migration"},
-    {"key": "digital_workplace", "label": "Digital workplace"},
-    {"key": "ecommerce", "label": "E-commerce"},
-]
+TRANSFORMATION_TEMPLATES = reference_data.transformation_templates()
 
-IMPLEMENTATION_TYPES = [
-    {"key": "platform", "label": "Platform (mostly configured, not coded)"},
-    {"key": "custom", "label": "Custom-built"},
-    {"key": "hybrid", "label": "Hybrid — some platform, some custom"},
-]
+IMPLEMENTATION_TYPES = reference_data.implementation_types()
 
-DEPLOYMENT_TARGETS = [
-    {"key": "cloud", "label": "Cloud"},
-    {"key": "on_prem", "label": "On-premises"},
-    {"key": "hybrid", "label": "Hybrid"},
-]
+DEPLOYMENT_TARGETS = reference_data.DEPLOYMENT_TARGETS
 
 SECTIONS = [
     {
@@ -198,6 +174,35 @@ _SECTION_BY_KEY = {s["key"]: s for s in SECTIONS}
 
 def section(section_key: str) -> dict | None:
     return _SECTION_BY_KEY.get(section_key)
+
+
+def section_for_org(org: Organization, section_key: str) -> dict | None:
+    """*section_key*'s definition, with the compliance section's "standards"
+    field grouped into recommended / common / other for this organisation --
+    Archiet's own grouping (``reference_data.grouped_compliance_standards``),
+    read from the region and industry signals Screen 2 already collected
+    (``region_europe_or_eu_customers``, the free-text ``industry``). Every
+    other section is returned unchanged; validation (``clean_answers``) never
+    uses this — it always validates against the flat, ungrouped list, so a
+    standard chosen before an industry/region was ever answered stays valid.
+    """
+    sec = section(section_key)
+    if sec is None:
+        return None
+    if section_key != "compliance":
+        return sec
+
+    org_profile = profile.read(org)
+    industry = reference_data.industry_value_for_label(org_profile.get("industry") or "")
+    region = "europe" if org_profile.get("region_europe_or_eu_customers") else None
+    grouped = reference_data.grouped_compliance_standards(region, industry)
+
+    sec = dict(sec)
+    sec["fields"] = [
+        {**f, "options": grouped} if f["key"] == "standards" else f
+        for f in sec["fields"]
+    ]
+    return sec
 
 
 def _now() -> str:
@@ -328,17 +333,22 @@ def clean_answers(section_key: str, raw_answers: dict) -> dict:
 
 
 def save_section(org: Organization, section_key: str, raw_answers: dict) -> dict:
-    """Save and continue: persist the cleaned answers and mark the section
-    saved. A save always counts as this section's final state (never
-    downgraded back to skipped)."""
+    """Save and continue: persist the cleaned answers, mark the section
+    saved, and set up the organisation's workspace from them (see
+    ``workspace_setup.py``). A save always counts as this section's final
+    state (never downgraded back to skipped). Re-saving updates the same
+    workspace records rather than duplicating them -- ``workspace_setup``'s
+    own contract, not re-implemented here."""
     progress = read_progress(org)
     sections = dict(progress.get("sections", {}))
     answers = dict(progress.get("answers", {}))
+    cleaned = clean_answers(section_key, raw_answers)
     sections[section_key] = {"status": "saved", "at": _now()}
-    answers[section_key] = clean_answers(section_key, raw_answers)
+    answers[section_key] = cleaned
     progress["sections"] = sections
     progress["answers"] = answers
     profile.write(org, **{_KEY: progress})
+    workspace_setup.apply_section(org, section_key, cleaned)
     return progress
 
 
