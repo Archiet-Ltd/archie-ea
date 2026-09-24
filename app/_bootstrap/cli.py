@@ -414,3 +414,11 @@ def init_cli(app):
         app.logger.info("✅ Strategic demo seed CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register strategic demo seed CLI: {e}")
+
+    # T-DEMO-1: Lantern Quay demonstration company
+    try:
+        from app.commands import seed_demo_company
+        seed_demo_company.init_app(app)
+        app.logger.info("✅ Demo company seed CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register demo company seed CLI: {e}")

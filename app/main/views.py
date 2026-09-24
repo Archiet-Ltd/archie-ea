@@ -609,3 +609,17 @@ def save_system_settings():
 from app.main import routes_ea_workflows
 
 routes_ea_workflows.register_ea_workflow_routes(main)
+
+
+# ── demo company website page ──────────────────────────────────────────────
+
+
+@main.route("/demo/lantern-quay")
+def demo_lantern_quay():
+    """Public one-page website for the Lantern Quay Systems demonstration."""
+    from app.models.organization import Organization
+
+    org = Organization.query.filter_by(slug="lantern-quay").first()
+    if org is None:
+        return render_template("main/demo_lantern_quay.html", org=None)
+    return render_template("main/demo_lantern_quay.html", org=org)
