@@ -1,0 +1,80 @@
+# Template families and guided paths for the company-context intake.
+#
+# families maps each segment (S1..S4) to the canvas family proposed for it and
+# the second choice, with a one-line reason. guided_paths is the ordered list
+# of guided-path steps per segment; `needs` says what answering the step
+# depends on (packs, canvas or none). Titles are plain-language questions; the
+# bucket plan maps every guided-step key to the register, and this product
+# file carries no register id.
+
+families:
+  S1:
+    family: lean_canvas
+    second: business_model_canvas
+    reason: A small or early company shows its plan on the nine-box lean canvas.
+  S2:
+    family: business_model_canvas
+    second: lean_canvas
+    reason: A growing company fills the broader business model canvas.
+  S3:
+    family: business_case
+    second: business_model_canvas
+    reason: An established company weighs options in a business case.
+  S4:
+    family: business_model_canvas
+    second: business_case
+    reason: A services firm maps its delivery model on the business model canvas.
+
+guided_paths:
+  S1:
+    - key: s1_lean_first_box
+      title: What problem do you solve first?
+      href: /ask
+      needs: none
+    - key: s1_sketch_lean
+      title: Where does the sketch of your model go?
+      href: /business-model
+      needs: canvas
+    - key: s1_adopt_pack
+      title: Which of these tools do you actually run?
+      href: /packs
+      needs: packs
+  S2:
+    - key: s2_metrics_focus
+      title: Which metric tells you it is working?
+      href: /ask
+      needs: none
+    - key: s2_bmc_sketch
+      title: Where do your channels and relationships go?
+      href: /business-model
+      needs: canvas
+    - key: s2_integrations
+      title: Which tools plug into your daily work?
+      href: /packs
+      needs: packs
+  S3:
+    - key: s3_case_focus
+      title: What change are you weighing?
+      href: /ask
+      needs: none
+    - key: s3_case_build
+      title: Where does the business case live?
+      href: /business-case
+      needs: canvas
+    - key: s3_case_packs
+      title: Which platforms does this depend on?
+      href: /packs
+      needs: packs
+  S4:
+    - key: s4_clients_first
+      title: Who do you serve and what do you hand over?
+      href: /ask
+      needs: none
+    - key: s4_delivery_canvas
+      title: Where does your delivery model go?
+      href: /business-model
+      needs: canvas
+    - key: s4_service_tools
+      title: Which subscribing tools run your delivery?
+      href: /packs
+      needs: packs

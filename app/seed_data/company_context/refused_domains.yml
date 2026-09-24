@@ -1,0 +1,8 @@
+# Registered domains the company-context intake will never read.
+#
+# `domains` is empty in the repository: a site owner opts out at the instance
+# level, in the file <instance_path>/company_context_refused_domains.txt, one
+# registered domain per line, `#` comments allowed. The file is read at every
+# run start; a missing file means an empty list. The contact address in the
+# user agent is the published opt-out route, honoured within one working day.
+domains: []
