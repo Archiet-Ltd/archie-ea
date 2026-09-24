@@ -102,6 +102,21 @@ def _find_element_by_marker(org_id: int, marker: str, *, layer: str | None = Non
     return None
 
 
+def _find_elements_by_marker_prefix(org_id: int, prefix: str, *, layer: str | None = None) -> list[ArchiMateElement]:
+    """Every ArchiMateElement for *org_id* whose ``onboarding_source`` starts
+    with *prefix*. Used to find records a previous save created so they can
+    be removed when the answer that produced them is deselected."""
+    query = ArchiMateElement.query.filter_by(organization_id=org_id)
+    if layer is not None:
+        query = query.filter_by(layer=layer)
+    result: list[ArchiMateElement] = []
+    for element in query.all():
+        marker = (element.custom_properties or {}).get(_MARKER_KEY, "")
+        if isinstance(marker, str) and marker.startswith(prefix):
+            result.append(element)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Compliance standards -> Risk (the Risk lens's own model)
 # ---------------------------------------------------------------------------
@@ -109,15 +124,29 @@ def _find_element_by_marker(org_id: int, marker: str, *, layer: str | None = Non
 
 def _apply_compliance(org: Organization, answers: dict) -> dict:
     standards = answers.get("standards") or {}
-    created, updated = 0, 0
+    created, updated, removed = 0, 0, 0
+    keep_markers: set[str] = set()
     for standard_key, status_key in standards.items():
         standard = reference_data.compliance_standard(standard_key)
         if standard is None:
             continue
+        marker = f"tell_us_more:compliance:{standard['id']}"
+        keep_markers.add(marker)
         _, was_created = _upsert_compliance_risk(org, standard, status_key)
         created += was_created
         updated += 0 if was_created else 1
-    return {"risks_created": created, "risks_updated": updated}
+
+    # Remove risks whose standard was deselected since the last save.
+    for element in _find_elements_by_marker_prefix(org.id, "tell_us_more:compliance:", layer="Motivation"):
+        marker = (element.custom_properties or {}).get(_MARKER_KEY, "")
+        if marker not in keep_markers:
+            risk = Risk.query.filter_by(organization_id=org.id, archimate_element_id=element.id).first()
+            if risk is not None:
+                db.session.delete(risk)
+                removed += 1
+            db.session.delete(element)
+
+    return {"risks_created": created, "risks_updated": updated, "risks_removed": removed}
 
 
 def _upsert_compliance_risk(org: Organization, standard: dict, status_key: str) -> tuple[Risk, bool]:
@@ -215,12 +244,14 @@ def _upsert_capability(
 
 
 def _apply_frameworks(org: Organization, answers: dict) -> dict:
-    created, updated = 0, 0
+    created, updated, removed = 0, 0, 0
+    keep_markers: set[str] = set()
     for key in answers.get("frameworks_in_use") or []:
         framework = reference_data.framework(key)
         if framework is None:
             continue
         marker = f"tell_us_more:how_you_work:in_use:{key}"
+        keep_markers.add(marker)
         _, was_created = _upsert_capability(org, marker=marker, name=framework["name"], status="operational")
         created += was_created
         updated += 0 if was_created else 1
@@ -229,12 +260,27 @@ def _apply_frameworks(org: Organization, answers: dict) -> dict:
         if framework is None:
             continue
         marker = f"tell_us_more:how_you_work:want:{key}"
+        keep_markers.add(marker)
         _, was_created = _upsert_capability(
             org, marker=marker, name=framework["name"], status="defined", target_maturity_level=3
         )
         created += was_created
         updated += 0 if was_created else 1
-    return {"capabilities_created": created, "capabilities_updated": updated}
+
+    # Remove capabilities whose framework was deselected since the last save.
+    existing = UnifiedCapability.query.filter_by(
+        organization_id=org.id, source_table="onboarding"
+    ).all()
+    for cap in existing:
+        if (cap.source_id or "").startswith("tell_us_more:how_you_work:") and cap.source_id not in keep_markers:
+            if cap.archimate_element_id:
+                element = db.session.get(ArchiMateElement, cap.archimate_element_id)
+                if element is not None:
+                    db.session.delete(element)
+            db.session.delete(cap)
+            removed += 1
+
+    return {"capabilities_created": created, "capabilities_updated": updated, "capabilities_removed": removed}
 
 
 # ---------------------------------------------------------------------------
@@ -302,20 +348,24 @@ def _upsert_work_package(
 
 
 def _apply_transformation(org: Organization, answers: dict) -> dict:
-    work_packages_created, work_packages_updated = 0, 0
-    capabilities_created = 0
+    work_packages_created, work_packages_updated, work_packages_removed = 0, 0, 0
+    capabilities_created, capabilities_removed = 0, 0
+    keep_capability_markers: set[str] = set()
+    keep_work_package_markers: set[str] = set()
     for key in answers.get("transformation_templates") or []:
         template = reference_data.transformation_template(key)
         if template is None:
             continue
         category = template.get("category") or template["name"]
         capability_marker = f"tell_us_more:whats_changing:capability:{key}"
+        keep_capability_markers.add(capability_marker)
         capability, cap_created = _upsert_capability(org, marker=capability_marker, name=category, status="defined")
         capabilities_created += cap_created
 
         phases = template.get("phases") or [template["name"]]
         for index, phase in enumerate(phases):
             marker = f"tell_us_more:whats_changing:{key}:{index}"
+            keep_work_package_markers.add(marker)
             name = f"{template['name']} — {phase}"
             _, wp_created = _upsert_work_package(
                 org,
@@ -331,6 +381,7 @@ def _apply_transformation(org: Organization, answers: dict) -> dict:
     other_text = answers.get("transformation_other")
     if other_text:
         marker = "tell_us_more:whats_changing:other"
+        keep_work_package_markers.add(marker)
         _, wp_created = _upsert_work_package(
             org,
             marker=marker,
@@ -342,10 +393,47 @@ def _apply_transformation(org: Organization, answers: dict) -> dict:
         work_packages_created += wp_created
         work_packages_updated += 0 if wp_created else 1
 
+    # Remove capabilities whose template was deselected.
+    existing_caps = UnifiedCapability.query.filter_by(
+        organization_id=org.id, source_table="onboarding"
+    ).all()
+    for cap in existing_caps:
+        sid = cap.source_id or ""
+        if sid.startswith("tell_us_more:whats_changing:capability:") and sid not in keep_capability_markers:
+            if cap.archimate_element_id:
+                element = db.session.get(ArchiMateElement, cap.archimate_element_id)
+                if element is not None:
+                    db.session.delete(element)
+            db.session.delete(cap)
+            capabilities_removed += 1
+
+    # Remove work packages whose template was deselected.
+    all_wps = (
+        UnifiedWorkPackage.query
+        .join(ArchiMateElement, UnifiedWorkPackage.archimate_element_id == ArchiMateElement.id)
+        .filter(ArchiMateElement.organization_id == org.id, UnifiedWorkPackage.generation_method == "onboarding")
+        .all()
+    )
+    for wp in all_wps:
+        try:
+            source_data = json.loads(wp.source_data or "{}")
+        except (TypeError, ValueError):
+            source_data = {}
+        wp_marker = source_data.get(_MARKER_KEY, "")
+        if wp_marker.startswith("tell_us_more:whats_changing:") and wp_marker not in keep_work_package_markers:
+            if wp.archimate_element_id:
+                element = db.session.get(ArchiMateElement, wp.archimate_element_id)
+                if element is not None:
+                    db.session.delete(element)
+            db.session.delete(wp)
+            work_packages_removed += 1
+
     return {
         "capabilities_created": capabilities_created,
+        "capabilities_removed": capabilities_removed,
         "work_packages_created": work_packages_created,
         "work_packages_updated": work_packages_updated,
+        "work_packages_removed": work_packages_removed,
     }
 
 
@@ -383,19 +471,23 @@ def _upsert_technology_element(org: Organization, *, marker: str, name: str, ele
 
 
 def _apply_implementation(org: Organization, answers: dict) -> dict:
-    capabilities_created = 0
-    technology_created = 0
+    capabilities_created, capabilities_removed = 0, 0
+    technology_created, technology_removed = 0, 0
+    keep_capability_markers: set[str] = set()
+    keep_technology_markers: set[str] = set()
 
     implementation_type_key = answers.get("implementation_type")
     if implementation_type_key:
         impl_type = reference_data.implementation_type(implementation_type_key)
         if impl_type is not None:
             marker = f"tell_us_more:how_you_build:implementation_type:{implementation_type_key}"
+            keep_capability_markers.add(marker)
             _, created = _upsert_capability(org, marker=marker, name=impl_type["title"], status="operational")
             capabilities_created += created
 
     if answers.get("has_dev_team") is True:
         marker = "tell_us_more:how_you_build:dev_team"
+        keep_capability_markers.add(marker)
         _, created = _upsert_capability(org, marker=marker, name="Software engineering", status="operational")
         capabilities_created += created
 
@@ -406,6 +498,7 @@ def _apply_implementation(org: Organization, answers: dict) -> dict:
         )
         if target is not None:
             marker = f"tell_us_more:how_you_build:deployment:{deployment_target_key}"
+            keep_capability_markers.add(marker)
             _, created = _upsert_capability(
                 org, marker=marker, name=f"{target['label']} operations", status="operational"
             )
@@ -413,15 +506,43 @@ def _apply_implementation(org: Organization, answers: dict) -> dict:
 
     for token in _split_stack_tokens(answers.get("stack") or ""):
         marker = f"tell_us_more:how_you_build:stack:{token.casefold()}"
+        keep_technology_markers.add(marker)
         _, created = _upsert_technology_element(org, marker=marker, name=token, element_type="Node")
         technology_created += created
 
     for token in _split_stack_tokens(answers.get("integrations") or ""):
         marker = f"tell_us_more:how_you_build:integrations:{token.casefold()}"
+        keep_technology_markers.add(marker)
         _, created = _upsert_technology_element(org, marker=marker, name=token, element_type="TechnologyService")
         technology_created += created
 
-    return {"capabilities_created": capabilities_created, "technology_elements_created": technology_created}
+    # Remove capabilities whose answer was deselected.
+    existing_caps = UnifiedCapability.query.filter_by(
+        organization_id=org.id, source_table="onboarding"
+    ).all()
+    for cap in existing_caps:
+        sid = cap.source_id or ""
+        if sid.startswith("tell_us_more:how_you_build:") and sid not in keep_capability_markers:
+            if cap.archimate_element_id:
+                element = db.session.get(ArchiMateElement, cap.archimate_element_id)
+                if element is not None:
+                    db.session.delete(element)
+            db.session.delete(cap)
+            capabilities_removed += 1
+
+    # Remove technology elements whose answer was deselected.
+    for element in _find_elements_by_marker_prefix(org.id, "tell_us_more:how_you_build:", layer="technology"):
+        marker = (element.custom_properties or {}).get(_MARKER_KEY, "")
+        if marker not in keep_technology_markers:
+            db.session.delete(element)
+            technology_removed += 1
+
+    return {
+        "capabilities_created": capabilities_created,
+        "capabilities_removed": capabilities_removed,
+        "technology_elements_created": technology_created,
+        "technology_elements_removed": technology_removed,
+    }
 
 
 _HANDLERS = {

@@ -232,3 +232,127 @@ def test_programme_ask_lens_reads_the_work_packages_it_created(app, db_session, 
     body = resp.get_json()["data"]
     assert len(body["work_packages"]) == 1
     assert "Cloud Migration" in body["work_packages"][0]["name"]
+
+
+# ---------------------------------------------------------------------------
+# Orphan cleanup: re-saving with fewer answers removes the old records
+# ---------------------------------------------------------------------------
+
+
+def test_deselecting_a_compliance_standard_removes_its_risk(app, db_session, make_org):
+    from app.models.risk import Risk
+    from app.modules.onboarding.services import tell_us_more
+
+    org = make_org("ws-orphan-compliance")
+    tell_us_more.save_section(org, "compliance", {
+        "standards": {"gdpr": "partial", "iso27001": "full"},
+    })
+    assert Risk.query.filter_by(organization_id=org.id).count() == 2
+
+    tell_us_more.save_section(org, "compliance", {
+        "standards": {"gdpr": "partial"},
+    })
+    risks = Risk.query.filter_by(organization_id=org.id).all()
+    assert len(risks) == 1
+    assert risks[0].title == "GDPR compliance"
+
+
+def test_deselecting_a_framework_removes_its_capability(app, db_session, make_org):
+    from app.models.unified_capability import UnifiedCapability
+    from app.modules.onboarding.services import tell_us_more
+
+    org = make_org("ws-orphan-frameworks")
+    tell_us_more.save_section(org, "how_you_work", {
+        "frameworks_in_use": ["agile-methodology", "devops-practices"],
+    })
+    assert UnifiedCapability.query.filter_by(
+        organization_id=org.id, source_table="onboarding"
+    ).count() == 2
+
+    tell_us_more.save_section(org, "how_you_work", {
+        "frameworks_in_use": ["agile-methodology"],
+    })
+    caps = UnifiedCapability.query.filter_by(
+        organization_id=org.id, source_table="onboarding"
+    ).all()
+    assert len(caps) == 1
+    assert caps[0].name == "Agile Methodology"
+
+
+def test_deselecting_a_transformation_template_removes_its_work_packages(app, db_session, make_org):
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.modules.onboarding.services import tell_us_more
+
+    org = make_org("ws-orphan-transformation")
+    tell_us_more.save_section(org, "whats_changing", {
+        "transformation_templates": ["crm", "cloud-migration"],
+    })
+
+    wps_before = (
+        UnifiedWorkPackage.query
+        .join(ArchiMateElement, UnifiedWorkPackage.archimate_element_id == ArchiMateElement.id)
+        .filter(ArchiMateElement.organization_id == org.id)
+        .count()
+    )
+    assert wps_before > 4  # CRM has 4 phases, cloud-migration has its own
+
+    tell_us_more.save_section(org, "whats_changing", {
+        "transformation_templates": ["crm"],
+    })
+    wps_after = (
+        UnifiedWorkPackage.query
+        .join(ArchiMateElement, UnifiedWorkPackage.archimate_element_id == ArchiMateElement.id)
+        .filter(ArchiMateElement.organization_id == org.id)
+        .count()
+    )
+    assert wps_after == 4, "only CRM's 4 phases must remain"
+
+
+def test_clearing_the_stack_field_removes_technology_elements(app, db_session, make_org):
+    from app.models.archimate_core import ArchiMateElement
+    from app.modules.onboarding.services import tell_us_more
+
+    org = make_org("ws-orphan-stack")
+    tell_us_more.save_section(org, "how_you_build", {
+        "stack": "Next.js, PostgreSQL, Docker",
+    })
+    tech_before = ArchiMateElement.query.filter_by(
+        organization_id=org.id, layer="technology"
+    ).count()
+    assert tech_before == 3
+
+    tell_us_more.save_section(org, "how_you_build", {
+        "stack": "Next.js",
+    })
+    tech_after = ArchiMateElement.query.filter_by(
+        organization_id=org.id, layer="technology"
+    ).all()
+    assert len(tech_after) == 1
+    assert tech_after[0].name == "Next.js"
+
+
+def test_deselected_answer_cleanup_is_isolated_between_organisations(app, db_session, make_org):
+    from app.models.risk import Risk
+    from app.modules.onboarding.services import tell_us_more
+
+    org_a = make_org("ws-orphan-iso-a")
+    org_b = make_org("ws-orphan-iso-b")
+
+    tell_us_more.save_section(org_a, "compliance", {
+        "standards": {"gdpr": "partial", "iso27001": "full"},
+    })
+    tell_us_more.save_section(org_b, "compliance", {
+        "standards": {"gdpr": "partial", "iso27001": "full"},
+    })
+
+    # Deselect iso27001 only in org A.
+    tell_us_more.save_section(org_a, "compliance", {
+        "standards": {"gdpr": "partial"},
+    })
+
+    risks_a = Risk.query.filter_by(organization_id=org_a.id).all()
+    risks_b = Risk.query.filter_by(organization_id=org_b.id).all()
+    assert len(risks_a) == 1
+    assert risks_a[0].title == "GDPR compliance"
+    assert len(risks_b) == 2, "org B's iso27001 risk must not be touched by org A's cleanup"

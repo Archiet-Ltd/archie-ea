@@ -296,7 +296,6 @@ def test_review_route_isolation_between_organizations(app, db_session, make_org,
     login_as(client, user_a)
     resp = client.get("/onboarding/review")
     assert resp.status_code == 200
-    from app.modules.onboarding.services import producers
     candidate_id = proposals.proposal_id("funding_stage", "Series A or B")
     resp = client.post(f"/onboarding/review/{candidate_id}/action", json={"action": "confirm"})
     assert resp.status_code == 200, resp.get_data(as_text=True)
@@ -464,3 +463,98 @@ def test_company_screen_has_no_review_link_for_a_new_user_mid_onboarding(
     assert resp.status_code == 200, resp.get_data(as_text=True)
     html = resp.get_data(as_text=True)
     assert 'href="/onboarding/review"' not in html
+
+
+# --- preview (read-only sync) ------------------------------------------------
+
+
+def test_preview_returns_same_shape_as_sync_without_writing(app, db_session, make_org):
+    from app.modules.onboarding.services import proposals
+
+    org = make_org("preview-shape")
+    candidates = [{
+        "field": "funding_stage", "value": "Seed", "source": "answers",
+        "source_label": "From your answers", "confidence": "likely", "reason": "why",
+    }]
+
+    previewed = proposals.preview(org, candidates)
+    assert len(previewed) == 1
+    assert previewed[0]["status"] == "pending"
+    assert previewed[0]["id"] == "funding_stage:seed"
+
+    # The store must still be empty -- preview never writes.
+    stored = proposals.read(org)
+    assert stored == []
+
+
+def test_preview_respects_decided_proposals_without_writing(app, db_session, make_org):
+    from app.modules.onboarding.services import proposals
+
+    org = make_org("preview-decided")
+    candidate = {
+        "field": "region", "value": "Serves customers in Europe / the EU",
+        "source": "answers", "source_label": "From your answers",
+        "confidence": "certain", "reason": "why",
+    }
+    # Sync first so a real decision exists in the store.
+    proposals.sync(org, [candidate])
+    pid = proposals.proposal_id("region", candidate["value"])
+    proposals.decide(org, pid, "dismiss")
+
+    # preview must see the dismissed status without writing.
+    previewed = proposals.preview(org, [candidate])
+    assert previewed[0]["status"] == "dismissed"
+
+    # The store must still have exactly one entry (the dismissed one).
+    stored = proposals.read(org)
+    assert len(stored) == 1
+    assert stored[0]["status"] == "dismissed"
+
+
+def test_review_get_does_not_write_to_the_proposal_store(app, db_session, make_org, client, login_as):
+    from app.modules.onboarding.services import profile, proposals
+
+    org, _ = _logged_in(db_session, make_org, client, login_as, "get-nowrite", with_role=True)
+    profile.write(org, stage="early_revenue", region_europe_or_eu_customers=True)
+
+    # The store must be empty before the GET.
+    assert proposals.read(org) == []
+
+    resp = client.get("/onboarding/review")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+
+    # After the GET, the store must still be empty -- GET must not write.
+    assert proposals.read(org) == [], "GET /onboarding/review must not commit proposals"
+
+
+def test_gaps_get_does_not_write_to_the_proposal_store(app, db_session, make_org, client, login_as):
+    from app.modules.onboarding.services import profile, proposals
+
+    org, _ = _logged_in(db_session, make_org, client, login_as, "gaps-nowrite", with_role=True)
+    profile.write(org, stage="early_revenue", region_europe_or_eu_customers=True)
+
+    assert proposals.read(org) == []
+
+    resp = client.get("/onboarding/gaps")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+
+    assert proposals.read(org) == [], "GET /onboarding/gaps must not commit proposals"
+
+
+def test_review_action_post_syncs_before_deciding(app, db_session, make_org, client, login_as):
+    """The POST route must sync proposals from the current profile before
+    deciding, since the GET routes no longer seed the store."""
+    from app.modules.onboarding.services import profile, proposals
+
+    org, _ = _logged_in(db_session, make_org, client, login_as, "post-syncs", with_role=True)
+    profile.write(org, stage="growing")
+
+    pid = proposals.proposal_id("funding_stage", "Series A or B")
+    # No prior sync -- the store is empty.
+    assert proposals.read(org) == []
+
+    resp = client.post(f"/onboarding/review/{pid}/action", json={"action": "confirm"})
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+
+    db_session.refresh(org)
+    assert profile.read(org)["funding_stage"] == "Series A or B"

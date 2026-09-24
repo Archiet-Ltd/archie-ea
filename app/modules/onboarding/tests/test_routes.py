@@ -460,6 +460,26 @@ def test_twin_screen_renders_and_shows_the_role_chosen_earlier(
     assert "View Architecture Health" in html, "cto's primaryCTA label must be present"
 
 
+def test_security_and_data_architect_roles_are_accepted_by_set_role(
+    app, db_session, make_org, client, login_as
+):
+    """Finding 5: security_architect and data_architect appear in the role
+    picker UI but were silently dropped by completion.set_role -- they must
+    now be accepted."""
+    org, user = _logged_in(db_session, make_org, client, login_as, "sec-data-role")
+    from app.modules.onboarding.services import completion
+
+    assert completion.set_role(user, "security_architect") is True
+    assert user.enterprise_role == "security_architect"
+
+    assert completion.set_role(user, "data_architect") is True
+    assert user.enterprise_role == "data_architect"
+
+    # An unknown role must still be rejected.
+    assert completion.set_role(user, "not_a_real_role") is False
+    assert user.enterprise_role == "data_architect"
+
+
 def test_skip_marks_onboarding_complete_and_goes_to_the_dashboard(
     app, db_session, make_org, client, login_as
 ):

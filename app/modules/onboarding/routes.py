@@ -183,7 +183,7 @@ def gaps():
     statuses = tell_us_more.section_statuses(org)
     tell_us_more_done = sum(1 for v in statuses.values() if v == "saved")
     pending_review_count = sum(
-        1 for p in proposals.sync(org, producers.from_answers(org_profile))
+        1 for p in proposals.preview(org, producers.from_answers(org_profile))
         if p["status"] == "pending"
     )
     return render_template(
@@ -307,7 +307,7 @@ def review():
     org = _current_org()
     org_profile = profile.read(org)
     candidates = producers.from_answers(org_profile)
-    items = proposals.sync(org, candidates)
+    items = proposals.preview(org, candidates)
     pending = [p for p in items if p["status"] == "pending"]
     decided = [p for p in items if p["status"] != "pending"]
     return render_template(
@@ -327,6 +327,10 @@ def review_action(the_proposal_id: str):
     org = _current_org()
     data = request.get_json(silent=True) or {}
     action = data.get("action")
+    # Sync proposals from the current profile before deciding -- the GET
+    # routes only preview, so the store may not yet hold this proposal.
+    org_profile = profile.read(org)
+    proposals.sync(org, producers.from_answers(org_profile))
     try:
         result = proposals.decide(
             org,

@@ -133,6 +133,51 @@ def read(org: Organization) -> list[dict]:
     return sorted(store.values(), key=lambda p: p.get("created_at") or "", reverse=True)
 
 
+def preview(org: Organization, candidates: list[dict]) -> list[dict]:
+    """Return what sync would produce without writing to the store.
+
+    A read-only counterpart to ``sync()`` for GET routes: the same merge
+    logic (decided proposals keep their status, pending ones are refreshed,
+    stale pending ones whose signal disappeared are dropped), but nothing
+    is committed. Use this when the caller only needs to display proposals,
+    not persist them.
+    """
+    store = _store(org)
+    now = datetime.datetime.utcnow().isoformat()
+    seen_ids: set[str] = set()
+    result: list[dict] = []
+
+    for candidate in candidates:
+        pid = proposal_id(candidate["field"], candidate["value"])
+        seen_ids.add(pid)
+        existing = store.get(pid)
+        if existing and existing.get("status") != "pending":
+            result.append(dict(existing))
+            continue
+        result.append({
+            "id": pid,
+            "field": candidate["field"],
+            "field_label": FIELD_LABELS.get(candidate["field"], candidate["field"]),
+            "value": candidate["value"],
+            "source": candidate["source"],
+            "source_label": candidate["source_label"],
+            "confidence": candidate["confidence"],
+            "reason": candidate.get("reason"),
+            "status": "pending",
+            "decided_value": None,
+            "created_at": (existing or {}).get("created_at", now),
+            "decided_at": None,
+            "decided_by_user_id": None,
+        })
+
+    # Decided proposals whose signal disappeared are still shown.
+    for pid, proposal in store.items():
+        if pid not in seen_ids and proposal.get("status") != "pending":
+            result.append(dict(proposal))
+
+    return sorted(result, key=lambda p: p.get("created_at") or "", reverse=True)
+
+
 def sync(org: Organization, candidates: list[dict]) -> list[dict]:
     """Merge freshly-produced *candidates* into *org*'s proposal store.
 

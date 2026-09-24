@@ -28,6 +28,8 @@ VALID_ENTERPRISE_ROLES = (
     "cto",
     "application_manager",
     "procurement",
+    "security_architect",
+    "data_architect",
 )
 
 
