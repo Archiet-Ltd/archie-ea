@@ -61,6 +61,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 
 from app.services.application_consolidation_service import (
     ApplicationConsolidationService,
@@ -724,6 +725,7 @@ def get_scoring_configuration(config_id):
 
 @dashboard_pages_bp.route("/api/scoring-configurations", methods=["POST"])
 @login_required
+@platform_admin_required
 @audit_log("create_scoring_configuration")
 def create_scoring_configuration():
     """Create a new scoring configuration."""
@@ -791,6 +793,7 @@ def create_scoring_configuration():
     "/api/scoring-configurations/<int:config_id>", methods=["PUT"]
 )
 @login_required
+@platform_admin_required
 def update_scoring_configuration(config_id):
     """Update an existing scoring configuration."""
     try:
@@ -868,6 +871,7 @@ def update_scoring_configuration(config_id):
     "/api/scoring-configurations/<int:config_id>", methods=["DELETE"]
 )
 @login_required
+@platform_admin_required
 def delete_scoring_configuration(config_id):
     """Soft delete a scoring configuration."""
     try:

@@ -13,10 +13,12 @@ from decimal import Decimal
 from typing import Dict, Optional, Tuple
 
 from flask import current_app
+from flask_login import current_user
 from sqlalchemy import func
 
 from app import db
 from app.models import LLMInteraction
+from app.models.user import User
 
 # from app.services.decorators import transactional  # Temporarily disabled
 
@@ -145,14 +147,26 @@ class LLMCostTracker:
                     "Please optimize your prompts or request a budget increase."
                 )
 
-        # Calculate overall organizational spending
-        org_spending = self._get_organization_spending(month_start)
-        org_budget = self._get_organization_budget()
+        # Calculate overall organizational spending -- scoped to the CALLER's own
+        # organisation. LLMInteraction carries no organisation column of its own, so an
+        # unscoped sum (the previous behaviour) mixed every tenant's spend into one
+        # number: one tenant's usage could exhaust every other tenant's budget check.
+        organization_id = self._resolve_organization_id(user_id)
+        if organization_id is not None:
+            org_spending = self._get_organization_spending(month_start, organization_id)
+            org_budget = self._get_organization_budget()
 
-        if org_spending >= org_budget * Decimal(str(self.HARD_LIMIT_THRESHOLD)):
-            return False, (
-                f"Organization monthly budget limit reached (£{org_spending:.2f} / £{org_budget:.2f}). "
-                "Please contact the Enterprise Architecture team."
+            if org_spending >= org_budget * Decimal(str(self.HARD_LIMIT_THRESHOLD)):
+                return False, (
+                    f"Organization monthly budget limit reached (£{org_spending:.2f} / £{org_budget:.2f}). "
+                    "Please contact the Enterprise Architecture team."
+                )
+        else:
+            logger.warning(
+                "Budget check could not resolve a calling organisation (no signed-in user and "
+                "no resolvable user_id=%s); skipping the organisation-level budget check rather "
+                "than falling back to a cross-tenant sum.",
+                user_id,
             )
 
         return True, None
@@ -244,11 +258,39 @@ class LLMCostTracker:
 
         return Decimal(str(result)) if result else Decimal("0")
 
-    def _get_organization_spending(self, since: datetime) -> Decimal:
-        """Get total organization spending since a given date."""
+    def _resolve_organization_id(self, user_id: Optional[int]) -> Optional[int]:
+        """The organisation whose budget this call should count against.
+
+        Prefers the signed-in user (the normal case: a live chat request), falling back to
+        the ``user_id`` argument for a call made on another user's behalf. ``User`` has no
+        ``TenantMixin`` (see ``app/utils/tenant_users.py``), so this direct lookup by id is
+        the correct way to resolve a user's own organisation -- unlike resolving an
+        externally-supplied id against a *known* organisation, it is not itself a tenancy
+        check. Returns ``None`` when neither is available (e.g. a background job with no
+        user context), so the caller can skip the organisation-level check rather than fall
+        back to a cross-tenant sum.
+        """
+        if current_user and getattr(current_user, "is_authenticated", False):
+            return current_user.organization_id
+        if user_id is not None:
+            user = db.session.get(User, user_id)
+            if user is not None:
+                return user.organization_id
+        return None
+
+    def _get_organization_spending(self, since: datetime, organization_id: int) -> Decimal:
+        """Total spend since a date, for interactions made by users of ONE organisation.
+
+        ``LLMInteraction`` carries no organisation column of its own -- ``user_id`` (via
+        ``User.organization_id``) is the only link, so the sum is joined through ``User``.
+        An interaction with no ``user_id`` (a background job not attributed to a user)
+        cannot be joined to any organisation and is excluded here, the same as it already
+        is from ``_get_user_spending``.
+        """
         result = (
             db.session.query(func.sum(LLMInteraction.cost))
-            .filter(LLMInteraction.created_at >= since)
+            .join(User, LLMInteraction.user_id == User.id)
+            .filter(User.organization_id == organization_id, LLMInteraction.created_at >= since)
             .scalar()
         )
 
@@ -351,16 +393,26 @@ class LLMCostTracker:
             },
         }
 
-    def get_budget_status(self) -> Dict:
+    def get_budget_status(self, organization_id: Optional[int] = None) -> Dict:
         """
-        Get current budget status for the organization.
+        Get current budget status for one organization.
+
+        Args:
+            organization_id: Organisation to report on. Defaults to the signed-in user's
+                own organisation; raises if neither is available, rather than falling back
+                to a cross-tenant sum (the previous, unscoped behaviour).
 
         Returns:
             Dict with budget utilization metrics
         """
+        if organization_id is None:
+            organization_id = self._resolve_organization_id(None)
+        if organization_id is None:
+            raise ValueError("get_budget_status requires an organization_id (no signed-in user)")
+
         month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        org_spending = self._get_organization_spending(month_start)
+        org_spending = self._get_organization_spending(month_start, organization_id)
         org_budget = self._get_organization_budget()
 
         days_in_month = (

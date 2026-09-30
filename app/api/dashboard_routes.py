@@ -14,6 +14,7 @@ from flask import Blueprint, flash, jsonify, redirect, render_template, request,
 from flask_login import login_required
 
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 
 from app.services.application_consolidation_service import (
     ApplicationConsolidationService,
@@ -541,6 +542,7 @@ def get_scoring_configuration(config_id):
 
 @dashboard_bp.route("/api/scoring-configurations", methods=["POST"])
 @login_required
+@platform_admin_required
 @audit_log("scoring_configuration_create")
 def create_scoring_configuration():
     """Create a new scoring configuration."""
@@ -604,6 +606,7 @@ def create_scoring_configuration():
 
 @dashboard_bp.route("/api/scoring-configurations/<int:config_id>", methods=["PUT"])
 @login_required
+@platform_admin_required
 @audit_log("scoring_configuration_update")
 def update_scoring_configuration(config_id):
     """Update an existing scoring configuration."""
@@ -678,6 +681,7 @@ def update_scoring_configuration(config_id):
 
 @dashboard_bp.route("/api/scoring-configurations/<int:config_id>", methods=["DELETE"])
 @login_required
+@platform_admin_required
 @audit_log("scoring_configuration_delete")
 def delete_scoring_configuration(config_id):
     """Soft delete a scoring configuration."""

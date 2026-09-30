@@ -23,6 +23,7 @@ from flask_login import login_required
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 from app.modules.dashboard.v2.services import (
     ApplicationConsolidationService,
     CapabilityHeatmapService,
@@ -702,6 +703,7 @@ def get_scoring_configuration(config_id):
 @dashboard_pages_bp_v2.route("/api/scoring-configurations", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @audit_log("scoring_configuration_create")
 def create_scoring_configuration():
     """Create a new scoring configuration."""
@@ -768,6 +770,7 @@ def create_scoring_configuration():
 )
 @timed_route
 @login_required
+@platform_admin_required
 @audit_log("scoring_configuration_update")
 def update_scoring_configuration(config_id):
     """Update an existing scoring configuration."""
@@ -843,6 +846,7 @@ def update_scoring_configuration(config_id):
 )
 @timed_route
 @login_required
+@platform_admin_required
 @audit_log("scoring_configuration_delete")
 def delete_scoring_configuration(config_id):
     """Soft delete a scoring configuration."""
