@@ -1585,6 +1585,131 @@ def _backfill_document_chunk_organizations(*, dry_run, existing_tables, added, f
         )
 
 
+def _backfill_options_analysis_organizations(*, dry_run, existing_tables, added, failed):
+    """Recover the tenant key for the OptionsAnalysis family, which predates
+    TenantMixin on all seven tables.
+
+    options_analysis backfills via created_by_id -> users.organization_id (a
+    trustworthy join: every user belongs to exactly one org). The six child
+    tables (vendor_options, analysis_recommendations, stakeholder_inputs,
+    analysis_scenarios, required_capabilities, analysis_audit_logs) backfill
+    via analysis_id -> options_analysis.organization_id, so they must run
+    after the parent has been resolved. Unresolvable rows (an analysis whose
+    creator no longer exists, or a child row whose analysis was deleted) are
+    left NULL and reported, never guessed.
+    """
+    from sqlalchemy import inspect, text
+
+    def _backfill_by_creator(table: str):
+        if table not in existing_tables:
+            return
+        live_columns = {c["name"] for c in inspect(db.engine).get_columns(table)}
+        if "organization_id" not in live_columns:
+            return
+        before = db.session.scalar(
+            text(f"SELECT count(*) FROM {table} WHERE organization_id IS NULL")
+        )
+        if not before:
+            return
+        eligible = db.session.scalar(
+            text(
+                f"""
+                SELECT count(*)
+                FROM {table} t
+                JOIN users u ON u.id = t.created_by_id
+                WHERE t.organization_id IS NULL
+                  AND u.organization_id IS NOT NULL
+                """
+            )
+        )
+        updated = eligible
+        if not dry_run and eligible:
+            result = db.session.execute(
+                text(
+                    f"""
+                    UPDATE {table} AS t
+                    SET organization_id = u.organization_id
+                    FROM users AS u
+                    WHERE u.id = t.created_by_id
+                      AND t.organization_id IS NULL
+                      AND u.organization_id IS NOT NULL
+                    """
+                )
+            )
+            updated = result.rowcount
+            db.session.commit()
+        unresolved = before - updated
+        added.append(
+            f"backfill.{table}.organization_id :: before={before}, "
+            f"updated={updated}, unresolved={unresolved}"
+        )
+        if unresolved:
+            failed.append(
+                f"backfill.{table}.organization_id: {unresolved} row(s) whose "
+                "created_by_id names no live users row"
+            )
+
+    def _backfill_by_analysis(table: str):
+        if table not in existing_tables or "options_analysis" not in existing_tables:
+            return
+        live_columns = {c["name"] for c in inspect(db.engine).get_columns(table)}
+        if "organization_id" not in live_columns:
+            return
+        before = db.session.scalar(
+            text(f"SELECT count(*) FROM {table} WHERE organization_id IS NULL")
+        )
+        if not before:
+            return
+        eligible = db.session.scalar(
+            text(
+                f"""
+                SELECT count(*)
+                FROM {table} t
+                JOIN options_analysis a ON a.id = t.analysis_id
+                WHERE t.organization_id IS NULL
+                  AND a.organization_id IS NOT NULL
+                """
+            )
+        )
+        updated = eligible
+        if not dry_run and eligible:
+            result = db.session.execute(
+                text(
+                    f"""
+                    UPDATE {table} AS t
+                    SET organization_id = a.organization_id
+                    FROM options_analysis AS a
+                    WHERE a.id = t.analysis_id
+                      AND t.organization_id IS NULL
+                      AND a.organization_id IS NOT NULL
+                    """
+                )
+            )
+            updated = result.rowcount
+            db.session.commit()
+        unresolved = before - updated
+        added.append(
+            f"backfill.{table}.organization_id :: before={before}, "
+            f"updated={updated}, unresolved={unresolved}"
+        )
+        if unresolved:
+            failed.append(
+                f"backfill.{table}.organization_id: {unresolved} row(s) whose "
+                "analysis_id names no live options_analysis row"
+            )
+
+    _backfill_by_creator("options_analysis")
+    for child in (
+        "vendor_options",
+        "analysis_recommendations",
+        "stakeholder_inputs",
+        "analysis_scenarios",
+        "required_capabilities",
+        "analysis_audit_logs",
+    ):
+        _backfill_by_analysis(child)
+
+
 def _ensure_condition_evidence_canonical_document(
     *, dry_run, existing_tables, added, failed
 ):
@@ -1839,6 +1964,12 @@ def _reconcile(dry_run=False):
         failed=failed,
     )
     _backfill_webhook_organizations(
+        dry_run=dry_run,
+        existing_tables=existing_tables,
+        added=added,
+        failed=failed,
+    )
+    _backfill_options_analysis_organizations(
         dry_run=dry_run,
         existing_tables=existing_tables,
         added=added,

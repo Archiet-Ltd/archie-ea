@@ -30,6 +30,10 @@ class OptionsAnalysis(TenantMixin, db.Model):
     - Vendor selection
     - Scoring criteria configuration
     - Analysis execution and results
+
+    TenantMixin added: prior to this fix the table had no organization_id at
+    all, so any query against it (e.g. the vendor catalog's cross-analysis
+    scoring view) returned every organization's vendor analyses.
     """
 
     __tablename__ = "options_analysis"
@@ -197,7 +201,7 @@ class OptionsAnalysis(TenantMixin, db.Model):
         return f"<OptionsAnalysis {self.id}: {self.name} ({self.status})>"
 
 
-class VendorOption(db.Model):
+class VendorOption(TenantMixin, db.Model):
     """
     Individual vendor being evaluated in an analysis.
 
@@ -460,7 +464,7 @@ class VendorComparisonCriteria(db.Model):
         return f"<VendorComparisonCriteria {self.name}: weight={self.weight}>"
 
 
-class AnalysisRecommendation(db.Model):
+class AnalysisRecommendation(TenantMixin, db.Model):
     """
     AI-generated recommendation for an options analysis.
 
@@ -687,7 +691,7 @@ class StakeholderInput(TenantMixin, db.Model):
         )
 
 
-class AnalysisScenario(db.Model):
+class AnalysisScenario(TenantMixin, db.Model):
     """
     What-if scenario analysis for vendor comparison.
 
@@ -752,7 +756,7 @@ class AnalysisScenario(db.Model):
         return f"<AnalysisScenario {self.id}: {self.scenario_name}>"
 
 
-class RequiredCapability(db.Model):
+class RequiredCapability(TenantMixin, db.Model):
     """
     Structured capability requirements with importance weighting.
 
@@ -823,7 +827,7 @@ class RequiredCapability(db.Model):
         return f"<RequiredCapability {self.id}: {self.capability_name} ({self.importance})>"
 
 
-class AnalysisAuditLog(db.Model):
+class AnalysisAuditLog(TenantMixin, db.Model):
     """
     Comprehensive audit trail for vendor analysis decisions.
 
