@@ -98,24 +98,6 @@ class ArchitectureAlert:
 
 
 @dataclass
-class ArchitectureBaseline:
-    """Represents an architecture baseline snapshot."""
-
-    id: str
-    name: str
-    created_at: str
-    created_by: Optional[str]
-    description: Optional[str]
-    capabilities_snapshot: List[Dict[str, Any]]
-    coverage_snapshot: Dict[str, Any]
-    health_snapshot: Dict[str, Any]
-    gap_snapshot: List[Dict[str, Any]]
-    vendor_snapshot: List[Dict[str, Any]]
-    checksum: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
 class DriftAnalysis:
     """Represents drift analysis results."""
 
@@ -143,198 +125,91 @@ class ArchitectureMonitoringService:
     - Drift detection algorithms
     - Alert generation and management
     - Integration with existing services
+
+    No baseline or alert is ever held in an instance or class attribute across
+    calls: every method reads from and writes to MonitoringBaseline /
+    MonitoringAlert (both TenantMixin) directly, so the tenant ORM filter
+    (do_orm_execute, app.middleware.tenant_isolation) scopes every query to
+    g.current_org_id and two organisations' data can never mix in this
+    service. Two instances of this class share nothing (F-3,
+    SECURITY-FINDINGS-R2-5.md).
     """
 
-    # In-memory cache (backed by database via MonitoringBaseline / MonitoringAlert models)
-    _baselines: Dict[str, ArchitectureBaseline] = {}
-    _alerts: Dict[str, ArchitectureAlert] = {}
-    _status: MonitoringStatus = MonitoringStatus.ACTIVE
-    _last_scan_time: Optional[datetime] = None
-    _scan_interval_minutes: int = 60
-    _active_baseline_id: Optional[str] = None
-    _db_loaded: bool = False
-
-    # Alert thresholds
-    COVERAGE_DECREASE_WARNING_THRESHOLD = 5  # 5% decrease
-    COVERAGE_DECREASE_CRITICAL_THRESHOLD = 15  # 15% decrease
-    HEALTH_SCORE_WARNING_THRESHOLD = 10  # 10 point decrease
-    HEALTH_SCORE_CRITICAL_THRESHOLD = 20  # 20 point decrease
-
     def __init__(self):
-        """Initialize the Architecture Monitoring Service."""
-        self._ensure_loaded()
+        """Initialize per-call defaults. None of these are class attributes:
+        each instance gets its own, so setting one on this instance can never
+        leak into another instance or another organisation's request."""
+        self._status = MonitoringStatus.ACTIVE
+        # Scan cadence is platform-wide configuration, not per-organisation
+        # state, so it is a plain instance default rather than a stored row.
+        self._scan_interval_minutes = 60
+        self.COVERAGE_DECREASE_WARNING_THRESHOLD = 5  # 5% decrease
+        self.COVERAGE_DECREASE_CRITICAL_THRESHOLD = 15  # 15% decrease
+        self.HEALTH_SCORE_WARNING_THRESHOLD = 10  # 10 point decrease
+        self.HEALTH_SCORE_CRITICAL_THRESHOLD = 20  # 20 point decrease
 
-    def _ensure_loaded(self):
-        """Load baselines and alerts from database if not already loaded."""
-        if self._db_loaded:
-            return
-        try:
-            from app.models.policy_monitoring import MonitoringAlert as MAModel
-            from app.models.policy_monitoring import MonitoringBaseline as MBModel
+    def _active_baseline_row(self):
+        """The current organisation's active baseline row, or None."""
+        from app.models.policy_monitoring import MonitoringBaseline as MBModel
 
-            # Load baselines
-            for row in MBModel.query.all():
-                snapshot = json.loads(row.snapshot_data) if row.snapshot_data else {}
-                baseline = ArchitectureBaseline(
-                    id=row.baseline_id,
-                    name=row.name,
-                    created_at=row.created_at.isoformat() if row.created_at else "",
-                    created_by=row.created_by,
-                    description=row.description,
-                    capabilities_snapshot=snapshot.get("capabilities", []),
-                    coverage_snapshot=snapshot.get("coverage", {}),
-                    health_snapshot=snapshot.get("health", {}),
-                    gap_snapshot=snapshot.get("gaps", []),
-                    vendor_snapshot=snapshot.get("vendors", []),
-                    checksum=row.checksum,
-                    metadata=snapshot.get("metadata", {}),
-                )
-                self._baselines[row.baseline_id] = baseline
-                if row.is_active:
-                    self._active_baseline_id = row.baseline_id
+        return MBModel.query.filter_by(is_active=True).first()
 
-            # Load alerts
-            for row in MAModel.query.all():
-                alert = ArchitectureAlert(
-                    id=row.alert_id,
-                    alert_type=row.alert_type,
-                    severity=row.severity,
-                    title=row.title,
-                    description=row.description or "",
-                    affected_element_id=row.affected_element_id,
-                    affected_element_type=row.affected_element_type,
-                    affected_element_name=row.affected_element_name,
-                    baseline_value=json.loads(row.baseline_value) if row.baseline_value else None,
-                    current_value=json.loads(row.current_value) if row.current_value else None,
-                    delta=row.delta,
-                    recommended_action=row.recommended_action,
-                    created_at=row.created_at.isoformat() if row.created_at else "",
-                    acknowledged=row.acknowledged or False,
-                    acknowledged_by=row.acknowledged_by,
-                    acknowledged_at=row.acknowledged_at.isoformat() if row.acknowledged_at else None,
-                    metadata=json.loads(row.alert_metadata) if row.alert_metadata else {},
-                )
-                self._alerts[row.alert_id] = alert
+    def _persist_alert(self, alert: "ArchitectureAlert"):
+        """Insert a newly generated alert row."""
+        from app.models.policy_monitoring import MonitoringAlert as MAModel
 
-            self._db_loaded = True
-            logger.info(
-                "Loaded %d baselines and %d alerts from database",
-                len(self._baselines), len(self._alerts),
-            )
-        except Exception as e:
-            logger.warning("Could not load monitoring data from database: %s", e)
-            self._db_loaded = True  # Don't retry on every call
+        row = MAModel(
+            alert_id=alert.id,
+            alert_type=alert.alert_type,
+            severity=alert.severity,
+            title=alert.title,
+            description=alert.description,
+            affected_element_id=alert.affected_element_id,
+            affected_element_type=alert.affected_element_type,
+            affected_element_name=alert.affected_element_name,
+            baseline_value=json.dumps(alert.baseline_value) if alert.baseline_value is not None else None,
+            current_value=json.dumps(alert.current_value) if alert.current_value is not None else None,
+            delta=alert.delta,
+            recommended_action=alert.recommended_action,
+            acknowledged=alert.acknowledged,
+            acknowledged_by=alert.acknowledged_by,
+            alert_metadata=json.dumps(alert.metadata) if alert.metadata else None,
+        )
+        db.session.add(row)
+        db.session.commit()
 
-    def _persist_baseline(self, baseline: ArchitectureBaseline):
-        """Save or update a baseline in the database."""
-        try:
-            from app.models.policy_monitoring import MonitoringBaseline as MBModel
+    def _unknown_drift(self, row, reason: str) -> Dict[str, Any]:
+        """A drift result that honestly reports nothing could be compared,
+        instead of fabricating a zero or crashing on a None comparison."""
+        return {
+            "success": True,
+            "status": "unknown",
+            "baseline_id": row.baseline_id,
+            "baseline_name": row.name,
+            "reason": reason,
+        }
 
-            snapshot_data = json.dumps({
-                "capabilities": baseline.capabilities_snapshot,
-                "coverage": baseline.coverage_snapshot,
-                "health": baseline.health_snapshot,
-                "gaps": baseline.gap_snapshot,
-                "vendors": baseline.vendor_snapshot,
-                "metadata": baseline.metadata,
-            })
-
-            existing = MBModel.query.filter_by(baseline_id=baseline.id).first()
-            if existing:
-                existing.name = baseline.name
-                existing.snapshot_data = snapshot_data
-                existing.checksum = baseline.checksum
-            else:
-                row = MBModel(
-                    baseline_id=baseline.id,
-                    name=baseline.name,
-                    description=baseline.description,
-                    created_by=baseline.created_by,
-                    is_active=(baseline.id == self._active_baseline_id),
-                    snapshot_data=snapshot_data,
-                    checksum=baseline.checksum,
-                )
-                db.session.add(row)
-
-            db.session.commit()
-        except Exception as e:
-            logger.error("Failed to persist baseline %s: %s", baseline.id, e)
-            db.session.rollback()
-
-    def _persist_alert(self, alert: ArchitectureAlert):
-        """Save or update an alert in the database."""
-        try:
-            from app.models.policy_monitoring import MonitoringAlert as MAModel
-
-            existing = MAModel.query.filter_by(alert_id=alert.id).first()
-            if existing:
-                existing.acknowledged = alert.acknowledged
-                existing.acknowledged_by = alert.acknowledged_by
-                existing.acknowledged_at = (
-                    datetime.fromisoformat(alert.acknowledged_at)
-                    if alert.acknowledged_at else None
-                )
-            else:
-                row = MAModel(
-                    alert_id=alert.id,
-                    alert_type=alert.alert_type,
-                    severity=alert.severity,
-                    title=alert.title,
-                    description=alert.description,
-                    affected_element_id=alert.affected_element_id,
-                    affected_element_type=alert.affected_element_type,
-                    affected_element_name=alert.affected_element_name,
-                    baseline_value=json.dumps(alert.baseline_value) if alert.baseline_value is not None else None,
-                    current_value=json.dumps(alert.current_value) if alert.current_value is not None else None,
-                    delta=alert.delta,
-                    recommended_action=alert.recommended_action,
-                    acknowledged=alert.acknowledged,
-                    acknowledged_by=alert.acknowledged_by,
-                    alert_metadata=json.dumps(alert.metadata) if alert.metadata else None,
-                )
-                db.session.add(row)
-
-            db.session.commit()
-        except Exception as e:
-            logger.error("Failed to persist alert %s: %s", alert.id, e)
-            db.session.rollback()
-
-    def _delete_baseline_from_db(self, baseline_id: str):
-        """Remove a baseline from the database."""
-        try:
-            from app.models.policy_monitoring import MonitoringBaseline as MBModel
-
-            MBModel.query.filter_by(baseline_id=baseline_id).delete()
-            db.session.commit()
-        except Exception as e:
-            logger.error("Failed to delete baseline %s from DB: %s", baseline_id, e)
-            db.session.rollback()
-
-    def _delete_alert_from_db(self, alert_id: str):
-        """Remove an alert from the database."""
-        try:
-            from app.models.policy_monitoring import MonitoringAlert as MAModel
-
-            MAModel.query.filter_by(alert_id=alert_id).delete()
-            db.session.commit()
-        except Exception as e:
-            logger.error("Failed to delete alert %s from DB: %s", alert_id, e)
-            db.session.rollback()
-
-    def _update_active_baseline_in_db(self):
-        """Update which baseline is marked active in the database."""
-        try:
-            from app.models.policy_monitoring import MonitoringBaseline as MBModel
-
-            MBModel.query.update({MBModel.is_active: False})
-            if self._active_baseline_id:
-                MBModel.query.filter_by(baseline_id=self._active_baseline_id).update(
-                    {MBModel.is_active: True}
-                )
-            db.session.commit()
-        except Exception as e:
-            logger.error("Failed to update active baseline in DB: %s", e)
-            db.session.rollback()
+    def _alert_to_api_dict(self, row) -> Dict[str, Any]:
+        """Render a MonitoringAlert row in the shape the API has always returned."""
+        return {
+            "id": row.alert_id,
+            "alert_type": row.alert_type,
+            "severity": row.severity,
+            "title": row.title,
+            "description": row.description or "",
+            "affected_element_id": row.affected_element_id,
+            "affected_element_type": row.affected_element_type,
+            "affected_element_name": row.affected_element_name,
+            "baseline_value": json.loads(row.baseline_value) if row.baseline_value else None,
+            "current_value": json.loads(row.current_value) if row.current_value else None,
+            "delta": row.delta,
+            "recommended_action": row.recommended_action,
+            "created_at": row.created_at.isoformat() if row.created_at else "",
+            "acknowledged": row.acknowledged or False,
+            "acknowledged_by": row.acknowledged_by,
+            "acknowledged_at": row.acknowledged_at.isoformat() if row.acknowledged_at else None,
+            "metadata": json.loads(row.alert_metadata) if row.alert_metadata else {},
+        }
 
     # =========================================================================
     # Monitoring Status
@@ -347,30 +222,44 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with monitoring status information
         """
+        from app.models.policy_monitoring import MonitoringAlert as MAModel
+        from app.models.policy_monitoring import MonitoringBaseline as MBModel
+
+        active_row = self._active_baseline_row()
         active_baseline = None
-        if self._active_baseline_id and self._active_baseline_id in self._baselines:
-            baseline = self._baselines[self._active_baseline_id]
+        if active_row:
             active_baseline = {
-                "id": baseline.id,
-                "name": baseline.name,
-                "created_at": baseline.created_at,
+                "id": active_row.baseline_id,
+                "name": active_row.name,
+                "created_at": active_row.created_at.isoformat() if active_row.created_at else None,
             }
+
+        total_baselines = MBModel.query.count()
 
         # Count alerts by severity
         alert_counts = {"info": 0, "warning": 0, "critical": 0, "total": 0, "unacknowledged": 0}
-        for alert in self._alerts.values():
+        for row in MAModel.query.all():
             alert_counts["total"] += 1
-            alert_counts[alert.severity] += 1
-            if not alert.acknowledged:
+            alert_counts[row.severity] = alert_counts.get(row.severity, 0) + 1
+            if not row.acknowledged:
                 alert_counts["unacknowledged"] += 1
+
+        # No dedicated "last scan" column exists on either model; the most
+        # recent alert timestamp is the honest proxy (alerts are only ever
+        # created during a scan). None, not a fabricated time, when no scan
+        # has produced an alert yet.
+        last_alert = MAModel.query.order_by(MAModel.created_at.desc()).first()
+        last_scan_time = (
+            last_alert.created_at.isoformat() if last_alert and last_alert.created_at else None
+        )
 
         return {
             "success": True,
             "status": self._status.value,
-            "last_scan_time": self._last_scan_time.isoformat() if self._last_scan_time else None,
+            "last_scan_time": last_scan_time,
             "scan_interval_minutes": self._scan_interval_minutes,
             "active_baseline": active_baseline,
-            "total_baselines": len(self._baselines),
+            "total_baselines": total_baselines,
             "alerts": alert_counts,
             "thresholds": {
                 "coverage_decrease_warning": self.COVERAGE_DECREASE_WARNING_THRESHOLD,
@@ -473,6 +362,8 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with baseline details
         """
+        from app.models.policy_monitoring import MonitoringBaseline as MBModel
+
         try:
             baseline_id = str(uuid4())
 
@@ -500,40 +391,44 @@ class ArchitectureMonitoringService:
                 vendor_snapshot,
             )
 
-            baseline = ArchitectureBaseline(
-                id=baseline_id,
-                name=name,
-                created_at=datetime.utcnow().isoformat(),
-                created_by=created_by,
-                description=description,
-                capabilities_snapshot=capabilities_snapshot,
-                coverage_snapshot=coverage_snapshot,
-                health_snapshot=health_snapshot,
-                gap_snapshot=gap_snapshot,
-                vendor_snapshot=vendor_snapshot,
-                checksum=checksum,
+            snapshot_data = json.dumps(
+                {
+                    "capabilities": capabilities_snapshot,
+                    "coverage": coverage_snapshot,
+                    "health": health_snapshot,
+                    "gaps": gap_snapshot,
+                    "vendors": vendor_snapshot,
+                    "metadata": {},
+                }
             )
 
-            self._baselines[baseline_id] = baseline
-
             if set_as_active:
-                self._active_baseline_id = baseline_id
+                # Bulk UPDATE is tenant-filtered (ADR-0003), so this only
+                # touches the current organisation's own baselines.
+                MBModel.query.update({MBModel.is_active: False})
 
-            # Persist to database
-            self._persist_baseline(baseline)
-            if set_as_active:
-                self._update_active_baseline_in_db()
+            row = MBModel(
+                baseline_id=baseline_id,
+                name=name,
+                description=description,
+                created_by=created_by,
+                is_active=set_as_active,
+                snapshot_data=snapshot_data,
+                checksum=checksum,
+            )
+            db.session.add(row)
+            db.session.commit()
 
             return {
                 "success": True,
                 "baseline": {
-                    "id": baseline.id,
-                    "name": baseline.name,
-                    "created_at": baseline.created_at,
-                    "created_by": baseline.created_by,
-                    "description": baseline.description,
-                    "checksum": baseline.checksum,
-                    "is_active": baseline_id == self._active_baseline_id,
+                    "id": row.baseline_id,
+                    "name": row.name,
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
+                    "created_by": row.created_by,
+                    "description": row.description,
+                    "checksum": row.checksum,
+                    "is_active": row.is_active,
                     "stats": {
                         "capabilities_count": len(capabilities_snapshot),
                         "gaps_count": len(gap_snapshot),
@@ -546,6 +441,7 @@ class ArchitectureMonitoringService:
 
         except Exception as e:
             logger.error(f"Error capturing baseline: {e}")
+            db.session.rollback()
             return {"success": False, "error": str(e)}
 
     def get_baseline(self, baseline_id: str) -> Dict[str, Any]:
@@ -558,27 +454,30 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with baseline details
         """
-        if baseline_id not in self._baselines:
+        from app.models.policy_monitoring import MonitoringBaseline as MBModel
+
+        row = MBModel.query.filter_by(baseline_id=baseline_id).first()
+        if not row:
             return {"success": False, "error": "Baseline not found"}
 
-        baseline = self._baselines[baseline_id]
+        snapshot = json.loads(row.snapshot_data) if row.snapshot_data else {}
 
         return {
             "success": True,
             "baseline": {
-                "id": baseline.id,
-                "name": baseline.name,
-                "created_at": baseline.created_at,
-                "created_by": baseline.created_by,
-                "description": baseline.description,
-                "checksum": baseline.checksum,
-                "is_active": baseline_id == self._active_baseline_id,
-                "capabilities_snapshot": baseline.capabilities_snapshot,
-                "coverage_snapshot": baseline.coverage_snapshot,
-                "health_snapshot": baseline.health_snapshot,
-                "gap_snapshot": baseline.gap_snapshot,
-                "vendor_snapshot": baseline.vendor_snapshot,
-                "metadata": baseline.metadata,
+                "id": row.baseline_id,
+                "name": row.name,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "created_by": row.created_by,
+                "description": row.description,
+                "checksum": row.checksum,
+                "is_active": row.is_active,
+                "capabilities_snapshot": snapshot.get("capabilities", []),
+                "coverage_snapshot": snapshot.get("coverage", {}),
+                "health_snapshot": snapshot.get("health", {}),
+                "gap_snapshot": snapshot.get("gaps", []),
+                "vendor_snapshot": snapshot.get("vendors", []),
+                "metadata": snapshot.get("metadata", {}),
             },
         }
 
@@ -589,28 +488,29 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with list of baselines
         """
-        baselines = []
-        for baseline in self._baselines.values():
-            baselines.append(
-                {
-                    "id": baseline.id,
-                    "name": baseline.name,
-                    "created_at": baseline.created_at,
-                    "created_by": baseline.created_by,
-                    "description": baseline.description,
-                    "checksum": baseline.checksum,
-                    "is_active": baseline.id == self._active_baseline_id,
-                }
-            )
+        from app.models.policy_monitoring import MonitoringBaseline as MBModel
 
-        # Sort by creation date (newest first)
-        baselines.sort(key=lambda x: x["created_at"], reverse=True)
+        rows = MBModel.query.order_by(MBModel.created_at.desc()).all()
+        baselines = [
+            {
+                "id": row.baseline_id,
+                "name": row.name,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "created_by": row.created_by,
+                "description": row.description,
+                "checksum": row.checksum,
+                "is_active": row.is_active,
+            }
+            for row in rows
+        ]
+
+        active_baseline_id = next((b["id"] for b in baselines if b["is_active"]), None)
 
         return {
             "success": True,
             "baselines": baselines,
             "total": len(baselines),
-            "active_baseline_id": self._active_baseline_id,
+            "active_baseline_id": active_baseline_id,
         }
 
     def set_active_baseline(self, baseline_id: str) -> Dict[str, Any]:
@@ -623,16 +523,22 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with result
         """
-        if baseline_id not in self._baselines:
+        from app.models.policy_monitoring import MonitoringBaseline as MBModel
+
+        row = MBModel.query.filter_by(baseline_id=baseline_id).first()
+        if not row:
             return {"success": False, "error": "Baseline not found"}
 
-        self._active_baseline_id = baseline_id
-        baseline = self._baselines[baseline_id]
+        # Bulk UPDATE is tenant-filtered (ADR-0003): only this organisation's
+        # own baselines are cleared.
+        MBModel.query.update({MBModel.is_active: False})
+        row.is_active = True
+        db.session.commit()
 
         return {
             "success": True,
-            "active_baseline": {"id": baseline.id, "name": baseline.name},
-            "message": f"Baseline '{baseline.name}' set as active",
+            "active_baseline": {"id": row.baseline_id, "name": row.name},
+            "message": f"Baseline '{row.name}' set as active",
         }
 
     def delete_baseline(self, baseline_id: str) -> Dict[str, Any]:
@@ -645,16 +551,14 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with result
         """
-        if baseline_id not in self._baselines:
+        from app.models.policy_monitoring import MonitoringBaseline as MBModel
+
+        row = MBModel.query.filter_by(baseline_id=baseline_id).first()
+        if not row:
             return {"success": False, "error": "Baseline not found"}
 
-        if baseline_id == self._active_baseline_id:
-            self._active_baseline_id = None
-
-        del self._baselines[baseline_id]
-        self._delete_baseline_from_db(baseline_id)
-        if baseline_id == self._active_baseline_id:
-            self._update_active_baseline_in_db()
+        db.session.delete(row)
+        db.session.commit()
 
         return {"success": True, "message": "Baseline deleted successfully"}
 
@@ -682,12 +586,12 @@ class ArchitectureMonitoringService:
             scan_start = datetime.utcnow()
             new_alerts = []
 
+            active_row = self._active_baseline_row()
+
             # If no active baseline, just capture current state
-            if not self._active_baseline_id:
+            if not active_row:
                 # Run gap discovery
                 gap_results = self._run_gap_discovery()
-
-                self._last_scan_time = scan_start
 
                 return {
                     "success": True,
@@ -699,12 +603,11 @@ class ArchitectureMonitoringService:
                 }
 
             # Perform drift analysis against active baseline
-            drift_analysis = self.analyze_drift(self._active_baseline_id)
+            drift_analysis = self.analyze_drift(active_row.baseline_id)
 
             if drift_analysis.get("success"):
                 new_alerts = drift_analysis.get("alerts", [])
 
-            self._last_scan_time = scan_start
             scan_duration = (datetime.utcnow() - scan_start).total_seconds()
 
             return {
@@ -732,12 +635,39 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with drift analysis results
         """
-        target_baseline_id = baseline_id or self._active_baseline_id
+        from app.models.policy_monitoring import MonitoringBaseline as MBModel
 
-        if not target_baseline_id or target_baseline_id not in self._baselines:
+        if baseline_id:
+            row = MBModel.query.filter_by(baseline_id=baseline_id).first()
+        else:
+            row = self._active_baseline_row()
+
+        if not row:
             return {"success": False, "error": "No valid baseline for comparison"}
 
-        baseline = self._baselines[target_baseline_id]
+        snapshot = json.loads(row.snapshot_data) if row.snapshot_data else {}
+        capabilities_snapshot = snapshot.get("capabilities", [])
+
+        # A baseline with no capability snapshot, or where no capability in it
+        # has an assessed maturity level, has nothing to compare against.
+        # Treating that as zero drift would fabricate a measurement, so this
+        # is reported honestly as "unknown" (HTTP 200 from the route, not a
+        # 500 and not a silent zero).
+        unassessed = (not capabilities_snapshot) or all(
+            c.get("current_maturity") is None for c in capabilities_snapshot
+        )
+        if unassessed:
+            return self._unknown_drift(
+                row,
+                "Baseline has no capability snapshot, or no capability in it has an "
+                "assessed maturity level, so drift cannot be computed.",
+            )
+
+        baseline_coverage = snapshot.get("coverage", {})
+        baseline_health = snapshot.get("health", {})
+        baseline_gaps = snapshot.get("gaps", [])
+        baseline_vendors = snapshot.get("vendors", [])
+
         analysis_time = datetime.utcnow()
 
         try:
@@ -748,19 +678,43 @@ class ArchitectureMonitoringService:
             current_gaps = self._capture_gap_snapshot()
             current_vendors = self._capture_vendor_snapshot()
 
+            # Coverage and health drift are both a subtraction over an
+            # "average_*" figure that is None, by design, when nothing was
+            # measured (see _capture_health_snapshot / the health service's
+            # own None-not-zero comment) -- never 0. None minus None crashes
+            # a real tenant with capabilities but no health scores yet
+            # (reported against this service before this guard existed).
+            # Treating a missing measure on either side as 0 would fabricate
+            # a drift figure, so report the comparison as impossible instead.
+            missing_measures = []
+            if baseline_coverage.get("average_coverage") is None:
+                missing_measures.append("the baseline's average coverage")
+            if current_coverage.get("average_coverage") is None:
+                missing_measures.append("the current average coverage")
+            if baseline_health.get("average_health") is None:
+                missing_measures.append("the baseline's average health score")
+            if current_health.get("average_health") is None:
+                missing_measures.append("the current average health score")
+
+            if missing_measures:
+                return self._unknown_drift(
+                    row,
+                    "Drift cannot be computed because "
+                    f"{', '.join(missing_measures)} {'is' if len(missing_measures) == 1 else 'are'} "
+                    "not available.",
+                )
+
             # Analyze each dimension
-            coverage_drift = self._analyze_coverage_drift(
-                baseline.coverage_snapshot, current_coverage
-            )
+            coverage_drift = self._analyze_coverage_drift(baseline_coverage, current_coverage)
 
-            health_drift = self._analyze_health_drift(baseline.health_snapshot, current_health)
+            health_drift = self._analyze_health_drift(baseline_health, current_health)
 
-            gap_drift = self._analyze_gap_drift(baseline.gap_snapshot, current_gaps)
+            gap_drift = self._analyze_gap_drift(baseline_gaps, current_gaps)
 
-            vendor_drift = self._analyze_vendor_drift(baseline.vendor_snapshot, current_vendors)
+            vendor_drift = self._analyze_vendor_drift(baseline_vendors, current_vendors)
 
             capability_drift = self._analyze_capability_drift(
-                baseline.capabilities_snapshot, current_capabilities
+                capabilities_snapshot, current_capabilities
             )
 
             # Generate alerts based on drift
@@ -770,7 +724,6 @@ class ArchitectureMonitoringService:
 
             # Store new alerts
             for alert in alerts:
-                self._alerts[alert.id] = alert
                 self._persist_alert(alert)
 
             # Calculate totals
@@ -784,8 +737,8 @@ class ArchitectureMonitoringService:
             )
 
             drift_result = DriftAnalysis(
-                baseline_id=baseline.id,
-                baseline_name=baseline.name,
+                baseline_id=row.baseline_id,
+                baseline_name=row.name,
                 analysis_timestamp=analysis_time.isoformat(),
                 total_drifts=len(alerts),
                 critical_drifts=critical_count,
@@ -834,27 +787,22 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with alerts
         """
-        alerts = list(self._alerts.values())
+        from app.models.policy_monitoring import MonitoringAlert as MAModel
 
-        # Apply filters
+        query = MAModel.query
         if severity:
-            alerts = [a for a in alerts if a.severity == severity]
-
+            query = query.filter_by(severity=severity)
         if alert_type:
-            alerts = [a for a in alerts if a.alert_type == alert_type]
-
+            query = query.filter_by(alert_type=alert_type)
         if acknowledged is not None:
-            alerts = [a for a in alerts if a.acknowledged == acknowledged]
+            query = query.filter_by(acknowledged=acknowledged)
 
-        # Sort by creation time (newest first)
-        alerts.sort(key=lambda x: x.created_at, reverse=True)
-
-        total = len(alerts)
-        alerts = alerts[offset : offset + limit]
+        total = query.count()
+        rows = query.order_by(MAModel.created_at.desc()).offset(offset).limit(limit).all()
 
         return {
             "success": True,
-            "alerts": [asdict(a) for a in alerts],
+            "alerts": [self._alert_to_api_dict(row) for row in rows],
             "total": total,
             "limit": limit,
             "offset": offset,
@@ -875,10 +823,13 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with alert details
         """
-        if alert_id not in self._alerts:
+        from app.models.policy_monitoring import MonitoringAlert as MAModel
+
+        row = MAModel.query.filter_by(alert_id=alert_id).first()
+        if not row:
             return {"success": False, "error": "Alert not found"}
 
-        return {"success": True, "alert": asdict(self._alerts[alert_id])}
+        return {"success": True, "alert": self._alert_to_api_dict(row)}
 
     def acknowledge_alert(
         self, alert_id: str, acknowledged_by: Optional[str] = None
@@ -893,16 +844,22 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with result
         """
-        if alert_id not in self._alerts:
+        from app.models.policy_monitoring import MonitoringAlert as MAModel
+
+        row = MAModel.query.filter_by(alert_id=alert_id).first()
+        if not row:
             return {"success": False, "error": "Alert not found"}
 
-        alert = self._alerts[alert_id]
-        alert.acknowledged = True
-        alert.acknowledged_by = acknowledged_by
-        alert.acknowledged_at = datetime.utcnow().isoformat()
-        self._persist_alert(alert)
+        row.acknowledged = True
+        row.acknowledged_by = acknowledged_by
+        row.acknowledged_at = datetime.utcnow()
+        db.session.commit()
 
-        return {"success": True, "alert": asdict(alert), "message": "Alert acknowledged"}
+        return {
+            "success": True,
+            "alert": self._alert_to_api_dict(row),
+            "message": "Alert acknowledged",
+        }
 
     def bulk_acknowledge_alerts(
         self, alert_ids: List[str], acknowledged_by: Optional[str] = None
@@ -917,19 +874,23 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with result
         """
+        from app.models.policy_monitoring import MonitoringAlert as MAModel
+
         acknowledged = 0
         not_found = 0
+        now = datetime.utcnow()
 
         for alert_id in alert_ids:
-            if alert_id in self._alerts:
-                alert = self._alerts[alert_id]
-                alert.acknowledged = True
-                alert.acknowledged_by = acknowledged_by
-                alert.acknowledged_at = datetime.utcnow().isoformat()
-                self._persist_alert(alert)
+            row = MAModel.query.filter_by(alert_id=alert_id).first()
+            if row:
+                row.acknowledged = True
+                row.acknowledged_by = acknowledged_by
+                row.acknowledged_at = now
                 acknowledged += 1
             else:
                 not_found += 1
+
+        db.session.commit()
 
         return {
             "success": True,
@@ -945,16 +906,18 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with result
         """
-        to_remove = [aid for aid, alert in self._alerts.items() if alert.acknowledged]
+        from app.models.policy_monitoring import MonitoringAlert as MAModel
 
-        for alert_id in to_remove:
-            del self._alerts[alert_id]
-            self._delete_alert_from_db(alert_id)
+        rows = MAModel.query.filter_by(acknowledged=True).all()
+        cleared = len(rows)
+        for row in rows:
+            db.session.delete(row)
+        db.session.commit()
 
         return {
             "success": True,
-            "cleared": len(to_remove),
-            "message": f"{len(to_remove)} acknowledged alerts cleared",
+            "cleared": cleared,
+            "message": f"{cleared} acknowledged alerts cleared",
         }
 
     # =========================================================================
@@ -1158,9 +1121,17 @@ class ArchitectureMonitoringService:
     def _analyze_coverage_drift(
         self, baseline: Dict[str, Any], current: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Analyze coverage drift."""
-        baseline_avg = baseline.get("average_coverage", 0)
-        current_avg = current.get("average_coverage", 0)
+        """Analyze coverage drift.
+
+        ``average_coverage`` is only absent from a very old snapshot; a
+        current one always sets it. Even so, this never treats a missing
+        value as 0 -- a caller that reaches this directly (bypassing
+        analyze_drift's own upfront guard) still gets ``None``, not a
+        fabricated zero delta or a crash on ``None - None``.
+        """
+        baseline_avg = baseline.get("average_coverage")
+        current_avg = current.get("average_coverage")
+        comparable = baseline_avg is not None and current_avg is not None
 
         baseline_uncovered = baseline.get("uncovered_capabilities", 0)
         current_uncovered = current.get("uncovered_capabilities", 0)
@@ -1168,19 +1139,27 @@ class ArchitectureMonitoringService:
         return {
             "baseline_average_coverage": baseline_avg,
             "current_average_coverage": current_avg,
-            "coverage_delta": round(current_avg - baseline_avg, 2),
+            "coverage_delta": round(current_avg - baseline_avg, 2) if comparable else None,
             "baseline_uncovered": baseline_uncovered,
             "current_uncovered": current_uncovered,
             "uncovered_delta": current_uncovered - baseline_uncovered,
-            "has_regression": current_avg < baseline_avg,
+            "has_regression": (current_avg < baseline_avg) if comparable else None,
         }
 
     def _analyze_health_drift(
         self, baseline: Dict[str, Any], current: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Analyze health score drift."""
-        baseline_health = baseline.get("average_health", 0)
-        current_health = current.get("average_health", 0)
+        """Analyze health score drift.
+
+        ``average_health`` is ``None``, by design, whenever no capability has
+        been assessed yet (a realistic tenant state, not an edge case) -- so
+        this never subtracts through a missing value as if it were 0. A
+        caller that reaches this directly (bypassing analyze_drift's own
+        upfront guard) still gets ``None`` deltas rather than a crash.
+        """
+        baseline_health = baseline.get("average_health")
+        current_health = current.get("average_health")
+        comparable = baseline_health is not None and current_health is not None
 
         baseline_at_risk = baseline.get("at_risk_capabilities", 0)
         current_at_risk = current.get("at_risk_capabilities", 0)
@@ -1188,11 +1167,11 @@ class ArchitectureMonitoringService:
         return {
             "baseline_average_health": baseline_health,
             "current_average_health": current_health,
-            "health_delta": round(current_health - baseline_health, 2),
+            "health_delta": round(current_health - baseline_health, 2) if comparable else None,
             "baseline_at_risk": baseline_at_risk,
             "current_at_risk": current_at_risk,
             "at_risk_delta": current_at_risk - baseline_at_risk,
-            "has_regression": current_health < baseline_health,
+            "has_regression": (current_health < baseline_health) if comparable else None,
         }
 
     def _analyze_gap_drift(
