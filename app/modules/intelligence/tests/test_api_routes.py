@@ -609,6 +609,7 @@ def test_programme_endpoint_returns_work_package_with_its_own_blast_radius(
     wp = UnifiedWorkPackage(
         name="Migrate A",
         archimate_element_id=a.id,
+        organization_id=org.id,
         business_capability="Test",
         status="in_progress",
         progress_percentage=25.0,
@@ -641,7 +642,8 @@ def test_programme_endpoint_redacts_cost_for_a_role_without_budget_authority(
     user = _make_user(db_session, org, enterprise_role="solution_architect")
     a = _make_element(db_session, org.id, "A")
     db_session.add(UnifiedWorkPackage(
-        name="Migrate A", archimate_element_id=a.id, business_capability="Test",
+        name="Migrate A", archimate_element_id=a.id, organization_id=org.id,
+        business_capability="Test",
         estimated_cost=50000.0, actual_cost=45000.0,
     ))
     db_session.commit()
@@ -662,7 +664,8 @@ def test_programme_endpoint_does_not_redact_cost_for_cto(
     user = _make_user(db_session, org, enterprise_role="cto")
     a = _make_element(db_session, org.id, "A")
     db_session.add(UnifiedWorkPackage(
-        name="Migrate A", archimate_element_id=a.id, business_capability="Test",
+        name="Migrate A", archimate_element_id=a.id, organization_id=org.id,
+        business_capability="Test",
         estimated_cost=50000.0, actual_cost=45000.0,
     ))
     db_session.commit()
@@ -684,7 +687,8 @@ def test_programme_endpoint_cross_tenant_element_is_404_not_leak(
     user_b = _make_user(db_session, org_b)
     a = _make_element(db_session, org_a.id, "A")
     wp = UnifiedWorkPackage(
-        name="Tenant A's work", archimate_element_id=a.id, business_capability="Test",
+        name="Tenant A's work", archimate_element_id=a.id, organization_id=org_a.id,
+        business_capability="Test",
     )
     db_session.add(wp)
     db_session.commit()
