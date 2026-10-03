@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<!-- smoke-coverage-ok: OAuth consent screen exercised through API-level authorization-code flow tests -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Authorize Access</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 60px auto; padding: 0 20px; }
+    h1 { font-size: 1.4rem; }
+    .client { color: #555; margin-bottom: 1.5rem; }
+    .scopes { margin: 1rem 0; }
+    .scope { padding: 6px 0; }
+    button { padding: 10px 24px; margin-right: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+    .allow { background: #2563eb; color: #fff; }
+    .deny { background: #e5e7eb; color: #333; }
+  </style>
+</head>
+<body>
+  <h1>Authorize Access</h1>
+  <p class="client"><strong>{{ client_name }}</strong> wants to access your account.</p>
+
+  <div class="scopes">
+    <p>This application is requesting the following permissions:</p>
+    {% for scope in scopes %}
+    <div class="scope">
+      {% if scope == "mcp:read" %}
+        <strong>Read your architecture data</strong> — view elements, canvases, and intelligence lenses
+      {% else %}
+        {{ scope }}
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <form method="post" action="{{ url_for('oauth_provider.authorize') }}">
+    <input type="hidden" name="client_id" value="{{ client_id }}">
+    <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
+    <input type="hidden" name="code_challenge" value="{{ code_challenge }}">
+    <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}">
+    <input type="hidden" name="state" value="{{ state or '' }}">
+    <input type="hidden" name="scope" value="{{ scope }}">
+    {% if resource %}<input type="hidden" name="resource" value="{{ resource }}">{% endif %}
+    <button type="submit" class="allow">Allow</button>
+    <a href="{{ redirect_uri }}{% if state %}?error=access_denied&state={{ state }}{% else %}?error=access_denied{% endif %}" class="deny" style="display:inline-block;text-decoration:none;line-height:2.4;">Deny</a>
+  </form>
+</body>
+</html>

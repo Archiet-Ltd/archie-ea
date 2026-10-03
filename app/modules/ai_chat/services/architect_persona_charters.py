@@ -43,7 +43,6 @@ Consumed by MultiDomainChatService._get_persona_system_prompt.
 """
 
 import logging
-import re
 from typing import Callable, Dict, Optional
 
 from sqlalchemy import func
@@ -1495,26 +1494,7 @@ UNTRUSTED_PREAMBLE = (
 )
 
 
-_FENCE_LOOKALIKE = re.compile(r"={3,}")
-
-
-def _neutralize_fence_lookalikes(text: str) -> str:
-    """Break any byte-identical match to our own '=== BEGIN/END ... ===' fence
-    syntax that might appear inside untrusted content.
-
-    Red-teamed 4 Sep 2026: a document containing a literal
-    "=== END <label> ===" line, followed by forged instruction text and a
-    fake "=== BEGIN <label> ===", round-tripped through the original
-    fence_untrusted() completely unchanged -- the forged close marker was
-    byte-identical to a real one, so nothing (the preamble is advisory, not
-    structural) stopped retrieved content from manufacturing what looks like
-    the end of the untrusted block followed by fresh "trusted" text. Runs of
-    3+ '=' are spaced apart ("===" -> "= = =") so untrusted content can
-    describe or quote fence syntax (still legible) but can never produce the
-    exact delimiter the real fence uses, the same way user input gets HTML-
-    escaped rather than trusted not to contain "<script>".
-    """
-    return _FENCE_LOOKALIKE.sub(lambda m: " ".join("=" * len(m.group(0))), text)
+from app.utils.text_sanitization import neutralize_fence_lookalikes as _neutralize_fence_lookalikes
 
 
 def fence_untrusted(label: str, body: str) -> str:

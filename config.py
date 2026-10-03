@@ -194,6 +194,10 @@ class Config:
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY") or SECRET_KEY
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
 
+    # MCP server — OAuth-protected endpoint for AI assistants
+    MCP_ALLOWED_ORIGIN = os.environ.get("MCP_ALLOWED_ORIGIN", "")
+    MCP_ENDPOINT_URL = os.environ.get("MCP_ENDPOINT_URL", "")
+
     # Email
     MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.sendgrid.net")
     # Parsed, not passed through: any non-empty string is truthy, so
