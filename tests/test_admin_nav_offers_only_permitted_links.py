@@ -78,6 +78,10 @@ GUARDED = [
     # org_admin guard entry here.  /admin/feature-flags is still independently
     # gated on the is_platform_admin cross-tenant flag.
     ("/admin/feature-flags", False, True),
+    # Abacus/Jira config is platform-wide (ExternalSystem/Job carry no
+    # tenant column); pr314-review-v1.md MEDIUM.
+    ("/admin/abacus-settings", False, True),
+    ("/admin/jira-settings", False, True),
 ]
 
 
