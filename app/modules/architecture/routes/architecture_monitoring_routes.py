@@ -35,10 +35,11 @@ Endpoints:
   - DELETE /api/architecture-monitoring/alerts/acknowledged - Clear acknowledged alerts
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, abort, jsonify, request
 from flask_login import current_user, login_required
 
 from app.decorators import audit_log, require_roles
+from app.middleware.tenant_context import current_org_id
 from app.modules.architecture.services.architecture_monitoring_service import ArchitectureMonitoringService
 from app.utils.pagination import safe_int_arg
 from config import _env_bool
@@ -56,8 +57,17 @@ def monitoring_api_enabled(app) -> bool:
 
 
 def _get_service() -> ArchitectureMonitoringService:
-    """Get service instance."""
-    return ArchitectureMonitoringService()
+    """Get a service instance scoped to the caller's organisation.
+
+    No tenant on the request means no engine: every route that reads or
+    writes baselines, alerts or drift needs an organisation to scope to, so
+    this aborts rather than falling back to an unscoped read. The app-wide
+    HTTPException handler turns this into a JSON 404 under /api/.
+    """
+    org_id = current_org_id()
+    if org_id is None:
+        abort(404, description="No tenant context")
+    return ArchitectureMonitoringService(org_id)
 
 
 def _get_current_user() -> str:
