@@ -832,11 +832,11 @@ def simple_group_detail(group_id):
             "applications": [],
         }
 
-        # UnifiedDuplicateGroup is a plain db.Model (no TenantMixin) and
-        # unified_duplicate_groups/unified_group_members have no
-        # organization_id, so get_or_404(group_id) is NOT org-filtered and
-        # group_id does not scope this join. application_components does carry
-        # organization_id — put the predicate there.
+        # UnifiedDuplicateGroup now carries TenantMixin (organization_id),
+        # but this raw-SQL join bypasses the ORM tenant filter and
+        # unified_group_members has no organization_id, so group_id does not
+        # scope this join. application_components does carry organization_id
+        # — put the predicate there.
         from flask import g as _g
         _org = getattr(_g, "current_org_id", None)
         _org_and = " AND ac.organization_id = :org" if _org is not None else ""
