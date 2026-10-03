@@ -75,7 +75,7 @@ REQUIRED_CHECKS = (
     "Tests (pytest + coverage)",
     # The backend-test matrix shards that job combines, one per matrix.shard
     # value in ci.yml (a count kept in step with it by the test named above).
-    *(f"Tests (pytest + coverage) \u2014 shard {shard}" for shard in range(8)),
+    *(f"Tests (pytest + coverage) \u2014 shard {shard}" for shard in range(12)),
     "Database gates (schema drift)",
     "SAST (bandit)",
     "Browser journeys (one per archetype)",
@@ -92,6 +92,16 @@ EXCLUDED_CHECKS = {
         "builds and pushes a GHCR image, which production does not run: it deploys "
         "a bind-mounted source checkout (see the header of scripts/deploy_verified.sh). "
         "A registry or buildx outage must not block a deploy that never uses the image."
+    ),
+    "Fast lane (static + boot + db + changed tests)": (
+        "runs only on non-labeled PR events without the full-ci label; its name is "
+        "distinct from every required-check name, so it cannot satisfy a required-check "
+        "requirement.  The full suite runs on push to main and on full-ci labeled PRs."
+    ),
+    "Quarantined tests (non-blocking)": (
+        "continue-on-error: true and runs only quarantined tests; it cannot fail the "
+        "workflow.  The blocking shards use CI_QUARANTINE_MODE=exclude, so a "
+        "non-quarantined test failure in any shard still fails the run."
     ),
 }
 CHECK_APP_SLUG = "github-actions"

@@ -12,7 +12,7 @@ name: CI
 #
 # Labeled trigger: the `labeled` pull_request event type fires for every label
 # added to a PR. Each such event creates a workflow run in the GitHub Actions
-# UI, even though all jobs are skipped for non-`ci-fast` labels by the job-level
+# UI, even though all jobs are skipped for non-`full-ci` labels by the job-level
 # `if:` guards. The concurrency group's `cancel-in-progress` excludes labeled
 # events so that adding an unrelated label never cancels an in-progress CI run.
 on:
@@ -70,7 +70,7 @@ jobs:
   secret-scan:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -94,7 +94,7 @@ jobs:
   static-gates:
     name: Static gates (compile + ratchets)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
     # The static tag includes route/navigation and CSRF coverage, which import
     # the real app, plus the reproducible CSS build. Install the application
     # dependencies and the exact standalone Tailwind binary those gates need;
@@ -126,7 +126,7 @@ jobs:
   boot-health:
     name: Boot health (no database)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
     # Catches the class of failure nothing else here can see: a blueprint that
     # silently fails to register, or a url_for() endpoint that no longer resolves
     # (a BuildError 500 on every page rendering the sidebar).
@@ -162,7 +162,110 @@ jobs:
       - name: Real requests survive worker recycling
         run: python scripts/qa/check_worker_recycling.py
 
-  # Split across 8 matrix shards, each with its own PostgreSQL service (no
+  # Fast lane for ordinary PR pushes (opened/synchronize/reopened without the
+  # full-ci label). Runs the static & boot gates plus the schema-drift database
+  # gate plus the pytest tests changed by this PR and any tests that import
+  # changed modules, on one runner — target under 15 minutes. The full suite
+  # below (tests-shard + tests + smoke + browser-compat) only runs on push to
+  # main/master, on a PR labelled full-ci, or on workflow_dispatch.
+  fast-lane:
+    name: Fast lane (static + boot + db + changed tests)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' && github.event.action != 'labeled' && !contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/archie_test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/archie_test
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # git diff against main needs history
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt "ruff==${RUFF_VERSION}" pip-audit "bandit==${BANDIT_VERSION}"
+          pip install pytest-cov
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+          mkdir -p scripts/bin
+          curl --fail --location --retry 3 \
+            --output scripts/bin/tailwindcss \
+            https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.17/tailwindcss-linux-x64
+          chmod +x scripts/bin/tailwindcss
+      - name: Install Chromium for JavaScript syntax validation
+        run: python -m playwright install --with-deps chromium
+      - name: Secret scan (gitleaks)
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest \
+            detect --source=/repo --redact --verbose --no-banner --exit-code 1
+      - name: Static gates (compile + ratchets + design tokens + air-gap)
+        run: python scripts/verify.py --tag static
+      - name: Dependency CVE gate
+        run: python scripts/verify.py --gate dependency-cves
+      - name: Boot + wiring gate
+        env:
+          FLASK_CONFIG: testing
+          SECRET_KEY: ci-only-not-secret
+        run: python scripts/verify.py --gate boot-health
+      - name: Front-end targets resolve to real routes
+        env:
+          FLASK_CONFIG: testing
+          SECRET_KEY: ci-only-not-secret
+        run: python scripts/verify.py --gate broken-surfaces
+      - name: Deployed dependency floors
+        run: python scripts/verify.py --gate deployed-deps
+      - name: Real requests survive worker recycling
+        run: python scripts/qa/check_worker_recycling.py
+      - name: Create schema
+        run: |
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+      - name: Schema drift gate
+        run: python scripts/verify.py --gate schema-drift --require-db
+      - name: Select affected test files
+        id: test-files
+        run: |
+          TESTS=$(python scripts/ci/pr_test_selector.py origin/main)
+          if [ -n "$TESTS" ]; then
+            echo "tests=$TESTS" >> "$GITHUB_OUTPUT"
+            echo "running: $TESTS"
+          else
+            echo "tests=" >> "$GITHUB_OUTPUT"
+            echo "no test files affected by this change"
+          fi
+      - name: Run affected tests
+        if: ${{ steps.test-files.outputs.tests != '' }}
+        env:
+          CI_QUARANTINE_MODE: exclude
+        run: |
+          pytest -q --maxfail=20 -o xfail_strict=true --timeout=600 \
+            --junitxml=fast-lane-tests.xml \
+            ${{ steps.test-files.outputs.tests }}
+      - name: Upload fast-lane test evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: fast-lane-tests
+          path: fast-lane-tests.xml
+          if-no-files-found: ignore
+
+  # Split across 12 matrix shards, each with its own PostgreSQL service (no
   # shared database), because this job alone had grown to ~2 hours and every
   # merge waits on it. tests-shard does the running; tests (below) combines
   # the shards' coverage data and route-verification evidence and applies the
@@ -186,26 +289,26 @@ jobs:
   # database sessions; it does not protect against state shared ACROSS files.
   tests-shard:
     name: Tests (pytest + coverage) — shard ${{ matrix.shard }}
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
     # Same-repository runs (push/dispatch and same-repo PRs) select a runner
     # via repository variables: vars.CI_FAST_RUNNER takes precedence when the
-    # PR carries the ci-fast label, vars.CI_SHARD_RUNNER routes to a managed
+    # PR carries the full-ci label, vars.CI_SHARD_RUNNER routes to a managed
     # pool when set, otherwise the job falls back to the self-hosted ibm-vsi
     # runners. A PR from a fork never runs job code on our own or a managed
     # runner — it always uses ubuntu-latest. Several jobs run at once on the
     # same ibm-vsi machine, so the postgres service below must not bind a
     # fixed host port either way.
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
     strategy:
       # A failing shard should not hide failures in the others.
       fail-fast: false
       # vars.CI_SHARD_MAX_PARALLEL controls how many shards run at once on
       # same-repository runs (default 6 when the variable is unset).
-      # GitHub-hosted runners (forked PRs) have no such limit, so all eight
+      # GitHub-hosted runners (forked PRs) have no such limit, so all twelve
       # shards start together there.
-      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && 8 || vars.CI_SHARD_MAX_PARALLEL || 6) || 8 }}
+      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci') && 8 || vars.CI_SHARD_MAX_PARALLEL || 6) || 8 }}
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
     services:
       postgres:
         image: postgres:16
@@ -226,8 +329,9 @@ jobs:
       # takes this on trust rather than deriving it.
       # tests/test_ci_nav_verification_lifecycle.py fails when this, the
       # matrix and the tests job's combine count disagree.
-      CI_SHARD_TOTAL: "8"
+      CI_SHARD_TOTAL: "12"
       COVERAGE_FILE: .coverage.${{ matrix.shard }}
+      CI_QUARANTINE_MODE: exclude
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -280,23 +384,45 @@ jobs:
       # which is not valid release evidence. Every shard installs all three
       # browsers because which shard this file lands in is a hash-independent
       # bin-pack outcome, not a fixed assignment.
-      - name: Install browsers for rendered UI regression tests
-        # Several runners share one ibm-vsi host, so two shards can reach this
-        # step at once; --with-deps runs apt-get, and the second one failed on
-        # the host's dpkg lock before any test ran. The host-wide flock makes
-        # this job's shards take turns, and the retries (about ten minutes in
-        # all) wait out any other apt process holding the lock: on 3afb5625 one
-        # apt-get held it across two shards' installs a minute apart.
+      - name: Install browsers for rendered UI regression tests (cached)
+        # Self-hosted runners keep their home directory (and ~/.cache/ms-playwright)
+        # between jobs, so browser binaries survive across runs. Skip the full
+        # --with-deps install when they are already present; the retry+flock path
+        # below is still available for cold-start and shared-host races.
         run: |
-          for attempt in $(seq 1 10); do
-            if flock /tmp/archie-ci-browser-install.lock \
-                python -m playwright install --with-deps chromium firefox webkit; then
-              exit 0
-            fi
-            echo "Browser install attempt $attempt failed; retrying in 60 seconds."
-            sleep 60
-          done
-          exit 1
+          if python -m playwright install --dry-run chromium firefox webkit 2>/dev/null; then
+            echo "browsers already cached; skipping install"
+          else
+            echo "installing browsers (cold cache)"
+            for attempt in $(seq 1 10); do
+              if flock /tmp/archie-ci-browser-install.lock \
+                  python -m playwright install --with-deps chromium firefox webkit; then
+                exit 0
+              fi
+              echo "Browser install attempt $attempt failed; retrying in 60 seconds."
+              sleep 60
+            done
+            exit 1
+          fi
+      - name: Download test durations from main
+        # The combine job on main uploads a test-durations artifact built from
+        # the shards' junit XML. Download it here so the splitter can bin-pack
+        # by recorded duration rather than file size. Missing on fork PRs and
+        # on the very first run — the splitter falls back to file size.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm -f /tmp/test_durations.json
+          gh run download --repo "$GITHUB_REPOSITORY" \
+            --name test-durations --dir /tmp/durations 2>/dev/null || true
+          if [ -f /tmp/durations/test_durations.json ]; then
+            cp /tmp/durations/test_durations.json /tmp/test_durations.json
+            echo "CI_DURATIONS_FILE=/tmp/test_durations.json" >> "$GITHUB_ENV"
+            echo "durations loaded; $(python -c 'import json; d=json.load(open(\"/tmp/test_durations.json\")); print(len(d.get(\"files\",{})))') files have recorded durations"
+          else
+            echo "no durations artifact from main; falling back to file-size bin-pack"
+          fi
       - name: Create schema
         run: |
           python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
@@ -342,13 +468,13 @@ jobs:
   tests:
     name: Tests (pytest + coverage)
     needs: tests-shard
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) }}
+    if: ${{ always() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci')) }}
     # Same runner selection as tests-shard above: vars.CI_FAST_RUNNER takes
-    # precedence when the PR carries the ci-fast label, vars.CI_SHARD_RUNNER
+    # precedence when the PR carries the full-ci label, vars.CI_SHARD_RUNNER
     # routes to a managed pool when set, otherwise the job falls back to the
     # self-hosted ibm-vsi runners. It runs after every shard has finished, so
     # it never competes with them for a runner.
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
     # No PostgreSQL service here: this job only imports the app to build its
     # route/nav sets (for nav-verified) and combines files (coverage, junit).
     # Confirmed by running route_verification_audit.py against an unreachable
@@ -401,7 +527,7 @@ jobs:
         if: always()
         run: |
           rm -f route_verification.json
-          python scripts/ci/combine_shard_results.py shard-artifacts 8
+          python scripts/ci/combine_shard_results.py shard-artifacts 12
       - name: Route verification (nav-verified)
         if: always()
         run: python scripts/verify.py --gate nav-verified
@@ -416,6 +542,31 @@ jobs:
           coverage combine shard-artifacts/tests-shard-*/.coverage.*
           coverage xml
           coverage report -m --skip-covered
+      - name: Build test durations for next run
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, sys
+          sys.path.insert(0, ".")
+          from scripts.ci.test_sharding import build_durations_from_junit
+          import glob
+          xmls = sorted(glob.glob("shard-artifacts/tests-shard-*/backend-tests-*.xml"))
+          if not xmls:
+              print("no shard junit XMLs found; skipping durations")
+              raise SystemExit(0)
+          durations = build_durations_from_junit(xmls)
+          n = len(durations.get("files", {}))
+          print(f"built durations for {n} files from {len(xmls)} shard junit XMLs")
+          with open("test_durations.json", "w") as f:
+              json.dump(durations, f, indent=2)
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: test-durations
+          path: test_durations.json
+          if-no-files-found: ignore
+          retention-days: 90
       - name: Coverage summary
         # Published, not gated. Establishing the number is step one; a
         # do-not-decrease gate follows once a baseline exists on main.
@@ -451,6 +602,93 @@ jobs:
           echo "one or more tests-shard matrix jobs did not succeed (${{ needs.tests-shard.result }})"
           exit 1
 
+  # Quarantined tests run on every full suite run but do not block merge.
+  # CI_QUARANTINE_MODE=only keeps only tests listed in tests/quarantine.json.
+  # This job runs without sharding (the full quarantined set is small) and
+  # without route-verification evidence (those tests were excluded from the
+  # shards that produce it).  continue-on-error: true means a quarantined
+  # flake appears red in the run summary but never fails the workflow.
+  quarantine:
+    name: Quarantined tests (non-blocking)
+    needs: tests-shard
+    if: ${{ always() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci')) }}
+    continue-on-error: true
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+      CI_QUARANTINE_MODE: only
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Create an isolated virtual environment for this job's dependencies
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || {
+            echo "::warning::pip install from the cache failed; retrying without it"
+            pip install --no-cache-dir -r requirements.txt
+          }
+          pip install pytest-cov
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install browsers (cached)
+        run: |
+          if python -m playwright install --dry-run chromium firefox webkit 2>/dev/null; then
+            echo "browsers already cached; skipping install"
+          else
+            for attempt in $(seq 1 10); do
+              if flock /tmp/archie-ci-browser-install.lock \
+                  python -m playwright install --with-deps chromium firefox webkit; then
+                exit 0
+              fi
+              echo "Browser install attempt $attempt failed; retrying in 60 seconds."
+              sleep 60
+            done
+            exit 1
+          fi
+      - name: Create schema
+        run: |
+          python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+      - name: Apply the capability provenance migration
+        run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Run quarantined tests
+        run: |
+          pytest -q --maxfail=20 --ignore=tests/smoke \
+            -o xfail_strict=true --junitxml=quarantine-tests.xml
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: quarantine-tests
+          path: quarantine-tests.xml
+          if-no-files-found: ignore
+
   # main grew a parallel `verify` job that ran --tag static / boot-health /
   # schema-drift with --require-db. Its coverage is already provided here by the
   # static-gates, boot-health and db-gates jobs against the 18-gate runner, so it
@@ -459,7 +697,7 @@ jobs:
   db-gates:
     name: Database gates (schema drift)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
     services:
       postgres:
         image: postgres:16
@@ -529,7 +767,7 @@ jobs:
   security-sast:
     name: SAST (bandit)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -558,7 +796,7 @@ jobs:
   smoke:
     name: Browser journeys (one per archetype)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
     # Renders real pages in a real browser against a real database. Every cheaper
     # layer has passed defects this catches: a front end blocked by integrity
     # hashes, handlers that 500 on their first row, and pages returning 200 while
@@ -648,7 +886,7 @@ jobs:
   browser-compatibility:
     name: Browser compatibility (${{ matrix.browser }})
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
     strategy:
       fail-fast: false
       matrix:
@@ -743,7 +981,7 @@ jobs:
   walkthrough:
     name: Level 10 archetype walkthrough
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
     # docs/TESTING_STANDARD.md level 10: not "does it break?" but "can this
     # archetype do their job, and could they have FOUND the page?". It runs as a
     # non-admin per persona, measures geometry at a fixed viewport rather than
@@ -812,7 +1050,7 @@ jobs:
   dependency-audit:
     name: Dependency CVEs (pip-audit)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
     # A ratchet against scripts/ci/dependency_baseline.json: the count may fall,
     # never rise. The baseline is accepted risk, not proof of safety - every entry
     # is a real advisory a security review will ask about.

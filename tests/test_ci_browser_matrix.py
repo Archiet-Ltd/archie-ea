@@ -327,10 +327,10 @@ def test_runner_choice_and_parallelism_contract():
     Cases covered:
     - Forked PR (always ubuntu-latest, max-parallel 8)
     - Same-repo PR without label (falls back to self-hosted ibm-vsi, default 6)
-    - Same-repo PR with ci-fast label and CI_FAST_RUNNER set
-    - Same-repo PR with ci-fast label and CI_FAST_RUNNER unset (fallback)
+    - Same-repo PR with full-ci label and CI_FAST_RUNNER set
+    - Same-repo PR with full-ci label and CI_FAST_RUNNER unset (fallback)
     - CI_SHARD_RUNNER set on same-repo PR
-    - A label other than ci-fast
+    - A label other than full-ci
     - Push to main (not a PR)
     - CI_SHARD_MAX_PARALLEL set to a custom value
     """
@@ -396,14 +396,14 @@ def test_runner_choice_and_parallelism_contract():
             6,
         ),
         (
-            "same-repo PR with ci-fast and CI_FAST_RUNNER set",
+            "same-repo PR with full-ci and CI_FAST_RUNNER set",
             {
                 "github": {
                     "event_name": "pull_request",
                     "event": {
                         "pull_request": {
                             "head": {"repo": {"full_name": REPO}},
-                            "labels": [{"name": "ci-fast"}],
+                            "labels": [{"name": "full-ci"}],
                         }
                     },
                     "repository": REPO,
@@ -413,20 +413,20 @@ def test_runner_choice_and_parallelism_contract():
                     "CI_SHARD_RUNNER": "",
                     "CI_SHARD_MAX_PARALLEL": "",
                 },
-                "_labels": ["ci-fast"],
+                "_labels": ["full-ci"],
             },
             "custom-fast-runner",
             8,
         ),
         (
-            "same-repo PR with ci-fast and CI_FAST_RUNNER unset",
+            "same-repo PR with full-ci and CI_FAST_RUNNER unset",
             {
                 "github": {
                     "event_name": "pull_request",
                     "event": {
                         "pull_request": {
                             "head": {"repo": {"full_name": REPO}},
-                            "labels": [{"name": "ci-fast"}],
+                            "labels": [{"name": "full-ci"}],
                         }
                     },
                     "repository": REPO,
@@ -436,7 +436,7 @@ def test_runner_choice_and_parallelism_contract():
                     "CI_SHARD_RUNNER": "",
                     "CI_SHARD_MAX_PARALLEL": "",
                 },
-                "_labels": ["ci-fast"],
+                "_labels": ["full-ci"],
             },
             ["self-hosted", "ibm-vsi"],
             6,
@@ -465,7 +465,7 @@ def test_runner_choice_and_parallelism_contract():
             6,
         ),
         (
-            "label other than ci-fast",
+            "label other than full-ci",
             {
                 "github": {
                     "event_name": "pull_request",
@@ -543,36 +543,50 @@ def test_runner_choice_and_parallelism_contract():
         )
 
 
-def test_labeled_event_triggers_workflow_for_ci_fast():
-    """Adding a label must trigger a fresh workflow run so the ci-fast label
+def test_labeled_event_triggers_workflow_for_full_ci():
+    """Adding a label must trigger a fresh workflow run so the full-ci label
     takes effect without requiring a new push."""
     workflow = _workflow()
     assert "labeled" in workflow
 
 
-def test_jobs_skip_on_non_ci_fast_labeled_events():
-    """Every job (except release-image, which already gates on event_name)
-    must carry an if: condition that skips the job when the trigger is a
-    labeled pull_request event that does not carry the ci-fast label.  This
-    prevents a full CI re-run when any unrelated label is added to a PR."""
+def test_jobs_skip_on_non_full_ci_labeled_events():
+    """Every full-suite job must carry an if: condition that skips the job
+    when the trigger is a labeled pull_request event that does not carry the
+    full-ci label.  This prevents a full CI re-run when any unrelated label
+    is added to a PR.  (The fast-lane job has the inverse condition: it only
+    runs on non-labeled PR events without the full-ci label.)"""
     jobs = _ci_jobs()
     gating_jobs = {
         "secret-scan", "static-gates", "boot-health", "tests-shard",
-        "tests", "db-gates", "security-sast", "smoke",
+        "tests", "quarantine", "db-gates", "security-sast", "smoke",
         "browser-compatibility", "walkthrough", "dependency-audit",
     }
     for job_id in gating_jobs:
         job = jobs[job_id]
         if_expr = job.get("if", "")
-        assert "labeled" in if_expr, (
-            f"{job_id} must guard against non-ci-fast labeled events"
+        assert "full-ci" in if_expr, (
+            f"{job_id} must allow full-ci labeled events through"
         )
-        assert "ci-fast" in if_expr, (
-            f"{job_id} must allow ci-fast labeled events through"
+        # The condition must either check the event is not a PR (push/dispatch)
+        # or require the full-ci label on PR events — a labeled event without
+        # full-ci must be skipped.
+        assert "github.event_name" in if_expr or "full-ci" in if_expr, (
+            f"{job_id} must guard against non-full-ci labeled events: {if_expr}"
         )
-        assert "github.event.action" in if_expr or "labeled" in if_expr, (
-            f"{job_id} must check the event action for labeled"
-        )
+
+
+def test_fast_lane_skips_on_labeled_and_full_ci_prs():
+    """The fast lane must only run on non-labeled PR events without the
+    full-ci label (opened, synchronize, reopened)."""
+    jobs = _ci_jobs()
+    assert "fast-lane" in jobs, "fast-lane job must exist"
+    if_expr = jobs["fast-lane"].get("if", "")
+    assert "full-ci" in if_expr
+    assert "labeled" in if_expr, (
+        "fast-lane must skip labeled events so adding full-ci triggers the "
+        "full suite, not a fast-lane re-run"
+    )
 
 
 def test_every_postgres_service_mounts_pgdata_on_tmpfs():

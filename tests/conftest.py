@@ -20,8 +20,10 @@ Requires PostgreSQL: ``TestingConfig`` rejects SQLite outright. Set
 
 from __future__ import annotations
 
+import json
 import os
 import uuid
+from pathlib import Path
 
 import pytest
 
@@ -248,3 +250,59 @@ def login_as(app):
                 delattr(g, cached)
 
     return _login
+
+
+# ── Quarantine marker applied at collection time ──────────────────────────
+
+_QUARANTINE_FILE = Path(__file__).resolve().parent / "quarantine.json"
+_CI_QUARANTINE_MODE = os.environ.get("CI_QUARANTINE_MODE", "")  # "exclude" | "only"
+
+
+def _load_quarantined_tests():
+    """Return the set of test prefixes that should carry the quarantine marker."""
+    if not _QUARANTINE_FILE.exists():
+        return frozenset()
+    try:
+        data = json.loads(_QUARANTINE_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return frozenset()
+    return frozenset(entry["test"] for entry in data.get("quarantined", []))
+
+
+_QUARANTINED = _load_quarantined_tests()
+
+
+def _is_quarantined(nodeid: str) -> bool:
+    for prefix in _QUARANTINED:
+        if nodeid.startswith(prefix):
+            return True
+    return False
+
+
+def pytest_collection_modifyitems(config, items):
+    """Mark quarantined tests and optionally exclude/include them.
+
+    The quarantine marker is always added when the list matches, so
+    ``pytest --markers`` and ``--collect-only -m quarantine`` remain
+    informative. Actual selection is driven by ``CI_QUARANTINE_MODE``:
+    ``exclude`` removes quarantined tests (blocking shards),
+    ``only`` keeps only quarantined tests (non-blocking quarantine job).
+    """
+    if not _QUARANTINED or not items:
+        return
+
+    quarantined_indices: list[int] = []
+    for i, item in enumerate(items):
+        if _is_quarantined(item.nodeid):
+            item.add_marker(pytest.mark.quarantine)
+            quarantined_indices.append(i)
+
+    if _CI_QUARANTINE_MODE == "exclude":
+        deselected = [items[i] for i in quarantined_indices]
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = [item for i, item in enumerate(items) if i not in set(quarantined_indices)]
+    elif _CI_QUARANTINE_MODE == "only":
+        kept = [items[i] for i in quarantined_indices]
+        deselected = [items[i] for i in range(len(items)) if i not in set(quarantined_indices)]
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = kept
