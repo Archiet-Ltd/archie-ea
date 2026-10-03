@@ -88,6 +88,7 @@ def test_scheduler_disabled_preserves_established_jobs(monkeypatch):
         "teams_subscription_renewal",
         "error_digest",
         "approval_escalation",
+        "event_log_relay",
     }
 
 
@@ -111,6 +112,7 @@ def test_malformed_optional_interval_does_not_disable_established_jobs(monkeypat
         "teams_subscription_renewal",
         "error_digest",
         "approval_escalation",
+        "event_log_relay",
     }
 
 
@@ -137,6 +139,7 @@ def test_overflowing_optional_trigger_does_not_disable_established_jobs(monkeypa
         "teams_subscription_renewal",
         "error_digest",
         "approval_escalation",
+        "event_log_relay",
     }
 
 
@@ -155,4 +158,5 @@ def test_optional_add_job_failure_does_not_disable_established_jobs(monkeypatch)
         "teams_subscription_renewal",
         "error_digest",
         "approval_escalation",
+        "event_log_relay",
     }
