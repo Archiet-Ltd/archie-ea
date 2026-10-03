@@ -121,6 +121,8 @@ def _seed_capability_with_mappings(db_session, org, tenant_ctx, mapped_apps=0):
     from app.models.application_capability import ApplicationCapabilityMapping
     from app.models.application_portfolio import ApplicationComponent
     from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+    from app.models.unified_capability import UnifiedCapability
 
     with tenant_ctx(org.id):
         cap = BusinessCapability(
@@ -132,6 +134,34 @@ def _seed_capability_with_mappings(db_session, org, tenant_ctx, mapped_apps=0):
         db_session.add(cap)
         db_session.flush()
 
+        # Also create the UnifiedCapability projection (simulating the
+        # project-capabilities command) so the mapping count query finds it.
+        # Check if it already exists (test database may have residue from
+        # previous runs due to the provenance unique index).
+        unified_cap = UnifiedCapability.query.filter(
+            UnifiedCapability.source_table == "business_capability",
+            UnifiedCapability.source_id == str(cap.id),
+            UnifiedCapability.source_org_id == cap.organization_id,
+        ).first()
+        if not unified_cap:
+            unified_cap = UnifiedCapability(
+                name=cap.name,
+                level=cap.level,
+                description=cap.description,
+                code=cap.code,
+                category=cap.category,
+                strategic_importance=cap.strategic_importance,
+                parent_capability_id=cap.parent_capability_id,
+                specialization_type=cap.specialization_type if hasattr(cap, 'specialization_type') else "BUSINESS",
+                organization_id=cap.organization_id,
+                scope=cap.scope if hasattr(cap, 'scope') else "tenant",
+                source_table="business_capability",
+                source_id=str(cap.id),
+                source_org_id=cap.organization_id,
+            )
+            db_session.add(unified_cap)
+            db_session.flush()
+
         for _ in range(mapped_apps):
             app_component = ApplicationComponent(
                 name=f"App {uuid.uuid4().hex[:8]}",
@@ -139,6 +169,7 @@ def _seed_capability_with_mappings(db_session, org, tenant_ctx, mapped_apps=0):
             )
             db_session.add(app_component)
             db_session.flush()
+            # Create legacy mapping
             db_session.add(
                 ApplicationCapabilityMapping(
                     organization_id=org.id,
@@ -146,6 +177,20 @@ def _seed_capability_with_mappings(db_session, org, tenant_ctx, mapped_apps=0):
                     business_capability_id=cap.id,
                 )
             )
+            # Create unified mapping (canonical store)
+            unified_mapping = UnifiedApplicationCapabilityMapping.query.filter(
+                UnifiedApplicationCapabilityMapping.unified_capability_id == unified_cap.id,
+                UnifiedApplicationCapabilityMapping.application_component_id == app_component.id,
+            ).first()
+            if not unified_mapping:
+                db_session.add(
+                    UnifiedApplicationCapabilityMapping(
+                        unified_capability_id=unified_cap.id,
+                        application_component_id=app_component.id,
+                        support_level="partial",
+                        coverage_percentage=80,
+                    )
+                )
         db_session.commit()
         return cap
 

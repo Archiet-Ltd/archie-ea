@@ -23,13 +23,13 @@ from app import db
 
 TREE_REGISTRY = {
     "capability": {
-        "model": "app.models.business_capabilities.BusinessCapability",
+        "model": "app.models.unified_capability.UnifiedCapability",
         "parent_fk": "parent_capability_id",
         "name_field": "name",
         "fields": [
-            "description", "code", "level", "category", "business_domain",
-            "strategic_importance", "current_maturity_level", "target_maturity_level",
-            "business_owner", "it_owner", "performance_score",
+            "description", "code", "level", "category", "domain_id",
+            "specialization_type", "current_maturity_level", "target_maturity_level",
+            "business_criticality", "business_owner",
         ],
         "root_label": "Capabilities",
         "order_by": ["level", "name"],
