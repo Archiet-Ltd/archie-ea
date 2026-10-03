@@ -1,0 +1,37 @@
+{% extends 'onboarding/_tell_us_more_shell.html' %}
+{% from 'components/status_badge.html' import status_badge %}
+{% set page_title = 'Tell us more' %}
+
+{% block tell_us_more_content %}
+<div class="p-8 space-y-6">
+    <div class="space-y-1">
+        <h1 class="text-lg font-bold text-foreground">Tell us more</h1>
+        <p class="text-sm text-muted-foreground">
+            Five short sections, each optional. Answer what you know, skip the rest, and come back any time —
+            what you've saved stays saved.
+        </p>
+    </div>
+
+    <div class="space-y-2">
+        {% for section in sections %}
+        <a href="{{ url_for('onboarding.tell_us_more_section', section_key=section.key) }}"
+           class="flex items-center justify-between gap-3 rounded-lg border border-border p-4 hover:border-primary/30 transition-colors">
+            <div class="min-w-0">
+                <p class="text-sm font-medium text-foreground">{{ section.title }}</p>
+                <p class="text-xs text-muted-foreground">{{ section.unlock_line }}</p>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+                {% if section.status == 'saved' %}
+                    {{ status_badge('Saved', 'success', icon='check') }}
+                {% elif section.status == 'skipped' %}
+                    {{ status_badge('Skipped', 'neutral', icon='minus') }}
+                {% else %}
+                    {{ status_badge('Not started', 'neutral') }}
+                {% endif %}
+                <i data-lucide="chevron-right" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

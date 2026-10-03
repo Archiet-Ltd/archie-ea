@@ -1,0 +1,197 @@
+{% extends 'onboarding/_tell_us_more_shell.html' %}
+{% set page_title = section.title %}
+{% set back_href = url_for('onboarding.tell_us_more_hub') %}
+{% set back_label = 'All sections' %}
+
+{% block tell_us_more_content %}
+<div x-data="{
+        fields: {{ section.fields | tojson | forceescape }},
+        values: (function () {
+            const saved = {{ answers | tojson | forceescape }};
+            const defaults = {
+                multiselect: [], select: '', text: '', boolean: null,
+                status_list: {}, people_list: [],
+            };
+            const out = {};
+            {{ section.fields | tojson | forceescape }}.forEach(function (f) {
+                const d = defaults[f.type];
+                out[f.key] = (f.key in saved) ? saved[f.key] : (Array.isArray(d) ? d.slice() : (d && typeof d === 'object' ? Object.assign({}, d) : d));
+            });
+            return out;
+        })(),
+        submitting: false,
+        errorMessage: '',
+        toggleMulti(fieldKey, optionKey) {
+            const list = this.values[fieldKey] || [];
+            const idx = list.indexOf(optionKey);
+            if (idx === -1) { list.push(optionKey); } else { list.splice(idx, 1); }
+            this.values[fieldKey] = list;
+        },
+        setStatus(fieldKey, optionKey, status) {
+            this.values[fieldKey] = Object.assign({}, this.values[fieldKey], {[optionKey]: status});
+        },
+        addPerson(fieldKey) {
+            const list = this.values[fieldKey] || [];
+            list.push({name: '', does: ''});
+            this.values[fieldKey] = list;
+        },
+        removePerson(fieldKey, idx) {
+            const list = (this.values[fieldKey] || []).slice();
+            list.splice(idx, 1);
+            this.values[fieldKey] = list;
+        },
+        submit(action) {
+            this.submitting = true;
+            this.errorMessage = '';
+            window.Platform.fetch('{{ url_for('onboarding.tell_us_more_section', section_key=section.key) }}', {
+                method: 'POST',
+                body: {action: action, answers: this.values},
+                silent: true,
+            }).then(data => {
+                this.submitting = false;
+                if (data && data.success && data.data && data.data.next) {
+                    window.location.href = data.data.next;
+                } else {
+                    this.errorMessage = 'Something went wrong — try again.';
+                }
+            }).catch(() => {
+                this.submitting = false;
+                this.errorMessage = 'Something went wrong — try again.';
+            });
+        }
+    }"
+    class="p-8 space-y-6">
+    <div class="space-y-1">
+        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Section {{ section_index }} of {{ section_count }}</p>
+        <h1 class="text-lg font-bold text-foreground">{{ section.title }}</h1>
+        <p class="text-sm text-muted-foreground">{{ section.unlock_line }}</p>
+    </div>
+
+    <div class="space-y-5">
+        <template x-for="field in fields" :key="field.key">
+            <div>
+                <label class="text-sm font-medium text-foreground mb-2 block" x-text="field.label"></label>
+
+                {# multiselect: a grid of checkboxes #}
+                <template x-if="field.type === 'multiselect'">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <template x-for="opt in field.options" :key="opt.key">
+                            <label class="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer transition-colors"
+                                   :class="(values[field.key] || []).includes(opt.key) ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'">
+                                <input type="checkbox" class="accent-primary"
+                                       :checked="(values[field.key] || []).includes(opt.key)"
+                                       @change="toggleMulti(field.key, opt.key)">
+                                <span class="text-sm text-foreground" x-text="opt.label"></span>
+                            </label>
+                        </template>
+                    </div>
+                </template>
+
+                {# select: a radio group #}
+                <template x-if="field.type === 'select'">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <template x-for="opt in field.options" :key="opt.key">
+                            <label class="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer transition-colors"
+                                   :class="values[field.key] === opt.key ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'">
+                                <input type="radio" class="accent-primary" :name="field.key"
+                                       :checked="values[field.key] === opt.key"
+                                       @change="values[field.key] = opt.key">
+                                <span class="text-sm text-foreground" x-text="opt.label"></span>
+                            </label>
+                        </template>
+                    </div>
+                </template>
+
+                {# text: a plain input #}
+                <template x-if="field.type === 'text'">
+                    <input type="text" x-model="values[field.key]"
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1
+                                  text-sm shadow-sm transition-colors placeholder:text-muted-foreground
+                                  focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                </template>
+
+                {# boolean: yes / no, tri-state (unanswered is neither) #}
+                <template x-if="field.type === 'boolean'">
+                    <div class="flex gap-2">
+                        <button type="button" @click="values[field.key] = true"
+                                class="rounded-md text-sm font-medium h-9 px-4 border"
+                                :class="values[field.key] === true ? 'border-primary bg-primary/5 text-foreground' : 'border-border hover:border-primary/30 text-muted-foreground'">
+                            Yes
+                        </button>
+                        <button type="button" @click="values[field.key] = false"
+                                class="rounded-md text-sm font-medium h-9 px-4 border"
+                                :class="values[field.key] === false ? 'border-primary bg-primary/5 text-foreground' : 'border-border hover:border-primary/30 text-muted-foreground'">
+                            No
+                        </button>
+                    </div>
+                </template>
+
+                {# status_list: each option (grouped) with a status select #}
+                <template x-if="field.type === 'status_list'">
+                    <div class="space-y-3">
+                        <template x-for="grp in ['recommended', 'common', 'other']" :key="grp">
+                            <div x-show="field.options.some(o => o.group === grp)" class="space-y-1.5">
+                                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground" x-text="grp"></p>
+                                <template x-for="opt in field.options.filter(o => o.group === grp)" :key="opt.key">
+                                    <div class="flex items-center justify-between gap-3 rounded-lg border border-border p-2.5">
+                                        <span class="text-sm text-foreground" x-text="opt.label"></span>
+                                        <select class="h-8 rounded-md border border-input bg-transparent px-2 text-xs"
+                                                :value="(values[field.key] || {})[opt.key] || ''"
+                                                @change="setStatus(field.key, opt.key, $event.target.value)">
+                                            <option value="">Not answered</option>
+                                            <template x-for="s in field.statuses" :key="s.key">
+                                                <option :value="s.key" x-text="s.label"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                {# people_list: repeatable name + role rows #}
+                <template x-if="field.type === 'people_list'">
+                    <div class="space-y-2">
+                        <template x-for="(person, idx) in values[field.key]" :key="idx">
+                            <div class="flex gap-2 items-center">
+                                <input type="text" x-model="person.name" placeholder="Name"
+                                       class="flex h-9 w-1/2 rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                                <input type="text" x-model="person.does" placeholder="What they do (e.g. sales, founder does this)"
+                                       class="flex h-9 w-1/2 rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                                <button type="button" @click="removePerson(field.key, idx)" aria-label="Remove"
+                                        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-input hover:bg-accent">
+                                    <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </template>
+                        <button type="button" @click="addPerson(field.key)"
+                                class="inline-flex items-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent h-8 px-3">
+                            <i data-lucide="plus" class="h-3.5 w-3.5 mr-1.5" aria-hidden="true"></i>
+                            Add someone
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </div>
+
+    <p x-show="errorMessage" x-cloak x-text="errorMessage" class="text-sm text-destructive" role="alert"></p>
+
+    <div class="flex gap-2">
+        <button type="button" @click="submit('save')" :disabled="submitting"
+                class="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium
+                       bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2
+                       disabled:opacity-50 disabled:pointer-events-none">
+            <span x-show="!submitting">Save and continue</span>
+            <span x-show="submitting" x-cloak>Saving…</span>
+        </button>
+        <button type="button" @click="submit('skip')" :disabled="submitting"
+                class="inline-flex items-center justify-center rounded-md text-sm font-medium
+                       border border-input bg-background hover:bg-accent h-9 px-4 py-2
+                       disabled:opacity-50 disabled:pointer-events-none">
+            Skip
+        </button>
+    </div>
+</div>
+{% endblock %}

@@ -159,6 +159,12 @@ def _init_blueprints(app):
         app.logger.info("[BLUEPRINT] Genome AI-systems register at /genome/ai-systems")
     except Exception as _gai_exc:
         app.logger.warning("[BLUEPRINT] Genome AI-systems not available: %s", _gai_exc)
+    try:
+        from app.modules.onboarding import register as register_onboarding
+        register_onboarding(app)
+        app.logger.info("[BLUEPRINT] Onboarding registered at /onboarding")
+    except Exception as _ob_exc:
+        app.logger.warning("[BLUEPRINT] Onboarding not available: %s", _ob_exc)
 
     # --- Feature-flagged domain modules ---
     _ff_solutions_strategic = _register_solutions_strategic(app, csrf)

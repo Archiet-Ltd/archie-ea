@@ -25,6 +25,7 @@ Uses the shared fixtures in tests/conftest.py (`db_session`, `make_org`,
 """
 
 from __future__ import annotations
+import datetime
 
 import uuid
 
@@ -44,7 +45,7 @@ def _user(db_session, make_org, label, role="enterprise_architect"):
         first_name="S11",
         last_name="Tester",
         organization_id=org.id,
-        confirmed=True,
+        confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),
         enterprise_role=role,
     )
     db_session.add(user)

@@ -1,0 +1,1617 @@
+{
+  "industries": [
+    {
+      "category": "Technology & Software",
+      "items": [
+        {
+          "value": "software-development",
+          "label": "Software Development",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "process_maturity": 0.5,
+            "data_management": 1.0
+          }
+        },
+        {
+          "value": "saas-platforms",
+          "label": "SaaS Platforms",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "data_management": 1.5,
+            "compliance_readiness": 0.5
+          }
+        },
+        {
+          "value": "cybersecurity",
+          "label": "Cybersecurity",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "risk_management": 2.0,
+            "compliance_readiness": 1.5,
+            "governance": 1.0
+          }
+        },
+        {
+          "value": "artificial-intelligence",
+          "label": "Artificial Intelligence & Machine Learning",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "data_management": 2.0,
+            "change_management": 1.0,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "cloud-computing",
+          "label": "Cloud Computing & Infrastructure",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "governance": 1.0,
+            "compliance_readiness": 1.0
+          }
+        },
+        {
+          "value": "data-analytics",
+          "label": "Data Analytics & Business Intelligence",
+          "maturityModifiers": {
+            "data_management": 2.0,
+            "technology_readiness": 1.5,
+            "process_maturity": 1.0
+          }
+        },
+        {
+          "value": "enterprise-software",
+          "label": "Enterprise Software Solutions",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "process_maturity": 1.5,
+            "governance": 1.0,
+            "compliance_readiness": 1.0
+          }
+        },
+        {
+          "value": "mobile-app-development",
+          "label": "Mobile App Development",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "process_maturity": 0.5
+          }
+        },
+        {
+          "value": "web-development",
+          "label": "Web Development & Design",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "change_management": 1.0,
+            "process_maturity": 0.5
+          }
+        },
+        {
+          "value": "blockchain-crypto",
+          "label": "Blockchain & Cryptocurrency",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "risk_management": 1.0,
+            "compliance_readiness": 0.5,
+            "change_management": 1.5
+          }
+        },
+        {
+          "value": "iot-solutions",
+          "label": "Internet of Things (IoT)",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "data_management": 1.5,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "quantum-computing",
+          "label": "Quantum Computing",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "data_management": 1.5,
+            "risk_management": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "category": "Financial Services",
+      "items": [
+        {
+          "value": "banking-traditional",
+          "label": "Traditional Banking",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 2.0,
+            "risk_management": 1.5,
+            "process_maturity": 1.0
+          }
+        },
+        {
+          "value": "digital-banking",
+          "label": "Digital Banking & Neobanks",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "compliance_readiness": 1.5,
+            "governance": 1.0
+          }
+        },
+        {
+          "value": "investment-banking",
+          "label": "Investment Banking",
+          "maturityModifiers": {
+            "governance": 2.0,
+            "compliance_readiness": 2.0,
+            "risk_management": 2.0,
+            "data_management": 1.5
+          }
+        },
+        {
+          "value": "investment-management",
+          "label": "Investment Management & Asset Management",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 2.0,
+            "risk_management": 2.0,
+            "data_management": 1.0
+          }
+        },
+        {
+          "value": "insurance",
+          "label": "Insurance",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.5,
+            "risk_management": 2.0,
+            "process_maturity": 1.0
+          }
+        },
+        {
+          "value": "insurtech",
+          "label": "InsurTech",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "compliance_readiness": 1.0,
+            "risk_management": 1.5
+          }
+        },
+        {
+          "value": "fintech",
+          "label": "FinTech",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "compliance_readiness": 1.0,
+            "data_management": 1.0
+          }
+        },
+        {
+          "value": "payment-processing",
+          "label": "Payment Processing & Payment Gateways",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "compliance_readiness": 2.0,
+            "risk_management": 1.5,
+            "data_management": 1.5
+          }
+        },
+        {
+          "value": "wealth-management",
+          "label": "Wealth Management & Private Banking",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 1.5,
+            "risk_management": 1.5,
+            "data_management": 1.0
+          }
+        },
+        {
+          "value": "credit-lending",
+          "label": "Credit & Lending Services",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.5,
+            "risk_management": 2.0,
+            "data_management": 1.0
+          }
+        },
+        {
+          "value": "capital-markets",
+          "label": "Capital Markets & Trading",
+          "maturityModifiers": {
+            "governance": 2.0,
+            "compliance_readiness": 2.0,
+            "risk_management": 2.0,
+            "technology_readiness": 1.5
+          }
+        }
+      ]
+    },
+    {
+      "category": "Healthcare & Life Sciences",
+      "items": [
+        {
+          "value": "hospitals-health-systems",
+          "label": "Hospitals & Health Systems",
+          "maturityModifiers": {
+            "compliance_readiness": 1.5,
+            "risk_management": 1.0,
+            "data_management": 1.0,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "pharmaceutical",
+          "label": "Pharmaceutical Manufacturing",
+          "maturityModifiers": {
+            "compliance_readiness": 2.0,
+            "risk_management": 1.5,
+            "process_maturity": 1.5,
+            "data_management": 1.0
+          }
+        },
+        {
+          "value": "biotechnology",
+          "label": "Biotechnology",
+          "maturityModifiers": {
+            "compliance_readiness": 1.5,
+            "risk_management": 1.0,
+            "technology_readiness": 1.5,
+            "data_management": 1.5
+          }
+        },
+        {
+          "value": "medical-devices",
+          "label": "Medical Devices & Equipment",
+          "maturityModifiers": {
+            "compliance_readiness": 2.0,
+            "risk_management": 1.5,
+            "process_maturity": 1.5,
+            "governance": 1.0
+          }
+        },
+        {
+          "value": "healthtech",
+          "label": "HealthTech & Digital Health",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "compliance_readiness": 1.5,
+            "data_management": 1.5,
+            "change_management": 1.0
+          }
+        },
+        {
+          "value": "telemedicine",
+          "label": "Telemedicine & Virtual Care",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "compliance_readiness": 1.5,
+            "change_management": 1.5,
+            "data_management": 1.0
+          }
+        },
+        {
+          "value": "clinical-research",
+          "label": "Clinical Research & CRO",
+          "maturityModifiers": {
+            "compliance_readiness": 2.0,
+            "data_management": 1.5,
+            "process_maturity": 1.5,
+            "governance": 1.0
+          }
+        },
+        {
+          "value": "diagnostics",
+          "label": "Diagnostics & Laboratory Services",
+          "maturityModifiers": {
+            "compliance_readiness": 1.5,
+            "process_maturity": 1.5,
+            "data_management": 1.0,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "mental-health",
+          "label": "Mental Health & Behavioral Health",
+          "maturityModifiers": {
+            "compliance_readiness": 1.5,
+            "risk_management": 1.0,
+            "data_management": 1.0,
+            "governance": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "category": "Manufacturing & Industrial",
+      "items": [
+        {
+          "value": "automotive-manufacturing",
+          "label": "Automotive Manufacturing",
+          "maturityModifiers": {
+            "process_maturity": 2.0,
+            "governance": 1.0,
+            "risk_management": 1.0,
+            "compliance_readiness": 1.0
+          }
+        },
+        {
+          "value": "aerospace-defense",
+          "label": "Aerospace & Defense",
+          "maturityModifiers": {
+            "process_maturity": 2.0,
+            "governance": 2.0,
+            "compliance_readiness": 2.0,
+            "risk_management": 1.5
+          }
+        },
+        {
+          "value": "electronics-manufacturing",
+          "label": "Electronics Manufacturing",
+          "maturityModifiers": {
+            "process_maturity": 1.5,
+            "technology_readiness": 1.5,
+            "governance": 1.0,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "chemical-manufacturing",
+          "label": "Chemical Manufacturing",
+          "maturityModifiers": {
+            "process_maturity": 1.5,
+            "compliance_readiness": 1.5,
+            "risk_management": 1.5,
+            "governance": 1.0
+          }
+        },
+        {
+          "value": "industrial-machinery",
+          "label": "Industrial Machinery & Equipment",
+          "maturityModifiers": {
+            "process_maturity": 1.5,
+            "governance": 1.0,
+            "risk_management": 1.0,
+            "technology_readiness": 0.5
+          }
+        },
+        {
+          "value": "food-beverage-manufacturing",
+          "label": "Food & Beverage Manufacturing",
+          "maturityModifiers": {
+            "process_maturity": 1.5,
+            "compliance_readiness": 1.5,
+            "risk_management": 1.0,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "textile-apparel",
+          "label": "Textile & Apparel Manufacturing",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "governance": 0.5,
+            "compliance_readiness": 0.5,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "pharmaceutical-manufacturing",
+          "label": "Pharmaceutical Manufacturing",
+          "maturityModifiers": {
+            "process_maturity": 2.0,
+            "compliance_readiness": 2.0,
+            "governance": 1.5,
+            "risk_management": 1.5
+          }
+        },
+        {
+          "value": "plastics-packaging",
+          "label": "Plastics & Packaging",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "compliance_readiness": 1.0,
+            "governance": 0.5,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "semiconductor",
+          "label": "Semiconductor Manufacturing",
+          "maturityModifiers": {
+            "process_maturity": 2.0,
+            "technology_readiness": 2.0,
+            "governance": 1.5,
+            "compliance_readiness": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "category": "Retail & E-Commerce",
+      "items": [
+        {
+          "value": "ecommerce-platforms",
+          "label": "E-Commerce Platforms",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "data_management": 1.5,
+            "compliance_readiness": 0.5
+          }
+        },
+        {
+          "value": "retail-traditional",
+          "label": "Traditional Retail",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "governance": 0.5,
+            "change_management": 0.0,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "luxury-goods",
+          "label": "Luxury Goods & Fashion",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "process_maturity": 1.0,
+            "data_management": 0.5,
+            "compliance_readiness": 0.5
+          }
+        },
+        {
+          "value": "grocery-supermarkets",
+          "label": "Grocery & Supermarkets",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "compliance_readiness": 1.0,
+            "risk_management": 0.5,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "consumer-electronics-retail",
+          "label": "Consumer Electronics Retail",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "change_management": 1.0,
+            "data_management": 1.0,
+            "process_maturity": 0.5
+          }
+        },
+        {
+          "value": "furniture-home-goods",
+          "label": "Furniture & Home Goods",
+          "maturityModifiers": {
+            "process_maturity": 0.5,
+            "governance": 0.5,
+            "change_management": 0.5,
+            "data_management": 0.5
+          }
+        },
+        {
+          "value": "marketplace-platforms",
+          "label": "Marketplace Platforms",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "data_management": 1.5,
+            "change_management": 1.5,
+            "governance": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "category": "Energy & Utilities",
+      "items": [
+        {
+          "value": "oil-gas",
+          "label": "Oil & Gas",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 1.5,
+            "risk_management": 1.5,
+            "process_maturity": 1.0
+          }
+        },
+        {
+          "value": "renewable-energy",
+          "label": "Renewable Energy",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "change_management": 1.0,
+            "governance": 1.0,
+            "compliance_readiness": 1.0
+          }
+        },
+        {
+          "value": "electric-utilities",
+          "label": "Electric Utilities",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 1.5,
+            "process_maturity": 1.5,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "water-utilities",
+          "label": "Water & Wastewater Utilities",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.5,
+            "process_maturity": 1.0,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "solar-energy",
+          "label": "Solar Energy",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "change_management": 1.0,
+            "compliance_readiness": 0.5,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "wind-energy",
+          "label": "Wind Energy",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "change_management": 1.0,
+            "compliance_readiness": 0.5,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "energy-storage",
+          "label": "Energy Storage & Battery Technology",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.0,
+            "risk_management": 1.0,
+            "compliance_readiness": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "category": "Transportation & Logistics",
+      "items": [
+        {
+          "value": "logistics-shipping",
+          "label": "Logistics & Shipping",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "governance": 1.0,
+            "compliance_readiness": 1.0,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "airlines",
+          "label": "Airlines & Aviation",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 2.0,
+            "risk_management": 1.5,
+            "process_maturity": 1.5
+          }
+        },
+        {
+          "value": "freight-trucking",
+          "label": "Freight & Trucking",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "compliance_readiness": 1.0,
+            "governance": 0.5,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "public-transportation",
+          "label": "Public Transportation",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 1.5,
+            "process_maturity": 1.0,
+            "change_management": -0.5
+          }
+        },
+        {
+          "value": "maritime-shipping",
+          "label": "Maritime & Shipping",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.5,
+            "process_maturity": 1.0,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "warehousing-distribution",
+          "label": "Warehousing & Distribution",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "governance": 0.5,
+            "technology_readiness": 0.5,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "last-mile-delivery",
+          "label": "Last-Mile Delivery",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "change_management": 1.5,
+            "process_maturity": 0.5,
+            "data_management": 1.0
+          }
+        },
+        {
+          "value": "autonomous-vehicles",
+          "label": "Autonomous Vehicles",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "risk_management": 1.5,
+            "compliance_readiness": 1.0,
+            "change_management": 1.5
+          }
+        }
+      ]
+    },
+    {
+      "category": "Real Estate & Construction",
+      "items": [
+        {
+          "value": "commercial-real-estate",
+          "label": "Commercial Real Estate",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "process_maturity": 0.5,
+            "compliance_readiness": 1.0,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "residential-real-estate",
+          "label": "Residential Real Estate",
+          "maturityModifiers": {
+            "governance": 0.5,
+            "process_maturity": 0.5,
+            "compliance_readiness": 1.0,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "construction",
+          "label": "Construction & Engineering",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "governance": 0.5,
+            "compliance_readiness": 1.0,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "property-management",
+          "label": "Property Management",
+          "maturityModifiers": {
+            "process_maturity": 0.5,
+            "governance": 0.5,
+            "compliance_readiness": 0.5,
+            "data_management": 0.5
+          }
+        },
+        {
+          "value": "proptech",
+          "label": "PropTech & Real Estate Technology",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "data_management": 1.0,
+            "process_maturity": 0.5
+          }
+        },
+        {
+          "value": "architecture-design",
+          "label": "Architecture & Design",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "governance": 0.5,
+            "technology_readiness": 1.0,
+            "compliance_readiness": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "category": "Media & Entertainment",
+      "items": [
+        {
+          "value": "streaming-services",
+          "label": "Streaming Services & OTT",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "data_management": 1.5,
+            "change_management": 1.5,
+            "compliance_readiness": 0.5
+          }
+        },
+        {
+          "value": "gaming",
+          "label": "Gaming & Esports",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "data_management": 1.0,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "film-production",
+          "label": "Film & Video Production",
+          "maturityModifiers": {
+            "governance": 0.5,
+            "process_maturity": 1.0,
+            "technology_readiness": 1.5,
+            "compliance_readiness": 0.5
+          }
+        },
+        {
+          "value": "music-production",
+          "label": "Music Production & Distribution",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "change_management": 1.0,
+            "data_management": 1.0,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "publishing",
+          "label": "Publishing & Digital Media",
+          "maturityModifiers": {
+            "technology_readiness": 1.0,
+            "change_management": 1.0,
+            "data_management": 1.0,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "advertising",
+          "label": "Advertising & Marketing Services",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "data_management": 1.5,
+            "change_management": 1.0,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "social-media",
+          "label": "Social Media Platforms",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "data_management": 2.0,
+            "change_management": 1.5,
+            "compliance_readiness": 1.0
+          }
+        },
+        {
+          "value": "broadcast-media",
+          "label": "Broadcast Media",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.5,
+            "process_maturity": 1.0,
+            "technology_readiness": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "category": "Professional Services",
+      "items": [
+        {
+          "value": "consulting",
+          "label": "Management Consulting",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "process_maturity": 1.5,
+            "data_management": 1.0,
+            "compliance_readiness": 1.0
+          }
+        },
+        {
+          "value": "accounting-audit",
+          "label": "Accounting & Audit",
+          "maturityModifiers": {
+            "governance": 2.0,
+            "compliance_readiness": 2.0,
+            "process_maturity": 1.5,
+            "risk_management": 1.5
+          }
+        },
+        {
+          "value": "legal-services",
+          "label": "Legal Services",
+          "maturityModifiers": {
+            "governance": 2.0,
+            "compliance_readiness": 2.0,
+            "risk_management": 1.5,
+            "data_management": 1.0
+          }
+        },
+        {
+          "value": "hr-staffing",
+          "label": "HR Services & Staffing",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.5,
+            "process_maturity": 1.0,
+            "data_management": 1.0
+          }
+        },
+        {
+          "value": "market-research",
+          "label": "Market Research & Analytics",
+          "maturityModifiers": {
+            "data_management": 2.0,
+            "process_maturity": 1.0,
+            "governance": 1.0,
+            "compliance_readiness": 0.5
+          }
+        },
+        {
+          "value": "executive-search",
+          "label": "Executive Search & Recruitment",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.0,
+            "data_management": 1.0,
+            "process_maturity": 0.5
+          }
+        },
+        {
+          "value": "public-relations",
+          "label": "Public Relations & Communications",
+          "maturityModifiers": {
+            "governance": 0.5,
+            "process_maturity": 0.5,
+            "change_management": 1.0,
+            "data_management": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "category": "Education & Training",
+      "items": [
+        {
+          "value": "higher-education",
+          "label": "Higher Education",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 1.5,
+            "process_maturity": 1.0,
+            "change_management": -0.5
+          }
+        },
+        {
+          "value": "k12-education",
+          "label": "K-12 Education",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.5,
+            "process_maturity": 0.5,
+            "change_management": 0.0
+          }
+        },
+        {
+          "value": "edtech",
+          "label": "EdTech & E-Learning",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "data_management": 1.0,
+            "compliance_readiness": 0.5
+          }
+        },
+        {
+          "value": "corporate-training",
+          "label": "Corporate Training & Development",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "governance": 1.0,
+            "data_management": 0.5,
+            "technology_readiness": 1.0
+          }
+        },
+        {
+          "value": "vocational-training",
+          "label": "Vocational & Technical Training",
+          "maturityModifiers": {
+            "process_maturity": 0.5,
+            "governance": 0.5,
+            "compliance_readiness": 1.0,
+            "change_management": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "category": "Hospitality & Tourism",
+      "items": [
+        {
+          "value": "hotels-resorts",
+          "label": "Hotels & Resorts",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "governance": 0.5,
+            "compliance_readiness": 1.0,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "restaurants-food-service",
+          "label": "Restaurants & Food Service",
+          "maturityModifiers": {
+            "process_maturity": 0.5,
+            "compliance_readiness": 1.0,
+            "governance": 0.0,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "travel-tourism",
+          "label": "Travel & Tourism Services",
+          "maturityModifiers": {
+            "technology_readiness": 1.0,
+            "data_management": 1.0,
+            "process_maturity": 0.5,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "cruise-lines",
+          "label": "Cruise Lines",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.5,
+            "risk_management": 1.5,
+            "process_maturity": 1.0
+          }
+        },
+        {
+          "value": "event-management",
+          "label": "Event Management & Conferences",
+          "maturityModifiers": {
+            "process_maturity": 0.5,
+            "governance": 0.5,
+            "technology_readiness": 1.0,
+            "data_management": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "category": "Agriculture & Food",
+      "items": [
+        {
+          "value": "agriculture-farming",
+          "label": "Agriculture & Farming",
+          "maturityModifiers": {
+            "process_maturity": 0.5,
+            "governance": 0.0,
+            "compliance_readiness": 1.0,
+            "technology_readiness": 0.0
+          }
+        },
+        {
+          "value": "agtech",
+          "label": "AgTech & Precision Agriculture",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.0,
+            "data_management": 1.5,
+            "process_maturity": 0.5
+          }
+        },
+        {
+          "value": "food-processing",
+          "label": "Food Processing & Distribution",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "compliance_readiness": 1.5,
+            "governance": 0.5,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "aquaculture",
+          "label": "Aquaculture & Fisheries",
+          "maturityModifiers": {
+            "process_maturity": 0.5,
+            "compliance_readiness": 1.0,
+            "governance": 0.5,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "organic-sustainable-farming",
+          "label": "Organic & Sustainable Farming",
+          "maturityModifiers": {
+            "compliance_readiness": 1.5,
+            "governance": 0.5,
+            "process_maturity": 0.5,
+            "risk_management": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "category": "Telecommunications",
+      "items": [
+        {
+          "value": "telecom-carriers",
+          "label": "Telecommunications Carriers",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 1.5,
+            "process_maturity": 1.5,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "mobile-networks",
+          "label": "Mobile Network Operators",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "governance": 1.5,
+            "compliance_readiness": 1.5,
+            "data_management": 1.5
+          }
+        },
+        {
+          "value": "internet-service-providers",
+          "label": "Internet Service Providers",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "governance": 1.0,
+            "compliance_readiness": 1.0,
+            "process_maturity": 1.0
+          }
+        },
+        {
+          "value": "satellite-communications",
+          "label": "Satellite Communications",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "governance": 1.5,
+            "compliance_readiness": 1.5,
+            "risk_management": 1.5
+          }
+        },
+        {
+          "value": "5g-networks",
+          "label": "5G & Next-Gen Networks",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "governance": 1.0,
+            "compliance_readiness": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "category": "Government & Public Sector",
+      "items": [
+        {
+          "value": "government-federal",
+          "label": "Federal Government",
+          "maturityModifiers": {
+            "governance": 2.0,
+            "compliance_readiness": 2.0,
+            "process_maturity": 1.0,
+            "change_management": -1.0
+          }
+        },
+        {
+          "value": "government-state-local",
+          "label": "State & Local Government",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 1.5,
+            "process_maturity": 1.0,
+            "change_management": -0.5
+          }
+        },
+        {
+          "value": "defense-military",
+          "label": "Defense & Military",
+          "maturityModifiers": {
+            "governance": 2.0,
+            "compliance_readiness": 2.0,
+            "risk_management": 2.0,
+            "process_maturity": 1.5
+          }
+        },
+        {
+          "value": "public-safety",
+          "label": "Public Safety & Emergency Services",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 1.5,
+            "risk_management": 1.5,
+            "process_maturity": 1.0
+          }
+        },
+        {
+          "value": "smart-cities",
+          "label": "Smart Cities & Urban Planning",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "governance": 1.5,
+            "change_management": 1.0,
+            "data_management": 1.5
+          }
+        }
+      ]
+    },
+    {
+      "category": "Non-Profit & NGO",
+      "items": [
+        {
+          "value": "nonprofit-social-services",
+          "label": "Non-Profit Social Services",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.0,
+            "process_maturity": 0.5,
+            "change_management": 0.0
+          }
+        },
+        {
+          "value": "international-development",
+          "label": "International Development",
+          "maturityModifiers": {
+            "governance": 1.5,
+            "compliance_readiness": 1.5,
+            "risk_management": 1.0,
+            "process_maturity": 0.5
+          }
+        },
+        {
+          "value": "environmental-conservation",
+          "label": "Environmental Conservation",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.0,
+            "process_maturity": 0.5,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "education-nonprofits",
+          "label": "Educational Non-Profits",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.0,
+            "process_maturity": 0.5,
+            "change_management": 0.0
+          }
+        },
+        {
+          "value": "healthcare-nonprofits",
+          "label": "Healthcare Non-Profits",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.5,
+            "risk_management": 1.0,
+            "process_maturity": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "category": "Emerging Industries",
+      "items": [
+        {
+          "value": "space-technology",
+          "label": "Space Technology & Commercial Spaceflight",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "risk_management": 2.0,
+            "governance": 1.5,
+            "compliance_readiness": 1.5
+          }
+        },
+        {
+          "value": "3d-printing",
+          "label": "3D Printing & Additive Manufacturing",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.0,
+            "process_maturity": 0.5,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "robotics-automation",
+          "label": "Robotics & Automation",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "process_maturity": 1.0,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "drones-uav",
+          "label": "Drones & UAV Technology",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "compliance_readiness": 1.0,
+            "risk_management": 1.5,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "virtual-reality",
+          "label": "Virtual Reality & Augmented Reality",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "change_management": 1.5,
+            "data_management": 1.0,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "nanotechnology",
+          "label": "Nanotechnology",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "risk_management": 1.5,
+            "compliance_readiness": 1.0,
+            "governance": 1.0
+          }
+        },
+        {
+          "value": "carbon-capture",
+          "label": "Carbon Capture & Climate Tech",
+          "maturityModifiers": {
+            "technology_readiness": 1.5,
+            "compliance_readiness": 1.0,
+            "governance": 1.0,
+            "risk_management": 1.0
+          }
+        },
+        {
+          "value": "synthetic-biology",
+          "label": "Synthetic Biology",
+          "maturityModifiers": {
+            "technology_readiness": 2.0,
+            "compliance_readiness": 1.5,
+            "risk_management": 2.0,
+            "governance": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "category": "Consumer Services",
+      "items": [
+        {
+          "value": "fitness-wellness",
+          "label": "Fitness & Wellness",
+          "maturityModifiers": {
+            "technology_readiness": 1.0,
+            "change_management": 1.0,
+            "compliance_readiness": 0.5,
+            "governance": 0.5
+          }
+        },
+        {
+          "value": "beauty-cosmetics",
+          "label": "Beauty & Cosmetics",
+          "maturityModifiers": {
+            "compliance_readiness": 1.0,
+            "governance": 0.5,
+            "process_maturity": 0.5,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "pet-care-services",
+          "label": "Pet Care & Services",
+          "maturityModifiers": {
+            "compliance_readiness": 0.5,
+            "process_maturity": 0.5,
+            "governance": 0.0,
+            "risk_management": 0.5
+          }
+        },
+        {
+          "value": "personal-services",
+          "label": "Personal Services",
+          "maturityModifiers": {
+            "process_maturity": 0.0,
+            "governance": 0.0,
+            "compliance_readiness": 0.5,
+            "risk_management": 0.0
+          }
+        },
+        {
+          "value": "funeral-services",
+          "label": "Funeral & Memorial Services",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "compliance_readiness": 1.5,
+            "process_maturity": 0.5,
+            "risk_management": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "category": "Sports & Recreation",
+      "items": [
+        {
+          "value": "professional-sports",
+          "label": "Professional Sports Teams & Leagues",
+          "maturityModifiers": {
+            "governance": 1.0,
+            "data_management": 1.0,
+            "technology_readiness": 1.0,
+            "compliance_readiness": 0.5
+          }
+        },
+        {
+          "value": "sports-equipment",
+          "label": "Sports Equipment & Apparel",
+          "maturityModifiers": {
+            "process_maturity": 1.0,
+            "governance": 0.5,
+            "compliance_readiness": 0.5,
+            "technology_readiness": 0.5
+          }
+        },
+        {
+          "value": "fitness-centers",
+          "label": "Fitness Centers & Gyms",
+          "maturityModifiers": {
+            "process_maturity": 0.5,
+            "governance": 0.0,
+            "compliance_readiness": 0.5,
+            "technology_readiness": 0.5
+          }
+        },
+        {
+          "value": "outdoor-recreation",
+          "label": "Outdoor Recreation",
+          "maturityModifiers": {
+            "governance": 0.5,
+            "compliance_readiness": 1.0,
+            "risk_management": 1.0,
+            "process_maturity": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "category": "Other",
+      "items": [
+        {
+          "value": "other",
+          "label": "Other Industry",
+          "maturityModifiers": {}
+        }
+      ]
+    }
+  ],
+  "sectors": [
+    {
+      "value": "private",
+      "label": "Private",
+      "description": "Privately held companies"
+    },
+    {
+      "value": "public",
+      "label": "Public",
+      "description": "Publicly traded companies"
+    },
+    {
+      "value": "nonprofit",
+      "label": "Non-profit",
+      "description": "Non-profit organizations"
+    }
+  ],
+  "companySizes": [
+    {
+      "value": "startup",
+      "label": "Startup (1-10)",
+      "range": { "min": 1, "max": 10 },
+      "maturityModifiers": {
+        "change_management": 1.5,
+        "technology_readiness": 1.0,
+        "governance": -1.0,
+        "process_maturity": -0.5
+      },
+      "recommendedFrameworks": [
+        "lean-canvas",
+        "agile-methodology",
+        "okr-objectives-key-results"
+      ]
+    },
+    {
+      "value": "small",
+      "label": "Small (11-50)",
+      "range": { "min": 11, "max": 50 },
+      "maturityModifiers": {
+        "change_management": 1.0,
+        "technology_readiness": 0.5,
+        "governance": -0.5,
+        "process_maturity": 0.0
+      },
+      "recommendedFrameworks": [
+        "agile-methodology",
+        "balanced-scorecard",
+        "lean-six-sigma"
+      ]
+    },
+    {
+      "value": "medium",
+      "label": "Medium (51-200)",
+      "range": { "min": 51, "max": 200 },
+      "maturityModifiers": {
+        "technology_readiness": 0.5,
+        "change_management": 0.5,
+        "process_maturity": 0.5
+      },
+      "recommendedFrameworks": [
+        "togaf-enterprise-architecture",
+        "itil-v4",
+        "iso27001"
+      ]
+    },
+    {
+      "value": "large",
+      "label": "Large (201-1000)",
+      "range": { "min": 201, "max": 1000 },
+      "maturityModifiers": {
+        "governance": 0.5,
+        "process_maturity": 0.5,
+        "technology_readiness": 0.5,
+        "compliance_readiness": 0.5
+      },
+      "recommendedFrameworks": [
+        "cobit2019",
+        "iso27001",
+        "itil-v4",
+        "togaf-enterprise-architecture"
+      ]
+    },
+    {
+      "value": "enterprise",
+      "label": "Enterprise (1000+)",
+      "range": { "min": 1000, "max": null },
+      "maturityModifiers": {
+        "governance": 1.0,
+        "process_maturity": 1.0,
+        "compliance_readiness": 1.0,
+        "change_management": 0.5
+      },
+      "recommendedFrameworks": [
+        "cobit2019",
+        "togaf-enterprise-architecture",
+        "iso27001",
+        "sox-sarbanes-oxley"
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "value": "north-america",
+      "label": "North America",
+      "countries": ["USA", "Canada", "Mexico"],
+      "timezones": [
+        "America/New_York",
+        "America/Los_Angeles",
+        "America/Chicago"
+      ],
+      "recommendedCompliance": [
+        "hipaa",
+        "soc2",
+        "nist-csf",
+        "sox",
+        "ccpa",
+        "pipeda"
+      ]
+    },
+    {
+      "value": "europe",
+      "label": "Europe",
+      "countries": ["UK", "Germany", "France", "Spain", "Italy"],
+      "timezones": ["Europe/London", "Europe/Paris", "Europe/Berlin"],
+      "recommendedCompliance": ["gdpr", "iso27001", "mifid-ii"]
+    },
+    {
+      "value": "asia-pacific",
+      "label": "Asia Pacific",
+      "countries": ["China", "Japan", "Singapore", "Australia", "India"],
+      "timezones": ["Asia/Singapore", "Asia/Tokyo", "Australia/Sydney"],
+      "recommendedCompliance": [
+        "appi",
+        "pdpa-singapore",
+        "mlps",
+        "dpdpa",
+        "asd-essential-eight"
+      ]
+    },
+    {
+      "value": "latin-america",
+      "label": "Latin America",
+      "countries": ["Brazil", "Argentina", "Chile", "Colombia"],
+      "timezones": ["America/Sao_Paulo", "America/Argentina/Buenos_Aires"],
+      "recommendedCompliance": ["lgpd"]
+    },
+    {
+      "value": "africa",
+      "label": "Africa",
+      "countries": ["South Africa", "Nigeria", "Kenya", "Egypt"],
+      "timezones": ["Africa/Johannesburg", "Africa/Lagos"],
+      "recommendedCompliance": ["popia", "ndpr"]
+    },
+    {
+      "value": "middle-east",
+      "label": "Middle East",
+      "countries": ["UAE", "Saudi Arabia", "Israel", "Qatar"],
+      "timezones": ["Asia/Dubai", "Asia/Riyadh"],
+      "recommendedCompliance": ["iso27001"]
+    }
+  ],
+  "governanceMaturityLevels": [
+    {
+      "value": "none",
+      "label": "None - No formal governance processes",
+      "description": "No documented processes, reactive management, unclear accountability",
+      "level": 1
+    },
+    {
+      "value": "ad-hoc",
+      "label": "Ad-hoc - Informal processes, reactive approach",
+      "description": "Some informal processes exist but are not documented or consistently followed",
+      "level": 1.5
+    },
+    {
+      "value": "developing",
+      "label": "Developing - Some documented processes",
+      "description": "Key processes are documented, basic organizational structure defined",
+      "level": 2
+    },
+    {
+      "value": "managed",
+      "label": "Managed - Well-defined, consistently applied",
+      "description": "Formal governance framework with clear policies, regular strategic planning",
+      "level": 3
+    },
+    {
+      "value": "optimized",
+      "label": "Optimized - Continuous improvement culture",
+      "description": "Metrics-driven governance with continuous improvement and innovation",
+      "level": 4
+    }
+  ]
+}

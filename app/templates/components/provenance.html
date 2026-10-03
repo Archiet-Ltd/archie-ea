@@ -45,6 +45,36 @@
 {% endmacro %}
 
 
+{% macro coverage_badge(state, note=none) %}
+{# Coverage (onboarding-redesign-v3 §5): whether an expected organisation
+   fact is recorded, worked out, or merely expected at the org's stage —
+   plus a fourth badge for a stage gap the founder accepted for now. Same
+   one-word-pill shape as provenance_badge above; kept as its own macro
+   because it answers a different question ("what is the status of this
+   expected fact about the organisation") from provenance_badge's ("where
+   did this measured number come from"), not a fifth `kind` on that closed
+   three-kind vocabulary. `note` carries the "why" (worked out) or the
+   reason (accepted); states are never mixed on one chip. #}
+{% if state == 'recorded' %}
+<span class="inline-flex items-center gap-1 rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-xs font-medium text-success-emphasis">
+    <i data-lucide="check-circle-2" class="h-3 w-3" aria-hidden="true"></i>Recorded
+</span>
+{% elif state == 'worked_out' %}
+<span class="inline-flex items-center gap-1 rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info-emphasis" {% if note %}title="{{ note }}"{% endif %}>
+    <i data-lucide="git-branch" class="h-3 w-3" aria-hidden="true"></i>Worked out{% if note %} — {{ note }}{% endif %}
+</span>
+{% elif state == 'accepted' %}
+<span class="inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis">
+    <i data-lucide="clock" class="h-3 w-3" aria-hidden="true"></i>Accepted{% if note %} — {{ note }}{% endif %}
+</span>
+{% else %}
+<span class="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+    <i data-lucide="circle-dashed" class="h-3 w-3" aria-hidden="true"></i>Expected at your stage
+</span>
+{% endif %}
+{% endmacro %}
+
+
 {% macro provenance_legend() %}
 {# Shown once per page, above the lenses. A badge vocabulary only works if the
    page states it rather than assuming the reader infers it. #}

@@ -9,6 +9,7 @@ Written against the shared fixtures in ``tests/conftest.py`` — ``db_session``
 rolls everything back, ``app`` is session-scoped.
 """
 
+import datetime
 import uuid
 
 import pytest
@@ -24,7 +25,7 @@ def _make_user(db_session, org, password=_PASSWORD):
     user = User(
         email=f"sess-{uuid.uuid4().hex[:10]}@example.com",
         organization_id=org.id,
-        confirmed=True,
+        confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),
     )
     user.password = password
     db_session.add(user)
