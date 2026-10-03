@@ -934,6 +934,140 @@ def get_sidebar_zones(user) -> List[Dict]:
     return visible
 
 
+# ---------------------------------------------------------------------------
+# Sidebar display groups
+# ---------------------------------------------------------------------------
+# The sidebar shows the SAME question-shaped groups to every role. Zones (home, my_work,
+# library, governance, admin) stay exactly as they are: the modules directory, the
+# dashboard's workspace cards, the link budget and the search API all read them. This layer
+# only decides where a link is DISPLAYED, so no route, label or permission changes.
+#
+# Product ruling (product manager, 2026-09-25): six headings, in this order, empty groups
+# hidden, governance links under "What if we change it", Admin still its own group. The
+# Ask link stays first and outside any group. A link appears once.
+
+_SIDEBAR_GROUPS = (
+    ("start", "Getting started"),
+    ("what_we_do", "What we do"),
+    ("supports", "What supports it"),
+    ("goals", "Goals and changes"),
+    ("what_if", "What if we change it"),
+    ("build", "Build and model"),
+    ("admin", "Admin"),
+)
+
+# Where a link lands when its endpoint has no explicit entry below (a link added later still
+# shows somewhere sensible; tests/test_sidebar_groups.py requires every CURRENT endpoint to
+# be listed explicitly).
+_ZONE_DEFAULT_GROUP = {
+    "home": "start",
+    "my_work": "what_we_do",
+    "library": "supports",
+    "governance": "what_if",
+    "admin": "admin",
+}
+
+_GROUP_FOR_ENDPOINT = {
+    # Getting started
+    "dashboard.overview": "start",
+    # What we do: the capabilities and how well the organisation runs them
+    "dashboard.health_scorecard": "what_we_do",
+    "capability_map.index": "what_we_do",
+    "maturity_management.maturity_heatmap": "what_we_do",
+    "strategic.capability_health": "what_we_do",
+    "value_stream.index": "what_we_do",
+    "archimate_layers.business_products": "what_we_do",
+    "organization.index": "what_we_do",
+    "stakeholder_map.stakeholder_map_page": "what_we_do",
+    "dashboard_pages.rationalization_scorecard": "what_we_do",
+    # What supports it: the tools, data, suppliers and people behind it
+    "unified_applications.application_list": "supports",
+    "unified_applications.vendors": "supports",
+    "unified_applications.rationalization_dashboard": "supports",
+    "my_applications.dashboard": "supports",
+    "consolidation_list.dashboard": "supports",
+    "unified_duplicate.simple_dashboard": "supports",
+    "interface_register.index": "supports",
+    "tech_radar.index": "supports",
+    "data_architecture.data_architecture_dashboard": "supports",
+    "data_architecture.data_lineage_view": "supports",
+    "solution_design.data_stewardship": "supports",
+    "procurement.index": "supports",
+    "procurement.contracts_list": "supports",
+    "procurement.renewals_dashboard": "supports",
+    "procurement.spend_analytics": "supports",
+    "procurement.licenses_list": "supports",
+    "procurement.compliance_dashboard": "supports",
+    # Goals and changes: where we are heading and the work that gets us there
+    "main.capability_roadmap": "goals",
+    "architect_ui.motivation_view": "goals",
+    "enterprise.gap_analysis": "goals",
+    "enterprise.work_packages": "goals",
+    "solution_design.programmes_list": "goals",
+    "architecture.investment_priorities": "goals",
+    "portfolio.index": "goals",
+    "adm_kanban_view.index": "goals",
+    "maturity_management.frameworks_overview": "goals",
+    # What if we change it: impact, and everything that governs a change
+    "strategic.impact_analysis": "what_if",
+    "architect_ui.traceability_matrix": "what_if",
+    "arb.dashboard": "what_if",
+    "arb.reviews": "what_if",
+    "arb.sessions": "what_if",
+    "arch_decisions.list_decisions": "what_if",
+    "risk.risk_register": "what_if",
+    "policy_monitoring.policy_dashboard": "what_if",
+    "application_mgmt.compliance_frameworks_dashboard": "what_if",
+    "admin.governance_gates": "what_if",
+    # Build and model: where you draw, write and design
+    "business_model.index": "build",
+    "archimate_crud.dashboard": "build",
+    "archimate.diagrams_library": "build",
+    "archimate.composer_page": "build",
+    "solution_design.list_solutions": "build",
+    "architecture_journey.index": "build",
+    "unified_ai_chat.index": "build",
+    "modules_directory.index": "build",
+}
+
+
+
+def get_sidebar_groups(user) -> List[Dict]:
+    """The sidebar's display groups for this user: ``[{group, title, links}]``.
+
+    Built from ``get_sidebar_zones`` so the per-link permission filtering is identical. The Ask
+    link comes first as an untitled group; then the six question groups in a fixed order with
+    empty ones left out; Admin last. A link is listed once (the zone it came from decides only
+    the Admin group, which is always the admin zone).
+    """
+    ask_endpoint = _ASK_LINK["endpoint"]
+    ask = None
+    buckets = {key: [] for key, _ in _SIDEBAR_GROUPS}
+    seen = set()
+    for zone in get_sidebar_zones(user):
+        for link in zone["links"]:
+            endpoint = link["endpoint"]
+            if endpoint in seen:
+                continue
+            seen.add(endpoint)
+            if endpoint == ask_endpoint:
+                ask = link
+                continue
+            if zone["zone"] == "admin":
+                key = "admin"
+            else:
+                key = _GROUP_FOR_ENDPOINT.get(endpoint) or _ZONE_DEFAULT_GROUP.get(zone["zone"], "what_we_do")
+            buckets[key].append(link)
+
+    groups: List[Dict] = []
+    if ask is not None:
+        groups.append({"group": "ask", "title": None, "links": [ask]})
+    for key, title in _SIDEBAR_GROUPS:
+        if buckets[key]:
+            groups.append({"group": key, "title": title, "links": buckets[key]})
+    return groups
+
+
 def link_requires_satisfied(user, requires):
     """True when `user` satisfies a sidebar link's `requires` guard (see `_link`'s docstring), or
     `requires` is None. The one predicate `get_sidebar_zones` uses per-link, pulled out so any other

@@ -197,20 +197,33 @@ DEPENDENCIES:
         <div x-show="!searching()">
 
         {% set ns = namespace(has_all_modules=false) %}
-        {% for zone in get_sidebar_zones(current_user) %}
-        {# A zone whose every link's endpoint is unregistered (guardrail flag
-           off, blueprint import failed, endpoint string drifted) must not
-           print an empty heading — that reads as "you have Governance access
-           but zero Governance links" instead of "you have no Governance
-           access here". Compute the surviving links once and gate the whole
-           zone, heading included, on that list being non-empty. #}
-        {% set visible_links = zone.links | selectattr('endpoint', 'in', flask.current_app.view_functions) | list %}
+        {# The same six question-shaped groups for every role (get_sidebar_groups). The links are
+           always in the DOM (a collapsed group is hidden with x-show, not removed) so the link
+           budget and the "absent for a role means absent from the DOM" rule are unchanged. A
+           group whose every endpoint is unregistered must not print an empty heading: compute
+           the surviving links once and gate the whole group on that list being non-empty. #}
+        {% set all_groups = get_sidebar_groups(current_user) %}
+        {% set ns_total = namespace(count=0, first_titled=true) %}
+        {% for g in all_groups %}{% set ns_total.count = ns_total.count + (g.links | selectattr('endpoint', 'in', flask.current_app.view_functions) | list | length) %}{% endfor %}
+        {% for group in all_groups %}
+        {% set visible_links = group.links | selectattr('endpoint', 'in', flask.current_app.view_functions) | list %}
         {% if visible_links %}
-        <div class="px-3 py-2">
-            <div class="mb-2 px-2 text-xs font-semibold tracking-tight text-muted-foreground uppercase" role="heading" aria-level="3">
-                {{ zone.title }}
-            </div>
-            <div class="space-y-1">
+        {% set holds_current_page = request.endpoint in (visible_links | map(attribute='endpoint') | list) %}
+        {# Every group starts open: the headings organise the list, they do not hide it. Existing journeys
+           and the "reachable from your own sidebar" acceptance tests click these links directly, and a
+           role with many links can still collapse a group by hand with its heading. #}
+        {% set is_open = true %}
+        {% if group.title %}{% set ns_total.first_titled = false %}{% endif %}
+        <div class="px-3 py-2" data-sidebar-group="{{ group.group }}"
+             x-data="{ open: {{ 'true' if is_open else 'false' }} }">
+            {% if group.title %}
+            <button type="button" @click="open = !open" :aria-expanded="open ? 'true' : 'false'"
+                    class="mb-2 flex w-full items-center justify-between rounded-md px-2 text-xs font-semibold tracking-tight text-muted-foreground uppercase hover:text-foreground">
+                <span role="heading" aria-level="3">{{ group.title }}</span>
+                <i data-lucide="chevron-down" class="h-3.5 w-3.5 transition-transform" :class="open ? '' : '-rotate-90'"></i>
+            </button>
+            {% endif %}
+            <div class="space-y-1" x-show="open" {% if not is_open %}x-cloak{% endif %}>
                 {% for link in visible_links %}
                 {% if link.endpoint == 'modules_directory.index' %}{% set ns.has_all_modules = true %}{% endif %}
                 {# title, not just the label span: collapsed, the span is

@@ -16,7 +16,7 @@ from flask import Flask, render_template_string
 from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
-from app.utils.role_access import get_sidebar_zones
+from app.utils.role_access import get_sidebar_groups, get_sidebar_zones
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -56,6 +56,7 @@ def brand_shell(request):
         return render_template_string(
             '<!doctype html><html><body>{% include "components/admin_sidebar.html" %}</body></html>',
             current_user=user, flask=flask, get_sidebar_zones=get_sidebar_zones,
+            get_sidebar_groups=get_sidebar_groups,
         )
 
     server = make_server("127.0.0.1", 0, shell, threaded=True)
