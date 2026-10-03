@@ -333,14 +333,14 @@ def test_expanded_chain_marks_an_unresolved_link_instead_of_dropping_it(
     assert "source_id" not in expanded[1]
 
 
-def test_module_registers_exactly_twelve_routes(app):
+def test_module_registers_exactly_thirteen_routes(app):
     """The impact, risk, portfolio, programme, strategy, accountability,
-    data, traceability, value-streams-at-risk and yield routes all mount on
-    this same existing blueprint rather than a new one each. Still exactly
-    one blueprint, now twelve routes on it -- all six lenses of the
-    catalogue, the L7 data lens, the traceability check over the impact
-    walk, the Strategic value-streams-at-risk surface and
-    recompute/derived/yield.
+    data, compliance, traceability, value-streams-at-risk and yield routes
+    all mount on this same existing blueprint rather than a new one each.
+    Still exactly one blueprint, now thirteen routes on it -- all six lenses
+    of the catalogue, the L7 data lens, the L6 compliance lens, the
+    traceability check over the impact walk, the Strategic
+    value-streams-at-risk surface and recompute/derived/yield.
     """
     rules = [
         rule for rule in app.url_map.iter_rules() if rule.endpoint.startswith("intelligence_api.")
@@ -357,6 +357,7 @@ def test_module_registers_exactly_twelve_routes(app):
         "intelligence_api.strategy_for_element",
         "intelligence_api.accountability_for_element",
         "intelligence_api.data_for_element",
+        "intelligence_api.compliance_for_element",
         "intelligence_api.traceability_check",
         "intelligence_api.derivation_yield",
     }
@@ -993,3 +994,56 @@ def test_data_endpoint_returns_objects_and_flows_for_a_real_element(
     assert [f["direction"] for f in data["flows"]] == ["out"]
     assert data["reasons"] == []
     assert "pii_fields" not in resp.get_data(as_text=True) and "email" not in str(data["data_objects"])
+
+
+# --- Compliance (under L6) -----------------------------------------------------
+
+
+def test_compliance_endpoint_requires_login(client):
+    resp = client.get("/api/v1/intelligence/compliance/1")
+    assert resp.status_code in (302, 401)
+
+
+def test_compliance_endpoint_unknown_element_is_404(app, db_session, make_org, client, login_as):
+    org = make_org("compliance-route-404")
+    user = _make_user(db_session, org)
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get("/api/v1/intelligence/compliance/999999999")
+    assert resp.status_code == 404
+    assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
+
+
+def test_compliance_endpoint_returns_controls_for_a_real_application(
+    app, db_session, make_org, client, login_as
+):
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+
+    org = make_org("compliance-route-ok")
+    user = _make_user(db_session, org)
+    a = _make_element(db_session, org.id, "A")
+    component = ApplicationComponent(name="A App", organization_id=org.id, archimate_element_id=a.id)
+    framework = RegulatoryFramework(code="RT-FW", name="Route framework", category="security")
+    db_session.add_all([component, framework])
+    db_session.flush()
+    control = ComplianceControl(framework_id=framework.id, control_code="R-1", title="Route control")
+    db_session.add(control)
+    db_session.flush()
+    db_session.add(ApplicationComplianceControl(
+        organization_id=org.id, application_id=component.id, control_id=control.id,
+        implementation_status="planned", evidence_url="https://secret.example/x",
+    ))
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get(f"/api/v1/intelligence/compliance/{a.id}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert [c["code"] for c in data["controls"]] == ["R-1"]
+    assert data["controls"][0]["evidence_url_recorded"] is True
+    assert "no_policy_scan_recorded" in data["reasons"]
+    assert "secret.example" not in resp.get_data(as_text=True)
