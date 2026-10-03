@@ -9,7 +9,7 @@ import json
 import re
 from datetime import datetime
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, redirect, url_for
 
 from app import db
 from app.decorators import audit_log
@@ -30,8 +30,7 @@ framework_management_bp = Blueprint(
 @platform_admin_required
 def dashboard():
     """Framework Management Dashboard"""
-    has_manufacturing = db.session.query(FrameworkInstance).count() > 0
-    return render_template("framework_management/dashboard.html", has_manufacturing=has_manufacturing)
+    return redirect(url_for("maturity_management.frameworks_overview"), code=302)
 
 
 MATURITY_LABELS = {1: "Initial", 2: "Developing", 3: "Defined", 4: "Managed", 5: "Optimizing"}

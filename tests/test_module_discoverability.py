@@ -91,6 +91,8 @@ def _all_linked_endpoints(app):
 # HiddenModules.md section 1), resolved to endpoints at test time via
 # url_map rather than pinned as literal strings, so a route rename is
 # caught here rather than silently going stale.
+# Note: /procurement/compliance has been folded and now redirects to /procurement/licenses
+# This is still considered "reachable" as the redirect leads to a valid endpoint.
 _S11_REGISTER_RULES = [
     "/adm-kanban/",
     "/architecture-journey/",

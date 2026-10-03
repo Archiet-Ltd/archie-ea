@@ -741,15 +741,14 @@ _MY_WORK_LINKS = {
         _link("Ownership Coverage", "unified_applications.ownership_coverage", "users"),
     ],
     ROLE_PROCUREMENT: [
-        # Fix round: Overview, Licences and Compliance were reachable from
-        # nowhere in the sidebar despite having working, guarded routes.
-        _link("Overview", "procurement.index", "shopping-cart"),
+        # Renewals is this zone's one entry for "what is due for renewal";
+        # the section landing page and the compliance statistics view are
+        # both still reachable by their own URL, just not from here.
+        _link("Renewals", "procurement.renewals_dashboard", "history"),
         _link("Vendors", "unified_applications.vendors", "building"),
         _link("Contracts", "procurement.contracts_list", "file-text"),
-        _link("Renewals", "procurement.renewals_dashboard", "history"),
         _link("Spend", "procurement.spend_analytics", "bar-chart-3"),
         _link("Licences", "procurement.licenses_list", "key-round"),
-        _link("Compliance", "procurement.compliance_dashboard", "clipboard-check"),
     ],
     ROLE_APPLICATION_MANAGER: [
         # Fix round: my_applications.dashboard is a personally-scoped view

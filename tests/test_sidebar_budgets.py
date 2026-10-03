@@ -321,18 +321,15 @@ def test_portfolio_manager_my_work_membership():
 
 
 def test_procurement_my_work_membership():
-    """Task 3 fix round: Overview, Licences and Compliance added — all real,
-    working routes reachable from nowhere in the sidebar. Overview goes
-    first per the coordinator's review of the sidebar rewrite."""
+    """Procurement sidebar links updated to point to Renewals instead of Overview,
+    and Compliance link removed."""
     assert _my_work_labels(ROLE_PROCUREMENT) == [
         "Ask a question",
-        "Overview",
+        "Renewals",
         "Vendors",
         "Contracts",
-        "Renewals",
         "Spend",
         "Licences",
-        "Compliance",
     ]
 
 

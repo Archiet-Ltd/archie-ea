@@ -9,7 +9,7 @@ ADR Reference: docs/adr/0010-procurement-persona.md
 
 from datetime import date, timedelta
 
-from flask import render_template, request
+from flask import render_template, request, redirect, url_for
 from flask_login import current_user, login_required
 
 from app.decorators import requires_procurement
@@ -238,41 +238,8 @@ def license_detail(license_id):
 @login_required
 @requires_procurement
 def compliance_dashboard():
-    """License compliance dashboard."""
-    org_id = current_user.organization_id
-
-    licenses = LicenseEntitlement.query.filter_by(organization_id=org_id).all()
-
-    # Group by compliance status
-    by_status = {}
-    for item in licenses:
-        status = item.compliance_status or "unknown"
-        if status not in by_status:
-            by_status[status] = []
-        by_status[status].append(item)
-
-    # Calculate risk exposure (over-deployed licenses)
-    risk_exposure = sum(
-        (item.quantity_deployed - item.quantity_entitled) * float(item.unit_cost or 0)
-        for item in licenses
-        if item.compliance_status == "over_deployed" and item.quantity_deployed and item.quantity_entitled
-    )
-
-    # Shelfware (entitled but not used)
-    shelfware_value = sum(
-        (item.quantity_entitled - item.quantity_used) * float(item.unit_cost or 0)
-        for item in licenses
-        if item.quantity_entitled and item.quantity_used and item.quantity_entitled > item.quantity_used
-    )
-
-    return render_template(
-        "procurement/compliance_dashboard.html",
-        licenses=licenses,
-        by_status=by_status,
-        risk_exposure=risk_exposure,
-        shelfware_value=shelfware_value,
-        summary=_compliance_summary(licenses),
-    )
+    """License compliance dashboard - this page has been folded."""
+    return redirect(url_for("procurement.licenses_list"), code=302)
 
 
 @procurement_bp.route("/spend")

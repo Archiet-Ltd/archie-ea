@@ -12,7 +12,7 @@ Features:
 - Migration support
 """
 
-from flask import Blueprint, current_app, jsonify, render_template, request
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, url_for
 from app.middleware.tenant_decorators import platform_admin_required
 
 from app import db
@@ -38,42 +38,8 @@ framework_config_ui_bp = Blueprint(
 @framework_config_ui_bp.route("/")
 @platform_admin_required
 def framework_config_dashboard():
-    """Framework configuration dashboard"""
-    try:
-        # Get active configuration
-        active_config = FrameworkConfigurationService.get_active_configuration()
-
-        # Get available templates
-        templates = FrameworkConfigurationTemplate.query.filter_by(
-            status="active"
-        ).all()
-
-        # Get available extensions
-        extensions = FrameworkExtension.query.filter_by(status="active").all()
-
-        # Get recent configurations
-        recent_configs = (
-            CapabilityFrameworkConfiguration.query.order_by(
-                CapabilityFrameworkConfiguration.created_at.desc()
-            )
-            .limit(10)
-            .all()
-        )
-
-        return render_template(
-            "framework_config/dashboard.html",
-            active_config=active_config,
-            templates=templates,
-            extensions=extensions,
-            recent_configs=recent_configs,
-        )
-
-    except Exception as e:
-        current_app.logger.error(f"Error loading framework config dashboard: {str(e)}")
-        return render_template(
-            "framework_config/error.html",
-            error="An unexpected error occurred. Please try again.",
-        ), 500
+    """Framework configuration dashboard - this page has been folded."""
+    return redirect(url_for("maturity_management.frameworks_overview"), code=302)
 
 
 @framework_config_ui_bp.route("/configuration/new")

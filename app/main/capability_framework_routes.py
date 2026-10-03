@@ -2,7 +2,7 @@
 Capability Framework Dashboard Routes
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, redirect, request, url_for
 from sqlalchemy import func
 
 from app import db
@@ -20,10 +20,8 @@ capability_framework_bp = Blueprint(
 @capability_framework_bp.route("/")
 @platform_admin_required
 def dashboard():
-    """Redirect to new Framework Management Dashboard"""
-    from flask import redirect, url_for
-
-    return redirect(url_for("main.framework_management.dashboard"))
+    """Redirect to Capability Frameworks overview - this page has been folded."""
+    return redirect(url_for("maturity_management.frameworks_overview"), code=302)
 
 
 @capability_framework_bp.route("/api/domains")
