@@ -37,4 +37,5 @@ from . import (  # noqa: F401, E402
     approval_routes,
     metrics_routes,
     page_guide_routes,
+    agent_oversight_routes,
 )
