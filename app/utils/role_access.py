@@ -441,6 +441,14 @@ def _link(label, endpoint, icon, requires=None, query_params=None):
 # cannot drift apart between personas.
 _ASK_LINK = _link("Ask a question", "intelligence_ui.ask", "search")
 
+# Approval Inbox — one queue for every pending change proposal.
+# Shared definition so the label, endpoint and icon cannot drift apart between
+# personas. Requires GENERAL permission (write/approval access) so Viewer roles
+# do not see a link that 403s.
+_APPROVAL_INBOX_LINK = _link(
+    "Approval Inbox", "unified_ai_chat.approval_inbox", "inbox", requires="general"
+)
+
 _HOME_LINKS = [
     _link("Dashboard Overview", "dashboard.overview", "layout-dashboard"),
     _link("Health Scorecard", "dashboard.health_scorecard", "heart-pulse"),
@@ -537,6 +545,7 @@ _ADMIN_LINKS = [
 _MY_WORK_LINKS = {
     ROLE_SOLUTION_ARCHITECT: [
         _link("Architecture Journey", "architecture_journey.index", "compass"),
+        _APPROVAL_INBOX_LINK,
         _link("Solutions", "solution_design.list_solutions", "wrench"),
         _link("AI Chat", "unified_ai_chat.index", "message-square"),
         _link("ADM Kanban", "adm_kanban_view.index", "kanban"),
@@ -562,6 +571,7 @@ _MY_WORK_LINKS = {
     ],
     ROLE_ENTERPRISE_ARCHITECT: [
         _link("Transformation programmes", "solution_design.programmes_list", "waypoints"),
+        _APPROVAL_INBOX_LINK,
         # BA-A3 (21 Aug 2026, re-measured 27 Aug 2026): the
         # /business-architecture landing page is deliberately NOT here.
         # enterprise_architect renders 25 sidebar links, which is the
@@ -628,6 +638,7 @@ _MY_WORK_LINKS = {
         # every journey test passes, because those address it by URL. This
         # persona could not find it from their landing page.
         _link("Roadmaps", "main.capability_roadmap", "milestone"),
+        _APPROVAL_INBOX_LINK,
         _link("Transformation programmes", "solution_design.programmes_list", "waypoints"),
         _link("Health Scorecard", "dashboard.health_scorecard", "heart-pulse"),
         _link("Rationalization", "unified_applications.rationalization_dashboard", "git-merge"),
@@ -661,6 +672,7 @@ _MY_WORK_LINKS = {
         # over five generic zones with no page that presents them as one
         # practice. /business-architecture is that page.
         _link("Architecture Journey", "architecture_journey.index", "compass"),
+        _APPROVAL_INBOX_LINK,
         # "Capability Map" folded out in the canvas/framework UI fix, round 2
         # (25 Sep 2026): it pointed at capability_map.index, the exact
         # endpoint Library already carries as "Capabilities" for every role
@@ -724,6 +736,7 @@ _MY_WORK_LINKS = {
         # already in the enterprise_architect / arb_member / platform_admin
         # zones; this is the missing one.
         _link("Portfolio", "portfolio.index", "briefcase"),
+        _APPROVAL_INBOX_LINK,
         _link("Rationalization", "unified_applications.rationalization_dashboard", "git-merge"),
         _link("Vendors", "unified_applications.vendors", "building"),
         _link("Applications", "unified_applications.application_list", "list"),
@@ -744,6 +757,7 @@ _MY_WORK_LINKS = {
         # Fix round: Overview, Licences and Compliance were reachable from
         # nowhere in the sidebar despite having working, guarded routes.
         _link("Overview", "procurement.index", "shopping-cart"),
+        _APPROVAL_INBOX_LINK,
         _link("Vendors", "unified_applications.vendors", "building"),
         _link("Contracts", "procurement.contracts_list", "file-text"),
         _link("Renewals", "procurement.renewals_dashboard", "history"),
@@ -758,6 +772,7 @@ _MY_WORK_LINKS = {
         # unified_applications.application_list's org-wide paginated list; it
         # was reachable from nowhere in the sidebar.
         _link("My Applications", "my_applications.dashboard", "layout-dashboard"),
+        _APPROVAL_INBOX_LINK,
         _link("Applications", "unified_applications.application_list", "list"),
         _link("Rationalization", "unified_applications.rationalization_dashboard", "git-merge"),
         _link("Vendors", "unified_applications.vendors", "building"),
@@ -767,6 +782,7 @@ _MY_WORK_LINKS = {
     # its existing legacy ROLE_SECTION_ACCESS scope (solutions, portfolio).
     ROLE_ARB_MEMBER: [
         _link("Solutions", "solution_design.list_solutions", "wrench"),
+        _APPROVAL_INBOX_LINK,
         _link("Portfolio", "portfolio.index", "briefcase"),
     ],
     # Also not enumerated in the spec; platform_admin gets a working set that
@@ -781,6 +797,7 @@ _MY_WORK_LINKS = {
     ROLE_PLATFORM_ADMIN: [
         _link("Solutions", "solution_design.list_solutions", "wrench"),
         _link("Portfolio", "portfolio.index", "briefcase"),
+        _APPROVAL_INBOX_LINK,
         # BA-A3. platform_admin is the default enterprise_role for every user
         # who has not picked one during onboarding (see the column comment in
         # app/models/user.py), so a page that exists only for the two architect
@@ -804,6 +821,7 @@ _MY_WORK_LINKS = {
         _link("Policy Monitoring",
               "policy_monitoring.policy_dashboard", "shield-alert",
               requires="general"),
+        _APPROVAL_INBOX_LINK,
         # Security architects have read-only access to the page and list API;
         # mutation endpoints remain ADMINISTER-only.
         _link("Governance Gates", "admin.governance_gates", "shield-check"),
@@ -835,6 +853,7 @@ _MY_WORK_LINKS = {
     # persona's remit, so the fold is now unnecessary rather than pragmatic.
     ROLE_DATA_ARCHITECT: [
         _link("Data Architecture", "data_architecture.data_architecture_dashboard", "database"),
+        _APPROVAL_INBOX_LINK,
         _link("Data Lineage", "data_architecture.data_lineage_view", "git-fork"),
         _link("Data Stewardship", "solution_design.data_stewardship", "shield"),
         _link("System of Record", "data_governance.entities", "database-zap"),
