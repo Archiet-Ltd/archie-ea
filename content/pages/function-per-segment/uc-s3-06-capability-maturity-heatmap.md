@@ -6,7 +6,7 @@ state: in_review
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: plans
 capture_status: live
-url_slug: /enterprise-architecture/capability-maturity
+url_slug: /capability-maturity/heatmap
 ---
 
 # Show capability maturity as a heat map that never invents a value

@@ -4,8 +4,8 @@ use_case_id: UC-S3-11
 segment_id: S3
 state: in_review
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
-cta: plans
-capture_status: live
+cta: waiting_list
+capture_status: not_applicable_not_yet_built
 url_slug: /enterprise-architecture/derivation-yield
 ---
 
@@ -24,7 +24,7 @@ A derivation yield report per tenant — how many connections were entered direc
 by the product — alongside a screen where you can open any single derived connection and see exactly
 how it was reasoned.
 
-It's live now, on a paid plan. [See plans](/pricing).
+Coming soon. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 
