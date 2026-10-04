@@ -10,7 +10,7 @@ answers_use_cases:
   - {id: UC-S2-07, segment: S2}
   - {id: UC-S3-01, segment: S3}
   - {id: UC-S4-05, segment: S4}
-capture_status: awaiting_capture
+capture_status: live
 cta: plans
 ---
 
