@@ -12,7 +12,7 @@ cta: plans
 
 # Rationalization
 
-*Duplicate spend, found automatically, with a consolidation list and portfolio KPIs to act on it.*
+*Duplicate spend, found by running detection against your own records, with a consolidation list and portfolio KPIs to act on it.*
 
 ## What is application rationalization?
 
