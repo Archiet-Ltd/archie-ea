@@ -29,6 +29,8 @@ import markdown
 import yaml
 from markupsafe import Markup
 
+from app.services.billing_plans import CONTACT_SALES_URL, PLANS
+
 CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content" / "pages"
 
 FAMILY_DIR_MAP = {
@@ -272,6 +274,111 @@ def _escape_for_script_block(serialised: str) -> str:
     )
 
 
+def _self_hosted_offer() -> dict[str, Any]:
+    """The self-hosted AGPL edition: unlimited editors, $0, forever.
+
+    Kept distinct from the hosted "Community" tier below, which is also $0
+    but is a different thing -- hosted by Entelim, capped at three people --
+    so a reader (human or crawler) cannot read one price as describing both.
+    """
+    return {
+        "@type": "Offer",
+        "name": "Self-Hosted Edition",
+        "price": "0",
+        "priceCurrency": "USD",
+        "description": (
+            "Free to self-host under AGPL-3.0, at any size, for as long as "
+            "you want -- unlimited editors, no hosted-tier cap."
+        ),
+    }
+
+
+def _flat_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
+    """An Offer for a flat (non per-unit) hosted plan price at one interval."""
+    suffix = "month" if interval == "month" else "year"
+    price_text = "Free" if amount == 0 else f"${amount}/{suffix}"
+    return {
+        "@type": "Offer",
+        "name": f"{plan.name} (hosted)",
+        "price": str(amount),
+        "priceCurrency": plan.display_currency,
+        "description": f"{plan.summary} {price_text}, hosted by Entelim.",
+    }
+
+
+def _per_unit_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
+    """An Offer for a per-seat hosted plan price at one interval.
+
+    Carries a UnitPriceSpecification with a referenceQuantity rather than a
+    flat Offer.price, since the real charge is quantity (seats) x this
+    per-unit amount, not this amount alone.
+    """
+    unit = plan.display_price_unit or "unit"
+    billing_duration = "P1M" if interval == "month" else "P1Y"
+    suffix = "month" if interval == "month" else "year"
+    return {
+        "@type": "Offer",
+        "name": f"{plan.name} (hosted, per {unit})",
+        "price": str(amount),
+        "priceCurrency": plan.display_currency,
+        "description": (
+            f"{plan.summary} ${amount}/{unit}/{suffix}, hosted by Entelim."
+        ),
+        "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "price": str(amount),
+            "priceCurrency": plan.display_currency,
+            "unitText": unit,
+            "billingDuration": billing_duration,
+            "referenceQuantity": {
+                "@type": "QuantitativeValue",
+                "value": 1,
+                "unitText": unit,
+            },
+        },
+    }
+
+
+def _enterprise_offer(plan, site_url: str) -> dict[str, Any]:
+    """Enterprise's contract floor: a minimum, not a fixed, purchasable price.
+
+    Typed AggregateOffer (schema.org's type for a price that starts at a
+    floor rather than naming one fixed amount), carrying lowPrice rather
+    than price, and pointing at contact sales rather than a checkout flow,
+    since Enterprise is sold by contract and is not purchasable online.
+    """
+    floor = plan.display_price_floor_annual
+    return {
+        "@type": "AggregateOffer",
+        "name": plan.name,
+        "lowPrice": str(floor),
+        "priceCurrency": plan.display_currency,
+        "url": f"{site_url}{CONTACT_SALES_URL}",
+        "description": (
+            f"{plan.summary} Sold by contract, from ${floor:,}/year -- contact sales."
+        ),
+    }
+
+
+def _hosted_plan_offers(site_url: str) -> list[dict[str, Any]]:
+    """The real hosted tiers (Community, Startup, Team, Enterprise), read
+    from billing_plans.PLANS's display-price fields -- the one place those
+    dollar figures live, so this list can never silently drift from the
+    pricing page or the home page again.
+    """
+    offers: list[dict[str, Any]] = []
+    for plan in PLANS:
+        if plan.display_price_floor_annual is not None:
+            offers.append(_enterprise_offer(plan, site_url))
+            continue
+        offer_fn = _per_unit_plan_offer if plan.display_price_per_unit else _flat_plan_offer
+        if plan.display_price_monthly is not None:
+            offers.append(offer_fn(plan, "month", plan.display_price_monthly))
+        if plan.display_price_annual is not None:
+            offers.append(offer_fn(plan, "year", plan.display_price_annual))
+    return offers
+
+
 def _jsonld_webpage(page: PublicPage, site_url: str) -> dict[str, Any]:
     return {
         "@context": "https://schema.org",
@@ -283,12 +390,7 @@ def _jsonld_webpage(page: PublicPage, site_url: str) -> dict[str, Any]:
             "name": "Entelim",
             "applicationCategory": "Enterprise Architecture",
             "operatingSystem": "Web",
-            "offers": {
-                "@type": "Offer",
-                "price": "0",
-                "priceCurrency": "USD",
-                "description": "Free to self-host under AGPL",
-            },
+            "offers": [_self_hosted_offer(), *_hosted_plan_offers(site_url)],
         },
     }
 
@@ -302,22 +404,7 @@ def _jsonld_software_app(page: PublicPage, site_url: str) -> dict[str, Any]:
         "applicationCategory": "Enterprise Architecture",
         "operatingSystem": "Web",
         "description": page.title,
-        "offers": [
-            {
-                "@type": "Offer",
-                "name": "Self-Hosted",
-                "price": "0",
-                "priceCurrency": "USD",
-                "description": "Free to self-host under AGPL",
-            },
-            {
-                "@type": "Offer",
-                "name": "Commercial Licence",
-                "price": "0",
-                "priceCurrency": "USD",
-                "description": "Available for organisations that need different terms",
-            },
-        ],
+        "offers": [_self_hosted_offer(), *_hosted_plan_offers(site_url)],
     }
 
 
