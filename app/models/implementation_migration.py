@@ -402,6 +402,20 @@ class Deliverable(db.Model):
     assigned_user = db.relationship("User", backref="assigned_migration_deliverables")
     goal = db.relationship("Goal", backref="migration_deliverables")
 
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description or "",
+            "delivery_status": self.delivery_status,
+            "deliverable_type": self.deliverable_type,
+            "target_date": self.target_date.isoformat() if self.target_date else None,
+            "delivered_date": self.delivered_date.isoformat() if self.delivered_date else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
     def is_completed(self) -> bool:
         return self.delivery_status == "completed"
 
@@ -778,6 +792,22 @@ class Gap(TenantMixin, db.Model):
         else:
             self.gap_type = None
             self.gap_sub_types = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description or "",
+            "gap_type": self.gap_type,
+            "priority": self.priority,
+            "severity": self.severity,
+            "resolution_status": self.resolution_status,
+            "current_state_ref": self.current_state_ref,
+            "target_state_ref": self.target_state_ref,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
 
     def to_roadmap_dict(self) -> dict:
         """Convert to dictionary for roadmap API responses."""

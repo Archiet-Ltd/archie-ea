@@ -51,92 +51,141 @@ def _count(conn, sql, **params):
     return conn.execute(text(sql), params).scalar()
 
 
-# Each entry describes one superseded store. `insert_sql` selects straight
-# into the exact column list `gaps` needs (including the columns `gaps`
-# requires but has no server_default for: name, context, auto_generated,
-# created_at, updated_at -- a raw INSERT bypasses every Python-side ORM
-# default, so each is supplied explicitly here). `org_joins` / `org_expr`
-# resolve organization_id per the attribution rule above; COALESCE falls
-# through to NULL (quarantine) when nothing matches.
+# Every SQL string below is a single literal -- no f-string, no +, no % at
+# runtime -- so bandit sees no string-built SQL.  The only runtime values are
+# :source_table (bound parameter, used only in WHERE/NOT EXISTS comparisons
+# against the varchar column gaps.source_table) and :source_table_val (used
+# in the SELECT clause as a literal value, cast explicitly to avoid the
+# "inconsistent types deduced for parameter" error from PostgreSQL).
 _MERGE_SOURCES = (
     {
         "table": "roadmap_gaps",
-        "org_joins": (
+        "count_sql": (
+            'SELECT count(*) FROM "roadmap_gaps" WHERE retired_into_id IS NULL'
+        ),
+        "insert_sql": (
+            "WITH inserted AS ("
+            "INSERT INTO gaps (name, description, gap_type, severity, priority, "
+            "resolution_status, current_state_ref, target_state_ref, created_at, "
+            "updated_at, context, auto_generated, gap_kind, organization_id, "
+            "source_table, source_id) "
+            "SELECT "
+            "LEFT(s.name, 255) AS name, "
+            "COALESCE(s.description, '') "
+            "|| CASE WHEN s.impact_assessment IS NOT NULL "
+            "THEN E'\\n\\nImpact: ' || s.impact_assessment ELSE '' END "
+            "AS description, "
+            "LEFT(s.gap_type, 30) AS gap_type, "
+            "s.risk_level AS severity, "
+            "s.priority AS priority, "
+            "CASE WHEN s.status = 'open' THEN 'identified' ELSE s.status END AS resolution_status, "
+            "LEFT(s.current_state, 255) AS current_state_ref, "
+            "LEFT(s.target_state, 255) AS target_state_ref, "
+            "COALESCE(s.created_at, now()) AS created_at, "
+            "COALESCE(s.updated_at, s.created_at, now()) AS updated_at, "
+            "'architecture', false, 'capability_shortfall', "
+            "COALESCE(ac.organization_id, uc.source_org_id, u.organization_id), "
+            "CAST(:source_table_val AS varchar), s.id "
+            'FROM "roadmap_gaps" s '
             "LEFT JOIN application_components ac ON ac.id = s.source_application_id "
             "LEFT JOIN unified_capabilities uc ON uc.id = s.source_capability_id "
-            "LEFT JOIN users u ON u.id = s.created_by"
+            "LEFT JOIN users u ON u.id = s.created_by "
+            "WHERE s.retired_into_id IS NULL "
+            "AND NOT EXISTS ("
+            "SELECT 1 FROM gaps g WHERE g.source_table = :source_table AND g.source_id = s.id"
+            ") "
+            "RETURNING id AS new_id, source_id AS old_id"
+            ") "
+            'UPDATE "roadmap_gaps" SET retired_into_id = inserted.new_id '
+            'FROM inserted WHERE "roadmap_gaps".id = inserted.old_id'
         ),
-        "org_expr": "COALESCE(ac.organization_id, uc.source_org_id, u.organization_id)",
-        "select": """
-            LEFT(s.name, 255) AS name,
-            COALESCE(s.description, '')
-                || CASE WHEN s.impact_assessment IS NOT NULL
-                        THEN E'\\n\\nImpact: ' || s.impact_assessment ELSE '' END
-                AS description,
-            LEFT(s.gap_type, 30) AS gap_type,
-            s.risk_level AS severity,
-            s.priority AS priority,
-            CASE WHEN s.status = 'open' THEN 'identified' ELSE s.status END AS resolution_status,
-            LEFT(s.current_state, 255) AS current_state_ref,
-            LEFT(s.target_state, 255) AS target_state_ref,
-            COALESCE(s.created_at, now()) AS created_at,
-            COALESCE(s.updated_at, s.created_at, now()) AS updated_at
-        """,
     },
     {
         "table": "implementation_gaps",
-        "org_joins": "LEFT JOIN architecture_models am ON am.id = s.architecture_id",
-        "org_expr": "am.organization_id",
-        "select": """
-            LEFT(s.name, 255) AS name,
-            COALESCE(s.gap_description, s.description, '')
-                || CASE WHEN s.impact_description IS NOT NULL
-                        THEN E'\\n\\nImpact: ' || s.impact_description ELSE '' END
-                || CASE WHEN s.business_impact IS NOT NULL
-                        THEN E'\\n\\nBusiness impact: ' || s.business_impact ELSE '' END
-                AS description,
-            LEFT(s.gap_type, 30) AS gap_type,
-            s.impact_level AS severity,
-            s.priority AS priority,
-            s.status AS resolution_status,
-            LEFT(s.baseline_state, 255) AS current_state_ref,
-            LEFT(s.target_state, 255) AS target_state_ref,
-            COALESCE(s.created_at, now()) AS created_at,
-            COALESCE(s.updated_at, s.created_at, now()) AS updated_at
-        """,
+        "count_sql": (
+            'SELECT count(*) FROM "implementation_gaps" WHERE retired_into_id IS NULL'
+        ),
+        "insert_sql": (
+            "WITH inserted AS ("
+            "INSERT INTO gaps (name, description, gap_type, severity, priority, "
+            "resolution_status, current_state_ref, target_state_ref, created_at, "
+            "updated_at, context, auto_generated, gap_kind, organization_id, "
+            "source_table, source_id) "
+            "SELECT "
+            "LEFT(s.name, 255) AS name, "
+            "COALESCE(s.gap_description, s.description, '') "
+            "|| CASE WHEN s.impact_description IS NOT NULL "
+            "THEN E'\\n\\nImpact: ' || s.impact_description ELSE '' END "
+            "|| CASE WHEN s.business_impact IS NOT NULL "
+            "THEN E'\\n\\nBusiness impact: ' || s.business_impact ELSE '' END "
+            "AS description, "
+            "LEFT(s.gap_type, 30) AS gap_type, "
+            "s.impact_level AS severity, "
+            "s.priority AS priority, "
+            "s.status AS resolution_status, "
+            "LEFT(s.baseline_state, 255) AS current_state_ref, "
+            "LEFT(s.target_state, 255) AS target_state_ref, "
+            "COALESCE(s.created_at, now()) AS created_at, "
+            "COALESCE(s.updated_at, s.created_at, now()) AS updated_at, "
+            "'architecture', false, 'capability_shortfall', "
+            "am.organization_id, "
+            "CAST(:source_table_val AS varchar), s.id "
+            'FROM "implementation_gaps" s '
+            "LEFT JOIN architecture_models am ON am.id = s.architecture_id "
+            "WHERE s.retired_into_id IS NULL "
+            "AND NOT EXISTS ("
+            "SELECT 1 FROM gaps g WHERE g.source_table = :source_table AND g.source_id = s.id"
+            ") "
+            "RETURNING id AS new_id, source_id AS old_id"
+            ") "
+            'UPDATE "implementation_gaps" SET retired_into_id = inserted.new_id '
+            'FROM inserted WHERE "implementation_gaps".id = inserted.old_id'
+        ),
     },
     {
         "table": "compliance_gaps",
-        "org_joins": (
-            "LEFT JOIN users ua ON ua.id = s.assigned_to_id "
-            "LEFT JOIN users ui ON ui.id = s.identified_by_id"
+        "count_sql": (
+            'SELECT count(*) FROM "compliance_gaps" WHERE retired_into_id IS NULL'
         ),
-        "org_expr": "COALESCE(ua.organization_id, ui.organization_id)",
-        "select": """
-            LEFT(s.title, 255) AS name,
-            s.description AS description,
-            LEFT(s.gap_type, 30) AS gap_type,
-            s.risk_level AS severity,
-            s.risk_level AS priority,
-            CASE WHEN s.status = 'open' THEN 'identified' ELSE s.status END AS resolution_status,
-            NULL AS current_state_ref,
-            NULL AS target_state_ref,
-            COALESCE(s.identified_at, now()) AS created_at,
-            COALESCE(s.resolved_at, s.identified_at, now()) AS updated_at
-        """,
+        "insert_sql": (
+            "WITH inserted AS ("
+            "INSERT INTO gaps (name, description, gap_type, severity, priority, "
+            "resolution_status, current_state_ref, target_state_ref, created_at, "
+            "updated_at, context, auto_generated, gap_kind, organization_id, "
+            "source_table, source_id) "
+            "SELECT "
+            "LEFT(s.title, 255) AS name, "
+            "s.description AS description, "
+            "LEFT(s.gap_type, 30) AS gap_type, "
+            "s.risk_level AS severity, "
+            "s.risk_level AS priority, "
+            "CASE WHEN s.status = 'open' THEN 'identified' ELSE s.status END AS resolution_status, "
+            "NULL AS current_state_ref, "
+            "NULL AS target_state_ref, "
+            "COALESCE(s.identified_at, now()) AS created_at, "
+            "COALESCE(s.resolved_at, s.identified_at, now()) AS updated_at, "
+            "'architecture', false, 'capability_shortfall', "
+            "COALESCE(ua.organization_id, ui.organization_id), "
+            "CAST(:source_table_val AS varchar), s.id "
+            'FROM "compliance_gaps" s '
+            "LEFT JOIN users ua ON ua.id = s.assigned_to_id "
+            "LEFT JOIN users ui ON ui.id = s.identified_by_id "
+            "WHERE s.retired_into_id IS NULL "
+            "AND NOT EXISTS ("
+            "SELECT 1 FROM gaps g WHERE g.source_table = :source_table AND g.source_id = s.id"
+            ") "
+            "RETURNING id AS new_id, source_id AS old_id"
+            ") "
+            'UPDATE "compliance_gaps" SET retired_into_id = inserted.new_id '
+            'FROM inserted WHERE "compliance_gaps".id = inserted.old_id'
+        ),
     },
-)
-
-_TARGET_COLUMNS = (
-    "name", "description", "gap_type", "severity", "priority", "resolution_status",
-    "current_state_ref", "target_state_ref", "created_at", "updated_at",
-    "context", "auto_generated", "gap_kind", "organization_id", "source_table", "source_id",
 )
 
 
 def _merge_one(conn, spec, dry_run):
     table = spec["table"]
-    eligible = _count(conn, f'SELECT count(*) FROM "{table}" WHERE retired_into_id IS NULL')
+    eligible = _count(conn, spec["count_sql"])
     if not eligible:
         click.echo(f"  {table}: nothing to merge")
         return
@@ -144,26 +193,10 @@ def _merge_one(conn, spec, dry_run):
         click.echo(f"  - {table}: would merge {eligible} row(s) into gaps")
         return
 
-    select_columns = (
-        spec["select"].strip().rstrip(",")
-        + ", 'architecture', false, 'capability_shortfall', "
-        + f"{spec['org_expr']}, '{table}', s.id"
+    conn.execute(
+        text(spec["insert_sql"]),
+        {"source_table": table, "source_table_val": table},
     )
-    sql = (
-        "WITH inserted AS ("
-        f"INSERT INTO gaps ({', '.join(_TARGET_COLUMNS)}) "
-        f"SELECT {select_columns} "
-        f'FROM "{table}" s {spec["org_joins"]} '
-        "WHERE s.retired_into_id IS NULL "
-        "AND NOT EXISTS ("
-        "SELECT 1 FROM gaps g WHERE g.source_table = :source_table AND g.source_id = s.id"
-        ") "
-        "RETURNING id AS new_id, source_id AS old_id"
-        ") "
-        f'UPDATE "{table}" SET retired_into_id = inserted.new_id '
-        f'FROM inserted WHERE "{table}".id = inserted.old_id'
-    )
-    conn.execute(text(sql), {"source_table": table})
     click.echo(f"  + {table}: merged {eligible} row(s), marked retired_into_id")
 
 
