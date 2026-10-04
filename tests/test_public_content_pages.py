@@ -59,6 +59,12 @@ BANNED_CLAIMS = [
         "an application's own record shows the vendor name as plain text only -- no page "
         "links from an application to vendor or procurement detail",
     ),
+    (
+        "not published; free to self-host",
+        "Entelim's prices are published at /pricing (Startup $49/month, Team $29/editor/month) -- "
+        "self-hosting under AGPL is a separate, true fact, but it does not mean pricing is "
+        "unpublished",
+    ),
 ]
 
 # Front-matter keys that are metadata-only and must never appear as visible
