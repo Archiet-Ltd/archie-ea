@@ -368,6 +368,29 @@ def test_plan_not_yet_set_up_on_monelytics_is_a_readable_error(db_session, monel
         monelytics_provider.start_checkout(org, "startup", "year", None, "https://x/ok", "https://x/cancel")
 
 
+def test_403_raises_the_not_yet_authorised_error_not_the_generic_refusal(
+    db_session, monelytics_env, monkeypatch
+):
+    from app.services import monelytics_provider
+
+    def fake_request(method, url, **kwargs):
+        if url == TOKEN_URL:
+            return _token_response()
+        if url.endswith("/api/billing/plans"):
+            return _plans_response()
+        return FakeResponse(403, {"error": "Forbidden"})
+
+    monkeypatch.setattr(monelytics_provider.requests, "request", fake_request)
+    org = _org(db_session, "notpermitted")
+    db_session.commit()
+
+    with pytest.raises(monelytics_provider.MonelyticsError) as exc_info:
+        monelytics_provider.start_checkout(org, "startup", "month", None, "https://x/ok", "https://x/cancel")
+
+    assert str(exc_info.value) == monelytics_provider.NOT_PERMITTED_YET
+    assert str(exc_info.value) != monelytics_provider.PROVIDER_REFUSED
+
+
 def test_refresh_returns_none_when_monelytics_has_no_subscription(db_session, monelytics_env, monkeypatch):
     from app.services import monelytics_provider
 

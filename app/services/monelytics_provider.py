@@ -61,6 +61,10 @@ SETTINGS = (
 NOT_CONFIGURED = "Online payment is not set up on this installation."
 PROVIDER_REFUSED = "The payment provider did not accept the request. Nothing was changed."
 UNREACHABLE = "The payment provider could not be reached. Nothing was changed."
+NOT_PERMITTED_YET = (
+    "This installation is not yet authorised to use Monelytics. "
+    "Ask Archiet to finish setting up access, then try again."
+)
 
 # Entelim's billing_plans plan key <-> Monelytics' plan code.
 _PLAN_CODE = {"startup": "STARTUP", "team": "TEAM"}
@@ -259,6 +263,15 @@ def _request(
 
     if not_found_ok and resp.status_code == 404:
         return None
+    if resp.status_code == 403:
+        # Expected until Archiet assigns this installation's service account
+        # its Permit.io role on Monelytics: a known, temporary state, not a
+        # real failure, so it gets its own message rather than falling
+        # through to the generic PROVIDER_REFUSED one below.
+        logger.warning(
+            "Monelytics %s %s not yet permitted: %s %s", method, path, resp.status_code, resp.text[:200]
+        )
+        raise MonelyticsError(NOT_PERMITTED_YET)
     if resp.status_code >= 400:
         message = PROVIDER_REFUSED
         try:
