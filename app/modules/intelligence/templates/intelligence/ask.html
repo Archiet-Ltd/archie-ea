@@ -42,6 +42,7 @@
     {'key': 'portfolio', 'before': 'What is the rationalization status of', 'blank': '___', 'after': '?'},
     {'key': 'programme', 'before': "What's changing at", 'blank': '___', 'after': ', and is it on track?'},
     {'key': 'data', 'before': 'What data does', 'blank': '___', 'after': 'hold or produce, who stewards it, and where does it flow?'},
+    {'key': 'compliance', 'before': 'Which regulations and controls apply to', 'blank': '___', 'after': ', and which controls have no evidence of being met?'},
     {'key': 'accountability', 'before': "Who's accountable for", 'blank': '___', 'after': ', and can they take on more?'}
 ] %}
 {% macro _ps_actions() %}
@@ -343,6 +344,54 @@
                         </li>
                     </template>
                 </ul>
+            </div>
+        </template>
+    </div>
+
+    {# Compliance (under L6): one card per control the element's application is
+       mapped to, then open policy violations. A control with no evidence says
+       so. The last scan time is shown only when one exists; nothing is shown as
+       a percentage or a zero. #}
+    <div id="ask-compliance-results" aria-busy="false" :aria-busy="complianceBusy ? 'true' : 'false'" x-show="answeredKey === 'compliance' && complianceState !== 'idle'" x-cloak class="space-y-4">
+        <h2 id="ask-compliance-results-heading" x-ref="complianceResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <template x-if="complianceState === 'loading'">
+            <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+        </template>
+        <template x-if="complianceState === 'empty'">
+            <p class="text-sm text-muted-foreground">No compliance controls are recorded for this element yet.</p>
+        </template>
+        <template x-if="complianceState === 'error'">
+            <p class="text-sm text-destructive">Could not load the compliance records for this element.</p>
+        </template>
+        <template x-if="complianceState === 'ready'">
+            <div class="space-y-4">
+                <p class="text-sm text-muted-foreground" x-show="!controls.length">No compliance controls are recorded for this element.</p>
+                <ul class="space-y-3" x-show="controls.length">
+                    <template x-for="control in controls" :key="control.code + control.name">
+                        <li class="rounded-lg border border-border bg-card p-4" data-ask-compliance-row>
+                            <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+                                <h3 class="min-w-0 break-words text-base font-semibold text-foreground"><span x-show="control.code" x-text="control.code + ': '"></span><span x-text="control.name"></span></h3>
+                                <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-show="control.frameworkName" x-text="control.frameworkName"></span>
+                            </div>
+                            <p class="mt-1 text-sm text-foreground"><span class="text-muted-foreground">Status: </span><span x-text="control.status"></span></p>
+                            <p class="mt-1 text-sm text-destructive" x-show="control.noEvidence">No evidence recorded and not verified</p>
+                            <p class="mt-1 text-sm text-muted-foreground" x-show="!control.noEvidence &amp;&amp; control.evidenceRecorded">Evidence recorded</p>
+                            <p class="mt-1 text-sm text-muted-foreground" x-show="control.verifiedDate" x-text="'Verified ' + control.verifiedDate"></p>
+                        </li>
+                    </template>
+                </ul>
+                <h3 class="text-base font-semibold text-foreground">Open policy violations</h3>
+                <p class="text-sm text-muted-foreground" x-show="!violations.length">No open policy violations are recorded for this element.</p>
+                <ul class="space-y-2" x-show="violations.length">
+                    <template x-for="violation in violations" :key="violation.policyName + violation.detectedAt">
+                        <li class="text-sm text-foreground" data-ask-compliance-violation>
+                            <span x-text="violation.policyName"></span>
+                            <span class="text-muted-foreground" x-show="violation.severity"> (<span x-text="violation.severity"></span>)</span>
+                        </li>
+                    </template>
+                </ul>
+                <p class="text-sm text-muted-foreground" x-show="lastScanAt" x-text="'Last policy scan: ' + lastScanAt"></p>
+                <p class="text-sm text-muted-foreground" x-show="!lastScanAt">No policy scan is recorded for this element.</p>
             </div>
         </template>
     </div>

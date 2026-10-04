@@ -10,6 +10,7 @@
   GET  /api/v1/intelligence/strategy/<element_id>
   GET  /api/v1/intelligence/accountability/<element_id>
   GET  /api/v1/intelligence/data/<element_id>
+  GET  /api/v1/intelligence/compliance/<element_id>
   GET  /api/v1/intelligence/traceability/<element_id>
   GET  /api/v1/intelligence/yield
 
@@ -834,7 +835,7 @@ def data_for_element(element_id: int):
     this organisation's (or does not exist) is the same 404, so a foreign id cannot be told
     from a missing one.
     """
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -863,6 +864,50 @@ def data_for_element(element_id: int):
             "data_objects": result["data_objects"],
             "flows": result["flows"],
             "elements": result.get("elements") or {},
+            "reasons": result.get("reasons") or [],
+            "as_of": result.get("as_of"),
+        }
+    )
+
+
+@intelligence_api.route("/compliance/<int:element_id>", methods=["GET"])
+@login_required
+def compliance_for_element(element_id: int):
+    """Compliance (under L6): "which regulations and controls apply to this, and which
+    controls have no evidence of being met?" Serialises
+    ``IntelligenceQueryService.compliance_for_element`` through ``success_response``.
+    No tenant context is 400; an element that is not this organisation's (or does not
+    exist) is the same 404, so a foreign id cannot be told from a missing one.
+    """
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    from app.models import ArchiMateElement
+
+    element = ArchiMateElement.query.filter_by(id=element_id).first()
+    if element is None:
+        return error_response(
+            "Element not found",
+            code="NOT_FOUND",
+            details={"reason": _ELEMENT_NOT_FOUND_REASON},
+            status_code=404,
+        )
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    result = IntelligenceQueryService.compliance_for_element(element_id)
+
+    return success_response(
+        {
+            "controls": result["controls"],
+            "open_violations": result["open_violations"],
+            "last_scan_at": result.get("last_scan_at"),
             "reasons": result.get("reasons") or [],
             "as_of": result.get("as_of"),
         }

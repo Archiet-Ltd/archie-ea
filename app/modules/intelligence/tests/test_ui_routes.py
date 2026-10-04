@@ -420,6 +420,7 @@ def test_names_come_only_from_the_impact_answers_element_map():
     # brief's own strategy URL; corrected to the real, current set rather
     # than bumped by one on top of a stale base. L7 (Data lens) adds its
     # own endpoint which now returns an elements map for name lookups.
+    # Compliance (under L6) adds its own endpoint the same way.
     urls = set(re.findall(r"'(/[a-z0-9_/.-]*)'", _scripts()["core.js"]))
     assert urls == {
         "/archimate/api/elements/search",
@@ -432,6 +433,7 @@ def test_names_come_only_from_the_impact_answers_element_map():
         "/api/v1/intelligence/accountability/",
         "/api/v1/intelligence/derived/",
         "/api/v1/intelligence/data/",
+        "/api/v1/intelligence/compliance/",
     }
 
 
