@@ -7,7 +7,8 @@ state: on_main
 answers_use_cases:
   - {id: UC-S3-04, segment: S3}
   - {id: UC-S3-09, segment: S3}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Portfolio
