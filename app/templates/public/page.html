@@ -109,6 +109,7 @@
     <p class="text-sm text-destructive mb-4" role="alert">{{ error }}</p>
     {% endif %}
     <form method="POST" action="{{ url_for('main.product_inquiry_submit') }}" class="space-y-4" data-testid="offer-inquiry-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="offer" value="{{ page.front_matter.get('offer', '') }}">
       <input type="hidden" name="family" value="{{ page.family }}">
       <input type="hidden" name="slug" value="{{ page.slug }}">
