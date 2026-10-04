@@ -1,6 +1,7 @@
 account_tokens
 adm_phase_approvals
 adm_transition_history
+agent_oversight_state
 ai_chat_crud_approvals
 ai_chat_document_uploads
 ai_chat_feedback
@@ -118,6 +119,7 @@ enterprise_briefings
 enterprise_initiatives
 enterprise_raci_assignments
 entity_history
+event_log
 evidence_claim_heads
 evidence_head_events
 evidence_records
@@ -167,6 +169,8 @@ projects
 raid_items
 rate_cards
 reference_model_import
+regulatory_change_impacts
+regulatory_changes
 representations
 requirements
 review_queue_items
@@ -237,6 +241,7 @@ transformation_option_versions
 transformation_options
 transformation_outbox_events
 unified_value_stream_stages
+unified_work_packages
 value_streams
 values
 vendor_component_architecture

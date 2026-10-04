@@ -138,6 +138,7 @@ def test_backfill_derives_roadmap_task_org_from_work_package_creator(db_session,
         name="Migrate ERP",
         business_capability="Finance",
         created_by=user_b.id,
+        organization_id=org_b.id,
     )
     db_session.add(wp)
     db_session.flush()
@@ -173,6 +174,7 @@ def test_backfill_prefers_work_package_provenance_over_moved_creator(db_session,
         name="Migrate CRM",
         business_capability="Sales",
         created_by=wp_creator.id,
+        organization_id=org_a.id,
     )
     db_session.add(wp)
     db_session.flush()

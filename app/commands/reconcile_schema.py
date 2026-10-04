@@ -1026,6 +1026,91 @@ def _column_clause(col, dialect):
     return re.sub(r"\s+NOT\s+NULL\b", "", rendered).strip()
 
 
+def _backfill_roadmap_organizations(*, dry_run, existing_tables, added, failed):
+    """Recover the tenant key for RoadmapItems that predate TenantMixin.
+
+    A roadmap item's canonical programme is the only trustworthy tenant
+    provenance available in the old schema.  Rows without that provenance are
+    reported and left untouched; guessing would risk assigning another
+    organisation's data to the active tenant.
+    """
+    from sqlalchemy import inspect, text
+
+    required = {"strategic_roadmap_items", "strategic_initiatives"}
+    if not required <= existing_tables:
+        return
+    live_columns = {
+        column["name"]
+        for column in inspect(db.engine).get_columns("strategic_roadmap_items")
+    }
+    if "organization_id" not in live_columns:
+        return
+
+    before = db.session.scalar(
+        text(
+            "SELECT count(*) FROM strategic_roadmap_items "
+            "WHERE organization_id IS NULL"
+        )
+    )
+    eligible = db.session.scalar(
+        text(
+            """
+            SELECT count(*)
+            FROM strategic_roadmap_items r
+            JOIN strategic_initiatives p ON p.id = r.initiative_id
+            WHERE r.organization_id IS NULL
+              AND p.organization_id IS NOT NULL
+            """
+        )
+    )
+    conflicts = db.session.scalar(
+        text(
+            """
+            SELECT count(*)
+            FROM strategic_roadmap_items r
+            JOIN strategic_initiatives p ON p.id = r.initiative_id
+            WHERE r.organization_id IS NOT NULL
+              AND p.organization_id IS NOT NULL
+              AND r.organization_id <> p.organization_id
+            """
+        )
+    )
+    unresolved = before - eligible
+    updated = eligible
+    if not dry_run and eligible:
+        result = db.session.execute(
+            text(
+                """
+                UPDATE strategic_roadmap_items AS r
+                SET organization_id = p.organization_id
+                FROM strategic_initiatives AS p
+                WHERE r.initiative_id = p.id
+                  AND r.organization_id IS NULL
+                  AND p.organization_id IS NOT NULL
+                """
+            )
+        )
+        updated = result.rowcount
+        db.session.commit()
+
+    if before or conflicts:
+        added.append(
+            "backfill.strategic_roadmap_items.organization_id "
+            f":: before={before}, updated={updated}, "
+            f"unresolved={unresolved}, conflicts={conflicts}"
+        )
+    if unresolved:
+        failed.append(
+            "backfill.strategic_roadmap_items.organization_id: "
+            f"{unresolved} unresolved row(s); no programme tenant provenance"
+        )
+    if conflicts:
+        failed.append(
+            "backfill.strategic_roadmap_items.organization_id: "
+            f"{conflicts} existing row(s) conflict with their programme tenant"
+        )
+
+
 def _backfill_sso_mapping_organizations(*, dry_run, existing_tables, added, failed):
     """Recover the tenant key for SSO group-role mappings that predate TenantMixin.
 
@@ -1648,6 +1733,12 @@ def _reconcile(dry_run=False):
         added=added,
         failed=failed,
         blocking=blocking,
+    )
+    _backfill_roadmap_organizations(
+        dry_run=dry_run,
+        existing_tables=existing_tables,
+        added=added,
+        failed=failed,
     )
     _backfill_sso_mapping_organizations(
         dry_run=dry_run,

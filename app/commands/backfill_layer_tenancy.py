@@ -142,6 +142,29 @@ _DERIVABLE_ORG = {
            AND r.organization_id IS NULL
            AND p.organization_id IS NOT NULL
     """,
+    # An options analysis belongs to the organisation that owns the capability it
+    # analyses: capability_id is NOT NULL and points at business_capability, which
+    # is already tenant-fenced. An analysis whose capability itself has no
+    # organisation cannot be resolved here; see _PROVENANCE_ONLY.
+    "options_analysis": """
+        UPDATE options_analysis a
+           SET organization_id = b.organization_id
+          FROM business_capability b
+         WHERE a.capability_id = b.id
+           AND a.organization_id IS NULL
+           AND b.organization_id IS NOT NULL
+    """,
+    # A stakeholder input belongs to its analysis. Ordering is load-bearing in the
+    # same way as above: "options_analysis" < "stakeholder_inputs", so the analysis
+    # is derived (or left NULL) before this reads it.
+    "stakeholder_inputs": """
+        UPDATE stakeholder_inputs i
+           SET organization_id = a.organization_id
+          FROM options_analysis a
+         WHERE i.analysis_id = a.id
+           AND i.organization_id IS NULL
+           AND a.organization_id IS NOT NULL
+    """,
 }
 
 # Tables whose link column to a parent is set at every creation site (a NULL
@@ -160,6 +183,19 @@ _DERIVABLE_ORG = {
 # A derivation for this table also still lives in reconcile_schema.py rather
 # than here; both are one change together, not made in this one.
 _PURGE_ORPHANS = {}
+
+# Tables whose remaining NULL rows carry per-row provenance rather than a
+# single owning entity this command can always resolve: an options analysis
+# whose own capability has no organization_id, or a stakeholder input whose
+# analysis could not be resolved. Handing either to an operator-chosen
+# --org-id would move another tenant's row into view, so with several
+# organisations in the database the row stays NULL here and is only
+# reported, never a candidate for the single-organisation or --org-id orphan
+# assignment below. With exactly one organisation there is no other one it
+# could belong to, so the ordinary single-organisation rule still applies.
+_PROVENANCE_ONLY = {
+    "options_analysis", "stakeholder_inputs",
+}
 
 
 def _resolve_org_id(conn, explicit):
@@ -259,12 +295,27 @@ def _process_table(conn, insp, t, resolved_org, dry_run):
 
     if t in _PURGE_ORPHANS:
         link, parent = _PURGE_ORPHANS[t]
-        purged = conn.execute(
-            text(
-                f'DELETE FROM "{t}" WHERE {link} IS NOT NULL '
-                f'AND {link} NOT IN (SELECT id FROM "{parent}")'
+        # _PURGE_ORPHANS is a hardcoded dict; link and parent are trusted
+        # identifiers.  Validate them anyway so bandit B608 can see the
+        # guard is executable rather than a comment.
+        import re
+        _safe = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+        if not (_safe.match(link) and _safe.match(parent)):
+            raise RuntimeError(
+                f"refusing to interpolate unexpected identifier {link!r} / {parent!r}"
             )
-        ).rowcount
+        from sqlalchemy import delete as sa_delete, select as sa_select, and_ as sa_and, not_ as sa_not
+        from sqlalchemy.sql.expression import table as sa_table, column as sa_column
+        tbl = sa_table(t)
+        parent_tbl = sa_table(parent)
+        link_col = sa_column(link)
+        stmt = sa_delete(tbl).where(
+            sa_and(
+                link_col.isnot(None),
+                sa_not(link_col.in_(sa_select(sa_column("id")).select_from(parent_tbl)))
+            )
+        )
+        purged = conn.execute(stmt).rowcount
         if purged:
             click.echo(f"  - {t}: purged {purged} row(s) whose parent is gone")
 

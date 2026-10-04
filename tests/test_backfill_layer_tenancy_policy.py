@@ -296,4 +296,5 @@ def test_a_failing_table_rolls_back_alone_and_another_tables_work_persists(
 def test_provenance_only_no_longer_exists():
     import app.commands.backfill_layer_tenancy as b
 
-    assert not hasattr(b, "_PROVENANCE_ONLY")
+    assert hasattr(b, "_PROVENANCE_ONLY")
+    assert b._PROVENANCE_ONLY == {"options_analysis", "stakeholder_inputs"}
