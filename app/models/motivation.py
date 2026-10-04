@@ -385,6 +385,9 @@ class Assessment(TenantMixin, db.Model):
     # ArchiMate linkage
     archimate_element_id = db.Column(db.Integer, db.ForeignKey("archimate_elements.id"))
 
+    # Driver linkage — an Assessment is conducted against a Driver
+    driver_id = db.Column(db.Integer, db.ForeignKey("drivers.id"), nullable=True, index=True)
+
     # Assessment Specifics
     assessment_type = db.Column(db.String(50))  # SWOT, Maturity, Risk, Performance
     result_score = db.Column(db.String(50))
@@ -396,6 +399,7 @@ class Assessment(TenantMixin, db.Model):
 
     # Relationships
     archimate_element = db.relationship("ArchiMateElement", foreign_keys=[archimate_element_id])
+    driver = db.relationship("Driver", backref="assessments", foreign_keys=[driver_id])
 
     def __repr__(self):
         return f"<Assessment {self.name}>"
