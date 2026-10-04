@@ -190,8 +190,9 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     homepage = [(loc, rest) for loc, rest in entries if urlparse(loc).path == "/"]
     assert len(homepage) == 1
     assert "<priority>1.0</priority>" in homepage[0][1]
-    # Listing it does not displace any content page.
-    assert len(entries) == len(load_all_pages()) + 1
+    # Listing it does not displace any content page. +2 non-content URLs:
+    # the homepage and the /vs comparison hub (a view, not a load_all_pages() page).
+    assert len(entries) == len(load_all_pages()) + 2
 
 
 def _strings_in(value):
@@ -958,3 +959,140 @@ def test_xss_sanitization_cross_org(app):
                 assert f"{handler}=" not in html.lower(), (
                     f"{page.url}: contains {handler} handler"
                 )
+
+
+# ── /vs comparison hub (SEO: new competitor comparison pages) ─────────────
+
+NEW_VS_SLUGS = [
+    "avolution-abacus",
+    "orbus-iserver",
+    "sparx-enterprise-architect",
+    "servicenow-apm",
+    "archi",
+    "boc-adoit",
+]
+
+ALL_VS_SLUGS = ["leanix", "ardoq", "bizzdesign-hopex", *NEW_VS_SLUGS]
+
+
+def test_vs_hub_returns_200_and_lists_all_comparison_pages(app):
+    """GET /vs returns 200 and links to every comparison page at its real URL."""
+    comparison_pages = [p for p in load_all_pages() if p.family == "comparison"]
+    assert len(comparison_pages) == 9, (
+        f"expected 9 comparison pages (3 existing + 6 new), found {len(comparison_pages)}"
+    )
+    with app.test_client() as client:
+        rv = client.get("/vs")
+        assert rv.status_code == 200
+        html = rv.data.decode()
+        for page in comparison_pages:
+            real_url = page.canonical_url or f"https://entelim.org{page.url}"
+            assert real_url in html, (
+                f"/vs hub missing link to {real_url} ({page.slug})"
+            )
+
+
+def test_vs_hub_has_exactly_one_h1(app):
+    """The /vs hub page has exactly one h1."""
+    import re
+
+    with app.test_client() as client:
+        html = client.get("/vs").data.decode()
+        assert len(re.findall(r"<h1[^>]*>", html)) == 1
+
+
+def test_all_new_vs_slugs_covered_by_this_test_module():
+    """Guard against the new-page list drifting from what's really on disk."""
+    on_disk = {
+        p.stem for p in (CONTENT_ROOT / "vs").glob("*.md")
+    }
+    assert on_disk == set(ALL_VS_SLUGS), (
+        f"content/pages/vs/ has {sorted(on_disk)}, test expects {sorted(ALL_VS_SLUGS)}"
+    )
+
+
+def test_new_vs_pages_return_200_with_one_h1(app):
+    """Each of the 6 new comparison pages returns 200 with exactly one h1."""
+    import re
+
+    with app.test_client() as client:
+        for slug in NEW_VS_SLUGS:
+            rv = client.get(f"/vs/{slug}")
+            assert rv.status_code == 200, f"/vs/{slug} returned {rv.status_code}"
+            html = rv.data.decode()
+            h1s = re.findall(r"<h1[^>]*>", html)
+            assert len(h1s) == 1, f"/vs/{slug}: expected exactly one h1, found {len(h1s)}"
+
+
+def test_new_vs_pages_have_faq_jsonld_with_entries(app):
+    """Each new comparison page has valid FAQPage JSON-LD with at least one entry."""
+    import re
+
+    with app.test_client() as client:
+        for slug in NEW_VS_SLUGS:
+            html = client.get(f"/vs/{slug}").data.decode()
+            ld_match = re.search(
+                r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
+                html,
+                re.DOTALL,
+            )
+            assert ld_match is not None, f"/vs/{slug}: no JSON-LD script found"
+            ld = json.loads(ld_match.group(1))
+            assert ld["@type"] == "FAQPage", f"/vs/{slug}: expected FAQPage, got {ld.get('@type')}"
+            assert len(ld.get("mainEntity", [])) > 0, f"/vs/{slug}: FAQPage mainEntity is empty"
+            for item in ld["mainEntity"]:
+                assert item["@type"] == "Question"
+                assert len(item["name"]) > 0
+                assert len(item["acceptedAnswer"]["text"]) > 0
+
+
+def test_new_vs_pages_link_to_pricing(app):
+    """Each new comparison page links to /pricing."""
+    with app.test_client() as client:
+        for slug in NEW_VS_SLUGS:
+            html = client.get(f"/vs/{slug}").data.decode()
+            assert 'href="/pricing"' in html, f"/vs/{slug}: no link to /pricing"
+
+
+def test_new_vs_pages_have_sourced_front_matter(app):
+    """Each new comparison page's front matter lists at least one source with url and read_date."""
+    for slug in NEW_VS_SLUGS:
+        page = load_page("comparison", slug=slug)
+        assert page is not None, f"comparison page {slug} not found"
+        sources = page.front_matter.get("sources")
+        assert sources and len(sources) >= 1, f"{slug}: no sources in front matter"
+        for source in sources:
+            assert source.get("url"), f"{slug}: a source is missing url"
+            assert source.get("read_date"), f"{slug}: a source is missing read_date"
+
+
+def test_new_vs_pages_have_canonical_archiet_ai_link(app):
+    """Each new comparison page carries a canonical link to its archiet.ai address."""
+    with app.test_client() as client:
+        for slug in NEW_VS_SLUGS:
+            page = load_page("comparison", slug=slug)
+            assert page.canonical_url == f"https://archiet.ai/vs/{slug}", (
+                f"{slug}: expected canonical https://archiet.ai/vs/{slug}, got {page.canonical_url}"
+            )
+            html = client.get(f"/vs/{slug}").data.decode()
+            assert f'rel="canonical" href="{page.canonical_url}"' in html
+
+
+def test_new_vs_pages_no_invented_price_without_a_source_marker(app):
+    """Pages with a specific price figure flag it as vendor-published or third-party-reported."""
+    # Only orbus-iserver and sparx-enterprise-architect carry a specific price figure;
+    # both must flag it as third-party-reported, never presented as vendor-confirmed.
+    priced_slugs = ["orbus-iserver", "sparx-enterprise-architect"]
+    with app.test_client() as client:
+        for slug in priced_slugs:
+            html = client.get(f"/vs/{slug}").data.decode()
+            assert "third-party" in html.lower(), (
+                f"/vs/{slug}: a price figure is present but not flagged as third-party-reported"
+            )
+
+
+def test_sitemap_includes_vs_hub(app):
+    """/sitemap.xml includes the /vs hub."""
+    with app.test_client() as client:
+        xml = client.get("/sitemap.xml").data.decode()
+        assert "<loc>https://entelim.org/vs</loc>" in xml
