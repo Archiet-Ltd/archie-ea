@@ -7,7 +7,8 @@ state: on_main
 answers_use_cases:
   - {id: UC-S3-01, segment: S3}
   - {id: UC-S4-02, segment: S4}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Batch Import
