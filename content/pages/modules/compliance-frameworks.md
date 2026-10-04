@@ -23,7 +23,7 @@ requirements — never a certification or a guarantee that you pass an audit.
 
 ## Where you'll meet it
 
-- [Which risks and control gaps touch this goal?](/enterprise-architecture/risk-and-controls)
+- [Which risks touch this part of the architecture?](/enterprise-architecture/risk-and-controls)
 
 ## Related modules
 
