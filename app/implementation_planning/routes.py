@@ -646,7 +646,6 @@ def gaps_list():
                 or_(
                     ImplementationGap.name.ilike(f"%{search}%"),
                     ImplementationGap.description.ilike(f"%{search}%"),
-                    ImplementationGap.gap_description.ilike(f"%{search}%"),
                 )
             )
 
@@ -673,12 +672,12 @@ def gaps_list():
             "critical": ImplementationGap.query.filter_by(priority="critical").count(),
             "high": ImplementationGap.query.filter_by(priority="high").count(),
             "identified": ImplementationGap.query.filter_by(
-                status="identified"
+                resolution_status="identified"
             ).count(),
             "in_progress": ImplementationGap.query.filter_by(
-                status="in_progress"
+                resolution_status="in_progress"
             ).count(),
-            "resolved": ImplementationGap.query.filter_by(status="resolved").count(),
+            "resolved": ImplementationGap.query.filter_by(resolution_status="resolved").count(),
         }
 
         return render_template(
@@ -700,7 +699,11 @@ def gaps_list():
 @login_required
 def discover_gaps():
     """
-    Run intelligent gap discovery analysis.
+    Run intelligent gap discovery analysis and save the results to the gap
+    register. Called by the dashboard's "Run Gap Discovery" button
+    (Platform.fetch.post), so this responds with JSON -- it never had a
+    plain HTML-form caller, and a redirect response makes fetch() try to
+    parse the following page's HTML as JSON.
     """
     try:
         architecture_id = request.form.get("architecture_id", type=int)
@@ -709,19 +712,21 @@ def discover_gaps():
         gap_service = GapDiscoveryService()
         gaps_data = gap_service.discover_all_gaps(architecture_id)
 
-        # Save discovered gaps
-        saved_count = gap_service.save_discovered_gaps(gaps_data, architecture_id)
-
-        flash(
-            f"Gap discovery completed! Found {len(gaps_data['gaps'])} gaps, saved {saved_count} new gaps.",
-            "success",
+        # Save discovered gaps to the gap register, skipping any already there
+        result = gap_service.save_discovered_gaps(
+            gaps_data, architecture_id, current_user.organization_id
         )
 
-        return redirect(url_for("implementation_planning.gaps_list"))
+        return jsonify({
+            "success": True,
+            "found": len(gaps_data["gaps"]),
+            "saved": result["saved"],
+            "duplicates": result["duplicates"],
+            "failed": result["failed"],
+        })
 
     except Exception:
-        flash("Error during gap discovery. Please try again.", "error")
-        return redirect(url_for("implementation_planning.gaps_list"))
+        return jsonify({"success": False, "error": "Error during gap discovery. Please try again."}), 500
 
 
 @implementation_planning.route("/gaps/<int:gap_id>")
@@ -733,15 +738,11 @@ def gap_detail(gap_id):
     try:
         gap = ImplementationGap.query.get_or_404(gap_id)
 
-        # Get related work packages
-        related_work_packages = []
-        if gap.required_work_packages:
-            wp_ids = [
-                wp_id for wp_id in gap.required_work_packages if isinstance(wp_id, int)
-            ]
-            related_work_packages = ImplementationWorkPackage.query.filter(
-                ImplementationWorkPackage.id.in_(wp_ids)
-            ).all()
+        # Get related work packages (Gap.work_packages: the gap_work_packages
+        # association table, not a required_work_packages id list -- that
+        # field belongs to the unrelated, similarly-named
+        # app.models.implementation_planning.ImplementationGap)
+        related_work_packages = list(gap.work_packages)
 
         return render_template(
             "implementation_planning/dashboard.html",
@@ -791,11 +792,15 @@ def api_discover_gaps():
         gap_service = GapDiscoveryService()
         gaps_data = gap_service.discover_all_gaps(architecture_id)
 
-        # Optionally save to database
+        # Optionally save to the gap register
         save_to_db = data.get("save_to_db", False)
         if save_to_db:
-            saved_count = gap_service.save_discovered_gaps(gaps_data, architecture_id)
-            gaps_data["saved_count"] = saved_count
+            result = gap_service.save_discovered_gaps(
+                gaps_data, architecture_id, current_user.organization_id
+            )
+            gaps_data["saved_count"] = result["saved"]
+            gaps_data["duplicate_count"] = result["duplicates"]
+            gaps_data["failed_count"] = result["failed"]
 
         return jsonify({"success": True, "gaps_data": gaps_data})
 
@@ -1078,7 +1083,7 @@ def generate_report():
         # Generate report data
         report_data = {
             "generated_at": datetime.now().isoformat(),
-            "generated_by": current_user.username
+            "generated_by": current_user.full_name()
             if current_user.is_authenticated
             else "system",
             "summary": {
@@ -1115,6 +1120,7 @@ def generate_report():
         return jsonify({"success": True, "report": report_data})
 
     except Exception:
+        current_app.logger.exception("Error generating implementation planning report")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
