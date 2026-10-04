@@ -2,6 +2,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/card.html' import card, card_header, card_title, card_content %}
 
 {# Consolidated governance queue - typed queue is the single code path.
    Make queue available to all blocks (content, extra_head_js, etc.) #}
@@ -63,6 +64,69 @@
             <i data-lucide="calendar" class="mr-2 h-4 w-4" aria-hidden="true"></i>Sessions
         </a>
     </div>
+
+    {# AI Queue Triage (board-secretary assist). arbQueueTriagePanel() below
+       advises on the pending queue only; it writes nothing back and never
+       reorders or changes a review — the queue below still reflects the
+       real, stored data. #}
+    <section aria-label="AI queue triage" x-data="arbQueueTriagePanel()">
+    {% call card() %}
+        {% call card_header() %}
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="sparkles" class="h-4 w-4 text-primary" aria-hidden="true"></i>
+                    {% call card_title(class='text-lg') %}AI queue triage{% endcall %}
+                    <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">AI-suggested draft</span>
+                </div>
+                <button type="button" @click="generate()" :disabled="loading"
+                        class="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                        aria-label="Generate AI queue triage">
+                    <i data-lucide="loader" x-show="loading" x-cloak class="h-3.5 w-3.5 animate-spin" aria-hidden="true"></i>
+                    <span x-text="loading ? 'Triaging…' : (triage ? 'Regenerate' : 'Triage pending queue')"></span>
+                </button>
+            </div>
+        {% endcall %}
+        {% call card_content(class='space-y-3') %}
+        <p class="text-xs text-muted-foreground">
+            AI-assessed complexity and suggested review order for the pending queue. Advisory only &#8212; it does
+            not reorder or change any review; the queue below still reflects the real, stored data.
+        </p>
+
+        <div x-show="error" x-cloak role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" x-text="error"></div>
+        <div x-show="message" x-cloak class="text-sm text-muted-foreground" x-text="message"></div>
+
+        <div x-show="triage" x-cloak class="space-y-3">
+            <p class="text-sm text-foreground" x-text="triage && triage.summary"></p>
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse text-sm">
+                    <thead>
+                        <tr>
+                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Review #</th>
+                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Title</th>
+                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Complexity</th>
+                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        <template x-for="(item, idx) in (triage ? triage.items : [])" :key="idx">
+                            <tr>
+                                <td class="px-3 py-2 text-foreground" x-text="item.review_number"></td>
+                                <td class="px-3 py-2 text-foreground" x-text="item.title"></td>
+                                <td class="px-3 py-2 text-foreground" x-text="item.complexity"></td>
+                                <td class="px-3 py-2 text-muted-foreground" x-text="item.reason"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div x-show="triage && triage.suggested_order && triage.suggested_order.length" x-cloak>
+                <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Suggested order</h3>
+                <p class="mt-1 text-sm text-foreground" x-text="triage && triage.suggested_order.join(' → ')"></p>
+            </div>
+        </div>
+        {% endcall %}
+    {% endcall %}
+    </section>
 
     {% if queue.state != 'failed' %}
     {% set completed_reviews = dashboard_data.metrics.approved_items + dashboard_data.metrics.rejected_items %}

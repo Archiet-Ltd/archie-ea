@@ -1699,6 +1699,64 @@ def review_audit_trail_csv(id):
     )
 
 
+@arb_bp.route("/reviews/<int:id>/history.csv")
+@login_required
+def review_typed_history_csv(id):
+    """Export the typed decision-and-provenance ledger for one review as CSV.
+
+    This is the typed-workspace counterpart to ``review_audit_trail_csv``
+    above: that route reads ``ARBAuditLog``, a mutable, untyped ledger the
+    typed read model deliberately does not use (see
+    ``arb/partials/_typed_history.html``). This route exports exactly the
+    rows ``_typed_history.html`` renders — the persisted submission,
+    decision and condition events from ``ARBReadModel._history`` — so the
+    export matches what the page shows rather than a different ledger.
+    Read-only: it writes nothing.
+    """
+    import csv
+    import io
+
+    from flask import Response
+
+    review = ARBReviewItem.query.get_or_404(id)
+
+    actor = _typed_actor()
+    history = []
+    if actor is not None:
+        from app.modules.transformation_room.arb_read_models import (
+            typed_arb_review_view,
+        )
+
+        view = typed_arb_review_view(actor=actor, review_item_id=id)
+        history = view.get("history") or []
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        ["recorded_at_utc", "kind", "event_type", "from_state", "to_state", "actor", "rationale"]
+    )
+    for entry in history:
+        recorded_at = entry.get("recorded_at")
+        writer.writerow(
+            [
+                recorded_at.isoformat() if recorded_at else "",
+                entry.get("kind") or "",
+                entry.get("event_type") or "",
+                entry.get("from_state") or "",
+                entry.get("to_state") or "",
+                entry.get("actor_display") or "",
+                entry.get("rationale") or "",
+            ]
+        )
+
+    filename = f"{review.review_number}-history.csv"
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @arb_bp.route("/reviews/<int:id>/submit", methods=["POST"])
 @login_required
 @audit_log("arb_review_submit")

@@ -4,11 +4,13 @@
   This partial does NOT extend a layout and renders NO page header, breadcrumb
   or <h1>: arb/review_detail.html owns all three (blueprint section 3).
 
-  Order (blueprint section 6): evidence pin, then a two-column body at lg with
-  the dossier at lg:col-span-2 and the decision task at lg:col-span-1, then the
-  conditions ledger, then history. The DOM order is decision-first so mobile
-  reads header -> pin -> decision -> dossier -> conditions -> history; at lg the
-  grid's `order` classes put the dossier back on the left.
+  Order (blueprint section 6): evidence pin, then the advisory AI pre-brief,
+  then a two-column body at lg with the dossier at lg:col-span-2 and the
+  decision task at lg:col-span-1, then the conditions ledger, then history,
+  comments and supporting documents. The DOM order is decision-first so
+  mobile reads header -> pin -> pre-brief -> decision -> dossier ->
+  conditions -> history -> comments -> documents; at lg the grid's `order`
+  classes put the dossier back on the left.
 
   The decision card is sticky only at lg, so it can never cover the mobile
   bottom edge.
@@ -35,6 +37,7 @@
 {% endif %}
 
 {% include 'arb/partials/_typed_evidence_pin.html' %}
+{% include 'arb/partials/_typed_ai_prebrief.html' %}
 
 <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
     {# Decision task first in the DOM so mobile reads pin -> decision -> dossier.
@@ -51,3 +54,5 @@
 
 {% include 'arb/partials/_typed_conditions.html' %}
 {% include 'arb/partials/_typed_history.html' %}
+{% include 'arb/partials/_typed_comments.html' %}
+{% include 'arb/partials/_typed_documents.html' %}

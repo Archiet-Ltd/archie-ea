@@ -58,4 +58,93 @@
 
 {% block extra_head_js %}
 <script src="{{ url_for('static', filename='js/arb/typed_governance.js') }}" defer></script>
+{# arbDocPanel and arbPrebriefPanel back the documents and AI pre-brief
+   partials included from _typed_review_workspace.html. Both are advisory /
+   read-and-attach only: neither writes to the typed review graph. Kept
+   inline rather than in a shared file, matching this page's own
+   dashboard.html precedent for its AI Queue Triage panel. #}
+<script>
+function arbDocPanel(parentType, parentId) {
+    return {
+        documents: [],
+        uploading: false,
+        error: null,
+        docType: 'supporting',
+
+        listUrl() {
+            if (parentType === 'review-item') return `/arb/api/review-items/${parentId}/documents`;
+            return `/arb/api/change-requests/${parentId}/documents`;
+        },
+        uploadUrl() { return this.listUrl(); },
+
+        async loadDocuments() {
+            try {
+                const d = await Platform.fetch(this.listUrl());
+                this.documents = d.documents || [];
+                this.error = null;
+            } catch (e) {
+                this.error = 'Failed to load documents';
+            }
+        },
+
+        async uploadFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            this.uploading = true;
+            this.error = null;
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('document_type', this.docType);
+            try {
+                const d = await Platform.fetch(this.uploadUrl(), {
+                    method: 'POST',
+                    body: fd,
+                });
+                if (d.success) {
+                    this.documents.unshift(d.document);
+                } else {
+                    this.error = d.error || 'Upload failed';
+                }
+            } catch (e) {
+                this.error = 'Upload failed';
+            } finally {
+                this.uploading = false;
+                event.target.value = '';
+                if (window.lucide) lucide.createIcons();
+            }
+        },
+
+        formatDate(iso) {
+            if (!iso) return '';
+            try { return new Date(iso).toLocaleDateString(); } catch (e) { return iso; }
+        }
+    };
+}
+</script>
+<script>
+/* AI pre-brief panel (reviewer assist). Advisory only: calls
+   POST /arb/api/reviews/<id>/ai-prebrief, which writes nothing to the
+   review — the result is rendered here only. */
+function arbPrebriefPanel(reviewId) {
+    return {
+        loading: false,
+        error: null,
+        prebrief: null,
+
+        async generate() {
+            this.loading = true;
+            this.error = null;
+            try {
+                const d = await Platform.fetch.post(`/arb/api/reviews/${reviewId}/ai-prebrief`, null, {});
+                this.prebrief = d.prebrief;
+            } catch (e) {
+                this.error = e.message || 'AI pre-brief failed';
+            } finally {
+                this.loading = false;
+                if (window.lucide) lucide.createIcons();
+            }
+        }
+    };
+}
+</script>
 {% endblock %}
