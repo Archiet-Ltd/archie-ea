@@ -121,8 +121,8 @@ _MORE_TOOLS = [
     #     AND is active, and the module is marked DEPRECATED in its own
     #     docstring. "Work Packages" (enterprise.work_packages) is the live
     #     surface and is already listed.
-    #   main.capability_framework.dashboard - 302 to /framework-management/,
-    #     already listed as "Framework Management".
+    #   main.capability_framework.dashboard - 302 to
+    #     /capability-maturity/frameworks, already listed as "Maturity Frameworks".
     #   dashboard.index - 302 to /dashboard/overview, already a Home zone link.
     #   unified_duplicate.enterprise_dashboard - 302 to
     #     /duplicate-detection/simple, already listed as "Duplicate Detection".
@@ -134,7 +134,7 @@ _MORE_TOOLS = [
     #
     # They stay in this list rather than being deleted, because
     # tests/test_module_discoverability.py scans the url_map for module roots
-    # and requires each to be known here — deleting them would report five
+    # and requires each to be known here — deleting them would report nine
     # brand-new "orphan modules" that are not orphans. `_NOT_RENDERED` below is
     # what keeps them out of the page and out of global search.
     ("Implementation Planning", "implementation_planning.implementation_dashboard", "package"),
@@ -142,6 +142,20 @@ _MORE_TOOLS = [
     ("Dashboard", "dashboard.index", "layout-dashboard"),
     ("Duplicate Detection — Enterprise", "unified_duplicate.enterprise_dashboard", "copy"),
     ("Roadmap Builder", "architect_ui.roadmap_builder", "map"),
+    # Framework Management, Framework Config and the Procurement section root
+    # are redirects now too; kept listed here for the same reason as the five
+    # rows above.
+    #   main.framework_management.dashboard - 302 to /capability-maturity/frameworks.
+    #   framework_config_ui.framework_config_dashboard - 302 to
+    #     /capability-maturity/frameworks.
+    #   procurement.compliance_dashboard - 302 to /procurement/licenses.
+    #   procurement.index - already redirected to /procurement/contracts before
+    #     this change; the sidebar's Overview link now points at Renewals
+    #     instead, so this section root is otherwise unlinked.
+    ("Framework Management", "main.framework_management.dashboard", "settings"),
+    ("Framework Config", "framework_config_ui.framework_config_dashboard", "settings"),
+    ("Licence Compliance", "procurement.compliance_dashboard", "clipboard-check"),
+    ("Procurement Overview", "procurement.index", "shopping-cart"),
     ("My Applications — My List", "my_applications.app_list", "list"),
     ("My Applications — Health", "my_applications.health_overview", "heart-pulse"),
     ("My Applications — Roadmap Impact", "my_applications.roadmap_impact", "git-branch"),
@@ -162,8 +176,6 @@ _MORE_TOOLS = [
     ("Business Case", "business_case.index", "briefcase"),
     ("Business Model", "business_model.index", "layout-dashboard"),
     ("EA Workflows", "main.ea_workflows_dashboard", "git-merge"),
-    ("Framework Config", "framework_config_ui.framework_config_dashboard", "settings"),
-    ("Framework Management", "main.framework_management.dashboard", "settings"),
     ("Hybrid Mapping Dashboard", "main.hybrid_mapping_dashboard", "map"),
     ("Industry APQC", "industry_apqc.industry_apqc_dashboard", "layers"),
     ("Integration Workflows", "integration.workflow_dashboard", "git-branch"),
@@ -197,10 +209,14 @@ _NOT_RENDERED = {
     # says DEPRECATED. "Work Packages" (enterprise.work_packages) is live.
     "implementation_planning.implementation_dashboard": "404 - deprecated module",
     # 302 aliases onto a page this directory already lists under its own name.
-    "main.capability_framework.dashboard": "302 -> Framework Management",
+    "main.capability_framework.dashboard": "302 -> Maturity Frameworks",
     "dashboard.index": "302 -> Dashboard Overview",
     "unified_duplicate.enterprise_dashboard": "302 -> Duplicate Detection",
     "architect_ui.roadmap_builder": "302 -> Roadmaps",
+    "main.framework_management.dashboard": "302 -> Maturity Frameworks",
+    "framework_config_ui.framework_config_dashboard": "302 -> Maturity Frameworks",
+    "procurement.compliance_dashboard": "302 -> Licences",
+    "procurement.index": "section landing; sidebar points at Renewals",
 }
 
 _ZONE_ORDER = ["home", "my_work", "library", "governance", "admin"]
