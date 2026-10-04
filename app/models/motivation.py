@@ -528,7 +528,14 @@ from sqlalchemy import event
 
 @event.listens_for(Meaning, "after_insert")
 def create_meaning_archimate(mapper, connection, target):
-    """Auto-create ArchiMateElement for Meaning"""
+    """Auto-create ArchiMateElement for Meaning.
+
+    R1-B81: Meaning gained TenantMixin, which made
+    ArchiMateElement.organization_id NOT NULL on any row this listener
+    creates -- the synced element must carry the same organisation as the
+    Meaning it mirrors (NULL included, since a NOT NULL insert of NULL
+    fails outright rather than quietly defaulting to the wrong tenant).
+    """
     from sqlalchemy import insert
 
     from .archimate_core import ArchiMateElement
@@ -540,6 +547,7 @@ def create_meaning_archimate(mapper, connection, target):
                 type="Meaning",
                 layer="Motivation",
                 description=target.description or f"Meaning: {target.name}",
+                organization_id=target.organization_id,
             )
         )
         target.archimate_element_id = result.inserted_primary_key[0]
