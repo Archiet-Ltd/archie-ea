@@ -209,8 +209,12 @@ class Config:
     MAIL_TIMEOUT = _env_optional_positive_int("MAIL_TIMEOUT") or 15
 
     # Analytics
-    GOOGLE_ANALYTICS_ID = os.environ.get("GOOGLE_ANALYTICS_ID", "")
     SEGMENT_API_KEY = os.environ.get("SEGMENT_API_KEY", "")
+    # Public analytics (GA4, Clarity) and search verification — behind consent
+    GA4_MEASUREMENT_ID = os.environ.get("GA4_MEASUREMENT_ID", "")
+    CLARITY_PROJECT_ID = os.environ.get("CLARITY_PROJECT_ID", "")
+    GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "")
+    BING_SITE_VERIFICATION = os.environ.get("BING_SITE_VERIFICATION", "")
 
     # Admin account
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")

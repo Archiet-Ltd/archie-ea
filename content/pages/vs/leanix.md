@@ -45,7 +45,7 @@ can ask without learning the notation first.
 | Vendor | SAP LeanIX (part of SAP since 2023) | Archiet Ltd |
 | Licence | Proprietary | Open source, AGPL, plus a commercial licence |
 | Self-hostable | No — SaaS only | Yes |
-| Pricing | Not published; priced per application, tiered; available on request | Not published; free to self-host under AGPL |
+| Pricing | Not published; priced per application, tiered; available on request | Published at /pricing; free to self-host under AGPL |
 | Core products | Application Portfolio Management, Technology Risk and Compliance, Architecture and Road Map Planning | One product across modelling, application portfolio, business case, and governance |
 | Modelling notation | Proprietary fact-sheet model | ArchiMate 3.2 |
 | G2 rating | 4.5/5, roughly 190 reviews | Not yet listed |
@@ -53,7 +53,7 @@ can ask without learning the notation first.
 ## What Entelim already does
 
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
-  browser across every layer and import history that keeps track of where each element came from.
+  browser across every layer and an import history of what was brought in and when.
 - **CSV and Excel import** for anything not already in ArchiMate form.
 - **Find what you're paying for twice.** Ask the question directly and get duplicate detection
   across your application list, a consolidation plan, and spend broken down by category.
