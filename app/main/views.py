@@ -201,7 +201,7 @@ def sitemap_xml():
 
 @main.route("/llms.txt")
 def llms_txt():
-    """Serve llms.txt listing every public content page."""
+    """Serve llms.txt listing every public content page with a Capabilities section."""
     from app.services.public_pages import load_all_pages
 
     pages = load_all_pages()
@@ -213,11 +213,147 @@ def llms_txt():
         "enter your website address and see your company."
     )
     lines.append("")
-    for p in pages:
+
+    # Capabilities section: modules and intelligence lenses
+    module_pages = [p for p in pages if p.family == "module"]
+    if module_pages:
+        lines.append("## Capabilities")
+        lines.append("")
+        for p in module_pages:
+            # Extract a quotable factual sentence from the page body
+            sentence = _extract_first_sentence(p.body_html)
+            lines.append(f"- [{p.title}]({base_url}{p.url}) — {sentence}")
+        lines.append("")
+
+    # All pages list (exclude module pages already listed in Capabilities)
+    non_module_pages = [p for p in pages if p.family != "module"]
+    for p in non_module_pages:
         lines.append(f"- [{p.title}]({base_url}{p.url})")
     text = "\n".join(lines) + "\n"
     from flask import Response
     return Response(text, mimetype="text/plain")
+
+
+@main.route("/llms-full.txt")
+def llms_full_txt():
+    """Serve llms-full.txt with the full text of every public module, use-case and comparison page."""
+    from app.services.public_pages import load_all_pages
+
+    pages = load_all_pages()
+    base_url = "https://entelim.org"
+    lines = ["# Entelim — Full Content"]
+    lines.append("")
+    lines.append(
+        "> Entelim is the open-source Enterprise Intelligence Model: "
+        "enter your website address and see your company."
+    )
+    lines.append("")
+
+    # Include modules, use-cases, and comparisons
+    target_families = {"module", "function-per-segment", "comparison"}
+    target_pages = [p for p in pages if p.family in target_families]
+
+    for p in target_pages:
+        lines.append(f"## {p.title}")
+        lines.append("")
+        lines.append(f"URL: {base_url}{p.url}")
+        lines.append("")
+        # Convert HTML body to plain text/markdown
+        plain_text = _html_to_plain_text(p.body_html)
+        lines.append(plain_text)
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    text = "\n".join(lines) + "\n"
+    from flask import Response
+    return Response(text, mimetype="text/plain")
+
+
+def _extract_first_sentence(html: str) -> str:
+    """Extract the first meaningful sentence from rendered HTML body.
+
+    Takes the first sentence from the first <p> element (skipping headings)
+    to avoid the h1 title running into the first paragraph.
+    """
+    import re
+    import html as html_mod
+
+    # Find the first <p> element content
+    p_match = re.search(r"<p[^>]*>(.*?)</p>", html, flags=re.DOTALL | re.IGNORECASE)
+    if p_match:
+        text = p_match.group(1)
+        # Strip any nested HTML tags from the paragraph content
+        text = re.sub(r"<[^>]+>", "", text)
+    else:
+        # Fallback: remove all tags and use the whole text
+        text = re.sub(r"<[^>]+>", "", html)
+
+    text = html_mod.unescape(text)
+    text = " ".join(text.split())  # Normalize whitespace
+
+    # Find first sentence ending with . ! or ?
+    match = re.search(r"([^.!?]*[.!?])", text)
+    if match:
+        sentence = match.group(1).strip()
+        # Limit length
+        if len(sentence) > 200:
+            sentence = sentence[:197] + "..."
+        return sentence
+    return text[:200] if text else "No description available."
+
+
+def _html_to_plain_text(html: str) -> str:
+    """Convert rendered HTML body to plain text/markdown."""
+    import re
+    import html as html_mod
+
+    # Remove <script> and <style> elements with their content FIRST
+    text = re.sub(r"<script\b[^>]*>.*?</script>", "", html, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<style\b[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
+
+    # Convert common HTML elements to markdown-like plain text
+    # Headings
+    text = re.sub(r"<h1[^>]*>(.*?)</h1>", r"# \1", text, flags=re.DOTALL)
+    text = re.sub(r"<h2[^>]*>(.*?)</h2>", r"## \1", text, flags=re.DOTALL)
+    text = re.sub(r"<h3[^>]*>(.*?)</h3>", r"### \1", text, flags=re.DOTALL)
+
+    # Links
+    text = re.sub(r'<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>', r"[\2](\1)", text, flags=re.DOTALL)
+
+    # Bold/italic
+    text = re.sub(r"<strong[^>]*>(.*?)</strong>", r"**\1**", text, flags=re.DOTALL)
+    text = re.sub(r"<b[^>]*>(.*?)</b>", r"**\1**", text, flags=re.DOTALL)
+    text = re.sub(r"<em[^>]*>(.*?)</em>", r"*\1*", text, flags=re.DOTALL)
+    text = re.sub(r"<i[^>]*>(.*?)</i>", r"*\1*", text, flags=re.DOTALL)
+
+    # Code
+    text = re.sub(r"<code[^>]*>(.*?)</code>", r"`\1`", text, flags=re.DOTALL)
+    text = re.sub(r"<pre[^>]*>(.*?)</pre>", r"\n```\n\1\n```\n", text, flags=re.DOTALL)
+
+    # Lists
+    text = re.sub(r"<li[^>]*>(.*?)</li>", r"- \1", text, flags=re.DOTALL)
+    text = re.sub(r"</?(ul|ol)[^>]*>", "", text, flags=re.DOTALL)
+
+    # Paragraphs and line breaks
+    text = re.sub(r"</p>", "\n\n", text, flags=re.DOTALL)
+    text = re.sub(r"<p[^>]*>", "", text, flags=re.DOTALL)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.DOTALL)
+
+    # Horizontal rule
+    text = re.sub(r"<hr\s*/?>", "\n---\n", text, flags=re.DOTALL)
+
+    # Remove remaining tags
+    text = re.sub(r"<[^>]+>", "", text)
+
+    # Unescape HTML entities
+    text = html_mod.unescape(text)
+
+    # Normalize whitespace
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = text.strip()
+
+    return text
 
 
 # ============================================================================

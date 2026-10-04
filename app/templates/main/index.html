@@ -7,6 +7,12 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "The open-source Enterprise Intelligence Model."}</script>
+{% if config.GOOGLE_SITE_VERIFICATION %}
+<meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">
+{% endif %}
+{% if config.BING_SITE_VERIFICATION %}
+<meta name="msvalidate.01" content="{{ config.BING_SITE_VERIFICATION }}">
+{% endif %}
 {% endblock %}
 
 {% block header %}
