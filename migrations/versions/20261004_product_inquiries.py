@@ -14,7 +14,7 @@ from sqlalchemy import text
 from app.commands.schema_migrations import ContractBlocked
 
 revision = "20261004_product_inquiries"
-down_revision = "20261004_agten_cascade"
+down_revision = "20261004_evt_default"
 branch_labels = None
 depends_on = None
 
