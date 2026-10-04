@@ -293,7 +293,7 @@ def test_a_failing_table_rolls_back_alone_and_another_tables_work_persists(
     assert _roadmap_item_org(db_session, item_id) == org.id
 
 
-def test_provenance_only_no_longer_exists():
+def test_provenance_only_quarantines_options_analysis_and_stakeholder_inputs():
     import app.commands.backfill_layer_tenancy as b
 
     assert hasattr(b, "_PROVENANCE_ONLY")
