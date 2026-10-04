@@ -76,5 +76,9 @@ def test_architect_reaches_glossary_and_retention_breaches(browser, live_server)
         live_server + "/data-governance/retention-breaches", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT,
     )
     assert resp.status == 200
-    expect(page.get_by_role("heading", name="Retention breaches")).to_have_count(1)
+    # exact=True matters here: with no breaches seeded, the page also
+    # renders an empty_state <h3>No retention breaches</h3>, and
+    # Playwright's accessible-name match is substring by default, so an
+    # unqualified "Retention breaches" matches both headings.
+    expect(page.get_by_role("heading", name="Retention breaches", exact=True, level=1)).to_have_count(1)
     context.close()

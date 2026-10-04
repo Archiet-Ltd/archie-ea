@@ -315,6 +315,18 @@ class Meaning(TenantMixin, db.Model):
     name = db.Column(db.String(255), nullable=False, index=True)
     description = db.Column(db.Text)
 
+    # Meaning gained TenantMixin after rows already existed with no
+    # organisation (backfill_meaning_tenancy derives what it can and
+    # leaves the rest NULL rather than guessing -- CLAUDE.md's "never
+    # invent data"). TenantMixin declares organization_id NOT NULL for
+    # every model that starts tenant-scoped from creation; Meaning is the
+    # one exception with a real pre-existing orphan population, so it
+    # overrides that back to nullable here. See migrations/versions/
+    # 20261004_meaning_org_nullable.py for the matching DB-level change.
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True,
+    )
+
     # ArchiMate linkage
     archimate_element_id = db.Column(db.Integer, db.ForeignKey("archimate_elements.id"))
 
