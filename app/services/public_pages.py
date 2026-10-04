@@ -27,6 +27,7 @@ from typing import Any
 import bleach
 import markdown
 import yaml
+from markupsafe import Markup
 
 CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content" / "pages"
 
@@ -71,14 +72,20 @@ _ALLOWED_ATTRS = {
 }
 
 
-def _sanitize_html(html: str) -> str:
-    """Strip unsafe HTML tags and attributes from rendered Markdown."""
-    return bleach.clean(
+def _sanitize_html(html: str) -> Markup:
+    """Strip unsafe HTML tags and attributes from rendered Markdown.
+
+    Returns ``Markup`` (a ``str`` subclass), not a plain string: this is the
+    one place sanitization actually happens, so it is also the one place
+    that gets to mark the result trusted -- the template then renders it
+    with no bare ``|safe`` for test_template_escaping.py to flag.
+    """
+    return Markup(bleach.clean(
         html,
         tags=_ALLOWED_TAGS,
         attributes=_ALLOWED_ATTRS,
         strip=True,
-    )
+    ))
 
 
 @dataclass
@@ -223,7 +230,14 @@ def load_page(family: str, slug: str | None = None) -> PublicPage | None:
 
 
 def build_jsonld(page: PublicPage) -> str:
-    """Build JSON-LD structured data for a page based on its family."""
+    """Build JSON-LD structured data for a page based on its family.
+
+    Returns ``Markup`` (a ``str`` subclass -- every existing caller treating
+    it as plain text, including ``json.loads()``, is unaffected): the value
+    is already escaped for a <script> block by the time it leaves this
+    function, so the template renders it with no bare ``|safe`` for
+    test_template_escaping.py to flag.
+    """
     family = page.page_family
     site_url = "https://entelim.org"
 
@@ -240,7 +254,7 @@ def build_jsonld(page: PublicPage) -> str:
     else:
         ld = _jsonld_webpage(page, site_url)
 
-    return _escape_for_script_block(json.dumps(ld, indent=2, ensure_ascii=False))
+    return Markup(_escape_for_script_block(json.dumps(ld, indent=2, ensure_ascii=False)))
 
 
 def _escape_for_script_block(serialised: str) -> str:
@@ -249,6 +263,9 @@ def _escape_for_script_block(serialised: str) -> str:
     ``json.dumps`` does not escape ``<``, ``>`` or ``&``, so a title or answer
     containing ``</script>`` would end the block early and let the rest run as
     markup. The escaped forms are still valid JSON and decode to the same text.
+    Returned as a plain ``str``: the caller (``build_jsonld``) is the one that
+    marks the final value ``Markup``-trusted, since this helper's own output
+    still needs JSON-encoding (by ``json.dumps`` above) before that's true.
     """
     return (
         serialised.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")

@@ -254,6 +254,13 @@ def init_cli(app):
         app.logger.warning(f"Failed to register review queue tenancy backfill CLI: {e}")
 
     try:
+        from app.commands.backfill_review_queue_approvals import init_app as init_review_queue_approvals
+        init_review_queue_approvals(app)
+        app.logger.info("approval-queue consolidation backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register approval-queue consolidation backfill CLI: {e}")
+
+    try:
         from app.commands.dedupe_entities import init_app as init_dedupe_entities
         init_dedupe_entities(app)
         app.logger.info("\u2705 Dedupe entities CLI command registered")
@@ -317,6 +324,13 @@ def init_cli(app):
         app.logger.warning(f"\u26a0\ufe0f  Failed to register architect-role backfill CLI: {e}")
 
     try:
+        from app.commands.reconcile_admin_flags import init_app as init_reconcile_admin_flags
+        init_reconcile_admin_flags(app)
+        app.logger.info("reconcile-admin-flags CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register reconcile-admin-flags CLI: {e}")
+
+    try:
         from app.commands.cutover_capability_tenancy import init_app as init_capability_cutover
         init_capability_cutover(app)
         app.logger.info("Capability tenancy cutover CLI command registered")
@@ -340,6 +354,15 @@ def init_cli(app):
         app.logger.warning(f"Failed to register capability provenance migration CLI: {e}")
 
     try:
+        from app.commands.backfill_capability_catalogs import (
+            init_app as init_capability_catalog_backfill,
+        )
+        init_capability_catalog_backfill(app)
+        app.logger.info("Capability catalog backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register capability catalog backfill CLI: {e}")
+
+    try:
         from app.commands.backfill_audit_trail import init_app as init_audit_trail_backfill
         init_audit_trail_backfill(app)
         app.logger.info("Audit trail backfill CLI command registered")
@@ -361,6 +384,21 @@ def init_cli(app):
         app.logger.info("\u2705 Audit-log viewpoint-FK drop CLI command registered")
     except Exception as e:
         app.logger.warning(f"\u26a0\ufe0f  Failed to register audit-log viewpoint-FK drop CLI: {e}")
+
+    # The entity_history trigger reconcile-schema cannot create
+    try:
+        from app.commands.apply_entity_history_trigger import init_app as init_entity_history_trigger
+        init_entity_history_trigger(app)
+        app.logger.info("\u2705 Entity-history trigger CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"\u26a0\ufe0f  Failed to register entity-history trigger CLI: {e}")
+
+    try:
+        from app.commands.backfill_entity_history import init_app as init_entity_history_backfill
+        init_entity_history_backfill(app)
+        app.logger.info("\u2705 Entity-history backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"\u26a0\ufe0f  Failed to register entity-history backfill CLI: {e}")
 
     try:
         from app.commands.seed_minimal_vendor_products import seed_minimal_vendor_products
@@ -398,6 +436,19 @@ def init_cli(app):
         app.logger.info("\u2705 ARB/EA tenancy backfill CLI command registered")
     except Exception as e:
         app.logger.warning(f"\u26a0\ufe0f  Failed to register ARB/EA tenancy backfill CLI: {e}")
+
+    # Decision register consolidation (ADR records paired into
+    # architecture_decisions; decision_ledger tenant-fenced)
+    try:
+        from app.commands.backfill_decision_register_consolidation import (
+            init_app as init_decision_register_consolidation,
+        )
+        init_decision_register_consolidation(app)
+        app.logger.info("\u2705 Decision register consolidation backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(
+            f"\u26a0\ufe0f  Failed to register decision register consolidation backfill CLI: {e}"
+        )
 
     try:
         from app.commands.process_arb_waiver_expiries import init_app as init_arb_expiry
@@ -443,9 +494,33 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register demo company seed CLI: {e}")
 
+# Application owners backfill
+    try:
+        from app.commands import backfill_application_owners
+        backfill_application_owners.init_app(app)
+        app.logger.info("✅ Application owners backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register application owners backfill CLI: {e}")
+
     try:
         from app.commands.clear_foreign_assignees import init_app as init_clear_foreign_assignees
         init_clear_foreign_assignees(app)
         app.logger.info("✅ Clear foreign assignees CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register clear foreign assignees CLI: {e}")
+
+# One risk register: copy solution_risks rows into the canonical risks table
+    try:
+        from app.commands.backfill_solution_risk_merge import init_app as init_solution_risk_merge
+        init_solution_risk_merge(app)
+        app.logger.info("✅ Solution risk merge backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register solution risk merge backfill CLI: {e}")
+
+    # unified_work_packages gained TenantMixin; four other stores merge into it
+    try:
+        from app.commands.consolidate_work_packages import init_app as init_consolidate_work_packages
+        init_consolidate_work_packages(app)
+        app.logger.info("✅ Work package consolidation CLI commands registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register work package consolidation CLI: {e}")

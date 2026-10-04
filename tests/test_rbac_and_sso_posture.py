@@ -101,23 +101,34 @@ def test_plain_user_is_rejected_by_the_rbac_gate(app, db_session, rbac_org, logi
     )
 
 
-def test_org_admin_without_administer_permission_is_still_rejected(app, db_session, rbac_org, login_as):
-    """org_admin_required alone is not sufficient — admin_required (the
-    Permission.ADMINISTER check) is a second, independent gate on the same
-    route. This is the layering the RBAC matrix depends on: flipping one
-    flag must not be enough to reach an ADMINISTER-only surface.
+def test_is_org_admin_derives_from_is_admin(app, db_session, rbac_org):
+    """is_org_admin is a derived property that returns is_admin().
+    Setting is_org_admin=True assigns the Administrator role, so the two can
+    never disagree.  The old test that asserted they COULD disagree
+    (is_org_admin=True with admin_permission=False) described a state this
+    change makes impossible by construction.
     """
     user = _make_rbac_user(db_session, rbac_org, is_org_admin=True, admin_permission=False)
     db_session.commit()
-    client = app.test_client()
-    login_as(client, user)
 
-    resp = client.get(_GATED_ROUTE)
-    assert resp.status_code == 403, (
-        f"is_org_admin=True but role lacks Permission.ADMINISTER still "
-        f"reached {_GATED_ROUTE} — got {resp.status_code}. The two gates "
-        "are not actually independent."
+    # After the setter runs, is_admin() must be True because is_org_admin=True
+    # assigned the Administrator role.
+    assert user.is_admin() is True, (
+        "is_org_admin=True must imply is_admin()==True — the setter assigns "
+        "the Administrator role"
     )
+    assert user.is_org_admin is True, (
+        "is_org_admin property must agree with is_admin()"
+    )
+
+
+def test_is_org_admin_false_does_not_grant_admin(app, db_session, rbac_org):
+    """Setting is_org_admin=False on a non-admin user leaves them non-admin."""
+    user = _make_rbac_user(db_session, rbac_org, is_org_admin=False, admin_permission=False)
+    db_session.commit()
+
+    assert user.is_admin() is False
+    assert user.is_org_admin is False
 
 
 def test_org_admin_with_administer_permission_is_admitted(app, db_session, rbac_org, login_as):

@@ -724,3 +724,86 @@ def api_validate_relationships():
             "errors": errors,
         }
     )
+
+
+# ==================== APPLICATION TECHNOLOGY LINKS ====================
+# What an application runs on. Each link is a real ArchiMate "realization"
+# relationship (node or system software -> application), written through
+# ArchiMateRelationshipService, so the impact answer follows it unchanged.
+
+
+def _technology_link_error(exc):
+    return jsonify({"status": "error", "error": exc.message}), exc.status
+
+
+@architecture_crud_bp.route(
+    "/api/applications/<int:application_id>/technology-links", methods=["GET"]
+)
+@login_required
+def api_application_technology_links(application_id):
+    """API: the nodes and system software an application is mapped to."""
+    from app.modules.architecture.services.application_technology_links import (
+        TechnologyLinkError,
+        list_links,
+    )
+
+    try:
+        links = list_links(application_id)
+    except TechnologyLinkError as exc:
+        return _technology_link_error(exc)
+    return jsonify({"status": "success", "links": links})
+
+
+@architecture_crud_bp.route(
+    "/api/applications/<int:application_id>/technology-links", methods=["POST"]
+)
+@login_required
+@require_roles("admin", "architect")
+@audit_log("application_technology_link_create")
+def api_add_application_technology_link(application_id):
+    """API: map an application to a node or system software it runs on."""
+    from flask_login import current_user
+
+    from app.modules.architecture.services.application_technology_links import (
+        TechnologyLinkError,
+        add_link,
+    )
+
+    data = request.get_json(silent=True) or {}
+    try:
+        element_id = int(data.get("element_id"))
+    except (TypeError, ValueError):
+        element_id = 0
+    if element_id <= 0:
+        return jsonify({"status": "error", "error": "Choose a node or system software."}), 400
+
+    try:
+        link = add_link(application_id, element_id, user_id=getattr(current_user, "id", None))
+        db.session.commit()
+    except TechnologyLinkError as exc:
+        db.session.rollback()
+        return _technology_link_error(exc)
+    return jsonify({"status": "success", "link": link}), 201
+
+
+@architecture_crud_bp.route(
+    "/api/applications/<int:application_id>/technology-links/<int:relationship_id>",
+    methods=["DELETE"],
+)
+@login_required
+@require_roles("admin", "architect")
+@audit_log("application_technology_link_delete")
+def api_remove_application_technology_link(application_id, relationship_id):
+    """API: remove one of an application's technology links."""
+    from app.modules.architecture.services.application_technology_links import (
+        TechnologyLinkError,
+        remove_link,
+    )
+
+    try:
+        remove_link(application_id, relationship_id)
+        db.session.commit()
+    except TechnologyLinkError as exc:
+        db.session.rollback()
+        return _technology_link_error(exc)
+    return jsonify({"status": "success"})

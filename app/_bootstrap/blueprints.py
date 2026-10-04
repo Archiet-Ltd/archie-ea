@@ -262,6 +262,14 @@ def _register_optional_standalone(app):
         # scope comes from the share row, never from the URL. See the module
         # docstring in app/modules/sharing/routes.py.
         ("app.modules.sharing.routes", "artefact_share_bp", None),
+        # System of record per data entity, undeclared copies, master data
+        # domain register and the logical-model standards check. Tier-
+        # independent: the blueprint carries its own /data-governance prefix.
+        (
+            "app.modules.architecture.routes.data_governance_routes",
+            "data_governance_bp",
+            None,
+        ),
         # ARCH-123 (Data Lineage) is NOT a new blueprint: it extends the
         # existing app.modules.architecture.routes.data_architecture_routes
         # (blueprint "data_architecture", already registered elsewhere) with
@@ -544,6 +552,19 @@ def _register_always_on_apis(app, csrf):
 
     app.register_blueprint(error_events_bp)
     app.logger.info("[BLUEPRINT] Error aggregation registered at /api/client-error, /admin/errors")
+
+    # Capability merge report (ADR 0008 consolidation): platform-admin view of
+    # which duplicate capability records were merged. Registered here rather
+    # than under app.modules.governance's own register() because that module
+    # is reached only when USE_NEW_GOVERNANCE (or USE_GOVERNANCE_GUARDRAILS,
+    # which registers app.modules.governance.v2 instead) is enabled -- this
+    # report must exist regardless of that flag.
+    from app.modules.governance.routes.capability_merge_report_routes import (
+        init_app as init_capability_merge_report,
+    )
+
+    init_capability_merge_report(app)
+    app.logger.info("[BLUEPRINT] Capability merge report registered at /admin/capability-merges")
 
     # Service status: current health, incident history, subscribe (any signed-in user).
     from app.modules.monitoring.routes.status_routes import status_bp
@@ -892,6 +913,17 @@ def _register_architecture(app, csrf):
         app.logger.info("[BLUEPRINT] SA-008 completeness routes registered")
     except ImportError as e:
         app.logger.warning(f"Completeness blueprint not available: {e}")
+
+    # Motivation traceability API — tier-independent (no v2 equivalent)
+    try:
+        from app.modules.architecture.routes.motivation_traceability_routes import (
+            motivation_api,
+        )
+
+        app.register_blueprint(motivation_api)
+        app.logger.info("[BLUEPRINT] Motivation traceability API registered at /api/v1/motivation")
+    except ImportError as e:
+        app.logger.warning(f"Motivation traceability API blueprint not available: {e}")
 
     # --- Tier 1: v2 (guardrail-enabled) ---
     if _is_flag("USE_ARCHITECTURE_GUARDRAILS"):

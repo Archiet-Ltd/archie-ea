@@ -22,7 +22,18 @@ metadata-only operation, so this stays cheap on a large table.
 
 It also creates the four canonical Transformation Programme tables when they are
 absent. Other missing tables remain the responsibility of `flask init-db`
-(`create_all`). Run them together:  flask init-db && flask reconcile-schema
+(`create_all`).
+
+Deploy order (scripts/database/deploy-schema.sh):
+    flask init-db && flask schema-upgrade && flask reconcile-schema
+
+This command is the drift detector in that sequence, not the authority. Any
+change it cannot make — relaxing or tightening NOT NULL, retyping or widening a
+column, a constraint added after a backfill — is an Alembic revision applied by
+`flask schema-upgrade` (app/commands/schema_migrations.py). On a database the
+first two steps brought up to date it adds only the nullable columns models
+gained since the last deploy, each listed in its output, which is the deploy
+log's record of them.
 
 Usage:
     flask --app manage reconcile-schema            # apply
@@ -43,6 +54,7 @@ _TRANSFORMATION_TABLES = (
     "command_materialisations",
     "operation_results",
     "transformation_outbox_events",
+    "event_log",
     "transformation_candidates",
     "candidate_overlap_dispositions",
     "candidate_signals",
@@ -1269,6 +1281,103 @@ def _ensure_sso_mapping_tenant_unique_constraint(*, dry_run, existing_tables, ad
     )
     db.session.commit()
     added.append(f"constraint.{table}.{new_name} :: added, replacing {old_name}")
+# Tenant-owned tables created with a platform-wide UNIQUE on a business key
+# each organisation chooses for itself. Each organisation overrides a
+# system-default governance gate by name and numbers its own contracts, so the
+# routes' tenant-filtered duplicate checks passed and the INSERT then hit the
+# global rule: once one organisation used a name, every other organisation got
+# an error for it (for contracts, also learning that another tenant holds that
+# number). The models declare the per-organisation rule; this brings an
+# existing database into line. A platform-wide unique CONSTRAINT is dropped; a
+# platform-wide unique INDEX is replaced by a plain index of the same name so
+# lookups by the key stay indexed.
+# (table, key column, per-organisation constraint, platform-wide rule, rule kind)
+_TENANT_SCOPED_UNIQUE_KEYS = (
+    ("governance_gates", "gate_name", "uq_governance_gates_org_gate_name",
+     "governance_gates_gate_name_key", "constraint"),
+    ("vendor_contracts", "contract_number", "uq_vendor_contracts_org_contract_number",
+     "ix_vendor_contracts_contract_number", "index"),
+)
+
+
+def _ensure_tenant_scoped_unique_keys(*, dry_run, existing_tables, added, failed):
+    """Make organisation-chosen business keys unique per organisation."""
+    from sqlalchemy import inspect, text
+
+    for table, column, new_name, old_name, old_kind in _TENANT_SCOPED_UNIQUE_KEYS:
+        if table not in existing_tables:
+            continue
+        try:
+            conn = db.session.connection()
+            insp = inspect(conn)
+            uniques = {u.get("name") for u in insp.get_unique_constraints(table)}
+            add_new = new_name not in uniques
+            if old_kind == "constraint":
+                remove_old = old_name in uniques
+            else:
+                remove_old = any(ix.get("name") == old_name and ix.get("unique")
+                                 for ix in insp.get_indexes(table))
+            if not (add_new or remove_old):
+                continue
+            label = f"constraint.{table}.{new_name}"
+            if dry_run:
+                added.append(f"{label} :: would make {column} unique per organisation, "
+                             f"replacing platform-wide {old_name}")
+                continue
+            if add_new:
+                conn.execute(text(
+                    f'ALTER TABLE "{table}" ADD CONSTRAINT "{new_name}" '
+                    f'UNIQUE (organization_id, "{column}")'
+                ))
+            if remove_old and old_kind == "constraint":
+                conn.execute(text(f'ALTER TABLE "{table}" DROP CONSTRAINT IF EXISTS "{old_name}"'))
+            elif remove_old:
+                conn.execute(text(f'DROP INDEX IF EXISTS "{old_name}"'))
+                conn.execute(text(f'CREATE INDEX IF NOT EXISTS "{old_name}" ON "{table}" ("{column}")'))
+            db.session.commit()
+            added.append(f"{label} :: {column} unique per organisation, replacing platform-wide {old_name}")
+        except Exception as exc:  # noqa: BLE001 — keep going, report at end
+            db.session.rollback()
+            failed.append(f"constraint.{table}.{new_name}: {str(exc)[:120]}")
+
+
+# Columns that were NOT NULL DEFAULT 0 although "not recorded" is a real state:
+# a zero stored for an unknown figure is indistinguishable from a measured
+# zero on every screen that reads it. The models now declare them nullable;
+# this relaxes the constraint on an existing database. Existing rows keep
+# their values - a stored 0 cannot be told apart from a real one after the
+# fact, so none is rewritten.
+_UNRECORDED_ALLOWED = (
+    ("license_entitlements", "quantity_deployed"),
+    ("license_entitlements", "quantity_used"),
+)
+
+
+def _relax_not_null_for_unrecorded_values(*, dry_run, existing_tables, added, failed):
+    """Allow NULL (not recorded) where a column wrongly forced a zero."""
+    from sqlalchemy import inspect, text
+
+    for table, column in _UNRECORDED_ALLOWED:
+        if table not in existing_tables:
+            continue
+        try:
+            conn = db.session.connection()
+            live = {c["name"]: c for c in inspect(conn).get_columns(table)}
+            if column not in live or live[column].get("nullable", True):
+                continue
+            label = f"nullable.{table}.{column}"
+            if dry_run:
+                added.append(f"{label} :: would allow NULL (not recorded)")
+                continue
+            conn.execute(text(f'ALTER TABLE "{table}" ALTER COLUMN "{column}" DROP NOT NULL'))
+            conn.execute(text(f'ALTER TABLE "{table}" ALTER COLUMN "{column}" DROP DEFAULT'))
+            db.session.commit()
+            added.append(f"{label} :: NULL now means not recorded")
+        except Exception as exc:  # noqa: BLE001 — keep going, report at end
+            db.session.rollback()
+            failed.append(f"nullable.{table}.{column}: {str(exc)[:120]}")
+
+
 def _backfill_webhook_organizations(*, dry_run, existing_tables, added, failed):
     """Recover the tenant key for webhook rows that predate TenantMixin.
 
@@ -1712,6 +1821,18 @@ def _reconcile(dry_run=False):
         added=added,
         failed=failed,
     )
+    _ensure_tenant_scoped_unique_keys(
+        dry_run=dry_run,
+        existing_tables=existing_tables,
+        added=added,
+        failed=failed,
+    )
+    _relax_not_null_for_unrecorded_values(
+        dry_run=dry_run,
+        existing_tables=existing_tables,
+        added=added,
+        failed=failed,
+    )
     _backfill_document_chunk_organizations(
         dry_run=dry_run,
         existing_tables=existing_tables,
@@ -1917,5 +2038,8 @@ def reconcile_schema(dry_run):
 
 
 def init_app(app):
-    """Register the reconcile-schema CLI command."""
+    """Register the reconcile-schema and schema-upgrade CLI commands."""
+    from app.commands.schema_migrations import init_app as init_schema_migrations
+
     app.cli.add_command(reconcile_schema)
+    init_schema_migrations(app)

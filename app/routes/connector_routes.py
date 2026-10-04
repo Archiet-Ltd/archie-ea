@@ -15,6 +15,7 @@ from app.services.connector_framework import (
     SyncLog,
 )
 from flask_login import login_required
+from app.utils.api_response import error_response, not_found_response
 from app.utils.pagination import safe_int_arg
 
 connector_bp = Blueprint("connectors", __name__, url_prefix="/integrations")
@@ -236,34 +237,34 @@ def api_test_connection(connector_id):
 @admin_required
 @audit_log("connector_sync")
 def api_trigger_sync(connector_id):
-    """Manually trigger a sync for a connector."""
+    """Manually trigger a sync for a connector.
+
+    Sync is not available yet for any connector type: no connector in
+    app/connectors/ is ever registered with ConnectorManager, and none of
+    their batch_sync implementations persist a fetched record anywhere --
+    they log a "mapped but not persisted" line instead. This always
+    returned a generic 500 (ConnectorManager has no get_connector method),
+    which read as a bug rather than as the missing feature it is; this
+    reports that honestly instead.
+    """
     try:
         conn = ConnectorConfig.query.get(connector_id)
-        if not conn:
-            return jsonify({"error": "Connector not found"}), 404
-
-        manager = ConnectorManager()
-        connector = manager.get_connector(connector_id)
-
-        if not connector:
-            return jsonify({"error": "Connector not initialized"}), 500
-
-        # Trigger sync (async in production)
-        import asyncio
-
-        result = asyncio.run(connector.batch_sync())
-
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "message": "Sync triggered successfully",
-                    "result": result,
-                    "triggered_at": datetime.utcnow().isoformat(),
-                }
-            ),
-            200,
+    except Exception:
+        return error_response(
+            message="An internal error occurred",
+            code="INTERNAL_ERROR",
+            status_code=500,
         )
 
-    except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
+    if not conn:
+        return not_found_response("Connector")
+
+    return error_response(
+        message=(
+            "Sync is not available for this connector yet. No connector "
+            "type in this deployment is wired to persist synced records, "
+            "so there is nothing to run."
+        ),
+        code="SYNC_NOT_IMPLEMENTED",
+        status_code=501,
+    )

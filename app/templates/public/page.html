@@ -41,11 +41,11 @@
   {% endif %}
 
   {% if jsonld %}
-  <script type="application/ld+json">{{ jsonld | safe }}</script>
+  <script type="application/ld+json">{{ jsonld }}</script>
   {% endif %}
 
   <article class="public-page-content prose max-w-none">
-    {{ page.body_html | safe }}
+    {{ page.body_html }}
   </article>
 
   {% if page.cta == 'plans' %}

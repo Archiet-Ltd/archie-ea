@@ -507,7 +507,7 @@ to reconfirm the count before trusting it:**
 | `air-gap` | a UI asset loaded from a public CDN | ratchet @ 0 |
 | `raw-sql-tenancy` | raw SQL on a tenant table with no `organization_id` predicate | ratchet @ 0 |
 | `tenant-scoping` | ORM queries on a tenant-owned-but-unmixed model with no org predicate | ratchet @ 0 |
-| `untenanted-reads` | a read (`db.select`, `.query`, `session.get`) of ANY model with no `TenantMixin`, with no org predicate in the statement | ratchet @ 2988; a bare `tenant-scoping-ok` (no reason) or an org word inside another name does not clear a read |
+| `untenanted-reads` | a read (`db.select`, `.query`, `session.get`) of ANY model with no `TenantMixin`, with no org predicate in the statement | ratchet @ 2633; a bare `tenant-scoping-ok` (no reason) or an org word inside another name does not clear a read |
 | `unfenced-tables` | a database table with no `TenantMixin` that is not listed in `scripts/unfenced_tables.txt` (a new one is a decision) | ratchet @ 0 |
 | `llm-boundary` | a codegen emitter calling an LLM directly | ratchet @ 0 |
 | `evidence-contract` | behavioural changes/checkers missing evidence or provenance | ratchet @ 29 |
@@ -674,30 +674,43 @@ decisions for the repository owner. Setup, rollback and revoking access are in
 
 ## Schema management — read this before touching a model
 
-There are **three** overlapping mechanisms, and Alembic is *not* the source of truth:
+Three mechanisms run, in this order, on every deploy and every CI job that builds a schema
+(`scripts/database/deploy-schema.sh`):
 
-1. **`create_all()`** via `flask init-db` — creates missing tables only. It **cannot** add a column to
-   a table that already exists.
-2. **`flask reconcile-schema`** (`app/commands/reconcile_schema.py`) — the actual answer to drift.
-   Diffs every mapped model against the live table and emits `ALTER TABLE ... ADD COLUMN IF NOT
-   EXISTS`. ADD-only, all nullable, never drops or retypes; idempotent. Runs on container boot.
-3. **`migrations/`** — Flask-Migrate/Alembic exists with 130+ revisions and multiple merge heads, but
-   deploys do **not** run `flask db upgrade`. Treat it as historical.
+1. **`flask init-db`** (`create_all(checkfirst=True)`) — creates missing tables only. It **cannot**
+   add a column to a table that already exists.
+2. **`flask schema-upgrade`** (`app/commands/schema_migrations.py`, Flask-Migrate/Alembic underneath,
+   baseline `20260926_baseline`) — applies versioned revisions under `migrations/versions/`. This is
+   where every change `reconcile-schema` cannot make lives: relaxing or tightening `NOT NULL`,
+   widening or narrowing a column, adding a constraint after a backfill. A revision follows
+   expand-and-contract, using the helpers in `app/commands/schema_migrations.py` (`relax_not_null` /
+   `widen_varchar` to expand, `tighten_not_null` / `narrow_varchar` to contract — the contract step
+   raises `ContractBlocked` rather than discard a value): expand in one revision, backfill with a
+   `flask` command run one organisation at a time, contract in a later revision once the backfill is
+   measured complete. Serialised across concurrent deploys by a bounded advisory-lock wait
+   (`acquire_upgrade_lock`, 60s default; raises `SchemaUpgradeLocked` rather than hang forever behind
+   a stuck or crashed holder). A failed revision rolls back on its own (PostgreSQL DDL is
+   transactional) and stops the deploy before new code starts.
+3. **`flask reconcile-schema`** (`app/commands/reconcile_schema.py`) — now the drift detector, not the
+   primary mechanism. Diffs every mapped model against the live table and emits
+   `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. ADD-only, all nullable, never drops or retypes;
+   idempotent. Still wired as the `schema-drift` CI gate.
 
-Consequence: **adding a non-nullable column, or one with a backfill requirement, will break existing
-databases** — `reconcile-schema` only adds nullable columns. New columns should be nullable (or carry
-a server default) and be tolerated by code when NULL. See
-`docs/known-issues/schema-drift-on-existing-databases.md` for the full failure mode: one missing
-column raises `UndefinedColumn`, which aborts the transaction and cascades into
-`InFailedSqlTransaction` for every later query, 500-ing the whole page.
+Consequence: an ordinary new nullable column still needs no revision — `reconcile-schema` adds it.
+Anything else (`NOT NULL`, retype, widen/narrow, a constraint) needs a revision, expand-and-contract,
+following the two worked examples (`migrations/versions/20260926_relax_owner_app.py`,
+`20260926_widen_element_name.py`). A revision that changes a column's nullability or type without
+updating the matching model creates permanent model/database drift (a from-scratch `create_all()` —
+every test database, an empty deploy — then builds the *old* shape): update the model in the same
+change.
 
 `manage.py init_db` also contains a long tail of hand-written idempotent `ALTER TABLE` statements for
-pre-Alembic columns. **Do not add to it** — it is legacy.
+pre-Alembic columns. **Do not add to it** — it is legacy. `.dockerignore` must not exclude
+`migrations/versions/` — `schema-upgrade` runs inside the deployed image and needs every revision
+file present to apply it.
 
-The agreed target state (Alembic baseline + `db upgrade` on deploy, `reconcile-schema`
-demoted to a drift detector) and the maintenance-window migration plan are in
-[ADR 0002](docs/adr/0002-schema-management.md). The detector half is already wired as
-the `schema-drift` gate.
+Full history and the maintenance-window migration plan are in
+[ADR 0002](docs/adr/0002-schema-management.md).
 
 ## Architecture
 

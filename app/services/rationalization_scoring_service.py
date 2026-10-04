@@ -380,6 +380,8 @@ class RationalizationScoringService:
 
         # --- cost ---
         # At least one of the four cost fields must be non-zero and non-null.
+        # TODO(Release 2 Cost Fact consolidation): Use application_cost_accessor.get_annual_cost()
+        # and related accessors instead of direct model field access.
         cost_fields = [
             app.total_cost_of_ownership,
             app.license_cost,
@@ -621,7 +623,7 @@ class RationalizationScoringService:
                 "weight": cost_weight_pct,
                 "raw_value": round(cost_score, 2),
                 "contribution": round(cost_score * weights["cost_efficiency"], 2),
-                "source": "ApplicationComponent (total_cost_of_ownership, license_cost, maintenance_cost, infrastructure_cost, user_count)",
+                "source": "ApplicationComponent (total_cost_of_ownership, license_cost, maintenance_cost, infrastructure_cost, user_count) — TODO(Release 2): use cost accessor",
                 "rationale": f"Cost efficiency score of {cost_score:.1f} contributes {cost_score * weights['cost_efficiency']:.1f} pts to overall score (weight {cost_weight_pct}%)",
                 "sub_factors": cost_evidence,
             })
@@ -981,7 +983,7 @@ class RationalizationScoringService:
                     "weight": cost_weight_pct,
                     "raw_value": round(cost_score, 2),
                     "contribution": round(cost_score * weights["cost_efficiency"], 2),
-                    "source": "ApplicationComponent (total_cost_of_ownership, license_cost, maintenance_cost, infrastructure_cost, user_count)",
+                    "source": "ApplicationComponent (total_cost_of_ownership, license_cost, maintenance_cost, infrastructure_cost, user_count) — TODO(Release 2): use cost accessor",
                     "rationale": f"Cost efficiency score of {cost_score:.1f} contributes {cost_score * weights['cost_efficiency']:.1f} pts to overall score (weight {cost_weight_pct}%)",
                     "sub_factors": cost_evidence,
                 },
@@ -1966,6 +1968,8 @@ class RationalizationScoringService:
         evidence: List[Dict] = []
 
         # --- Prefer structured cost fields on ApplicationComponent ---
+        # TODO(Release 2 Cost Fact consolidation): Use application_cost_accessor.get_annual_cost()
+        # and related accessors instead of direct model field access.
         tco = app.total_cost_of_ownership
         license_cost = app.license_cost
         maint_cost = app.maintenance_cost
@@ -2686,6 +2690,8 @@ class RationalizationScoringService:
                 uncertainty_reasons.append("Score near threshold boundary")
 
             # Cost dimension gap — TCO analysis requires at least one cost field
+            # TODO(Release 2 Cost Fact consolidation): Use application_cost_accessor.get_annual_cost()
+            # and related accessors instead of direct model field access.
             cost_fields = [
                 app.total_cost_of_ownership,  # model-safety-ok (known field)
                 app.license_cost,  # model-safety-ok

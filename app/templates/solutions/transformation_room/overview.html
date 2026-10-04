@@ -13,5 +13,12 @@
     <p class="mt-3 text-2xl font-bold text-foreground">{{ room.workstreams|length }}</p>
     <a href="/solutions/programmes/{{ room.programme.id }}/workstreams" class="mt-4 inline-flex text-sm font-medium text-primary hover:underline">View workstreams</a>
   </section>
+  {% if 'stakeholder_map.stakeholder_map_page' in flask.current_app.view_functions %}
+  <section class="rounded-lg border border-border bg-card p-5" aria-labelledby="overview-stakeholders-heading">
+    <h2 id="overview-stakeholders-heading" class="text-sm font-semibold text-foreground">Stakeholders</h2>
+    <p class="mt-2 text-sm text-muted-foreground">Who this programme needs to manage, satisfy or keep informed.</p>
+    <a href="{{ url_for('stakeholder_map.stakeholder_map_page', programme_id=room.programme.id) }}" data-testid="programme-stakeholder-map-link" class="mt-4 inline-flex text-sm font-medium text-primary hover:underline">Open stakeholder map</a>
+  </section>
+  {% endif %}
 </div>
 {% endblock %}

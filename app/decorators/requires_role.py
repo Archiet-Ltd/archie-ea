@@ -18,6 +18,18 @@ from app.models.user import ROLE_PLATFORM_ADMIN
 from app.utils.role_access import get_user_role
 
 
+# The roles that handle data-subject requests (scope, assign, access, erasure).
+# The route decorators and the sidebar/directory link share this one list.
+DATA_SUBJECT_REQUEST_ROLES = ["security_architect"]
+
+
+def may_handle_data_subject_requests(user):
+    """True when ``user`` may open the data-subject request pages: the roles in
+    DATA_SUBJECT_REQUEST_ROLES, and platform_admin as ``requires_role`` always
+    admits it."""
+    return get_user_role(user) in DATA_SUBJECT_REQUEST_ROLES + [ROLE_PLATFORM_ADMIN]
+
+
 def requires_role(allowed_roles: Union[str, List[str]]):
     """
     Decorator to restrict route access to specific enterprise roles.

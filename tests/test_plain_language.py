@@ -118,6 +118,7 @@ def test_plain_name_for_none_returns_em_dash():
 
 def test_plain_layer_names():
     from app.models.archimate_element_types import plain_layer_name
+    from app.models.constants import ArchiMateLayer
 
     assert plain_layer_name("strategy") == "Strategy"
     assert plain_layer_name("business") == "Business"
@@ -125,6 +126,8 @@ def test_plain_layer_names():
     assert plain_layer_name("technology") == "Technology"
     assert plain_layer_name("implementation") == "Projects and change"
     assert plain_layer_name("implementation_migration") == "Projects and change"
+    assert ArchiMateLayer.IMPLEMENTATION == "implementation"
+    assert ArchiMateLayer.normalize("Implementation & Migration") == "implementation"
     assert plain_layer_name(None) == "\u2014"
 
 
@@ -894,5 +897,4 @@ def test_plain_language_context_populated_for_authenticated(app, db_session, mak
     assert "window.__PLAIN_LANGUAGE_NAMES__" in html
     assert "window.__PLAIN_LAYER_NAMES__" in html
     assert "window.__SHOW_ARCHIMATE_NAMES__" in html
-
 

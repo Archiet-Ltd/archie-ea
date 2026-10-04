@@ -3,12 +3,13 @@ import logging
 from datetime import date
 
 from flask import Blueprint, jsonify, render_template, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app import db
 from app.models.raid_item import RaidItem, RaidKind, RaidStatus
 from app.models.risk import Risk
 from app.models.risk_entity_link import ENTITY_TYPES
+from app.models.risk_score_history import SCORE_KINDS
 from app.services import risk_service
 
 logger = logging.getLogger(__name__)
@@ -143,6 +144,48 @@ def remove_risk_link(risk_id, link_id):
     """DELETE /api/risks/<id>/links/<link_id> — unmap a risk from an entity."""
     risk_service.remove_risk_link(risk_id, link_id)
     return jsonify({"success": True}), 200
+
+
+@risk_bp.route("/api/risks/<int:risk_id>/scores", methods=["POST"])
+@login_required
+def set_risk_score(risk_id):
+    """POST /api/risks/<id>/scores — record an inherent or residual
+    likelihood/impact score, with history: the score is stored, not only
+    displayed. The HTTP surface for risk_service.set_risk_score (the one
+    writer), previously reachable only from the backfill command and from
+    tests, never from a request. The browser journey that wires a screen to
+    it is a later change.
+    {"score_kind": "inherent"|"residual", "likelihood": 1-5, "impact": 1-5}
+    """
+    data = request.get_json(force=True) or {}
+    score_kind = data.get("score_kind")
+    likelihood = data.get("likelihood")
+    impact = data.get("impact")
+    if score_kind not in SCORE_KINDS or likelihood is None or impact is None:
+        return jsonify({
+            "error": "score_kind (one of %s), likelihood and impact are required" % (SCORE_KINDS,)
+        }), 400
+    try:
+        risk = risk_service.set_risk_score(
+            risk_id, score_kind, likelihood, impact,
+            recorded_by_id=current_user.id,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify(serialize_risk_row(risk)), 200
+
+
+@risk_bp.route("/api/risks/<int:risk_id>/scores", methods=["GET"])
+@login_required
+def get_risk_score_history(risk_id):
+    """GET /api/risks/<id>/scores?score_kind=inherent|residual — history rows,
+    oldest first, for risk_service.risk_score_history -- the HTTP surface
+    proving a score history row exists per change, not only the latest
+    value, over the real HTTP surface rather than only at the service layer."""
+    Risk.query.get_or_404(risk_id)
+    score_kind = request.args.get("score_kind")
+    rows = risk_service.risk_score_history(risk_id, score_kind)
+    return jsonify([r.to_dict() for r in rows]), 200
 
 
 @risk_bp.route("/api/programmes/search", methods=["GET"])
@@ -343,6 +386,13 @@ def serialize_risk_row(risk):
         "owner": risk.owner or "—",
         "likelihood": risk.likelihood,
         "impact": risk.impact,
+        # Additive, so a caller can read a risk back and see both scores: no
+        # existing key removed or renamed, so no current reader of this shape
+        # (the H2 slide-over) is affected by their presence.
+        "inherent_likelihood": risk.inherent_likelihood,
+        "inherent_impact": risk.inherent_impact,
+        "residual_likelihood": risk.residual_likelihood,
+        "residual_impact": risk.residual_impact,
         "risk_score": risk.risk_score,
         "risk_level": risk.risk_level,
         "status": risk.status.value,

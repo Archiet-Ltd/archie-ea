@@ -325,10 +325,21 @@ CONCEPTS = {
                 scope="primary owner"),
     ],
     "architecture decisions": [
+        # ArchitectureDecisionRecord dropped as a peer surface (decision
+        # register consolidation): every ArchitectureDecisionRecord row is
+        # now dual-write paired into ArchitectureDecision via
+        # pair_with_canonical_register() (app/models/adr.py), so it is a
+        # satellite detail-store for review-board fields ArchitectureDecision
+        # has no columns for, not an independent answer to "how many
+        # architecture decisions". GET /arb/api/decisions already reads
+        # ArchitectureDecision (app/modules/architecture/routes/
+        # arb_decision_routes.py:161), so both remaining surfaces agree by
+        # construction. Edited by the decision-register consolidation brief
+        # directly, not requested from this file's owner first -- flagged in
+        # the PR for their awareness; this narrows one concept's surface list
+        # to a direct, unavoidable consequence of that brief's own change.
         Surface("orm:ArchitectureDecision", "orm",
                 "app.models.architecture_decision.ArchitectureDecision"),
-        Surface("orm:ArchitectureDecisionRecord", "orm",
-                "app.models.adr.ArchitectureDecisionRecord"),
         Surface("GET /arb/api/decisions", "http",
                 "/arb/api/decisions?per_page=1", extract="total"),
     ],

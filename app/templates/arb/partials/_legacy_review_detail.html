@@ -198,6 +198,12 @@
                     {{ review.decision_date.strftime('%d %b %Y') if review.decision_date else '—' }}
                 </dd>
             </div>
+            <div>
+                <dt class="text-xs font-semibold text-foreground/80 uppercase tracking-wide">Review date</dt>
+                <dd class="mt-1 text-sm text-foreground" data-testid="decision-review-date">
+                    {{ review.follow_up_date.strftime('%d %b %Y') if review.follow_up_date else '—' }}
+                </dd>
+            </div>
         </dl>
         <div class="px-4 pb-4">
             <h4 class="text-xs font-semibold text-foreground/80 uppercase tracking-wide mb-1">Rationale</h4>

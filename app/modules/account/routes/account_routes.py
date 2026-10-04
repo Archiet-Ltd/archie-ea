@@ -187,6 +187,17 @@ def manage():
     )
 
 
+@account_bp.route("/switch-organization", methods=["POST"])
+@login_required
+def switch_organization():
+    """Switch the signed-in user's active organisation."""
+    success, message = _svc.switch_active_organization(
+        current_user, request.form.get("organization_id", type=int)
+    )
+    flash(message, "success" if success else "error")
+    return redirect(url_for("account.manage"))
+
+
 @account_bp.route("/session/keepalive", methods=["GET"])
 @login_required
 def session_keepalive():

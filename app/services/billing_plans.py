@@ -251,19 +251,30 @@ def _count_members(connection, org_id: int, counts: str) -> int:
 
     Runs on a Core connection so it gives the same answer inside a flush.
     """
-    from sqlalchemy import func, select
+    from sqlalchemy import and_, distinct, func, or_, select
 
     from app.models.org_role import OrgRole
     from app.models.user import User
 
     users = User.__table__
-    stmt = select(func.count()).select_from(users).where(users.c.organization_id == org_id)
+    roles = OrgRole.__table__
+    membership = (
+        select(distinct(users.c.id).label("user_id"))
+        .select_from(
+            users.outerjoin(
+                roles,
+                and_(roles.c.user_id == users.c.id, roles.c.organization_id == org_id),
+            )
+        )
+        .where(or_(users.c.organization_id == org_id, roles.c.organization_id == org_id))
+    ).subquery()
+
+    stmt = select(func.count()).select_from(membership)
     if counts == "editors":
-        roles = OrgRole.__table__
         readers = select(roles.c.user_id).where(
             roles.c.organization_id == org_id, roles.c.role == "viewer"
         )
-        stmt = stmt.where(users.c.id.not_in(readers))
+        stmt = stmt.where(membership.c.user_id.not_in(readers))
     return connection.execute(stmt).scalar_one()
 
 

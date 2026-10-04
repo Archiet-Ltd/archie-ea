@@ -228,6 +228,20 @@ class Capability(TenantMixin, db.Model):
     created_at = db.Column(db.DateTime, default=utcnow)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
+    # Set once by `flask backfill-capability-catalogs` when this row's
+    # capability has a canonical `unified_capabilities` row (ADR 0008): either
+    # a fresh projection of this row, or an existing row this one turned out
+    # to duplicate. NULL means "not yet processed", which is also what makes
+    # the backfill idempotent (it only ever selects WHERE retired_into_id IS
+    # NULL) and what the platform-admin merge report reads to show which
+    # duplicate records were merged into which survivor.
+    retired_into_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("unified_capabilities.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     parent_capability = db.relationship(
         "Capability", remote_side=[id], backref="children"
     )

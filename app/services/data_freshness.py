@@ -48,6 +48,8 @@ def _summary(scored: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def build_data_freshness() -> Dict[str, Any]:
     """Portfolio-wide completeness roll-up across applications and capabilities."""
+    from app import db  # noqa: PLC0415
+    from app.models.application_owner import ApplicationOwner  # noqa: PLC0415
     from app.models.application_portfolio import ApplicationComponent  # noqa: PLC0415
     from app.models.business_capabilities import BusinessCapability  # noqa: PLC0415
     from app.services.application_fact_sheet import (  # noqa: PLC0415
@@ -60,7 +62,27 @@ def build_data_freshness() -> Dict[str, Any]:
     apps = ApplicationComponent.query.limit(_SCAN_LIMIT).all()
     caps = BusinessCapability.query.limit(_SCAN_LIMIT).all()
 
-    app_scored = _score_set(apps, app_completeness, "application")
+    app_ids = [app.id for app in apps]
+    org_ids = sorted({app.organization_id for app in apps if getattr(app, "organization_id", None) is not None})
+    owner_counts = {}
+    if app_ids and org_ids:
+        owner_counts = {
+            app_id: count
+            for app_id, count in db.session.query(
+                ApplicationOwner.application_id,
+                db.func.count(ApplicationOwner.id),
+            )
+            .filter(ApplicationOwner.application_id.in_(app_ids))
+            .filter(ApplicationOwner.organization_id.in_(org_ids))
+            .group_by(ApplicationOwner.application_id)
+            .all()
+        }
+
+    app_scored = _score_set(
+        apps,
+        lambda app: app_completeness(app, owner_count=owner_counts.get(app.id, 0)),
+        "application",
+    )
     cap_scored = _score_set(caps, cap_completeness, "capability")
     everything = app_scored + cap_scored
 

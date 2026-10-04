@@ -30,6 +30,21 @@ class _Graph:
         self.__dict__.update(values)
 
 
+def _letters_only_token(length=10):
+    """Return an uppercase token that never contains decimal digits.
+
+    The cross-tenant successor isolation test proves a foreign review item id
+    never appears anywhere in the visible identity payload.  A random decimal id
+    can appear as a substring inside an unrelated UUID-derived review number,
+    which turns that assertion into an intermittent false positive.  Mapping a
+    UUID nibble to ``A``-``P`` keeps the token collision-free for that check
+    without weakening the leak assertion itself.
+    """
+
+    alphabet = "ABCDEFGHIJKLMNOP"
+    return "".join(alphabet[int(ch, 16)] for ch in uuid.uuid4().hex[:length])
+
+
 def _user(db_session, org, label, *, role="enterprise_architect", admin=False):
     from app.models.user import User
 
@@ -63,6 +78,7 @@ def _build_adr_cycle(
     from app.models.transformation_decision import ARBSubjectEvidenceSnapshot
 
     suffix = uuid.uuid4().hex[:10]
+    review_number_token = _letters_only_token()
     _sql(db_session, "SET LOCAL session_replication_role = replica")
     existing_adr = adr
     adr = existing_adr or ArchitectureDecision(
@@ -113,7 +129,7 @@ def _build_adr_cycle(
         subject_id=adr.id,
         adr_id=adr.id,
         subject_evidence_snapshot_id=None if historical else snapshot.id,
-        review_number=f"REV-{suffix}",
+        review_number=f"REV-{review_number_token}",
         cycle_number=cycle_number,
         predecessor_cycle_id=predecessor_cycle_id,
         status="historical_unverified" if historical else status,

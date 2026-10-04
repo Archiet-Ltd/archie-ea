@@ -655,7 +655,10 @@ def check_deliverable(deliverable_id):
     data = request.get_json() or {}
     checked = bool(data.get("checked", False))
     board_id = data.get("board_id") or None
-    check = toggle_deliverable(deliverable_id, board_id, checked)
+    try:
+        check = toggle_deliverable(deliverable_id, board_id, checked)
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 404
     return jsonify({"success": True, "check": check})
 
 

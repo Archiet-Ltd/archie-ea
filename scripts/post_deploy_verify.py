@@ -50,7 +50,7 @@ import sys
 import urllib.error
 import urllib.request
 
-DEFAULT_BASE = "https://165-22-125-156.sslip.io"
+DEFAULT_BASE = "https://entelim.org"
 DEFAULT_DROPLET = "root@134.122.105.56"
 DEFAULT_APP_DIR = "/root/archie-ea"
 
@@ -87,7 +87,7 @@ def _fetch(url: str, timeout: int = 30):
     """Return (status, body). Never raises for an HTTP error status."""
     context = ssl.create_default_context()
     context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE  # sslip.io front uses a self-signed cert
+    context.verify_mode = ssl.CERT_NONE  # tolerate whatever front-end cert is in place
     request = urllib.request.Request(url, headers={"User-Agent": "archie-post-deploy"})
     try:
         with urllib.request.urlopen(request, timeout=timeout, context=context) as response:

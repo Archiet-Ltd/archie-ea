@@ -19,7 +19,7 @@ Routes:
 import logging
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
-from flask_login import current_user, login_required
+from flask_login import login_required
 
 from app.extensions import csrf
 from app.decorators import admin_required
@@ -30,7 +30,9 @@ billing_bp = Blueprint("billing", __name__)
 
 
 def _org():
-    return getattr(current_user, "organization", None)
+    from app.middleware.tenant_context import current_org
+
+    return current_org()
 
 
 def _seats(raw):

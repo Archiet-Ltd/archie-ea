@@ -296,7 +296,7 @@ def init_security(app):
         return response
 
     # Wire MetricsCollector to request pipeline for automatic tracking, and
-    # (TB-0165) the same request into the Prometheus HTTP counters that
+    # the same request into the Prometheus HTTP counters that
     # app/services/platform_slo_service.py reads -- one collector recording
     # every request, not two (CLAUDE.md ADR 0008).
     try:

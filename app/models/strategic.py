@@ -197,7 +197,7 @@ class StrategicInitiative(TenantMixin, db.Model):
         return result
 
 
-class StrategicMilestone(db.Model):
+class StrategicMilestone(TenantMixin, db.Model):
     """
     Milestone model for tracking initiative milestones.
 
@@ -472,7 +472,7 @@ class RoadmapItem(TenantMixin, db.Model):
         return result
 
 
-class CapabilityHealthOverride(db.Model):
+class CapabilityHealthOverride(TenantMixin, db.Model):
     """
     Manual override for calculated capability health scores.
     
@@ -536,7 +536,7 @@ class CapabilityHealthOverride(db.Model):
         }
 
 
-class StrategicRecommendation(db.Model):
+class StrategicRecommendation(TenantMixin, db.Model):
     """
     LLM-generated strategic recommendation with user feedback tracking.
     
@@ -632,7 +632,7 @@ class StrategicRecommendation(db.Model):
         }
 
 
-class ProgrammeSnapshot(db.Model):
+class ProgrammeSnapshot(TenantMixin, db.Model):
     """Point-in-time governance snapshot of a Transformation Programme (PROG-005).
 
     Written on landscape imports, manual capture, or scheduled runs. The
@@ -698,7 +698,7 @@ class ProgrammeSnapshot(db.Model):
         }
 
 
-class EnterpriseBriefing(db.Model):
+class EnterpriseBriefing(TenantMixin, db.Model):
     """A periodic Enterprise-Architecture briefing (AI-2).
 
     The EA Briefing Agent computes the week's notable findings from live
@@ -747,7 +747,7 @@ class EnterpriseBriefing(db.Model):
         }
 
 
-class SolutionMigrationRoadmap(db.Model):
+class SolutionMigrationRoadmap(TenantMixin, db.Model):
     """An AI-generated TOGAF Phase F migration roadmap for a solution (PROG-020).
 
     Stored solution-scoped (not as enterprise Plateau rows) so the roadmap stays

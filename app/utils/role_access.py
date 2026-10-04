@@ -165,6 +165,18 @@ EXCLUSIVE_SECTIONS: Dict[str, List[str]] = {
 DEFAULT_ROLE = ROLE_SOLUTION_ARCHITECT
 
 
+# One cost-visibility rule.  Every surface that redacts financial
+# figures (cost, budget, TCO, licence unit cost) checks this single set.
+# Previously each surface maintained its own copy of the same three roles;
+# a fourth surface that forgot to update its copy would leak cost data.
+# Import this constant — do not define a second list.
+COST_VISIBILITY_ROLES: frozenset = frozenset({
+    ROLE_CTO,
+    ROLE_PORTFOLIO_MANAGER,
+    ROLE_PLATFORM_ADMIN,
+})
+
+
 def get_user_role(user) -> str:
     """Get user's enterprise role with fallback to default.
 
@@ -222,8 +234,17 @@ def get_visible_sections(user) -> List[str]:
 
 
 def is_admin(user) -> bool:
-    """Check if user has admin role."""
-    return get_user_role(user) == ROLE_PLATFORM_ADMIN
+    """Check if user has admin role.
+
+    The system of record for "is an administrator" is
+    Permission.ADMINISTER via user.is_admin().  This function delegates to it
+    rather than re-deriving the answer from enterprise_role, so every caller
+    that uses this accessor shares one authority.
+    """
+    try:
+        return bool(user.is_admin())
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        return False
 
 
 # Roles whose job is to author the capability model. The capability pages used
@@ -393,6 +414,8 @@ def _link(label, endpoint, icon, requires=None, query_params=None):
       "admin"          — route is @admin_required (Permission.ADMINISTER)
       "platform_admin" — route is @platform_admin_required (the cross-tenant
                          is_platform_admin super-admin flag)
+      "data_subject_requests" — routes are @requires_role(DATA_SUBJECT_REQUEST_ROLES)
+                         (security_architect, and platform_admin as always)
       "general"        — route requires Permission.GENERAL (require_roles()
                          only grants access when current_user.can(GENERAL)
                          holds), which a read-only Viewer role (permissions=0)
@@ -621,6 +644,8 @@ _MY_WORK_LINKS = {
         # its sidebar. 28 nav links on the CTO dashboard, none of them this.
         # Finding a page by grepping the source is not finding it.
         _link("Tech Radar", "tech_radar.index", "radar"),
+        # Ownership coverage by business unit — CTO accountability.
+        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users"),
     ],
     ROLE_BUSINESS_ARCHITECT: [
         # BA-A1/A2. This persona had 4 links against a budget of 27 while
@@ -652,6 +677,11 @@ _MY_WORK_LINKS = {
         # finding nothing is precisely why maturity was reported as missing.
         _link("Capability Maturity", "maturity_management.maturity_heatmap", "thermometer"),
         _link("Value Streams", "value_stream.index", "waypoints"),
+        # The value streams that depend on a capability below a maturity
+        # threshold, answered by the intelligence API. Sits under Value
+        # Streams, the page where the capability links it reads are made.
+        # 28 -> 29 rendered links, within SIDEBAR_LINK_BUDGET (31).
+        _link("Value Streams at Risk", "intelligence_ui.value_streams_at_risk", "trending-down"),
         _link("Stakeholder Map", "stakeholder_map.stakeholder_map_page", "users"),
         _link("Gap Analysis", "enterprise.gap_analysis", "search-x"),
         _link("Roadmaps", "main.capability_roadmap", "milestone"),
@@ -707,6 +737,8 @@ _MY_WORK_LINKS = {
         # zone has ample headroom, and portfolio_manager already owns
         # Rationalization above, from which this page is reached in context.
         _link("Duplicate Detection", "unified_duplicate.simple_dashboard", "copy"),
+        # Ownership coverage by business unit — portfolio manager accountability.
+        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users"),
     ],
     ROLE_PROCUREMENT: [
         # Fix round: Overview, Licences and Compliance were reachable from
@@ -786,6 +818,10 @@ _MY_WORK_LINKS = {
         # this degrades safely if application_mgmt fails to import.
         _link("Compliance", "application_mgmt.compliance_frameworks_dashboard",
               "clipboard-check"),
+        # The Data Protection Officer's work: scope data-subject requests,
+        # assign the searches, and run access and erasure with evidence.
+        _link("Data Subject Requests", "gdpr_bp.dsr_index", "user-x",
+              requires="data_subject_requests"),
         _link("Applications", "unified_applications.application_list", "list"),
         _link("Data Architecture", "data_architecture.data_architecture_dashboard", "database"),
         _link("Traceability Matrix", "architect_ui.traceability_matrix", "git-compare"),
@@ -801,6 +837,8 @@ _MY_WORK_LINKS = {
         _link("Data Architecture", "data_architecture.data_architecture_dashboard", "database"),
         _link("Data Lineage", "data_architecture.data_lineage_view", "git-fork"),
         _link("Data Stewardship", "solution_design.data_stewardship", "shield"),
+        _link("System of Record", "data_governance.entities", "database-zap"),
+        _link("Master Data Domains", "data_governance.domains", "folder-tree"),
         _link("Architecture Model", "archimate_crud.dashboard", "boxes"),
         _link("Applications", "unified_applications.application_list", "list"),
         _link("Capability Map", "capability_map.index", "layers"),
@@ -821,11 +859,19 @@ def _build_zones(role: str) -> List[Dict]:
     # platform_admin has no headroom left for a 5th library link once its two
     # admin-zone additions are counted (23 zone links -> 25 rendered, exactly
     # at SIDEBAR_LINK_BUDGET) — see _LIBRARY_LINKS_WITH_DIRECTORY's comment.
+    # Value Streams at Risk is a business_architect-only My-work link. To keep
+    # the rendered sidebar within the existing ratchet (28) rather than raising
+    # verification_baseline.json, that persona's Home zone keeps Dashboard
+    # Overview and drops Health Scorecard, which remains reachable from the
+    # dashboard itself and from the personas that actively work from it.
+    home_links = (
+        _HOME_LINKS[:1] if role == ROLE_BUSINESS_ARCHITECT else _HOME_LINKS
+    )
     library_links = (
         _LIBRARY_LINKS if role == ROLE_PLATFORM_ADMIN else _LIBRARY_LINKS_WITH_DIRECTORY
     )
     zones = [
-        _zone("home", _HOME_LINKS),
+        _zone("home", home_links),
         _zone("my_work", [_ASK_LINK] + _MY_WORK_LINKS[role]),
         _zone("library", library_links),
     ]
@@ -904,6 +950,13 @@ def link_requires_satisfied(user, requires):
         return bool(getattr(user, "is_org_admin", False))
     if requires == "platform_admin":
         return bool(getattr(user, "is_platform_admin", False))
+    if requires == "data_subject_requests":
+        try:
+            from app.decorators.requires_role import may_handle_data_subject_requests
+
+            return may_handle_data_subject_requests(user)
+        except Exception:  # anonymous / unexpected user object
+            return False
     if requires == "general":
         try:
             from app.models.user import Permission

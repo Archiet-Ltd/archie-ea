@@ -75,7 +75,7 @@ def _schema(app):
     """Ensure tables exist once per session.
 
     ``create_all()`` only creates *missing* tables, so this is safe against a
-    shared database that already has a schema. It does not add missing columns —
+    shared database that already has a schema.  It does not add missing columns —
     see the schema-drift gate in scripts/verify.py for that.
 
     It also seeds the standard roles, as a deployed database has them. A user
@@ -92,7 +92,6 @@ def _schema(app):
         Role.insert_roles()
         db.session.remove()
     return True
-
 
 @pytest.fixture
 def db_session(app, _schema):

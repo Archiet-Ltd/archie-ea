@@ -38,6 +38,7 @@ _INFRA_RULES = {
     "/favicon.ico",
     "/robots.txt",
     "/sitemap.xml",
+    "/llms.txt",  # crawler/agent meta file, same category as robots.txt
     "/apidocs/",
     "/apispec.json",
     "/oauth2-redirect.html",
@@ -46,6 +47,14 @@ _INFRA_RULES = {
     "/login",
     "/settings",  # account settings, not a module — already reachable via user menu
     "/modules/",  # the directory page itself
+    # Public, unauthenticated marketing pages (app/main/views.py) — not a
+    # module a signed-in persona would look for in the app's own navigation.
+    # /pricing, /about etc. share one route with a slug argument and never
+    # reach this list in the first place; these two are each their own
+    # zero-argument route only because they are the one fixed page in their
+    # family, not because they need an in-app nav entry.
+    "/vision",
+    "/how-archiet-runs-on-entelim",
 }
 
 _SINGLE_SEGMENT = re.compile(r"^/[^/]+/?$")

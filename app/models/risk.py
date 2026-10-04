@@ -22,6 +22,19 @@ class Risk(TenantMixin, db.Model):
     description = db.Column(db.Text, nullable=True)
     likelihood = db.Column(db.Integer, nullable=False)  # 1-5
     impact = db.Column(db.Integer, nullable=False)       # 1-5
+    # Inherent (before mitigation) and residual (after mitigation) scores,
+    # each 1-5, nullable: a risk created before this consolidation, or one
+    # nobody has scored either way yet, has neither. Kept separate from the
+    # legacy likelihood/impact pair above rather than repurposing it, so
+    # every existing reader of likelihood/impact (the heat map, the register
+    # table, risk_detail_modal.html) keeps working unchanged. Each write goes
+    # through risk_service.set_risk_score, which also appends a
+    # RiskScoreHistory row (app/models/risk_score_history.py) — the score is
+    # stored, not only displayed.
+    inherent_likelihood = db.Column(db.Integer, nullable=True)
+    inherent_impact = db.Column(db.Integer, nullable=True)
+    residual_likelihood = db.Column(db.Integer, nullable=True)
+    residual_impact = db.Column(db.Integer, nullable=True)
     status = db.Column(db.Enum(RiskStatus), default=RiskStatus.OPEN, nullable=False)
     owner = db.Column(db.String(128), nullable=True)
     mitigation_plan = db.Column(db.Text, nullable=True)
@@ -61,6 +74,10 @@ class Risk(TenantMixin, db.Model):
             "description": self.description,
             "likelihood": self.likelihood,
             "impact": self.impact,
+            "inherent_likelihood": self.inherent_likelihood,
+            "inherent_impact": self.inherent_impact,
+            "residual_likelihood": self.residual_likelihood,
+            "residual_impact": self.residual_impact,
             "status": self.status.value,
             "owner": self.owner,
             "mitigation_plan": self.mitigation_plan,

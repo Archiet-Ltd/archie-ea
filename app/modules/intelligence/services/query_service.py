@@ -66,6 +66,12 @@ CAPACITY_NOT_AVAILABLE_REASON = validate_reason_code("capacity_not_available")
 # Distinct from a "decision pending" state -- the ownership data source IS
 # decided; what doesn't exist yet is a shared, tenant-safe reader for it.
 OWNERSHIP_READER_NOT_BUILT_REASON = validate_reason_code("ownership_reader_not_built")
+NO_DATA_RECORDED_REASON = validate_reason_code("no_data_recorded")
+NO_STEWARD_RECORDED_REASON = validate_reason_code("no_steward_recorded")
+NO_LINEAGE_RECORDED_REASON = validate_reason_code("no_lineage_recorded")
+NO_COMPLIANCE_CONTROLS_RECORDED_REASON = validate_reason_code("no_compliance_controls_recorded")
+NO_CONTROL_EVIDENCE_REASON = validate_reason_code("no_control_evidence")
+NO_POLICY_SCAN_RECORDED_REASON = validate_reason_code("no_policy_scan_recorded")
 # The programme lens's own plateau/gap block: a work package's stored
 # plateau_id/gap_id may be unset (a nullable FK) or point at a record
 # outside the caller's tenant (the FK itself carries no tenant check, so the
@@ -1827,6 +1833,329 @@ class IntelligenceQueryService:
             "source": "enterprise_raci_assignments",
         }
         return answer
+
+    # ------------------------------------------------------------------ #
+    # L7: the Data lens.
+    # ------------------------------------------------------------------ #
+
+    _DATA_OBJECT_LIMIT = 200
+
+    @staticmethod
+    def _data_tenant_predicate(model, organization_id: int):
+        """The explicit ``organization_id ==`` predicate on every read of the Data lens,
+        isolated as its own seam so a mutation test can replace it and watch the
+        cross-tenant tests go red. ``DataObject``, ``DataLineage`` and
+        ``ArchiMateElement`` all carry ``TenantMixin``, so this is defence in depth in a
+        request and what keeps a caller correct with no ambient request context."""
+        return model.organization_id == organization_id
+
+    @staticmethod
+    def _lineage_other_end_visible(other_ids, organization_id: int) -> Dict[int, str]:
+        """id -> name for the lineage endpoints that are elements of THIS organisation.
+
+        The ORM filter fences the lineage row, not the element ids it names: a row can
+        point at another organisation's element. An endpoint missing from the result is
+        dropped by the caller and never named. Isolated as its own seam for the mutation
+        proof, like the ownership seams."""
+        from app.models import ArchiMateElement
+
+        ids = {i for i in other_ids if i is not None}
+        if not ids:
+            return {}
+        rows = db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.name)
+            .where(ArchiMateElement.id.in_(ids))
+            .where(IntelligenceQueryService._data_tenant_predicate(ArchiMateElement, organization_id))
+        ).all()
+        return {row[0]: row[1] for row in rows}
+
+    @staticmethod
+    def data_for_element(element_id: int) -> Dict[str, Any]:
+        """L7, "what data does this hold or produce, who stewards it, and where does it
+        flow?": the ``DataObject`` rows linked to the element (directly, or through its
+        application component) and the lineage edges in and out of it.
+
+        Absence is stated, never filled: no data object is ``no_data_recorded``; objects
+        with neither a steward nor an owner recorded add ``no_steward_recorded``; no
+        lineage edge adds ``no_lineage_recorded``. A missing figure stays ``None``.
+
+        Steward and owner are FREE TEXT on the model, not users: they are returned as
+        recorded, flagged ``recorded_as_text``, and never joined to ``User``. Sensitive or
+        operational detail nobody asked for (``pii_fields``, ``storage_location``, schema
+        and table names, access roles) is not returned. A lineage edge whose other end is
+        not an element of this organisation is dropped, not named.
+        """
+        from datetime import datetime, timezone
+
+        from app.models import ArchiMateElement
+        from app.models.all_missing_models import DataLineage
+        from app.models.application_layer import DataObject
+        from app.models.application_portfolio import ApplicationComponent
+
+        predicate = IntelligenceQueryService._data_tenant_predicate
+        as_of = datetime.now(timezone.utc).isoformat()
+        empty = {"data_objects": [], "flows": [], "as_of": as_of}
+
+        org_id = current_org_id()
+        if org_id is None:
+            return {**empty, "reasons": [NO_TENANT_CONTEXT_REASON]}
+
+        element = db.session.execute(
+            db.select(ArchiMateElement)
+            .where(ArchiMateElement.id == element_id)
+            .where(predicate(ArchiMateElement, org_id))
+        ).scalar_one_or_none()
+        if element is None:
+            return {**empty, "reasons": [ELEMENT_NOT_FOUND_REASON]}
+
+        component_ids = list(db.session.execute(
+            db.select(ApplicationComponent.id)
+            .where(ApplicationComponent.archimate_element_id == element_id)
+            .where(predicate(ApplicationComponent, org_id))
+        ).scalars())
+        if getattr(element, "application_component_id", None):
+            component_ids.append(element.application_component_id)
+
+        object_filter = DataObject.archimate_element_id == element_id
+        if component_ids:
+            object_filter = db.or_(object_filter, DataObject.application_component_id.in_(component_ids))
+        objects = db.session.execute(
+            db.select(DataObject)
+            .where(object_filter)
+            .where(predicate(DataObject, org_id))
+            .order_by(DataObject.name, DataObject.id)
+            .limit(IntelligenceQueryService._DATA_OBJECT_LIMIT)
+        ).scalars().all()
+
+        data_objects = []
+        for obj in objects:
+            steward = (obj.data_steward or "").strip() or None
+            owner = (obj.data_owner or "").strip() or None
+            data_objects.append({
+                "id": obj.id,
+                "name": obj.name,
+                "data_type": obj.data_type,
+                "data_classification": obj.data_classification,
+                "is_master_data": bool(obj.is_master_data),
+                "contains_pii": bool(obj.contains_pii),
+                "gdpr_scope": bool(obj.gdpr_scope),
+                "retention_period_days": obj.retention_period_days,
+                "steward": steward,
+                "owner": owner,
+                "recorded_as_text": True,
+            })
+
+        edges = db.session.execute(
+            db.select(DataLineage)
+            .where(db.or_(
+                DataLineage.archimate_element_id == element_id,
+                DataLineage.target_archimate_element_id == element_id,
+            ))
+            .where(predicate(DataLineage, org_id))
+            .order_by(DataLineage.id)
+        ).scalars().all()
+        others = {
+            (e.target_archimate_element_id if e.archimate_element_id == element_id else e.archimate_element_id)
+            for e in edges
+        }
+        visible = IntelligenceQueryService._lineage_other_end_visible(others, org_id)
+
+        # Build elements map for all referenced elements (center + flow endpoints)
+        elements = {}
+        # Add center element
+        elements[str(element_id)] = {
+            "id": element.id,
+            "name": element.name,
+            "type": element.type,
+            "layer": element.layer,
+        }
+        # Add other elements from flows
+        for other_id, other_name in visible.items():
+            other_element = db.session.execute(
+                db.select(ArchiMateElement)
+                .where(ArchiMateElement.id == other_id)
+                .where(predicate(ArchiMateElement, org_id))
+            ).scalar_one_or_none()
+            if other_element:
+                elements[str(other_id)] = {
+                    "id": other_element.id,
+                    "name": other_element.name,
+                    "type": other_element.type,
+                    "layer": other_element.layer,
+                }
+
+        flows = []
+        for edge in edges:
+            outgoing = edge.archimate_element_id == element_id
+            other_id = edge.target_archimate_element_id if outgoing else edge.archimate_element_id
+            if other_id not in visible:
+                continue
+            flows.append({
+                "direction": "out" if outgoing else "in",
+                "other_element_id": other_id,
+                "other_element_name": visible[other_id],
+                "lineage_type": edge.lineage_type,
+                "frequency": edge.frequency,
+            })
+
+        reasons = []
+        if not data_objects:
+            reasons.append(NO_DATA_RECORDED_REASON)
+        elif all(o["steward"] is None and o["owner"] is None for o in data_objects):
+            reasons.append(NO_STEWARD_RECORDED_REASON)
+        if not flows:
+            reasons.append(NO_LINEAGE_RECORDED_REASON)
+        return {"data_objects": data_objects, "flows": flows, "elements": elements, "as_of": as_of, "reasons": reasons}
+
+    # ------------------------------------------------------------------ #
+    # Compliance (under L6): the controls an application is mapped to.
+    # ------------------------------------------------------------------ #
+
+    _COMPLIANCE_LIMIT = 200
+    # A control in one of these states is reported as recorded; it is not flagged as missing evidence.
+    _EVIDENCE_NOT_REQUIRED = frozenset({"not_applicable", "waived"})
+
+    @staticmethod
+    def _compliance_tenant_predicate(model, organization_id: int):
+        """The explicit ``organization_id ==`` predicate on every tenant read of the Compliance
+        question, isolated as its own seam for the mutation proof. ``ApplicationComponent``,
+        ``ApplicationComplianceControl``, ``PolicyViolation`` and ``ComplianceStatus`` all
+        carry ``TenantMixin``; this is defence in depth in a request and what keeps a caller
+        correct with no ambient request context. The global ``ComplianceControl`` and
+        ``RegulatoryFramework`` rows have no tenant column and are never read with it."""
+        return model.organization_id == organization_id
+
+    @staticmethod
+    def compliance_for_element(element_id: int) -> Dict[str, Any]:
+        """"Which regulations and controls apply to this, and which controls have no evidence
+        of being met?": the controls the element's application is mapped to
+        (``ApplicationComplianceControl``, the tenant bridge), their global control and
+        framework names reached ONLY by the ids on those rows, the open policy violations
+        against the application, and when it was last scanned.
+
+        Nothing is inferred and no stored aggregate is shown: ``ComplianceStatus`` percentages
+        and counts default to zero on a row that was never scanned, so only its last-scan time
+        is returned. No mapped control is ``no_compliance_controls_recorded``, never "0%
+        compliant". A control with neither ``evidence_url`` nor ``verified_date`` (and not
+        ``not_applicable``/``waived``) adds ``no_control_evidence``. The evidence URL and the
+        verifier are user-authored or personal and are not returned; only whether an URL is
+        recorded is.
+        """
+        from datetime import datetime, timezone
+
+        from app.models import ArchiMateElement
+        from app.models.application_compliance import ApplicationComplianceControl
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+        from app.models.policy_monitoring import ArchitecturePolicy, ComplianceStatus, PolicyViolation
+
+        predicate = IntelligenceQueryService._compliance_tenant_predicate
+        as_of = datetime.now(timezone.utc).isoformat()
+        empty = {"controls": [], "open_violations": [], "last_scan_at": None, "as_of": as_of}
+
+        org_id = current_org_id()
+        if org_id is None:
+            return {**empty, "reasons": [NO_TENANT_CONTEXT_REASON]}
+
+        element = db.session.execute(
+            db.select(ArchiMateElement)
+            .where(ArchiMateElement.id == element_id)
+            .where(predicate(ArchiMateElement, org_id))
+        ).scalar_one_or_none()
+        if element is None:
+            return {**empty, "reasons": [ELEMENT_NOT_FOUND_REASON]}
+
+        component_id = None
+        if getattr(element, "application_component_id", None):
+            component_id = db.session.execute(
+                db.select(ApplicationComponent.id)
+                .where(ApplicationComponent.id == element.application_component_id)
+                .where(predicate(ApplicationComponent, org_id))
+            ).scalar_one_or_none()
+        if component_id is None:
+            component_id = db.session.execute(
+                db.select(ApplicationComponent.id)
+                .where(ApplicationComponent.archimate_element_id == element_id)
+                .where(predicate(ApplicationComponent, org_id))
+            ).scalars().first()
+        if component_id is None:
+            return {**empty, "reasons": [NO_APPLICATION_COMPONENT_REASON]}
+
+        rows = db.session.execute(
+            db.select(ApplicationComplianceControl, ComplianceControl, RegulatoryFramework)
+            .outerjoin(ComplianceControl, ComplianceControl.id == ApplicationComplianceControl.control_id)
+            .outerjoin(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
+            .where(ApplicationComplianceControl.application_id == component_id)
+            .where(predicate(ApplicationComplianceControl, org_id))
+            .order_by(RegulatoryFramework.code, ComplianceControl.control_code, ApplicationComplianceControl.id)
+            .limit(IntelligenceQueryService._COMPLIANCE_LIMIT)
+        ).all()
+
+        controls = []
+        any_missing_evidence = False
+        for mapping, control, framework in rows:
+            status = mapping.implementation_status
+            has_url = bool((mapping.evidence_url or "").strip())
+            verified = mapping.verified_date is not None
+            missing = (
+                not has_url and not verified
+                and status not in IntelligenceQueryService._EVIDENCE_NOT_REQUIRED
+            )
+            any_missing_evidence = any_missing_evidence or missing
+            controls.append({
+                "control_id": mapping.control_id,
+                "code": control.control_code if control else None,
+                "name": control.title if control else "Unknown control",
+                "framework_code": framework.code if framework else None,
+                "framework_name": framework.name if framework else None,
+                "implementation_status": status,
+                "evidence_url_recorded": has_url,
+                "verified": verified,
+                "verified_date": mapping.verified_date.isoformat() if mapping.verified_date else None,
+                "no_evidence": missing,
+            })
+
+        violations = db.session.execute(
+            db.select(PolicyViolation, ArchitecturePolicy.name)
+            .outerjoin(ArchitecturePolicy, ArchitecturePolicy.id == PolicyViolation.policy_id)
+            .where(PolicyViolation.entity_type == "application")
+            .where(PolicyViolation.entity_id == component_id)
+            .where(PolicyViolation.status == "open")
+            .where(predicate(PolicyViolation, org_id))
+            .order_by(PolicyViolation.detected_at.desc(), PolicyViolation.id)
+            .limit(IntelligenceQueryService._COMPLIANCE_LIMIT)
+        ).all()
+        open_violations = [
+            {
+                "policy_name": name,
+                "severity": violation.severity,
+                "status": violation.status,
+                "detected_at": violation.detected_at.isoformat() if violation.detected_at else None,
+            }
+            for violation, name in violations
+        ]
+
+        last_scan = db.session.execute(
+            db.select(db.func.max(ComplianceStatus.last_scan_at))
+            .where(ComplianceStatus.entity_type == "application")
+            .where(ComplianceStatus.entity_id == component_id)
+            .where(predicate(ComplianceStatus, org_id))
+        ).scalar_one_or_none()
+
+        reasons = []
+        if not controls:
+            reasons.append(NO_COMPLIANCE_CONTROLS_RECORDED_REASON)
+        elif any_missing_evidence:
+            reasons.append(NO_CONTROL_EVIDENCE_REASON)
+        if last_scan is None:
+            reasons.append(NO_POLICY_SCAN_RECORDED_REASON)
+        return {
+            "controls": controls,
+            "open_violations": open_violations,
+            "last_scan_at": last_scan.isoformat() if last_scan else None,
+            "as_of": as_of,
+            "reasons": reasons,
+        }
 
     # ------------------------------------------------------------------ #
     # T-S1: value streams at risk -- the curated path (DA-S1). Helpers are

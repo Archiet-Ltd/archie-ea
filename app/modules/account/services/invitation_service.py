@@ -313,6 +313,12 @@ def accept_new(raw_token, password):
         offered["organization_id"], user.id, offered["role"] or "viewer",
         granted_by_id=offered["invited_by"],
     )
+    # The account this invitation opened lives in the invited organisation
+    # (checked above against ``offered["organization_id"]``), so granting the
+    # canonical Administrator role here is always a grant in the user's own
+    # organisation — never a foreign one.
+    if offered["role"] == "org_admin":
+        user.grant_org_admin()
     db.session.commit()
     _log.info("invitation taken up into organisation %s", offered["organization_id"])
     return user
@@ -336,5 +342,20 @@ def answer_existing(raw_token, user, accept):
             offered["organization_id"], user.id, offered["role"] or "viewer",
             granted_by_id=offered["invited_by"],
         )
+        # This invitee already has an account, so the invited organisation
+        # can be a DIFFERENT one from their own (``user.organization_id`` is
+        # untouched here).  The Administrator role is global to the user, not
+        # scoped to one organisation, so it must only be granted or revoked
+        # when the invitation's organisation IS the user's own — otherwise
+        # accepting an org-admin invite into organisation A would also make
+        # the user an administrator of their own organisation B.  A grant
+        # into a foreign organisation is carried by the OrgRole row above
+        # alone; rbac_service.is_org_admin() reads that row first, before it
+        # ever falls back to the user's own-organisation Administrator role.
+        if offered["organization_id"] == user.organization_id:
+            if offered["role"] == "org_admin":
+                user.grant_org_admin()
+            elif user.is_admin():
+                user.revoke_org_admin()
     db.session.commit()
     return offered["organization_id"]

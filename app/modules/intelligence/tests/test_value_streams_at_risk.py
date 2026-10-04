@@ -178,10 +178,16 @@ def _relax_not_null(db_session, table: str, column: str) -> None:
     otherwise be constructed against a schema built from the current models.
     This recreates exactly that shape for one test, not a schema change that
     survives it.
-    """
-    from app.extensions import db
 
-    db_session.execute(db.text(f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL"))
+    Delegates to the production ``relax_not_null`` rather than duplicating
+    the ``ALTER TABLE`` statement. ``relax_not_null`` needs an
+    actual ``Connection`` (it reads ``.dialect`` to quote identifiers), not
+    the ``scoped_session`` itself -- ``db_session.connection()`` returns the
+    one bound to this test's own transaction.
+    """
+    from app.commands.schema_migrations import relax_not_null
+
+    relax_not_null(db_session.connection(), table, column)
 
 
 # --- Acceptance item 1 ----------------------------------------------------------

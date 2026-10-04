@@ -77,6 +77,18 @@ def _link_visible(endpoint: str, requires: str | None = None) -> bool:
 # by the shell-overhaul Wave 1 review. Not the ~50 /architecture/<layer>/<type>
 # drill-downs (those are covered by the single "ArchiMate Elements" library
 # link) — see the review comment on scripts task-3 fix round.
+#
+# _MORE_TOOLS entries carry no "requires" field of their own (unlike
+# role_access.py's _link()), so every entry defaults to visible to anyone
+# -- wrong for the two platform_admin-only tiles below (role_access.py's own
+# comment: "Framework Management and Framework Configuration (platform_admin
+# -only) are reachable from the admin dashboard page"). Overridden here by
+# endpoint rather than widening every tuple in this list to four elements.
+_MORE_TOOLS_REQUIRES = {
+    "framework_config_ui.framework_config_dashboard": "platform_admin",
+    "main.framework_management.dashboard": "platform_admin",
+}
+
 _MORE_TOOLS = [
     # A-20 (readiness table 5.1, 2026-09-22): Ask already has a real sidebar
     # link in every persona's My-work zone (role_access.py's _ASK_LINK), so
@@ -166,6 +178,11 @@ _MORE_TOOLS = [
     ("Integrations", "main.integrations", "cloud"),
     ("Architecture Roadmap", "main.archimate_roadmap", "map"),
     ("Enterprise Dashboard", "enterprise.enterprise_dashboard", "layout-dashboard"),
+    # Every signed-in user can already open this from the sidebar footer
+    # (app/modules/monitoring/routes/status_routes.py's own docstring) --
+    # no persona zone owns it since it is the same page for every
+    # organisation, so this directory is its one discoverability-test home.
+    ("Service Status", "service_status.status_page", "activity"),
 ]
 
 # Endpoints present in _MORE_TOOLS / SIDEBAR_ZONES that must never be rendered
@@ -214,7 +231,10 @@ def all_module_links():
             for link in zone["links"]:
                 seen.setdefault(link["endpoint"], link)
     for label, endpoint, icon in _MORE_TOOLS:
-        seen.setdefault(endpoint, {"label": label, "endpoint": endpoint, "icon": icon})
+        seen.setdefault(endpoint, {
+            "label": label, "endpoint": endpoint, "icon": icon,
+            "requires": _MORE_TOOLS_REQUIRES.get(endpoint),
+        })
     return list(seen.values())
 
 
@@ -317,7 +337,8 @@ def index():
     more_tools = _resolve(
         {"label": label, "endpoint": endpoint, "icon": icon}
         for label, endpoint, icon in _MORE_TOOLS
-        if endpoint not in zone_endpoints and _link_visible(endpoint)
+        if endpoint not in zone_endpoints
+        and _link_visible(endpoint, _MORE_TOOLS_REQUIRES.get(endpoint))
     )
     total = sum(len(section["links"]) for section in sections) + len(more_tools)
     return render_template(

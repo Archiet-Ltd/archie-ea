@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ast
 import uuid
+from pathlib import Path
 
 import pytest
 from sqlalchemy import Column, Integer, String, Table, create_engine, inspect, text
@@ -529,20 +531,28 @@ def test_task9_history_tables_and_dropped_triggers_reconcile_idempotently(
             connection.execute(
                 text(
                     "INSERT INTO work_packages (id, name, organization_id) "
-                    "VALUES (901, 'Task 9 guarded work', 1); "
+                    "VALUES (901, 'Task 9 guarded work', 1)"
+                )
+            )
+            connection.execute(
+                text(
                     "INSERT INTO delivery_export_attempts "
                     "(id, organization_id, work_package_id, provider_key, attempt_key, "
                     " request_json, status, error_class, error_message, attempted_by_id, "
                     " completed_at) VALUES "
                     "(902, 1, 901, 'delivery', :attempt_key, '{}'::json, 'failed', "
-                    " 'ConnectionError', 'unavailable', 1, clock_timestamp()); "
+                    " 'ConnectionError', 'unavailable', 1, clock_timestamp())"
+                ),
+                {"attempt_key": "9" * 64},
+            )
+            connection.execute(
+                text(
                     "INSERT INTO outcome_measurements "
                     "(id, organization_id, benefit_id, value, observed_at, "
                     " source_identity, source_version, recorded_by_id) VALUES "
                     "(903, 1, 200, 1.000000, clock_timestamp(), "
                     " 'ledger:run-cost', 'v1', 1)"
-                ),
-                {"attempt_key": "9" * 64},
+                )
             )
             with pytest.raises(Exception, match="completed delivery export attempts"):
                 with connection.begin_nested():
@@ -617,20 +627,28 @@ def test_task9_history_guard_definition_drift_is_detected_and_repaired(
             connection.execute(
                 text(
                     "INSERT INTO work_packages (id, name, organization_id) "
-                    "VALUES (911, 'Task 9 definition guarded work', 1); "
+                    "VALUES (911, 'Task 9 definition guarded work', 1)"
+                )
+            )
+            connection.execute(
+                text(
                     "INSERT INTO delivery_export_attempts "
                     "(id, organization_id, work_package_id, provider_key, attempt_key, "
                     " request_json, status, error_class, error_message, attempted_by_id, "
                     " completed_at) VALUES "
                     "(912, 1, 911, 'delivery', :attempt_key, '{}'::json, 'failed', "
-                    " 'ConnectionError', 'unavailable', 1, clock_timestamp()); "
+                    " 'ConnectionError', 'unavailable', 1, clock_timestamp())"
+                ),
+                {"attempt_key": "8" * 64},
+            )
+            connection.execute(
+                text(
                     "INSERT INTO outcome_measurements "
                     "(id, organization_id, benefit_id, value, observed_at, "
                     " source_identity, source_version, recorded_by_id) VALUES "
                     "(913, 1, 200, 1.000000, clock_timestamp(), "
                     " 'ledger:run-cost', 'v1', 1)"
-                ),
-                {"attempt_key": "8" * 64},
+                )
             )
             with pytest.raises(Exception, match="completed delivery export attempts"):
                 with connection.begin_nested():
@@ -648,6 +666,49 @@ def test_task9_history_guard_definition_drift_is_detected_and_repaired(
                             "WHERE id=913 AND organization_id=1"
                         )
                     )
+
+
+def _task9_parameterized_multicommand_execute_sites():
+    source = Path(__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    target_tests = {
+        "test_task9_history_tables_and_dropped_triggers_reconcile_idempotently",
+        "test_task9_history_guard_definition_drift_is_detected_and_repaired",
+    }
+
+    offenders = []
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name not in target_tests:
+            continue
+        for descendant in ast.walk(node):
+            if not isinstance(descendant, ast.Call):
+                continue
+            if not (
+                isinstance(descendant.func, ast.Attribute)
+                and descendant.func.attr == "execute"
+                and descendant.args
+            ):
+                continue
+            sql_call = descendant.args[0]
+            if not (
+                isinstance(sql_call, ast.Call)
+                and isinstance(sql_call.func, ast.Name)
+                and sql_call.func.id == "text"
+                and sql_call.args
+                and isinstance(sql_call.args[0], ast.Constant)
+                and isinstance(sql_call.args[0].value, str)
+            ):
+                continue
+            sql_text = sql_call.args[0].value
+            has_parameters = len(descendant.args) > 1 or bool(descendant.keywords)
+            if has_parameters and ";" in sql_text:
+                offenders.append(f"{node.name}:{descendant.lineno}")
+    return offenders
+
+
+def test_task9_regression_avoids_parameterized_multicommand_sql_blocks():
+    """Parameterized multi-command SQL breaks prepared execution on psycopg v3."""
+    assert _task9_parameterized_multicommand_execute_sites() == []
 
 
 def test_genuine_pre_feature_schema_backfills_roadmap_and_repairs_delivery_fks(

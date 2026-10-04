@@ -60,6 +60,7 @@ jobs:
       - name: Create the isolated audit schema
         run: |
           python -m flask --app manage init-db
+          python -m flask --app manage schema-upgrade
           python -m flask --app manage reconcile-schema
       - name: Exercise every registered surface as ${{ matrix.persona }}
         run: >-

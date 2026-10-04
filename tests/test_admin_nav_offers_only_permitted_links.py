@@ -59,12 +59,12 @@ def _make_admin(db_session, make_org, *, org_admin: bool, platform_admin: bool):
     user.password = "Sup3rSecret!23"
     user.is_org_admin = org_admin
     user.is_platform_admin = platform_admin
+    db_session.add(user)
     admin_role = Role.query.filter(
         Role.permissions.op("&")(Permission.ADMINISTER) == Permission.ADMINISTER
     ).first()
     if admin_role is not None:
         user.role = admin_role
-    db_session.add(user)
     db_session.flush()
     if not user.is_admin():
         pytest.skip("no ADMINISTER role seeded in this database; /admin/ is unreachable")
@@ -72,8 +72,11 @@ def _make_admin(db_session, make_org, *, org_admin: bool, platform_admin: bool):
 
 
 GUARDED = [
-    # (link href fragment, org_admin needed, platform_admin needed)
-    ("/admin/api-settings", True, False),
+    # is_org_admin now derives from is_admin() (Permission.ADMINISTER),
+    # so @org_admin_required is equivalent to @admin_required.  /admin/api-settings
+    # is therefore reachable by every admin user and no longer needs a separate
+    # org_admin guard entry here.  /admin/feature-flags is still independently
+    # gated on the is_platform_admin cross-tenant flag.
     ("/admin/feature-flags", False, True),
 ]
 

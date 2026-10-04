@@ -42,7 +42,11 @@ def live_server():
     proc = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     base = "http://127.0.0.1:%d" % port
-    deadline = time.time() + 60
+    # The app takes about 50 seconds to boot on an idle machine, so 60 was
+    # overrun whenever the runner host was busy (several test shards share
+    # one host). Same budget and override as the smoke harness.
+    boot_timeout = int(os.environ.get("SMOKE_BOOT_TIMEOUT", "180"))
+    deadline = time.time() + boot_timeout
     while time.time() < deadline:
         if proc.poll() is not None:
             pytest.fail("flask dev server exited during boot")
@@ -56,7 +60,7 @@ def live_server():
         time.sleep(2)
     else:
         proc.kill()
-        pytest.fail("flask dev server did not start within 60s")
+        pytest.fail("flask dev server did not start within %ds" % boot_timeout)
 
     yield base
     proc.terminate()

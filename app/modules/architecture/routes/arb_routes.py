@@ -1762,6 +1762,17 @@ def record_decision(id):
             if line.strip()
         ]
 
+        # The date the board looks at this decision again. Optional: blank
+        # stays blank ("—" on the page), never a date the board did not set.
+        raw_review_date = (data.get("review_date") or "").strip()
+        review_date = None
+        if raw_review_date:
+            try:
+                review_date = datetime.strptime(raw_review_date, "%Y-%m-%d").date()
+            except ValueError:
+                flash("The review date must be a date (YYYY-MM-DD).", "error")
+                return redirect(url_for("arb.review_detail", id=id)), 400
+
         try:
             review = arb_service.record_decision(
                 review_item_id=id,
@@ -1769,6 +1780,7 @@ def record_decision(id):
                 rationale=data.get("rationale"),
                 decided_by_id=current_user.id,
                 conditions=conditions if conditions else None,
+                review_date=review_date,
             )
         except SelfApprovalError as e:
             current_app.logger.warning(

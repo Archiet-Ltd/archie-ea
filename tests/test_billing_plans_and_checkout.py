@@ -12,6 +12,7 @@ import time
 import uuid
 
 import pytest
+from flask import render_template_string, session
 
 WEBHOOK_SECRET = "unit-test-signing-value"
 PRICES = {
@@ -595,6 +596,64 @@ def test_billing_details_and_invoices(app, db_session, client, login_as, billing
     assert "https://pay.stripe.com/invoice/ENT-0001/pdf" in html
     # An invoice whose tax the provider did not report shows a dash, not 0.00.
     assert "USD 0.00" not in html
+
+
+def test_billing_page_uses_the_switched_organisation(app, db_session, client, login_as, no_billing):
+    from app.models.org_role import OrgRole
+    from app.models.subscription import SubscriptionPlan
+
+    home_org, admin = _admin_org(db_session, "home")
+    switched_org = _org(db_session, "second")
+    OrgRole.set_role(switched_org.id, admin.id, "architect", granted_by_id=admin.id)
+    _subscription(db_session, switched_org, plan=SubscriptionPlan.team, seats_purchased=20)
+    db_session.commit()
+
+    with app.app_context():
+        login_as(client, admin)
+        switched = client.post(
+            "/account/switch-organization",
+            data={"organization_id": str(switched_org.id)},
+            follow_redirects=True,
+        )
+        login_as(client, admin)
+        page = client.get("/admin/billing/")
+
+    switched_html = switched.get_data(as_text=True)
+    html = page.get_data(as_text=True)
+
+    assert switched.status_code == 200
+    assert page.status_code == 200
+    assert f"Active: {switched_org.name}" in switched_html
+    assert switched_org.name in html
+    assert home_org.name not in html
+    assert 'data-testid="billing-current-plan">Team<' in html
+
+
+def test_currency_context_and_filter_follow_the_switched_organisation(app, db_session, make_org):
+    from app.models.org_role import OrgRole
+    from tests._session_test_helpers import mint_test_sid
+
+    home_org = make_org("currency-home")
+    switched_org = make_org("currency-second")
+    home_org.settings = {"currency_code": "USD"}
+    switched_org.settings = {"currency_code": "EUR"}
+    user = _user(db_session, home_org, admin=True)
+    OrgRole.set_role(switched_org.id, user.id, "architect", granted_by_id=user.id)
+    db_session.commit()
+
+    sid = mint_test_sid(user.id, organization_id=home_org.id, app=app)
+    with app.test_request_context("/"):
+        session["_user_id"] = str(user.id)
+        session["_fresh"] = True
+        session["_sid"] = sid
+        session["current_org_id"] = switched_org.id
+
+        app.preprocess_request()
+        rendered = render_template_string(
+            "{{ active_organization_name }}|{{ currency_config.code }}|{{ 12.5|format_currency(show_code=True) }}"
+        )
+
+    assert rendered == f"{switched_org.name}|EUR|EUR 12.50€"
 
 
 def test_admin_at_the_limit_is_shown_the_upgrade_instead_of_adding(app, db_session, client, login_as, no_billing):
