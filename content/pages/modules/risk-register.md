@@ -38,10 +38,11 @@ way to notice.
 
 ## What this module does
 
-Entelim's Risk Register module runs that register and scoring loop in software, not a spreadsheet.
-Ask which risks matter, and the answer doesn't stop at the element a risk was originally logged
-against — it follows the same connection chain that answers what breaks, so a risk shows up
-everywhere its impact would actually reach.
+Entelim's Risk Register module runs that register in software, not a spreadsheet: each risk
+carries a single score for how likely it is and how much damage it would do, a status, an owner
+and a mitigation plan. Ask which risks matter, and the answer doesn't stop at the element a risk
+was originally logged against — it follows the same connection chain that answers what breaks, so a
+risk shows up everywhere its impact would actually reach.
 
 ## Where you'll meet it
 
