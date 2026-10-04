@@ -10,8 +10,11 @@ inquiry_consent_text: "Used to follow up about pricing and scheduling for the ar
 
 # Architecture health check
 
-A fixed-price, one-time engagement. Entelim runs against your own systems, and what
-comes back is a written report your team can act on.
+A fixed-price, one-time engagement. We import your application landscape
+(spreadsheets, Archi or Open Exchange files, exports from your current tools,
+or a start from your website address) and run Entelim's analysis over your
+real data, not a demonstration. What comes back is a written report your team
+can act on.
 
 ## What it costs
 
@@ -19,14 +22,14 @@ comes back is a written report your team can act on.
 
 ## What's included
 
-- A full run of the platform against your real systems, not a demonstration environment.
+- A full run of the platform over your imported application landscape, not a demonstration environment.
 - A written report covering what it finds: the dependencies between your applications,
   the gaps in ownership and coverage, and the risks they create. These are the same
   categories the product itself surfaces, applied to your own landscape.
 
 ## What happens next
 
-A short call to scope access to your systems, then the report lands within two weeks
+A short call to scope what to import, then the report lands within two weeks
 of kickoff.
 
 Request the health check below and we will set up that call.
