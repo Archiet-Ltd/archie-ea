@@ -950,6 +950,17 @@ class AIChatApprovalService:
                     "arguments": json.loads(approval.operation_payload),
                     "created_at": approval.created_at.isoformat() if approval.created_at else None,
                     "expires_at": approval.expires_at.isoformat() if approval.expires_at else None,
+                    # The queue query filters to PENDING only, so every item
+                    # here is "pending". The inbox template's isOverdue()
+                    # checks this field to decide whether to show the Overdue
+                    # indicator — without it the indicator never renders even
+                    # for genuinely overdue items.
+                    "status": approval.status.value if approval.status else "pending",
+                    # Source table/id for backfilled items (e.g. confidence
+                    # reviews). The inbox template renders a source badge when
+                    # these are present; without them the badge is always dead.
+                    "source_table": getattr(approval, "source_table", None),
+                    "source_id": getattr(approval, "source_id", None),
                     "requester": {
                         "id": approval.user_id,
                         "display_name": " ".join(

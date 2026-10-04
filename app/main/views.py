@@ -22,6 +22,7 @@ from app import db
 from app.core.auth.decorators import admin_required
 from app.main.capability_framework_routes import capability_framework_bp
 from app.main.framework_management_routes import framework_management_bp
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.business_capabilities import BusinessCapability
 from app.services.rate_limiter import rate_limit
 from app.services.vendor_analysis.capability_based_vendor_selector import (
@@ -33,6 +34,22 @@ main = Blueprint("main", __name__)
 # Register sub-blueprints
 main.register_blueprint(capability_framework_bp)
 main.register_blueprint(framework_management_bp)
+
+
+def _csv_safe(value):
+    """Escape one CSV cell against spreadsheet formula injection.
+
+    A value starting with ``=``, ``+``, ``-``, ``@``, or a leading tab/CR
+    becomes a formula when the file is opened in Excel/Sheets. Prefixing it
+    with a single quote keeps the value literal. Shared by every export in
+    this module that writes a user-submitted string into a CSV cell.
+    """
+    if value is None:
+        return ""
+    text = str(value)
+    if text[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + text
+    return text
 
 
 @main.route("/", methods=["GET", "POST"])
@@ -77,10 +94,11 @@ def index():
 
 
 @main.route("/admin/waitlist.csv")
-@login_required
-@admin_required
+@platform_admin_required
 def waitlist_csv():
-    """Export the waiting list as CSV. Admin only."""
+    """Export the waiting list as CSV. Platform admin only — this is prospect
+    data across every organisation, not something an organisation's own
+    admin should be able to download."""
     from app.models.waitlist_signup import WaitlistSignup
 
     rows = (
@@ -93,13 +111,122 @@ def waitlist_csv():
     writer = csv.writer(output)
     writer.writerow(["email", "created_at", "source", "consent_text"])
     for row in rows:
-        writer.writerow([row.email, row.created_at.isoformat(), row.source, row.consent_text])
+        writer.writerow([
+            _csv_safe(row.email),
+            row.created_at.isoformat(),
+            _csv_safe(row.source),
+            _csv_safe(row.consent_text),
+        ])
 
     csv_content = output.getvalue()
     return Response(
         csv_content,
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=waitlist.csv"},
+    )
+
+
+@main.route("/offers/inquire", methods=["POST"])
+@rate_limit(10, "1m", methods=("POST",))
+def product_inquiry_submit():
+    """Submit an inquiry from one of the fixed-price offer pages.
+
+    One route serves every offer page; hidden fields say which page and
+    family to reload. The offer identifier and the consent sentence shown
+    next to the checkbox both come from that page's own front-matter, so
+    what gets stored can never say something the visitor was not shown.
+    """
+    from flask import abort
+
+    from app.models.product_inquiry import ProductInquiry
+    from app.services.public_pages import build_jsonld, load_page
+
+    page_family = request.form.get("family", "")
+    page_slug = request.form.get("slug", "")
+    page = load_page(page_family, slug=page_slug) if page_family and page_slug else None
+    if page is None or page.cta != "inquiry":
+        abort(404)
+
+    offer = page.front_matter.get("offer")
+    consent_text = page.front_matter.get("inquiry_consent_text")
+    submitted_offer = request.form.get("offer", "")
+
+    thanks = False
+    error = None
+
+    if not offer or not consent_text or submitted_offer != offer:
+        error = "This request could not be matched to an offer. Please try again."
+    else:
+        email = (request.form.get("email") or "").strip().lower()
+        name = (request.form.get("name") or "").strip() or None
+        consent = request.form.get("consent")
+
+        if not email:
+            error = "Please enter an email address."
+        elif not consent:
+            error = "You must agree to be contacted about this request."
+        elif name is not None and len(name) > 200:
+            error = "Please use a shorter name (200 characters or fewer)."
+        else:
+            try:
+                valid = validate_email(email, check_deliverability=False)
+                email = valid.normalized
+            except EmailNotValidError:
+                error = "Please enter a valid email address."
+
+        if error is None:
+            existing = ProductInquiry.query.filter_by(email=email, offer=offer).first()
+            if existing is None:
+                inquiry = ProductInquiry(
+                    email=email,
+                    name=name,
+                    offer=offer,
+                    consent_text=consent_text,
+                )
+                db.session.add(inquiry)
+                db.session.commit()
+            thanks = True
+
+    return render_template(
+        "public/page.html",
+        page=page,
+        jsonld=build_jsonld(page),
+        thanks=thanks,
+        error=error,
+    )
+
+
+@main.route("/admin/product-inquiries.csv")
+@platform_admin_required
+def product_inquiries_csv():
+    """Export product inquiries as CSV. Platform admin only — this is prospect
+    data across every organisation, not something an organisation's own
+    admin should be able to download."""
+    from app.models.product_inquiry import ProductInquiry
+
+    rows = (
+        ProductInquiry.query
+        .order_by(ProductInquiry.created_at.desc())
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["email", "name", "offer", "created_at", "consent_text"])
+    for row in rows:
+        writer.writerow([
+            _csv_safe(row.email),
+            _csv_safe(row.name or ""),
+            _csv_safe(row.offer),
+            row.created_at.isoformat(),
+            _csv_safe(row.consent_text),
+        ])
+
+    csv_content = output.getvalue()
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=product-inquiries.csv"},
     )
 
 
@@ -196,7 +323,7 @@ def sitemap_xml():
 
 @main.route("/llms.txt")
 def llms_txt():
-    """Serve llms.txt listing every public content page."""
+    """Serve llms.txt listing every public content page with a Capabilities section."""
     from app.services.public_pages import load_all_pages
 
     pages = load_all_pages()
@@ -208,11 +335,147 @@ def llms_txt():
         "enter your website address and see your company."
     )
     lines.append("")
-    for p in pages:
+
+    # Capabilities section: modules and intelligence lenses
+    module_pages = [p for p in pages if p.family == "module"]
+    if module_pages:
+        lines.append("## Capabilities")
+        lines.append("")
+        for p in module_pages:
+            # Extract a quotable factual sentence from the page body
+            sentence = _extract_first_sentence(p.body_html)
+            lines.append(f"- [{p.title}]({base_url}{p.url}) — {sentence}")
+        lines.append("")
+
+    # All pages list (exclude module pages already listed in Capabilities)
+    non_module_pages = [p for p in pages if p.family != "module"]
+    for p in non_module_pages:
         lines.append(f"- [{p.title}]({base_url}{p.url})")
     text = "\n".join(lines) + "\n"
     from flask import Response
     return Response(text, mimetype="text/plain")
+
+
+@main.route("/llms-full.txt")
+def llms_full_txt():
+    """Serve llms-full.txt with the full text of every public module, use-case and comparison page."""
+    from app.services.public_pages import load_all_pages
+
+    pages = load_all_pages()
+    base_url = "https://entelim.org"
+    lines = ["# Entelim — Full Content"]
+    lines.append("")
+    lines.append(
+        "> Entelim is the open-source Enterprise Intelligence Model: "
+        "enter your website address and see your company."
+    )
+    lines.append("")
+
+    # Include modules, use-cases, and comparisons
+    target_families = {"module", "function-per-segment", "comparison"}
+    target_pages = [p for p in pages if p.family in target_families]
+
+    for p in target_pages:
+        lines.append(f"## {p.title}")
+        lines.append("")
+        lines.append(f"URL: {base_url}{p.url}")
+        lines.append("")
+        # Convert HTML body to plain text/markdown
+        plain_text = _html_to_plain_text(p.body_html)
+        lines.append(plain_text)
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    text = "\n".join(lines) + "\n"
+    from flask import Response
+    return Response(text, mimetype="text/plain")
+
+
+def _extract_first_sentence(html: str) -> str:
+    """Extract the first meaningful sentence from rendered HTML body.
+
+    Takes the first sentence from the first <p> element (skipping headings)
+    to avoid the h1 title running into the first paragraph.
+    """
+    import re
+    import html as html_mod
+
+    # Find the first <p> element content
+    p_match = re.search(r"<p[^>]*>(.*?)</p>", html, flags=re.DOTALL | re.IGNORECASE)
+    if p_match:
+        text = p_match.group(1)
+        # Strip any nested HTML tags from the paragraph content
+        text = re.sub(r"<[^>]+>", "", text)
+    else:
+        # Fallback: remove all tags and use the whole text
+        text = re.sub(r"<[^>]+>", "", html)
+
+    text = html_mod.unescape(text)
+    text = " ".join(text.split())  # Normalize whitespace
+
+    # Find first sentence ending with . ! or ?
+    match = re.search(r"([^.!?]*[.!?])", text)
+    if match:
+        sentence = match.group(1).strip()
+        # Limit length
+        if len(sentence) > 200:
+            sentence = sentence[:197] + "..."
+        return sentence
+    return text[:200] if text else "No description available."
+
+
+def _html_to_plain_text(html: str) -> str:
+    """Convert rendered HTML body to plain text/markdown."""
+    import re
+    import html as html_mod
+
+    # Remove <script> and <style> elements with their content FIRST
+    text = re.sub(r"<script\b[^>]*>.*?</script>", "", html, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<style\b[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
+
+    # Convert common HTML elements to markdown-like plain text
+    # Headings
+    text = re.sub(r"<h1[^>]*>(.*?)</h1>", r"# \1", text, flags=re.DOTALL)
+    text = re.sub(r"<h2[^>]*>(.*?)</h2>", r"## \1", text, flags=re.DOTALL)
+    text = re.sub(r"<h3[^>]*>(.*?)</h3>", r"### \1", text, flags=re.DOTALL)
+
+    # Links
+    text = re.sub(r'<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>', r"[\2](\1)", text, flags=re.DOTALL)
+
+    # Bold/italic
+    text = re.sub(r"<strong[^>]*>(.*?)</strong>", r"**\1**", text, flags=re.DOTALL)
+    text = re.sub(r"<b[^>]*>(.*?)</b>", r"**\1**", text, flags=re.DOTALL)
+    text = re.sub(r"<em[^>]*>(.*?)</em>", r"*\1*", text, flags=re.DOTALL)
+    text = re.sub(r"<i[^>]*>(.*?)</i>", r"*\1*", text, flags=re.DOTALL)
+
+    # Code
+    text = re.sub(r"<code[^>]*>(.*?)</code>", r"`\1`", text, flags=re.DOTALL)
+    text = re.sub(r"<pre[^>]*>(.*?)</pre>", r"\n```\n\1\n```\n", text, flags=re.DOTALL)
+
+    # Lists
+    text = re.sub(r"<li[^>]*>(.*?)</li>", r"- \1", text, flags=re.DOTALL)
+    text = re.sub(r"</?(ul|ol)[^>]*>", "", text, flags=re.DOTALL)
+
+    # Paragraphs and line breaks
+    text = re.sub(r"</p>", "\n\n", text, flags=re.DOTALL)
+    text = re.sub(r"<p[^>]*>", "", text, flags=re.DOTALL)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.DOTALL)
+
+    # Horizontal rule
+    text = re.sub(r"<hr\s*/?>", "\n---\n", text, flags=re.DOTALL)
+
+    # Remove remaining tags
+    text = re.sub(r"<[^>]+>", "", text)
+
+    # Unescape HTML entities
+    text = html_mod.unescape(text)
+
+    # Normalize whitespace
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = text.strip()
+
+    return text
 
 
 # ============================================================================
@@ -281,7 +544,8 @@ def public_dogfood():
 
 
 @main.route(
-    "/<any(about, security, privacy, terms, contact, features, pricing, docs):slug>"
+    "/<any(about, security, privacy, terms, contact, features, pricing, docs, "
+    "'architecture-health-check', 'team-annual-onboarding'):slug>"
 )
 def public_site_page(slug):
     """A fixed top-level marketing/legal page (one file per page under content/pages/site/)."""
