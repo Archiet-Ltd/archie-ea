@@ -21,8 +21,7 @@ which risks and control gaps actually touch it, and whether anyone owns closing 
 ## What Entelim answers
 
 Ask the question directly, and Entelim traces risks across the same connections that answer what
-breaks — filtered against the compliance frameworks that matter to you, with the mitigation and its
-owner attached.
+breaks, with the mitigation and its owner attached.
 
 ## Related
 
