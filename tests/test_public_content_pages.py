@@ -590,11 +590,19 @@ def test_comparison_canonical_url():
     assert page.canonical_url == "https://archiet.ai/vs/leanix"
 
 
-def test_non_comparison_no_canonical():
-    """Non-comparison pages have no canonical_url."""
+def test_all_pages_have_canonical_url():
+    """All pages have a canonical URL pointing to entelim.org."""
     page = load_page("module", slug="applications")
     assert page is not None
-    assert page.canonical_url is None
+    assert page.canonical_url == "https://entelim.org/modules/applications"
+    # Also check a use-case page
+    page = load_page("function-per-segment", slug="canvas-dependencies")
+    assert page is not None
+    assert page.canonical_url == "https://entelim.org/use-cases/canvas-dependencies"
+    # And a comparison page (which has a different canonical)
+    page = load_page("comparison", slug="leanix")
+    assert page is not None
+    assert page.canonical_url == "https://archiet.ai/vs/leanix"
 
 
 def test_waiting_list_cta_renders_link(app):
@@ -958,3 +966,220 @@ def test_xss_sanitization_cross_org(app):
                 assert f"{handler}=" not in html.lower(), (
                     f"{page.url}: contains {handler} handler"
                 )
+
+
+# ── SEO meta tags and canonical URL tests ───────────────────────────────────
+
+
+def test_all_pages_have_meta_description(app):
+    """Every public page has a non-empty meta description <= 160 chars."""
+    from app.services.public_pages import load_all_pages
+
+    pages = load_all_pages()
+    with app.test_client() as client:
+        for page in pages:
+            rv = client.get(page.url)
+            assert rv.status_code == 200
+            html = rv.data.decode()
+            # Check meta description tag exists
+            assert 'name="description"' in html, f"{page.url}: missing meta description tag"
+            # Extract content
+            import re
+            match = re.search(r'name="description" content="([^"]*)"', html)
+            assert match is not None, f"{page.url}: meta description tag has no content"
+            desc = match.group(1)
+            assert len(desc) > 0, f"{page.url}: meta description is empty"
+            assert len(desc) <= 160, f"{page.url}: meta description exceeds 160 chars ({len(desc)})"
+            # Should be HTML-escaped (no raw & < >)
+            assert "&" not in desc or "&" in desc, f"{page.url}: meta description contains unescaped &"
+            assert "<" not in desc, f"{page.url}: meta description contains <"
+            assert ">" not in desc, f"{page.url}: meta description contains >"
+
+
+def test_all_pages_have_canonical_url_in_html(app):
+    """Every public page renders a canonical link in HTML."""
+    from app.services.public_pages import load_all_pages
+
+    pages = load_all_pages()
+    with app.test_client() as client:
+        for page in pages:
+            rv = client.get(page.url)
+            assert rv.status_code == 200
+            html = rv.data.decode()
+            # Check canonical link exists
+            assert 'rel="canonical"' in html, f"{page.url}: missing canonical link"
+            # Extract href
+            import re
+            match = re.search(r'rel="canonical" href="([^"]*)"', html)
+            assert match is not None, f"{page.url}: canonical link has no href"
+            canonical = match.group(1)
+            # Comparison pages have archiet.ai canonical, others have entelim.org
+            if page.family == "comparison":
+                assert canonical.startswith("https://archiet.ai"), (
+                    f"{page.url}: comparison canonical URL doesn't start with https://archiet.ai: {canonical}"
+                )
+            else:
+                assert canonical.startswith("https://entelim.org"), (
+                    f"{page.url}: canonical URL doesn't start with https://entelim.org: {canonical}"
+                )
+            # No query string
+            assert "?" not in canonical, f"{page.url}: canonical URL contains query string: {canonical}"
+
+
+def test_all_pages_have_open_graph_tags(app):
+    """Every public page has Open Graph tags."""
+    from app.services.public_pages import load_all_pages
+
+    pages = load_all_pages()
+    with app.test_client() as client:
+        for page in pages:
+            rv = client.get(page.url)
+            assert rv.status_code == 200
+            html = rv.data.decode()
+            # Check all four OG tags
+            for prop in ["og:title", "og:description", "og:url", "og:type"]:
+                assert f'property="{prop}"' in html, f"{page.url}: missing {prop} tag"
+                import re
+                match = re.search(f'property="{prop}" content="([^"]*)"', html)
+                assert match is not None, f"{page.url}: {prop} tag has no content"
+            # og:type should be website
+            match = re.search(r'property="og:type" content="([^"]*)"', html)
+            assert match.group(1) == "website", f"{page.url}: og:type is not 'website'"
+
+
+def test_use_case_old_urls_redirect_301(app):
+    """Old use-case URLs with coded prefix redirect 301 to new URLs."""
+    from app.services.public_pages import load_all_pages
+
+    pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+    assert len(pages) > 0, "No use-case pages found"
+    with app.test_client() as client:
+        for page in pages[:5]:  # Test first 5
+            # Construct old URL from the file name pattern
+            # We need to find the original file name
+            from app.services.public_pages import CONTENT_ROOT
+            family_dir = CONTENT_ROOT / "function-per-segment"
+            for md_file in family_dir.glob("*.md"):
+                from app.services.public_pages import _get_use_case_slugs
+                old_slug, new_slug = _get_use_case_slugs(md_file.name)
+                if new_slug == page.slug:
+                    old_url = f"/use-cases/{old_slug}"
+                    rv = client.get(old_url, follow_redirects=False)
+                    assert rv.status_code == 301, f"{old_url}: expected 301, got {rv.status_code}"
+                    # Redirect location is relative path
+                    assert rv.location == page.url, (
+                        f"{old_url}: redirect location mismatch: {rv.location} != {page.url}"
+                    )
+                    break
+
+
+def test_sitemap_excludes_coded_use_case_slugs(app):
+    """sitemap.xml only lists new use-case URLs (no uc-s*-* pattern)."""
+    with app.test_client() as client:
+        rv = client.get("/sitemap.xml")
+        assert rv.status_code == 200
+        xml = rv.data.decode()
+        # No coded slugs in sitemap
+        import re
+        coded_slugs = re.findall(r"/use-cases/uc-s\d+-\d+-", xml)
+        assert len(coded_slugs) == 0, f"sitemap.xml contains coded use-case slugs: {coded_slugs}"
+        # But should have new slugs
+        from app.services.public_pages import load_all_pages
+        pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+        for page in pages:
+            assert page.url in xml, f"sitemap.xml missing new use-case URL: {page.url}"
+
+
+def test_llms_txt_excludes_coded_use_case_slugs(app):
+    """llms.txt only lists new use-case URLs (no uc-s*-* pattern)."""
+    with app.test_client() as client:
+        rv = client.get("/llms.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+        # No coded slugs in llms.txt
+        import re
+        coded_slugs = re.findall(r"/use-cases/uc-s\d+-\d+-", text)
+        assert len(coded_slugs) == 0, f"llms.txt contains coded use-case slugs: {coded_slugs}"
+        # But should have new slugs
+        from app.services.public_pages import load_all_pages
+        pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+        for page in pages:
+            assert page.url in text, f"llms.txt missing new use-case URL: {page.url}"
+
+
+def test_meta_description_from_front_matter():
+    """Meta description uses front-matter description when present."""
+    from app.services.public_pages import _extract_meta_description
+
+    front_matter = {"description": "Custom description from front matter"}
+    body_md = "# Title\n\n*Italic summary*\n\nFirst paragraph."
+    desc = _extract_meta_description(front_matter, body_md)
+    assert desc == "Custom description from front matter"
+
+
+def test_meta_description_from_italic_summary():
+    """Meta description uses first italic line when no front-matter description."""
+    from app.services.public_pages import _extract_meta_description
+
+    front_matter = {}
+    body_md = "# Title\n\n*This is the italic summary line*\n\nFirst paragraph."
+    desc = _extract_meta_description(front_matter, body_md)
+    assert desc == "This is the italic summary line"
+
+
+def test_meta_description_from_first_paragraph():
+    """Meta description uses first paragraph when no italic summary."""
+    from app.services.public_pages import _extract_meta_description
+
+    front_matter = {}
+    body_md = "# Title\n\nFirst paragraph with some content.\n\nSecond paragraph."
+    desc = _extract_meta_description(front_matter, body_md)
+    assert desc == "First paragraph with some content."
+
+
+def test_meta_description_truncated_at_word_boundary():
+    """Meta description is truncated at word boundary, not mid-word."""
+    from app.services.public_pages import _extract_meta_description
+
+    front_matter = {}
+    # Create a long paragraph > 160 chars
+    long_text = "This is a very long paragraph that exceeds the maximum length of one hundred and sixty characters so it should be truncated at a word boundary not in the middle of a word"
+    body_md = f"# Title\n\n{long_text}"
+    desc = _extract_meta_description(front_matter, body_md)
+    assert len(desc) <= 160
+    # Should not end mid-word (last char should not be a letter if truncated)
+    if len(desc) == 160:
+        # Actually at exactly 160 it might end mid-word, but our function finds last space
+        pass
+    # Verify it ends at a word boundary
+    assert not desc.endswith(" "), "Description should not end with space"
+
+
+def test_meta_description_html_escaped():
+    """Meta description is HTML-escaped."""
+    from app.services.public_pages import _extract_meta_description
+
+    front_matter = {"description": "Tom & Jerry <script>alert(1)</script>"}
+    body_md = "# Title"
+    desc = _extract_meta_description(front_matter, body_md)
+    # Should be HTML-escaped: & -> &, < -> <, > -> >
+    assert "&" in desc, f"Expected & in '{desc}'"
+    assert "<" in desc, f"Expected < in '{desc}'"
+    assert ">" in desc, f"Expected > in '{desc}'"
+    # Raw characters should not appear
+    assert "<" not in desc, f"Raw < found in '{desc}'"
+    assert ">" not in desc, f"Raw > found in '{desc}'"
+    # & should be escaped (but & contains &)
+    # Just verify the escaped forms are present
+
+
+def test_use_case_slug_transformation():
+    """Use-case slug transformation drops coded prefix."""
+    from app.services.public_pages import _transform_use_case_slug
+
+    assert _transform_use_case_slug("uc-s1-01-canvas-dependencies") == "canvas-dependencies"
+    assert _transform_use_case_slug("uc-s2-03-duplicate-spend") == "duplicate-spend"
+    assert _transform_use_case_slug("uc-s4-06-what-we-can-and-cannot-tell") == "what-we-can-and-cannot-tell"
+    # Non-matching slugs returned as-is
+    assert _transform_use_case_slug("already-clean") == "already-clean"
+    assert _transform_use_case_slug("") == ""

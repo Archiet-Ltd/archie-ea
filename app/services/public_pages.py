@@ -6,20 +6,22 @@ page objects with parsed metadata and rendered HTML body.
 Directory layout maps to URL families:
   content/pages/vision/          → /vision
   content/pages/modules/         → /modules/<slug>
-  content/pages/function-per-segment/ → /use-cases/<slug>
+  content/pages/function-per-segment/ → /use-cases/<slug> (new: without coded prefix)
   content/pages/vs/              → /vs/<slug>
   content/pages/dogfood/         → /how-archiet-runs-on-entelim
   content/pages/site/            → /<slug> (about, security, privacy, terms,
-                                    contact, features, pricing, docs — one
-                                    fixed top-level page per file)
+                                     contact, features, pricing, docs — one
+                                     fixed top-level page per file)
   content/pages/legal/           → /<slug> (legal pages held back until
-                                    LEGAL_PAGES_ENABLED is on — see
-                                    app/services/legal_pages.py)
+                                     LEGAL_PAGES_ENABLED is on — see
+                                     app/services/legal_pages.py)
 """
 
 from __future__ import annotations
 
+import html
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -54,6 +56,9 @@ FAMILY_URL_PREFIX = {
     "legal": "",
 }
 
+# Base URL for canonical and Open Graph URLs
+SITE_URL = "https://entelim.org"
+
 _md = markdown.Markdown(extensions=["extra"])
 
 # Tags and attributes produced by standard Markdown (plus extra extension).
@@ -70,6 +75,87 @@ _ALLOWED_ATTRS = {
     "th": ["align"],
     "td": ["align"],
 }
+
+
+def _extract_meta_description(front_matter: dict[str, Any], body_md: str) -> str:
+    """Extract meta description for a page.
+
+    Priority:
+    1. Front-matter 'description' field if present
+    2. First italic summary line (text wrapped in *...* or _..._)
+    3. First paragraph of content
+
+    Returns plain text, at most 160 characters, cut at a word boundary,
+    HTML-escaped.
+    """
+    # 1. Check front-matter description
+    if "description" in front_matter and front_matter["description"]:
+        desc = str(front_matter["description"]).strip()
+        if desc:
+            return _truncate_at_word_boundary(html.escape(desc), 160)
+
+    # 2. Look for first italic summary line in markdown body
+    # Pattern: *text* or _text_ at the start of a line (after optional whitespace)
+    # Must be a single line, not spanning multiple lines
+    italic_match = re.search(r"(?m)^\s*[\*_]([^\*_\n]+)[\*_]\s*$", body_md.strip())
+    if italic_match:
+        desc = italic_match.group(1).strip()
+        if desc:
+            return _truncate_at_word_boundary(html.escape(desc), 160)
+
+    # 3. Fall back to first paragraph (non-heading, non-empty line)
+    lines = body_md.strip().split("\n")
+    for line in lines:
+        line = line.strip()
+        if line and not line.startswith("#") and not line.startswith("---"):
+            # This is the first paragraph
+            # Remove markdown formatting for plain text
+            plain = re.sub(r"[\*_`\[\]()#]", "", line)
+            plain = re.sub(r"\s+", " ", plain).strip()
+            if plain:
+                return _truncate_at_word_boundary(html.escape(plain), 160)
+
+    return ""
+
+
+def _truncate_at_word_boundary(text: str, max_len: int) -> str:
+    """Truncate text at a word boundary, not exceeding max_len."""
+    if len(text) <= max_len:
+        return text
+    truncated = text[:max_len]
+    # Find last space
+    last_space = truncated.rfind(" ")
+    if last_space > 0:
+        return truncated[:last_space]
+    return truncated
+
+
+def _transform_use_case_slug(slug: str) -> str:
+    """Transform use-case slug by dropping the coded prefix.
+
+    e.g., 'uc-s1-01-canvas-dependencies' -> 'canvas-dependencies'
+    If the slug doesn't match the pattern, return as-is.
+    """
+    # Pattern: uc-s<digit>-<digits>-<rest>
+    match = re.match(r"^uc-s\d+-\d+-(.+)$", slug)
+    if match:
+        return match.group(1)
+    return slug
+
+
+def _build_canonical_url(page_url: str) -> str:
+    """Build canonical URL for a page."""
+    return f"{SITE_URL}{page_url}"
+
+
+def _build_og_data(page: "PublicPage") -> dict[str, str]:
+    """Build Open Graph data for a page."""
+    return {
+        "og:title": page.title,
+        "og:description": page.meta_description or page.title,
+        "og:url": _build_canonical_url(page.url),
+        "og:type": "website",
+    }
 
 
 def _sanitize_html(html: str) -> Markup:
@@ -100,6 +186,8 @@ class PublicPage:
     front_matter: dict[str, Any] = field(default_factory=dict)
     source_path: Path | None = None
     canonical_url: str | None = None
+    meta_description: str = ""
+    og_data: dict[str, str] = field(default_factory=dict)
 
     @property
     def cta(self) -> str | None:
@@ -153,7 +241,11 @@ def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     body_html = _sanitize_html(_md.reset().convert(body_md))
     title = _extract_title(body_html, front_matter)
     canonical = _build_canonical(front_matter)
-    return PublicPage(
+    # For non-comparison pages, canonical is the entelim.org URL
+    if canonical is None:
+        canonical = _build_canonical_url(url)
+    meta_description = _extract_meta_description(front_matter, body_md)
+    page = PublicPage(
         family=family,
         slug=slug,
         url=url,
@@ -162,11 +254,26 @@ def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
         front_matter=front_matter,
         source_path=file_path,
         canonical_url=canonical,
+        meta_description=meta_description,
     )
+    page.og_data = _build_og_data(page)
+    return page
 
 
 def _slug_from_filename(filename: str) -> str:
     return filename.replace(".md", "")
+
+
+def _get_use_case_slugs(filename: str) -> tuple[str, str]:
+    """Get both old and new slugs for a use-case file.
+
+    Returns (old_slug, new_slug) where:
+    - old_slug is the filename without .md (e.g., 'uc-s1-01-canvas-dependencies')
+    - new_slug is the transformed slug without coded prefix (e.g., 'canvas-dependencies')
+    """
+    old_slug = _slug_from_filename(filename)
+    new_slug = _transform_use_case_slug(old_slug)
+    return old_slug, new_slug
 
 
 def load_all_pages() -> list[PublicPage]:
@@ -184,12 +291,18 @@ def load_all_pages() -> list[PublicPage]:
         if not family_dir.is_dir():
             continue
         for md_file in sorted(family_dir.glob("*.md")):
-            slug = _slug_from_filename(md_file.name)
-            if family == "dogfood":
+            if family == "function-per-segment":
+                old_slug, new_slug = _get_use_case_slugs(md_file.name)
+                slug = new_slug  # Use new slug for the page
+                url = f"{FAMILY_URL_PREFIX[family]}/{new_slug}"
+            elif family == "dogfood":
+                slug = _slug_from_filename(md_file.name)
                 url = FAMILY_URL_PREFIX[family]
             elif family == "vision":
+                slug = _slug_from_filename(md_file.name)
                 url = FAMILY_URL_PREFIX[family]
             else:
+                slug = _slug_from_filename(md_file.name)
                 url = f"{FAMILY_URL_PREFIX[family]}/{slug}"
             pages.append(_load_page(md_file, family, slug, url))
 
@@ -221,12 +334,57 @@ def load_page(family: str, slug: str | None = None) -> PublicPage | None:
     if slug is None:
         return None
 
+    # For use-case pages, try both old and new slug patterns
+    if family == "function-per-segment":
+        # First try the slug as-is (could be new slug)
+        file_path = family_dir / f"{slug}.md"
+        if file_path.is_file():
+            url = f"{FAMILY_URL_PREFIX[family]}/{slug}"
+            return _load_page(file_path, family, slug, url)
+        # Then try to find a file whose new slug matches
+        for md_file in family_dir.glob("*.md"):
+            old_slug, new_slug = _get_use_case_slugs(md_file.name)
+            if new_slug == slug:
+                url = f"{FAMILY_URL_PREFIX[family]}/{new_slug}"
+                return _load_page(md_file, family, new_slug, url)
+        return None
+
     file_path = family_dir / f"{slug}.md"
     if not file_path.is_file():
         return None
 
     url = f"{FAMILY_URL_PREFIX[family]}/{slug}"
     return _load_page(file_path, family, slug, url)
+
+
+def get_old_use_case_url(new_slug: str) -> str | None:
+    """Get the old URL for a use-case page given its new slug.
+
+    Returns the old URL (with coded prefix) if found, else None.
+    """
+    family_dir = CONTENT_ROOT / "function-per-segment"
+    if not family_dir.is_dir():
+        return None
+    for md_file in family_dir.glob("*.md"):
+        old_slug, file_new_slug = _get_use_case_slugs(md_file.name)
+        if file_new_slug == new_slug:
+            return f"{FAMILY_URL_PREFIX['function-per-segment']}/{old_slug}"
+    return None
+
+
+def get_new_use_case_url(old_slug: str) -> str | None:
+    """Get the new URL for a use-case page given its old slug.
+
+    Returns the new URL (without coded prefix) if found, else None.
+    """
+    family_dir = CONTENT_ROOT / "function-per-segment"
+    if not family_dir.is_dir():
+        return None
+    for md_file in family_dir.glob("*.md"):
+        file_old_slug, new_slug = _get_use_case_slugs(md_file.name)
+        if file_old_slug == old_slug:
+            return f"{FAMILY_URL_PREFIX['function-per-segment']}/{new_slug}"
+    return None
 
 
 def build_jsonld(page: PublicPage) -> str:

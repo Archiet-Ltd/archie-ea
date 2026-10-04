@@ -244,6 +244,23 @@ def public_module(slug):
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 
+@main.route("/use-cases/uc-s<int:segment>-<num>-<path:rest>")
+def public_use_case_redirect(segment, num, rest):
+    """Redirect old coded use-case URLs to new clean URLs.
+
+    Old: /use-cases/uc-s1-01-canvas-dependencies
+    New: /use-cases/canvas-dependencies
+    """
+    from app.services.public_pages import get_new_use_case_url
+
+    old_slug = f"uc-s{segment}-{num}-{rest}"
+    new_url = get_new_use_case_url(old_slug)
+    if new_url:
+        return redirect(new_url, code=301)
+    from flask import abort
+    abort(404)
+
+
 @main.route("/use-cases/<slug>")
 def public_use_case(slug):
     """A function-per-segment content page."""

@@ -7,6 +7,12 @@
 {% extends 'layouts/public_base.html' %}
 {% block title %}{{ page.title }}{% endblock %}
 
+{% block meta_description %}
+{% if page.meta_description %}
+<meta name="description" content="{{ page.meta_description }}">
+{% endif %}
+{% endblock %}
+
 {% block header %}
 {% include 'components/public_navbar.html' %}
 {% endblock %}
@@ -32,6 +38,12 @@
   .public-page-content pre { background: var(--color-muted, #f3f4f6); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 1rem; }
   .public-page-content pre code { background: none; padding: 0; }
 </style>
+{% if page.og_data %}
+<meta property="og:title" content="{{ page.og_data['og:title'] }}">
+<meta property="og:description" content="{{ page.og_data['og:description'] }}">
+<meta property="og:url" content="{{ page.og_data['og:url'] }}">
+<meta property="og:type" content="{{ page.og_data['og:type'] }}">
+{% endif %}
 {% endblock %}
 
 {% block content %}
