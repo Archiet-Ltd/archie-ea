@@ -380,5 +380,16 @@ def test_approval_inbox_source_table_display(app, db_session, make_org, tenant_c
     # Find the backfilled item
     backfilled = next((a for a in data["approvals"] if a["summary"] == "Confidence review: Source Display Item"), None)
     assert backfilled is not None
-    # The source_table is not in the queue API response, but the approval row has it
-    # This test verifies the item exists in the queue
+    assert backfilled.get("source_table") == "review_queue_items", (
+        "backfilled item must carry its source_table so the inbox template "
+        "can render the source badge"
+    )
+    # source_id is the review_queue_items row id, not item_id.
+    assert isinstance(backfilled.get("source_id"), int) and backfilled["source_id"] > 0, (
+        "backfilled item must carry its source_id so the inbox template "
+        "can render the source badge"
+    )
+    assert backfilled.get("status") == "pending", (
+        "queue items must carry their status so the inbox template's "
+        "isOverdue() can decide whether to show the Overdue indicator"
+    )

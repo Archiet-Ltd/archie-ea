@@ -392,7 +392,17 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # from the admin dashboard page (app/templates/admin/index.html) instead of a
 # third and fourth new Admin-zone sidebar entry, which is why they add zero to
 # every role's rendered count.
-SIDEBAR_LINK_BUDGET = 31
+#
+# Approval Inbox (4 Oct 2026): raised 31 -> 32. The Approval Inbox is one new
+# link in every persona's My work — the single queue for every pending change
+# proposal, shared by every persona with GENERAL permission. platform_admin
+# (the role with zero headroom) renders it like every other role, moving its
+# zone-only total 28 -> 29 and its rendered total 31 -> 32. No fold is
+# available: the Admin zone already shed four links in the canvas/framework
+# round, and the My-work zone carries only four links (plus Ask). Raising the
+# budget by one is the honest cost of adding a genuinely new, intentional link
+# that every persona needs.
+SIDEBAR_LINK_BUDGET = 32
 
 _ZONE_TITLES = {
     "home": "Home",
