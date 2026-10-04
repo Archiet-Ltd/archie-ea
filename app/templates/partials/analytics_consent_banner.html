@@ -102,6 +102,15 @@
           withdrawConsent();
         });
       }
+
+      // Attach click handler to footer "Cookie settings" link
+      const cookieSettingsLink = document.querySelector('[data-action="openAnalyticsConsentBanner"]');
+      if (cookieSettingsLink) {
+        cookieSettingsLink.addEventListener('click', function(event) {
+          event.preventDefault();
+          window.openAnalyticsConsentBanner();
+        });
+      }
     }
 
     function init() {

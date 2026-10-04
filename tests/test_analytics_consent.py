@@ -304,6 +304,20 @@ class TestAnalyticsConsentCookieBehavior:
             assert "Cookie settings" in html
             assert "openAnalyticsConsentBanner" in html
 
+    def test_footer_cookie_settings_link_has_click_handler(self, app_with_settings):
+        """The footer 'Cookie settings' link must have a click handler attached
+        that prevents navigation and calls window.openAnalyticsConsentBanner()."""
+        with app_with_settings.test_client() as client:
+            rv = client.get("/pricing")
+            html = rv.data.decode()
+            # The link must exist with the data-action attribute
+            assert 'data-action="openAnalyticsConsentBanner"' in html
+            # The script must attach a click handler to that selector
+            assert 'querySelector(\'[data-action="openAnalyticsConsentBanner"]\')' in html
+            assert "addEventListener('click'" in html
+            assert "event.preventDefault()" in html
+            assert "window.openAnalyticsConsentBanner()" in html
+
     def test_open_banner_always_shows_regardless_of_cookie(self, app_with_settings):
         """window.openAnalyticsConsentBanner must always show the banner,
         even if consent was previously accepted or rejected."""
@@ -454,11 +468,11 @@ class TestSharedArtefactPageExcludesAnalytics:
                     artefact_title="Test Artefact",
                     artefact_type="capability_map",
                     data={"total_count": 0, "domain_count": 0, "groups": []},
-                        organization_name="Test Org",
-                        generated_at=datetime(2024, 1, 1, 0, 0, 0),
-                        link=type("Link", (), {"created_at": datetime(2024, 1, 1, 0, 0, 0)})()
-                    )
-                    assert "analytics-consent-banner" not in html
+                    organization_name="Test Org",
+                    generated_at=datetime(2024, 1, 1, 0, 0, 0),
+                    link=type("Link", (), {"created_at": datetime(2024, 1, 1, 0, 0, 0)})()
+                )
+                assert "analytics-consent-banner" not in html
 
 
 class TestHeadHtmlNoGoogleAnalyticsId:
