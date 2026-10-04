@@ -396,7 +396,7 @@ def test_llms_txt_first_sentence_not_glued_to_title(app):
     # Pattern: - [AI Chat](https://entelim.org/modules/ai-chat) — <sentence>
     pattern = rf"\[{re.escape(page.title)}\]\(https://entelim\.org{re.escape(page.url)}\) — ([^\n]+)"
     match = re.search(pattern, text)
-    assert match is not None, f"ai-chat entry not found in llms.txt Capabilities section"
+    assert match is not None, "ai-chat entry not found in llms.txt Capabilities section"
 
     sentence = match.group(1).strip()
     # The sentence must not start with the page title (glued)
