@@ -4,7 +4,8 @@ use_case_id: UC-S1-05
 segment_id: S1
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
-capture_status: awaiting_capture
+cta: plans
+capture_status: live
 url_slug: /startups/show-what-we-run
 ---
 
