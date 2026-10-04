@@ -519,9 +519,14 @@ def downgrade():
         bind.execute(text(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY"))
         bind.execute(text(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY"))
 
-    # Revoke the platform role's grants, then drop it -- DROP ROLE fails
-    # while the role still holds privileges (not just ownership), the exact
-    # bug the archie_app role hit below before this fix.
+    # Revoke the platform role's grants in this database. The role itself
+    # is cluster-wide (CREATE ROLE's own guard above is what makes that
+    # safe to re-run) and is NOT dropped here: a Postgres cluster hosting
+    # several databases -- exactly what a CI run's shared service container
+    # does across shards -- still has this role granted in the OTHER
+    # databases, and DROP ROLE fails while the role holds privileges
+    # anywhere in the cluster, not just in this database. A downgrade must
+    # only undo this database's own state.
     if _role_exists(bind, "archie_platform"):
         bind.execute(text(
             "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM archie_platform"
@@ -532,11 +537,9 @@ def downgrade():
         bind.execute(text("REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM archie_platform"))
         bind.execute(text("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM archie_platform"))
         bind.execute(text("REVOKE USAGE ON SCHEMA public FROM archie_platform"))
-        bind.execute(text("DROP ROLE IF EXISTS archie_platform"))
 
-    # Revoke the DML grants given to archie_app, then drop the role
-    # itself (only if no other objects depend on it), mirroring
-    # archie_platform above.
+    # Revoke the DML grants given to archie_app in this database, for the
+    # same cluster-wide reason -- the role itself is not dropped here.
     if _role_exists(bind, "archie_app"):
         bind.execute(text(
             "ALTER DEFAULT PRIVILEGES IN SCHEMA public "
@@ -548,4 +551,3 @@ def downgrade():
         ))
         bind.execute(text("REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM archie_app"))
         bind.execute(text("REVOKE USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public FROM archie_app"))
-        bind.execute(text("DROP ROLE IF EXISTS archie_app"))
