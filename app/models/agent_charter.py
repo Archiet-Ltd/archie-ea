@@ -11,17 +11,15 @@ affecting organisation B.
 from datetime import datetime
 
 from app import db
+from app.models.mixins import TenantMixin
 
 
-class AgentCharter(db.Model):
+class AgentCharter(TenantMixin, db.Model):
     """A versioned charter that governs one AI persona in one organisation."""
 
     __tablename__ = "agent_charters"
 
     id = db.Column(db.Integer, primary_key=True)
-    organization_id = db.Column(
-        db.Integer, db.ForeignKey("organizations.id"), nullable=False, index=True
-    )
     persona = db.Column(db.String(80), nullable=False, index=True)
     version = db.Column(db.Integer, nullable=False, default=1)
     purpose = db.Column(db.Text, nullable=False, default="")

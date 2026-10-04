@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S1-04, segment: S1}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Value Streams

@@ -4,17 +4,15 @@ Agent Run Record model — one record per agent run, replayable.
 from datetime import datetime
 
 from app import db
+from app.models.mixins import TenantMixin
 
 
-class AgentRunRecord(db.Model):
+class AgentRunRecord(TenantMixin, db.Model):
     """One record per agent invocation, capturing everything needed for audit and replay."""
 
     __tablename__ = "agent_run_records"
 
     id = db.Column(db.Integer, primary_key=True)
-    organization_id = db.Column(
-        db.Integer, db.ForeignKey("organizations.id"), nullable=False, index=True
-    )
     user_id = db.Column(
         db.Integer, db.ForeignKey("users.id"), nullable=True, index=True
     )

@@ -508,6 +508,13 @@ class ComplianceGap(db.Model):
     identified_at = db.Column(db.DateTime, default=datetime.utcnow)
     identified_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
 
+    # Set once this row has been merged into the one gap register (app.models.
+    # implementation_migration.Gap) by app/commands/consolidate_gaps.py. NULL
+    # means not yet merged; the row itself is never dropped (CLAUDE.md).
+    retired_into_id = db.Column(
+        db.Integer, db.ForeignKey("gaps.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     # Relationships
     compliance_requirement = db.relationship("ComplianceRequirement", backref="gaps")
     quality_attribute = db.relationship("QualityAttribute", backref="gaps")

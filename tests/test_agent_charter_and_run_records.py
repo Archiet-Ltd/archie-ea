@@ -337,12 +337,17 @@ def test_run_record_two_org_isolation(db_session, make_org, app):
         g.current_org_id = org_a.id
         runner = AgentRunner(user_a.id)
         runner.run(user_message="Org A test", domain="general", persona="cto")
+        # Clear tenant context so queries outside the request context are not
+        # filtered by a stale g.current_org_id (it persists after the context
+        # exits because g is bound to the application context).
+        g.current_org_id = None
 
     # Run in org B
     with app.test_request_context("/"):
         g.current_org_id = org_b.id
         runner = AgentRunner(user_b.id)
         runner.run(user_message="Org B test", domain="general", persona="cto")
+        g.current_org_id = None
 
     db_session.flush()
 
@@ -658,3 +663,79 @@ def test_run_record_replay_org_scoped(db_session, make_org, app):
             id=record_b.id, organization_id=org_a.id
         ).first()
         assert found is None
+
+
+# ---------------------------------------------------------------------------
+# TenantMixin automatic filtering tests
+# ---------------------------------------------------------------------------
+
+def test_charter_tenant_mixin_filters_by_g_current_org_id(db_session, make_org, app):
+    """TenantMixin auto-filters AgentCharter queries by g.current_org_id."""
+    org_a = make_org("A")
+    org_b = make_org("B")
+    _seed_charters([org_a.id, org_b.id])
+
+    from flask import g
+
+    # Inside org A's request context, only org A's charters are visible
+    with app.test_request_context("/"):
+        g.current_org_id = org_a.id
+        visible = AgentCharter.query.all()
+        assert len(visible) > 0
+        for c in visible:
+            assert c.organization_id == org_a.id, (
+                f"TENANT LEAK: org A saw charter id={c.id} belonging to org {c.organization_id}"
+            )
+
+    # Inside org B's request context, only org B's charters are visible
+    with app.test_request_context("/"):
+        g.current_org_id = org_b.id
+        visible = AgentCharter.query.all()
+        assert len(visible) > 0
+        for c in visible:
+            assert c.organization_id == org_b.id, (
+                f"TENANT LEAK: org B saw charter id={c.id} belonging to org {c.organization_id}"
+            )
+
+
+def test_run_record_tenant_mixin_filters_by_g_current_org_id(db_session, make_org, app):
+    """TenantMixin auto-filters AgentRunRecord queries by g.current_org_id."""
+    org_a = make_org("A")
+    org_b = make_org("B")
+    _seed_charters([org_a.id, org_b.id])
+    user_a = _make_user(org_a.id, db_session)
+    user_b = _make_user(org_b.id, db_session)
+
+    # Create a record in each org
+    rec_a = AgentRunRecord(
+        organization_id=org_a.id, user_id=user_a.id, persona="cto",
+        charter_version=1, inputs={"user_message": "A"}, outcome="OK", success=True,
+    )
+    rec_b = AgentRunRecord(
+        organization_id=org_b.id, user_id=user_b.id, persona="cto",
+        charter_version=1, inputs={"user_message": "B"}, outcome="OK", success=True,
+    )
+    db_session.add_all([rec_a, rec_b])
+    db_session.commit()
+
+    from flask import g
+
+    # Inside org A's request context, only org A's records are visible
+    with app.test_request_context("/"):
+        g.current_org_id = org_a.id
+        visible = AgentRunRecord.query.all()
+        visible_ids = {r.id for r in visible}
+        assert rec_a.id in visible_ids, "org A cannot see its own run record"
+        assert rec_b.id not in visible_ids, (
+            f"TENANT LEAK: org A saw run record id={rec_b.id} belonging to org {org_b.id}"
+        )
+
+    # Inside org B's request context, only org B's records are visible
+    with app.test_request_context("/"):
+        g.current_org_id = org_b.id
+        visible = AgentRunRecord.query.all()
+        visible_ids = {r.id for r in visible}
+        assert rec_b.id in visible_ids, "org B cannot see its own run record"
+        assert rec_a.id not in visible_ids, (
+            f"TENANT LEAK: org B saw run record id={rec_a.id} belonging to org {org_a.id}"
+        )

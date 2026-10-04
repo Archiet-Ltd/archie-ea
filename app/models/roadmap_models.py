@@ -355,6 +355,11 @@ class RoadmapGap(db.Model):
     created_by = Column(Integer, ForeignKey("users.id"))
     updated_by = Column(Integer, ForeignKey("users.id"))
 
+    # Set once this row has been merged into the one gap register (app.models.
+    # implementation_migration.Gap) by app/commands/consolidate_gaps.py. NULL
+    # means not yet merged; the row itself is never dropped (CLAUDE.md).
+    retired_into_id = Column(Integer, ForeignKey("gaps.id", ondelete="SET NULL"), nullable=True, index=True)
+
     # Relationships
     source_capability = relationship("UnifiedCapability", backref="related_roadmap_gaps")
     source_application = relationship("ApplicationComponent", backref="related_roadmap_gaps")

@@ -8,7 +8,10 @@
    Every class used here already appears in the committed tailwind-output.css
    (the level ramp is copied verbatim from capability_maturity/heatmap.html), so
    the page renders without a Tailwind rebuild.
+   Suppress public analytics (GA4/Clarity) because this page carries customer
+   architecture content and must never load third-party tracking.
 #}
+{% set suppress_public_analytics = true %}
 {% extends 'layouts/public_base.html' %}
 
 {% block title %}{{ artefact_title }}{% endblock %}

@@ -431,9 +431,35 @@ def test_without_keys_the_billing_page_says_payment_is_not_set_up(app, db_sessio
     html = page.get_data(as_text=True)
     assert page.status_code == 200
     assert "Online payment is not set up on this installation" in html
-    assert "STRIPE_SECRET_KEY" in html  # the operator can see which setting is missing
+    # An organisation administrator is a customer, not the platform operator:
+    # the banner tells them payment is not available, but not which settings
+    # are missing.
+    assert "STRIPE_SECRET_KEY" not in html
+    assert "Settings the operator has not provided" not in html
     assert "Continue to payment" not in html
     assert "Online payment is not set up on this installation. No payment was taken." in resp.get_data(as_text=True)
+
+
+def test_without_keys_a_platform_admin_sees_which_settings_are_missing(app, db_session, client, login_as, no_billing):
+    platform = _platform_admin(db_session)
+    with app.app_context():
+        login_as(client, platform)
+        page = client.get("/admin/billing/")
+    html = page.get_data(as_text=True)
+    assert page.status_code == 200
+    assert "Online payment is not set up on this installation" in html
+    assert "STRIPE_SECRET_KEY" in html  # the operator can see which setting is missing
+
+
+def test_with_keys_the_billing_page_shows_no_configuration_warning(app, db_session, client, login_as, billing):
+    org, admin = _admin_org(db_session, "haskeys")
+    with app.app_context():
+        login_as(client, admin)
+        page = client.get("/admin/billing/")
+    html = page.get_data(as_text=True)
+    assert page.status_code == 200
+    assert "Online payment is not set up on this installation" not in html
+    assert 'data-testid="billing-not-configured"' not in html
 
 
 def test_buy_starts_checkout_for_the_chosen_plan(app, db_session, client, login_as, billing, monkeypatch):

@@ -56,8 +56,18 @@ class Risk(TenantMixin, db.Model):
         return self.likelihood * self.impact
 
     @property
+    def _effective_score(self):
+        """The score used for the risk_level badge: residual when available,
+        falling back to inherent, then to the base likelihood×impact pair."""
+        if self.residual_likelihood is not None and self.residual_impact is not None:
+            return self.residual_likelihood * self.residual_impact
+        if self.inherent_likelihood is not None and self.inherent_impact is not None:
+            return self.inherent_likelihood * self.inherent_impact
+        return self.likelihood * self.impact
+
+    @property
     def risk_level(self):
-        s = self.risk_score
+        s = self._effective_score
         if s >= 15:
             return "critical"
         if s >= 9:

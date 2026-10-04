@@ -504,6 +504,11 @@ class ImplementationGap(db.Model):
     created_by = Column(String(255))
     resolved_date = Column(DateTime, nullable=True)
 
+    # Set once this row has been merged into the one gap register (app.models.
+    # implementation_migration.Gap) by app/commands/consolidate_gaps.py. NULL
+    # means not yet merged; the row itself is never dropped (CLAUDE.md).
+    retired_into_id = Column(Integer, ForeignKey("gaps.id", ondelete="SET NULL"), nullable=True, index=True)
+
     # Foreign Keys
     architecture_id = Column(Integer, ForeignKey("architecture_models.id"), nullable=True)
     baseline_plateau_id = Column(Integer, ForeignKey("implementation_plateaus.id"), nullable=True)

@@ -61,10 +61,6 @@ def org_id(app):
         ArchiMateRelationship.query.filter_by(organization_id=created).delete()
         ArchiMateElement.query.filter_by(organization_id=created).delete()
         db.session.commit()
-        row = db.session.get(Organization, created)
-        if row is not None:
-            db.session.delete(row)
-        db.session.commit()
 
 
 def _payload():
