@@ -1371,3 +1371,36 @@ def test_sitemap_includes_vs_hub(app):
     with app.test_client() as client:
         xml = client.get("/sitemap.xml").data.decode()
         assert "<loc>https://entelim.org/vs</loc>" in xml
+
+
+# ── Guard: a disproven pricing claim must not return ─────────────
+#
+# Entelim's prices are published at /pricing (Startup $49/month, Team
+# $29/editor/month). Earlier drafts of the /vs comparison tables carried
+# "Not published; free to self-host under AGPL" for Entelim's own pricing
+# column -- self-hosting under AGPL is a true, separate fact, but it does
+# not mean pricing is unpublished. This guard fails if any rendered page
+# repeats that claim.
+
+BANNED_CLAIMS = [
+    (
+        "not published; free to self-host",
+        "Entelim's prices are published at /pricing (Startup $49/month, Team "
+        "$29/editor/month) -- self-hosting under AGPL is a separate, true fact, "
+        "but it does not mean pricing is unpublished",
+    ),
+]
+
+
+def test_no_page_repeats_a_disproven_pricing_claim(app):
+    """No rendered page claims Entelim's own pricing is unpublished."""
+    pages = load_all_pages()
+    offenders = []
+    with app.test_client() as client:
+        for page in pages:
+            rv = client.get(page.url)
+            html = rv.data.decode().lower()
+            for phrase, reason in BANNED_CLAIMS:
+                if phrase in html:
+                    offenders.append(f"{page.url}: {phrase!r} ({reason})")
+    assert not offenders, "pages repeat a disproven claim:\n" + "\n".join(offenders)
