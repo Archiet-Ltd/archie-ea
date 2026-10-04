@@ -25,4 +25,4 @@ write straight through to your change-request system, so the record doesn't live
 
 ## Related
 
-- [Which risks and control gaps touch this goal?](/enterprise-architecture/risk-and-controls)
+- [Which risks touch this part of the architecture?](/enterprise-architecture/risk-and-controls)
