@@ -354,6 +354,84 @@ def test_llms_full_txt_under_size_limit(app):
         assert len(rv.data) < 2 * 1024 * 1024, "llms-full.txt exceeds 2 MB limit"
 
 
+# ── Review findings: llms.txt defects ───────────────────────────────────────
+
+
+def test_llms_txt_no_duplicate_urls(app):
+    """/llms.txt must not contain any URL more than once."""
+    from app.services.public_pages import load_all_pages
+
+    with app.test_client() as client:
+        rv = client.get("/llms.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+    # Extract all URLs from markdown links [title](url)
+    import re
+
+    urls = re.findall(r"\]\((https://entelim\.org[^)]+)\)", text)
+    # Count occurrences
+    from collections import Counter
+
+    counts = Counter(urls)
+    duplicates = [url for url, count in counts.items() if count > 1]
+    assert not duplicates, f"llms.txt contains duplicate URLs: {duplicates}"
+
+
+def test_llms_txt_first_sentence_not_glued_to_title(app):
+    """For ai-chat, the extracted sentence in llms.txt does not start with the page title."""
+    from app.services.public_pages import load_page
+
+    page = load_page("module", slug="ai-chat")
+    assert page is not None, "ai-chat page not found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+    # Find the line for ai-chat in the Capabilities section
+    import re
+
+    # Pattern: - [AI Chat](https://entelim.org/modules/ai-chat) — <sentence>
+    pattern = rf"\[{re.escape(page.title)}\]\(https://entelim\.org{re.escape(page.url)}\) — ([^\n]+)"
+    match = re.search(pattern, text)
+    assert match is not None, f"ai-chat entry not found in llms.txt Capabilities section"
+
+    sentence = match.group(1).strip()
+    # The sentence must not start with the page title (glued)
+    assert not sentence.startswith(page.title), (
+        f"Extracted sentence starts with page title (glued): '{sentence}'"
+    )
+    # The sentence should be a proper sentence starting with a capital letter
+    assert sentence[0].isupper(), f"Sentence should start with capital letter: '{sentence}'"
+
+
+def test_html_to_plain_text_removes_script_and_style_content():
+    """_html_to_plain_text removes <script> and <style> elements with their content."""
+    from app.main.views import _html_to_plain_text
+
+    html = """
+    <h1>Title</h1>
+    <script>alert('xss'); var x = 1;</script>
+    <p>Paragraph 1.</p>
+    <style>.hidden { display: none; }</style>
+    <p>Paragraph 2.</p>
+    """
+    result = _html_to_plain_text(html)
+
+    # Script content must not appear
+    assert "alert('xss')" not in result, "Script content leaked into plain text"
+    assert "var x = 1" not in result, "Script content leaked into plain text"
+    # Style content must not appear
+    assert ".hidden" not in result, "Style content leaked into plain text"
+    assert "display: none" not in result, "Style content leaked into plain text"
+    # But regular content must remain
+    assert "Title" in result
+    assert "Paragraph 1" in result
+    assert "Paragraph 2" in result
+
+
 # ── AC4: JSON-LD per page family ──────────────────────────────────────────
 
 
