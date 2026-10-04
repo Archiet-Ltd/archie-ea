@@ -220,8 +220,9 @@ def llms_txt():
             lines.append(f"- [{p.title}]({base_url}{p.url}) — {sentence}")
         lines.append("")
 
-    # All pages list
-    for p in pages:
+    # All pages list (exclude module pages already listed in Capabilities)
+    non_module_pages = [p for p in pages if p.family != "module"]
+    for p in non_module_pages:
         lines.append(f"- [{p.title}]({base_url}{p.url})")
     text = "\n".join(lines) + "\n"
     from flask import Response
@@ -265,12 +266,24 @@ def llms_full_txt():
 
 
 def _extract_first_sentence(html: str) -> str:
-    """Extract the first meaningful sentence from rendered HTML body."""
+    """Extract the first meaningful sentence from rendered HTML body.
+
+    Takes the first sentence from the first <p> element (skipping headings)
+    to avoid the h1 title running into the first paragraph.
+    """
     import re
     import html as html_mod
 
-    # Remove HTML tags
-    text = re.sub(r"<[^>]+>", "", html)
+    # Find the first <p> element content
+    p_match = re.search(r"<p[^>]*>(.*?)</p>", html, flags=re.DOTALL | re.IGNORECASE)
+    if p_match:
+        text = p_match.group(1)
+        # Strip any nested HTML tags from the paragraph content
+        text = re.sub(r"<[^>]+>", "", text)
+    else:
+        # Fallback: remove all tags and use the whole text
+        text = re.sub(r"<[^>]+>", "", html)
+
     text = html_mod.unescape(text)
     text = " ".join(text.split())  # Normalize whitespace
 
@@ -290,9 +303,11 @@ def _html_to_plain_text(html: str) -> str:
     import re
     import html as html_mod
 
-    # Convert common HTML elements to markdown-like plain text
-    text = html
+    # Remove <script> and <style> elements with their content FIRST
+    text = re.sub(r"<script\b[^>]*>.*?</script>", "", html, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<style\b[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
 
+    # Convert common HTML elements to markdown-like plain text
     # Headings
     text = re.sub(r"<h1[^>]*>(.*?)</h1>", r"# \1", text, flags=re.DOTALL)
     text = re.sub(r"<h2[^>]*>(.*?)</h2>", r"## \1", text, flags=re.DOTALL)
