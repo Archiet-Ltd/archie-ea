@@ -21,9 +21,9 @@ people. Every question, every canvas, the twin map, file import, and community s
 Ten people. For founders and small services firms, 5 to 50 people. Everything in Community, plus a
 webhook feed, export and share, and email support.
 
-## Team — $29/editor/month
+## Team — $29/editor/month ($290/editor/year)
 
-Or $290/month for fifteen editors; people who only ask questions are free. For scale-ups and
+People who only ask questions are free. For scale-ups and
 services companies, 50 to 500 people. Single sign-on, the review-board workflow, your own model
 key, and usage history.
 
