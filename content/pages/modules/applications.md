@@ -11,6 +11,7 @@ answers_use_cases:
   - {id: UC-S3-01, segment: S3}
   - {id: UC-S4-05, segment: S4}
 capture_status: awaiting_capture
+cta: plans
 ---
 
 # Applications
@@ -18,12 +19,36 @@ capture_status: awaiting_capture
 *The single list of every application Entelim knows about, where it came from, who owns it, and what
 it costs.*
 
+## What application portfolio management is
+
+An application portfolio is the complete list of every application your organisation runs, together
+with four things about each one: who owns it, what it costs, what stage of its life it's in, and how
+much risk it carries. Application portfolio management is keeping that list true and using it to
+make decisions — what to consolidate, what to renew, and what to retire before it becomes a problem
+instead of after.
+
+Most organisations never get past the first part. The list exists, but it's split across a
+spreadsheet, three people's memory, and whatever the last vendor renewal email said, and it goes
+stale the week after anyone updates it. The cost of that gap is specific and findable: two teams
+paying for software that does the same job, applications nobody has named an owner for, and
+contracts or end-of-life dates that arrive as a surprise because nothing was watching them. It also
+surfaces at the worst possible moment — when an audit, a security review, or an acquirer asks for the
+current system landscape, and the honest answer is a diagram drawn months ago by someone who has
+since left.
+
+Done well, a portfolio holds up under three questions asked at once: who is accountable for this
+application, what does it actually cost across licensing, maintenance, infrastructure and support,
+and what happens if it goes away. That means ownership and cost attached to every application, not
+just the ones someone remembered to document; renewal and retirement dates visible before they
+become urgent; and duplicate spend visible on its own, not found by accident during a budget review.
+
 ## What this module does
 
-Every application in your model — typed in, imported, or read through a connector — lives in one
-list, not scattered across a spreadsheet and three people's heads. Each row shows where the record
-came from, and links straight into the questions that read it: what you're paying for twice, vendor
-and procurement detail, and what breaks if this application fails.
+Entelim's Applications module is where that list lives for real, not hypothetically. Every
+application in your model — typed in, imported, or read through a connector — lives in one list, not
+scattered across a spreadsheet and three people's heads. Each row shows where the record came from,
+and links straight into the questions that read it: what you're paying for twice, vendor and
+procurement detail, and what breaks if this application fails.
 
 ## Where you'll meet it
 
