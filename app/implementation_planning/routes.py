@@ -1083,7 +1083,7 @@ def generate_report():
         # Generate report data
         report_data = {
             "generated_at": datetime.now().isoformat(),
-            "generated_by": current_user.username
+            "generated_by": current_user.full_name()
             if current_user.is_authenticated
             else "system",
             "summary": {
@@ -1120,6 +1120,7 @@ def generate_report():
         return jsonify({"success": True, "report": report_data})
 
     except Exception:
+        current_app.logger.exception("Error generating implementation planning report")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
