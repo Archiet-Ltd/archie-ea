@@ -242,6 +242,118 @@ def test_sitemap_xml_has_correct_content_type(app):
         assert "xml" in rv.content_type
 
 
+# ── AC3 extended: llms.txt Capabilities section and llms-full.txt ─────────────
+
+
+def test_llms_txt_has_capabilities_section(app):
+    """/llms.txt includes a ## Capabilities section with all module pages."""
+    from app.services.public_pages import load_all_pages
+
+    module_pages = [p for p in load_all_pages() if p.family == "module"]
+    assert len(module_pages) > 0, "No module pages found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+        # Check Capabilities section exists
+        assert "## Capabilities" in text, "llms.txt missing ## Capabilities section"
+
+        # Every module page should appear in the Capabilities section with its URL
+        for page in module_pages:
+            assert page.url in text, f"llms.txt Capabilities section missing URL {page.url}"
+            # Title should appear
+            assert page.title in text, f"llms.txt Capabilities section missing title '{page.title}'"
+            # Should have a descriptive sentence (the — separator)
+            assert f"[{page.title}](https://entelim.org{page.url}) —" in text, (
+                f"llms.txt Capabilities section missing description for {page.url}"
+            )
+
+
+def test_llms_full_txt_returns_200(app):
+    """/llms-full.txt returns 200 with text/plain content type."""
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        assert "text/plain" in rv.content_type
+
+
+def test_llms_full_txt_contains_all_module_titles(app):
+    """/llms-full.txt contains the title of every module page."""
+    from app.services.public_pages import load_all_pages
+
+    module_pages = [p for p in load_all_pages() if p.family == "module"]
+    assert len(module_pages) > 0, "No module pages found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+        for page in module_pages:
+            assert page.title in text, f"llms-full.txt missing module title '{page.title}'"
+
+
+def test_llms_full_txt_contains_all_use_case_titles(app):
+    """/llms-full.txt contains the title of every use-case page."""
+    from app.services.public_pages import load_all_pages
+
+    use_case_pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+    assert len(use_case_pages) > 0, "No use-case pages found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+        for page in use_case_pages:
+            assert page.title in text, f"llms-full.txt missing use-case title '{page.title}'"
+
+
+def test_llms_full_txt_contains_all_comparison_titles(app):
+    """/llms-full.txt contains the title of every comparison page."""
+    from app.services.public_pages import load_all_pages
+
+    comparison_pages = [p for p in load_all_pages() if p.family == "comparison"]
+    assert len(comparison_pages) > 0, "No comparison pages found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+        for page in comparison_pages:
+            assert page.title in text, f"llms-full.txt missing comparison title '{page.title}'"
+
+
+def test_llms_full_txt_includes_urls(app):
+    """/llms-full.txt includes the URL for each page."""
+    from app.services.public_pages import load_all_pages
+
+    target_pages = [
+        p for p in load_all_pages()
+        if p.family in {"module", "function-per-segment", "comparison"}
+    ]
+    assert len(target_pages) > 0, "No target pages found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+        for page in target_pages:
+            assert page.url in text, f"llms-full.txt missing URL {page.url}"
+
+
+def test_llms_full_txt_under_size_limit(app):
+    """/llms-full.txt is under 2 MB."""
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        assert len(rv.data) < 2 * 1024 * 1024, "llms-full.txt exceeds 2 MB limit"
+
+
 # ── AC4: JSON-LD per page family ──────────────────────────────────────────
 
 
