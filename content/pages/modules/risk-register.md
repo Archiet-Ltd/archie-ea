@@ -25,7 +25,7 @@ everywhere its impact would actually reach.
 ## Where you'll meet it
 
 - [Which risks sit on our revenue-critical path?](/scale-up/risk-blast-radius)
-- [Which risks and control gaps touch this goal?](/enterprise-architecture/risk-and-controls)
+- [Which risks touch this part of the architecture?](/enterprise-architecture/risk-and-controls)
 
 ## Related modules
 

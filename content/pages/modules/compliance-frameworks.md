@@ -12,8 +12,8 @@ cta: plans
 
 # Compliance Frameworks
 
-*The filter that turns the Risk Register into a control-gap view — which framework requirements
-your model's risks actually touch.*
+*Checks every application in your model against each framework's controls, showing what's
+implemented and what's still a gap.*
 
 ## What this module does
 
