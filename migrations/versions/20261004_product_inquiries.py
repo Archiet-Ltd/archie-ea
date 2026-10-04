@@ -5,7 +5,7 @@ Team annual plan with onboarding). Mirrors waitlist_signups: no organisation
 or user link, a visitor may not have an account.
 
 Revision ID: 20261004_product_inquiries
-Revises: 20261004_agten_cascade
+Revises: 20261003_gap_org_nullable
 Create Date: 2026-10-04
 """
 from alembic import op
@@ -14,7 +14,7 @@ from sqlalchemy import text
 from app.commands.schema_migrations import ContractBlocked
 
 revision = "20261004_product_inquiries"
-down_revision = "20261004_evt_default"
+down_revision = "20261003_gap_org_nullable"
 branch_labels = None
 depends_on = None
 
