@@ -599,9 +599,10 @@ def test_non_comparison_no_canonical():
 
 def test_waiting_list_cta_renders_link(app):
     """Pages with cta=waiting_list show the waiting list link."""
-    # ai-chat has cta: waiting_list
+    # ai-chat moved to cta: plans (feature shipped), so use /contact instead,
+    # which still carries cta: waiting_list.
     with app.test_client() as client:
-        rv = client.get("/modules/ai-chat")
+        rv = client.get("/contact")
         html = rv.data.decode()
         assert "/#waitlist" in html
         assert "Join the waiting list" in html

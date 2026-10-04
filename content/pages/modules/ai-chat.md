@@ -6,8 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: briefed
 answers_use_cases:
   - {id: UC-S3-10, segment: S3}
-cta: waiting_list
-capture_status: not_applicable_not_yet_built
+cta: plans
+capture_status: live
 ---
 
 # AI Chat

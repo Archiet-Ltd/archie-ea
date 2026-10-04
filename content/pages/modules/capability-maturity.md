@@ -7,8 +7,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: in_review
 answers_use_cases:
   - {id: UC-S3-06, segment: S3}
-capture_status: not_applicable_not_yet_built
-cta: waiting_list
+capture_status: live
+cta: plans
 ---
 
 # Capability Maturity

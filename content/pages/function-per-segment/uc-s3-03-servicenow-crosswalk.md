@@ -5,8 +5,8 @@ segment_id: S3
 state: briefed
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 roadmap_citation: "roadmap-v2.md 'Next: December 2026 to February 2027' — 'ServiceNow as the first native connector, with incidents and changes read into the model and each configuration item resolved to exactly one element'"
-cta: waiting_list
-capture_status: not_applicable_not_yet_built
+cta: plans
+capture_status: live
 url_slug: /enterprise-architecture/servicenow-crosswalk
 ---
 
