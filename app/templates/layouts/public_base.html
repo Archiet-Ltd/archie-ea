@@ -24,8 +24,10 @@
     <script src="{{ url_for('static', filename='js/ui/modal.js') }}"></script>
 
     {% block extra_css %}{% endblock %}
+    {% if not suppress_public_analytics %}
     {% include 'partials/analytics_ga4_loader.html' %}
     {% include 'partials/analytics_clarity_loader.html' %}
+    {% endif %}
 </head>
 <body class="h-full bg-background text-foreground antialiased">
     <!-- Skip to main content link for keyboard users -->
@@ -90,7 +92,9 @@
     <!-- Export Utilities -->
     <script src="{{ url_for('static', filename='js/shared/export-utils.js') }}"></script>
 
+    {% if not suppress_public_analytics %}
     {% include 'partials/analytics_consent_banner.html' %}
+    {% endif %}
 
     {% block extra_js %}{% endblock %}
 </body>

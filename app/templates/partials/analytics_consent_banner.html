@@ -53,7 +53,8 @@
 
     function setCookie(name, value, days) {
       const expires = new Date(Date.now() + days * 864e5).toUTCString();
-      document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Lax';
+      const secure = location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Lax' + secure;
     }
 
     function showBanner() {
@@ -71,26 +72,18 @@
       window.dispatchEvent(new CustomEvent('analytics:consent', { detail: { consent: ACCEPT_VALUE } }));
     }
 
-    function init() {
-      const consent = getCookie(COOKIE_NAME);
-      const banner = document.getElementById(BANNER_ID);
-
-      if (!banner) return; // No banner on this page (e.g. signed-in pages)
-
-      if (consent === ACCEPT_VALUE) {
-        // Already accepted — load analytics immediately, no banner
-        loadAnalytics();
-        return;
+    function withdrawConsent() {
+      // Update GA4 consent to denied if gtag exists
+      if (window.gtag) {
+        gtag('consent', 'update', {
+          'analytics_storage': 'denied'
+        });
       }
+      // Reload so Clarity stops (Clarity has no programmatic stop)
+      location.reload();
+    }
 
-      if (consent === REJECT_VALUE) {
-        // Explicitly rejected — never show banner, never load
-        return;
-      }
-
-      // No choice yet — show banner
-      showBanner();
-
+    function attachHandlers() {
       const acceptBtn = document.getElementById('consent-accept');
       const rejectBtn = document.getElementById('consent-reject');
 
@@ -106,8 +99,33 @@
         rejectBtn.addEventListener('click', function() {
           setCookie(COOKIE_NAME, REJECT_VALUE, 365);
           hideBanner();
+          withdrawConsent();
         });
       }
+    }
+
+    function init() {
+      const consent = getCookie(COOKIE_NAME);
+      const banner = document.getElementById(BANNER_ID);
+
+      if (!banner) return; // No banner on this page (e.g. signed-in pages)
+
+      // Always attach handlers so reopened banner works
+      attachHandlers();
+
+      if (consent === ACCEPT_VALUE) {
+        // Already accepted — load analytics immediately, no banner
+        loadAnalytics();
+        return;
+      }
+
+      if (consent === REJECT_VALUE) {
+        // Explicitly rejected — never show banner, never load
+        return;
+      }
+
+      // No choice yet — show banner
+      showBanner();
     }
 
     if (document.readyState === 'loading') {
@@ -116,12 +134,9 @@
       init();
     }
 
-    // Expose for "Cookie settings" link in footer
+    // Expose for "Cookie settings" link in footer — always shows banner
     window.openAnalyticsConsentBanner = function() {
-      const consent = getCookie(COOKIE_NAME);
-      if (consent !== ACCEPT_VALUE) {
-        showBanner();
-      }
+      showBanner();
     };
   })();
 </script>

@@ -16,26 +16,26 @@
       'ad_personalization': 'denied'
     });
 
-    // Load the GA4 script
-    var script = document.createElement('script');
-    script.async = true;
-    script.src = 'https://www.googletagmanager.com/gtag/js?id=' + '{{ config.GA4_MEASUREMENT_ID }}';
-    script.nonce = '{{ csp_nonce }}';
-    document.head.appendChild(script);
-
-    gtag('js', new Date());
-    gtag('config', '{{ config.GA4_MEASUREMENT_ID }}', {
-      'send_page_view': true
-    });
-
     // Listen for consent change from banner
     window.addEventListener('analytics:consent', function(e) {
-      if (e.detail && e.detail.consent === 'accepted') {
+      if (e.detail && e.detail.consent === 'accepted' && !window._ga4Loaded) {
+        window._ga4Loaded = true;
+
+        // Load the GA4 script
+        var script = document.createElement('script');
+        script.async = true;
+        script.src = 'https://www.googletagmanager.com/gtag/js?id=' + '{{ config.GA4_MEASUREMENT_ID }}';
+        script.nonce = '{{ csp_nonce }}';
+        document.head.appendChild(script);
+
+        gtag('js', new Date());
+        gtag('config', '{{ config.GA4_MEASUREMENT_ID }}', {
+          'send_page_view': true
+        });
+
+        // Update consent to granted for analytics only
         gtag('consent', 'update', {
-          'ad_storage': 'granted',
-          'analytics_storage': 'granted',
-          'ad_user_data': 'granted',
-          'ad_personalization': 'granted'
+          'analytics_storage': 'granted'
         });
       }
     });

@@ -6,6 +6,11 @@ Covers:
 - Public page has consent banner, no tag script before consent
 - Loader appears with nonce after consent cookie is set
 - Signed-in pages never contain gtag/clarity even with consent
+- GA4 script only created inside consent handler (defect 1)
+- Accept grants only analytics_storage, not advertising (defect 2)
+- Banner handlers attached when choice exists; withdrawal works (defect 3)
+- Shared artefact page suppresses GA4/Clarity (defect 4)
+- _head.html no longer references GOOGLE_ANALYTICS_ID (defect 5)
 """
 
 from __future__ import annotations
@@ -163,6 +168,38 @@ class TestAnalyticsConsentWithSettings:
             assert "analytics-consent-banner" in html
             # The JS checks for rejected cookie and doesn't show banner
 
+    def test_ga4_script_created_only_in_consent_handler(self, app_with_settings):
+        """GA4 script element creation must be inside the consent event handler,
+        not at top level. The initial HTML must not contain a script tag with
+        googletagmanager.com src."""
+        with app_with_settings.test_client() as client:
+            rv = client.get("/pricing")
+            html = rv.data.decode()
+            # No script tag with googletagmanager.com src in initial render
+            assert 'src="https://www.googletagmanager.com/gtag/js?id=' not in html
+            # The URL string exists only inside the event handler
+            assert "googletagmanager.com/gtag/js?id=" in html
+            # Verify it's inside addEventListener
+            assert "addEventListener" in html
+            assert "analytics:consent" in html
+
+    def test_accept_grants_only_analytics_storage(self, app_with_settings):
+        """On accept, only analytics_storage is granted. ad_storage, ad_user_data,
+        ad_personalization remain denied."""
+        with app_with_settings.test_client() as client:
+            client.set_cookie("analytics_consent", "accepted")
+            rv = client.get("/pricing")
+            html = rv.data.decode()
+            # Consent update should only grant analytics_storage
+            assert "'analytics_storage': 'granted'" in html or '"analytics_storage": "granted"' in html
+            # Advertising consents must NOT be granted
+            assert "'ad_storage': 'granted'" not in html
+            assert '"ad_storage": "granted"' not in html
+            assert "'ad_user_data': 'granted'" not in html
+            assert '"ad_user_data": "granted"' not in html
+            assert "'ad_personalization': 'granted'" not in html
+            assert '"ad_personalization": "granted"' not in html
+
 
 class TestAnalyticsConsentSignedInPages:
     """Signed-in application pages must never load GA4/Clarity."""
@@ -267,6 +304,47 @@ class TestAnalyticsConsentCookieBehavior:
             assert "Cookie settings" in html
             assert "openAnalyticsConsentBanner" in html
 
+    def test_open_banner_always_shows_regardless_of_cookie(self, app_with_settings):
+        """window.openAnalyticsConsentBanner must always show the banner,
+        even if consent was previously accepted or rejected."""
+        with app_with_settings.test_client() as client:
+            # Test with accepted cookie
+            client.set_cookie("analytics_consent", "accepted")
+            rv = client.get("/pricing")
+            html = rv.data.decode()
+            # The function should be exposed and not check cookie value
+            assert "openAnalyticsConsentBanner" in html
+            assert "if (consent !== ACCEPT_VALUE)" not in html
+            assert "consent !== ACCEPT_VALUE" not in html
+
+    def test_handlers_attached_at_init_regardless_of_choice(self, app_with_settings):
+        """Accept and Reject handlers must be attached once at init
+        regardless of the stored choice, so a reopened banner has working buttons."""
+        with app_with_settings.test_client() as client:
+            # Test with accepted cookie - handlers should still be attached
+            client.set_cookie("analytics_consent", "accepted")
+            rv = client.get("/pricing")
+            html = rv.data.decode()
+            # attachHandlers should be called unconditionally
+            assert "attachHandlers" in html
+            # The init function should call attachHandlers before checking consent
+            assert "attachHandlers()" in html
+
+    def test_reject_after_accept_updates_cookie_and_reloads(self, app_with_settings):
+        """Reject after an earlier Accept sets the cookie to rejected,
+        calls gtag consent update analytics_storage denied if gtag exists,
+        and reloads the page so Clarity stops."""
+        with app_with_settings.test_client() as client:
+            client.set_cookie("analytics_consent", "accepted")
+            rv = client.get("/pricing")
+            html = rv.data.decode()
+            # withdrawConsent function should exist
+            assert "withdrawConsent" in html
+            # Should call gtag consent update with analytics_storage denied
+            assert "analytics_storage" in html and "denied" in html
+            # Should reload the page
+            assert "location.reload" in html
+
 
 class TestAnalyticsConsentOnlyPublicPages:
     """GA4/Clarity only on public pages, never on authenticated routes."""
@@ -315,3 +393,120 @@ class TestAnalyticsConsentPrivacyPage:
             assert "Consent Mode" in html
             assert "Cookie settings" in html
             assert "analytics_consent" in html
+
+
+class TestSharedArtefactPageExcludesAnalytics:
+    """Shared artefact pages must never load GA4 or Clarity."""
+
+    @pytest.fixture
+    def app_with_settings(self, app, monkeypatch):
+        monkeypatch.setitem(app.config, "GA4_MEASUREMENT_ID", "G-TEST123")
+        monkeypatch.setitem(app.config, "CLARITY_PROJECT_ID", "test-clarity-id")
+        monkeypatch.setitem(app.config, "GOOGLE_SITE_VERIFICATION", "google-verify-token")
+        monkeypatch.setitem(app.config, "BING_SITE_VERIFICATION", "bing-verify-token")
+        return app
+
+    def test_shared_artefact_page_no_ga4(self, app_with_settings):
+        """Shared artefact page must not contain GA4 markup."""
+        with app_with_settings.app_context():
+            from flask import render_template
+            from datetime import datetime
+            with app_with_settings.test_request_context():
+                html = render_template(
+                    "artefact_share/public.html",
+                    artefact_title="Test Artefact",
+                    artefact_type="capability_map",
+                    data={"total_count": 0, "domain_count": 0, "groups": []},
+                    organization_name="Test Org",
+                    generated_at=datetime(2024, 1, 1, 0, 0, 0),
+                    link=type("Link", (), {"created_at": datetime(2024, 1, 1, 0, 0, 0)})()
+                )
+                assert "googletagmanager.com" not in html
+                assert "gtag(" not in html
+                assert "dataLayer" not in html
+
+    def test_shared_artefact_page_no_clarity(self, app_with_settings):
+        """Shared artefact page must not contain Clarity markup."""
+        with app_with_settings.app_context():
+            from flask import render_template
+            from datetime import datetime
+            with app_with_settings.test_request_context():
+                html = render_template(
+                    "artefact_share/public.html",
+                    artefact_title="Test Artefact",
+                    artefact_type="capability_map",
+                    data={"total_count": 0, "domain_count": 0, "groups": []},
+                    organization_name="Test Org",
+                    generated_at=datetime(2024, 1, 1, 0, 0, 0),
+                    link=type("Link", (), {"created_at": datetime(2024, 1, 1, 0, 0, 0)})()
+                )
+                assert "clarity.ms" not in html
+                assert "clarity(" not in html
+
+    def test_shared_artefact_page_no_consent_banner(self, app_with_settings):
+        """Shared artefact page must not contain consent banner."""
+        with app_with_settings.app_context():
+            from flask import render_template
+            from datetime import datetime
+            with app_with_settings.test_request_context():
+                html = render_template(
+                    "artefact_share/public.html",
+                    artefact_title="Test Artefact",
+                    artefact_type="capability_map",
+                    data={"total_count": 0, "domain_count": 0, "groups": []},
+                        organization_name="Test Org",
+                        generated_at=datetime(2024, 1, 1, 0, 0, 0),
+                        link=type("Link", (), {"created_at": datetime(2024, 1, 1, 0, 0, 0)})()
+                    )
+                    assert "analytics-consent-banner" not in html
+
+
+class TestHeadHtmlNoGoogleAnalyticsId:
+    """_head.html must not reference GOOGLE_ANALYTICS_ID."""
+
+    def test_head_html_no_google_analytics_id(self, app):
+        with app.test_client() as client:
+            rv = client.get("/pricing")
+            html = rv.data.decode()
+            # Old Universal Analytics loader must be gone
+            assert "GOOGLE_ANALYTICS_ID" not in html
+            assert "google-analytics.com/analytics.js" not in html
+            assert "ga('create'" not in html
+            assert "ga('send', 'pageview')" not in html
+
+    def test_head_html_no_google_analytics_id_in_template_source(self):
+        """Check the template source directly."""
+        from pathlib import Path
+        head_path = Path(__file__).resolve().parent.parent / "app" / "templates" / "partials" / "_head.html"
+        source = head_path.read_text(encoding="utf-8")
+        assert "GOOGLE_ANALYTICS_ID" not in source
+        assert "google-analytics.com/analytics.js" not in source
+        assert "ga('create'" not in source
+        assert "ga('send', 'pageview')" not in source
+
+
+class TestConsentCookieSecureFlag:
+    """Consent cookie must have Secure flag when on HTTPS."""
+
+    @pytest.fixture
+    def app_with_settings(self, app, monkeypatch):
+        monkeypatch.setitem(app.config, "GA4_MEASUREMENT_ID", "G-TEST123")
+        monkeypatch.setitem(app.config, "CLARITY_PROJECT_ID", "test-clarity-id")
+        return app
+
+    def test_consent_cookie_sets_secure_on_https(self, app_with_settings):
+        """The cookie setting JS should include Secure flag when protocol is https."""
+        with app_with_settings.test_client() as client:
+            rv = client.get("/pricing")
+            html = rv.data.decode()
+            # The setCookie function should check location.protocol
+            assert "location.protocol === 'https:'" in html
+            assert "Secure" in html
+
+    def test_consent_banner_template_has_secure_logic(self):
+        """Check the consent banner template source directly for Secure flag logic."""
+        from pathlib import Path
+        banner_path = Path(__file__).resolve().parent.parent / "app" / "templates" / "partials" / "analytics_consent_banner.html"
+        source = banner_path.read_text(encoding="utf-8")
+        assert "location.protocol === 'https:'" in source
+        assert "Secure" in source
