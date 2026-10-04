@@ -54,6 +54,7 @@ _TRANSFORMATION_TABLES = (
     "command_materialisations",
     "operation_results",
     "transformation_outbox_events",
+    "event_log",
     "transformation_candidates",
     "candidate_overlap_dispositions",
     "candidate_signals",
