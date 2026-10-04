@@ -39,14 +39,14 @@ published directly rather than gated behind a sales conversation.
 | Vendor | Avolution | Archiet Ltd |
 | Licence | Proprietary | Open source, AGPL, plus a commercial licence |
 | Self-hostable | Not stated on the vendor's own pricing page | Yes |
-| Pricing | Not published; tiered plans from "ABACUS Core" upward; available on request | Not published; free to self-host under AGPL |
+| Pricing | Not published; tiered plans from "ABACUS Core" upward; available on request | Published at /pricing; free to self-host under AGPL |
 | Import/export | Supported, per third-party review | ArchiMate Open Exchange, .archimate, CSV and Excel |
 | ITSM integration | Supported, per third-party review | Not specifically marketed as an ITSM integration |
 
 ## What Entelim already does
 
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
-  browser across every layer and import history that keeps track of where each element came from.
+  browser across every layer and an import history of what was brought in and when.
 - **CSV and Excel import** for anything not already in ArchiMate form.
 - **Find what you're paying for twice.** Duplicate detection across your application list, a
   consolidation plan, and spend broken down by category, deep-linked from a plain-language question.

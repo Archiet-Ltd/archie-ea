@@ -47,7 +47,7 @@ and its own [plans and pricing](/pricing) published directly.
 | Vendor | Sparx Systems | Archiet Ltd |
 | Licence | Proprietary; licence with a 12-month subscription for updates/support | Open source, AGPL, plus a commercial licence |
 | Self-hostable | Desktop/on-premise tool by design | Yes |
-| Pricing | Not shown in dollar terms on Sparx's own shop page; third-party source reports Professional $245/licence, Corporate $320/licence | Not published; free to self-host under AGPL |
+| Pricing | Not shown in dollar terms on Sparx's own shop page; third-party source reports Professional $245/licence, Corporate $320/licence | Published at /pricing; free to self-host under AGPL |
 | Free version or trial | None, per a third-party pricing directory | Community edition free, no trial clock |
 
 ## What Entelim already does

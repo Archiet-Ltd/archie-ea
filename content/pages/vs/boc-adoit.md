@@ -46,7 +46,7 @@ publishes its own [plans and pricing](/pricing) directly.
 | Licence | Free Community Edition; proprietary paid Enterprise Edition | Open source, AGPL, plus a commercial licence |
 | AI / natural-language questions | Via external AI tools (ChatGPT, Copilot) connected through MCP, per BOC's own marketing | Built in directly, no external AI tool required |
 | Self-hostable | Not stated for the paid Enterprise Edition on the pages reviewed | Yes |
-| Pricing | Community Edition free; Enterprise Edition price varies by users and modules, annual billing, per Gartner Peer Insights — no fixed figure published | Not published; free to self-host under AGPL |
+| Pricing | Community Edition free; Enterprise Edition price varies by users and modules, annual billing, per Gartner Peer Insights — no fixed figure published | Published at /pricing; free to self-host under AGPL |
 
 ## What Entelim already does
 

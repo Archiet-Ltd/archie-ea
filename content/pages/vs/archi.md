@@ -44,7 +44,7 @@ published directly for the organisations that want the commercial licence instea
 | Derivation / impact analysis | Not part of the tool's own stated scope | Built in — shows its reasoning for every connection it works out |
 | Natural-language questions over the model | Not part of the tool's own stated scope | Built in |
 | Governance workflows | Not part of the tool's own stated scope | Built in |
-| Pricing | Free | Not published; free to self-host under AGPL |
+| Pricing | Free | Published at /pricing; free to self-host under AGPL |
 
 ## What Entelim already does
 

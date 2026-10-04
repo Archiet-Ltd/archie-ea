@@ -37,8 +37,8 @@ published directly.
 | Vendor | ServiceNow | Archiet Ltd |
 | Sold as | Part of the broader ServiceNow platform, not standalone | One product, runs on its own |
 | Licence | Proprietary | Open source, AGPL, plus a commercial licence |
-| Self-hostable | No — ServiceNow is a SaaS platform | Yes |
-| Pricing | Not published on ServiceNow's own product page | Not published; free to self-host under AGPL |
+| Self-hostable | Not stated on the product page | Yes |
+| Pricing | Not published on ServiceNow's own product page | Published at /pricing; free to self-host under AGPL |
 | Modelling notation | Not stated as ArchiMate-based; application/portfolio-centric | ArchiMate 3.2, specifically |
 
 ## What Entelim already does

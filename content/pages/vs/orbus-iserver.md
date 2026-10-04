@@ -48,7 +48,7 @@ ArchiMate 3.2 modelling, with its own [plans and pricing](/pricing) published di
 | Vendor | Orbus Software | Archiet Ltd |
 | Licence | Proprietary | Open source, AGPL, plus a commercial licence |
 | Self-hostable | Not stated on the vendor's own product page; moving toward a cloud service (OrbusInfinity) | Yes |
-| Pricing | Not published on Orbus's own site; a third-party aggregator reports a starting figure around 12,000, "Per Feature," unconfirmed on Orbus's own page | Not published; free to self-host under AGPL |
+| Pricing | Not published on Orbus's own site; a third-party aggregator reports a starting figure around 12,000, "Per Feature," unconfirmed on Orbus's own page | Published at /pricing; free to self-host under AGPL |
 | Recent acquisitions | Acquired Capsifi, December 2024, now folded into OrbusInfinity | None |
 | Branding | Actively rebranding iServer / iServer365 to OrbusInfinity | One name throughout |
 
