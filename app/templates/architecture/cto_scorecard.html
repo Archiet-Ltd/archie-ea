@@ -1,0 +1,69 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+
+{% block title %}CTO Scorecard — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6">
+  {{ page_shell(
+      title='CTO Scorecard',
+      subtitle='Supported estate, open exceptions and where surfaces disagree.',
+      breadcrumb=[('Home', url_for('main.index')), ('CTO Scorecard', None)]
+  ) }}
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <div class="rounded-lg border border-border bg-card p-4" data-testid="supported-version-share">
+      <h2 class="text-sm font-semibold text-muted-foreground mb-2">Supported estate</h2>
+      {% if versions.total %}
+      <p class="text-3xl font-bold text-foreground">{{ versions.share_pct }}%</p>
+      <p class="text-sm text-muted-foreground mt-1">{{ versions.supported }} of {{ versions.total }} applications on a supported technology version.</p>
+      {% else %}
+      <p class="text-sm text-muted-foreground">No application has a vendor product recorded yet — &mdash;</p>
+      {% endif %}
+    </div>
+
+    <div class="rounded-lg border border-border bg-card p-4" data-testid="open-exceptions">
+      <h2 class="text-sm font-semibold text-muted-foreground mb-2">Open exceptions</h2>
+      {% if exceptions %}
+      <ul class="divide-y divide-border text-sm">
+        {% for exc in exceptions[:2] %}
+        <li class="py-2 flex items-center justify-between gap-2" data-testid="exception-{{ exc.id }}">
+          <div>
+            <p class="font-medium text-foreground">{{ exc.title }}</p>
+            <p class="text-muted-foreground">{{ exc.acr_reference }} — {{ exc.age_days if exc.age_days is not none else '—' }} days open</p>
+          </div>
+          {% if exc.escalated_at %}
+          <span class="text-xs rounded-full bg-warning/10 text-warning-emphasis px-2 py-1" data-testid="escalated-badge">Escalated</span>
+          {% else %}
+          <form method="post" action="{{ url_for('cto_scorecard.escalate_exception', change_request_id=exc.id) }}">
+            <button type="submit" class="text-xs rounded-md border border-border px-2 py-1 hover:bg-muted transition-colors">Escalate</button>
+          </form>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% if exceptions|length > 2 %}
+      <p class="text-xs text-muted-foreground mt-2">{{ exceptions|length - 2 }} more open exception(s) not shown — the oldest two only.</p>
+      {% endif %}
+      {% else %}
+      {{ empty_state(icon='shield-check', headline='No open exceptions', body='Every architecture change request is on its standard path.') }}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="mt-6 rounded-lg border border-border bg-card p-4" data-testid="store-agreement-panel">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">Surfaces disagreeing</h2>
+    {% if agreement.error %}
+    <p class="text-sm text-destructive">Could not compare surfaces: {{ agreement.error }}</p>
+    {% elif agreement.findings %}
+    <ul class="text-sm font-mono space-y-1">
+      {% for finding in agreement.findings %}
+      <li class="text-foreground">{{ finding }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ empty_state(icon='check-circle', headline='No disagreement found', body='Every surface checked answers the same question with the same number.') }}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

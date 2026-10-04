@@ -667,6 +667,9 @@ _MY_WORK_LINKS = {
         _link("Tech Radar", "tech_radar.index", "radar"),
         # Ownership coverage by business unit — CTO accountability.
         _link("Ownership Coverage", "unified_applications.ownership_coverage", "users"),
+        # R1-B85: supported-estate share, open exceptions, the store-
+        # agreement disagreement finder.
+        _link("CTO Scorecard", "cto_scorecard.index", "clipboard-list"),
     ],
     ROLE_BUSINESS_ARCHITECT: [
         # BA-A1/A2. This persona had 4 links against a budget of 27 while

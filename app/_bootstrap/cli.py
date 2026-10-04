@@ -509,6 +509,13 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register clear foreign assignees CLI: {e}")
 
+    try:
+        from app.commands.scan_eol_alerts import init_app as init_scan_eol_alerts
+        init_scan_eol_alerts(app)
+        app.logger.info("✅ End-of-support alert scan CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register end-of-support alert scan CLI: {e}")
+
 # One risk register: copy solution_risks rows into the canonical risks table
     try:
         from app.commands.backfill_solution_risk_merge import init_app as init_solution_risk_merge
