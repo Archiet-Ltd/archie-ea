@@ -22,6 +22,11 @@ from app.models.user import (
     ROLE_PORTFOLIO_MANAGER,
     ROLE_PROCUREMENT,
     ROLE_SOLUTION_ARCHITECT,
+    ROLE_FINANCE,
+    ROLE_COMPLIANCE,
+    ROLE_RISK,
+    ROLE_OPERATIONS,
+    ROLE_NON_TECHNICAL_OWNER,
 )
 
 
@@ -151,6 +156,31 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
         "capabilities",
         "data_integration",
         "governance",
+    },
+    # R1-B36 (TB-0146): finance, compliance, risk, operations and
+    # non_technical_owner promoted from unassignable to assignable.
+    ROLE_FINANCE: {
+        "home",
+        "procurement",
+        "portfolio",
+    },
+    ROLE_COMPLIANCE: {
+        "home",
+        "procurement",
+        "governance",
+        "compliance",
+    },
+    ROLE_RISK: {
+        "home",
+        "architecture",
+        "governance",
+    },
+    ROLE_OPERATIONS: {
+        "home",
+    },
+    ROLE_NON_TECHNICAL_OWNER: {
+        "home",
+        "portfolio",
     },
 }
 
@@ -873,6 +903,30 @@ _MY_WORK_LINKS = {
         _link("Capability Map", "capability_map.index", "layers"),
         _link("Traceability Matrix", "architect_ui.traceability_matrix", "git-compare"),
         _link("Interface Register", "interface_register.index", "cable"),
+    ],
+    # R1-B36 (TB-0146): finance, compliance, risk, operations and
+    # non_technical_owner promoted from unassignable to assignable, each
+    # given the real pages their own section access already names.
+    ROLE_FINANCE: [
+        _link("Spend", "procurement.spend_analytics", "bar-chart-3"),
+        _link("Licences", "procurement.licenses_list", "key-round"),
+        _APPROVAL_INBOX_LINK,
+    ],
+    ROLE_COMPLIANCE: [
+        _link("Compliance", "application_mgmt.compliance_frameworks_dashboard", "clipboard-check"),
+        _APPROVAL_INBOX_LINK,
+    ],
+    ROLE_RISK: [
+        _link("Risk Register", "risk.risk_register", "alert-triangle"),
+        _APPROVAL_INBOX_LINK,
+    ],
+    ROLE_OPERATIONS: [
+        _link("Service Status", "service_status.status_page", "activity"),
+        _APPROVAL_INBOX_LINK,
+    ],
+    ROLE_NON_TECHNICAL_OWNER: [
+        _link("Applications", "unified_applications.application_list", "list"),
+        _APPROVAL_INBOX_LINK,
     ],
 }
 

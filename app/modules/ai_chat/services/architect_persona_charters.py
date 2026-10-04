@@ -110,6 +110,16 @@ ROLE_DEFAULT_PERSONAS: Dict[str, str] = {
     # generalist charter would concede the point.
     "security_architect": "security_architect",
     "data_architect": "data_architect",
+    # R1-B36 (TB-0146), 2026-10-04: promoted from unassignable to assignable.
+    # None of the five gets a dedicated charter in this PR -- mapped to the
+    # closest existing persona's voice and data, not a generic fallback, and
+    # a real charter per persona is named as follow-up work, not silently
+    # dropped.
+    "finance": "procurement",
+    "compliance": "security_architect",
+    "risk": "enterprise_architect",
+    "operations": "platform_admin",
+    "non_technical_owner": "application_manager",
 }
 
 DEFAULT_CHAT_PERSONA = "enterprise_architect"

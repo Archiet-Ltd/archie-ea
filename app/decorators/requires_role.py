@@ -111,8 +111,11 @@ def requires_procurement(f):
     """
     Shorthand decorator for procurement routes.
     Allows procurement role and portfolio_manager (read-only context).
+
+    R1-B36 (TB-0146): finance added -- licences/spend are a finance
+    persona's own numbers, not a second page for them to get built.
     """
-    return requires_role(["procurement", "portfolio_manager"])(f)
+    return requires_role(["procurement", "portfolio_manager", "finance"])(f)
 
 
 def requires_application_owner(f):

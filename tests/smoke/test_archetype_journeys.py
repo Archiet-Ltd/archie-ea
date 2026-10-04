@@ -40,6 +40,12 @@ JOURNEY = {
     "security_architect":   ["/risks/", "/admin/governance-gates"],
     "data_architect":       ["/architecture/data-architecture",
                              "/architecture/data-lineage"],
+    # R1-B36 (TB-0146/TB-0170): promoted from unassignable to assignable.
+    "finance":              ["/procurement/spend", "/procurement/licenses"],
+    "compliance":           ["/compliance"],
+    "risk":                 ["/risks/"],
+    "operations":           ["/status"],
+    "non_technical_owner":  ["/applications/"],
 }
 
 PAGE_STATE = """() => {
@@ -1041,3 +1047,19 @@ def test_data_architect_declares_system_of_record_and_checks_a_model(page, live_
         section.get_by_role("button", name="Save", exact=True).click()
     page.reload(wait_until="domcontentloaded")
     assert erp_name in page.locator("[data-testid=golden-source-%d]" % master_id).inner_text()
+
+
+def test_operations_subscribes_to_service_status_and_it_persists(page, live_server, seeded):
+    """R1-B36 (TB-0170): the operations persona reaches its own real control
+    (the subscribe toggle this page already had) and the change survives a
+    reload -- the acceptance criterion's "clicks a real control" test."""
+    _login(page, live_server, seeded["emails"]["operations"])
+
+    _visit(page, live_server, "/status")
+    page.locator("[data-testid=service-status-subscribe]").click(no_wait_after=True)
+    page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+
+    page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert page.locator("[data-testid=service-status-subscribed]").count() == 1, (
+        "the subscription did not persist after reload"
+    )
