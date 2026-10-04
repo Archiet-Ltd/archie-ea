@@ -91,7 +91,7 @@ def test_canvas_container_has_a_capped_height():
     `responsive: true` — Chart.js resizes from the CONTAINER, so the cap has
     to live on the wrapping element."""
     html = DASHBOARD_TEMPLATE.read_text(encoding="utf-8")
-    # R1-B31: The legacy dashboard partial has been deleted. The typed queue
+    # The legacy dashboard partial has been deleted. The typed queue
     # is the single code path. Only the main dashboard template is checked.
     assert re.search(r'id="arbStatusChart"', html)
     # Round-2 refuter fix (17 Sep 2026): `h-[220px]` was an arbitrary-value

@@ -622,7 +622,7 @@ def _typed_actor():
 def _typed_queue_context():
     actor = _typed_actor()
     if actor is None:
-        # R1-B31: No actor context (should not happen for authenticated users
+        # No actor context (should not happen for authenticated users
         # with organization_id). Return an empty queue view instead of None
         # so the consolidated template always has a valid typed_queue.
         return {
@@ -668,7 +668,7 @@ def _typed_queue_context():
 def _typed_review_context(review_item_id):
     actor = _typed_actor()
     if actor is None:
-        # R1-B31: No actor context. Return a failed view so the consolidated
+        # No actor context. Return a failed view so the consolidated
         # template renders the error state instead of crashing.
         return {
             "state": "failed",
@@ -989,7 +989,7 @@ def dashboard():
 
     typed_queue = _typed_queue_context()
 
-    # R1-B31: Consolidated governance queue - typed queue is the single code path.
+    # Consolidated governance queue - typed queue is the single code path.
     # The legacy generic_reviews fallback has been removed. The typed queue
     # (arb_review_cycles graph) is the authoritative view. If the read model
     # returns 'empty', the queue partial renders its own empty state.
@@ -1633,7 +1633,7 @@ def review_detail(id):
         current_app.logger.exception(f"Failed to load audit trail for review {id}")
 
     typed_review = _typed_review_context(id)
-    # R1-B31: Consolidated governance workspace - typed review is the single code path.
+    # Consolidated governance workspace - typed review is the single code path.
     # The legacy branch has been removed. The typed review workspace handles all
     # states: available, historical_unverified, legacy_generic, failed.
     response_status = 503 if typed_review and typed_review.get("state") == "failed" else 200

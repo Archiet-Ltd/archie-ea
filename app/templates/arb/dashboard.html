@@ -3,7 +3,7 @@
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/empty_state.html' import empty_state %}
 
-{# R1-B31: Consolidated governance queue - typed queue is the single code path.
+{# Consolidated governance queue - typed queue is the single code path.
    Make queue available to all blocks (content, extra_head_js, etc.) #}
 {% set queue = typed_queue %}
 
@@ -31,7 +31,7 @@
 
 {% block content %}
 {#
-  ARB queue — the consolidated governance queue (R1-B31).
+  ARB queue — the consolidated governance queue.
 
   The typed/legacy dispatch has been removed. The typed queue is now the
   single code path for the ARB dashboard. The queue is the mapping returned by

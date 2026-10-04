@@ -585,7 +585,7 @@ class ARBReviewCycle(TenantMixin, db.Model):
     terminal_outcome = db.Column(db.String(80), nullable=True)
     condition_projection_revision = db.Column(db.Integer, nullable=True)
 
-    # Consolidation provenance (R1-B31): tracks legacy row origin and retirement
+    # Consolidation provenance: tracks legacy row origin and retirement
     source_table = db.Column(db.String(128), nullable=True, index=True)
     source_id = db.Column(db.String(255), nullable=True, index=True)
     source_org_id = db.Column(
@@ -638,7 +638,7 @@ class ARBReviewCycle(TenantMixin, db.Model):
         ),
     )
 
-    # Consolidation relationship (R1-B31)
+    # Consolidation relationship
     retired_into = db.relationship(
         "ARBReviewCycle",
         foreign_keys=[retired_into_id],
@@ -837,7 +837,7 @@ class ARBReviewItem(TenantMixin, db.Model, OptimisticLockMixin):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Consolidation provenance (R1-B31): tracks legacy row origin and retirement
+    # Consolidation provenance: tracks legacy row origin and retirement
     source_table = db.Column(db.String(128), nullable=True, index=True)
     source_id = db.Column(db.String(255), nullable=True, index=True)
     source_org_id = db.Column(
@@ -872,7 +872,7 @@ class ARBReviewItem(TenantMixin, db.Model, OptimisticLockMixin):
         "ARBCapabilityImpact", back_populates="review_item", cascade="all, delete-orphan"
     )
 
-    # Consolidation relationship (R1-B31)
+    # Consolidation relationship
     retired_into = db.relationship(
         "ARBReviewItem",
         foreign_keys=[retired_into_id],

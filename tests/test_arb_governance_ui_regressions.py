@@ -235,7 +235,7 @@ def test_arb_session_creation_succeeds_and_reports_failure_as_json(
 def test_dashboard_kpis_and_list_read_the_same_store(
     db_session, make_org, client, login_as
 ):
-    """R1-B31: The typed queue is the single code path. Legacy reviews
+    """The typed queue is the single code path. Legacy reviews
     (ARBReviewItem rows without typed columns) are counted by the KPI tiles
     but do not appear in the typed queue. The dashboard must still render
     successfully and include the typed queue partial."""
@@ -249,7 +249,7 @@ def test_dashboard_kpis_and_list_read_the_same_store(
     resp = client.get("/arb/")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    # R1-B31: The typed queue is the single code path. The dashboard must
+    # The typed queue is the single code path. The dashboard must
     # include the typed queue partial and must not reference the deleted
     # legacy partial.
     assert "_typed_queue.html" in body or "typed" in body.lower(), (

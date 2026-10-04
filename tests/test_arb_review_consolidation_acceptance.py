@@ -1,4 +1,4 @@
-"""R1-B31 acceptance criteria: two-organisation isolation and template consolidation.
+"""ARB review consolidation acceptance criteria: two-organisation isolation and template consolidation.
 
 Proves:
 1. Organisation B cannot see or act on organisation A's submission, decision,
