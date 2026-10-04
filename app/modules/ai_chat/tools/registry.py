@@ -17,6 +17,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["Solution"],
         "description": (
             "Create a new architectural solution in the repository. "
             "Use when the user asks to design, propose, plan, or create a new solution, "
@@ -66,6 +67,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["SolutionCapabilityMapping"],
         "description": (
             "Link a business capability to a solution to show what capabilities "
             "the solution delivers, enables, or affects. "
@@ -103,6 +105,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["ApplicationCapabilityMapping"],
         "description": (
             "Map an application to a business capability it supports. "
             "Use when the user wants to record which applications cover a capability."
@@ -136,6 +139,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["ArchiMateElement"],
         "description": (
             "Create a new ArchiMate element and optionally attach it to a solution. "
             "Use when the user asks to model a component, service, process, data object, "
@@ -186,6 +190,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["ApplicationComponent"],
         "description": (
             "Update the deployment/lifecycle status of an application. "
             "Use when the user wants to mark an application as retiring, "
@@ -223,6 +228,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["ARBReviewItem"],
         "description": (
             "Submit a solution for Architecture Review Board (ARB) governance review. "
             "REQUIRES USER CONFIRMATION before executing."
@@ -250,6 +256,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Find business capabilities with no supporting applications, "
             "or capabilities below a specified maturity threshold. "
@@ -285,6 +292,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Search for applications by name, lifecycle status, or capability. "
             "Returns lifecycle_status (planning/development/testing/operational/"
@@ -333,6 +341,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["SolutionDriver"],
         "description": (
             "Add a business driver to a solution (ArchiMate Motivation layer). "
             "Use when the user says a solution is motivated by cost pressure, compliance, "
@@ -361,6 +370,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["SolutionGoal"],
         "description": (
             "Add a goal to a solution (ArchiMate Motivation layer). "
             "Use when the user describes a desired outcome or success criterion."
@@ -384,6 +394,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["SolutionConstraint"],
         "description": (
             "Add a constraint to a solution (ArchiMate Motivation layer). "
             "Use when the user mentions a hard limit: budget cap, regulatory requirement, timeline, etc."
@@ -411,6 +422,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["SolutionRequirement"],
         "description": (
             "Add a functional or non-functional requirement to a solution. "
             "Use when the user specifies something the solution MUST do or achieve."
@@ -437,6 +449,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["RiskRegisterEntry"],
         "description": (
             "Add a risk to a solution risk register. "
             "Use when the user identifies a threat, concern, or uncertainty for the solution."
@@ -461,6 +474,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["SolutionRecommendation"],
         "description": (
             "Add a Phase E solution option/recommendation. "
             "Use when the user describes an approach: buy a product, build custom, reuse existing, etc."
@@ -486,6 +500,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["SolutionRecommendation"],
         "description": (
             "Mark one solution option as the architect's recommended choice. "
             "Use when the user selects or endorses a specific option."
@@ -507,6 +522,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["SolutionApplicationLink"],
         "description": (
             "Link an existing application from the catalog to a solution. "
             "Use when the user says a solution involves, replaces, or integrates with an application."
@@ -533,6 +549,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["SolutionVendorProductLink"],
         "description": (
             "Link a vendor product from the catalog to a solution (Phase E). "
             "Use when the user identifies a commercial product as part of the technology stack."
@@ -554,6 +571,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
        "mutates": True, # Real write, not read-only despite the "diagnose"-adjacent name:
+        "record_types_written": ["ArchiMateElement", "ArchiMateRelationship"],
         # _tool_run_inference_engine (tools/executor.py) defaults dry_run to
         # False from args.get("dry_run", False) and calls
         # engine.repair(link.element_id, dry_run=dry_run) unconditionally.
@@ -588,6 +606,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": ["narrative"],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["BlueprintNarrative"],
         "description": (
             "Generate an AI narrative for a specific blueprint section. "
             "REQUIRES USER CONFIRMATION — this overwrites existing section text. "
@@ -614,6 +633,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["ArchiMateRelationship"],
         "description": (
             "Create a typed ArchiMate relationship between two existing elements. "
             "Use when the user wants to model how elements connect."
@@ -641,6 +661,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Show missing elements in an ArchiMate element's chain without repairing. "
             "Read-only. Use when the user asks what's incomplete or what's missing."
@@ -661,6 +682,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Explain why an ArchiMate element exists by tracing its upstream provenance chain. "
             "Read-only. Use when the user asks 'why does X exist?' or 'what drives X?'."
@@ -681,6 +703,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Show the blast radius if an ArchiMate element is retired or changed. "
             "Read-only. Returns all downstream dependents across all 6 layers."
@@ -704,6 +727,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Read the current state of a solution: maturity score, linked entity counts, "
             "ARB status, and completeness gaps. Read-only."
@@ -724,6 +748,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Get the blueprint completeness score with dimension breakdown "
             "(Elements %, Relationships %, Traceability %). Read-only."
@@ -744,6 +769,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["Solution"],
         "description": (
             "Update solution metadata: owner, business_sponsor, technical_lead, or description. "
             "Use when the user assigns roles or updates the solution description."
@@ -768,6 +794,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["Solution"],
         "description": (
             "Advance the solution's TOGAF ADM phase (A through H). "
             "Use when the user says they're done with a phase and ready to move on."
@@ -796,6 +823,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Semantic search over the business capability catalog to find which ones "
             "are most relevant to a stated problem or initiative. "
@@ -828,6 +856,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Find all applications already mapped to a specific business "
             "capability. "
@@ -851,8 +880,9 @@ TOOL_SCHEMAS = [
         "surfaces": ["chat"],
         "route": "TechnicalCapability.query",
         "fenced_fields": [],
-        "risk_class": "read",
+"risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Find technical capabilities from the ACM (Application Capability Model) taxonomy "
             "across 7 domains: USER-EXPERIENCE, APPLICATION-SERVICES, DATA-STORAGE, "
@@ -894,6 +924,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Search ArchiMate elements by name, layer, or type. Read-only. "
             "Use when the user asks what elements exist or wants to find a specific element."
@@ -922,6 +953,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Verify that a solution's generated artifacts trace back to ArchiMate sources. "
             "Checks application-layer coverage, data-layer coverage, technology-layer presence, "
@@ -946,6 +978,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Generate autonomous TIME (Tolerate/Invest/Migrate/Eliminate) rationalization proposals "
             "from portfolio data. Surfaces ELIMINATE candidates with no active programme, "
@@ -974,6 +1007,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Build a multi-step architecture execution plan for a goal. "
             "Selects the right template (SAP transformation, rationalization, solution design, "
@@ -1005,6 +1039,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "external_action",
         "mutates": True,
+        "record_types_written": [],
         "description": (
             "Check configured infrastructure endpoints for reachability. "
             "Probes: Abacus API connector, LLM API endpoints, integration pattern URLs. "
@@ -1034,6 +1069,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": ["candidates"],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Parse SQL DDL or OpenAPI 3.x JSON/YAML and infer ArchiMate DataObject elements. "
             "Returns a list of DataObject candidates with field attributes, ready to create "
@@ -1070,6 +1106,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Validate a solution's architecture against the SAP RISE clean-core extension model. "
             "Detects Tier 3/4 violations (RFC/BAPI integrations, CMOD/SMOD modifications, direct SAP coupling, "
@@ -1115,6 +1152,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "propose",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Propose a change to the enterprise genome (the ArchiMate model) as a "
             "structured, provenance-bearing PATCH. Use when the user asks to propose "
@@ -1158,13 +1196,14 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "CTO view: the ranked capability investment priorities for this "
             "organization, with the split across CRITICAL/HIGH/MEDIUM/LOW "
             "priority tiers and recommended next steps. "
             "USE when the user asks 'where should we invest?', 'what is our "
             "investment posture?', or any portfolio-investment question. "
-            "Read-only â safe to execute without confirmation."
+            "Read-only — safe to execute without confirmation."
         ),
         "parameters": {
             "type": "object",
@@ -1186,13 +1225,14 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "CTO/CIO one-call executive summary: portfolio health and stats, "
             "programme (ADM-phase) progress, the ARB decision pipeline, and the "
-            "top risks â all from real data. Fields that could not be computed "
+            "top risks — all from real data. Fields that could not be computed "
             "return null and MUST be shown as an em dash, never as zero. "
             "USE when the user asks for an executive overview, portfolio health, "
-            "or a board-level status. Read-only â safe to execute without confirmation."
+            "or a board-level status. Read-only — safe to execute without confirmation."
         ),
         "parameters": {
             "type": "object",
@@ -1207,13 +1247,14 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
+        "record_types_written": [],
         "description": (
             "Read a solution's Architecture Review Board status: each review "
             "item's status, decision (approved / approved_with_conditions / "
             "rejected / deferred), decision rationale and any conditions. "
             "USE when the user asks 'what did the ARB decide about X?', 'what are "
             "the conditions on X?', or wants a solution's governance outcome read "
-            "back. Read-only â safe to execute without confirmation."
+            "back. Read-only — safe to execute without confirmation."
         ),
         "parameters": {
             "type": "object",
@@ -1234,8 +1275,9 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["ArchitectureDecisionRecord"],
         "description": (
-            "Author an Architecture Decision Record (ADR) for a solution â the "
+            "Author an Architecture Decision Record (ADR) for a solution — the "
             "artifact the solution-architect charter centres on. Captures the "
             "context, the decision taken, its rationale and consequences. The "
             "ADR is created in status 'proposed' and moves through approve/reject "
@@ -1295,6 +1337,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["BusinessCapability"],
         "description": (
             "Record a maturity assessment against a business capability: set its "
             "current maturity (1-5) and, optionally, its target maturity (1-5). "
@@ -1336,6 +1379,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["ApplicationRationalizationScore"],
         "description": (
             "Compute and PERSIST an application's TIME (Tolerate/Invest/Migrate/"
             "Eliminate) rationalization score and disposition. This is the EA/"
@@ -1366,6 +1410,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["BusinessCapability"],
         "description": (
             "Resolve a duplicate business capability by MERGING one into another "
             "(Capability-Gap Register G3 — the systemic duplication debt). The "
@@ -1409,6 +1454,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["VendorOrganization"],
         "description": (
             "Register a new vendor organization in the shared vendor catalogue — the "
             "Procurement / vendor-management headline write. Use when the user wants to "
@@ -1458,6 +1504,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": ["terms", "parties", "dates", "obligations"],
         "risk_class": "external_action",
         "mutates": True,
+        "record_types_written": [],
         "description": (
             "Extract structured contract terms from pasted contract / MSA text — the "
             "Procurement 'paste this contract' capability. Reads the text and sends it "
@@ -1491,6 +1538,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["ApplicationComponent"],
         "description": (
             "Set the lifecycle stage of a SET of applications in one governed "
             "action — the portfolio / application-manager bulk write. "
@@ -1553,6 +1601,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["VendorContract"],
         "description": (
             "Create a PROCUREMENT (commercial) vendor contract — the "
             "vendor-management / procurement headline write. Captures the "
@@ -1614,6 +1663,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["Programme"],
         "description": (
             "Create a canonical business-first Transformation Programme — the "
             "same aggregate the /solutions/new-programme wizard creates, "
@@ -1684,6 +1734,7 @@ TOOL_SCHEMAS = [
         "fenced_fields": [],
         "risk_class": "write",
         "mutates": True,
+        "record_types_written": ["LicenseEntitlement"],
         "description": (
             "Create or update a licence entitlement under a procurement contract "
             "— the software-asset-management write. Records the product, licence "
@@ -1800,6 +1851,7 @@ def _archimate_element_schemas() -> list:
             "fenced_fields": [],
             "risk_class": "write",
             "mutates": True,
+            "record_types_written": ["ArchiMateElement"],
             # 'approve', not 'auto'. These write typed elements into the model
             # of record, and REQUIRE_AI_APPROVAL exists so an operator decides
             # whether AI-proposed writes reach it unreviewed.

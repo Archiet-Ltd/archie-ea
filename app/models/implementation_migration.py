@@ -59,6 +59,15 @@ class TechnologyRoadmapInitiative(db.Model):
     created_at = db.Column(db.DateTime, default=utcnow)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
+    # this store is retired into unified_work_packages (never dropped).
+    # NULL until `merge-work-package-stores` copies the row across.
+    retired_into_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("unified_work_packages.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -170,6 +179,15 @@ class WorkPackage(TenantMixin, db.Model):
 
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    # this store is retired into unified_work_packages (never dropped).
+    # NULL until `merge-work-package-stores` copies the row across.
+    retired_into_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("unified_work_packages.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     architecture = db.relationship("ArchitectureModel", backref="migration_work_packages")
     archimate_element = db.relationship(

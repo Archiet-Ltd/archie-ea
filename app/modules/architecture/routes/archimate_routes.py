@@ -302,7 +302,11 @@ def patch_element(element_id):
 @archimate_bp.route("/api/link/driver-to-goal", methods=["POST"])
 @login_required
 def link_driver_to_goal():
-    """Link an orphan driver to a goal. Body: {driver_id, goal_id}. Updates Goal.driver_id."""
+    """Link an orphan driver to a goal. Body: {driver_id, goal_id}. Updates Goal.driver_id.
+
+    Uses MotivationLayerService.link_driver_to_goal for tenant isolation and
+    overwrite protection. The old URL is preserved.
+    """
     data = request.get_json(silent=True) or {}
     driver_id = data.get("driver_id")
     goal_id = data.get("goal_id")
@@ -313,18 +317,35 @@ def link_driver_to_goal():
         goal_id = int(goal_id)
     except (ValueError, TypeError):
         return jsonify({"error": "driver_id and goal_id must be integers"}), 400
-    from app.models.motivation import Driver, Goal
-    driver = db.session.get(Driver, driver_id)
-    goal = db.session.get(Goal, goal_id)
-    if not driver or not goal:
-        return jsonify({"error": "Driver or Goal not found"}), 404
-    goal.driver_id = driver.id
+
+    from app.utils.tenant import current_organization_id
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return jsonify({"error": "no tenant context"}), 400
+
+    from app.modules.architecture.services.motivation_layer_service import (
+        MotivationLayerService,
+    )
+
     try:
+        result = MotivationLayerService.link_driver_to_goal(
+            driver_id, goal_id, organization_id
+        )
         db.session.commit()
+        return jsonify({
+            "ok": True,
+            "driver_id": result["driver"]["id"],
+            "goal_id": result["goal"]["id"],
+        }), 200
+    except ValueError as exc:
+        db.session.rollback()
+        msg = str(exc)
+        if "already linked" in msg:
+            return jsonify({"error": msg}), 409
+        return jsonify({"error": msg}), 404
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
-    return jsonify({"ok": True, "driver_id": driver.id, "goal_id": goal.id}), 200
 
 
 @archimate_bp.route("/api/link/capability-to-application", methods=["POST"])

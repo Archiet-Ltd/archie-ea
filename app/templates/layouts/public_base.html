@@ -9,7 +9,8 @@
 <head>
     {% include 'partials/_head.html' %}
     <title>{% block full_title %}{% block title %}Welcome{% endblock %} - {{ config.APP_NAME }}{% endblock %}</title>
-    
+    {% block meta_description %}{% endblock %}
+
     {# Accessibility CSS: loaded once via partials/_head.html (asset_url filter) — do not re-include here (ARCH-061) #}
 
     {# CSRF Protection - in head so it's available before any scripts run #}

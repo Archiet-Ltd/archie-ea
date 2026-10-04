@@ -33,6 +33,18 @@ flask --app manage backfill-solution-risk-merge || echo 'WARN solution risk merg
 flask --app manage backfill-audit-trail || echo 'WARN audit trail backfill skipped - older audit entries from ARB, ArchiMate composer and rationalisation stores remain uncopied until it runs (RUN-01)' >&2
 flask --app manage backfill-review-queue-approvals || echo 'WARN approval-queue consolidation backfill skipped - pending rows from review_queue_items, relationship_suggestions and solution_blueprint_proposals remain uncopied until it runs' >&2
 
+# ADR 0008 / unified_work_packages tenancy and consolidation. The unified
+# work packages table predates TenantMixin; reconcile-schema above adds
+# organization_id as NULL. The first backfill attributes every existing row
+# to its owning organisation (linked programme or element, else creator,
+# else quarantine). The merge copies rows from the four legacy stores
+# (work_packages, roadmap_work_packages, technology_roadmap_initiatives,
+# implementation_work_packages) into unified_work_packages with provenance.
+# The second backfill picks up rows that the merge resolved through a FK
+# its own attribution chain did not try. Each command is idempotent.
+flask --app manage backfill-work-package-org || echo 'WARN work package tenancy backfill skipped - unified_work_packages rows without an organisation are invisible to every org until this runs'
+flask --app manage merge-work-package-stores || echo 'WARN work package store merge skipped - legacy work package stores will not appear in the unified view until this runs'
+flask --app manage backfill-work-package-org || echo 'WARN work package tenancy second pass skipped - merged rows that resolved through a new FK remain unattributed until this runs'
 # The generic history trigger reconcile-schema cannot create, then
 # one seeded version per pre-existing element/relationship. Trigger first so
 # the backfill's "no entity_history row at all" check is not racing a
