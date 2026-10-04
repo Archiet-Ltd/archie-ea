@@ -84,7 +84,7 @@ class TestOfferPagesRender:
         assert resp.status_code == 200
         html = resp.data.decode()
         assert "Team annual plan with onboarding" in html
-        assert "$2,900" in html
+        assert "$290/editor/year" in html
         assert "$1,500" in html
         assert 'data-testid="offer-inquiry-form"' in html
         assert TEAM_ANNUAL_CONSENT in html

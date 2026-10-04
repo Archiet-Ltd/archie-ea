@@ -14,8 +14,8 @@ The Team plan, committed annually, with a hands-on onboarding engagement bundled
 
 ## What it costs
 
-**$2,900/year** for the fifteen-editor bundle — ten months' worth of the $290/month
-rate, as the discount for committing annually.
+**$290/editor/year**, billed annually — the discount on the $29/editor/month rate for
+committing annually.
 
 **$1,500, one time**, for onboarding.
 
