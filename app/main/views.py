@@ -22,6 +22,7 @@ from app import db
 from app.core.auth.decorators import admin_required
 from app.main.capability_framework_routes import capability_framework_bp
 from app.main.framework_management_routes import framework_management_bp
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.business_capabilities import BusinessCapability
 from app.services.rate_limiter import rate_limit
 from app.services.vendor_analysis.capability_based_vendor_selector import (
@@ -33,6 +34,22 @@ main = Blueprint("main", __name__)
 # Register sub-blueprints
 main.register_blueprint(capability_framework_bp)
 main.register_blueprint(framework_management_bp)
+
+
+def _csv_safe(value):
+    """Escape one CSV cell against spreadsheet formula injection.
+
+    A value starting with ``=``, ``+``, ``-``, ``@``, or a leading tab/CR
+    becomes a formula when the file is opened in Excel/Sheets. Prefixing it
+    with a single quote keeps the value literal. Shared by every export in
+    this module that writes a user-submitted string into a CSV cell.
+    """
+    if value is None:
+        return ""
+    text = str(value)
+    if text[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + text
+    return text
 
 
 @main.route("/", methods=["GET", "POST"])
@@ -77,10 +94,11 @@ def index():
 
 
 @main.route("/admin/waitlist.csv")
-@login_required
-@admin_required
+@platform_admin_required
 def waitlist_csv():
-    """Export the waiting list as CSV. Admin only."""
+    """Export the waiting list as CSV. Platform admin only — this is prospect
+    data across every organisation, not something an organisation's own
+    admin should be able to download."""
     from app.models.waitlist_signup import WaitlistSignup
 
     rows = (
@@ -93,7 +111,12 @@ def waitlist_csv():
     writer = csv.writer(output)
     writer.writerow(["email", "created_at", "source", "consent_text"])
     for row in rows:
-        writer.writerow([row.email, row.created_at.isoformat(), row.source, row.consent_text])
+        writer.writerow([
+            _csv_safe(row.email),
+            row.created_at.isoformat(),
+            _csv_safe(row.source),
+            _csv_safe(row.consent_text),
+        ])
 
     csv_content = output.getvalue()
     return Response(
@@ -142,6 +165,8 @@ def product_inquiry_submit():
             error = "Please enter an email address."
         elif not consent:
             error = "You must agree to be contacted about this request."
+        elif name is not None and len(name) > 200:
+            error = "Please use a shorter name (200 characters or fewer)."
         else:
             try:
                 valid = validate_email(email, check_deliverability=False)
@@ -172,10 +197,11 @@ def product_inquiry_submit():
 
 
 @main.route("/admin/product-inquiries.csv")
-@login_required
-@admin_required
+@platform_admin_required
 def product_inquiries_csv():
-    """Export product inquiries as CSV. Admin only."""
+    """Export product inquiries as CSV. Platform admin only — this is prospect
+    data across every organisation, not something an organisation's own
+    admin should be able to download."""
     from app.models.product_inquiry import ProductInquiry
 
     rows = (
@@ -188,9 +214,13 @@ def product_inquiries_csv():
     writer = csv.writer(output)
     writer.writerow(["email", "name", "offer", "created_at", "consent_text"])
     for row in rows:
-        writer.writerow(
-            [row.email, row.name or "", row.offer, row.created_at.isoformat(), row.consent_text]
-        )
+        writer.writerow([
+            _csv_safe(row.email),
+            _csv_safe(row.name or ""),
+            _csv_safe(row.offer),
+            row.created_at.isoformat(),
+            _csv_safe(row.consent_text),
+        ])
 
     csv_content = output.getvalue()
     return Response(

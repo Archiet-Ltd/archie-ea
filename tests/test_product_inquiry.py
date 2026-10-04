@@ -7,9 +7,13 @@ What these tests check:
    the right offer and the exact consent text the page showed.
 3. Duplicate (email, offer) shows the same thanks and stores nothing new;
    the same email against the other offer stores a second row.
-4. Missing consent and invalid email are refused with no row stored.
+4. Missing consent, invalid email and an over-length name are refused with
+   no row stored.
 5. /admin/product-inquiries.csv mirrors /admin/waitlist.csv: 403 for a
-   non-admin, redirect for anonymous, 200 with rows for an admin.
+   non-admin AND for an organisation admin who is not a platform admin,
+   redirect for anonymous, 200 with rows for a platform admin.
+6. Both CSV exports escape a cell that would otherwise open as a spreadsheet
+   formula.
 """
 
 import uuid
@@ -40,7 +44,21 @@ def _make_user(db_session, org, *, email=None, role_name="Architect"):
 
 
 def _make_admin(db_session, org, *, email=None):
+    """An organisation admin: Administrator role, but NOT a platform admin.
+
+    This is the role every customer's own org admin can hold — deliberately
+    distinct from ``_make_platform_admin`` below, so a test asking for "an
+    admin" here never silently gets cross-tenant access.
+    """
     return _make_user(db_session, org, email=email, role_name="Administrator")
+
+
+def _make_platform_admin(db_session, org, *, email=None):
+    """Archiet's own platform staff: Administrator role AND is_platform_admin."""
+    user = _make_user(db_session, org, email=email, role_name="Administrator")
+    user.is_platform_admin = True
+    db_session.flush()
+    return user
 
 
 HEALTH_CHECK_URL = "/architecture-health-check"
@@ -216,6 +234,44 @@ class TestProductInquirySubmit:
         )
         assert resp.status_code == 404
 
+    def test_name_over_200_characters_gets_a_clean_form_error_not_a_500(
+        self, client, db_session
+    ):
+        from app.models.product_inquiry import ProductInquiry
+
+        email = "toolongname@example.com"
+        resp = _submit(
+            client,
+            url=HEALTH_CHECK_URL,
+            offer="architecture_health_check",
+            email=email,
+            name="x" * 201,
+        )
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "shorter name" in html.lower() or "200 characters" in html.lower()
+
+        row = ProductInquiry.query.filter_by(email=email).first()
+        assert row is None
+
+    def test_name_at_200_characters_still_works(self, client, db_session):
+        from app.models.product_inquiry import ProductInquiry
+
+        email = "exactlength@example.com"
+        resp = _submit(
+            client,
+            url=HEALTH_CHECK_URL,
+            offer="architecture_health_check",
+            email=email,
+            name="x" * 200,
+        )
+        assert resp.status_code == 200
+        assert "Thank you" in resp.data.decode()
+
+        row = ProductInquiry.query.filter_by(email=email).first()
+        assert row is not None
+        assert row.name == "x" * 200
+
 
 class TestAdminProductInquiriesCsv:
     def test_non_admin_gets_403(self, client, db_session, make_org, login_as):
@@ -225,11 +281,22 @@ class TestAdminProductInquiriesCsv:
         resp = client.get("/admin/product-inquiries.csv")
         assert resp.status_code == 403
 
+    def test_org_admin_who_is_not_a_platform_admin_gets_403(
+        self, client, db_session, make_org, login_as
+    ):
+        """An organisation's own admin must not be able to download every
+        prospect's email and name — only Archiet's own platform admins can."""
+        org = make_org("entelim")
+        admin = _make_admin(db_session, org)
+        login_as(client, admin)
+        resp = client.get("/admin/product-inquiries.csv")
+        assert resp.status_code == 403
+
     def test_unauthenticated_gets_redirect(self, client):
         resp = client.get("/admin/product-inquiries.csv", follow_redirects=False)
         assert resp.status_code in (302, 401, 403)
 
-    def test_admin_gets_csv_with_rows(self, client, db_session, make_org, login_as):
+    def test_platform_admin_gets_csv_with_rows(self, client, db_session, make_org, login_as):
         from app.models.product_inquiry import ProductInquiry
 
         inquiry = ProductInquiry(
@@ -242,7 +309,7 @@ class TestAdminProductInquiriesCsv:
         db_session.flush()
 
         org = make_org("entelim")
-        admin = _make_admin(db_session, org)
+        admin = _make_platform_admin(db_session, org)
         login_as(client, admin)
 
         resp = client.get("/admin/product-inquiries.csv")
@@ -252,7 +319,7 @@ class TestAdminProductInquiriesCsv:
         assert "architecture_health_check" in csv_text
         assert "email" in csv_text  # header row
 
-    def test_admin_csv_read_is_not_scoped_to_any_organisation(
+    def test_platform_admin_csv_read_is_not_scoped_to_any_organisation(
         self, client, db_session, make_org, login_as
     ):
         from app.models.product_inquiry import ProductInquiry
@@ -267,8 +334,8 @@ class TestAdminProductInquiriesCsv:
 
         org_a = make_org("entelim-a")
         org_b = make_org("entelim-b")
-        admin_a = _make_admin(db_session, org_a)
-        admin_b = _make_admin(db_session, org_b)
+        admin_a = _make_platform_admin(db_session, org_a)
+        admin_b = _make_platform_admin(db_session, org_b)
 
         login_as(client, admin_a)
         resp_a = client.get("/admin/product-inquiries.csv")
@@ -279,3 +346,51 @@ class TestAdminProductInquiriesCsv:
         resp_b = client.get("/admin/product-inquiries.csv")
         assert resp_b.status_code == 200
         assert "cross-org-inquiry@example.com" in resp_b.data.decode()
+
+    @pytest.mark.parametrize("prefix", ["=", "+", "-", "@"])
+    def test_formula_like_name_is_escaped_in_the_csv(
+        self, client, db_session, make_org, login_as, prefix
+    ):
+        from app.models.product_inquiry import ProductInquiry
+
+        dangerous_name = f"{prefix}cmd|'/c calc'!A1"
+        inquiry = ProductInquiry(
+            email="formula-test@example.com",
+            name=dangerous_name,
+            offer="architecture_health_check",
+            consent_text=HEALTH_CHECK_CONSENT,
+        )
+        db_session.add(inquiry)
+        db_session.flush()
+
+        org = make_org("entelim")
+        admin = _make_platform_admin(db_session, org)
+        login_as(client, admin)
+
+        resp = client.get("/admin/product-inquiries.csv")
+        assert resp.status_code == 200
+        csv_text = resp.data.decode()
+        assert f"'{dangerous_name}" in csv_text
+        assert f",{dangerous_name}," not in csv_text
+
+    def test_normal_name_is_unchanged_in_the_csv(self, client, db_session, make_org, login_as):
+        from app.models.product_inquiry import ProductInquiry
+
+        inquiry = ProductInquiry(
+            email="normal-name@example.com",
+            name="Jo Example",
+            offer="architecture_health_check",
+            consent_text=HEALTH_CHECK_CONSENT,
+        )
+        db_session.add(inquiry)
+        db_session.flush()
+
+        org = make_org("entelim")
+        admin = _make_platform_admin(db_session, org)
+        login_as(client, admin)
+
+        resp = client.get("/admin/product-inquiries.csv")
+        assert resp.status_code == 200
+        csv_text = resp.data.decode()
+        assert "Jo Example" in csv_text
+        assert "'Jo Example" not in csv_text
