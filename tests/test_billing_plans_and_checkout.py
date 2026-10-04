@@ -436,6 +436,17 @@ def test_without_keys_the_billing_page_says_payment_is_not_set_up(app, db_sessio
     assert "Online payment is not set up on this installation. No payment was taken." in resp.get_data(as_text=True)
 
 
+def test_with_keys_the_billing_page_shows_no_configuration_warning(app, db_session, client, login_as, billing):
+    org, admin = _admin_org(db_session, "haskeys")
+    with app.app_context():
+        login_as(client, admin)
+        page = client.get("/admin/billing/")
+    html = page.get_data(as_text=True)
+    assert page.status_code == 200
+    assert "Online payment is not set up on this installation" not in html
+    assert 'data-testid="billing-not-configured"' not in html
+
+
 def test_buy_starts_checkout_for_the_chosen_plan(app, db_session, client, login_as, billing, monkeypatch):
     from app.models.subscription import Subscription
 
