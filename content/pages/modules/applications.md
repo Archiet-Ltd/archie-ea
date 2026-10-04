@@ -45,10 +45,10 @@ become urgent; and duplicate spend visible on its own, not found by accident dur
 ## What this module does
 
 Entelim's Applications module is where that list lives for real, not hypothetically. Every
-application in your model — typed in, imported, or read through a connector — lives in one list, not
-scattered across a spreadsheet and three people's heads. Each row shows where the record came from,
-and links straight into the questions that read it: what you're paying for twice, and what breaks
-if this application fails.
+application in your model — typed in or imported (spreadsheet, CSV, JSON, or an Archi / Open
+Exchange model) — lives in one list, not scattered across a spreadsheet and three people's heads. It
+links straight into the questions that read it: what you're paying for twice, and what breaks if
+this application fails.
 
 ## Where you'll meet it
 
