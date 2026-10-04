@@ -701,6 +701,38 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # Event-log partition maintenance: creates the next three months'
+        # partitions if missing. Runs daily so partitions exist before any
+        # outbox event needs them.  Platform job — partitions are shared
+        # across all organisations.
+        event_log_partition_registered = False
+        try:
+            def run_event_log_partition_maintenance():
+                with app.app_context():
+                    from app.services.event_log_service import (
+                        ensure_future_partitions,
+                    )
+                    created = ensure_future_partitions(months_ahead=3)
+                    app.logger.info(
+                        "event_log partition maintenance: %s partitions created",
+                        created,
+                    )
+
+            scheduler.add_job(
+                func=run_event_log_partition_maintenance,
+                trigger=CronTrigger(hour=3, minute=0),
+                id="event_log_partition_maintenance",
+                name="Event Log Partition Maintenance",
+                replace_existing=True,
+                max_instances=1,
+            )
+            event_log_partition_registered = True
+        except Exception as exc:
+            app.logger.error(
+                "Event-log partition maintenance job was not registered: %s",
+                exc,
+            )
+
         # Per-organisation model-health / drift scan. Runs the
         # deterministic drift detector for every active organisation and
         # stores the report so the page reads a single row rather than
@@ -791,6 +823,8 @@ def init_scheduler(app):
             scheduled_jobs += ", derived-facts recompute (interval)"
         if model_health_registered:
             scheduled_jobs += ", model-health drift scan (interval)"
+        if event_log_partition_registered:
+            scheduled_jobs += ", event log partition maintenance (daily)"
         app.logger.info("APScheduler started: %s", scheduled_jobs)
     except ImportError:
         app.logger.warning("APScheduler not available — EA workflow schedules disabled")
