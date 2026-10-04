@@ -9,14 +9,14 @@ capture_status: live
 url_slug: /enterprise-architecture/risk-and-controls
 ---
 
-# Which risks and control gaps touch this goal, and who owns the mitigation?
+# Which risks touch this part of the architecture, and who owns closing them?
 
-**For enterprise architecture teams answering to a regulator or an internal audit.**
+**For enterprise architecture teams tracking risk across the model.**
 
 ## The question
 
-A goal or an objective sits somewhere in your architecture. What's harder to answer on demand is
-which risks and control gaps actually touch it, and whether anyone owns closing them.
+A risk gets logged against one element in your architecture. What's harder to answer on demand is
+everywhere else that risk actually reaches, and whether anyone owns closing it.
 
 ## What Entelim answers
 
