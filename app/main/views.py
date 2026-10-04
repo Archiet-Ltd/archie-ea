@@ -103,6 +103,103 @@ def waitlist_csv():
     )
 
 
+@main.route("/offers/inquire", methods=["POST"])
+@rate_limit(10, "1m", methods=("POST",))
+def product_inquiry_submit():
+    """Submit an inquiry from one of the fixed-price offer pages.
+
+    One route serves every offer page; hidden fields say which page and
+    family to reload. The offer identifier and the consent sentence shown
+    next to the checkbox both come from that page's own front-matter, so
+    what gets stored can never say something the visitor was not shown.
+    """
+    from flask import abort
+
+    from app.models.product_inquiry import ProductInquiry
+    from app.services.public_pages import build_jsonld, load_page
+
+    page_family = request.form.get("family", "")
+    page_slug = request.form.get("slug", "")
+    page = load_page(page_family, slug=page_slug) if page_family and page_slug else None
+    if page is None or page.cta != "inquiry":
+        abort(404)
+
+    offer = page.front_matter.get("offer")
+    consent_text = page.front_matter.get("inquiry_consent_text")
+    submitted_offer = request.form.get("offer", "")
+
+    thanks = False
+    error = None
+
+    if not offer or not consent_text or submitted_offer != offer:
+        error = "This request could not be matched to an offer. Please try again."
+    else:
+        email = (request.form.get("email") or "").strip().lower()
+        name = (request.form.get("name") or "").strip() or None
+        consent = request.form.get("consent")
+
+        if not email:
+            error = "Please enter an email address."
+        elif not consent:
+            error = "You must agree to be contacted about this request."
+        else:
+            try:
+                valid = validate_email(email, check_deliverability=False)
+                email = valid.normalized
+            except EmailNotValidError:
+                error = "Please enter a valid email address."
+
+        if error is None:
+            existing = ProductInquiry.query.filter_by(email=email, offer=offer).first()
+            if existing is None:
+                inquiry = ProductInquiry(
+                    email=email,
+                    name=name,
+                    offer=offer,
+                    consent_text=consent_text,
+                )
+                db.session.add(inquiry)
+                db.session.commit()
+            thanks = True
+
+    return render_template(
+        "public/page.html",
+        page=page,
+        jsonld=build_jsonld(page),
+        thanks=thanks,
+        error=error,
+    )
+
+
+@main.route("/admin/product-inquiries.csv")
+@login_required
+@admin_required
+def product_inquiries_csv():
+    """Export product inquiries as CSV. Admin only."""
+    from app.models.product_inquiry import ProductInquiry
+
+    rows = (
+        ProductInquiry.query
+        .order_by(ProductInquiry.created_at.desc())
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["email", "name", "offer", "created_at", "consent_text"])
+    for row in rows:
+        writer.writerow(
+            [row.email, row.name or "", row.offer, row.created_at.isoformat(), row.consent_text]
+        )
+
+    csv_content = output.getvalue()
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=product-inquiries.csv"},
+    )
+
+
 @main.route("/login")
 def login_redirect():
     """Convenience redirect — canonical login URL is /account/login."""
@@ -281,7 +378,8 @@ def public_dogfood():
 
 
 @main.route(
-    "/<any(about, security, privacy, terms, contact, features, pricing, docs):slug>"
+    "/<any(about, security, privacy, terms, contact, features, pricing, docs, "
+    "'architecture-health-check', 'team-annual-onboarding'):slug>"
 )
 def public_site_page(slug):
     """A fixed top-level marketing/legal page (one file per page under content/pages/site/)."""
