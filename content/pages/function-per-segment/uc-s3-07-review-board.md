@@ -20,9 +20,11 @@ the meeting turns into a research session instead of a decision.
 ## What Entelim answers
 
 A solutions list the board reviews directly, with a full ARB dashboard, review history, sessions and
-decisions — and the impact analysis already run and attached before the meeting starts. Decisions
-write straight through to your change-request system, so the record doesn't live in two places.
+decisions — and the impact analysis already run and attached before the meeting starts. A decision
+here is locked to the exact proposal it reviewed — a decision brief, a solution, an architecture
+model, or an architecture decision record — along with its rationale and any conditions attached, so
+governance doesn't live in a separate record nobody trusts.
 
 ## Related
 
-- [Which risks and control gaps touch this goal?](/enterprise-architecture/risk-and-controls)
+- [Which risks touch this part of the architecture?](/enterprise-architecture/risk-and-controls)
