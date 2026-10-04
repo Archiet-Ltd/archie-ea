@@ -20,7 +20,7 @@ answer it can't check.*
 A chat page where every generated narrative lands, backed by direct access to the same questions Ask
 answers — so an AI assistant reasons from your real model, not from a plausible-sounding guess.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Available now on a paid plan. [See plans](/pricing).
 
 ## Related
 

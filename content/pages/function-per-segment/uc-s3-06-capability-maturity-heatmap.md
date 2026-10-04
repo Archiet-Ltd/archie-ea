@@ -24,7 +24,7 @@ checks.
 A capability heat grid, coloured strictly by what's actually been recorded, over whichever maturity
 framework you choose. A cell with nothing behind it stays honestly blank.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+It's live today, on a paid plan. [See plans](/pricing).
 
 ## Related
 

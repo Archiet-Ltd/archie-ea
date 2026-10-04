@@ -21,7 +21,7 @@ plausible-looking guess in an empty cell.*
 A capability heat grid over the framework you choose, colouring maturity exactly where it's been
 recorded and leaving the rest honestly blank rather than defaulting to some invented middle value.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+Available now on a paid plan. [See plans](/pricing).
 
 ## Related
 

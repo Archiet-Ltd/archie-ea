@@ -24,7 +24,7 @@ MCP read tools over the same questions Ask already answers, so any AI assistant 
 query the real model directly — and one chat page inside Entelim where every generated narrative
 lands, for anyone who wants it built in rather than external.
 
-Coming soon. Join the waiting list and we'll tell you the day it ships.
+It's live, on a paid plan. [See plans](/pricing).
 
 ## Related
 
