@@ -389,9 +389,12 @@ def test_typed_queue_partial_renders_no_header_breadcrumb_or_h1(app):
     assert 'aria-label="Breadcrumb"' not in body
 
 
-def test_review_and_queue_templates_are_dispatchers_with_one_header_each(app):
-    """The dispatchers must not render both branches, which would duplicate the
-    wrapper, the breadcrumb and the <h1>."""
+def test_review_and_queue_templates_render_one_header_and_no_legacy_dispatch(app):
+    """The templates must not render more than one wrapper/breadcrumb/<h1>, and
+    the typed/legacy dispatch this once guarded has been removed entirely: the
+    typed workspace and typed queue are now the only code path, so there is no
+    second branch left to duplicate the header, and the legacy partials these
+    templates used to fall through into no longer exist to be referenced."""
     source_review = app.jinja_env.loader.get_source(app.jinja_env, "arb/review_detail.html")[0]
     source_queue = app.jinja_env.loader.get_source(app.jinja_env, "arb/dashboard.html")[0]
 
@@ -399,11 +402,11 @@ def test_review_and_queue_templates_are_dispatchers_with_one_header_each(app):
     for source in (source_review, source_queue):
         code = strip_comments.sub("", source)
         assert code.count("page_header(") == 1
-        assert "{% if _typed %}" in code or "{% if not _typed %}" in code
+        assert "{% if _typed %}" not in code and "{% if not _typed %}" not in code
 
-    # The typed branch never falls through into the legacy body.
-    assert "arb/partials/_legacy_review_detail.html" in source_review
-    assert "arb/partials/_legacy_dashboard.html" in source_queue
+    # The legacy dispatch and its partials are gone, not merely unreached.
+    assert "arb/partials/_legacy_review_detail.html" not in source_review
+    assert "arb/partials/_legacy_dashboard.html" not in source_queue
 
 
 # --------------------------------------------------------------------------
