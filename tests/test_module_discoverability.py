@@ -39,6 +39,7 @@ _INFRA_RULES = {
     "/robots.txt",
     "/sitemap.xml",
     "/llms.txt",  # crawler/agent meta file, same category as robots.txt
+    "/llms-full.txt",  # crawler/agent meta file, same category as robots.txt
     "/apidocs/",
     "/apispec.json",
     "/oauth2-redirect.html",
