@@ -1,7 +1,7 @@
 """Add a DEFAULT partition to event_log so out-of-range rows are stored.
 
 ID: 20261004_evt_default
-Revises: 20261002_event_log
+Revises: 20261004_agten_cascade
 Create Date: 2026-10-04
 
 A DEFAULT partition catches rows whose created_at falls outside every
@@ -12,7 +12,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261004_evt_default"
-down_revision = "20261002_event_log"
+down_revision = "20261004_agten_cascade"
 branch_labels = None
 depends_on = None
 
