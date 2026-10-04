@@ -11,14 +11,14 @@ meant to tolerate, not reject. This migration makes the schema this
 repo builds fresh match what production already has, idempotently.
 
 Revision ID: 20261004_meaning_org_nullable
-Revises: 20261003_gap_org_nullable
+Revises: 20261004_product_inquiries
 Create Date: 2026-10-04
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261004_meaning_org_nullable"
-down_revision = "20261003_gap_org_nullable"
+down_revision = "20261004_product_inquiries"
 branch_labels = None
 depends_on = None
 
