@@ -13,7 +13,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261003_gap_org_nullable"
-down_revision = "20261002_data_domain_org_unique"
+down_revision = "20261004_agten_cascade"
 branch_labels = None
 depends_on = None
 
