@@ -16,8 +16,29 @@ cta: plans
 *Every recorded risk, traced over derived connections to show its real blast radius — not just the
 one component it was logged against.*
 
+## What is enterprise risk management?
+
+Enterprise risk management is the practice of recording, scoring and tracking every risk that
+could get in the way of an organisation's objectives in one place, instead of each team keeping
+its own list. The COSO and ISO 31000 frameworks most risk and compliance functions already work
+from describe the same basic loop: log the risk, score how likely it is and how much damage it
+would do, assign someone to own it, and score it again once a mitigation is in place — the
+inherent risk before that work starts, the residual risk after.
+
+A buyer searching for enterprise risk management software is typically looking for whatever makes
+that loop survive contact with a real organisation: one register instead of several spreadsheets,
+a scoring method that means the same thing wherever it's applied, a record of how a score moved
+over time rather than just its latest value, and a way to see at a glance which risks carry the
+most exposure right now.
+
+What a static register can't do is keep up with the fact that a risk rarely stays confined to the
+one thing it was originally logged against — the system, process or programme it threatens shifts
+as the architecture around it changes, and a document frozen at the moment it was written has no
+way to notice.
+
 ## What this module does
 
+Entelim's Risk Register module runs that register and scoring loop in software, not a spreadsheet.
 Ask which risks matter, and the answer doesn't stop at the element a risk was originally logged
 against — it follows the same connection chain that answers what breaks, so a risk shows up
 everywhere its impact would actually reach.
