@@ -519,8 +519,19 @@ def downgrade():
         bind.execute(text(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY"))
         bind.execute(text(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY"))
 
-    # Drop the platform role (only if no other objects depend on it).
+    # Revoke the platform role's grants, then drop it -- DROP ROLE fails
+    # while the role still holds privileges (not just ownership), the exact
+    # bug the archie_app role hit below before this fix.
     if _role_exists(bind, "archie_platform"):
+        bind.execute(text(
+            "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM archie_platform"
+        ))
+        bind.execute(text(
+            "ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM archie_platform"
+        ))
+        bind.execute(text("REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM archie_platform"))
+        bind.execute(text("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM archie_platform"))
+        bind.execute(text("REVOKE USAGE ON SCHEMA public FROM archie_platform"))
         bind.execute(text("DROP ROLE IF EXISTS archie_platform"))
 
     # Revoke the DML grants given to archie_app, then drop the role
