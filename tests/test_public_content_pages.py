@@ -599,9 +599,10 @@ def test_non_comparison_no_canonical():
 
 def test_waiting_list_cta_renders_link(app):
     """Pages with cta=waiting_list show the waiting list link."""
-    # ai-chat has cta: waiting_list
+    # ai-chat moved to cta: plans (feature shipped), so use /contact instead,
+    # which still carries cta: waiting_list.
     with app.test_client() as client:
-        rv = client.get("/modules/ai-chat")
+        rv = client.get("/contact")
         html = rv.data.decode()
         assert "/#waitlist" in html
         assert "Join the waiting list" in html
@@ -958,3 +959,88 @@ def test_xss_sanitization_cross_org(app):
                 assert f"{handler}=" not in html.lower(), (
                     f"{page.url}: contains {handler} handler"
                 )
+
+
+# ── cta: plans must match a feature that is actually live (PR #373 review) ─
+#
+# PR #373 flipped 7 pages from cta: waiting_list to cta: plans on the claim
+# that the feature each one describes was shipped and reachable. An
+# independent review found 4 of the 7 were not: capture_status had been set
+# to "live" right alongside cta, so a check that only compares those two
+# front-matter fields against each other would have passed all 7 pages,
+# including the 4 that were wrong. The actual tell, in every one of the 4
+# bad pages, was that nothing in the running app answers the page's own
+# url_slug -- the only front-matter field that names a concrete, checkable
+# destination. That is what this test verifies, for every module and
+# function-per-segment page, via the app's real url_map rather than by
+# re-reading the content files a second time.
+#
+# state: missing is also rejected outright, since a page admitting its own
+# feature does not exist yet is never consistent with cta: plans -- see
+# uc-s3-15, the one page of the 4 that had this set and still should not
+# have needed a route check to catch.
+
+
+def test_cta_plans_requires_capture_status_live(app):
+    """Any module / function-per-segment page claiming cta: plans must also
+    declare capture_status: live and must not declare state: missing."""
+    pages = [
+        p for p in load_all_pages() if p.family in ("module", "function-per-segment")
+    ]
+    assert pages, "no module / function-per-segment pages loaded"
+
+    for page in pages:
+        fm = page.front_matter
+        if fm.get("cta") != "plans":
+            continue
+        assert fm.get("capture_status") == "live", (
+            f"{page.source_path}: cta: plans but capture_status is "
+            f"{fm.get('capture_status')!r}, not 'live'"
+        )
+        assert fm.get("state") != "missing", (
+            f"{page.source_path}: cta: plans but state is 'missing' -- "
+            "the page itself says the feature does not exist yet"
+        )
+
+
+def test_cta_plans_url_slug_matches_a_real_route(app):
+    """Any module / function-per-segment page claiming cta: plans, with a
+    same-origin url_slug, must name a route the app actually serves.
+
+    A page can legitimately have no url_slug (nothing to check) or a
+    url_slug pointing at an external canonical (archiet.ai/...), which this
+    skips -- only a same-origin path (starting with "/") makes a checkable
+    claim about this app's own routing.
+    """
+    from werkzeug.exceptions import MethodNotAllowed, NotFound
+
+    adapter = app.url_map.bind("entelim.org")
+    pages = [
+        p for p in load_all_pages() if p.family in ("module", "function-per-segment")
+    ]
+    checked_at_least_one = False
+
+    for page in pages:
+        fm = page.front_matter
+        if fm.get("cta") != "plans":
+            continue
+        url_slug = fm.get("url_slug")
+        if not isinstance(url_slug, str) or not url_slug.startswith("/"):
+            continue
+
+        checked_at_least_one = True
+        try:
+            adapter.match(url_slug, method="GET")
+        except MethodNotAllowed:
+            pass  # route exists; GET just isn't one of its declared methods
+        except NotFound:
+            pytest.fail(
+                f"{page.source_path}: cta: plans and url_slug={url_slug!r}, "
+                "but no route in the app answers that path -- the feature "
+                "it describes is not actually reachable"
+            )
+
+    assert checked_at_least_one, (
+        "no cta: plans page with a same-origin url_slug was found to check -- "
+        "this test would pass vacuously; update it alongside whatever changed"
+    )
