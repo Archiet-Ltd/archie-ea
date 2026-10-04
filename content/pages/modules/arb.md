@@ -42,8 +42,8 @@ the bigger picture before it ships, not after.
 ## What this module does
 
 Entelim's Architecture Review Board module runs that process in software, not in someone's inbox.
-Every change proposal your board reviews, alongside the sessions where it was discussed and the
-decisions that came out of them. A decision here is locked to the exact proposal it reviewed — a
+It holds every change proposal your board reviews, alongside the sessions where it was discussed
+and the decisions that came out of them. A decision here is locked to the exact proposal it reviewed — a
 decision brief, a solution, an architecture model, or an architecture decision record — along with
 its rationale and any conditions attached, so governance doesn't live in a separate record nobody
 trusts.
