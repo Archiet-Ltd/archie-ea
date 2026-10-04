@@ -33,6 +33,40 @@ FORBIDDEN_STRINGS = [
     "UC-S",
 ]
 
+# Factual claims that were found false on one or more content pages and
+# corrected. Each entry is (banned phrase, why it is false) so a future
+# diff that reintroduces any of these phrases fails loudly instead of
+# shipping a disproven claim again.
+BANNED_CLAIMS = [
+    (
+        "straight through to your change-request system",
+        "ARBDecisionEvent's subject_type is DB-constrained to decision_brief/solution/"
+        "architecture_model/adr only -- no model links an ARB decision to a change request",
+    ),
+    (
+        "control-gap view",
+        "RiskEntityLink only links risks to application/solution/programme, never to a "
+        "compliance control; the real compliance mechanism maps applications to controls, "
+        "not risks",
+    ),
+    (
+        "current automatically",
+        "no content page module keeps any derived map, dependency graph, or model current "
+        "without an explicit action recorded by someone",
+    ),
+    (
+        "vendor and procurement detail",
+        "an application's own record shows the vendor name as plain text only -- no page "
+        "links from an application to vendor or procurement detail",
+    ),
+    (
+        "not published; free to self-host",
+        "Entelim's prices are published at /pricing (Startup $49/month, Team $29/editor/month) -- "
+        "self-hosting under AGPL is a separate, true fact, but it does not mean pricing is "
+        "unpublished",
+    ),
+]
+
 # Front-matter keys that are metadata-only and must never appear as visible
 # text. We check these as whole-word patterns to avoid false positives from
 # common English words like "source" or "state" that appear in body copy.
@@ -1149,6 +1183,34 @@ def test_xss_sanitization_cross_org(app):
                 assert f"{handler}=" not in html.lower(), (
                     f"{page.url}: contains {handler} handler"
                 )
+
+
+# ── Regression guard: disproven factual claims must never reappear ────────
+
+
+def test_no_page_repeats_a_disproven_claim():
+    """No content page body contains a factual claim already found false
+    and corrected elsewhere.
+
+    Each phrase in BANNED_CLAIMS was once live on a content page and was
+    disproven against the data model (see the reason recorded next to each
+    phrase). This test collects every page/phrase match across the whole
+    corpus before failing, so a single run shows every offending page at
+    once rather than stopping at the first one.
+    """
+    pages = load_all_pages()
+    violations = []
+    for page in pages:
+        body_lower = page.body_html.lower()
+        for phrase, reason in BANNED_CLAIMS:
+            if phrase.lower() in body_lower:
+                violations.append(
+                    f"{page.url}: contains banned phrase '{phrase}' ({reason})"
+                )
+    assert not violations, (
+        "Disproven claim(s) reappeared on a content page:\n"
+        + "\n".join(violations)
+    )
 
 
 # ── cta: plans must match a feature that is actually live (PR #373 review) ─
