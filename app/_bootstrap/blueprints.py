@@ -914,6 +914,17 @@ def _register_architecture(app, csrf):
     except ImportError as e:
         app.logger.warning(f"Completeness blueprint not available: {e}")
 
+    # Motivation traceability API — tier-independent (no v2 equivalent)
+    try:
+        from app.modules.architecture.routes.motivation_traceability_routes import (
+            motivation_api,
+        )
+
+        app.register_blueprint(motivation_api)
+        app.logger.info("[BLUEPRINT] Motivation traceability API registered at /api/v1/motivation")
+    except ImportError as e:
+        app.logger.warning(f"Motivation traceability API blueprint not available: {e}")
+
     # --- Tier 1: v2 (guardrail-enabled) ---
     if _is_flag("USE_ARCHITECTURE_GUARDRAILS"):
         try:

@@ -119,6 +119,9 @@ else:
     from .capabilities import *  # noqa
     from .capability_governance import *  # noqa - CapabilityGovernanceDecision
     from .compliance_models import *  # noqa
+    from .application_compliance import *  # noqa - ApplicationComplianceControl (application-to-control mapping)
+    from .regulatory_framework import *  # noqa - FrameworkAdoption (tenant-hybrid framework catalogue)
+    from .regulatory_change import *  # noqa - RegulatoryChange, RegulatoryChangeImpact (regulatory change tracker)
     from .cost_intelligence import *  # noqa - CapabilityCostAllocation, VendorContract, SLA (Cost intelligence)
     from .decision_ledger import *  # noqa - DecisionLedger (append-only governance ledger)
 
@@ -279,6 +282,7 @@ else:
     from .strategic import *  # noqa - StrategicInitiative, StrategicMilestone, RoadmapItem
     from .transformation_programme import *  # noqa - canonical programme aggregate children
     from .transformation_execution import *  # noqa - fenced commands and immutable results
+    from .event_log import EventLogRecord  # noqa: F401 - platform event log (partitioned)
     from .transformation_evidence import *  # noqa - candidates, signals, and evidence requests
     from .transformation_decision import *  # noqa - immutable options and decision briefs
     from .arb_submission_event import *  # noqa - immutable typed ARB submission receipt
@@ -315,6 +319,10 @@ else:
 
     # ArchiMate Relationship Auto-Sync - event listeners for junction table -> ArchiMateRelationship
     from . import archimate_relationship_sync  # noqa: F401 - registers event listeners
+    # ArchiMate Outbox Sync - ORM listeners that emit outbox events on every
+    # element / relationship mutation.
+    from .archimate_outbox_sync import install_archimate_outbox_sync  # noqa: F401
+    install_archimate_outbox_sync()
 
     # SA-001: Solution ↔ ArchiMate junction tables
     from .solution_archimate_element import SolutionArchiMateElement  # noqa: F401

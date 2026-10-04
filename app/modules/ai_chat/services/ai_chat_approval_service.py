@@ -82,6 +82,7 @@ def create_approval_record(
     source_table: Optional[str] = None,
     source_id: Optional[int] = None,
     expiry_minutes: int = 15,
+    persona: Optional[str] = None,
 ) -> AIChatCRUDApproval:
     """The one writer of ai_chat_crud_approvals (consolidation).
 
@@ -113,6 +114,7 @@ def create_approval_record(
         agent_turn_id=agent_turn_id,
         source_table=source_table,
         source_id=source_id,
+        persona=persona,
     )
     db.session.add(approval)
     db.session.flush()
@@ -535,7 +537,7 @@ class AIChatApprovalService:
             "error": result.get("error", "Operation failed"),
             "approval_id": approval_id,
         }
-        for key in ("reason_codes", "missing_evidence", "recovery"):
+        for key in ("reason_codes", "missing_evidence", "recovery", "charter_refused", "code"):
             if key in result:
                 response[key] = result[key]
         return response
@@ -717,7 +719,7 @@ class AIChatApprovalService:
                 # "Unsupported operation type: tool_use".
                 from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
 
-                executor = ToolExecutor(self.user_id)
+                executor = ToolExecutor(self.user_id, persona=approval.persona)
                 tc = ToolCall(id=str(approval_id), name=approval.entity_type, arguments=payload)
                 result = executor.execute(tc)
 

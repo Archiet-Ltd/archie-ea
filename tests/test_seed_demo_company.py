@@ -122,6 +122,23 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
     assert counts["risks"] == 10
     assert counts["programmes"] == 5
     assert counts["work_packages"] == 12
+    # Every seeded work package must carry the organisation so it is visible
+    # under the tenant filter used by TenantMixin models.
+    from app.models import ArchiMateElement
+    from app.models.unified_work_package import UnifiedWorkPackage
+    wp_orgs = (
+        db_session.query(UnifiedWorkPackage.organization_id)
+        .filter(UnifiedWorkPackage.id.in_(
+            db_session.query(UnifiedWorkPackage.id)
+            .join(ArchiMateElement, UnifiedWorkPackage.archimate_element_id == ArchiMateElement.id)
+            .filter(ArchiMateElement.organization_id == org_id)
+        ))
+        .distinct()
+        .all()
+    )
+    assert len(wp_orgs) == 1 and wp_orgs[0][0] == org_id, (
+        f"all seeded work packages must carry org_id={org_id}, got {wp_orgs}"
+    )
     assert counts["plateaus"] == 5
     assert counts["gaps"] == 10
     assert counts["users"] >= 17  # demo user + 16 owner users
