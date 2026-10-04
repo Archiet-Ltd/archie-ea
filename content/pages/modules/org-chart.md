@@ -7,7 +7,8 @@ state: on_main
 answers_use_cases:
   - {id: UC-S2-02, segment: S2}
   - {id: UC-S4-04, segment: S4}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Org Chart & RACI
@@ -18,8 +19,7 @@ missing, not silently assigned to someone.*
 ## What this module does
 
 Every ownership record in one place: who's accountable for what, by organisation unit, with gaps
-shown as genuinely missing rather than silently assigned to someone. It's the record the
-accountability answer on Ask is built to read.
+shown as genuinely missing rather than silently assigned to someone.
 
 ## Where you'll meet it
 

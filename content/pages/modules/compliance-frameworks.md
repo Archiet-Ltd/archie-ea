@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S3-08, segment: S3}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Compliance Frameworks
@@ -16,8 +17,8 @@ your model's risks actually touch.*
 
 ## What this module does
 
-Pairs with the Risk Register to show which control or compliance requirement a risk maps to, and
-whether the gap is owned. It shows what your own model's data says against a framework's
+This module maps the applications in your model against each framework's controls, tracking
+implementation status per control. It shows what your own model's data says against a framework's
 requirements — never a certification or a guarantee that you pass an audit.
 
 ## Where you'll meet it

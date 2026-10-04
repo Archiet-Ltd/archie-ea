@@ -7,7 +7,8 @@ state: on_main
 answers_use_cases:
   - {id: UC-S2-08, segment: S2}
   - {id: UC-S3-08, segment: S3}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Risk Register
@@ -19,8 +20,7 @@ one component it was logged against.*
 
 Ask which risks matter, and the answer doesn't stop at the element a risk was originally logged
 against — it follows the same connection chain that answers what breaks, so a risk shows up
-everywhere its impact would actually reach. Enterprise teams get a compliance-frameworks filter
-alongside it for control-gap questions.
+everywhere its impact would actually reach.
 
 ## Where you'll meet it
 
