@@ -293,11 +293,24 @@ def test_a_failing_table_rolls_back_alone_and_another_tables_work_persists(
     assert _roadmap_item_org(db_session, item_id) == org.id
 
 
-def test_provenance_only_quarantines_options_analysis_and_stakeholder_inputs():
+def test_provenance_only_quarantines_every_table_with_no_single_resolvable_owner():
+    """_PROVENANCE_ONLY documents every table whose _DERIVABLE_ORG entry (or
+    complete absence of one) can leave a genuine remainder with no single
+    entity this command can resolve to -- options_analysis and
+    stakeholder_inputs are two of these, not the whole set; the roadmap and
+    motivation/requirements/strategic/technology-layer tables this module's
+    other tests exercise belong to the same set for the same reason.
+    """
     import app.commands.backfill_layer_tenancy as b
 
     assert hasattr(b, "_PROVENANCE_ONLY")
-    assert b._PROVENANCE_ONLY == {"options_analysis", "stakeholder_inputs"}
+    assert b._PROVENANCE_ONLY == {
+        "application_ownership", "options_analysis", "organization_units", "stakeholder_inputs",
+        "drivers", "goals", "meanings", "values", "assessments", "stakeholders", "requirements",
+        "strategic_recommendations", "enterprise_briefings",
+        "monitoring_alerts", "monitoring_baselines",
+        "framework_instances", "reference_model_import", "industry_process_recommendation",
+    }
 
 
 @pytest.mark.timeout(90)
