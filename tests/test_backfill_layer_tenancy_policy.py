@@ -200,12 +200,36 @@ def test_single_active_organisation_receives_the_residual_rows(db_session, make_
     """One active, non-default organisation, plus the default and an
     inactive one: the row with no provenance is assigned to the active
     organisation, never to the default or the inactive one, and the column
-    is hardened once nothing is left NULL."""
+    is hardened once nothing is left NULL.
+
+    This test's precondition is "exactly one active, non-default
+    organisation exists" -- that is what it is actually testing, not "this
+    is the only test that has ever run against this database". A fresh
+    local database happens to start empty, so the precondition held by
+    accident; the shared CI database carries other tests' active
+    organisations (several pre-existing test modules commit real rows
+    outside the rollback-savepoint db_session fixture, and never clean them
+    up), so without this, _resolve_org_id correctly refuses to guess among
+    several and the assignment this test asserts never happens -- not a
+    wrong fix, just an unisolated test. Every other organisation in the
+    database is made ineligible for _resolve_org_id's count (is_active =
+    FALSE, the same column its own WHERE clause filters on) inside this
+    test's own transaction, so it rolls back with the rest of this test's
+    fixtures rather than becoming a permanent change.
+    """
     from app.commands.backfill_layer_tenancy import repair_layer_tenancy
 
     org_active = make_org("single-active")
     _make_inactive_org(db_session, "single-inactive")
     _make_default_org(db_session, "single-default")
+
+    # Explicit precondition: org_active is the only active, non-default
+    # organisation _resolve_org_id can see, however many other tests'
+    # organisations already live in this shared database.
+    db_session.execute(
+        text("UPDATE organizations SET is_active = FALSE WHERE id != :keep"),
+        {"keep": org_active.id},
+    )
 
     orphan_id = _insert_roadmap_item(db_session, initiative_id=None, title="orphan")
     db_session.flush()
@@ -216,6 +240,76 @@ def test_single_active_organisation_receives_the_residual_rows(db_session, make_
     assert "strategic_roadmap_items" not in stats["unresolved"]
     assert stats["failed"] == {}
     assert _is_nullable(db_session, "strategic_roadmap_items") is False
+
+
+def _has_organization_id_index(db_session, table):
+    from sqlalchemy import inspect
+
+    insp = inspect(db_session.connection())
+    return any(
+        i["column_names"] == ["organization_id"] for i in insp.get_indexes(table)
+    ) or f"ix_{table}_organization_id" in {i["name"] for i in insp.get_indexes(table)}
+
+
+def test_hardening_never_tightens_a_column_the_model_declares_nullable(db_session, make_org, app):
+    """unified_work_packages' model overrides TenantMixin's default
+    (nullable=False) back to nullable=True as a permanent choice -- see
+    UnifiedWorkPackage.organization_id's own docstring: an unattributable
+    row is left NULL as its quarantine, which the tenant filter's `=`
+    comparison then hides from every organisation, by design.
+
+    Even with a single active organisation (so the residual sweep assigns
+    every currently-NULL row and this table reaches zero orphans -- exactly
+    the condition that used to make hardening fire), the NOT NULL
+    constraint must never be added: the model's own declared nullability
+    decides, not how many orphans happen to be resolved on this run. The
+    index is still added regardless.
+    """
+    from app.commands.backfill_layer_tenancy import repair_layer_tenancy
+    from app.models.unified_work_package import UnifiedWorkPackage
+
+    org_active = make_org("nullable-design")
+    _make_inactive_org(db_session, "nullable-design-inactive")
+    _make_default_org(db_session, "nullable-design-default")
+    db_session.execute(
+        text("UPDATE organizations SET is_active = FALSE WHERE id != :keep"),
+        {"keep": org_active.id},
+    )
+
+    # wiring-ok: backfill test fixture -- this row's NULL organization_id is
+    # deliberate, the exact shape a pre-TenantMixin row takes.
+    orphan = UnifiedWorkPackage(name=f"uwp-orphan-{uuid.uuid4().hex[:8]}", organization_id=None)
+    db_session.add(orphan)
+    db_session.flush()
+
+    stats = repair_layer_tenancy()
+
+    db_session.refresh(orphan)
+    # This table has no _DERIVABLE_ORG entry and no multi-tenant ambiguity
+    # here, so the ordinary residual-assignment rule applies and this row
+    # is assigned -- the table reaches zero orphans, the condition that
+    # used to make hardening fire regardless of the model's own design.
+    assert orphan.organization_id == org_active.id
+    assert "unified_work_packages" not in stats["unresolved"]
+    assert stats["failed"] == {}
+    assert "unified_work_packages" in stats["nullable_by_design"]
+
+    # The column must still be nullable -- a permanent model choice, not a
+    # backlog this run happened to clear -- and the index must exist.
+    assert _is_nullable(db_session, "unified_work_packages") is True
+    assert _has_organization_id_index(db_session, "unified_work_packages") is True
+
+    # The regression this bug is actually about: a fresh, genuinely
+    # unattributable row inserted after this run must not raise
+    # NotNullViolation.
+    # wiring-ok: same deliberate NULL as above, inserted after hardening to
+    # prove the column was never tightened.
+    post_hardening_orphan = UnifiedWorkPackage(
+        name=f"uwp-post-hardening-{uuid.uuid4().hex[:8]}", organization_id=None
+    )
+    db_session.add(post_hardening_orphan)
+    db_session.flush()
+    assert post_hardening_orphan.organization_id is None
 
 
 def test_purges_a_row_whose_always_set_link_names_a_gone_parent(db_session, make_org, monkeypatch):

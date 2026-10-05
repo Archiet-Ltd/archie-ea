@@ -56,7 +56,13 @@ table, in order:
      allowed to make. Every such table is reported, not silently skipped.
   4. Index and harden. The index is always added. The NOT NULL constraint is
      added only when nothing was left NULL; a deferred table gets the index
-     and is reported, not the constraint, which would only fail.
+     and is reported, not the constraint, which would only fail. A table
+     whose model declares organization_id nullable=True as a permanent
+     override of TenantMixin's default (UnifiedWorkPackage, ConnectorConfig
+     and the rest of that generation -- an unattributable row is their
+     deliberate, permanent quarantine) never gets the constraint either,
+     however many rows happen to be resolved; it is reported as nullable by
+     design, not as a deferred backlog.
 
 Each table's purge, derivation, assignment, index and hardening run in their
 own transaction, committed before the next table starts (rolled back, always,
@@ -568,8 +574,20 @@ def _tenant_tables():
 def _process_table(conn, insp, t, resolved_org, dry_run):
     """Purge, derive, assign, index and harden one table.
 
-    Returns (status, extra): status is "healthy" or "repaired"; extra is the
-    unresolved-orphan count when the table was deferred, else None.
+    Returns (status, extra): status is "healthy", "repaired" or
+    "nullable_by_design"; extra is the unresolved-orphan count when the
+    table was deferred, else None.
+
+    "nullable_by_design" is distinct from a deferred table: several models
+    override TenantMixin's default (nullable=False) back to nullable=True as
+    a permanent choice -- UnifiedWorkPackage, ConnectorConfig and others --
+    because an unattributable row is their deliberate, permanent quarantine,
+    not a transient state this command's own backfilling is meant to
+    resolve. Hardening must never fight that model declaration, however many
+    orphans happen to be resolved right now; the check is against the
+    model's own declared nullability (db.metadata), not the live column,
+    since the live column is exactly what this function is deciding whether
+    to change.
 
     Raises on an SQL error the caller could not have anticipated -- nothing
     here commits or rolls back on its own; the caller does that once, around
@@ -622,6 +640,18 @@ def _process_table(conn, insp, t, resolved_org, dry_run):
         click.echo(f"  + {t}: added organization_id")
         col = {"nullable": True}
 
+    # The model's own declared nullability -- not the live column's current
+    # nullability, which is exactly what the hardening step below is
+    # deciding whether to change -- is the one source of truth for whether
+    # organization_id may ever be hardened to NOT NULL on this table. A
+    # model that overrides TenantMixin's default back to nullable=True (see
+    # the class docstrings/comments on UnifiedWorkPackage, ConnectorConfig,
+    # EnterpriseInitiative, KanbanCard and the rest of this generation) has
+    # made a permanent design choice: an unattributable row is left NULL as
+    # its quarantine, not a defect for this command to fix once enough
+    # other rows happen to get resolved.
+    model_nullable = db.metadata.tables[t].columns["organization_id"].nullable
+
     # A table that can state its own tenant does so first, so those rows
     # never reach the guess-based orphan pass below. Run this in dry-run
     # too (it is rolled back with everything else this table did): the
@@ -640,8 +670,8 @@ def _process_table(conn, insp, t, resolved_org, dry_run):
         text(f'SELECT count(*) FROM "{t}" WHERE organization_id IS NULL')
     ).scalar()
 
-    if not orphans and col.get("nullable") is False and has_index:
-        return "healthy", None
+    if not orphans and has_index and (model_nullable or col.get("nullable") is False):
+        return ("nullable_by_design" if model_nullable else "healthy"), None
 
     # Every table takes the branch #112 wrote only for roadmap_tasks: with no
     # single active, non-default organisation to assign to, residual rows
@@ -672,16 +702,25 @@ def _process_table(conn, insp, t, resolved_org, dry_run):
                 )
 
     if dry_run:
-        if col.get("nullable") is not False or not has_index:
+        if model_nullable:
+            if not has_index:
+                click.echo(f"  - {t}: would add index; organization_id stays nullable (model declares it by design)")
+        elif col.get("nullable") is not False or not has_index:
             click.echo(f"  - {t}: would add index / SET NOT NULL as needed")
-        return "repaired", (orphans if deferred else None)
+        return ("nullable_by_design" if model_nullable else "repaired"), (orphans if deferred else None)
 
     # Index before NOT NULL, both idempotent; reconcile-schema adds neither.
     # A deferred table (unresolved provenance rows still NULL) gets the
     # index but not the NOT NULL constraint, which would only fail; that is
-    # reported explicitly instead of via the try/except below.
+    # reported explicitly instead of via the try/except below. A table whose
+    # model declares organization_id permanently nullable never gets the
+    # NOT NULL DDL at all, deferred or not -- that is a design choice, not
+    # an unresolved backlog, and is reported as such rather than lumped in
+    # with the deferred-orphan case.
     ddls = [(f'CREATE INDEX IF NOT EXISTS {wanted_index} ON "{t}" (organization_id)', "index")]
-    if deferred:
+    if model_nullable:
+        click.echo(f"  = {t}: organization_id is nullable by design (model declares it); not-null skipped")
+    elif deferred:
         click.echo(f"  ! {t}: not-null deferred: {orphans} unresolved row(s)")
     else:
         ddls.append((f'ALTER TABLE "{t}" ALTER COLUMN organization_id SET NOT NULL', "not-null"))
@@ -690,8 +729,8 @@ def _process_table(conn, insp, t, resolved_org, dry_run):
             conn.execute(text(ddl))
         except Exception as exc:  # noqa: BLE001 — report, keep repairing other tables
             click.echo(f"  ! {t}: {label} skipped ({str(exc)[:100]})")
-    click.echo(f"  + {t}: hardened (index{'' if deferred else ', NOT NULL'})")
-    return "repaired", (orphans if deferred else None)
+    click.echo(f"  + {t}: hardened (index{'' if (deferred or model_nullable) else ', NOT NULL'})")
+    return ("nullable_by_design" if model_nullable else "repaired"), (orphans if deferred else None)
 
 
 def repair_layer_tenancy(org_id=None, dry_run=False):
@@ -706,7 +745,10 @@ def repair_layer_tenancy(org_id=None, dry_run=False):
     own, recorded in "failed", and every other table still runs.
 
     Returns {"repaired": [...], "skipped_healthy": n, "absent": [...],
-    "unresolved": {table: count}, "failed": {table: reason}}.
+    "unresolved": {table: count}, "failed": {table: reason},
+    "nullable_by_design": [...]}. A table in "nullable_by_design" never
+    appears in "unresolved": organization_id there is a permanent model
+    choice, not a deferred backlog this command failed to resolve.
     """
     from sqlalchemy import inspect
 
@@ -722,7 +764,7 @@ def repair_layer_tenancy(org_id=None, dry_run=False):
     # connection, same transaction: nothing here can lock against itself.
     live = set(inspect(db.session.connection()).get_table_names())
 
-    repaired, absent = [], []
+    repaired, absent, nullable_by_design = [], [], []
     healthy = 0
     unresolved = {}
     failed = {}
@@ -763,6 +805,8 @@ def repair_layer_tenancy(org_id=None, dry_run=False):
 
         if status == "healthy":
             healthy += 1
+        elif status == "nullable_by_design":
+            nullable_by_design.append(t)
         else:
             repaired.append(t)
             if deferred_count is not None:
@@ -774,6 +818,7 @@ def repair_layer_tenancy(org_id=None, dry_run=False):
         "absent": absent,
         "unresolved": unresolved,
         "failed": failed,
+        "nullable_by_design": nullable_by_design,
     }
 
 
@@ -793,6 +838,12 @@ def backfill_layer_tenancy(dry_run, org_id):
     )
     for table, count in stats.get("unresolved", {}).items():
         click.echo(f"  {table}: {count} row(s) left without a tenant; no provenance found")
+    if stats.get("nullable_by_design"):
+        click.echo(
+            f"  {len(stats['nullable_by_design'])} table(s) left nullable by permanent model design "
+            "(not hardened, not a backlog): " + ", ".join(stats["nullable_by_design"][:6])
+            + ("…" if len(stats["nullable_by_design"]) > 6 else "")
+        )
     if stats["failed"]:
         click.echo(f"\n{len(stats['failed'])} table(s) FAILED:")
         for table, reason in stats["failed"].items():
