@@ -12,14 +12,14 @@ cta: plans
 
 # Compliance Frameworks
 
-*Checks every application in your model against each framework's controls, showing what's
-implemented and what's still a gap.*
+*Records where each application in your model stands against every framework's controls —
+what's implemented, what's still a gap.*
 
 ## What this module does
 
-This module maps the applications in your model against each framework's controls, tracking
-implementation status per control. It shows what your own model's data says against a framework's
-requirements — never a certification or a guarantee that you pass an audit.
+Records, per application, where it stands against each framework's controls. It shows what your
+own model's data says against a framework's requirements — never a certification or a guarantee
+that you pass an audit.
 
 ## Where you'll meet it
 
