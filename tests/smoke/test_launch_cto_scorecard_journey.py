@@ -43,6 +43,12 @@ def test_cto_escalates_an_open_exception_and_it_persists(browser, live_server):
     exception_id = _seed_open_exception(org["org_id"])
 
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    # The first-run onboarding overlay (x-show="showOnboarding") covers the
+    # page for a fresh user and would block the Escalate click below; the
+    # other launch journeys dismiss it the same way, by pre-seeding the
+    # localStorage key the Alpine component itself checks, not by changing
+    # the overlay.
+    context.add_init_script("try { localStorage.setItem('archie_onboarding_ts', '1'); } catch (e) {}")
     page = context.new_page()
     sign_in(page, live_server, org["emails"]["cto"])
 
