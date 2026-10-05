@@ -233,6 +233,13 @@ def init_cli(app):
         app.logger.warning(f"\u26a0\ufe0f  Failed to register integration flow columns CLI: {e}")
 
     try:
+        from app.commands.backfill_meaning_tenancy import init_app as init_backfill_meaning
+        init_backfill_meaning(app)
+        app.logger.info("Meaning tenancy backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"\u26a0\ufe0f  Failed to register meaning tenancy backfill CLI: {e}")
+
+    try:
         from app.commands.reconcile_schema import init_app as init_reconcile_schema
         init_reconcile_schema(app)
         app.logger.info("\u2705 Schema reconcile CLI command registered")

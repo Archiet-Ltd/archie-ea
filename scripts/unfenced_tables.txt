@@ -290,6 +290,7 @@ process_actor_raci
 process_application_mapping
 process_embeddings
 process_role_raci
+product_inquiries
 product_taxonomy
 production_lines
 production_orders

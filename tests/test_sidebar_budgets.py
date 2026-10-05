@@ -218,7 +218,10 @@ def test_enterprise_architect_my_work_membership():
     """Task 3 fix round: ArchiMate Composer and Traceability Matrix added —
     both real, working routes reachable from nowhere in the sidebar.
     Coordinator review of the sidebar rewrite; membership amended
-    accordingly."""
+    accordingly.
+
+    Model as of and Changes added — the enterprise architect owns the
+    capability model and needs to audit its evolution."""
     assert _my_work_labels(ROLE_ENTERPRISE_ARCHITECT) == [
         "Ask a question",
         "Transformation programmes",
@@ -256,6 +259,9 @@ def test_enterprise_architect_my_work_membership():
         # no dedicated Data Architect / Technical Architect role yet.
         "Data Architecture",
         "Tech Radar",
+        # Model history: as-of snapshot and changes between dates.
+        "Model as of",
+        "Changes",
     ]
 
 
