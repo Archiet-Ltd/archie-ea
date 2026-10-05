@@ -18,14 +18,14 @@ makes this revision a no-op either way, matching
 own idiom rather than inventing a new one.
 
 Revision ID: 20261004_arb_review_source_cols
-Revises: 20261003_gap_org_nullable
+Revises: 20261004_monelytics_sub_id
 Create Date: 2026-10-04
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261004_arb_review_source_cols"
-down_revision = "20261003_gap_org_nullable"
+down_revision = "20261004_monelytics_sub_id"
 branch_labels = None
 depends_on = None
 
