@@ -1,7 +1,7 @@
 """Add monelytics_subscription_id to subscriptions.
 
 ID: 20261004_monelytics_sub_id
-Revises: 20261004_evt_default
+Revises: 20261004_meaning_org_nullable
 Create Date: 2026-10-04
 
 The Monelytics provider (app/services/monelytics_provider.py) never writes a
@@ -16,7 +16,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "20261004_monelytics_sub_id"
-down_revision = "20261004_evt_default"
+down_revision = "20261004_meaning_org_nullable"
 branch_labels = None
 depends_on = None
 
