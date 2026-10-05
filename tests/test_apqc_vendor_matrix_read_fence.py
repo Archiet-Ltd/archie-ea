@@ -50,15 +50,23 @@ def test_capability_mappings_list_excludes_a_foreign_organisations_rows(app, db_
     db_session.add_all([cpm_a, cpm_b])
     db_session.flush()
     user_a = _user(db_session, org_a, "d1")
-    uid = user_a.id
+    uid, cap_a_id, cap_b_id = user_a.id, cap_a.id, cap_b.id
     db_session.expunge_all()
 
     login_as(client, db_session.get(User, uid))
     r = client.get("/api/vendors/apqc/capability-mappings")
 
     assert r.status_code == 200
-    text = r.get_data(as_text=True)
-    assert "SECRET-CAP-B-D1" not in text
+    body = r.get_json()
+    # Not a name check: CapabilityProcessMapping has no capability_name
+    # attribute of its own (only to_dict() computes one), so Flask-RESTX's
+    # marshal_list_with(capability_process_model) always returns None for
+    # it -- a name-in-response check passes on unfenced main for the wrong
+    # reason (pr306-v2 review, DEFECT-2). capability_id IS a real column and
+    # is marshaled, so assert on that instead.
+    returned_capability_ids = {row["capability_id"] for row in body}
+    assert cap_b_id not in returned_capability_ids
+    assert cap_a_id in returned_capability_ids
 
 
 def test_process_capabilities_excludes_a_foreign_organisations_rows(app, db_session, make_org, client, login_as):
@@ -147,24 +155,37 @@ def test_vendor_capability_process_matrix_excludes_a_foreign_organisations_capab
         coverage_percentage=50, automation_capability=50,
     )
     db_session.add(apqc_map)
+    cap_a = BusinessCapability(name="CapA", organization_id=org_a.id)
     cap_b = BusinessCapability(name="SECRET-CAP-B-D3", organization_id=org_b.id)
-    db_session.add(cap_b)
+    db_session.add_all([cap_a, cap_b])
     db_session.flush()
+    cpm_a = CapabilityProcessMapping(
+        capability_id=cap_a.id, apqc_process_id=process.id, process_contribution=50,
+    )
     cpm_b = CapabilityProcessMapping(
         capability_id=cap_b.id, apqc_process_id=process.id, process_contribution=50,
     )
-    db_session.add(cpm_b)
+    db_session.add_all([cpm_a, cpm_b])
     db_session.flush()
     user_a = _user(db_session, org_a, "d3")
-    product_id, uid = product.id, user_a.id
+    product_id, uid, cap_a_id, cap_b_id = product.id, user_a.id, cap_a.id, cap_b.id
     db_session.expunge_all()
 
     login_as(client, db_session.get(User, uid))
     r = client.get("/api/vendors/apqc/vendor-capability-process-matrix", query_string={"product_id": product_id})
 
     assert r.status_code == 200
-    text = r.get_data(as_text=True)
-    assert "SECRET-CAP-B-D3" not in text
+    # Not a name check: accessing cap_map.capability.name triggers a lazy
+    # load that the tenant-isolation listener filters for a foreign
+    # organisation's BusinessCapability, so the name comes back None
+    # whether or not the CapabilityProcessMapping row itself was excluded --
+    # a name-in-response check passes on unfenced main for the wrong reason
+    # (pr306-v2 review, DEFECT-3). The matrix item still carries a real
+    # capability_id, so assert on that instead.
+    matrix = r.get_json().get("matrix", [])
+    returned_capability_ids = {item["capability_id"] for item in matrix}
+    assert cap_b_id not in returned_capability_ids
+    assert cap_a_id in returned_capability_ids
 
 
 def test_apqc_suggestions_treats_a_foreign_organisations_link_as_still_unmapped(
