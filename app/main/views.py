@@ -312,6 +312,11 @@ def sitemap_xml():
     urls.append(
         f"  <url><loc>{base_url}/</loc><priority>1.0</priority></url>"
     )
+    # The /vs comparison hub is a view, not a content page from load_all_pages(),
+    # so it needs its own entry here, same as the homepage above.
+    urls.append(
+        f"  <url><loc>{base_url}/vs</loc></url>"
+    )
     for p in pages:
         urls.append(
             f"  <url><loc>{base_url}{p.url}</loc></url>"
@@ -517,6 +522,30 @@ def public_use_case(slug):
         from flask import abort
         abort(404)
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+
+
+@main.route("/vs")
+def public_comparison_hub():
+    """The /vs comparison hub: links to every comparison page at its real URL.
+
+    Reuses the same page loader as every other public page (no second loader):
+    a comparison page's own front-matter `routing` decides its real address — most
+    carry an archiet.ai canonical URL, so the hub links there rather than assuming
+    every comparison page lives on entelim.org.
+    """
+    from app.services.public_pages import load_all_pages
+
+    site_url = "https://entelim.org"
+    pages = [p for p in load_all_pages() if p.family == "comparison"]
+    entries = [
+        {
+            "competitor": p.front_matter.get("competitor", p.title),
+            "real_url": p.canonical_url or f"{site_url}{p.url}",
+        }
+        for p in pages
+    ]
+    entries.sort(key=lambda entry: entry["competitor"].lower())
+    return render_template("public/vs_hub.html", entries=entries)
 
 
 @main.route("/vs/<slug>")
