@@ -315,6 +315,18 @@ class Meaning(TenantMixin, db.Model):
     name = db.Column(db.String(255), nullable=False, index=True)
     description = db.Column(db.Text)
 
+    # Meaning gained TenantMixin after rows already existed with no
+    # organisation (backfill_meaning_tenancy derives what it can and
+    # leaves the rest NULL rather than guessing -- CLAUDE.md's "never
+    # invent data"). TenantMixin declares organization_id NOT NULL for
+    # every model that starts tenant-scoped from creation; Meaning is the
+    # one exception with a real pre-existing orphan population, so it
+    # overrides that back to nullable here. See migrations/versions/
+    # 20261004_meaning_org_nullable.py for the matching DB-level change.
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True,
+    )
+
     # ArchiMate linkage
     archimate_element_id = db.Column(db.Integer, db.ForeignKey("archimate_elements.id"))
 
@@ -385,6 +397,9 @@ class Assessment(TenantMixin, db.Model):
     # ArchiMate linkage
     archimate_element_id = db.Column(db.Integer, db.ForeignKey("archimate_elements.id"))
 
+    # Driver linkage — an Assessment is conducted against a Driver
+    driver_id = db.Column(db.Integer, db.ForeignKey("drivers.id"), nullable=True, index=True)
+
     # Assessment Specifics
     assessment_type = db.Column(db.String(50))  # SWOT, Maturity, Risk, Performance
     result_score = db.Column(db.String(50))
@@ -396,6 +411,7 @@ class Assessment(TenantMixin, db.Model):
 
     # Relationships
     archimate_element = db.relationship("ArchiMateElement", foreign_keys=[archimate_element_id])
+    driver = db.relationship("Driver", backref="assessments", foreign_keys=[driver_id])
 
     def __repr__(self):
         return f"<Assessment {self.name}>"
@@ -524,7 +540,14 @@ from sqlalchemy import event
 
 @event.listens_for(Meaning, "after_insert")
 def create_meaning_archimate(mapper, connection, target):
-    """Auto-create ArchiMateElement for Meaning"""
+    """Auto-create ArchiMateElement for Meaning.
+
+    R1-B81: Meaning gained TenantMixin, which made
+    ArchiMateElement.organization_id NOT NULL on any row this listener
+    creates -- the synced element must carry the same organisation as the
+    Meaning it mirrors (NULL included, since a NOT NULL insert of NULL
+    fails outright rather than quietly defaulting to the wrong tenant).
+    """
     from sqlalchemy import insert
 
     from .archimate_core import ArchiMateElement
@@ -536,6 +559,7 @@ def create_meaning_archimate(mapper, connection, target):
                 type="Meaning",
                 layer="Motivation",
                 description=target.description or f"Meaning: {target.name}",
+                organization_id=target.organization_id,
             )
         )
         target.archimate_element_id = result.inserted_primary_key[0]

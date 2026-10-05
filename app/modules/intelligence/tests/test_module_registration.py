@@ -85,11 +85,12 @@ def test_register_mounts_exactly_the_api_and_ui_blueprints():
     # confirmed pre-existing by running this test against main with the L2
     # diff stashed out (it already failed there: 7 != 4). Corrected to the
     # real count rather than only bumped for this brief's own addition.
-    assert len(bp.deferred_functions) == 11, (
-        "exactly eleven routes: POST .../recompute, GET .../derived/<id>, "
+    assert len(bp.deferred_functions) == 13, (
+        "exactly thirteen routes: POST .../recompute, GET .../derived/<id>, "
         "GET .../impact/<element_id>, GET .../risk/<element_id>, "
         "GET .../portfolio/<element_id>, GET .../programme/<element_id>, "
         "GET .../strategy/<element_id>, GET .../accountability/<element_id>, "
+        "GET .../data/<element_id>, GET .../compliance/<element_id>, "
         "GET .../traceability/<element_id>, "
         "GET .../value-streams-at-risk, GET .../yield"
     )

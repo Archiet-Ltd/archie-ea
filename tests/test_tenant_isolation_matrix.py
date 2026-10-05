@@ -104,6 +104,18 @@ INTENTIONALLY_GLOBAL = {
         "(llm_cost_tracker.py's _get_organization_spending, "
         "LLMService's decision-log query, TRNT-072)"
     ),
+    "ImportSessionLog": (
+        "organization_id is nullable (rows written before the column existed "
+        "stay valid, and the model's own comment says a row with no "
+        "organisation is never offered as a restore point); every real query "
+        "already adds an explicit organization_id filter "
+        "(import_restore_service.py's restore lookup, "
+        "import_snapshot_service.py's snapshot listing/creation, "
+        "import_sophisticated_routes.py's idempotency check) — adding "
+        "TenantMixin on top would need to decide how it treats those "
+        "existing nullable-org rows, which is its own deliberate change, "
+        "not something to fold into documenting the current state"
+    ),
 }
 
 
@@ -350,7 +362,16 @@ EXCLUDED_ENDPOINT_PREFIXES = {
 }
 
 # Exclusions by exact endpoint.
-EXCLUDED_ENDPOINTS: dict[str, str] = {}
+EXCLUDED_ENDPOINTS: dict[str, str] = {
+    "solution_design.mark_solution_notification_read": (
+        "SolutionNotification has no organisation of its own (solution_id is "
+        "nullable, so there is no required parent to derive one from either); "
+        "the route scopes by the specific recipient's own user_id "
+        "(filter_by(id=notification_id, user_id=current_user.id)), which "
+        "another organisation's user can never match -- a narrower guarantee "
+        "than organisation-scoping, not a gap in it"
+    ),
+}
 
 # Record types that belong to no organisation by design. A route whose
 # identifiers name only these is out of scope, with this reason. Any other

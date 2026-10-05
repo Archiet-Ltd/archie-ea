@@ -39,6 +39,7 @@ def _work_package(db_session, element, *, name="Migrate to cloud", status="in_pr
     wp = UnifiedWorkPackage(
         name=name,
         archimate_element_id=element.id,
+        organization_id=element.organization_id,
         business_capability="Test Capability",
         status=status,
         progress_percentage=progress_percentage,

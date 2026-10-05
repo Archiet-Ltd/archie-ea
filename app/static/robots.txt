@@ -1,2 +1,26 @@
 User-agent: *
+Allow: /$
+Allow: /vision
+Allow: /modules/
+Allow: /use-cases/
+Allow: /vs$
+Allow: /vs/
+Allow: /how-archiet-runs-on-entelim
+Allow: /about
+Allow: /architecture-health-check
+Allow: /contact
+Allow: /docs
+Allow: /features
+Allow: /pricing
+Allow: /privacy
+Allow: /security
+Allow: /team-annual-onboarding
+Allow: /terms
+Allow: /sitemap.xml
+Allow: /llms.txt
+Allow: /llms-full.txt
+Allow: /favicon.ico
+Allow: /static/
 Disallow: /
+
+Sitemap: https://entelim.org/sitemap.xml

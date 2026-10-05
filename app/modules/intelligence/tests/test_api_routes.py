@@ -333,12 +333,13 @@ def test_expanded_chain_marks_an_unresolved_link_instead_of_dropping_it(
     assert "source_id" not in expanded[1]
 
 
-def test_module_registers_exactly_eleven_routes(app):
+def test_module_registers_exactly_thirteen_routes(app):
     """The impact, risk, portfolio, programme, strategy, accountability,
-    traceability, value-streams-at-risk and yield routes all mount on this
-    same existing blueprint rather than a new one each. Still exactly one
-    blueprint, now eleven routes on it -- all six lenses of the catalogue,
-    the traceability check over the impact walk, the Strategic
+    data, compliance, traceability, value-streams-at-risk and yield routes
+    all mount on this same existing blueprint rather than a new one each.
+    Still exactly one blueprint, now thirteen routes on it -- all six lenses
+    of the catalogue, the L7 data lens, the L6 compliance lens, the
+    traceability check over the impact walk, the Strategic
     value-streams-at-risk surface and recompute/derived/yield.
     """
     rules = [
@@ -355,6 +356,8 @@ def test_module_registers_exactly_eleven_routes(app):
         "intelligence_api.programme_for_element",
         "intelligence_api.strategy_for_element",
         "intelligence_api.accountability_for_element",
+        "intelligence_api.data_for_element",
+        "intelligence_api.compliance_for_element",
         "intelligence_api.traceability_check",
         "intelligence_api.derivation_yield",
     }
@@ -607,6 +610,7 @@ def test_programme_endpoint_returns_work_package_with_its_own_blast_radius(
     wp = UnifiedWorkPackage(
         name="Migrate A",
         archimate_element_id=a.id,
+        organization_id=org.id,
         business_capability="Test",
         status="in_progress",
         progress_percentage=25.0,
@@ -639,7 +643,8 @@ def test_programme_endpoint_redacts_cost_for_a_role_without_budget_authority(
     user = _make_user(db_session, org, enterprise_role="solution_architect")
     a = _make_element(db_session, org.id, "A")
     db_session.add(UnifiedWorkPackage(
-        name="Migrate A", archimate_element_id=a.id, business_capability="Test",
+        name="Migrate A", archimate_element_id=a.id, organization_id=org.id,
+        business_capability="Test",
         estimated_cost=50000.0, actual_cost=45000.0,
     ))
     db_session.commit()
@@ -660,7 +665,8 @@ def test_programme_endpoint_does_not_redact_cost_for_cto(
     user = _make_user(db_session, org, enterprise_role="cto")
     a = _make_element(db_session, org.id, "A")
     db_session.add(UnifiedWorkPackage(
-        name="Migrate A", archimate_element_id=a.id, business_capability="Test",
+        name="Migrate A", archimate_element_id=a.id, organization_id=org.id,
+        business_capability="Test",
         estimated_cost=50000.0, actual_cost=45000.0,
     ))
     db_session.commit()
@@ -682,7 +688,8 @@ def test_programme_endpoint_cross_tenant_element_is_404_not_leak(
     user_b = _make_user(db_session, org_b)
     a = _make_element(db_session, org_a.id, "A")
     wp = UnifiedWorkPackage(
-        name="Tenant A's work", archimate_element_id=a.id, business_capability="Test",
+        name="Tenant A's work", archimate_element_id=a.id, organization_id=org_a.id,
+        business_capability="Test",
     )
     db_session.add(wp)
     db_session.commit()
@@ -924,3 +931,123 @@ def test_accountability_endpoint_cross_tenant_element_is_404_not_leak(
     resp = client.get(f"/api/v1/intelligence/accountability/{a.id}")
     assert resp.status_code == 404
     assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
+
+
+# --- L7: the Data lens ---------------------------------------------------------
+
+
+def test_data_endpoint_requires_login(client):
+    resp = client.get("/api/v1/intelligence/data/1")
+    assert resp.status_code in (302, 401)
+
+
+def test_data_endpoint_unknown_element_is_404(app, db_session, make_org, client, login_as):
+    org = make_org("data-route-404")
+    user = _make_user(db_session, org)
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get("/api/v1/intelligence/data/999999999")
+    assert resp.status_code == 404
+    assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
+
+
+def test_data_endpoint_foreign_element_reads_the_same_as_a_missing_one(
+    app, db_session, make_org, client, login_as
+):
+    org_a, org_b = make_org("data-route-a"), make_org("data-route-b")
+    user = _make_user(db_session, org_a)
+    foreign = _make_element(db_session, org_b.id, "foreign")
+    db_session.commit()
+    user_id, foreign_id = user.id, foreign.id
+    db_session.expunge_all()
+
+    from app.models.user import User
+
+    # tenant-scoping-ok: test fixture reloading the user this test just created, after expunge_all
+    login_as(client, db_session.get(User, user_id))
+    resp = client.get(f"/api/v1/intelligence/data/{foreign_id}")
+
+    assert resp.status_code == 404
+    assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
+
+
+def test_data_endpoint_returns_objects_and_flows_for_a_real_element(
+    app, db_session, make_org, client, login_as
+):
+    from app.models.all_missing_models import DataLineage
+    from app.models.application_layer import DataObject
+
+    org = make_org("data-route-ok")
+    user = _make_user(db_session, org)
+    a = _make_element(db_session, org.id, "A")
+    b = _make_element(db_session, org.id, "B")
+    db_session.add(DataObject(name="Orders", archimate_element_id=a.id, organization_id=org.id,
+                              data_steward="Sam", pii_fields='["email"]'))
+    db_session.add(DataLineage(name="A to B", archimate_element_id=a.id,
+                               target_archimate_element_id=b.id, organization_id=org.id))
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get(f"/api/v1/intelligence/data/{a.id}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert [o["name"] for o in data["data_objects"]] == ["Orders"]
+    assert data["data_objects"][0]["steward"] == "Sam"
+    assert [f["direction"] for f in data["flows"]] == ["out"]
+    assert data["reasons"] == []
+    assert "pii_fields" not in resp.get_data(as_text=True) and "email" not in str(data["data_objects"])
+
+
+# --- Compliance (under L6) -----------------------------------------------------
+
+
+def test_compliance_endpoint_requires_login(client):
+    resp = client.get("/api/v1/intelligence/compliance/1")
+    assert resp.status_code in (302, 401)
+
+
+def test_compliance_endpoint_unknown_element_is_404(app, db_session, make_org, client, login_as):
+    org = make_org("compliance-route-404")
+    user = _make_user(db_session, org)
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get("/api/v1/intelligence/compliance/999999999")
+    assert resp.status_code == 404
+    assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
+
+
+def test_compliance_endpoint_returns_controls_for_a_real_application(
+    app, db_session, make_org, client, login_as
+):
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+
+    org = make_org("compliance-route-ok")
+    user = _make_user(db_session, org)
+    a = _make_element(db_session, org.id, "A")
+    component = ApplicationComponent(name="A App", organization_id=org.id, archimate_element_id=a.id)
+    framework = RegulatoryFramework(code="RT-FW", name="Route framework", category="security")
+    db_session.add_all([component, framework])
+    db_session.flush()
+    control = ComplianceControl(framework_id=framework.id, control_code="R-1", title="Route control")
+    db_session.add(control)
+    db_session.flush()
+    db_session.add(ApplicationComplianceControl(
+        organization_id=org.id, application_id=component.id, control_id=control.id,
+        implementation_status="planned", evidence_url="https://secret.example/x",
+    ))
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get(f"/api/v1/intelligence/compliance/{a.id}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert [c["code"] for c in data["controls"]] == ["R-1"]
+    assert data["controls"][0]["evidence_url_recorded"] is True
+    assert "no_policy_scan_recorded" in data["reasons"]
+    assert "secret.example" not in resp.get_data(as_text=True)

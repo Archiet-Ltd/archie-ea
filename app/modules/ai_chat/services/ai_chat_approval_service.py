@@ -82,6 +82,7 @@ def create_approval_record(
     source_table: Optional[str] = None,
     source_id: Optional[int] = None,
     expiry_minutes: int = 15,
+    persona: Optional[str] = None,
 ) -> AIChatCRUDApproval:
     """The one writer of ai_chat_crud_approvals (consolidation).
 
@@ -113,6 +114,7 @@ def create_approval_record(
         agent_turn_id=agent_turn_id,
         source_table=source_table,
         source_id=source_id,
+        persona=persona,
     )
     db.session.add(approval)
     db.session.flush()
@@ -535,7 +537,7 @@ class AIChatApprovalService:
             "error": result.get("error", "Operation failed"),
             "approval_id": approval_id,
         }
-        for key in ("reason_codes", "missing_evidence", "recovery"):
+        for key in ("reason_codes", "missing_evidence", "recovery", "charter_refused", "code"):
             if key in result:
                 response[key] = result[key]
         return response
@@ -717,7 +719,7 @@ class AIChatApprovalService:
                 # "Unsupported operation type: tool_use".
                 from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
 
-                executor = ToolExecutor(self.user_id)
+                executor = ToolExecutor(self.user_id, persona=approval.persona)
                 tc = ToolCall(id=str(approval_id), name=approval.entity_type, arguments=payload)
                 result = executor.execute(tc)
 
@@ -948,6 +950,17 @@ class AIChatApprovalService:
                     "arguments": json.loads(approval.operation_payload),
                     "created_at": approval.created_at.isoformat() if approval.created_at else None,
                     "expires_at": approval.expires_at.isoformat() if approval.expires_at else None,
+                    # The queue query filters to PENDING only, so every item
+                    # here is "pending". The inbox template's isOverdue()
+                    # checks this field to decide whether to show the Overdue
+                    # indicator — without it the indicator never renders even
+                    # for genuinely overdue items.
+                    "status": approval.status.value if approval.status else "pending",
+                    # Source table/id for backfilled items (e.g. confidence
+                    # reviews). The inbox template renders a source badge when
+                    # these are present; without them the badge is always dead.
+                    "source_table": getattr(approval, "source_table", None),
+                    "source_id": getattr(approval, "source_id", None),
                     "requester": {
                         "id": approval.user_id,
                         "display_name": " ".join(

@@ -4,8 +4,10 @@ What these tests check:
 1. GET / signed out returns 200 with "Entelim" in title/h1, none of the old names.
 2. POST with valid email+consent stores one row; duplicate shows same thanks;
    without consent refuses; without CSRF refused.
-3. /admin/waitlist.csv returns 403 for non-admin, rows for admin.
-4. Cross-organisation: admin from any org sees the same global rows.
+3. /admin/waitlist.csv returns 403 for non-admin AND for an organisation
+   admin who is not a platform admin; 200 with rows for a platform admin.
+4. Cross-organisation: a platform admin from any org sees the same global
+   rows; a plain organisation admin cannot reach the export at all.
 """
 
 import uuid
@@ -36,7 +38,16 @@ def _make_user(db_session, org, *, email=None, role_name="Architect"):
 
 
 def _make_admin(db_session, org, *, email=None):
+    """An organisation admin: Administrator role, but NOT a platform admin."""
     return _make_user(db_session, org, email=email, role_name="Administrator")
+
+
+def _make_platform_admin(db_session, org, *, email=None):
+    """Archiet's own platform staff: Administrator role AND is_platform_admin."""
+    user = _make_user(db_session, org, email=email, role_name="Administrator")
+    user.is_platform_admin = True
+    db_session.flush()
+    return user
 
 
 class TestHomePage:
@@ -170,8 +181,19 @@ class TestAdminWaitlistCsv:
         resp = client.get("/admin/waitlist.csv")
         assert resp.status_code == 403
 
-    def test_admin_gets_csv_with_rows(self, client, db_session, make_org, login_as):
-        """AC 3: Admin gets 200 with CSV containing rows."""
+    def test_org_admin_who_is_not_a_platform_admin_gets_403_on_waitlist_csv(
+        self, client, db_session, make_org, login_as
+    ):
+        """An organisation's own admin must not be able to download every
+        prospect's email and name — only Archiet's own platform admins can."""
+        org = make_org("entelim")
+        admin = _make_admin(db_session, org)
+        login_as(client, admin)
+        resp = client.get("/admin/waitlist.csv")
+        assert resp.status_code == 403
+
+    def test_platform_admin_gets_csv_with_rows(self, client, db_session, make_org, login_as):
+        """AC 3: Platform admin gets 200 with CSV containing rows."""
         from app.models.waitlist_signup import WaitlistSignup
 
         # Seed a row
@@ -184,7 +206,7 @@ class TestAdminWaitlistCsv:
         db_session.flush()
 
         org = make_org("entelim")
-        admin = _make_admin(db_session, org)
+        admin = _make_platform_admin(db_session, org)
         login_as(client, admin)
 
         resp = client.get("/admin/waitlist.csv")
@@ -198,8 +220,10 @@ class TestAdminWaitlistCsv:
         resp = client.get("/admin/waitlist.csv", follow_redirects=False)
         assert resp.status_code in (302, 401, 403)
 
-    def test_admin_csv_read_is_not_scoped_to_any_organisation(self, client, db_session, make_org, login_as):
-        """Cross-organisation: admin from org A and org B both see the same global rows."""
+    def test_platform_admin_csv_read_is_not_scoped_to_any_organisation(
+        self, client, db_session, make_org, login_as
+    ):
+        """Cross-organisation: a platform admin from org A and org B both see the same global rows."""
         from app.models.waitlist_signup import WaitlistSignup
 
         # Seed a row
@@ -213,8 +237,8 @@ class TestAdminWaitlistCsv:
 
         org_a = make_org("entelim-a")
         org_b = make_org("entelim-b")
-        admin_a = _make_admin(db_session, org_a)
-        admin_b = _make_admin(db_session, org_b)
+        admin_a = _make_platform_admin(db_session, org_a)
+        admin_b = _make_platform_admin(db_session, org_b)
 
         login_as(client, admin_a)
         resp_a = client.get("/admin/waitlist.csv")
@@ -225,3 +249,48 @@ class TestAdminWaitlistCsv:
         resp_b = client.get("/admin/waitlist.csv")
         assert resp_b.status_code == 200
         assert "cross-org@example.com" in resp_b.data.decode()
+
+    @pytest.mark.parametrize("prefix", ["=", "+", "-", "@"])
+    def test_formula_like_email_source_is_escaped_in_the_csv(
+        self, client, db_session, make_org, login_as, prefix
+    ):
+        from app.models.waitlist_signup import WaitlistSignup
+
+        dangerous_source = f"{prefix}cmd|'/c calc'!A1"
+        signup = WaitlistSignup(
+            email="formula-test@example.com",
+            source=dangerous_source,
+            consent_text="Email used only for launch news about Entelim.",
+        )
+        db_session.add(signup)
+        db_session.flush()
+
+        org = make_org("entelim")
+        admin = _make_platform_admin(db_session, org)
+        login_as(client, admin)
+
+        resp = client.get("/admin/waitlist.csv")
+        assert resp.status_code == 200
+        csv_text = resp.data.decode()
+        assert f"'{dangerous_source}" in csv_text
+
+    def test_normal_source_is_unchanged_in_the_csv(self, client, db_session, make_org, login_as):
+        from app.models.waitlist_signup import WaitlistSignup
+
+        signup = WaitlistSignup(
+            email="plain-source@example.com",
+            source="home_page",
+            consent_text="Email used only for launch news about Entelim.",
+        )
+        db_session.add(signup)
+        db_session.flush()
+
+        org = make_org("entelim")
+        admin = _make_platform_admin(db_session, org)
+        login_as(client, admin)
+
+        resp = client.get("/admin/waitlist.csv")
+        assert resp.status_code == 200
+        csv_text = resp.data.decode()
+        assert "home_page" in csv_text
+        assert "'home_page" not in csv_text
