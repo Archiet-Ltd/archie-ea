@@ -140,6 +140,49 @@ _DERIVABLE_ORG = {
            AND a.organization_id IS NULL
            AND b.organization_id IS NOT NULL
     """,
+    # roadmap_tasks rows predate the tenant column and carry no single
+    # provenance link; each statement fills only NULLs, in precedence order.
+    # The per-object links (the work package's creator, the consolidation
+    # entry's application) are checked before the task's own creating user:
+    # a user can be moved to a different organisation after the task was
+    # created (an admin route reassigns a removed user to another
+    # organisation), which would misattribute the task if the creating-user
+    # statement ran first. The work package's creator can move too, but it
+    # is ordinarily a different user than the task's own creator, and the
+    # consolidation entry's application is not read off a user at all, so
+    # checking both first is strictly safer than checking the task's own
+    # creator first.
+    "roadmap_tasks": [
+        # 1. the creator of the work package the task belongs to
+        """
+        UPDATE roadmap_tasks t
+           SET organization_id = u.organization_id
+          FROM unified_work_packages w
+          JOIN users u ON u.id = w.created_by
+         WHERE w.id = t.unified_work_package_id
+           AND t.organization_id IS NULL
+        """,
+        # 2. the application whose consolidation entry created the task
+        """
+        UPDATE roadmap_tasks t
+           SET organization_id = a.organization_id
+          FROM consolidation_list_entries e
+          JOIN application_components a ON a.id = e.application_id
+         WHERE e.roadmap_item_id = t.id
+           AND t.organization_id IS NULL
+           AND a.organization_id IS NOT NULL
+        """,
+        # 3. the user who created the task (set by the roadmap UI route);
+        # checked last because this user's own organization_id can change
+        # after the task was created
+        """
+        UPDATE roadmap_tasks t
+           SET organization_id = u.organization_id
+          FROM users u
+         WHERE u.id = t.created_by
+           AND t.organization_id IS NULL
+        """,
+    ],
     # A stakeholder input belongs to its analysis. Ordering is load-bearing in the
     # same way as above: "options_analysis" < "stakeholder_inputs", so the analysis
     # is derived (or left NULL) before this reads it.
@@ -377,7 +420,11 @@ _PROVENANCE_ONLY = {
     # and industry_process_id), but every one of those targets is a
     # HybridTenantMixin shared-catalogue table with organization_id always
     # NULL by design, so following it resolves to nothing either way.
-    "framework_instances", "reference_model_import", "industry_process_recommendation",
+"framework_instances", "reference_model_import", "industry_process_recommendation",
+    # roadmap_tasks: per-row provenance derived from creating user, work
+    # package creator, or consolidation entry; a row with none of those is
+    # another tenant's plan, never a candidate for --org-id assignment.
+    "roadmap_tasks",
 }
 
 
@@ -489,7 +536,9 @@ def repair_layer_tenancy(org_id=None, dry_run=False):
         # moment later, or a dry-run's residual report for a _PROVENANCE_ONLY
         # table would overstate it.
         if t in _DERIVABLE_ORG:
-            derived = conn.execute(text(_DERIVABLE_ORG[t])).rowcount
+            stmts = _DERIVABLE_ORG[t]
+            stmts = [stmts] if isinstance(stmts, str) else stmts
+            derived = sum(conn.execute(text(s)).rowcount for s in stmts)
             if derived:
                 verb, prefix = ("would derive", "-") if dry_run else ("derived", "+")
                 click.echo(f"  {prefix} {t}: {verb} org for {derived} row(s) from the linked entity")
@@ -502,7 +551,8 @@ def repair_layer_tenancy(org_id=None, dry_run=False):
             healthy += 1
             continue
 
-        # application_ownership and organization_units (_PROVENANCE_ONLY)
+# application_ownership, organization_units, options_analysis,
+        # stakeholder_inputs, roadmap_tasks and other _PROVENANCE_ONLY tables
         # never hand a row _DERIVABLE_ORG could not resolve to an
         # operator-chosen organisation: with several tenants in the database
         # an unresolved row is another tenant's data, not a guess this
