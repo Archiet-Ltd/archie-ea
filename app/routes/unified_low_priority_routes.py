@@ -273,9 +273,11 @@ def capability_map_mapping():
         # application count, repeated on every row) in its place. Read the real
         # mappings.
         #
-        # ApplicationCapabilityCoverage has no TenantMixin, so it carries no
-        # organization_id and gets no automatic tenant predicate. Scope it by
-        # restricting to THIS organisation's capability ids, which are filtered.
+        # ApplicationCapabilityCoverage is TenantMixin and the ORM's
+        # tenant-isolation listener already applies the organization_id
+        # predicate to this query automatically. The explicit restriction to
+        # THIS organisation's capability ids below is kept as belt-and-braces
+        # scoping, not the only thing preventing cross-tenant rows here.
         mapped_apps = {c.id: [] for c in capabilities}
         cap_ids = list(mapped_apps)
         if cap_ids:

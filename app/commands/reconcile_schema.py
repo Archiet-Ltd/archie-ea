@@ -1038,6 +1038,158 @@ def _backfill_roadmap_organizations(*, dry_run, existing_tables, added, failed):
         )
 
 
+def _backfill_application_capability_coverage_organizations(
+    *, dry_run, existing_tables, added, failed
+):
+    """Recover the tenant key for ApplicationCapabilityCoverage rows that
+    predate TenantMixin.
+
+    Chosen source: business_capability.organization_id (investigation
+    section 2.1) — both `application_capability_coverage` parents
+    (application_components, business_capability) are TenantMixin with a
+    NOT NULL organization_id, so structurally either could serve as the
+    backfill source, but the two existing hand-scoped call sites both
+    resolve visibility through the capability, so backfilling from the
+    capability keeps every row's post-fix visibility identical to its
+    pre-fix visibility. A row whose application-org and capability-org
+    disagree is itself a cross-tenant link; picking a side would complete
+    the leak this fix exists to close, so such rows are left with
+    organization_id NULL (invisible to every tenant, fail-closed,
+    reversible) and reported as a blocking failure. Orphaned rows (missing
+    either parent) get the same treatment.
+    """
+    from sqlalchemy import inspect, text
+
+    required = {"application_capability_coverage", "application_components", "business_capability"}
+    if not required <= existing_tables:
+        return
+    live_columns = {
+        column["name"]
+        for column in inspect(db.engine).get_columns("application_capability_coverage")
+    }
+    if "organization_id" not in live_columns:
+        return
+
+    before = db.session.scalar(
+        text(
+            "SELECT count(*) FROM application_capability_coverage "
+            "WHERE organization_id IS NULL"
+        )
+    )
+    eligible = db.session.scalar(
+        text(
+            """
+            SELECT count(*)
+            FROM application_capability_coverage cov
+            JOIN application_components app ON app.id = cov.application_component_id
+            JOIN business_capability     cap ON cap.id = cov.capability_id
+            WHERE cov.organization_id IS NULL
+              AND cap.organization_id IS NOT NULL
+              AND app.organization_id IS NOT DISTINCT FROM cap.organization_id
+            """
+        )
+    )
+    conflicts = db.session.scalar(
+        text(
+            """
+            SELECT count(*)
+            FROM application_capability_coverage cov
+            JOIN application_components app ON app.id = cov.application_component_id
+            JOIN business_capability     cap ON cap.id = cov.capability_id
+            WHERE cov.organization_id IS NULL
+              AND app.organization_id IS NOT NULL
+              AND cap.organization_id IS NOT NULL
+              AND app.organization_id <> cap.organization_id
+            """
+        )
+    )
+    # Ongoing-drift detection, mirroring _backfill_roadmap_organizations's own
+    # conflicts query: a row that was already backfilled (organization_id NOT
+    # NULL) but whose capability parent has since moved to a different
+    # organisation. Without this branch, backfilling a row once would be the
+    # only time drift is ever checked for it. Not auto-corrected — reported
+    # as a failure only, same fail-closed treatment as a first-time conflict.
+    drifted = db.session.scalar(
+        text(
+            """
+            SELECT count(*)
+            FROM application_capability_coverage cov
+            JOIN business_capability cap ON cap.id = cov.capability_id
+            WHERE cov.organization_id IS NOT NULL
+              AND cap.organization_id IS NOT NULL
+              AND cov.organization_id <> cap.organization_id
+            """
+        )
+    )
+    orphans = db.session.scalar(
+        text(
+            """
+            SELECT count(*)
+            FROM application_capability_coverage cov
+            LEFT JOIN application_components app ON app.id = cov.application_component_id
+            LEFT JOIN business_capability     cap ON cap.id = cov.capability_id
+            WHERE cov.organization_id IS NULL
+              AND (app.id IS NULL OR cap.id IS NULL)
+            """
+        )
+    )
+    unresolved = before - eligible - conflicts - orphans
+    updated = eligible
+    if not dry_run and eligible:
+        result = db.session.execute(
+            text(
+                """
+                UPDATE application_capability_coverage AS cov
+                SET organization_id = cap.organization_id
+                FROM business_capability AS cap,
+                     application_components AS app
+                WHERE cov.capability_id = cap.id
+                  AND cov.application_component_id = app.id
+                  AND cov.organization_id IS NULL
+                  AND cap.organization_id IS NOT NULL
+                  AND app.organization_id IS NOT DISTINCT FROM cap.organization_id
+                """
+            )
+        )
+        updated = result.rowcount
+        db.session.commit()
+
+    if before or conflicts or orphans or drifted:
+        added.append(
+            "backfill.application_capability_coverage.organization_id "
+            f":: before={before}, updated={updated}, "
+            f"unresolved={unresolved}, conflicts={conflicts}, orphans={orphans}, "
+            f"drifted={drifted}"
+        )
+    if unresolved:
+        failed.append(
+            "backfill.application_capability_coverage.organization_id: "
+            f"{unresolved} unresolved row(s); no capability tenant provenance "
+            "(capability parent's organization_id is itself NULL — missing "
+            "provenance, not a real conflict)"
+        )
+    if conflicts:
+        failed.append(
+            "backfill.application_capability_coverage.organization_id: "
+            f"{conflicts} conflicting row(s) whose application and capability "
+            "parents disagree on organization — quarantined with "
+            "organization_id NULL, not assigned to either parent's tenant"
+        )
+    if orphans:
+        failed.append(
+            "backfill.application_capability_coverage.organization_id: "
+            f"{orphans} orphaned row(s) with a missing application or "
+            "capability parent — quarantined with organization_id NULL"
+        )
+    if drifted:
+        failed.append(
+            "backfill.application_capability_coverage.organization_id: "
+            f"{drifted} previously-backfilled row(s) whose organization_id no "
+            "longer matches their capability parent's organization (ongoing "
+            "drift) — not auto-corrected, flagged for manual review"
+        )
+
+
 def _ensure_condition_evidence_canonical_document(
     *, dry_run, existing_tables, added, failed
 ):
@@ -1250,6 +1402,12 @@ def _reconcile(dry_run=False):
         blocking=blocking,
     )
     _backfill_roadmap_organizations(
+        dry_run=dry_run,
+        existing_tables=existing_tables,
+        added=added,
+        failed=failed,
+    )
+    _backfill_application_capability_coverage_organizations(
         dry_run=dry_run,
         existing_tables=existing_tables,
         added=added,

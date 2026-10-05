@@ -2224,6 +2224,10 @@
     "has_default": false,
     "nullable": false
    },
+   "organization_id": {
+    "has_default": true,
+    "nullable": false
+   },
    "confidence_score": {
     "has_default": true,
     "nullable": true

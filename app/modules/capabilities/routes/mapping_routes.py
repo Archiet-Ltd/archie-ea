@@ -1383,10 +1383,11 @@ def api_delete_mapping(mapping_id):
         if not mapping:
             return jsonify({"error": "Mapping not found"}), 404
 
-        # ApplicationCapabilityCoverage has no TenantMixin, so nothing scopes it
-        # to the caller's organisation -- a bare id lookup would let any tenant
-        # delete any other tenant's mapping. BusinessCapability IS tenant-filtered,
-        # so resolving the parent capability is the check.
+        # ApplicationCapabilityCoverage is TenantMixin, so the bare id lookup
+        # above is already scoped to the caller's organisation by the ORM's
+        # tenant-isolation listener. The BusinessCapability lookup below is
+        # kept as an authorization check in its own right -- its 404 is
+        # load-bearing, not redundant scoping.
         owning_capability = BusinessCapability.query.filter_by(
             id=mapping.capability_id
         ).first()

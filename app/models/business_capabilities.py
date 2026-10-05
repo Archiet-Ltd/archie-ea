@@ -497,7 +497,7 @@ class NonFunctionalRequirement(db.Model):
         }
 
 
-class ApplicationCapabilityCoverage(db.Model):
+class ApplicationCapabilityCoverage(TenantMixin, db.Model):
     """
     Tracks which applications support which business capabilities.
 

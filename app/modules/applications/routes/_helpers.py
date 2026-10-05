@@ -3,7 +3,7 @@
 import logging
 from collections import defaultdict
 
-from flask import render_template
+from flask import g, render_template
 
 from app import db
 from app.models.archimate_core import ArchiMateElement
@@ -153,11 +153,31 @@ def _cascade_delete_application(app_id):
     """
     from sqlalchemy import text as _sql
 
+    def _current_org_id():
+        # `g` is a context-local proxy: outside an app context it raises
+        # RuntimeError, not AttributeError, so a bare getattr(g, ..., None)
+        # does NOT safely no-op for a truly context-free caller — it only
+        # covers the in-app-context-but-no-org-set case. Guard explicitly so
+        # a genuinely context-free call (if one ever exists) degrades to the
+        # id-only delete instead of raising.
+        try:
+            return getattr(g, "current_org_id", None)
+        except RuntimeError:
+            return None
+
     _deletes = [
         # ── junction / mapping tables ─────────────────────────────────────
         "DELETE FROM unified_application_capability_mapping WHERE application_component_id = :id",
         "DELETE FROM application_capability_mapping WHERE application_component_id = :id",
-        "DELETE FROM application_capability_coverage WHERE application_component_id = :id",
+        # application_capability_coverage is now TenantMixin (organization_id
+        # added for cross-tenant leak closure); app_id was already resolved
+        # from a tenant-scoped read upstream, so this predicate is
+        # defence-in-depth, not the only scoping. Callers with no org set in
+        # the current app context (or no app context at all) fall back to
+        # the id-only delete since there is no tenant context to scope
+        # against.
+        "DELETE FROM application_capability_coverage WHERE application_component_id = :id"
+        + (" AND organization_id = :org_id" if _current_org_id() else ""),
         "DELETE FROM application_process_support WHERE application_component_id = :id",
         "DELETE FROM application_technology_mapping WHERE application_component_id = :id",
         "DELETE FROM application_interface_mapping WHERE application_component_id = :id",
@@ -254,7 +274,10 @@ def _cascade_delete_application(app_id):
     for _stmt in _deletes:
         _sp = db.session.begin_nested()
         try:
-            db.session.execute(_sql(_stmt), {"id": app_id})
+            db.session.execute(
+                _sql(_stmt),
+                {"id": app_id, "org_id": _current_org_id()},
+            )
             _sp.commit()
         except Exception:
             _sp.rollback()

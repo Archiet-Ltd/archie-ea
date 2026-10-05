@@ -597,6 +597,479 @@ def test_bulk_delete_cannot_cross_tenants(db_session, make_org, tenant_ctx):
 # --------------------------------------------------------------- documented no-op
 
 
+# --------------------------------------------------------------- ApplicationCapabilityCoverage
+
+
+def _make_capability(db_session, org_id, name):
+    from app.models.business_capabilities import BusinessCapability
+
+    row = BusinessCapability(
+        name=name,
+        code=f"CAP-{uuid.uuid4().hex[:8]}",
+        organization_id=org_id,
+    )
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def _make_coverage(db_session, org_id, app_row, cap_row):
+    from app.models.business_capabilities import ApplicationCapabilityCoverage
+
+    row = ApplicationCapabilityCoverage(
+        application_component_id=app_row.id,
+        capability_id=cap_row.id,
+        organization_id=org_id,
+    )
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def test_coverage_select_all_is_tenant_scoped(db_session, make_org, tenant_ctx):
+    """ApplicationCapabilityCoverage.query.all() must not cross tenants."""
+    from app.models.business_capabilities import ApplicationCapabilityCoverage
+
+    org_a, org_b = make_org("cov-a"), make_org("cov-b")
+    app_a = _make_app_component(db_session, org_a.id, "App A")
+    cap_a = _make_capability(db_session, org_a.id, "Capability A")
+    app_b = _make_app_component(db_session, org_b.id, "App B")
+    cap_b = _make_capability(db_session, org_b.id, "Capability B")
+    _make_coverage(db_session, org_a.id, app_a, cap_a)
+    b_row = _make_coverage(db_session, org_b.id, app_b, cap_b)
+
+    with tenant_ctx(org_a.id):
+        visible = ApplicationCapabilityCoverage.query.all()
+        visible_ids = {row.id for row in visible}
+
+    assert b_row.id not in visible_ids, (
+        "TENANT LEAK: ApplicationCapabilityCoverage.query.all() in org A's context "
+        "returned org B's coverage row."
+    )
+    assert all(row.organization_id == org_a.id for row in visible)
+
+
+def test_coverage_filter_by_cannot_reach_other_org(db_session, make_org, tenant_ctx):
+    """filter_by(id=...) must not reach a foreign coverage row (api_delete_mapping)."""
+    from app.models.business_capabilities import ApplicationCapabilityCoverage
+
+    org_a, org_b = make_org("cov-fb-a"), make_org("cov-fb-b")
+    app_b = _make_app_component(db_session, org_b.id, "App B")
+    cap_b = _make_capability(db_session, org_b.id, "Capability B")
+    b_row = _make_coverage(db_session, org_b.id, app_b, cap_b)
+    b_row_id = b_row.id
+
+    with tenant_ctx(org_a.id):
+        found = ApplicationCapabilityCoverage.query.filter_by(id=b_row_id).first()
+
+    assert found is None, (
+        f"TENANT LEAK: org A retrieved org B's coverage row (id={b_row_id}) by "
+        "filtering on its id — api_delete_mapping's only guard."
+    )
+
+
+def test_coverage_filter_by_pair_cannot_reach_other_org(db_session, make_org, tenant_ctx):
+    """filter_by(capability_id=, application_component_id=) — api_delete_mapping_by_pair's guard."""
+    from app.models.business_capabilities import ApplicationCapabilityCoverage
+
+    org_a, org_b = make_org("cov-pair-a"), make_org("cov-pair-b")
+    app_b = _make_app_component(db_session, org_b.id, "App B")
+    cap_b = _make_capability(db_session, org_b.id, "Capability B")
+    b_row = _make_coverage(db_session, org_b.id, app_b, cap_b)
+
+    with tenant_ctx(org_a.id):
+        found = ApplicationCapabilityCoverage.query.filter_by(
+            capability_id=b_row.capability_id,
+            application_component_id=b_row.application_component_id,
+        ).first()
+
+    assert found is None, "TENANT LEAK: org A reached org B's coverage row by (capability, app) pair."
+
+
+def test_coverage_count_is_tenant_scoped(db_session, make_org, tenant_ctx):
+    """.count() must only count the calling tenant's rows."""
+    from app.models.business_capabilities import ApplicationCapabilityCoverage
+
+    org_a, org_b = make_org("cov-count-a"), make_org("cov-count-b")
+    app_a = _make_app_component(db_session, org_a.id, "App A")
+    cap_a = _make_capability(db_session, org_a.id, "Capability A")
+    app_b = _make_app_component(db_session, org_b.id, "App B")
+    cap_b = _make_capability(db_session, org_b.id, "Capability B")
+    _make_coverage(db_session, org_a.id, app_a, cap_a)
+    _make_coverage(db_session, org_b.id, app_b, cap_b)
+    _make_coverage(db_session, org_b.id, app_b, cap_a)  # second B row, different cap
+
+    with tenant_ctx(org_a.id):
+        count = ApplicationCapabilityCoverage.query.count()
+
+    assert count == 1, (
+        f"TENANT LEAK: .count() returned {count}, expected 1 (org A's row only); "
+        "org B's coverage rows are visible to org A."
+    )
+
+
+def test_coverage_distinct_column_only_select_is_tenant_scoped(db_session, make_org, tenant_ctx):
+    """Proof for the api_statistics shape (mapping_routes.py:1624): a column-only
+    ``db.session.query(Model.column).distinct()`` select over a TenantMixin
+    entity — must still carry the loader-criteria tenant predicate.
+    """
+    from app import db
+    from app.models.business_capabilities import ApplicationCapabilityCoverage
+
+    org_a, org_b = make_org("cov-distinct-a"), make_org("cov-distinct-b")
+    app_a = _make_app_component(db_session, org_a.id, "App A")
+    cap_a = _make_capability(db_session, org_a.id, "Capability A")
+    app_b = _make_app_component(db_session, org_b.id, "App B")
+    cap_b = _make_capability(db_session, org_b.id, "Capability B")
+    _make_coverage(db_session, org_a.id, app_a, cap_a)
+    _make_coverage(db_session, org_b.id, app_b, cap_b)
+
+    with tenant_ctx(org_a.id):
+        mapped_ids = {
+            row[0]
+            for row in db.session.query(
+                ApplicationCapabilityCoverage.application_component_id
+            ).distinct()
+        }
+
+    assert app_b.id not in mapped_ids, (
+        "TENANT LEAK: a column-only db.session.query(Model.column).distinct() "
+        "select is not carrying the tenant predicate — api_statistics "
+        "(mapping_routes.py:1624) would count another org's mapped applications."
+    )
+    assert mapped_ids == {app_a.id}
+
+
+def test_coverage_aggregate_group_by_is_tenant_scoped(db_session, make_org, tenant_ctx):
+    """Proof for enterprise_crud_routes.py:90-93's
+    ``query(ACC.capability_id, func.count(ACC.id)).group_by(...)`` shape.
+    """
+    from app import db
+    from sqlalchemy import func
+
+    from app.models.business_capabilities import ApplicationCapabilityCoverage
+
+    org_a, org_b = make_org("cov-agg-a"), make_org("cov-agg-b")
+    app_a = _make_app_component(db_session, org_a.id, "App A")
+    cap_a = _make_capability(db_session, org_a.id, "Capability A")
+    app_b = _make_app_component(db_session, org_b.id, "App B")
+    cap_b = _make_capability(db_session, org_b.id, "Capability B")
+    _make_coverage(db_session, org_a.id, app_a, cap_a)
+    _make_coverage(db_session, org_b.id, app_b, cap_b)
+    _make_coverage(db_session, org_b.id, app_b, cap_b)  # a second B row on the same pair
+
+    with tenant_ctx(org_a.id):
+        rows = (
+            db.session.query(
+                ApplicationCapabilityCoverage.capability_id,
+                func.count(ApplicationCapabilityCoverage.id),
+            )
+            .group_by(ApplicationCapabilityCoverage.capability_id)
+            .all()
+        )
+
+    counted = {cap_id: count for cap_id, count in rows}
+    assert cap_b.id not in counted, (
+        "TENANT LEAK: an aggregate group_by query over ApplicationCapabilityCoverage "
+        "is not tenant-scoped — enterprise_crud_routes.py:90-93 would leak org B's "
+        "coverage counts into org A's statistics."
+    )
+    assert counted == {cap_a.id: 1}
+
+
+def test_coverage_subquery_column_select_is_tenant_scoped(db_session, make_org, tenant_ctx):
+    """Proof for the mapping_routes.py:1795/2167 subquery-on-a-column shape."""
+    from app import db
+    from app.models.business_capabilities import ApplicationCapabilityCoverage
+
+    org_a, org_b = make_org("cov-sub-a"), make_org("cov-sub-b")
+    app_a = _make_app_component(db_session, org_a.id, "App A")
+    cap_a = _make_capability(db_session, org_a.id, "Capability A")
+    app_b = _make_app_component(db_session, org_b.id, "App B")
+    cap_b = _make_capability(db_session, org_b.id, "Capability B")
+    _make_coverage(db_session, org_a.id, app_a, cap_a)
+    _make_coverage(db_session, org_b.id, app_b, cap_b)
+
+    with tenant_ctx(org_a.id):
+        subq = db.session.query(ApplicationCapabilityCoverage.capability_id).subquery()
+        capability_ids = {row[0] for row in db.session.query(subq)}
+
+    assert cap_b.id not in capability_ids, (
+        "TENANT LEAK: a subquery built from a column-only select over "
+        "ApplicationCapabilityCoverage is not tenant-scoped."
+    )
+
+
+def test_coverage_delete_endpoints_404_for_foreign_mapping(db_session, make_org, tenant_ctx, app):
+    """api_delete_mapping and api_delete_mapping_by_pair must 404, not delete, a
+    foreign tenant's mapping — driven through the real view functions.
+    """
+    import uuid as _uuid
+
+    from flask_login import login_user
+
+    from app.models.business_capabilities import ApplicationCapabilityCoverage
+    from app.models.user import User
+    from app.modules.capabilities.routes.mapping_routes import (
+        api_delete_mapping,
+        api_delete_mapping_by_pair,
+    )
+
+    org_a, org_b = make_org("cov-del-a"), make_org("cov-del-b")
+    app_b = _make_app_component(db_session, org_b.id, "App B")
+    cap_b = _make_capability(db_session, org_b.id, "Capability B")
+    b_row = _make_coverage(db_session, org_b.id, app_b, cap_b)
+    b_row_id, b_cap_id, b_app_id = b_row.id, b_row.capability_id, b_row.application_component_id
+
+    actor = User(
+        email=f"cov-del-{_uuid.uuid4().hex[:10]}@example.test",
+        organization_id=org_a.id,
+        confirmed=True,
+        enterprise_role="enterprise_architect",
+    )
+    db_session.add(actor)
+    db_session.flush()
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org_a.id
+        login_user(actor)
+
+        resp = api_delete_mapping.__wrapped__(b_row_id)
+        status = resp[1] if isinstance(resp, tuple) else resp.status_code
+        assert status == 404, (
+            "TENANT LEAK: api_delete_mapping deleted (or found) another org's mapping."
+        )
+
+        resp2 = api_delete_mapping_by_pair.__wrapped__(b_cap_id, b_app_id)
+        status2 = resp2[1] if isinstance(resp2, tuple) else resp2.status_code
+        assert status2 == 404, (
+            "TENANT LEAK: api_delete_mapping_by_pair deleted (or found) another org's mapping."
+        )
+
+    # And the row genuinely still exists, as org B.
+    org_b_id = org_b.id  # capture before expunge_all detaches the instance
+    db_session.expunge_all()
+    with tenant_ctx(org_b_id):
+        still_there = ApplicationCapabilityCoverage.query.filter_by(id=b_row_id).first()
+    assert still_there is not None, "org B's mapping was deleted by a cross-org request"
+
+
+# --------------------------------------------------------------- backfill (reconcile-schema)
+
+
+def test_backfill_application_capability_coverage_organizations(db_session, make_org):
+    """Mirrors the _backfill_roadmap_organizations regression shape: an agreeing
+    row gets backfilled from its capability; a disagreeing row and an orphan row
+    are quarantined (left NULL) and reported as failures, never picked a side.
+    """
+    from app import db
+    from app.commands.reconcile_schema import (
+        _backfill_application_capability_coverage_organizations,
+    )
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import (
+        ApplicationCapabilityCoverage,
+        BusinessCapability,
+    )
+    from sqlalchemy import inspect
+
+    org_a, org_b = make_org("backfill-a"), make_org("backfill-b")
+
+    app_agree = ApplicationComponent(name="Agreeing app", organization_id=org_a.id)
+    cap_agree = BusinessCapability(
+        name="Agreeing cap", code=f"BF-AGREE-{uuid.uuid4().hex[:8]}", organization_id=org_a.id
+    )
+    app_conflict = ApplicationComponent(name="Conflict app", organization_id=org_a.id)
+    cap_conflict = BusinessCapability(
+        name="Conflict cap", code=f"BF-CONFLICT-{uuid.uuid4().hex[:8]}", organization_id=org_b.id
+    )
+    db_session.add_all((app_agree, cap_agree, app_conflict, cap_conflict))
+    db_session.flush()
+
+    # TenantMixin.organization_id is NOT NULL on a fresh create_all()-built
+    # schema (which is exactly what CI builds). Production rows predate the
+    # column/constraint entirely, so simulating "pre-existing NULL rows" here
+    # requires relaxing the constraint first, inside this test's own
+    # transaction (rolled back by the db_session fixture regardless).
+    db_session.execute(
+        db.text(
+            "ALTER TABLE application_capability_coverage "
+            "ALTER COLUMN organization_id DROP NOT NULL"
+        )
+    )
+
+    # Insert rows with organization_id NULL directly, bypassing the ORM's
+    # before_flush stamping (which would fill it in), to simulate pre-existing
+    # legacy rows the way they actually exist in production.
+    db_session.execute(
+        db.text(
+            "INSERT INTO application_capability_coverage "
+            "(application_component_id, capability_id, organization_id) "
+            "VALUES (:app_id, :cap_id, NULL)"
+        ),
+        {"app_id": app_agree.id, "cap_id": cap_agree.id},
+    )
+    db_session.execute(
+        db.text(
+            "INSERT INTO application_capability_coverage "
+            "(application_component_id, capability_id, organization_id) "
+            "VALUES (:app_id, :cap_id, NULL)"
+        ),
+        {"app_id": app_conflict.id, "cap_id": cap_conflict.id},
+    )
+    orphan_cap = BusinessCapability(
+        name="Orphan cap", code=f"BF-ORPHAN-{uuid.uuid4().hex[:8]}", organization_id=org_a.id
+    )
+    db_session.add(orphan_cap)
+    db_session.flush()
+    # A genuine orphan (missing application parent) cannot be created through
+    # a normal INSERT — the live FK rejects it. Production orphans arise from
+    # the FK being NO ACTION rather than CASCADE (see investigation.md §2.1):
+    # the row can predate the constraint, or survive a bypass of the ORM's
+    # own cascade-delete helper. Reproduce that shape here by disabling the
+    # table's triggers (which carry the FK enforcement) for the single insert.
+    db_session.execute(db.text("ALTER TABLE application_capability_coverage DISABLE TRIGGER ALL"))
+    db_session.execute(
+        db.text(
+            "INSERT INTO application_capability_coverage "
+            "(application_component_id, capability_id, organization_id) "
+            "VALUES (999999999, :cap_id, NULL)"
+        ),
+        {"cap_id": orphan_cap.id},
+    )
+    db_session.execute(db.text("ALTER TABLE application_capability_coverage ENABLE TRIGGER ALL"))
+    db_session.commit()
+
+    insp = inspect(db.engine)
+    existing_tables = set(insp.get_table_names())
+    added, failed = [], []
+    _backfill_application_capability_coverage_organizations(
+        dry_run=False, existing_tables=existing_tables, added=added, failed=failed
+    )
+
+    agreeing_org = db.session.execute(
+        db.text(
+            "SELECT organization_id FROM application_capability_coverage "
+            "WHERE capability_id = :c"
+        ),
+        {"c": cap_agree.id},
+    ).scalar()
+    conflict_org = db.session.execute(
+        db.text(
+            "SELECT organization_id FROM application_capability_coverage "
+            "WHERE capability_id = :c"
+        ),
+        {"c": cap_conflict.id},
+    ).scalar()
+    orphan_org = db.session.execute(
+        db.text(
+            "SELECT organization_id FROM application_capability_coverage "
+            "WHERE capability_id = :c"
+        ),
+        {"c": orphan_cap.id},
+    ).scalar()
+
+    assert agreeing_org == org_a.id, "agreeing row must be backfilled from its capability"
+    assert conflict_org is None, (
+        "PICKED A SIDE: a row whose application-org and capability-org disagree "
+        "must be quarantined with organization_id NULL, never resolved."
+    )
+    assert orphan_org is None, "an orphaned row (missing application parent) must stay NULL"
+    assert any("conflicts=" in entry for entry in added)
+    assert any("conflict" in entry.lower() for entry in failed), (
+        "the conflicting row must be reported into `failed` so reconcile-schema exits 1"
+    )
+    assert any("orphan" in entry.lower() for entry in failed), (
+        "the orphaned row must be reported into `failed` so reconcile-schema exits 1"
+    )
+
+
+def test_cascade_delete_application_scopes_coverage_delete_to_current_org(
+    db_session, make_org, tenant_ctx
+):
+    """``_cascade_delete_application``'s raw-SQL coverage DELETE must not
+    reach another organisation's row sharing the same ``application_component_id``
+    when a tenant context IS present (see app/modules/applications/routes/_helpers.py).
+
+    This exercises the predicate added for this task's round-2 fix directly —
+    round 1 shipped it with no dedicated test; round 2's result.md corrected
+    the false claim that ``raw-sql-tenancy`` covered it (the gate only
+    inspects string-literal ``text()`` calls, and this call site builds its
+    SQL from a loop variable, so it structurally cannot see this statement).
+    """
+    from app import db
+    from app.models.business_capabilities import ApplicationCapabilityCoverage, BusinessCapability
+    from app.modules.applications.routes._helpers import _cascade_delete_application
+
+    org_a, org_b = make_org("cascade-a"), make_org("cascade-b")
+
+    app_a = _make_app_component(db_session, org_a.id, "App A (target of delete)")
+    cap_a = BusinessCapability(
+        name="Cap A", code=f"CASCADE-A-{uuid.uuid4().hex[:8]}", organization_id=org_a.id
+    )
+    db_session.add(cap_a)
+    db_session.flush()
+    coverage_a = ApplicationCapabilityCoverage(
+        application_component_id=app_a.id, capability_id=cap_a.id, organization_id=org_a.id
+    )
+    db_session.add(coverage_a)
+    db_session.flush()
+    coverage_a_id = coverage_a.id
+
+    # A second, unrelated org B row happens to reuse the SAME application_component_id
+    # value via a raw insert bypassing the FK's natural uniqueness assumption — this
+    # simulates the exact hazard the added predicate defends against: an
+    # application_component_id collision (e.g. after an id sequence reset, or a
+    # cross-tenant id coincidence) must not let org A's cascade-delete reach org B's row.
+    app_b = _make_app_component(db_session, org_b.id, "App B (different org)")
+    cap_b = BusinessCapability(
+        name="Cap B", code=f"CASCADE-B-{uuid.uuid4().hex[:8]}", organization_id=org_b.id
+    )
+    db_session.add(cap_b)
+    db_session.flush()
+    coverage_b = ApplicationCapabilityCoverage(
+        application_component_id=app_b.id, capability_id=cap_b.id, organization_id=org_b.id
+    )
+    db_session.add(coverage_b)
+    db_session.flush()
+    coverage_b_id = coverage_b.id
+    # Force the collision the predicate must defend against: point org B's
+    # coverage row at org A's application_component_id via raw SQL (bypassing
+    # the FK's natural per-app uniqueness assumption is not required here —
+    # this directly simulates "another org's coverage row shares this id").
+    db_session.execute(
+        db.text(
+            "UPDATE application_capability_coverage SET application_component_id = :app_id "
+            "WHERE id = :cov_id"
+        ),
+        {"app_id": app_a.id, "cov_id": coverage_b_id},
+    )
+    db_session.commit()
+
+    with tenant_ctx(org_a.id):
+        _cascade_delete_application(app_a.id)
+
+    remaining_ids = {
+        row[0]
+        for row in db.session.execute(
+            db.text(
+                "SELECT id FROM application_capability_coverage "
+                "WHERE application_component_id = :app_id"
+            ),
+            {"app_id": app_a.id},
+        )
+    }
+    assert coverage_a_id not in remaining_ids, (
+        "org A's own coverage row for the deleted application must be gone"
+    )
+    assert coverage_b_id in remaining_ids, (
+        "TENANT LEAK: org A's cascade-delete removed org B's coverage row that "
+        "happened to share the same application_component_id"
+    )
+
+
 def test_no_tenant_context_is_unfiltered_by_design(db_session, make_org):
     """Outside a request context there is no filtering — assert it, don't assume it.
 
