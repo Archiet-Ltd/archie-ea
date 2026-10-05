@@ -1,4 +1,4 @@
-"""Single source of truth for "how many business capabilities exist".
+"""Single source of truth for "how many capabilities exist".
 
 `/capability-map/` (via ``api_unified_domains``) and `/capability-map/hierarchy`
 used to compute this number independently and disagreed (500 vs 495):
@@ -20,15 +20,26 @@ again. (The hierarchy *tree render* itself still only draws nodes reachable
 from a level-1 root; fixing orphaned capabilities to attach into the visible
 tree is a separate, larger change and out of scope here — only the headline
 count is unified.)
+
+Now reads from ``UnifiedCapability`` (the canonical store PR 1 built) so the
+map, the dashboard total, the heatmap and the capability interface all show
+the same number for an organisation.
 """
 
-from app.models.business_capabilities import BusinessCapability
+from app.models.unified_capability import UnifiedCapability
 
 
-def count_business_capabilities():
-    """Total BusinessCapability rows visible to the current tenant.
+def count_capabilities():
+    """Total UnifiedCapability rows visible to the current tenant.
 
-    Tenant-scoped automatically via ``TenantMixin``'s ORM event when called
-    inside a request context (see ``app/middleware/tenant_isolation.py``).
+    Tenant-scoped automatically via ``HybridCapabilityTenantMixin``'s ORM event
+    when called inside a request context (see ``app/middleware/tenant_isolation.py``
+    and ``UnifiedCapability.visibility_predicate``). Includes shared reference
+    rows (``scope == "reference"`` and ``organization_id IS NULL``) plus the
+    tenant's own rows.
     """
-    return BusinessCapability.query.count()
+    return UnifiedCapability.query.count()
+
+
+# Backward-compatible alias for any callers not yet updated.
+count_business_capabilities = count_capabilities
