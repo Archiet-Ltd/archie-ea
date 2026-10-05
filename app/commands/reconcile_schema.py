@@ -1111,72 +1111,6 @@ def _backfill_roadmap_organizations(*, dry_run, existing_tables, added, failed):
         )
 
 
-def _backfill_roadmap_task_organizations(*, dry_run, existing_tables, added, failed):
-    """Recover the tenant key for RoadmapTask rows that predate TenantMixin.
-
-    roadmap_tasks.archimate_element_id is nullable and carries no FK constraint
-    by this model's own long-standing convention (see roadmap.py), so it is the
-    only available provenance -- resolved via the already-scoped
-    archimate_elements table. Rows with no element link, or one pointing at a
-    since-deleted/unresolvable element, are left NULL and reported, not guessed.
-    """
-    from sqlalchemy import inspect, text
-
-    required = {"roadmap_tasks", "archimate_elements"}
-    if not required <= existing_tables:
-        return
-    live_columns = {
-        c["name"] for c in inspect(db.engine).get_columns("roadmap_tasks")
-    }
-    if "organization_id" not in live_columns:
-        return
-
-    before = db.session.scalar(
-        text("SELECT count(*) FROM roadmap_tasks WHERE organization_id IS NULL")
-    )
-    if not before:
-        return
-    eligible = db.session.scalar(
-        text(
-            """
-            SELECT count(*)
-            FROM roadmap_tasks t
-            JOIN archimate_elements e ON e.id = t.archimate_element_id
-            WHERE t.organization_id IS NULL
-              AND e.organization_id IS NOT NULL
-            """
-        )
-    )
-    updated = eligible
-    if not dry_run and eligible:
-        result = db.session.execute(
-            text(
-                """
-                UPDATE roadmap_tasks AS t
-                SET organization_id = e.organization_id
-                FROM archimate_elements AS e
-                WHERE e.id = t.archimate_element_id
-                  AND t.organization_id IS NULL
-                  AND e.organization_id IS NOT NULL
-                """
-            )
-        )
-        updated = result.rowcount
-        db.session.commit()
-    unresolved = before - updated
-    added.append(
-        f"backfill.roadmap_tasks.organization_id :: before={before}, "
-        f"updated={updated}, unresolved={unresolved}"
-    )
-    if unresolved:
-        failed.append(
-            f"backfill.roadmap_tasks.organization_id: {unresolved} row(s) have "
-            "no archimate_element_id link (or it names no live element) -- no "
-            "tenant provenance available; will stop appearing in roadmap views "
-            "until re-linked to an element or manually assigned an org"
-        )
-
-
 def _backfill_sso_mapping_organizations(*, dry_run, existing_tables, added, failed):
     """Recover the tenant key for SSO group-role mappings that predate TenantMixin.
 
@@ -1798,12 +1732,6 @@ def _reconcile(dry_run=False):
         blocking=blocking,
     )
     _backfill_roadmap_organizations(
-        dry_run=dry_run,
-        existing_tables=existing_tables,
-        added=added,
-        failed=failed,
-    )
-    _backfill_roadmap_task_organizations(
         dry_run=dry_run,
         existing_tables=existing_tables,
         added=added,
