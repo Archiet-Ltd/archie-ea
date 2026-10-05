@@ -30,7 +30,7 @@ compliance_note: >
 LeanIX (now SAP LeanIX) is an established, per-application-priced enterprise architecture
 platform — rated 4.5/5 on G2 across roughly 190 reviews, strong on application portfolio management
 and technology risk. Entelim is open source under AGPL, self-hostable, and built on full ArchiMate
-3.2 modelling rather than a proprietary fact-sheet model. Neither company publishes public pricing.
+3.2 modelling rather than a proprietary fact-sheet model. LeanIX does not publish pricing; Entelim's is published at /pricing.
 
 If you're already on LeanIX, you don't have to leave it to find out what Entelim adds. Import your
 model through ArchiMate Open Exchange or a CSV export and run both side by side. What's different is

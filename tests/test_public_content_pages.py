@@ -225,8 +225,9 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     homepage = [(loc, rest) for loc, rest in entries if urlparse(loc).path == "/"]
     assert len(homepage) == 1
     assert "<priority>1.0</priority>" in homepage[0][1]
-    # Listing it does not displace any content page.
-    assert len(entries) == len(load_all_pages()) + 1
+    # Listing it does not displace any content page. +2 non-content URLs:
+    # the homepage and the /vs comparison hub (a view, not a load_all_pages() page).
+    assert len(entries) == len(load_all_pages()) + 2
 
 
 def _strings_in(value):

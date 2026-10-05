@@ -225,6 +225,7 @@ else:
     # Dashboard edits store
     from .dashboard_edit import *  # noqa
     from .data_governance import *  # noqa - DataCatalog, DataQualityMetrics, DataGovernanceWorkflow, DataAccessControl, DataRetentionPolicy
+    from .data_issue import *  # noqa - DataIssue (R1-B81)
 
     # Derivation Audit Models - APQC to ArchiMate derivation tracking (Phase 6.1)
 
