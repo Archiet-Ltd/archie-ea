@@ -298,3 +298,79 @@ def test_provenance_only_quarantines_options_analysis_and_stakeholder_inputs():
 
     assert hasattr(b, "_PROVENANCE_ONLY")
     assert b._PROVENANCE_ONLY == {"options_analysis", "stakeholder_inputs"}
+
+
+@pytest.mark.timeout(90)
+def test_repair_layer_tenancy_does_not_deadlock_against_its_callers_own_open_transaction(
+    db_session, make_org
+):
+    """Regression test for the cross-connection deadlock: repair_layer_tenancy
+    used to reflect columns/indexes through a second, engine-level connection
+    (``inspect(db.engine)``) while everything else it does runs on
+    ``db.session``'s own connection. A caller that still has its own
+    transaction open when it calls this command -- exactly the shape of
+    every test fixture in this suite, including this one's db_session, which
+    never really commits until the whole test rolls back -- holds a relation
+    lock from its own DDL that the second connection's schema reflection then
+    waited on forever, because the two connections could not see each
+    other's in-progress work and PostgreSQL has no way to detect a
+    same-process, cross-connection wait as self-conflict.
+
+    This loosens roadmap_tasks's NOT NULL constraint the same way the lock
+    is actually taken in practice -- a plain ``ALTER TABLE`` on db_session's
+    own connection, inside its still-open transaction, not on a separate
+    autocommitting one the way tests/test_backfill_layer_tenancy_roadmap_tasks.py's
+    ``_relax_not_null`` deliberately works around it. Before the fix this hung
+    PostgreSQL CI shards forever; the explicit timeout above (generous enough
+    to cover a cold, session-scoped app boot, not just the command itself)
+    means a regression fails fast with a clear timeout error instead of
+    hanging CI again. roadmap_tasks's own derivation (the creating user's
+    organisation) proves the command still does real, correct work on the
+    same connection, not just that it returns.
+    """
+    from app.commands.backfill_layer_tenancy import repair_layer_tenancy
+    from app.models.user import User
+
+    org = make_org("deadlock-regress")
+    user = User(
+        email=f"deadlock-regress-{uuid.uuid4().hex[:10]}@example.com",
+        first_name="Test",
+        last_name="User",
+        organization_id=org.id,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    # The lock-taking step: a column-level ALTER on db_session's own
+    # connection, left uncommitted (this fixture's transaction is a SAVEPOINT
+    # that is never really released until the whole test rolls back) -- the
+    # same shape a long-lived CI fixture holds it in.
+    db_session.execute(
+        text("ALTER TABLE roadmap_tasks ALTER COLUMN organization_id DROP NOT NULL")
+    )
+
+    task_id = db_session.execute(
+        text(
+            """
+            INSERT INTO roadmap_tasks
+                (title, organization_id, archimate_element_id, created_by, unified_work_package_id)
+            VALUES
+                ('deadlock-regression task', NULL, NULL, :created_by, NULL)
+            RETURNING id
+            """
+        ),
+        {"created_by": user.id},
+    ).scalar()
+    db_session.flush()
+
+    # Would previously hang forever here (a second, engine-level connection's
+    # schema reflection waiting on the ALTER's lock above, held by this same
+    # process's other connection) -- the 30s timeout on this test is the
+    # safety net if that regresses, not the expected path.
+    stats = repair_layer_tenancy()
+
+    assert db_session.execute(
+        text("SELECT organization_id FROM roadmap_tasks WHERE id = :id"), {"id": task_id}
+    ).scalar() == org.id
+    assert "roadmap_tasks" not in stats["unresolved"]
+    assert stats["failed"] == {}

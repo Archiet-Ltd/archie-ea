@@ -423,8 +423,17 @@ def repair_layer_tenancy(org_id=None, dry_run=False):
     """
     from sqlalchemy import inspect
 
-    insp = inspect(db.engine)
-    live = set(insp.get_table_names())
+    # Introspect on db.session's own connection/transaction, not a second,
+    # separately-pooled one from db.engine: an engine-level inspector opens
+    # its own connection, so its catalog reads (get_table_names/get_columns/
+    # get_indexes) contend for the same relation locks db.session's
+    # transaction already holds from its own purge/derive/DDL statements on
+    # this table -- including, in a test fixture that holds an open,
+    # uncommitted transaction across the whole call, the relation lock a
+    # column-level ALTER on a still-open test transaction holds, which a
+    # second connection's schema reflection then waits on forever. Same
+    # connection, same transaction: nothing here can lock against itself.
+    live = set(inspect(db.session.connection()).get_table_names())
 
     repaired, absent = [], []
     healthy = 0
@@ -438,7 +447,20 @@ def repair_layer_tenancy(org_id=None, dry_run=False):
             absent.append(t)
             continue
 
+        # Both re-fetched every iteration, not once before the loop: a real
+        # (non-dry-run) run commits after every table (and a dry-run, or a
+        # failed table, rolls back every table), and each of those ends the
+        # SQLAlchemy Connection object the previous iteration was bound to --
+        # db.session.connection() afterwards returns a new one. An Inspector
+        # built on the old one would raise ResourceClosedError on the very
+        # next table it has not already cached (confirmed empirically: a
+        # single Inspector instance reused past a commit/rollback fails this
+        # way the moment it is asked about a table it has not seen before).
+        # The per-table cache this throws away was never serving a repeat
+        # read anyway -- _tenant_tables() is deduplicated, so a fresh
+        # Inspector per iteration costs nothing a stale one was saving.
         conn = db.session.connection()
+        insp = inspect(conn)
         try:
             status, deferred_count = _process_table(conn, insp, t, resolved_org, dry_run)
         except Exception as exc:  # noqa: BLE001 — isolate this table, keep going
