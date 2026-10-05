@@ -13,24 +13,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from flask import g, render_template, request
+from flask import render_template, request
 from flask_login import login_required
 
 from app.modules.intelligence.services.history_service import HistoryService
 from app.utils.api_response import error_response, success_response
+from app.utils.tenant import current_organization_id
 
 # Reuse the existing intelligence_ui blueprint from ui.py
 from app.modules.intelligence.routes.ui import intelligence_ui
-
-
-def _current_organization_id() -> int | None:
-    """The plain int this request belongs to — never an ORM object."""
-    org_id = getattr(g, "current_org_id", None)
-    if org_id is not None:
-        return int(org_id)
-    from flask_login import current_user
-    org_id = getattr(current_user, "organization_id", None)
-    return int(org_id) if org_id is not None else None
 
 
 def _parse_datetime_param(raw: str | None, param_name: str) -> tuple[datetime | None, dict | None]:
@@ -75,7 +66,7 @@ def history_as_of_page():
     else:
         as_of_date = datetime.utcnow()
 
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -121,7 +112,7 @@ def history_changes_page():
             status_code=400,
         )
 
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -166,7 +157,7 @@ def history_as_of_api():
     if err:
         return err
 
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -244,7 +235,7 @@ def history_changes_api():
             status_code=400,
         )
 
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -286,7 +277,7 @@ def history_element_api(element_id: int):
     Returns all versions of the element, ordered by valid_from, with audit log
     join for who/why on each version.
     """
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
