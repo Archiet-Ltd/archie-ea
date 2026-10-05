@@ -999,13 +999,53 @@ def ask_nl_question():
     from app.modules.intelligence.services.nl_query_interpreter import interpret
 
     if body.get("entry_id"):
-        # The user corrected the interpretation -- run exactly what they chose.
+        # The user corrected the interpretation -- run exactly what they
+        # chose. ``entry_id`` and ``params`` come straight off the request
+        # body, so both are checked before anything touches them: an
+        # unhashable ``entry_id`` (a list/dict) would raise at the first
+        # ``in CATALOGUE`` lookup below, and a non-dict ``params`` would
+        # raise on the ``**`` spread into ``run_entry`` further down.
+        raw_entry_id = body["entry_id"]
+        if not isinstance(raw_entry_id, str):
+            return error_response(
+                "entry_id must be a string",
+                code="INVALID_ENTRY_ID",
+                status_code=400,
+            )
+
+        raw_params = body.get("params")
+        if raw_params is not None and not isinstance(raw_params, dict):
+            return error_response(
+                "params must be an object",
+                code="INVALID_PARAMS",
+                status_code=400,
+            )
+        caller_params = raw_params or {}
+
+        # Same filtering the GET /catalogue/<entry_id> route already does:
+        # only the entry's own declared parameter names, and only string
+        # values, ever reach ``run_entry`` -- this is what keeps a caller
+        # from smuggling ``organization_id``/``entry_id`` (or anything else)
+        # into the ``**params`` spread below. An unknown entry_id simply
+        # yields no params; the existing "not in CATALOGUE" check further
+        # down is what turns that into the honest "could not map" response.
+        entry = CATALOGUE.get(raw_entry_id)
+        safe_params = (
+            {
+                name: caller_params[name]
+                for name in entry.params
+                if isinstance(caller_params.get(name), str)
+            }
+            if entry is not None
+            else {}
+        )
+
         interpretation = {
-            "entry_id": body["entry_id"],
-            "params": body.get("params") or {},
+            "entry_id": raw_entry_id,
+            "params": safe_params,
             "confidence": 1.0,
             "method": "corrected",
-            "title": CATALOGUE[body["entry_id"]].title if body["entry_id"] in CATALOGUE else None,
+            "title": entry.title if entry is not None else None,
         }
     else:
         interpretation = interpret(question)

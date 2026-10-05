@@ -240,3 +240,152 @@ class TestAskRouteTwoOrgIsolation:
         names = {row["name"] for group in data["groups"] for row in group["rows"]}
         assert "IsolationB-unowned" in names
         assert "IsolationA-unowned" not in names
+
+
+class TestAskRouteBadCorrectionBodiesNeverCrash:
+    """PR 361 fix: a caller correcting the interpretation can send a
+    ``params`` dict that collides with ``run_entry``'s own positional
+    arguments, a ``params`` that isn't a dict at all, or an ``entry_id``
+    that isn't a string. All three used to reach an unhandled TypeError
+    (500) inside ``ask_nl_question``; now each is rejected with a 400, or
+    (for the colliding-key case) answered normally with the dangerous key
+    silently dropped -- never a 500, and never another organisation's
+    rows."""
+
+    def test_params_colliding_with_organization_id_is_dropped_not_a_500(
+        self, app, db_session, make_org, client, login_as
+    ):
+        org_a = make_org("ask-collide-a")
+        org_b = make_org("ask-collide-b")
+        _make_app(org_a.id, "CollideA-critical", criticality="Critical")
+        _make_app(org_b.id, "CollideB-critical", criticality="Critical")
+
+        user_a = _make_user(db_session, org_a)
+        login_as(client, user_a)
+
+        resp = client.post(
+            "/api/v1/intelligence/ask",
+            json={
+                "question": "irrelevant text",
+                "entry_id": "business_continuity_criticality",
+                "params": {"criticality": "Critical", "organization_id": org_b.id},
+            },
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        data = resp.get_json()["data"]
+        names = {row["name"] for row in data["rows"]}
+        assert "CollideA-critical" in names
+        assert "CollideB-critical" not in names
+
+    def test_params_colliding_with_entry_id_is_dropped_not_a_500(
+        self, app, db_session, make_org, client, login_as
+    ):
+        org = make_org("ask-collide-entryid")
+        _make_app(org.id, "CollideEntryId-critical", criticality="Critical")
+        user = _make_user(db_session, org)
+        login_as(client, user)
+
+        resp = client.post(
+            "/api/v1/intelligence/ask",
+            json={
+                "question": "irrelevant text",
+                "entry_id": "business_continuity_criticality",
+                "params": {"criticality": "Critical", "entry_id": "applications_without_owner"},
+            },
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        data = resp.get_json()["data"]
+        names = {row["name"] for row in data["rows"]}
+        assert "CollideEntryId-critical" in names
+
+    def test_params_not_a_dict_returns_400_not_a_500(self, app, db_session, make_org, client, login_as):
+        org = make_org("ask-params-list")
+        user = _make_user(db_session, org)
+        login_as(client, user)
+
+        resp = client.post(
+            "/api/v1/intelligence/ask",
+            json={
+                "question": "irrelevant text",
+                "entry_id": "business_continuity_criticality",
+                "params": ["not", "a", "dict"],
+            },
+        )
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "INVALID_PARAMS"
+
+    def test_params_as_string_returns_400_not_a_500(self, app, db_session, make_org, client, login_as):
+        org = make_org("ask-params-string")
+        user = _make_user(db_session, org)
+        login_as(client, user)
+
+        resp = client.post(
+            "/api/v1/intelligence/ask",
+            json={
+                "question": "irrelevant text",
+                "entry_id": "business_continuity_criticality",
+                "params": "not-a-dict-either",
+            },
+        )
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        assert resp.get_json()["error"]["code"] == "INVALID_PARAMS"
+
+    def test_entry_id_not_a_string_returns_400_not_a_500(self, app, db_session, make_org, client, login_as):
+        org = make_org("ask-entryid-list")
+        user = _make_user(db_session, org)
+        login_as(client, user)
+
+        resp = client.post(
+            "/api/v1/intelligence/ask",
+            json={
+                "question": "irrelevant text",
+                "entry_id": ["not", "a", "string"],
+            },
+        )
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        body = resp.get_json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "INVALID_ENTRY_ID"
+
+    def test_entry_id_as_dict_returns_400_not_a_500(self, app, db_session, make_org, client, login_as):
+        org = make_org("ask-entryid-dict")
+        user = _make_user(db_session, org)
+        login_as(client, user)
+
+        resp = client.post(
+            "/api/v1/intelligence/ask",
+            json={
+                "question": "irrelevant text",
+                "entry_id": {"not": "a string"},
+            },
+        )
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        assert resp.get_json()["error"]["code"] == "INVALID_ENTRY_ID"
+
+    def test_legitimate_correction_with_real_declared_params_still_answers(
+        self, app, db_session, make_org, client, login_as
+    ):
+        """The fix must not silently break the working case: a correction
+        naming only the entry's own declared parameter, with a string
+        value, still runs and answers correctly."""
+        org = make_org("ask-legit-correction")
+        _make_app(org.id, "LegitCorrection-critical", criticality="Critical")
+        user = _make_user(db_session, org)
+        login_as(client, user)
+
+        resp = client.post(
+            "/api/v1/intelligence/ask",
+            json={
+                "question": "irrelevant text the interpreter would not map correctly",
+                "entry_id": "business_continuity_criticality",
+                "params": {"criticality": "Critical"},
+            },
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        data = resp.get_json()["data"]
+        assert data["interpretation"]["method"] == "corrected"
+        assert data["interpretation"]["params"] == {"criticality": "Critical"}
+        names = {row["name"] for row in data["rows"]}
+        assert "LegitCorrection-critical" in names
