@@ -36,6 +36,7 @@
           <span class="text-xs rounded-full bg-warning/10 text-warning-emphasis px-2 py-1" data-testid="escalated-badge">Escalated</span>
           {% else %}
           <form method="post" action="{{ url_for('cto_scorecard.escalate_exception', change_request_id=exc.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="text-xs rounded-md border border-border px-2 py-1 hover:bg-muted transition-colors">Escalate</button>
           </form>
           {% endif %}
