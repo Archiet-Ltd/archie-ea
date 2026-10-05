@@ -5,14 +5,14 @@ persist; nullable, so a request that was never escalated reads as "-" rather
 than a fabricated date.
 
 Revision ID: 20261004_acr_escalated_at
-Revises: 20261003_gap_org_nullable
+Revises: 20261004_arb_review_source_cols
 Create Date: 2026-10-04
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261004_acr_escalated_at"
-down_revision = "20261003_gap_org_nullable"
+down_revision = "20261004_arb_review_source_cols"
 branch_labels = None
 depends_on = None
 
