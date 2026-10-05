@@ -42,7 +42,7 @@ JOURNEY = {
                              "/architecture/data-lineage"],
     # R1-B36 (TB-0146/TB-0170): promoted from unassignable to assignable.
     "finance":              ["/procurement/spend", "/procurement/licenses"],
-    "compliance":           ["/compliance"],
+    "compliance":           ["/dashboard/compliance"],
     "risk":                 ["/risks/"],
     "operations":           ["/status"],
     "non_technical_owner":  ["/applications/"],

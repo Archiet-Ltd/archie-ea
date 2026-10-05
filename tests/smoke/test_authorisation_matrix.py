@@ -49,7 +49,7 @@ POLICY = {
     # application_mgmt.compliance_frameworks_dashboard is @login_required only
     # (RegulatoryFramework/ComplianceControl, a different store from the
     # procurement compliance page above) -- every persona can reach it.
-    "/compliance":             set(ARCHETYPES),
+    "/dashboard/compliance":   set(ARCHETYPES),
     # risk.risk_register is @login_required only.
     "/risks/":                 set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
