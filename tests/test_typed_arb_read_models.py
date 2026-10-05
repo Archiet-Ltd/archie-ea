@@ -500,6 +500,67 @@ def test_verified_evidence_exposes_named_immutable_sections(
     assert sections["pending_obligations"] is None
 
 
+def test_comments_are_scoped_to_the_review_item_and_ordered_oldest_first(
+    db_session, make_org, tenant_ctx
+):
+    from app.models.architecture_review_board import ARBReviewComment
+    from app.modules.transformation_room.arb_read_models import typed_arb_review_view
+
+    org = make_org("arb-comments-ok")
+    submitter = _user(db_session, org, "submitter")
+    commenter = _user(db_session, org, "commenter")
+
+    with tenant_ctx(org.id):
+        graph = _build_adr_cycle(db_session, org, submitter)
+
+        first = ARBReviewComment(
+            organization_id=org.id,
+            review_item_id=graph.review.id,
+            user_id=commenter.id,
+            comment_type="general",
+            content="First comment.",
+        )
+        db_session.add(first)
+        db_session.flush()
+        second = ARBReviewComment(
+            organization_id=org.id,
+            review_item_id=graph.review.id,
+            user_id=submitter.id,
+            comment_type="concern",
+            content="Second comment.",
+        )
+        db_session.add(second)
+        db_session.flush()
+
+        view = typed_arb_review_view(
+            actor=_actor(submitter, org), review_item_id=graph.review.id
+        )
+
+    comments = view["comments"]
+    assert [c["content"] for c in comments] == ["First comment.", "Second comment."]
+    assert comments[0]["comment_type"] == "general"
+    assert comments[1]["comment_type"] == "concern"
+    # Both commenters resolve to a real display name, not a fabricated one.
+    assert comments[0]["actor_display"]
+    assert comments[1]["actor_display"]
+
+
+def test_review_with_no_comments_exposes_an_empty_list_not_none(
+    db_session, make_org, tenant_ctx
+):
+    from app.modules.transformation_room.arb_read_models import typed_arb_review_view
+
+    org = make_org("arb-comments-empty")
+    submitter = _user(db_session, org, "submitter")
+    with tenant_ctx(org.id):
+        graph = _build_adr_cycle(db_session, org, submitter)
+        view = typed_arb_review_view(
+            actor=_actor(submitter, org), review_item_id=graph.review.id
+        )
+
+    assert view["comments"] == []
+
+
 # ---------------------------------------------------------------------------
 # server-derived authority
 # ---------------------------------------------------------------------------

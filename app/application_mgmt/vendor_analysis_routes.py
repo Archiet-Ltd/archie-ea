@@ -1421,11 +1421,11 @@ def api_get_export_history(analysis_id):
 @application_mgmt.route("/api/capabilities", methods=["GET"])
 @login_required
 def api_get_capabilities():
-    """Get list of business capabilities for dropdown."""
+    """Get list of capabilities for dropdown."""
     try:
-        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.order_by(BusinessCapability.name).all()
+        capabilities = UnifiedCapability.query.order_by(UnifiedCapability.name).all()
 
         return jsonify(
             [

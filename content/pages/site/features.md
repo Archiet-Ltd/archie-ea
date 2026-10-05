@@ -39,8 +39,8 @@ from every other.
 
 - [Risk Register](/modules/risk-register) — every recorded risk, traced across what it touches, to
   show its real blast radius, not just the obvious one.
-- [Compliance Frameworks](/modules/compliance-frameworks) — turns the risk register into a live
-  control-gap view against the frameworks you're measured on.
+- [Compliance Frameworks](/modules/compliance-frameworks) — records where each application stands
+  against each framework's controls, so you see what's implemented and what's still a gap.
 - [Capability Maturity](/modules/capability-maturity) — a heat grid that shows maturity where
   someone recorded it, and shows missing as missing, never a guess.
 - [Gap Analysis](/modules/gap-analysis) — what's missing between today's estate and the target
