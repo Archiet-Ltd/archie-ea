@@ -3,6 +3,7 @@ Allow: /$
 Allow: /vision
 Allow: /modules/
 Allow: /use-cases/
+Allow: /vs$
 Allow: /vs/
 Allow: /how-archiet-runs-on-entelim
 Allow: /about
