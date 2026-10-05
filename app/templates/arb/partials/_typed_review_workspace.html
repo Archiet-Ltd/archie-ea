@@ -6,20 +6,31 @@
 
   Order (blueprint section 6): evidence pin, then the advisory AI pre-brief,
   then a two-column body at lg with the dossier at lg:col-span-2 and the
-  decision task at lg:col-span-1, then the conditions ledger, then history,
-  comments and supporting documents. The DOM order is decision-first so
-  mobile reads header -> pin -> pre-brief -> decision -> dossier ->
+  decision task at lg:col-span-1, then the linked-solution card (solution-
+  subject reviews only), then the conditions ledger, then history, comments
+  and supporting documents. The DOM order is decision-first so mobile reads
+  header -> pin -> pre-brief -> decision -> dossier -> linked solution ->
   conditions -> history -> comments -> documents; at lg the grid's `order`
   classes put the dossier back on the left.
 
   The decision card is sticky only at lg, so it can never cover the mobile
   bottom edge.
 
-  Context: review, decision_action_url.
+  The linked-solution card reads `_orm_review.solution` (the direct ORM
+  relationship arb/review_detail.html captured before rebinding `review` to
+  the typed read-model mapping), not `review.subject` — the same relationship
+  the legacy review detail template read. This is a live reference to the
+  current Solution row, not a snapshot value, so it belongs beside the
+  dossier rather than inside it (_typed_dossier.html renders the pinned
+  snapshot only).
+
+  Context: review, decision_action_url, _orm_review (optional).
 #}
 {% from 'components/alert.html' import alert as alert_box, alert_title, alert_description %}
+{% from 'components/card.html' import card, card_content %}
 
 {% set _evidence = review.evidence or {} %}
+{% set _linked_solution = _orm_review.solution if (_orm_review is defined and _orm_review) else none %}
 
 {% if _evidence.hash_state == 'mismatch' %}
 {# Integrity failure is destructive and offers no mutation and no live-subject
@@ -51,6 +62,21 @@
         {% include 'arb/partials/_typed_dossier.html' %}
     </div>
 </div>
+
+{% if _linked_solution %}
+{% call card(class='mb-6') %}
+    {% call card_content(class='flex flex-wrap items-center justify-between gap-3 p-4 sm:p-6') %}
+        <div class="min-w-0">
+            <span class="text-sm font-medium text-foreground/80">Solution</span>
+            <span class="ml-2 break-words text-sm text-foreground">{{ _linked_solution.name }}</span>
+        </div>
+        <a href="{{ url_for('solution_design.view_solution', solution_id=_linked_solution.id) }}"
+           class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <i data-lucide="external-link" class="mr-1.5 h-3.5 w-3.5" aria-hidden="true"></i>View Solution
+        </a>
+    {% endcall %}
+{% endcall %}
+{% endif %}
 
 {% include 'arb/partials/_typed_conditions.html' %}
 {% include 'arb/partials/_typed_history.html' %}

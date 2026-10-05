@@ -22,9 +22,10 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
-from flask import render_template
+from flask import render_template, url_for
 
 
 # The families DESIGN.md bans outright, plus the four the typed ARB blueprint
@@ -564,6 +565,56 @@ def test_missing_canonical_url_does_not_render_a_dead_link(app):
 
     assert "Open subject" not in body
     assert "No canonical subject link is recorded" in body
+
+
+# --------------------------------------------------------------------------
+# Linked-solution card: the restored "View Solution" capability
+# --------------------------------------------------------------------------
+
+def test_solution_subject_review_renders_view_solution_link(app):
+    """A review backed by `_orm_review.solution` links to the live Solution row.
+
+    `_orm_review` is the ORM review arb/review_detail.html captures before
+    rebinding `review` to the typed read-model mapping; `.solution` is the
+    same direct relationship the dead legacy template read.
+    """
+    orm_review = SimpleNamespace(
+        solution=SimpleNamespace(id=42, name="Unified Billing Platform")
+    )
+    body = _render(
+        app,
+        "arb/partials/_typed_review_workspace.html",
+        review=available_review(),
+        decision_action_url="/arb/reviews/7/decision",
+        _orm_review=orm_review,
+    )
+
+    assert "View Solution" in body
+    assert "Unified Billing Platform" in body
+    with app.test_request_context("/arb/"):
+        expected_url = url_for("solution_design.view_solution", solution_id=42)
+    assert expected_url in body
+
+
+def test_review_with_no_linked_solution_renders_no_view_solution_link(app):
+    """No `_orm_review.solution` row means no View Solution link, not a dead one."""
+    orm_review = SimpleNamespace(solution=None)
+    body = _render(
+        app,
+        "arb/partials/_typed_review_workspace.html",
+        review=available_review(),
+        decision_action_url="/arb/reviews/7/decision",
+        _orm_review=orm_review,
+    )
+
+    assert "View Solution" not in body
+
+
+def test_review_body_without_orm_review_renders_no_view_solution_link(app):
+    """`_render_review_body` never passes `_orm_review`; this must not error."""
+    body = _render_review_body(app, available_review())
+
+    assert "View Solution" not in body
 
 
 # --------------------------------------------------------------------------
