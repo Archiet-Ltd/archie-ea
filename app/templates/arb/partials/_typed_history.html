@@ -13,13 +13,20 @@
 {% from 'components/empty_state.html' import empty_state %}
 
 {% set _history = review.history or [] %}
+{% set _rid = (review.identity or {}).get('review_item_id') %}
 
 <section id="history" aria-labelledby="history-heading" class="mb-6">
 {% call card() %}
     {% call card_header() %}
-        {% call card_title(class='text-lg') %}
-            <span id="history-heading">Decision and provenance history</span>
-        {% endcall %}
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            {% call card_title(class='text-lg') %}
+                <span id="history-heading">Decision and provenance history</span>
+            {% endcall %}
+            {% if _rid %}
+            <a href="{{ url_for('arb.review_typed_history_csv', id=_rid) }}"
+               class="text-xs font-medium text-primary hover:underline">Export CSV</a>
+            {% endif %}
+        </div>
     {% endcall %}
     {% call card_content(class='p-0') %}
     {% if _history %}
