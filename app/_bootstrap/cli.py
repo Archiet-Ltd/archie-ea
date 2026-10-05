@@ -324,6 +324,17 @@ def init_cli(app):
         app.logger.warning(f"Failed to register capability projection CLI: {e}")
 
     try:
+        from app.commands.sync_capability_hierarchy_relationships import (
+            init_app as init_capability_hierarchy_relationships,
+        )
+        init_capability_hierarchy_relationships(app)
+        app.logger.info("Capability hierarchy relationship sync CLI command registered")
+    except Exception as e:
+        app.logger.warning(
+            f"Failed to register capability hierarchy relationship sync CLI: {e}"
+        )
+
+    try:
         from app.commands.apply_unified_capability_provenance_migration import (
             init_app as init_capability_provenance_migration,
         )

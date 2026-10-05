@@ -598,6 +598,174 @@ def create_capability_archimate_element(mapper, connection, target):
 
 
 # ============================================================================
+# SQLAlchemy Event Listeners - Project the capability hierarchy into
+# archimate_relationships, so a Capability's ArchiMate element is never
+# created isolated when a parent is already on record.
+# ============================================================================
+#
+# `create_capability_archimate_element` above gives every BusinessCapability
+# an ArchiMateElement, but the relational hierarchy already sitting in
+# `parent_capability_id` was never projected into `archimate_relationships`.
+# That is the dominant reason a live org's "elements with no relationships"
+# count is mostly Capability rows: the element existed, the parent link
+# existed, and nothing ever wrote the row connecting them. Same "write the
+# projection, don't guess" instruction as the unified_capabilities producer
+# (docs/buckets/unified-capabilities-producer/) -- this listener writes the
+# one relationship a capability's own data already asserts (its parent),
+# never a relationship inferred from anything else, so it can never invent a
+# connection the org didn't already record.
+#
+# Relationship type is `composition` -- the only ArchiMate 3.2-valid choice
+# for a Capability/Capability pair that also matches how this hierarchy is
+# actually used (a sub-capability doesn't outlive being part of its parent);
+# see ("Capability", "Capability") in
+# app/config/archimate_relationship_matrix.py, which also allows aggregation/
+# specialization/association -- composition is the correct default, not the
+# only legal one, so a user who draws a different type on the canvas later is
+# not fighting this listener: `derived_from='capability-hierarchy'` only ever
+# marks the row THIS listener wrote, and reconciliation below only ever
+# touches rows carrying that marker.
+
+CAPABILITY_HIERARCHY_RELATIONSHIP_TYPE = "composition"
+CAPABILITY_HIERARCHY_DERIVED_FROM = "capability-hierarchy"
+
+
+def _sync_capability_hierarchy_relationship(connection, target):
+    """Ensure archimate_relationships has exactly one composition row for
+    target's current parent_capability_id, and none for a stale one.
+
+    Idempotent and safe to call on every insert/update: reads the current
+    state before writing, so calling it twice in a row is a no-op the second
+    time. Never raises -- a capability write must not 500 because the
+    relationship projection could not complete; see the provenance-index
+    fallback in `_project_capability_row` for the same policy on the
+    unified_capabilities projection, which this mirrors.
+    """
+    if target.archimate_element_id is None:
+        # The element itself is not on the backbone yet (should not happen --
+        # before_insert always sets it -- but a row loaded from a partial
+        # migration/fixture could lack it, and a hierarchy relationship with
+        # no source or target element would violate the FK anyway).
+        return
+
+    try:
+        # Drop any stale composition this listener previously wrote whose
+        # target is no longer this capability's *current* parent -- covers
+        # re-parenting and clearing parent_capability_id back to NULL.
+        connection.execute(
+            text(
+                """
+                DELETE FROM archimate_relationships
+                 WHERE target_id = :child_element_id
+                   AND type = :rel_type
+                   AND derived_from = :derived_from
+                   AND organization_id = :organization_id
+                   AND source_id IS DISTINCT FROM (
+                       SELECT archimate_element_id FROM business_capability
+                        WHERE id = :parent_capability_id
+                          AND organization_id = :organization_id
+                   )
+                """
+            ),
+            {
+                "child_element_id": target.archimate_element_id,
+                "rel_type": CAPABILITY_HIERARCHY_RELATIONSHIP_TYPE,
+                "derived_from": CAPABILITY_HIERARCHY_DERIVED_FROM,
+                "parent_capability_id": target.parent_capability_id,
+                "organization_id": target.organization_id,
+            },
+        )
+
+        if target.parent_capability_id is None:
+            return
+
+        # organization_id is defence-in-depth here, not the only guard: a
+        # parent_capability_id pointing at another tenant's row should not
+        # exist (capability creation doesn't let a user pick a cross-org
+        # parent), but this listener runs from raw SQL, which TenantMixin's
+        # ORM-level filtering does not reach -- see CLAUDE.md on raw SQL and
+        # tenant isolation.
+        parent_element_id = connection.execute(
+            text(
+                "SELECT archimate_element_id FROM business_capability "
+                " WHERE id = :id AND organization_id = :organization_id"
+            ),
+            {"id": target.parent_capability_id, "organization_id": target.organization_id},
+        ).scalar()
+
+        if parent_element_id is None:
+            # Parent hasn't been synced onto the backbone yet (out-of-order
+            # create, or a parent that predates this listener and hasn't been
+            # re-saved). Same honest deferral as `_PARENT_SQL`: resolves the
+            # next time either row is written, or on the backfill command.
+            _logger.info(
+                "business_capability id=%s has parent_capability_id=%s with no "
+                "archimate_element_id yet; deferring hierarchy relationship "
+                "until the parent is synced.",
+                target.id,
+                target.parent_capability_id,
+            )
+            return
+
+        exists = connection.execute(
+            text(
+                """
+                SELECT 1 FROM archimate_relationships
+                 WHERE source_id = :parent_element_id
+                   AND target_id = :child_element_id
+                   AND type = :rel_type
+                   AND organization_id = :organization_id
+                """
+            ),
+            {
+                "parent_element_id": parent_element_id,
+                "child_element_id": target.archimate_element_id,
+                "rel_type": CAPABILITY_HIERARCHY_RELATIONSHIP_TYPE,
+                "organization_id": target.organization_id,
+            },
+        ).first()
+        if exists:
+            return
+
+        connection.execute(
+            text(
+                """
+                INSERT INTO archimate_relationships
+                    (type, source_id, target_id, organization_id, derived_from,
+                     created_at, updated_at)
+                VALUES
+                    (:rel_type, :parent_element_id, :child_element_id,
+                     :organization_id, :derived_from, now(), now())
+                """
+            ),
+            {
+                "rel_type": CAPABILITY_HIERARCHY_RELATIONSHIP_TYPE,
+                "parent_element_id": parent_element_id,
+                "child_element_id": target.archimate_element_id,
+                "organization_id": target.organization_id,
+                "derived_from": CAPABILITY_HIERARCHY_DERIVED_FROM,
+            },
+        )
+    except Exception:
+        _logger.exception(
+            "Failed to sync capability-hierarchy relationship for "
+            "business_capability id=%s; the capability write itself is not "
+            "blocked on it.",
+            target.id,
+        )
+
+
+@event.listens_for(BusinessCapability, "after_insert")
+def sync_capability_hierarchy_relationship_after_insert(mapper, connection, target):
+    _sync_capability_hierarchy_relationship(connection, target)
+
+
+@event.listens_for(BusinessCapability, "after_update")
+def sync_capability_hierarchy_relationship_after_update(mapper, connection, target):
+    _sync_capability_hierarchy_relationship(connection, target)
+
+
+# ============================================================================
 # SQLAlchemy Event Listeners - Keep unified_capabilities (ADR 0008's canonical
 # capability store) current with every business_capability write.
 # ============================================================================
