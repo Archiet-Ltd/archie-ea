@@ -47,7 +47,7 @@ spend-by-category to show the savings once you act on it.
 
 ## Where you'll meet it
 
-- [What are we paying for twice?](/scale-up/duplicate-spend)
+- [What are we paying for twice?](/use-cases/duplicate-software-spend)
 
 ## Related modules
 

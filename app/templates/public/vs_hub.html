@@ -1,7 +1,10 @@
 {# smoke-coverage-ok: covered by tests/test_public_content_pages.py (hub lists every vs page).
    Template: public/vs_hub.html — Renders the /vs comparison hub: one list of links out to every
    comparison page at its real URL (most are the dedicated archiet.ai address recorded in that
-   page's own front matter; any page without one stays on entelim.org directly).
+   page's own front matter; any page without one stays on entelim.org directly). Where the real
+   URL is the archiet.ai one, a second, same-origin link to the entelim.org copy of that page is
+   shown alongside it, so that copy stays reachable within two clicks of the entelim.org home page
+   too, not just discoverable via sitemap.xml.
    Extends layouts/public_base.html, reuses components/public_navbar.html and
    components/public_footer.html — same page data app/services/public_pages.py already provides
    to every other public page; no second loader or renderer.
@@ -34,7 +37,12 @@
     </p>
     <ul>
       {% for entry in entries %}
-      <li><a href="{{ entry.real_url }}">Entelim vs {{ entry.competitor }}</a></li>
+      <li>
+        <a href="{{ entry.real_url }}">Entelim vs {{ entry.competitor }}</a>
+        {% if entry.same_origin_url %}
+        (also on <a href="{{ entry.same_origin_url }}">entelim.org</a>)
+        {% endif %}
+      </li>
       {% endfor %}
     </ul>
   </article>

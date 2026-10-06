@@ -6,7 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: plans
 capture_status: live
-url_slug: /startups/canvas-on-one-page
+url_slug: /use-cases/business-model-canvas-on-one-page
 ---
 
 # Put our business model on one page we can keep current
@@ -32,6 +32,6 @@ say which of your assumptions have nothing real behind them yet.
 
 ## Related
 
-- [If our one cloud platform or payment provider goes down, what stops?](/startups/single-point-of-failure)
-- [What must be true for our revenue stream?](/startups/revenue-stream-risk)
-- [Which boxes on my canvas depend on things we haven't built yet?](/startups/canvas-dependencies)
+- [If our one cloud platform or payment provider goes down, what stops?](/use-cases/single-point-of-failure)
+- [What must be true for our revenue stream?](/use-cases/revenue-stream-risk)
+- [Which boxes on my canvas depend on things we haven't built yet?](/use-cases/canvas-dependencies)

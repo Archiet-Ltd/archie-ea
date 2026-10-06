@@ -6,7 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: plans
 capture_status: live
-url_slug: /enterprise-architecture/programme-tracking
+url_slug: /use-cases/programme-tracking
 ---
 
 # Is the programme on time and on budget, and what does each project touch?

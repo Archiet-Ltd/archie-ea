@@ -6,7 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: plans
 capture_status: live
-url_slug: /scale-up/what-i-own
+url_slug: /use-cases/what-i-own
 ---
 
 # Show me what I own and what depends on it, so I know what I am on the hook for
@@ -27,4 +27,4 @@ of the estate is always one click away instead of a filtered search through ever
 ## Related
 
 - [My Applications](/modules/my-applications)
-- [Which systems have no owner, and which owner is a single point of failure?](/scale-up/no-owner)
+- [Which systems have no owner, and which owner is a single point of failure?](/use-cases/systems-with-no-owner)

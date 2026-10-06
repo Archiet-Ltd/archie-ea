@@ -6,7 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: plans
 capture_status: live
-url_slug: /enterprise-architecture/import
+url_slug: /use-cases/import-archimate-model
 ---
 
 # Import our existing Archi or Open Exchange model and keep working
@@ -28,4 +28,4 @@ and when. Everything lands in one element browser, across every ArchiMate layer,
 ## Related
 
 - [Architecture Model](/modules/architecture-model)
-- [Bring our LeanIX or Ardoq fact sheets across](/enterprise-architecture/leanix-ardoq-import)
+- [Bring our LeanIX or Ardoq fact sheets across](/use-cases/leanix-ardoq-import)

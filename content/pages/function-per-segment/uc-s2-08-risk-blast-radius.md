@@ -6,7 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: plans
 capture_status: live
-url_slug: /scale-up/risk-blast-radius
+url_slug: /use-cases/risk-blast-radius
 ---
 
 # Which risks sit on our revenue-critical path, and who owns the mitigation?
@@ -27,4 +27,4 @@ in a separate document.
 ## Related
 
 - [Risk Register](/modules/risk-register)
-- [What breaks if this service fails, and who gets called?](/scale-up/what-breaks-and-who-gets-called)
+- [What breaks if this service fails, and who gets called?](/use-cases/what-breaks-and-who-gets-called)

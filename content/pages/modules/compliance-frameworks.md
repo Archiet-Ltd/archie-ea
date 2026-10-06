@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S3-08, segment: S3}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Compliance Frameworks
@@ -22,7 +23,7 @@ that you pass an audit.
 
 ## Where you'll meet it
 
-- [Which risks touch this part of the architecture?](/enterprise-architecture/risk-and-controls)
+- [Which risks touch this part of the architecture?](/use-cases/risk-and-control-gaps)
 
 ## Related modules
 

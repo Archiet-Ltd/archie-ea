@@ -6,7 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: plans
 capture_status: live
-url_slug: /startups/single-point-of-failure
+url_slug: /use-cases/single-point-of-failure
 ---
 
 # If our one cloud platform or payment provider goes down, what stops?
@@ -45,6 +45,6 @@ run, so it can say which of your assumptions have nothing real behind them yet.
 
 ## Related
 
-- [Business Model Canvas](/startups/canvas-on-one-page)
-- [Show an investor what we run, in an afternoon](/startups/show-what-we-run)
-- [What must be true for our revenue stream](/startups/revenue-stream-risk)
+- [Business Model Canvas](/use-cases/business-model-canvas-on-one-page)
+- [Show an investor what we run, in an afternoon](/use-cases/show-investors-what-we-run)
+- [What must be true for our revenue stream](/use-cases/revenue-stream-risk)

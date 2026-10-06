@@ -6,7 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: plans
 capture_status: live
-url_slug: /enterprise-architecture/risk-and-controls
+url_slug: /use-cases/risk-and-control-gaps
 ---
 
 # Which risks touch this part of the architecture, and who owns closing them?

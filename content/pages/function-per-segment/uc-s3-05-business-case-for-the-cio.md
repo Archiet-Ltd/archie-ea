@@ -6,7 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: plans
 capture_status: live
-url_slug: /enterprise-architecture/business-case
+url_slug: /use-cases/business-case-for-the-cio
 ---
 
 # Build the business case for the CIO from the model's own cost and impact figures

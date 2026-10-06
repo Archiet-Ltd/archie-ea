@@ -23,7 +23,7 @@ that aren't mature enough yet.
 
 ## Where you'll meet it
 
-- [What must be true for our revenue stream?](/startups/revenue-stream-risk)
+- [What must be true for our revenue stream?](/use-cases/revenue-stream-risk)
 
 ## Related modules
 

@@ -88,6 +88,38 @@ def is_active(sid):
     return row is not None and row.revoked_at is None
 
 
+def age_seconds(sid):
+    """Return how many seconds old the session row ``sid`` is, or None if
+    the sid names no row. Used by session_policy.py's administrator
+    absolute-lifetime check (R1-B12 PR 2).
+
+    Computed with Postgres's own ``now() - created_at`` rather than pulling
+    ``created_at`` into Python and subtracting against ``datetime.now()``:
+    ``created_at`` is a plain (timezone-naive) column, and a driver stores
+    an incoming timezone-AWARE Python datetime converted into the
+    connection's session timezone first -- on a server not configured to
+    UTC (as this project's local dev Postgres is not), that silently shifts
+    every stored value by the session's UTC offset. Subtracting entirely
+    inside the same SQL session cancels that offset, because both sides of
+    the subtraction go through the identical conversion; comparing the
+    naive column against a Python-side ``datetime.now(timezone.utc)``, as
+    an earlier version of this function did, does not."""
+    if not sid:
+        return None
+    try:
+        seconds = db.session.execute(
+            db.select(
+                db.func.extract(
+                    "epoch", db.func.now() - UserSession.created_at
+                )
+            ).where(UserSession.sid == sid)
+        ).scalar()
+    except Exception:
+        logger.error("session_registry: age_seconds lookup failed for sid=%s...", sid[:8], exc_info=True)
+        return None
+    return float(seconds) if seconds is not None else None
+
+
 def touch(sid):
     """Best-effort ``last_seen_at`` update, throttled to avoid a write on
     every request. Never raises."""
