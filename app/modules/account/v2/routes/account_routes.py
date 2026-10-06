@@ -91,6 +91,22 @@ def login():
 
         user = _svc.authenticate(form.email.data, form.password.data)
         if user is not None:
+            # R1-B12 PR 2 (TB-0144/PB-0100): an administrator must complete
+            # multi-factor before the login finishes, whether they are
+            # enrolling for the first time or entering a code from an
+            # already-enrolled authenticator app. Checked before the
+            # session-fixation reset below so a password alone never mints
+            # a real session for an administrator account. Mirrors the v1
+            # account_routes.py login() gate exactly -- USE_ACCOUNT_GUARDRAILS
+            # chooses which of the two is registered, so both must agree.
+            from app.services import mfa_service
+
+            if mfa_service.required_for(user):
+                session["_mfa_pending_user_id"] = user.id
+                session["_mfa_pending_remember"] = bool(form.remember_me.data)
+                session["_mfa_pending_next"] = request.args.get("next", "")
+                return redirect(url_for("account.mfa_challenge"))
+
             # Fix Session Fixation: Regenerate session ID after successful authentication
             session.clear()
             session.modified = True
@@ -129,6 +145,97 @@ def login():
             auth_audit.record_login_failure(form.email.data)
             flash("Invalid email or password.", "form-error")
     return render_template("account/login.html", form=form)
+
+
+def _mfa_pending_user():
+    """Return the User this request is mid-MFA for, or None.
+
+    Mirrors the v1 account_routes.py helper exactly -- see its docstring.
+    """
+    from app.models.user import User
+
+    user_id = session.get("_mfa_pending_user_id")
+    if not user_id:
+        return None
+    # tenant-scoping-ok: pre-login MFA step, no org context yet -- this is
+    # the one user the signed session cookie names as mid-login, the same
+    # posture as the pre-auth SSO callback lookup below.
+    return User.query.get(user_id)
+
+
+def _complete_login_after_mfa(user):
+    """Finish the login that _mfa_pending_user_id was holding open, mirroring
+    login()'s own session-fixation reset and audit trail."""
+    from app.services import auth_audit
+
+    remember = bool(session.pop("_mfa_pending_remember", False))
+    next_url = session.pop("_mfa_pending_next", "") or ""
+    session.pop("_mfa_pending_user_id", None)
+
+    session.clear()
+    session.modified = True
+    _svc.login(user, remember)
+    session.permanent = True
+    try:
+        audit_logger.log_authentication(success=True)
+    except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
+        pass
+    _login_entry = auth_audit.record_login_success(user)
+    if _login_entry is not None:
+        session["_login_audit_id"] = _login_entry.id
+    flash("You are now logged in. Welcome back!", "success")
+
+    from app.utils.safe_redirect import safe_next_url
+
+    return redirect(safe_next_url(next_url, url_for("dashboard.overview")))
+
+
+@account_bp_v2.route("/mfa-challenge", methods=["GET", "POST"])
+@rate_limit(10, "1m", methods=("POST",))  # SECURITY: brute-force protection on code submits
+@timed_route
+def mfa_challenge():
+    """Multi-factor step for an administrator mid-login (R1-B12 PR 2,
+    TB-0144/PB-0100). Mirrors the v1 account_routes.py route exactly --
+    see its docstring.
+    """
+    user = _mfa_pending_user()
+    if user is None:
+        flash("Your sign-in attempt expired. Please sign in again.", "error")
+        return redirect(url_for("account.login"))
+
+    from app.services import mfa_service
+
+    if not user.mfa_enabled:
+        secret = session.get("_mfa_enroll_secret")
+        if not secret:
+            secret = mfa_service.generate_secret()
+            session["_mfa_enroll_secret"] = secret
+        if request.method == "POST":
+            code = request.form.get("code", "")
+            try:
+                mfa_service.enroll(user, secret, code)
+            except mfa_service.MFAError as exc:
+                flash(str(exc), "form-error")
+                return render_template(
+                    "account/mfa_enroll.html",
+                    secret=secret,
+                    provisioning_uri=mfa_service.provisioning_uri(user, secret),
+                )
+            session.pop("_mfa_enroll_secret", None)
+            return _complete_login_after_mfa(user)
+        return render_template(
+            "account/mfa_enroll.html",
+            secret=secret,
+            provisioning_uri=mfa_service.provisioning_uri(user, secret),
+        )
+
+    if request.method == "POST":
+        code = request.form.get("code", "")
+        if mfa_service.verify_login_code(user, code):
+            return _complete_login_after_mfa(user)
+        flash("That code was not accepted. Try again.", "form-error")
+
+    return render_template("account/mfa_challenge.html")
 
 
 @account_bp_v2.route("/register", methods=["GET", "POST"])

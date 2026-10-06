@@ -45,6 +45,22 @@ def create_app(config=None):
     app.config.from_object(Config[config_name])
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+    # SECURITY: ADMIN_MFA_BYPASS (config.py's SmokeTestingConfig) exists only
+    # so the browser-smoke subprocess can skip the admin MFA gate
+    # (app/services/mfa_service.py::required_for) for fixtures that are not
+    # testing MFA itself. It is a hardcoded class attribute, never read from
+    # an environment variable, a request, a header or a database setting --
+    # but a hardcoded attribute copied onto the wrong config class would
+    # still be a real hole. Refuse to boot at all rather than ever let an
+    # administrator sign in without completing MFA outside a genuine testing
+    # boot.
+    if app.config.get("ADMIN_MFA_BYPASS") and not app.config.get("TESTING"):
+        raise RuntimeError(
+            "ADMIN_MFA_BYPASS is set but TESTING is not -- refusing to "
+            "start. This switch may only be true on a genuine testing "
+            "config (see config.py's SmokeTestingConfig)."
+        )
+
     Config[config_name].init_app(app)
 
     # 1. Extensions (db, csrf, mail, login_manager, compress, migrate, rq, cache)
