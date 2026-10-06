@@ -786,6 +786,11 @@ _MY_WORK_LINKS = {
         _link("Portfolio", "portfolio.index", "briefcase"),
         _APPROVAL_INBOX_LINK,
         _link("Rationalization", "unified_applications.rationalization_dashboard", "git-merge"),
+        # R1-B34 (TB-0135): the reviewer of a composite score's weights is
+        # this persona -- the rationalization scorecard's own number now
+        # names a formula version, so the page that edits it belongs next
+        # to the dashboard that reads it.
+        _link("Formula Register", "formula_register.index", "calculator"),
         _link("Vendors", "unified_applications.vendors", "building"),
         _link("Applications", "unified_applications.application_list", "list"),
         # S-11 remainder: directory-only, never in a sidebar zone.
