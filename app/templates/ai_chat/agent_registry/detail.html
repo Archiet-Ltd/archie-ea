@@ -28,18 +28,20 @@
   <div class="rounded-lg border border-border bg-card p-4"
        x-data="{
          term: '', results: [], selected: null, searching: false,
-         async runSearch() {
+         runSearch() {
            const q = this.term.trim();
            if (!q) { this.results = []; return; }
            this.searching = true;
-           try {
-             const data = await Platform.fetch.get('{{ url_for('organization.stakeholder_search') }}', { q: q });
-             this.results = (data.results || []).filter(r => r.type === 'user');
-           } catch (e) {
-             this.results = [];
-           } finally {
-             this.searching = false;
-           }
+           Platform.fetch.get('{{ url_for('organization.stakeholder_search') }}', { q: q })
+             .then(data => {
+               this.results = (data.results || []).filter(r => r.type === 'user');
+             })
+             .catch(() => {
+               this.results = [];
+             })
+             .finally(() => {
+               this.searching = false;
+             });
          },
          choose(r) { this.selected = r; this.term = r.name; this.results = []; }
        }">
