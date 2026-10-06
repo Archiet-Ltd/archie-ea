@@ -9,7 +9,8 @@ flagged in review.
 
 TB-0496 (owner-leaver pause + successor recommendation) is explicitly out of
 scope here: it depends on a leaver signal that does not exist in this
-codebase yet (R1-B26's SCIM/identity-provider provisioning is unmerged). The
+codebase yet (R1-B26's identity-provider directory-sync provisioning is
+unmerged). The
 model carries the two columns a follow-up PR needs; nothing here sets them.
 """
 from __future__ import annotations

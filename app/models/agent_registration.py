@@ -37,10 +37,10 @@ class AgentRegistration(TenantMixin, db.Model):
     delegated_limits = db.Column(db.JSON, nullable=True)
 
     # TB-0496 (owner-leaver pause + successor recommendation) is not built in
-    # this PR -- it depends on a leaver signal R1-B26 (SCIM/identity-provider
-    # provisioning) has not merged yet. These two columns exist so the
-    # follow-up PR has somewhere to write without a second migration, but
-    # nothing in this PR sets them.
+    # this PR -- it depends on a leaver signal R1-B26 (identity-provider
+    # directory-sync provisioning) has not merged yet. These two columns
+    # exist so the follow-up PR has somewhere to write without a second
+    # migration, but nothing in this PR sets them.
     owner_departed_at = db.Column(db.DateTime, nullable=True)
     successor_user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True,

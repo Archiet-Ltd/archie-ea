@@ -108,8 +108,12 @@ def test_sidebar_link_budget_is_31():
     change proposal. platform_admin (the role with zero headroom) renders it
     like every other role; no fold is available. Raising the budget by one is
     the honest cost of a genuinely new, intentional link.
+
+    Agent Registry (R1-B56, 6 Oct 2026): raised 32 -> 33. One new
+    platform_admin-only link (owner, charter and delegated limits per
+    registered agent); no fold is available for the same reason as above.
     """
-    assert SIDEBAR_LINK_BUDGET == 32
+    assert SIDEBAR_LINK_BUDGET == 33
 
 
 def test_every_role_is_defined():
