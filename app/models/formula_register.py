@@ -15,6 +15,14 @@ remains the resolver of effective per-tenant overrides for the
 rationalization formula specifically; this model generalises the pattern so
 other composite scores can register here too, per the brief's own
 "generalises the rationalisation scoring configuration" reuse note.
+
+RationalizationScoringService.calculate_app_score treats an active,
+COMPLETE FormulaRegister row (every dimension the score needs is present)
+as the weights actually used, taking priority over ScoringConfiguration /
+policy overrides; it falls back to those, unchanged, when no formula is
+registered or a registered one is missing a dimension. A score's
+``formula_version`` is set only in the first case, so it never names a
+formula that did not produce that number.
 """
 
 from datetime import datetime

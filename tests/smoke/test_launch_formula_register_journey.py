@@ -37,9 +37,10 @@ def test_portfolio_manager_activates_a_formula_version_and_it_stays_scoped(brows
     page.goto(live_server + PAGE, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id("formula-no-version")).to_be_visible(timeout=PAGE_TIMEOUT)
 
+    # Input names are fixed to the formula's known dimensions (readonly);
+    # only the weight fields are editable.
     form = page.get_by_test_id("formula-new-version-form").first
-    form.get_by_test_id("formula-input-name").fill("technical_health")
-    form.get_by_test_id("formula-input-weight").fill("0.6")
+    form.get_by_test_id("formula-input-weight").first.fill("0.6")
     form.get_by_test_id("formula-activate-button").click()
     page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
 

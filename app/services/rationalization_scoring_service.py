@@ -565,11 +565,25 @@ class RationalizationScoringService:
             # Capability coverage dimension (CAP-020: now contributes to overall score)
             capability_result = RationalizationScoringService._compute_capability_score(application_id)
 
-            # Resolve effective weights — policy overrides base config if present.
-            if active_policy is not None:
-                weights = active_policy.get_effective_weights(scoring_config)
+            # R1-B34 (TB-0135): a registered FormulaRegister version, when one
+            # exists and names every dimension this score needs, is the
+            # weights actually used -- not merely recorded alongside a
+            # different set. Falls back to policy/ScoringConfiguration
+            # (unchanged prior behaviour) when no formula is registered, or
+            # when it is registered but incomplete.
+            from app.models.formula_register import FormulaRegister
+
+            REQUIRED_DIMENSIONS = {"technical_health", "business_value", "cost_efficiency", "vendor_risk"}
+            active_formula = FormulaRegister.active_for(app.organization_id, "rationalization_overall")
+            if active_formula is not None and REQUIRED_DIMENSIONS.issubset(active_formula.inputs or {}):
+                weights = active_formula.inputs
             else:
-                weights = scoring_config.get_weights_dict()
+                active_formula = None  # incomplete or missing -- not used, not recorded
+                # Resolve effective weights — policy overrides base config if present.
+                if active_policy is not None:
+                    weights = active_policy.get_effective_weights(scoring_config)
+                else:
+                    weights = scoring_config.get_weights_dict()
 
             # Calculate weighted overall score using resolved weights.
             overall_score = (
@@ -790,14 +804,11 @@ class RationalizationScoringService:
             score.assessment_date = datetime.utcnow().date()
             score.scoring_model_version = scoring_config.configuration_version
 
-            # R1-B34 (TB-0135): record the FormulaRegister version this score
-            # was computed with, when one is registered for this organisation.
-            # None when nothing is registered yet -- the score itself still
-            # computes from ScoringConfiguration's weights either way; this
-            # column is provenance, not a gate on whether scoring runs.
-            from app.models.formula_register import FormulaRegister
-
-            active_formula = FormulaRegister.active_for(app.organization_id, "rationalization_overall")
+            # R1-B34 (TB-0135): `active_formula` here is the same object
+            # resolved above when the overall score was computed -- it is
+            # None whenever the FormulaRegister's weights were NOT the ones
+            # actually used (missing or incomplete), so this column never
+            # names a formula that did not produce this number.
             score.formula_version = active_formula.version if active_formula else None
 
             # Record which policy was applied (nullable — None when no policy exists).

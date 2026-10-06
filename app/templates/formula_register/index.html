@@ -44,15 +44,18 @@
     <form method="post" action="{{ url_for('formula_register.new_version', formula_key=key) }}"
           class="space-y-2" data-testid="formula-new-version-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <p class="text-xs text-muted-foreground">New version's inputs and weights (repeat the row to add more):</p>
+      <p class="text-xs text-muted-foreground">New version's weight for each input:</p>
+      {% set current_weights = (active.inputs if active else {}) %}
+      {% for dim in formula_dimensions.get(key, []) %}
       <div class="grid grid-cols-2 gap-2">
-        <input type="text" name="input_name" placeholder="technical_health"
+        <input type="text" name="input_name" value="{{ dim }}" readonly
                data-testid="formula-input-name"
-               class="rounded-md border border-border bg-background px-3 py-2 text-sm">
-        <input type="text" name="input_weight" placeholder="0.3"
+               class="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+        <input type="text" name="input_weight" value="{{ current_weights.get(dim, '') }}" placeholder="0.3"
                data-testid="formula-input-weight"
                class="rounded-md border border-border bg-background px-3 py-2 text-sm">
       </div>
+      {% endfor %}
       <button type="submit" data-testid="formula-activate-button"
               class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">
         Activate new version
