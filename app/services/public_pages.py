@@ -20,6 +20,7 @@ Directory layout maps to URL families:
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -164,15 +165,25 @@ def _use_case_slug_and_url(front_matter: dict[str, Any], filename_slug: str) -> 
     return filename_slug, f"{FAMILY_URL_PREFIX['function-per-segment']}/{filename_slug}"
 
 
+_OLD_USE_CASE_FILENAME_RE = re.compile(r"uc-s\d-\d{2}-[a-z0-9-]+")
+
+
 def use_case_redirect_target(old_filename_slug: str) -> str | None:
     """The new ``/use-cases/<slug>`` URL for a use-case page previously
     served at its internal ``uc-sN-NN-*`` filename slug, or ``None`` if
-    ``old_filename_slug`` is not a known filename in this family, or is one
-    whose public slug was never different (nothing to redirect).
+    ``old_filename_slug`` doesn't even look like one of those filenames, is
+    not a known filename in this family, or is one whose public slug was
+    never different (nothing to redirect).
 
     Lets the ``/use-cases/<slug>`` route 301 an already-indexed old URL to
-    its new one instead of just 404ing it.
+    its new one instead of just 404ing it. The filename-shape check runs
+    first and fails closed: without it, any slug-shaped string reaching this
+    function would open whatever file matches it verbatim under
+    content/pages/function-per-segment/ and 301 to that file's own url_slug,
+    which is not a claim this function should make about arbitrary input.
     """
+    if not _OLD_USE_CASE_FILENAME_RE.fullmatch(old_filename_slug):
+        return None
     family_dir = CONTENT_ROOT / FAMILY_DIR_MAP["function-per-segment"]
     if not family_dir.is_dir():
         return None

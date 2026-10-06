@@ -828,9 +828,11 @@ def test_waiting_list_cta_renders_link(app):
     """Pages with cta=waiting_list show the waiting list link."""
     # ai-chat moved to cta: plans (feature shipped) and /contact moved to
     # cta: inquiry (a sales enquiry form), so use a not-yet-built use-case
-    # page instead, which still carries cta: waiting_list.
+    # page instead, which still carries cta: waiting_list. Its current,
+    # readable URL -- the old uc-s1-01-canvas-dependencies filename form
+    # now 301-redirects here instead of rendering directly.
     with app.test_client() as client:
-        rv = client.get("/use-cases/uc-s1-01-canvas-dependencies")
+        rv = client.get("/use-cases/canvas-dependencies")
         html = rv.data.decode()
         assert "/#waitlist" in html
         assert "Join the waiting list" in html
@@ -1567,11 +1569,13 @@ def test_use_case_unknown_slug_still_404s(app):
         assert rv.status_code == 404
 
 
-# Directories scanned for stale "/use-cases/uc-s" references (the old,
-# internal-filename-based URL form). Binary/vendor assets are skipped: they
+# Directories scanned for stale old-filename-form use-case references (see
+# the needle string built below). Binary/vendor assets are skipped: they
 # cannot contain a hand-written link to a content page and some are not
-# valid UTF-8.
-_STALE_REFERENCE_ROOTS = ["app", "content"]
+# valid UTF-8. tests/ is included deliberately (not just app/content/static):
+# a stale reference in a fixture, doc or test is exactly the same bug as one
+# in product code, just caught later.
+_STALE_REFERENCE_ROOTS = ["app", "content", "tests"]
 _STALE_REFERENCE_SKIP_DIR_NAMES = {
     "vendor", "node_modules", "__pycache__", ".git", "dist", "build",
 }
@@ -1580,12 +1584,50 @@ _STALE_REFERENCE_SKIP_SUFFIXES = {
     ".eot", ".pdf", ".svg", ".zip", ".pyc", ".map",
 }
 
+# Test functions that deliberately reference the old uc-sN-NN-* URL form, to
+# exercise the redirect itself (this file's own check logic, just below,
+# also carries the needle string literally and is exempted the same way).
+# A new file is never added to this allowlist to silence a hit -- only a
+# function whose whole job is testing the old-URL-to-new-URL redirect.
+_STALE_REFERENCE_ALLOWED_FUNCTIONS = {
+    ("tests/test_public_content_pages.py", "test_every_use_case_page_redirects_from_its_old_filename_url"),
+    ("tests/test_public_content_pages.py", "test_use_case_old_filename_url_redirects_to_new_slug_sample"),
+    ("tests/test_public_content_pages.py", "test_no_stale_internal_use_case_uc_slug_references"),
+}
+
+
+def _text_with_allowed_functions_blanked(repo_root, rel_path: str, text: str) -> str:
+    """``text`` with the source of any function in
+    ``_STALE_REFERENCE_ALLOWED_FUNCTIONS`` for this file replaced by blank
+    lines (preserving line numbers, in case a future failure message wants
+    them) -- a needle inside one of those functions is expected and not a
+    finding; a needle anywhere else in the same file still is.
+    """
+    import ast
+
+    names = {name for path, name in _STALE_REFERENCE_ALLOWED_FUNCTIONS if path == rel_path}
+    if not names:
+        return text
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return text
+    lines = text.splitlines(keepends=True)
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names:
+            start, end = node.lineno - 1, getattr(node, "end_lineno", node.lineno)
+            for i in range(start, end):
+                lines[i] = "\n"
+    return "".join(lines)
+
 
 def test_no_stale_internal_use_case_uc_slug_references():
-    """No file under app/ or content/ (which covers app/static/) contains
-    the string "/use-cases/uc-s" -- the old, internal-filename-based URL
-    form. A hit here would be a leftover internal link, fixture or doc still
-    pointing at the pre-migration URL instead of the current readable slug.
+    """No file under app/, content/ (which covers app/static/) or tests/
+    contains the string "/use-cases/uc-s" -- the old, internal-filename-based
+    URL form -- outside the specific test functions whose job is to exercise
+    the redirect from that old form. A hit here would be a leftover internal
+    link, fixture or doc still pointing at the pre-migration URL instead of
+    the current readable slug.
     """
     repo_root = Path(__file__).resolve().parent.parent
     needle = "/use-cases/uc-s"
@@ -1606,12 +1648,16 @@ def test_no_stale_internal_use_case_uc_slug_references():
                 text = path.read_text(encoding="utf-8")
             except (UnicodeDecodeError, OSError):
                 continue
+            rel_path = str(path.relative_to(repo_root)).replace("\\", "/")
+            if rel_path.endswith(".py"):
+                text = _text_with_allowed_functions_blanked(repo_root, rel_path, text)
             if needle in text:
-                offenders.append(str(path.relative_to(repo_root)))
+                offenders.append(rel_path)
 
     assert not offenders, (
         "stale '/use-cases/uc-s' reference(s) found (old filename-based URL "
-        "form) -- update to the current readable slug:\n" + "\n".join(offenders)
+        "form) outside the functions that deliberately test the redirect -- "
+        "update to the current readable slug:\n" + "\n".join(offenders)
     )
 
 
