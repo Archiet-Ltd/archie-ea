@@ -1,0 +1,25 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}Register agent — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6 max-w-xl">
+  {{ page_shell(
+      title='Register agent',
+      breadcrumb=[('Home', url_for('main.index')), ('Agent Registry', url_for('agent_registry.index')), ('Register', None)]
+  ) }}
+  <form method="post" class="space-y-4" data-testid="new-agent-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div>
+      <label for="name" class="block text-sm font-medium text-foreground mb-1">Name</label>
+      <input type="text" id="name" name="name" required class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label for="purpose" class="block text-sm font-medium text-foreground mb-1">Purpose</label>
+      <textarea id="purpose" name="purpose" rows="3" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"></textarea>
+    </div>
+    <button type="submit" class="inline-flex items-center rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors">Register</button>
+  </form>
+</div>
+{% endblock %}

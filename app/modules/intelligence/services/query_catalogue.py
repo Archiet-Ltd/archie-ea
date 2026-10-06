@@ -169,6 +169,106 @@ def _business_continuity_criticality(
     }
 
 
+def _overlapping_contracts(organization_id: int, **_: Any) -> Dict[str, Any]:
+    """"Where do our contracts overlap?" (R1-B38 PB-0225) -- applications
+    sharing a capability, grouped by that capability, with each
+    application's contracts, combined contract value and nearest end date.
+
+    Reads the existing contract_applications junction (R1-B38's own note:
+    this needs only the query, not a new writer) and resolves each
+    application's capability through BusinessCapability -- the write path
+    ADR 0008 keeps live -- rather than UnifiedCapability directly, since no
+    reverse (BusinessCapability id -> UnifiedCapability id) resolver exists
+    yet; UnifiedCapability's own source_table/source_id provenance on each
+    row is exactly this link, named here as a known shortcut rather than
+    silently assumed solved.
+    """
+    from app.models.application_capability import ApplicationCapabilityMapping
+    from app.models.application_portfolio import ApplicationComponent, VendorContract
+    from app.models.contract_application import ContractApplication
+
+    contract_apps = (
+        db.session.query(ContractApplication, VendorContract, ApplicationComponent)
+        .join(VendorContract, VendorContract.id == ContractApplication.contract_id)
+        .join(ApplicationComponent, ApplicationComponent.id == ContractApplication.application_id)
+        .filter(ContractApplication.organization_id == organization_id)
+        .all()
+    )
+    app_ids = {app.id for _, _, app in contract_apps}
+    capability_by_app: Dict[int, List[Any]] = {}
+    if app_ids:
+        mapping_rows = (
+            ApplicationCapabilityMapping.query.filter(
+                ApplicationCapabilityMapping.organization_id == organization_id,
+                ApplicationCapabilityMapping.application_component_id.in_(app_ids),
+            )
+            .all()
+        )
+        for m in mapping_rows:
+            bucket = capability_by_app.setdefault(m.application_component_id, [])
+            # A repeated (application, capability) mapping row must not
+            # repeat the contract row the loop below builds from it.
+            if m.business_capability_id not in bucket:
+                bucket.append(m.business_capability_id)
+
+    groups: Dict[str, Dict[str, Any]] = {}
+    for contract_app, contract, app in contract_apps:
+        for capability_id in capability_by_app.get(app.id, []):
+            key = str(capability_id)
+            bucket = groups.setdefault(key, {"capability_id": capability_id, "rows": []})
+            bucket["rows"].append(
+                {
+                    "application_id": app.id,
+                    "application_name": app.name,
+                    "contract_id": contract.id,
+                    "contract_name": contract.contract_name,
+                    "contract_value": contract.contract_value,
+                    "end_date": contract.end_date.isoformat() if contract.end_date else None,
+                    "source_table": "contract_applications",
+                    "truth_class": truth_class_for("contract_applications"),
+                }
+            )
+
+    # Only a capability shared by more than one application is an overlap.
+    overlapping = {
+        key: bucket for key, bucket in groups.items()
+        if len({row["application_id"] for row in bucket["rows"]}) > 1
+    }
+
+    from app.models.business_capabilities import BusinessCapability
+
+    result_groups = []
+    for bucket in overlapping.values():
+        capability = BusinessCapability.query.filter_by(
+            id=bucket["capability_id"], organization_id=organization_id,
+        ).first()
+        # Review finding: a single contract can cover several applications
+        # (contract_applications is a many-to-many join), so summing one row
+        # per (app, contract) double-counts that contract's value for every
+        # extra application sharing it. Sum each distinct contract once.
+        distinct_contracts = {
+            row["contract_id"]: row["contract_value"]
+            for row in bucket["rows"] if row["contract_value"] is not None
+        }
+        combined_value = sum(float(v) for v in distinct_contracts.values())
+        end_dates = [row["end_date"] for row in bucket["rows"] if row["end_date"]]
+        result_groups.append(
+            {
+                "group": capability.name if capability else "not recorded",
+                "rows": bucket["rows"],
+                "combined_contract_value": combined_value if combined_value else None,
+                "nearest_end_date": min(end_dates) if end_dates else None,
+            }
+        )
+
+    return {
+        "answer": "applications sharing a capability, with their overlapping contracts",
+        "groups": sorted(result_groups, key=lambda g: g["group"]),
+        "total": len(result_groups),
+        "reason": None if result_groups else "no capability is shared by more than one application with a contract",
+    }
+
+
 CATALOGUE: Dict[str, CatalogueEntry] = {
     "applications_without_owner": CatalogueEntry(
         id="applications_without_owner",
@@ -183,6 +283,13 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         description="Systems, suppliers and owners at a given business-criticality level.",
         params=["criticality"],
         run=_business_continuity_criticality,
+    ),
+    "overlapping_contracts": CatalogueEntry(
+        id="overlapping_contracts",
+        title="Where do our contracts overlap?",
+        description="Applications sharing a capability, with their contracts, combined value and nearest end date.",
+        params=[],
+        run=_overlapping_contracts,
     ),
 }
 
