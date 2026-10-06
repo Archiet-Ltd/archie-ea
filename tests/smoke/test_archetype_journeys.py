@@ -1056,8 +1056,8 @@ def test_operations_subscribes_to_service_status_and_it_persists(page, live_serv
     _login(page, live_server, seeded["emails"]["operations"])
 
     _visit(page, live_server, "/status")
-    page.locator("[data-testid=service-status-subscribe]").click(no_wait_after=True)
-    page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+        page.locator("[data-testid=service-status-subscribe]").click()
 
     page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert page.locator("[data-testid=service-status-subscribed]").count() == 1, (

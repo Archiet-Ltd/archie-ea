@@ -111,9 +111,18 @@ def requires_procurement(f):
     """
     Shorthand decorator for procurement routes.
     Allows procurement role and portfolio_manager (read-only context).
+    """
+    return requires_role(["procurement", "portfolio_manager"])(f)
 
-    R1-B36 (TB-0146): finance added -- licences/spend are a finance
-    persona's own numbers, not a second page for them to get built.
+
+def requires_procurement_or_finance(f):
+    """
+    Shorthand for the two procurement pages a finance persona also owns:
+    licences and spend (R1-B36, TB-0146). Deliberately NOT applied to
+    contracts, renewals or the compliance dashboard -- adding "finance" to
+    the shared requires_procurement would have opened every procurement
+    page to it, which the authorisation matrix caught as a real mismatch
+    (POLICY only names the two pages finance's own sidebar links to).
     """
     return requires_role(["procurement", "portfolio_manager", "finance"])(f)
 

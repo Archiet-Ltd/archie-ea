@@ -85,6 +85,16 @@ PERSONA_ALIASES: Dict[str, str] = {
     # ADM) is enterprise_architect's remit verbatim, so it is aliased rather
     # than given a duplicate charter.
     "capability_architect": "enterprise_architect",
+    # R1-B36 (TB-0146), 2026-10-05: finance/compliance/risk/operations/
+    # non_technical_owner promoted from unassignable to assignable with no
+    # dedicated charter of their own in this PR -- aliased to the closest
+    # existing persona (matches ROLE_DEFAULT_PERSONAS below) rather than
+    # left to resolve to nothing; a real charter per role is follow-up work.
+    "finance": "procurement",
+    "compliance": "security_architect",
+    "risk": "enterprise_architect",
+    "operations": "platform_admin",
+    "non_technical_owner": "application_manager",
 }
 
 # The database-backed enterprise role selects the initial chat persona. Keep
