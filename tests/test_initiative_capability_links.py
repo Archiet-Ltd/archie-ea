@@ -78,6 +78,22 @@ def _capability(db_session, org_id, *, with_element=True):
 
 
 class TestInitiativeCapabilityLinks:
+    def test_add_link_persists_the_contribution_level(self, app, db_session, make_org, tenant_ctx):
+        """Review finding: the join-table UPDATE ran before the
+        relationship-append's row was flushed, matched zero rows, and
+        silently dropped contribution_level with no error."""
+        org = make_org("initiative-cap-contribution")
+        initiative = _initiative(db_session, org.id)
+        capability = _capability(db_session, org.id)
+
+        with tenant_ctx(org.id):
+            result = add_link(initiative.id, capability.id, contribution_level="primary")
+            assert result["contribution_level"] == "primary"
+
+            db_session.expire_all()
+            links = list_links(initiative.id)
+            assert links[0]["contribution_level"] == "primary"
+
     def test_add_link_creates_both_the_join_row_and_the_relationship(
         self, app, db_session, make_org, tenant_ctx
     ):
@@ -230,6 +246,48 @@ class TestOverlappingContractsCatalogueEntry:
         app_ids_in_group = {row["application_id"] for row in group["rows"]}
         assert app_ids_in_group == {app1.id, app2.id}
         assert group["combined_contract_value"] == 1500.0
+
+    def test_one_contract_covering_both_overlapping_apps_is_counted_once(
+        self, app, db_session, make_org
+    ):
+        """Review finding: contract_applications is many-to-many, so one
+        contract covering both overlapping apps must contribute its value
+        once, not once per application it covers."""
+        from datetime import date
+
+        from app.models.application_capability import ApplicationCapabilityMapping
+        from app.models.application_portfolio import ApplicationComponent, VendorContract
+        from app.models.contract_application import ContractApplication
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("overlap-one-contract")
+        capability = _capability(db_session, org.id)
+
+        contract = VendorContract(
+            contract_name=f"Shared Contract {uuid.uuid4().hex[:6]}", organization_id=org.id,
+            contract_value=1000.0, start_date=date(2026, 1, 1),
+        )
+        db_session.add(contract)
+        db_session.flush()
+
+        app1 = ApplicationComponent(name=f"App {uuid.uuid4().hex[:6]}", organization_id=org.id)
+        app2 = ApplicationComponent(name=f"App {uuid.uuid4().hex[:6]}", organization_id=org.id)
+        db_session.add_all([app1, app2])
+        db_session.flush()
+        for a in (app1, app2):
+            db_session.add(ContractApplication(
+                contract_id=contract.id, application_id=a.id, organization_id=org.id,
+            ))
+            db_session.add(ApplicationCapabilityMapping(
+                application_component_id=a.id, business_capability_id=capability.id,
+                organization_id=org.id,
+            ))
+        db_session.commit()
+
+        result = run_entry("overlapping_contracts", org.id)
+
+        assert result["total"] == 1
+        assert result["groups"][0]["combined_contract_value"] == 1000.0
 
     def test_a_capability_used_by_only_one_application_is_not_an_overlap(
         self, app, db_session, make_org
