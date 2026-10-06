@@ -596,13 +596,16 @@ def public_vision():
 @main.route("/modules/<slug>")
 def public_module(slug):
     """A module content page."""
-    from app.services.public_pages import build_jsonld, load_page
+    from app.services.public_pages import build_jsonld, get_page_screenshot, load_page
 
     page = load_page("module", slug=slug)
     if page is None:
         from flask import abort
         abort(404)
-    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        screenshot=get_page_screenshot(page),
+    )
 
 
 _USE_CASE_SEGMENT_LABELS = {
@@ -643,7 +646,13 @@ def public_use_case(slug):
     already indexed, so a page that moved gets a real redirect, not a dead
     link.
     """
-    from app.services.public_pages import build_jsonld, load_page, use_case_redirect_target
+    from app.services.public_pages import (
+        build_jsonld,
+        get_page_recording,
+        get_page_screenshot,
+        load_page,
+        use_case_redirect_target,
+    )
 
     page = load_page("function-per-segment", slug=slug)
     if page is None:
@@ -652,7 +661,11 @@ def public_use_case(slug):
             return redirect(redirect_target, code=301)
         from flask import abort
         abort(404)
-    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        screenshot=get_page_screenshot(page),
+        recording=get_page_recording(page),
+    )
 
 
 @main.route("/vs")

@@ -33,6 +33,171 @@ from markupsafe import Markup
 from app.services.billing_plans import CONTACT_SALES_URL, PLANS
 
 CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content" / "pages"
+STATIC_ROOT = Path(__file__).resolve().parent.parent / "static"
+IMG_MODULES_DIR = STATIC_ROOT / "img" / "modules"
+IMG_USE_CASES_DIR = STATIC_ROOT / "img" / "use-cases"
+VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
+
+# ── seeded demo personas (Lantern Quay Systems -- app/commands/seed_demo_company.py) ──
+# scripts/capture_screenshots.py --modules logs in as these to capture the
+# registries below; kept here (not duplicated in the capture script) so the
+# fictional persona list has one source.
+DEMO_PERSONA = "demo@lantern-quay.example.com"
+ITOPS_ADMIN_PERSONA = "sage.itops@lantern-quay.example.com"
+APP_MANAGER_PERSONA = "casey.inventory@lantern-quay.example.com"
+PROCUREMENT_PERSONA = "taylor.procurement@lantern-quay.example.com"
+
+# ── module & use-case screenshot/recording registry ─────────────────────────
+# Single source of truth for which live pages get a captured screen: the path
+# scripts/capture_screenshots.py --modules visits, which seeded persona can
+# reach it, and the caption/alt text get_page_screenshot()/get_page_recording()
+# below attach to the image. The capture script imports this same list rather
+# than keeping its own copy, so the capture tool and the renderer can never
+# drift out of agreement about what a slug's image is of.
+#
+# Each entry: (slug, path, persona_email, caption, alt_text)
+MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
+    ("ai-chat", "/ai-chat", DEMO_PERSONA,
+     "The AI assistant answering a question from the organisation's own architecture model.",
+     "Screenshot of the AI Chat module answering a question about Lantern Quay Systems' architecture."),
+    ("applications", "/applications/", DEMO_PERSONA,
+     "The application portfolio list, with an owner, cost and lifecycle stage recorded for every entry.",
+     "Screenshot of the Applications module listing Lantern Quay Systems' application portfolio."),
+    ("arb", "/arb/", DEMO_PERSONA,
+     "The Architecture Review Board dashboard, tracking review sessions and decisions in progress.",
+     "Screenshot of the Architecture Review Board module's dashboard."),
+    ("architecture-model", "/architecture/", DEMO_PERSONA,
+     "The ArchiMate element browser, spanning the business, application, technology and motivation layers.",
+     "Screenshot of the Architecture Model module's ArchiMate element browser."),
+    ("business-case", "/business-case/", DEMO_PERSONA,
+     "Business cases with their status, three-year TCO and return on investment.",
+     "Screenshot of the Business Case module's list of business cases."),
+    ("business-model-canvas", "/business-model/", DEMO_PERSONA,
+     "The business model canvas library, with each canvas's operating-model archetype.",
+     "Screenshot of the Business Model Canvas module's canvas library."),
+    ("compliance-frameworks", "/dashboard/compliance", DEMO_PERSONA,
+     "The compliance frameworks dashboard, tracking framework coverage across the estate.",
+     "Screenshot of the Compliance Frameworks module's dashboard."),
+    ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,
+     "The duplicate detection dashboard, flagging applications that may overlap in function.",
+     "Screenshot of the Duplicate Detection module's dashboard."),
+    ("my-applications", "/my-applications/", APP_MANAGER_PERSONA,
+     "An application owner's personal dashboard of the applications they're responsible for.",
+     "Screenshot of the My Applications module's owner dashboard."),
+    ("portfolio", "/portfolio/", DEMO_PERSONA,
+     "The portfolio dashboard, summarising active initiatives and programmes.",
+     "Screenshot of the Portfolio module's dashboard."),
+    ("procurement", "/procurement/renewals", PROCUREMENT_PERSONA,
+     "The contract renewals dashboard, showing upcoming vendor renewal dates.",
+     "Screenshot of the Procurement module's contract renewals dashboard."),
+    ("projects", "/enterprise/implementation/work-packages", DEMO_PERSONA,
+     "The work packages list, tracking delivery programmes in progress.",
+     "Screenshot of the Projects module's work packages list."),
+    ("risk-register", "/risks/", DEMO_PERSONA,
+     "The risk register, with likelihood, impact and a mitigation plan recorded for each risk.",
+     "Screenshot of the Risk Register module."),
+    ("solutions", "/solutions/", DEMO_PERSONA,
+     "The solutions list, tracking each solution's design progress and next action.",
+     "Screenshot of the Solutions module's solution list."),
+    ("vendors", "/applications/vendors", DEMO_PERSONA,
+     "The vendor catalogue, with each vendor's type, products and contract status.",
+     "Screenshot of the Vendors module's vendor catalogue."),
+]
+
+# ── capture-pending: named explicitly, by design (lead review 2026-10-06) ──
+# Every slug below is genuinely capture_status: live in its own content file
+# -- the FEATURE is real and shipped, cta: plans stays untouched, and
+# nothing here ever flips that front-matter. What's pending is only the
+# capture: each one's first screenshot/recording was reviewed and rejected
+# (empty data, the wrong screen, or a recording that never performs the use
+# case it claims), the file was removed, and round 2 reseeds what each
+# screen actually needs and recaptures it properly.
+#
+# This dict (not just an absence from MODULE_CAPTURES) is what keeps the
+# registry-completeness tests strict: test_module_screenshots.py asserts
+# every live module/use-case is in MODULE_CAPTURES **or** named here, so a
+# module that quietly loses its capture without being added to this list
+# still fails the test, exactly as it would have before any pending list
+# existed. Round 2 deletes a name from here the same moment it adds the
+# slug back to the matching *_CAPTURES list above -- the two are meant to
+# be mutually exclusive, never both.
+MODULE_CAPTURE_PENDING: dict[str, str] = {
+    "integrations": (
+        "connector health dashboard throws \"An internal error occurred\" on any "
+        "data: app/routes/connector_routes.py api_list_connectors() calls .value "
+        "on connector_type/status/sync_mode as though they were Enum columns, but "
+        "app/models/connector_config.py declares all three as plain strings -- "
+        "pre-existing bug, unrelated file, out of scope to fix here"
+    ),
+    "capability-maturity": (
+        "heat map showed \"No capabilities yet\" for an organisation that has 24 "
+        "capabilities elsewhere (investment-analysis) -- this screen reads a "
+        "different capability store than the one seeded; a reuse-register-shaped "
+        "bug, separate brief owed"
+    ),
+    "batch-import": (
+        "completed jobs rendered at 0% progress and 0 elements generated -- "
+        "reads broken, not done; needs a real completed run with actual elements"
+    ),
+    "org-chart": (
+        "captured screen was the module's hub page (three link cards), not the "
+        "organisation chart itself -- needs actors/hierarchy seeded and the "
+        "/organization/chart route captured instead"
+    ),
+    "diagrams": (
+        "captured screen was a list of diagram names, not a rendered diagram -- "
+        "needs a diagram actually open in the Composer"
+    ),
+    "industry-apqc": "0 processes shown on every seeded framework",
+    "investment-analysis": "domain Unknown and 0 apps coverage on every capability row",
+    "gap-analysis": "type None on every row",
+    "rationalization": (
+        "captured screen was the \"Get started\" onboarding panel, not the "
+        "rationalization view itself -- needs scores past onboarding"
+    ),
+    "roadmaps": "0 gaps detected; plateaus with no description and 0 gaps",
+    "value-streams": "0 stages and 0 capabilities on every value stream",
+}
+
+# The one live use-case page: same screen as the capability-maturity module
+# (its own url_slug front-matter field points at the identical route). Empty
+# for the same reason as capability-maturity above -- see
+# USE_CASE_SCREENSHOT_PENDING.
+USE_CASE_SCREENSHOT_CAPTURES: list[tuple[str, str, str, str, str]] = []
+
+USE_CASE_SCREENSHOT_PENDING: dict[str, str] = {
+    "uc-s3-06-capability-maturity-heatmap": (
+        "same capability-maturity heat map issue as the module above -- "
+        "\"No capabilities yet\""
+    ),
+}
+
+# Four multi-step use cases keyed by file stem (not by URL -- a pending URL
+# rewrite from /use-cases/uc-* to a readable /use-cases/<slug> form had not
+# landed on main as of this capture, so a future rename is a rename, not a
+# recapture). Each entry: (slug, steps, persona_email, caption, alt_text) --
+# steps themselves only matter to the capture script. Empty for round 1 --
+# see USE_CASE_VIDEO_PENDING below; round 2 restores these once each
+# recording actually performs the use case it claims rather than touring
+# past it.
+USE_CASE_VIDEO_CAPTURES: list[tuple[str, list, str, str, str]] = []
+
+USE_CASE_VIDEO_PENDING: dict[str, str] = {
+    "uc-s3-01-import-your-model": "recording never selects or uploads a file",
+    "uc-s2-01-what-breaks": (
+        "recording ends on the Twin map's empty \"pick a system\" prompt"
+    ),
+    "uc-s3-07-review-board": "recording never submits or decides a change",
+    "uc-s3-05-business-case-for-the-cio": "recording never opens an actual business case",
+}
+
+# uc-s4-02-set-up-in-an-afternoon.md ("set it up from our spreadsheet in an
+# afternoon") is deliberately in neither USE_CASE_VIDEO_CAPTURES nor
+# USE_CASE_VIDEO_PENDING: its own content says plainly "What Entelim is
+# building ... Coming soon. Join the waiting list" (capture_status:
+# not_applicable_not_yet_built, state: briefed, not on_main). There is no
+# built screen behind that page to record, which is a different thing from
+# a capture being merely pending.
 
 FAMILY_DIR_MAP = {
     "vision": "vision",
@@ -195,6 +360,91 @@ def use_case_redirect_target(old_filename_slug: str) -> str | None:
     if public_slug == old_filename_slug:
         return None
     return public_url
+
+
+def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
+    """Screenshot metadata for a module or use-case page, if one exists.
+
+    Gated on capture_status: live -- a page flipped back to awaiting_capture
+    stops rendering its image with no code change, since this check runs
+    every request -- and on the file actually existing on disk, which is what
+    lets MODULE_CAPTURES/USE_CASE_SCREENSHOT_CAPTURES list a page before its
+    image has been captured without a broken <img> shipping in the meantime.
+    """
+    if page.front_matter.get("capture_status") != "live":
+        return None
+
+    if page.page_family == "module":
+        registry = MODULE_CAPTURES
+        static_dir = IMG_MODULES_DIR
+        url_prefix = "/static/img/modules"
+    elif page.page_family == "function-per-segment":
+        registry = USE_CASE_SCREENSHOT_CAPTURES
+        static_dir = IMG_USE_CASES_DIR
+        url_prefix = "/static/img/use-cases"
+    else:
+        return None
+
+    entry = next((e for e in registry if e[0] == page.slug), None)
+    if entry is None:
+        return None
+    _, _, _, caption, alt = entry
+
+    image_path = static_dir / f"{page.slug}.webp"
+    if not image_path.is_file():
+        return None
+
+    from PIL import Image
+
+    with Image.open(image_path) as im:
+        width, height = im.size
+
+    return {
+        "url": f"{url_prefix}/{page.slug}.webp",
+        "width": width,
+        "height": height,
+        "alt": alt,
+        "caption": caption,
+    }
+
+
+def get_page_recording(page: "PublicPage") -> dict[str, Any] | None:
+    """Recording metadata for a use-case page with a captured video, if any.
+
+    Independent of capture_status: these use cases get a recording precisely
+    because their answer is a sequence a single screenshot cannot show, and
+    most are (rightly) still marked awaiting_capture for the screenshot that
+    field was designed around. The three files existing together -- video,
+    poster, and the sidecar with the measured duration -- is this function's
+    own, separate signal; it does not read capture_status at all.
+    """
+    if page.page_family != "function-per-segment":
+        return None
+
+    entry = next((e for e in USE_CASE_VIDEO_CAPTURES if e[0] == page.slug), None)
+    if entry is None:
+        return None
+    _, _, _, caption, alt = entry
+
+    video_path = VIDEO_USE_CASES_DIR / f"{page.slug}.webm"
+    poster_path = VIDEO_USE_CASES_DIR / f"{page.slug}-poster.webp"
+    meta_path = VIDEO_USE_CASES_DIR / f"{page.slug}.json"
+    if not (video_path.is_file() and poster_path.is_file() and meta_path.is_file()):
+        return None
+
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+
+    return {
+        "video_url": f"/static/video/use-cases/{page.slug}.webm",
+        "poster_url": f"/static/video/use-cases/{page.slug}-poster.webp",
+        "width": meta["width"],
+        "height": meta["height"],
+        "duration_seconds": meta["duration_seconds"],
+        "captured_date": meta["captured_date"],
+        "caption": caption,
+        "alt": alt,
+        "name": f"{page.title} — recorded walkthrough",
+    }
 
 
 def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
@@ -442,7 +692,7 @@ def _hosted_plan_offers(site_url: str) -> list[dict[str, Any]]:
 
 
 def _jsonld_webpage(page: PublicPage, site_url: str) -> dict[str, Any]:
-    return {
+    ld: dict[str, Any] = {
         "@context": "https://schema.org",
         "@type": "WebPage",
         "name": page.title,
@@ -454,6 +704,29 @@ def _jsonld_webpage(page: PublicPage, site_url: str) -> dict[str, Any]:
             "operatingSystem": "Web",
             "offers": [_self_hosted_offer(), *_hosted_plan_offers(site_url)],
         },
+    }
+    recording = get_page_recording(page)
+    if recording is not None:
+        ld["video"] = _jsonld_video_object(recording, site_url)
+    return ld
+
+
+def _jsonld_video_object(recording: dict[str, Any], site_url: str) -> dict[str, Any]:
+    """VideoObject for a use-case page's recording, so search engines and AI
+    answers can cite the clip directly rather than just the page around it.
+
+    Required fields per the brief: name, description, thumbnailUrl,
+    uploadDate, duration, contentUrl.
+    """
+    duration_seconds = int(round(recording["duration_seconds"]))
+    return {
+        "@type": "VideoObject",
+        "name": recording["name"],
+        "description": recording["caption"],
+        "thumbnailUrl": f"{site_url}{recording['poster_url']}",
+        "uploadDate": f"{recording['captured_date']}T00:00:00Z",
+        "duration": f"PT{duration_seconds}S",
+        "contentUrl": f"{site_url}{recording['video_url']}",
     }
 
 
