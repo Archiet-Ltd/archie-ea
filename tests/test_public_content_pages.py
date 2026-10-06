@@ -11,6 +11,7 @@ Covers:
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 from pathlib import Path
 
@@ -31,6 +32,40 @@ FORBIDDEN_STRINGS = [
     "briefed",
     "in_review",
     "UC-S",
+]
+
+# Factual claims that were found false on one or more content pages and
+# corrected. Each entry is (banned phrase, why it is false) so a future
+# diff that reintroduces any of these phrases fails loudly instead of
+# shipping a disproven claim again.
+BANNED_CLAIMS = [
+    (
+        "straight through to your change-request system",
+        "ARBDecisionEvent's subject_type is DB-constrained to decision_brief/solution/"
+        "architecture_model/adr only -- no model links an ARB decision to a change request",
+    ),
+    (
+        "control-gap view",
+        "RiskEntityLink only links risks to application/solution/programme, never to a "
+        "compliance control; the real compliance mechanism maps applications to controls, "
+        "not risks",
+    ),
+    (
+        "current automatically",
+        "no content page module keeps any derived map, dependency graph, or model current "
+        "without an explicit action recorded by someone",
+    ),
+    (
+        "vendor and procurement detail",
+        "an application's own record shows the vendor name as plain text only -- no page "
+        "links from an application to vendor or procurement detail",
+    ),
+    (
+        "not published; free to self-host",
+        "Entelim's prices are published at /pricing (Startup $49/month, Team $29/editor/month) -- "
+        "self-hosting under AGPL is a separate, true fact, but it does not mean pricing is "
+        "unpublished",
+    ),
 ]
 
 # Front-matter keys that are metadata-only and must never appear as visible
@@ -190,8 +225,9 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     homepage = [(loc, rest) for loc, rest in entries if urlparse(loc).path == "/"]
     assert len(homepage) == 1
     assert "<priority>1.0</priority>" in homepage[0][1]
-    # Listing it does not displace any content page.
-    assert len(entries) == len(load_all_pages()) + 1
+    # Listing it does not displace any content page. +2 non-content URLs:
+    # the homepage and the /vs comparison hub (a view, not a load_all_pages() page).
+    assert len(entries) == len(load_all_pages()) + 2
 
 
 def _strings_in(value):
@@ -1149,6 +1185,185 @@ def test_xss_sanitization_cross_org(app):
                 assert f"{handler}=" not in html.lower(), (
                     f"{page.url}: contains {handler} handler"
                 )
+
+
+# ── robots.txt crawl-access guard ──────────────────────────────────────────
+#
+# app/static/robots.txt is an explicit allow-list: every ``Allow:`` line
+# names one path a crawler may fetch, and the file ends in a catch-all
+# ``Disallow: /`` that blocks anything not explicitly named. That shape makes
+# it easy to add a new public page or a new crawler-facing file (llms.txt,
+# llms-full.txt, sitemap.xml) without ever adding the matching ``Allow:``
+# line — the page renders fine for a signed-out visitor, and is simply
+# invisible to every crawler.
+#
+# This guard treats /sitemap.xml, /llms.txt and /llms-full.txt as the three
+# places a real crawler discovers the rest of the site, fetches each one for
+# real, collects every entelim.org URL any of them names (plus their own
+# three paths), and checks each one against the actual rules in robots.txt
+# using the same longest-match-wins algorithm real crawlers use. A URL that
+# is reachable from one of those three files but not allowed by robots.txt
+# fails this test by name.
+
+_ROBOTS_TXT_PATH = Path(__file__).resolve().parent.parent / "app" / "static" / "robots.txt"
+
+# The three files a crawler uses to discover the rest of the site. Each
+# one's own path must be allowed, and so must every entelim.org URL it names.
+_CRAWLER_FACING_ENDPOINTS = ["/sitemap.xml", "/llms.txt", "/llms-full.txt"]
+
+
+def _parse_robots_rules(text: str) -> list[tuple[str, str]]:
+    """Return the ordered ``(directive, pattern)`` rules for ``User-agent: *``.
+
+    Only the rule lines that apply to the wildcard user-agent group are
+    kept, in file order, which is all this robots.txt has.
+    """
+    rules: list[tuple[str, str]] = []
+    group_applies = False
+    for raw_line in text.splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line or ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip().lower()
+        value = value.strip()
+        if key == "user-agent":
+            group_applies = value == "*"
+            continue
+        if not group_applies:
+            continue
+        if key in ("allow", "disallow") and value:
+            rules.append((key, value))
+    return rules
+
+
+def _robots_pattern_matches(pattern: str, path: str) -> bool:
+    """A robots.txt pattern matches a path by prefix, except a trailing
+    ``$`` which anchors the match to the exact path (used here only by
+    ``/$``, the home page)."""
+    if pattern.endswith("$"):
+        return path == pattern[:-1]
+    return path.startswith(pattern)
+
+
+def _robots_allows(rules: list[tuple[str, str]], path: str) -> bool:
+    """Whether ``path`` is allowed under ``rules``.
+
+    The longest matching pattern wins, the de facto standard algorithm most
+    crawlers use, including Google's documented behaviour; a tie between an
+    Allow and a Disallow of the same length favours Allow; a path matched by
+    no rule at all is allowed by default (this file has no such paths, since
+    its own last rule is the catch-all ``Disallow: /``).
+    """
+    best_length = -1
+    best_directive = "allow"
+    for directive, pattern in rules:
+        if _robots_pattern_matches(pattern, path):
+            length = len(pattern)
+            if length > best_length or (length == best_length and directive == "allow"):
+                best_length = length
+                best_directive = directive
+    return best_directive == "allow"
+
+
+def _entelim_paths_in(text: str) -> set[str]:
+    """Every ``https://entelim.org/...`` URL referenced in a rendered
+    response, reduced to its path."""
+    paths = set()
+    for match in re.finditer(r"https://entelim\.org([^\s)\"'<>]*)", text):
+        paths.add(match.group(1) or "/")
+    return paths
+
+
+def _collect_must_allow_paths(client) -> set[str]:
+    """Every path a real crawler meets by fetching sitemap.xml, llms.txt and
+    llms-full.txt — plus the three paths themselves.
+
+    Each endpoint is fetched for real. If an endpoint isn't live yet, its
+    own path is still checked (robots.txt governs the URL whether or not the
+    route behind it has shipped), but there is no rendered body to pull
+    further URLs from.
+    """
+    paths: set[str] = set(_CRAWLER_FACING_ENDPOINTS)
+    for endpoint in _CRAWLER_FACING_ENDPOINTS:
+        response = client.get(endpoint)
+        if response.status_code == 200:
+            paths |= _entelim_paths_in(response.data.decode())
+    return paths
+
+
+def test_every_crawler_discoverable_url_is_allowed_by_robots_txt(app):
+    """No URL reachable from sitemap.xml, llms.txt or llms-full.txt, and none
+    of those three files' own paths, is blocked by robots.txt's catch-all
+    ``Disallow: /``."""
+    rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
+    with app.test_client() as client:
+        must_allow = _collect_must_allow_paths(client)
+
+    blocked = sorted(path for path in must_allow if not _robots_allows(rules, path))
+    assert not blocked, (
+        "robots.txt blocks these URLs that a crawler reaches from sitemap.xml, "
+        "llms.txt or llms-full.txt: " + ", ".join(blocked)
+    )
+
+
+def test_robots_root_dollar_matches_only_exact_root():
+    rules = [("allow", "/$"), ("disallow", "/")]
+    assert _robots_allows(rules, "/") is True
+    assert _robots_allows(rules, "/about") is False
+
+
+def test_robots_longest_match_wins_over_shorter_disallow():
+    rules = [("disallow", "/"), ("allow", "/modules/")]
+    assert _robots_allows(rules, "/modules/applications") is True
+    assert _robots_allows(rules, "/other") is False
+
+
+def test_robots_path_with_no_matching_rule_is_allowed_by_default():
+    rules = [("allow", "/vision")]
+    assert _robots_allows(rules, "/unrelated") is True
+
+
+def test_robots_parse_rules_ignores_other_user_agent_groups():
+    text = (
+        "User-agent: Googlebot-Image\n"
+        "Disallow: /private\n"
+        "\n"
+        "User-agent: *\n"
+        "Allow: /vision\n"
+        "Disallow: /\n"
+    )
+    rules = _parse_robots_rules(text)
+    assert ("disallow", "/private") not in rules
+    assert ("allow", "/vision") in rules
+
+
+# ── Regression guard: disproven factual claims must never reappear ────────
+
+
+def test_no_page_repeats_a_disproven_claim():
+    """No content page body contains a factual claim already found false
+    and corrected elsewhere.
+
+    Each phrase in BANNED_CLAIMS was once live on a content page and was
+    disproven against the data model (see the reason recorded next to each
+    phrase). This test collects every page/phrase match across the whole
+    corpus before failing, so a single run shows every offending page at
+    once rather than stopping at the first one.
+    """
+    pages = load_all_pages()
+    violations = []
+    for page in pages:
+        body_lower = page.body_html.lower()
+        for phrase, reason in BANNED_CLAIMS:
+            if phrase.lower() in body_lower:
+                violations.append(
+                    f"{page.url}: contains banned phrase '{phrase}' ({reason})"
+                )
+    assert not violations, (
+        "Disproven claim(s) reappeared on a content page:\n"
+        + "\n".join(violations)
+    )
 
 
 # ── cta: plans must match a feature that is actually live (PR #373 review) ─

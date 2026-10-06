@@ -671,6 +671,11 @@ _MY_WORK_LINKS = {
         # sidebar; Tech Radar is new. Both are now linked.
         _link("Data Architecture", "data_architecture.data_architecture_dashboard", "workflow"),
         _link("Tech Radar", "tech_radar.index", "radar"),
+        # Model history: as-of snapshot and changes between dates. Enterprise
+        # architect is the persona that owns the capability model and needs
+        # to audit its evolution.
+        _link("Model as of", "intelligence_ui.history_as_of_page", "clock"),
+        _link("Changes", "intelligence_ui.history_changes_page", "history"),
     ],
     ROLE_CTO: [
         # A CTO with no route to a roadmap from their own sidebar. Found

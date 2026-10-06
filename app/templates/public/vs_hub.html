@@ -1,0 +1,43 @@
+{# smoke-coverage-ok: covered by tests/test_public_content_pages.py (hub lists every vs page).
+   Template: public/vs_hub.html — Renders the /vs comparison hub: one list of links out to every
+   comparison page at its real URL (most are the dedicated archiet.ai address recorded in that
+   page's own front matter; any page without one stays on entelim.org directly).
+   Extends layouts/public_base.html, reuses components/public_navbar.html and
+   components/public_footer.html — same page data app/services/public_pages.py already provides
+   to every other public page; no second loader or renderer.
+#}
+{% extends 'layouts/public_base.html' %}
+{% block title %}Compare Entelim{% endblock %}
+
+{% block header %}
+{% include 'components/public_navbar.html' %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .public-page-content h1 { font-size: 2.25rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.2; }
+  .public-page-content p { margin-bottom: 1rem; line-height: 1.75; }
+  .public-page-content ul { margin-bottom: 1rem; padding-left: 1.5rem; }
+  .public-page-content li { margin-bottom: 0.5rem; line-height: 1.75; }
+  .public-page-content a { color: var(--color-primary, #3b82f6); text-decoration: underline; }
+  .public-page-content a:hover { color: var(--color-primary-hover, #2563eb); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16">
+  <article class="public-page-content prose max-w-none">
+    <h1>Entelim compared to other enterprise architecture tools</h1>
+    <p>
+      Factual, sourced comparisons against the enterprise architecture tools teams evaluate
+      alongside Entelim. Every claim on each page below carries its own source and read date.
+    </p>
+    <ul>
+      {% for entry in entries %}
+      <li><a href="{{ entry.real_url }}">Entelim vs {{ entry.competitor }}</a></li>
+      {% endfor %}
+    </ul>
+  </article>
+</div>
+{% include 'components/public_footer.html' %}
+{% endblock %}

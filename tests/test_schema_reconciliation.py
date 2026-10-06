@@ -711,9 +711,16 @@ def test_task9_regression_avoids_parameterized_multicommand_sql_blocks():
     assert _task9_parameterized_multicommand_execute_sites() == []
 
 
-def test_genuine_pre_feature_schema_backfills_roadmap_and_repairs_delivery_fks(
+def test_genuine_pre_feature_schema_adds_the_roadmap_tenant_column_and_repairs_delivery_fks(
     app, pre_feature_transformation_schema
 ):
+    """reconcile-schema adds the nullable organization_id column it finds
+    missing and reports that addition -- it does not write a row's tenant
+    value. That row-level backfill is ``flask backfill-layer-tenancy``'s job
+    alone (app/commands/backfill_layer_tenancy.py), per the single-write-path
+    consolidation: a schema run must never fail the deploy over a tenant row
+    it did not, itself, create.
+    """
     _schema_name, isolated_engine = pre_feature_transformation_schema
     with app.app_context():
         dry_added, dry_failed, _missing, _blocking = _reconcile(dry_run=True)
@@ -741,16 +748,15 @@ def test_genuine_pre_feature_schema_backfills_roadmap_and_repairs_delivery_fks(
 
         first_added, first_failed, _missing, _blocking = _reconcile(dry_run=False)
         assert first_failed == []
-        assert (
-            "backfill.strategic_roadmap_items.organization_id "
-            ":: before=1, updated=1, unresolved=0, conflicts=0"
-        ) in first_added
+        assert not any(
+            item.startswith("backfill.strategic_roadmap_items") for item in first_added
+        )
 
         with isolated_engine.connect() as connection:
             roadmap_org = connection.scalar(
                 text("SELECT organization_id FROM strategic_roadmap_items WHERE id = 100")
             )
-            assert roadmap_org == 1
+            assert roadmap_org is None
             benefit_fk = connection.execute(
                 text(
                     """
@@ -779,9 +785,15 @@ def test_genuine_pre_feature_schema_backfills_roadmap_and_repairs_delivery_fks(
         assert not any(item.startswith("backfill.strategic_roadmap_items") for item in second_added)
 
 
-def test_pre_feature_roadmap_without_tenant_provenance_is_reported_not_guessed(
+def test_pre_feature_roadmap_without_tenant_provenance_is_left_for_the_backfill_command(
     app, pre_feature_transformation_schema
 ):
+    """An unprovenanced roadmap row is not reconcile-schema's to resolve or
+    report on: it leaves the row exactly as it found it (nullable column,
+    NULL value) with no failure recorded, so ``flask backfill-layer-tenancy``
+    -- the one place allowed to write organization_id on an existing row --
+    is the only thing that assigns or defers it.
+    """
     _schema_name, isolated_engine = pre_feature_transformation_schema
     with app.app_context():
         _added, failed, _missing, _blocking = _reconcile(dry_run=False)
@@ -798,14 +810,8 @@ def test_pre_feature_roadmap_without_tenant_provenance_is_reported_not_guessed(
             )
 
         added, failed, _missing, _blocking = _reconcile(dry_run=False)
-        assert any(
-            item == (
-                "backfill.strategic_roadmap_items.organization_id "
-                ":: before=1, updated=0, unresolved=1, conflicts=0"
-            )
-            for item in added
-        )
-        assert any("1 unresolved row(s)" in item for item in failed)
+        assert not any(item.startswith("backfill.strategic_roadmap_items") for item in added)
+        assert failed == []
         with isolated_engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT organization_id FROM strategic_roadmap_items WHERE id = 101")
