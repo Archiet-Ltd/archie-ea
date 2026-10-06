@@ -43,6 +43,11 @@ _SECTION_BY_ENDPOINT_PREFIX = {
     # matched it -- without this entry it leaked to every role the same way
     # the admin zone itself did before this table existed.
     "agent_registry.": "administration",
+    # R1-B34 (TB-0135): same gap, different blueprint -- Formula Register
+    # lives under /admin/formula-register but its endpoints are
+    # "formula_register.*", not "admin.*", so it leaked to every role the
+    # same way agent_registry did above.
+    "formula_register.": "administration",
 }
 
 
