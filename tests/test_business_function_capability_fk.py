@@ -4,23 +4,30 @@ onto unified_capabilities.id.
 ensure_function() in
 app/modules/applications/services/application_capability_catalog.py builds
 every BusinessFunction it creates from a UnifiedCapability instance (via
-walk() -> get_or_create_capability()), never a BusinessCapability.
-unified_capabilities is this codebase's single source of truth for
-capability modeling; the old FK let that write succeed only when a
-UnifiedCapability.id happened to collide with a business_capability.id (the
-two tables have independent id sequences) and raised a ForeignKeyViolation
-the rest of the time.
+walk() -> get_or_create_capability()), never a BusinessCapability, and is
+the only code path that ever writes this column. unified_capabilities is
+this codebase's single source of truth for capability modeling; the old FK
+let that write succeed only when a UnifiedCapability.id happened to collide
+with a business_capability.id (the two tables have independent id
+sequences) and raised a ForeignKeyViolation the rest of the time.
 
-Three things are proved here:
+Five things are proved here:
   1. the declared FK metadata really targets unified_capabilities now;
   2. a UnifiedCapability.id -- the only shape ensure_function() ever writes
      -- is accepted;
   3. a capability_id that only exists in the legacy business_capability
      table is now correctly rejected, proving the constraint target really
      changed rather than the column merely accepting any integer;
-  4. the data migration itself resolves a pre-existing row's legacy id to
-     its projected unified_capabilities row via the established
-     (source_table, source_id) provenance lookup.
+  4. the migration does NOT rewrite a pre-existing row's capability_id --
+     it is already a unified_capabilities id (the only shape
+     ensure_function() ever wrote) and must come out of the migration
+     byte-for-byte identical, not remapped through the legacy provenance
+     lookup (an earlier version of this migration did exactly that, and it
+     was a data-corruption bug: see the migration's own docstring);
+  5. a row whose capability_id is NOT a valid unified_capabilities id (a
+     genuinely orphaned/legacy-only value) makes the migration fail loudly,
+     naming the row, rather than silently leaving it or guessing;
+  6. running the migration twice is a clean no-op.
 """
 from __future__ import annotations
 
@@ -134,7 +141,7 @@ def test_business_function_rejects_a_legacy_only_capability_id(db_session, make_
 
 
 # =========================================================================
-# Migration-level: the data walk in
+# Migration-level: the schema walk in
 # migrations/versions/20261005_business_function_capability_fk.py, exercised
 # against a real schema built up to, then through, that revision -- a
 # db.create_all()-based fixture cannot exercise this, since it always
@@ -224,14 +231,18 @@ def _revert_fk_to_business_capability(url):
         engine.dispose()
 
 
-def test_migration_resolves_legacy_capability_id_via_provenance(scratch_db):
-    """Seed a business_function row shaped like data that predates this
-    repoint (its capability_id a legacy business_capability.id, inserted
-    while the old FK was still in effect), run the migration, and assert
-    the row's capability_id now points at the unified_capabilities row
-    that was projected from that same legacy capability -- resolved via the
-    (source_table='business_capability', source_id) provenance lookup this
-    codebase already uses elsewhere for exactly this translation.
+def test_migration_keeps_a_real_ensure_function_row_unchanged(scratch_db):
+    """Seed a business_function row exactly the way ensure_function() always
+    has (capability_id set to a real UnifiedCapability's id -- never a
+    BusinessCapability's), run the migration, and assert capability_id comes
+    out byte-for-byte identical, not remapped to anything else.
+
+    This is the regression test for the corruption bug: an earlier version
+    of this migration ran every row's capability_id through the legacy
+    (source_table='business_capability', source_id) provenance lookup as if
+    it were an unresolved legacy id, which could silently rewrite an
+    already-correct unified_capabilities id to a different, unrelated one if
+    any unified_capabilities row happened to have a matching source_id.
     """
     proc = _run_flask(scratch_db, "schema-upgrade", "--to", PRE_REVISION)
     assert proc.returncode == 0, proc.stdout + proc.stderr
@@ -244,26 +255,32 @@ def test_migration_resolves_legacy_capability_id_via_provenance(scratch_db):
                 "INSERT INTO organizations (name, slug) "
                 "VALUES ('Fixture Org', :slug) RETURNING id"
             ), {"slug": f"fixture-org-{uuid.uuid4().hex[:8]}"}).scalar()
-            legacy_id = conn.execute(text(
-                "INSERT INTO business_capability (name, organization_id, level) "
-                "VALUES ('Legacy Cap', :org, 1) RETURNING id"
-            ), {"org": org_id}).scalar()
             unified_id = conn.execute(text(
                 "INSERT INTO unified_capabilities "
+                "(name, level, organization_id) "
+                "VALUES ('Real Cap', 1, :org) RETURNING id"
+            ), {"org": org_id}).scalar()
+            # A row that also happens to have a unified_capabilities row
+            # whose source_id matches this same numeric string -- the exact
+            # shape that tricked the old, corrupting migration into
+            # rewriting an already-correct value. This row proves the fix
+            # leaves it alone regardless.
+            decoy_unified_id = conn.execute(text(
+                "INSERT INTO unified_capabilities "
                 "(name, level, organization_id, source_table, source_id) "
-                "VALUES ('Projected Cap', 1, :org, 'business_capability', :source_id) "
+                "VALUES ('Decoy Projected Cap', 1, :org, 'business_capability', :source_id) "
                 "RETURNING id"
-            ), {"org": org_id, "source_id": str(legacy_id)}).scalar()
+            ), {"org": org_id, "source_id": str(unified_id)}).scalar()
             function_id = conn.execute(text(
                 "INSERT INTO business_function (name, capability_id, organization_id) "
-                "VALUES ('Legacy Function', :cap, :org) RETURNING id"
-            ), {"cap": legacy_id, "org": org_id}).scalar()
+                "VALUES ('Real Function', :cap, :org) RETURNING id"
+            ), {"cap": unified_id, "org": org_id}).scalar()
 
         proc = _run_flask(scratch_db, "schema-upgrade", "--to", REVISION)
         assert proc.returncode == 0, proc.stdout + proc.stderr
 
         with engine.connect() as conn:
-            resolved_capability_id = conn.execute(text(
+            capability_id_after = conn.execute(text(
                 "SELECT capability_id FROM business_function WHERE id = :id"
             ), {"id": function_id}).scalar()
             fk_target = conn.execute(text(
@@ -273,18 +290,19 @@ def test_migration_resolves_legacy_capability_id_via_provenance(scratch_db):
     finally:
         engine.dispose()
 
-    assert resolved_capability_id == unified_id, (
-        f"expected the legacy id {legacy_id} to resolve to unified_capabilities "
-        f"id {unified_id}, got {resolved_capability_id}"
+    assert capability_id_after == unified_id, (
+        f"expected capability_id to stay {unified_id} (unchanged), got "
+        f"{capability_id_after} -- the migration remapped an already-correct "
+        f"unified_capabilities id, likely via the decoy row {decoy_unified_id}"
     )
     assert fk_target == "unified_capabilities"
 
 
-def test_migration_fails_loudly_on_an_unresolvable_row(scratch_db):
-    """A business_function row whose capability_id has no corresponding
-    (source_table='business_capability', source_id) row in
-    unified_capabilities must fail this migration loudly, not silently drop
-    or null the row."""
+def test_migration_fails_loudly_on_a_row_with_no_valid_unified_capability(scratch_db):
+    """A business_function row whose capability_id is not a valid
+    unified_capabilities.id at all (a genuinely orphaned/legacy-only value)
+    must fail this migration loudly, not silently drop, null, or rewrite the
+    row."""
     proc = _run_flask(scratch_db, "schema-upgrade", "--to", PRE_REVISION)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     _revert_fk_to_business_capability(scratch_db)
@@ -300,7 +318,7 @@ def test_migration_fails_loudly_on_an_unresolvable_row(scratch_db):
                 "INSERT INTO business_capability (name, organization_id, level) "
                 "VALUES ('Orphan Legacy Cap', :org, 1) RETURNING id"
             ), {"org": org_id}).scalar()
-            # Deliberately no matching unified_capabilities row for this id.
+            # Deliberately no unified_capabilities row with this id at all.
             conn.execute(text(
                 "INSERT INTO business_function (name, capability_id, organization_id) "
                 "VALUES ('Orphan Function', :cap, :org)"
@@ -311,4 +329,74 @@ def test_migration_fails_loudly_on_an_unresolvable_row(scratch_db):
         engine.dispose()
 
     assert proc.returncode != 0
-    assert "could not be resolved" in (proc.stdout + proc.stderr)
+    assert "not a valid unified_capabilities.id" in (proc.stdout + proc.stderr)
+
+
+def test_migration_is_idempotent_on_a_second_run(scratch_db):
+    """A second invocation of this revision's upgrade() against a database
+    already in the post-upgrade state (FK already targeting
+    unified_capabilities) must be a clean no-op via the existing
+    current-FK-target check at the top of upgrade() -- not an error from
+    re-adding a constraint that already exists, and not a second,
+    unnecessary validation pass that could behave differently.
+
+    A plain second ``schema-upgrade --to <REVISION>`` would not actually
+    re-invoke this revision's upgrade() at all (Alembic sees the database is
+    already recorded at that revision and does nothing), so it would not
+    prove anything about the function's own idempotency check. This test
+    rewinds only the Alembic bookkeeping (the alembic_version row) back to
+    the prior revision -- the schema itself is left exactly as the first
+    upgrade left it -- so the second ``schema-upgrade`` call genuinely
+    re-runs this revision's upgrade() against an already-upgraded schema,
+    the scenario the current-FK-target check exists to handle (e.g. a
+    retried deploy that crashed after the DDL committed but before Alembic
+    recorded the new revision).
+    """
+    proc = _run_flask(scratch_db, "schema-upgrade", "--to", PRE_REVISION)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    _revert_fk_to_business_capability(scratch_db)
+
+    engine = create_engine(scratch_db)
+    try:
+        with engine.begin() as conn:
+            org_id = conn.execute(text(
+                "INSERT INTO organizations (name, slug) "
+                "VALUES ('Fixture Org', :slug) RETURNING id"
+            ), {"slug": f"fixture-org-{uuid.uuid4().hex[:8]}"}).scalar()
+            unified_id = conn.execute(text(
+                "INSERT INTO unified_capabilities "
+                "(name, level, organization_id) "
+                "VALUES ('Real Cap', 1, :org) RETURNING id"
+            ), {"org": org_id}).scalar()
+            function_id = conn.execute(text(
+                "INSERT INTO business_function (name, capability_id, organization_id) "
+                "VALUES ('Real Function', :cap, :org) RETURNING id"
+            ), {"cap": unified_id, "org": org_id}).scalar()
+
+        first = _run_flask(scratch_db, "schema-upgrade", "--to", REVISION)
+        assert first.returncode == 0, first.stdout + first.stderr
+
+        # Rewind only the bookkeeping, not the schema, so the second call
+        # genuinely re-enters this revision's upgrade() against a database
+        # already in the post-upgrade state.
+        with engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE alembic_version SET version_num = :pre"
+            ), {"pre": PRE_REVISION})
+
+        second = _run_flask(scratch_db, "schema-upgrade", "--to", REVISION)
+        assert second.returncode == 0, second.stdout + second.stderr
+
+        with engine.connect() as conn:
+            capability_id_after = conn.execute(text(
+                "SELECT capability_id FROM business_function WHERE id = :id"
+            ), {"id": function_id}).scalar()
+            fk_target = conn.execute(text(
+                "SELECT confrelid::regclass::text FROM pg_constraint "
+                "WHERE conname = 'business_function_capability_id_fkey'"
+            )).scalar()
+    finally:
+        engine.dispose()
+
+    assert capability_id_after == unified_id
+    assert fk_target == "unified_capabilities"

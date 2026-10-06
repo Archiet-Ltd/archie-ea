@@ -5,45 +5,45 @@ ensure_function() in
 app/modules/applications/services/application_capability_catalog.py builds
 every BusinessFunction it creates from a UnifiedCapability instance (via
 walk() -> get_or_create_capability() -> UnifiedCapability), never a
-BusinessCapability. The old FK target let that write succeed only when a
+BusinessCapability, and it is the ONLY code path that ever writes
+business_function.capability_id. unified_capabilities is this codebase's
+single source of truth for capability modeling; a BusinessFunction must
+point at a row there. The old FK target let that write succeed only when a
 UnifiedCapability.id happened to collide with a business_capability.id --
 the two tables have independent id sequences, so this was not a reliable
 coincidence, and the real shape of the bug was a ForeignKeyViolation the
-first time it did not. unified_capabilities is this codebase's single
-source of truth for capability modeling; a BusinessFunction must point at
-a row there.
+first time it did not.
 
-Existing rows (every one that predates this migration, which was written
-and tested on a database that never had a business_function row created
-through anything but the raw-SQL fixtures this migration's own test adds)
-have their capability_id resolved from the legacy business_capability.id
-space into the unified_capabilities.id space via the provenance lookup
-UnifiedCapability already carries for exactly this purpose:
-unified_capabilities rows migrated from business_capability are recorded
-with source_table='business_capability', source_id=str(<old id>), and
-there is a real unique index on unified_capabilities (source_table,
-source_id) (see app/commands/apply_unified_capability_provenance_migration.py,
-app/commands/project_capabilities.py:PROVENANCE_INDEX). This is the same
-lookup app/application_mgmt/routes.py and
-app/modules/intelligence/services/traceability_check_service.py already use
-to go from a legacy business_capability id to its projected
-unified_capabilities row.
+The important consequence: every existing business_function row's
+capability_id is ALREADY a unified_capabilities.id. It only ever passed the
+OLD FK by coincidence, because a Postgres FK check merely confirms the
+integer value exists as some row's primary key in the referenced table --
+it does not care which table conceptually "owns" that id space. There is
+therefore no legacy-id-to-unified-id translation to perform here, and an
+earlier version of this migration that attempted one via the
+(source_table='business_capability', source_id) provenance lookup was
+itself a data-corruption bug: it treated each row's already-correct
+unified_capabilities.id as if it were a legacy business_capability.id
+needing translation, and if any unified_capabilities row happened to have
+a source_id matching that same numeric string -- plausible, since legacy
+business_capability ids and unified_capabilities rows projected from
+business_capability can easily have overlapping-looking id values -- the
+UPDATE silently rewrote the row to point at a different, unrelated
+capability. Its "unresolved rows" safety check ran AFTER that UPDATE had
+already mutated the data, so it was validating the new, already-corrupted
+values rather than the ones it was meant to guard.
 
-No business_function row was found unresolvable by this lookup on the
-database this migration was developed and tested against (a fresh
-PostgreSQL instance carried through the full migration chain plus this
-project's own test fixtures) -- see the build report for the exact count.
-The column therefore stays NOT NULL, and an unresolved row found on any
-other database fails this migration loudly (a RuntimeError naming the
-offending ids) rather than silently leaving it pointed at a now-meaningless
-integer or guessing a capability for it, matching this file's own
-"don't guess, surface the gap" convention elsewhere
+This revision therefore does no UPDATE at all. It only validates that the
+assumption above actually holds -- every business_function.capability_id is
+already a valid unified_capabilities.id -- and repoints the FK. The
+validation exists because a different, as-yet-undiscovered write path could
+in principle have put a bad value in some row; it is not assumed away, it
+is checked, and the migration fails loudly (a RuntimeError naming the
+offending ids) rather than guessing or rewriting anything, matching this
+file's own "don't guess, surface the gap" convention elsewhere
 (app/models/business_capabilities.py's _project_capability_row,
 app/commands/backfill_decision_register_consolidation.py's decision_ledger
-orphan handling -- the latter is this migration's chosen precedent for what
-an unresolvable row escalates to if one is ever found: see that module's
-and PR #305's organization_id-nullable treatment of exactly this shape of
-problem).
+orphan handling).
 
 Revision ID: 20261005_bf_capability_fk
 Revises: 20261004_arb_review_source_cols
@@ -98,39 +98,26 @@ def upgrade():
         # already includes this repoint) or a second run of this revision.
         return
 
-    # (a) Drop the old FK so the data walk below is never blocked by it.
+    # (a) Drop the old FK so the validation query below is never blocked by
+    # it (and so the ADD CONSTRAINT in step (c) has a clean slate).
     if current_target is not None:
         bind.execute(text(
             f"ALTER TABLE business_function DROP CONSTRAINT {_FK_NAME}"
         ))
 
-    # (b) Resolve every row's legacy business_capability.id into its
-    # projected unified_capabilities.id via the (source_table, source_id)
-    # provenance lookup. The provenance unique index guarantees at most one
-    # match per legacy id, so this is a plain one-shot UPDATE ... FROM join,
-    # not a per-row Python loop.
-    bind.execute(text(
-        """
-        UPDATE business_function AS bf
-           SET capability_id = uc.id
-          FROM unified_capabilities AS uc
-         WHERE uc.source_table = 'business_capability'
-           AND uc.source_id = bf.capability_id::text
-        """
-    ))
-
-    # (c) Anything left that did not resolve. Never seen on the database
-    # this migration was developed against (see the build report for the
-    # count); fail loudly and name the rows rather than guess or silently
-    # drop them.
+    # (b) Validate the assumption this migration relies on: every existing
+    # capability_id is already a valid unified_capabilities.id (see the
+    # module docstring for why that is expected to always be true). No
+    # rewrite happens here -- only a check. Anything that fails this check
+    # fails the migration loudly, naming the offending rows, rather than
+    # guessing or silently leaving a dangling value in place.
     unresolved = bind.execute(text(
         """
         SELECT bf.id, bf.capability_id
           FROM business_function AS bf
          WHERE NOT EXISTS (
                SELECT 1 FROM unified_capabilities AS uc
-                WHERE uc.source_table = 'business_capability'
-                  AND uc.source_id = bf.capability_id::text
+                WHERE uc.id = bf.capability_id
          )
         """
     )).fetchall()
@@ -140,16 +127,15 @@ def upgrade():
             for row in unresolved
         )
         raise RuntimeError(
-            f"{len(unresolved)} business_function row(s) could not be resolved "
-            "from a legacy business_capability.id to a unified_capabilities.id "
-            f"via the source_table='business_capability' provenance lookup: {ids}. "
-            "Re-project the missing business_capability row(s) with `flask "
-            "--app manage project-capabilities --apply`, or correct these rows' "
+            f"{len(unresolved)} business_function row(s) have a capability_id "
+            f"that is not a valid unified_capabilities.id: {ids}. "
+            "Re-project the missing capability row(s) with `flask --app manage "
+            "project-capabilities --apply`, or correct these rows' "
             "capability_id by hand, then re-run this migration."
         )
 
-    # (d) Repoint the FK now that every row's value lives in the
-    # unified_capabilities id space.
+    # (c) Repoint the FK now that every row's value is confirmed to already
+    # live in the unified_capabilities id space.
     bind.execute(text(
         f"ALTER TABLE business_function ADD CONSTRAINT {_FK_NAME} "
         "FOREIGN KEY (capability_id) REFERENCES unified_capabilities(id)"
@@ -171,25 +157,25 @@ def downgrade():
             f"ALTER TABLE business_function DROP CONSTRAINT {_FK_NAME}"
         ))
 
-    # Best-effort only: map each unified_capabilities id back to the legacy
-    # business_capability.id it was itself projected from. A row now pointed
-    # at a UnifiedCapability that was never a projection of a
-    # business_capability row (the exact case this migration exists to make
-    # possible) has no legacy id to go back to and is left as-is; the
-    # ADD CONSTRAINT below will then fail with a ForeignKeyViolation naming
-    # that row, which is the correct, honest outcome for data this downgrade
-    # cannot reverse -- not a guess.
-    bind.execute(text(
-        """
-        UPDATE business_function AS bf
-           SET capability_id = uc.source_id::integer
-          FROM unified_capabilities AS uc
-         WHERE uc.id = bf.capability_id
-           AND uc.source_table = 'business_capability'
-           AND uc.source_id ~ '^[0-9]+$'
-        """
-    ))
-
+    # No data rewrite happened in upgrade() (see the module docstring), so
+    # there is nothing to reverse here: this just re-adds the old
+    # constraint. That re-add is NOT guaranteed to succeed, and that is the
+    # correct, honest outcome rather than a bug to paper over. upgrade()
+    # never changed any capability_id value, so every row that already
+    # existed before this revision's upgrade() ran still has the same
+    # business_capability.id-shaped value it always had, and this ADD
+    # CONSTRAINT will hold for it exactly as it did before. But any
+    # business_function row created AFTER upgrade() ran -- the normal,
+    # expected state once this fix is live -- legitimately carries a
+    # unified_capabilities.id that was never also a business_capability.id
+    # (that was always the correct value; the old FK merely forbade it by
+    # accident of overlapping id ranges). This downgrade has no way to
+    # invent a legacy id for such a row, because no legacy id for it has
+    # ever existed -- there is nothing to un-corrupt, since nothing was
+    # corrupted. The ADD CONSTRAINT below will then fail with a
+    # ForeignKeyViolation naming that row, which is the correct, honest
+    # outcome: this downgrade can only be relied on before any new-shaped
+    # row has been written.
     bind.execute(text(
         f"ALTER TABLE business_function ADD CONSTRAINT {_FK_NAME} "
         "FOREIGN KEY (capability_id) REFERENCES business_capability(id)"
