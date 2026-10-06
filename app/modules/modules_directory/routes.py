@@ -43,6 +43,15 @@ _SECTION_BY_ENDPOINT_PREFIX = {
     # matched it -- without this entry it leaked to every role the same way
     # the admin zone itself did before this table existed.
     "agent_registry.": "administration",
+    # R1-B34: lives under /admin/formula-register but is its own blueprint
+    # ("formula_register", not "admin") -- same leak class as agent_registry
+    # above, caught by tests/test_modules_directory.py::
+    # test_role_exclusive_sections_are_hidden_from_other_personas (an
+    # enterprise_architect could see /admin/formula-register/ in the
+    # directory). Its own section in EXCLUSIVE_SECTIONS (role_access.py)
+    # allows portfolio_manager, not just platform_admin, because that
+    # route's own POST is gated to portfolio_manager via @requires_role.
+    "formula_register.": "formula_register",
 }
 
 

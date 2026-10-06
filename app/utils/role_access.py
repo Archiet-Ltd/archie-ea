@@ -189,6 +189,14 @@ EXCLUSIVE_SECTIONS: Dict[str, List[str]] = {
     "administration": [ROLE_PLATFORM_ADMIN],
     "procurement": [ROLE_PROCUREMENT, ROLE_PORTFOLIO_MANAGER, ROLE_PLATFORM_ADMIN],
     "my_applications": [ROLE_APPLICATION_MANAGER, ROLE_PLATFORM_ADMIN],
+    # R1-B34: lives under /admin/formula-register but is its own blueprint
+    # ("formula_register", not "admin"), and its own POST route is gated to
+    # portfolio_manager (@requires_role), not platform_admin -- mapping it
+    # to "administration" would hide it from the one persona who actually
+    # uses it. Same leak class modules_directory/routes.py's own comment
+    # describes for agent_registry: without an entry here, this surface
+    # was shown to every role in the modules directory.
+    "formula_register": [ROLE_PORTFOLIO_MANAGER, ROLE_PLATFORM_ADMIN],
 }
 
 # Default role if user has no enterprise_role set

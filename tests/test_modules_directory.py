@@ -325,6 +325,30 @@ def test_platform_admin_still_sees_the_admin_zone(
     )
 
 
+def test_portfolio_manager_sees_formula_register_but_other_roles_do_not(
+    app, db_session, org, client, login_as
+):
+    """R1-B34 (TB-0135): formula_register is its own blueprint under
+    /admin/formula-register, exclusive to portfolio_manager (and
+    platform_admin) via its own EXCLUSIVE_SECTIONS entry -- not the
+    "administration" section, since platform_admin alone cannot submit a
+    new version (the POST route requires portfolio_manager)."""
+    pm = _make_user(db_session, org, enterprise_role="portfolio_manager")
+    login_as(client, pm)
+    hrefs = _rendered_hrefs(client)
+    assert any(h.startswith("/admin/formula-register/") for h in hrefs), (
+        "portfolio_manager lost the Formula Register entry"
+    )
+
+    db_session.remove()
+    other = _make_user(db_session, org, enterprise_role="enterprise_architect")
+    login_as(client, other)
+    hrefs = _rendered_hrefs(client)
+    assert not any(h.startswith("/admin/formula-register/") for h in hrefs), (
+        "formula_register leaked to a non-owner role"
+    )
+
+
 # --------------------------------------------------------------------------
 # _NOT_RENDERED: each entry is a recorded measurement, not an assumption.
 # --------------------------------------------------------------------------
