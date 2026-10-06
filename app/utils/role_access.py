@@ -432,7 +432,11 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # round, and the My-work zone carries only four links (plus Ask). Raising the
 # budget by one is the honest cost of adding a genuinely new, intentional link
 # that every persona needs.
-SIDEBAR_LINK_BUDGET = 32
+# R1-B56: Agent Registry (owner, charter, delegated limits per registered
+# agent) is a new, genuinely needed platform_admin-only screen, not a
+# duplicate of anything already in the Admin zone. No fold is available for
+# the same reason as above; taking the budget 32 -> 33.
+SIDEBAR_LINK_BUDGET = 33
 
 _ZONE_TITLES = {
     "home": "Home",
@@ -857,6 +861,8 @@ _MY_WORK_LINKS = {
         # roles is invisible to most real accounts. Rendered total for this
         # role goes 25 -> 26, still under SIDEBAR_LINK_BUDGET (27).
         _link("Architecture Journey", "architecture_journey.index", "compass"),
+        # R1-B56: agent owner/charter/lifecycle registry.
+        _link("Agent Registry", "agent_registry.index", "bot"),
     ],
     # Promoted from charter-only, 31 Aug 2026. The blueprint scores a Security
     # Viewpoint as one of its fifteen sections and nobody owned it; every link
