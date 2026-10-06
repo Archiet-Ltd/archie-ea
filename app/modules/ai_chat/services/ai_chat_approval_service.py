@@ -702,6 +702,24 @@ class AIChatApprovalService:
                 else:
                     return {"success": False, "error": f"Unknown entity type: {approval.entity_type}"}
 
+            elif approval.operation_type == "agent_charter_change":
+                # R1-B56: the proposed charter version was never created at
+                # request time -- only approving it creates the real
+                # AgentCharter row, so AgentCharter.current_for never sees
+                # an unreviewed change as current.
+                from app.modules.ai_chat.services.agent_registry_service import (
+                    execute_charter_change,
+                )
+                from app.models.agent_registration import AgentRegistration
+
+                registration = AgentRegistration.query.filter_by(
+                    id=approval.entity_id, organization_id=approval.organization_id,
+                ).first()
+                if registration is None:
+                    return {"success": False, "error": "Agent registration not found"}
+                charter = execute_charter_change(registration, payload)
+                result = {"success": True, "charter_id": charter.id, "version": charter.version}
+
             elif approval.operation_type == "tool_use":
                 # AgentRunner._queue_approval (agent_runner.py) writes exactly this
                 # operation_type for every queued agent tool call — both the

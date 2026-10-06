@@ -448,8 +448,13 @@ def test_platform_admin_zone_link_total_is_pinned():
     28 -> 29: "Approval Inbox" added to every persona's My work, platform_admin
     included. It is a genuinely new, intentional link — the one queue for every
     pending change proposal, shared by every persona with GENERAL permission.
+
+    29 -> 30 (R1-B56, 6 Oct 2026): "Agent Registry" added to platform_admin's
+    My work — the one registry recording each agent's owner, charter version
+    and delegated limits, closest existing persona to the brief's
+    "Organisation Administrator".
     """
-    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 29
+    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 30
 
 
 def test_platform_admin_collapsed_sidebar_icons_are_unambiguous():

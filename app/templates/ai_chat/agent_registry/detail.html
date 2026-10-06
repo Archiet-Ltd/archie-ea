@@ -1,0 +1,62 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}{{ reg.name }} — Agent Registry — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6 max-w-2xl space-y-6">
+  {{ page_shell(
+      title=reg.name,
+      subtitle=reg.purpose,
+      breadcrumb=[('Home', url_for('main.index')), ('Agent Registry', url_for('agent_registry.index')), (reg.name, None)]
+  ) }}
+
+  <div class="rounded-lg border border-border bg-card p-4" data-testid="agent-status-panel">
+    <p class="text-sm text-muted-foreground">Status</p>
+    <p class="text-lg font-semibold text-foreground" data-testid="agent-status">{{ reg.status }}</p>
+    {% if reg.missing_for_activation() %}
+    <p class="text-sm text-destructive mt-2" data-testid="activation-missing">Activation needs: {{ reg.missing_for_activation() | join(', ') }}</p>
+    {% endif %}
+    {% if reg.status != 'active' %}
+    <form method="post" action="{{ url_for('agent_registry.activate', registration_id=reg.id) }}" class="mt-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" data-testid="activate-button" class="inline-flex items-center rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Activate</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="rounded-lg border border-border bg-card p-4">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">Owner</h2>
+    <p class="text-sm text-foreground mb-2">{{ reg.owner.email if reg.owner else 'Not set' }}</p>
+    <form method="post" action="{{ url_for('agent_registry.set_owner', registration_id=reg.id) }}" class="flex gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="number" name="owner_user_id" placeholder="User id" required data-testid="owner-user-id-input" class="rounded-md border border-border bg-background px-3 py-2 text-sm flex-1">
+      <button type="submit" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Set owner</button>
+    </form>
+  </div>
+
+  <div class="rounded-lg border border-border bg-card p-4">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">Delegated limits</h2>
+    <p class="text-sm text-foreground mb-2">{{ reg.delegated_limits.max_writes_per_day if reg.delegated_limits else 'Not set' }} writes/day</p>
+    <form method="post" action="{{ url_for('agent_registry.set_limits', registration_id=reg.id) }}" class="flex gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="number" name="max_writes_per_day" placeholder="Max writes/day" required data-testid="max-writes-input" class="rounded-md border border-border bg-background px-3 py-2 text-sm flex-1">
+      <button type="submit" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Set limits</button>
+    </form>
+  </div>
+
+  <div class="rounded-lg border border-border bg-card p-4">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">Charter</h2>
+    <p class="text-sm text-foreground mb-3">{{ reg.charter_persona or 'Not set' }}{% if reg.charter_version %} (v{{ reg.charter_version.version }}){% endif %}</p>
+    <form method="post" action="{{ url_for('agent_registry.propose_charter', registration_id=reg.id) }}" class="space-y-2" data-testid="charter-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" name="persona" placeholder="Persona name" required data-testid="charter-persona-input" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      <textarea name="charter_text" placeholder="Charter text" rows="3" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"></textarea>
+      <input type="text" name="proposable_actions" placeholder="Proposable actions (comma-separated)" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      <input type="text" name="forbidden_actions" placeholder="Forbidden actions (comma-separated)" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      <button type="submit" data-testid="propose-charter-button" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Propose charter change</button>
+    </form>
+    <p class="text-xs text-muted-foreground mt-2">A proposed change is reviewed in the <a href="{{ url_for('unified_ai_chat.approval_inbox') if 'unified_ai_chat.approval_inbox' in flask.current_app.view_functions else '#' }}" class="underline">approval inbox</a> before it takes effect.</p>
+  </div>
+</div>
+{% endblock %}

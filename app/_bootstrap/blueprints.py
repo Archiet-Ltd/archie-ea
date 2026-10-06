@@ -270,6 +270,12 @@ def _register_optional_standalone(app):
             "data_governance_bp",
             None,
         ),
+        # R1-B56: agent owner/charter/lifecycle registry.
+        (
+            "app.modules.ai_chat.routes.agent_registry_routes",
+            "agent_registry_bp",
+            None,
+        ),
         # ARCH-123 (Data Lineage) is NOT a new blueprint: it extends the
         # existing app.modules.architecture.routes.data_architecture_routes
         # (blueprint "data_architecture", already registered elsewhere) with
