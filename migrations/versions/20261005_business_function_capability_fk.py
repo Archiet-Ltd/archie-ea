@@ -57,7 +57,7 @@ revision = "20261005_bf_capability_fk"
 # Updated 2026-10-06 to chain after 20261004_acr_escalated_at (PR387), which
 # merged to main's head after this revision was first written against
 # 20261004_arb_review_source_cols.
-down_revision = "20261006_formula_registers"
+down_revision = "20261006_agent_registration"
 branch_labels = None
 depends_on = None
 
