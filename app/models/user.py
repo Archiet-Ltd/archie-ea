@@ -39,6 +39,20 @@ ROLE_PLATFORM_ADMIN = "platform_admin"
 ROLE_SECURITY_ARCHITECT = "security_architect"
 ROLE_DATA_ARCHITECT = "data_architect"
 
+# R1-B36 (TB-0146): promoted from unassignable to assignable, 2026-10-04.
+# finance: licence/contract cost exposure had no owner who could act on it.
+# compliance: RegulatoryFramework/ComplianceControl is a security_architect-owned
+# surface today; this role is the one who actually works the control backlog.
+# risk: SolutionRisk/the risk register had readers with no accountable owner.
+# operations: service incidents and connector health had no persona of record.
+# non_technical_owner: a business-side application/capability owner who is not
+# an architect -- read-focused, named directly in the brief's objective line.
+ROLE_FINANCE = "finance"
+ROLE_COMPLIANCE = "compliance"
+ROLE_RISK = "risk"
+ROLE_OPERATIONS = "operations"
+ROLE_NON_TECHNICAL_OWNER = "non_technical_owner"
+
 VALID_ROLES = [
     ROLE_SOLUTION_ARCHITECT,
     ROLE_ENTERPRISE_ARCHITECT,
@@ -51,6 +65,11 @@ VALID_ROLES = [
     ROLE_PLATFORM_ADMIN,
     ROLE_SECURITY_ARCHITECT,
     ROLE_DATA_ARCHITECT,
+    ROLE_FINANCE,
+    ROLE_COMPLIANCE,
+    ROLE_RISK,
+    ROLE_OPERATIONS,
+    ROLE_NON_TECHNICAL_OWNER,
 ]
 
 # Role display names for UI
@@ -66,6 +85,11 @@ ROLE_DISPLAY_NAMES = {
     ROLE_PLATFORM_ADMIN: "Platform Admin",
     ROLE_SECURITY_ARCHITECT: "Security Architect",
     ROLE_DATA_ARCHITECT: "Data Architect",
+    ROLE_FINANCE: "Finance",
+    ROLE_COMPLIANCE: "Compliance",
+    ROLE_RISK: "Risk",
+    ROLE_OPERATIONS: "Operations",
+    ROLE_NON_TECHNICAL_OWNER: "Non-Technical Owner",
 }
 
 

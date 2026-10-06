@@ -85,6 +85,21 @@ PERSONA_ALIASES: Dict[str, str] = {
     # ADM) is enterprise_architect's remit verbatim, so it is aliased rather
     # than given a duplicate charter.
     "capability_architect": "enterprise_architect",
+    # R1-B36 (TB-0146), 2026-10-05: finance/compliance/risk/operations/
+    # non_technical_owner promoted from unassignable to assignable with no
+    # dedicated charter of their own in this PR -- aliased to the closest
+    # existing persona (matches ROLE_DEFAULT_PERSONAS below) rather than
+    # left to resolve to nothing; a real charter per role is follow-up work.
+    "finance": "procurement",
+    "compliance": "security_architect",
+    "risk": "enterprise_architect",
+    # NOT platform_admin: review fix (6 Oct 2026) -- _platform_admin_context's
+    # last_import() reads ImportHistory with no organisation filter, so an
+    # operations user aliased there would see another organisation's latest
+    # import filename. enterprise_architect's live context is
+    # organisation-scoped.
+    "operations": "enterprise_architect",
+    "non_technical_owner": "application_manager",
 }
 
 # The database-backed enterprise role selects the initial chat persona. Keep
@@ -110,6 +125,16 @@ ROLE_DEFAULT_PERSONAS: Dict[str, str] = {
     # generalist charter would concede the point.
     "security_architect": "security_architect",
     "data_architect": "data_architect",
+    # R1-B36 (TB-0146), 2026-10-04: promoted from unassignable to assignable.
+    # None of the five gets a dedicated charter in this PR -- mapped to the
+    # closest existing persona's voice and data, not a generic fallback, and
+    # a real charter per persona is named as follow-up work, not silently
+    # dropped.
+    "finance": "procurement",
+    "compliance": "security_architect",
+    "risk": "enterprise_architect",
+    "operations": "enterprise_architect",
+    "non_technical_owner": "application_manager",
 }
 
 DEFAULT_CHAT_PERSONA = "enterprise_architect"
