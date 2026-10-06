@@ -19,10 +19,17 @@ class CrossOrganisationCapabilityOwner(ValueError):
     """The chosen owner, or the capability itself, is not in this organisation."""
 
 
-def _get_tenant_capability(capability_id: int, organization_id: int) -> UnifiedCapability:
-    capability = UnifiedCapability.query.filter_by(
+def get_tenant_capability(capability_id: int, organization_id: int) -> Optional[UnifiedCapability]:
+    """The capability if it exists and belongs to this organisation, else
+    None -- a route uses this to 404 a nonexistent or cross-org id rather
+    than render a page for an entity that does not exist."""
+    return UnifiedCapability.query.filter_by(
         id=capability_id, organization_id=organization_id,
     ).first()
+
+
+def _get_tenant_capability(capability_id: int, organization_id: int) -> UnifiedCapability:
+    capability = get_tenant_capability(capability_id, organization_id)
     if capability is None:
         raise CrossOrganisationCapabilityOwner(
             "That capability does not belong to this organisation."

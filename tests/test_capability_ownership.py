@@ -178,6 +178,20 @@ def test_api_set_capability_owner_route_refuses_cross_org_capability(db_session,
     assert resp.status_code == 400, resp.get_data(as_text=True)
 
 
+def test_api_capability_owners_get_route_404s_a_nonexistent_capability(db_session, two_orgs, client, login_as):
+    """Adversarial-probe regression: GET on a capability id that does not
+    exist must 404, not render an empty-owners 200 as if the id were real."""
+    login_as(client, two_orgs["user_a"])
+    resp = client.get("/capability-map/api/capabilities/999999999/owners")
+    assert resp.status_code == 404, resp.get_data(as_text=True)
+
+
+def test_api_capability_owners_get_route_404s_a_cross_org_capability(db_session, two_orgs, client, login_as):
+    login_as(client, two_orgs["user_a"])
+    resp = client.get(f"/capability-map/api/capabilities/{two_orgs['cap_b'].id}/owners")
+    assert resp.status_code == 404, resp.get_data(as_text=True)
+
+
 def test_api_capability_owners_get_route(db_session, two_orgs, client, login_as):
     from app.services.capability_ownership_service import set_capability_owner
 

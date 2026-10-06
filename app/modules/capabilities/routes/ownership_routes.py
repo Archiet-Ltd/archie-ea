@@ -12,6 +12,7 @@ from app.models.application_owner import ApplicationOwner
 from app.models.user import ROLE_CTO, ROLE_PORTFOLIO_MANAGER
 from app.services.capability_ownership_service import (
     CrossOrganisationCapabilityOwner,
+    get_tenant_capability,
     list_capabilities_with_no_owner,
     remove_capability_owner,
     set_capability_owner,
@@ -41,6 +42,8 @@ def capabilities_no_owner():
 @login_required
 def api_capability_owners(capability_id):
     org_id = g.current_org_id
+    if get_tenant_capability(capability_id, org_id) is None:
+        return jsonify({"message": "Capability not found"}), 404
     rows = ApplicationOwner.get_display_rows_for_element("capability", capability_id, org_id)
     return jsonify({"owners": rows})
 
