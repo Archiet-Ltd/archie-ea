@@ -1575,7 +1575,21 @@ def _reconcile(dry_run=False):
     """
     from sqlalchemy import inspect, text
 
-    insp = inspect(db.engine)
+    # Reflect off db.session's own connection, not db.engine. db.engine.connect()
+    # opens a brand-new physical connection on every call; under the test
+    # suite's NullPool (tests/config.py TestingConfig), each of those is a
+    # fresh connect()+close() round trip, and this function reflects every
+    # mapped table twice (the blocking-NOT-NULL scan below, then the
+    # ADD COLUMN scan after it) — on the ~800-table model that is roughly
+    # 1,600 extra physical connections per call, which is what turned
+    # tests/test_schema_reconciliation.py from slow into a 90s-timeout hang
+    # rather than a passing (if slightly slow) run. Reusing the session's one
+    # already-open connection for every reflection call removes those extra
+    # connections entirely. It also closes the PR132 risk by construction:
+    # there is no second connection left that could block on a lock the
+    # session's own uncommitted DDL is holding.
+    conn = db.session.connection()
+    insp = inspect(conn)
     active_schema = db.session.scalar(text("SELECT current_schema()"))
     existing_tables = set(insp.get_table_names(schema=active_schema))
     dialect = db.engine.dialect
@@ -1598,6 +1612,16 @@ def _reconcile(dry_run=False):
     for table in db.metadata.tables.values():
         if table.name not in existing_tables:
             continue
+        # Re-fetch db.session's connection every outer iteration rather than
+        # reusing the Inspector built above: a successful ADD COLUMN further
+        # down this loop commits, and committing releases/invalidates the
+        # specific Connection object SQLAlchemy had checked out for it — an
+        # Inspector still bound to that stale Connection raises
+        # ResourceClosedError the next time it is used. db.session.connection()
+        # transparently starts a new one when the previous transaction ended,
+        # so this is always the live connection, never a stale one.
+        conn = db.session.connection()
+        insp = inspect(conn)
         live_cols = {c["name"] for c in insp.get_columns(table.name)}
         for col in table.columns:
             if col.name in live_cols:

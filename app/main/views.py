@@ -181,6 +181,39 @@ def waitlist_csv():
     )
 
 
+def _notify_sales_of_inquiry(inquiry, page):
+    """E-mail ``SALES_NOTIFY_EMAIL`` about one new sales enquiry.
+
+    Store-only when the setting is unset: logged once as a warning, never
+    raised, so a visitor's submission is never affected either way. Called
+    after the inquiry row is already committed.
+    """
+    recipient = current_app.config.get("SALES_NOTIFY_EMAIL")
+    if not recipient:
+        current_app.logger.warning(
+            "SALES_NOTIFY_EMAIL is not configured; product inquiry %s (offer=%s) was not emailed",
+            inquiry.id,
+            inquiry.offer,
+        )
+        return
+
+    from app.flask_email import deliver_email
+
+    delivered, error = deliver_email(
+        recipient=recipient,
+        subject="New enquiry: {}".format(inquiry.offer),
+        template="public/email/sales_inquiry",
+        inquiry=inquiry,
+        page_url=page.url,
+    )
+    if not delivered:
+        current_app.logger.error(
+            "sales enquiry notification for product inquiry %s failed: %s",
+            inquiry.id,
+            error,
+        )
+
+
 @main.route("/offers/inquire", methods=["POST"])
 @rate_limit(10, "1m", methods=("POST",))
 def product_inquiry_submit():
@@ -240,6 +273,7 @@ def product_inquiry_submit():
                 )
                 db.session.add(inquiry)
                 db.session.commit()
+                _notify_sales_of_inquiry(inquiry, page)
             thanks = True
 
     return render_template(

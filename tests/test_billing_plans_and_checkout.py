@@ -733,6 +733,16 @@ def test_pricing_page_has_a_buy_button_per_plan(app, client):
     assert 'data-testid="buy-enterprise"' in html
 
 
+def test_pricing_contact_sales_button_points_at_the_contact_page(app, client):
+    """'Contact sales' leads to /contact, which now carries the sales enquiry
+    form rather than the old pre-launch waiting list."""
+    import re
+
+    resp = client.get("/pricing")
+    html = resp.get_data(as_text=True)
+    assert re.search(r'<a href="/contact"[^>]*data-testid="buy-enterprise"', html)
+
+
 def test_signing_in_returns_the_visitor_to_the_plan_they_chose(app, db_session, client, login_as, no_billing):
     org, admin = _admin_org(db_session, "next")
     with app.app_context():

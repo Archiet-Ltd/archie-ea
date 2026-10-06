@@ -41,8 +41,19 @@ DENIED = "denied"
 # covers it, which matters because the chat sees the whole portfolio.
 POLICY = {
     "/procurement/contracts":  {"procurement", "portfolio_manager"},
-    "/procurement/licenses":   {"procurement", "portfolio_manager"},
+    # R1-B36 (TB-0146): finance added via requires_procurement_or_finance --
+    # licences/spend are a finance persona's own numbers. Deliberately NOT
+    # extended to contracts/renewals/compliance below, which stay
+    # requires_procurement-only.
+    "/procurement/licenses":   {"procurement", "portfolio_manager", "finance"},
+    "/procurement/spend":      {"procurement", "portfolio_manager", "finance"},
     "/procurement/compliance": {"procurement", "portfolio_manager"},
+    # application_mgmt.compliance_frameworks_dashboard is @login_required only
+    # (RegulatoryFramework/ComplianceControl, a different store from the
+    # procurement compliance page above) -- every persona can reach it.
+    "/dashboard/compliance":   set(ARCHETYPES),
+    # risk.risk_register is @login_required only.
+    "/risks/":                 set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},

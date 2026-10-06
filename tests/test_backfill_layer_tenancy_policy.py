@@ -37,12 +37,15 @@ def _make_inactive_org(db_session, label):
 
 
 def _make_default_org(db_session, label):
-    """One "default" organisation. slug is unique, so this may run once per
-    test (each test's db_session rolls the row back at teardown)."""
+    """One "default"-named organisation, with a unique slug -- the same
+    db_session-rolls-back-at-teardown reasoning as _make_inactive_org above,
+    but CI's real shard/concurrency conditions still need the suffix
+    actually used in the slug to avoid a genuine UniqueViolation on
+    ix_organizations_slug across concurrent runs."""
     from app.models.organization import Organization
 
     suffix = uuid.uuid4().hex[:10]
-    org = Organization(name=f"Test {label} {suffix}", slug="default")
+    org = Organization(name=f"Test {label} {suffix}", slug=f"default-{suffix}")
     db_session.add(org)
     db_session.flush()
     return org
