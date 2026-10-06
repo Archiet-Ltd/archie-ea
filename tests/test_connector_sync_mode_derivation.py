@@ -29,9 +29,23 @@ public_webhook_config(), for the same reason on webhook_config) now masks any
 key that looks like it names a secret -- recursively, including nested dicts
 and lists -- with the literal string "configured" before either column is
 serialised. See _is_sensitive_key's docstring in app/models/connector_config.py
-for the exact matching rule and its one documented exception (keys containing
-"auth" that end in a metadata suffix like "_name" or "_enabled", e.g.
-auth_header_name or basic_auth_enabled, are not treated as secrets).
+for the exact matching rule and its exceptions (keys containing "auth" that
+end in a metadata suffix like "_name" or "_enabled", e.g. auth_header_name or
+basic_auth_enabled, are not treated as secrets; neither is "auth" appearing
+merely as a substring of an unrelated word, e.g. "oauth", which is not itself
+a credential).
+
+Second security follow-up: a URL is itself often a credential -- a webhook
+URL's path is typically the secret (e.g. Slack/Teams incoming webhooks), and
+any URL can carry userinfo (user:pass@host) or a secret query parameter
+(?token=/?key=/?sig=...). A key naming a webhook (containing "webhook",
+anywhere, no exceptions) is now always fully masked rather than merely
+sanitized. Every other key ending in "_url" is sanitized via
+_sanitize_url -- real URL parsing (urllib.parse), not a regex guess --
+stripping userinfo, query string and fragment while keeping scheme/host/path.
+public_webhook_config() additionally treats every URL-shaped key inside
+webhook_config as fully sensitive (url_keys_fully_sensitive=True), since
+every URL there names a webhook endpoint, not just an incidental link.
 
 Follows tests/test_connector_config_tenant_scope.py's fixture pattern (the
 shared db_session / make_org / tenant_ctx / login_as fixtures from
@@ -286,9 +300,12 @@ class TestSensitiveKeyDetection:
             "credentials",
             "token",
             "token_type",
+            "token_endpoint",
             "authorization",
             "oauth_token",
             "auth_token",
+            "webhook_url",
+            "webhook_secret",
         ],
     )
     def test_sensitive_keys_are_detected(self, key):
@@ -304,22 +321,79 @@ class TestSensitiveKeyDetection:
             "auth_header_name",
             "basic_auth_enabled",
             "auth_method",
+            "auth_url",
+            "callback_url",
+            "sync_endpoint_url",
         ],
     )
-    def test_harmless_keys_naming_auth_metadata_are_not_masked(self, key):
+    def test_harmless_or_url_keys_are_not_fully_masked(self, key):
         """"auth" is broad enough to catch harmless field names describing
         an auth setting rather than holding one (the header's NAME, or
-        whether auth is enabled) -- these must pass through unmasked."""
+        whether auth is enabled); a key ending in "_url" that isn't
+        otherwise sensitive (including "auth_url" itself) is sanitized
+        rather than fully masked -- see TestSanitizeUrl and
+        TestPublicConfigMasking for that path. Neither case is "fully
+        sensitive" by this function."""
         from app.models.connector_config import _is_sensitive_key
 
         assert _is_sensitive_key(key) is False, key
 
+    def test_oauth_is_not_treated_as_an_auth_match(self):
+        """"auth" must start a word, not just appear inside one -- "oauth"
+        contains the substring "auth" but is an extremely common, entirely
+        harmless config section name. Masking it wholesale would hide an
+        entire nested dict of otherwise-fine settings, not just a label."""
+        from app.models.connector_config import _is_sensitive_key
+
+        assert _is_sensitive_key("oauth") is False
+        assert _is_sensitive_key("oauth_settings") is False
+        # "oauth_token" is still masked -- via the separate "token" term,
+        # not via "auth" -- so this isn't a blanket oauth exemption.
+        assert _is_sensitive_key("oauth_token") is True
+
+
+class TestSanitizeUrl:
+    """Unit coverage for _sanitize_url: strips userinfo/query/fragment via
+    real URL parsing, keeps scheme/host/path."""
+
+    def test_strips_userinfo_query_and_fragment(self):
+        from app.models.connector_config import _sanitize_url
+
+        assert (
+            _sanitize_url("https://user:pass@api.example.com/v1/sync?token=abc123#frag")
+            == "https://api.example.com/v1/sync"
+        )
+
+    def test_clean_url_is_unchanged(self):
+        from app.models.connector_config import _sanitize_url
+
+        assert (
+            _sanitize_url("https://prod.service-now.com")
+            == "https://prod.service-now.com"
+        )
+
+    def test_port_is_preserved(self):
+        from app.models.connector_config import _sanitize_url
+
+        assert (
+            _sanitize_url("https://user:pass@api.example.com:8443/path?key=secret")
+            == "https://api.example.com:8443/path"
+        )
+
+    def test_non_string_value_passes_through(self):
+        from app.models.connector_config import _sanitize_url
+
+        assert _sanitize_url(None) is None
+
 
 class TestPublicConfigMasking:
     def test_public_config_masks_top_level_and_nested_secrets(self, db_session, org):
-        """A config with a password, an API key, and a token nested inside
-        a dict inside the config: every secret value is replaced with
-        "configured", every harmless value passes through unchanged."""
+        """A config with a password, an API key, and a client secret nested
+        inside an "oauth" dict: every secret value is replaced with
+        "configured", every harmless value (including the nested dict's own
+        key, "oauth") passes through/recurses unchanged. "token_endpoint" is
+        also masked -- it contains "token", and this module masks that term
+        unconditionally (see its module-level docstring)."""
         cfg = _make_connector_config(
             db_session,
             org.id,
@@ -339,26 +413,72 @@ class TestPublicConfigMasking:
         assert public["instance_url"] == "https://prod.service-now.com"
         assert public["password"] == "configured"
         assert public["api_key"] == "configured"
+        # "oauth" itself must recurse, not be wholly masked (it is not an
+        # auth-word match -- see test_oauth_is_not_treated_as_an_auth_match).
+        assert isinstance(public["oauth"], dict)
         assert public["oauth"]["client_secret"] == "configured"
-        assert public["oauth"]["token_endpoint"] == (
-            "https://prod.service-now.com/oauth/token"
-        )
+        assert public["oauth"]["token_endpoint"] == "configured"
         # The real config column is untouched -- public_config() returns a copy.
         assert cfg.config["password"] == "hunter2-super-secret"
 
-    def test_public_webhook_config_masks_secrets_too(self, db_session, org):
+    def test_public_config_sanitizes_non_webhook_urls_instead_of_masking(
+        self, db_session, org
+    ):
+        """A key ending in "_url" that isn't otherwise sensitive still
+        shouldn't come back raw -- it's sanitized (userinfo/query/fragment
+        stripped), not fully masked, so the still-useful host/path survive."""
+        cfg = _make_connector_config(
+            db_session,
+            org.id,
+            config={
+                "instance_url": "https://prod.service-now.com",
+                "callback_url": "https://user:s3cr3tpass@api.example.com/callback",
+                "sync_endpoint_url": "https://api.example.com/sync?token=zzz999secrettoken",
+            },
+        )
+
+        public = cfg.public_config()
+
+        assert public["instance_url"] == "https://prod.service-now.com"
+        assert public["callback_url"] == "https://api.example.com/callback"
+        assert public["sync_endpoint_url"] == "https://api.example.com/sync"
+
+    def test_public_config_fully_masks_webhook_named_urls(self, db_session, org):
+        """A webhook URL is never safe to return even sanitized -- its path
+        is typically itself the credential (e.g. a Slack incoming-webhook
+        URL) -- so a key naming one is fully masked, not just stripped of
+        its query string."""
+        cfg = _make_connector_config(
+            db_session,
+            org.id,
+            config={
+                "webhook_url": (
+                    "https://hooks.slack.com/services/T000/B000/"
+                    "XXXXXXXXXXXXXXXXXXXXXXXX"
+                ),
+            },
+        )
+
+        public = cfg.public_config()
+
+        assert public["webhook_url"] == "configured"
+
+    def test_public_webhook_config_masks_secrets_and_url_fields(self, db_session, org):
+        """public_webhook_config() treats every URL-shaped key as fully
+        sensitive (not just sanitized), since every URL inside this column
+        is a webhook endpoint, not an incidental link."""
         cfg = _make_connector_config(
             db_session,
             org.id,
             webhook_config={
-                "url": "https://hooks.example.invalid/servicenow",
+                "url": "https://hooks.example.invalid/servicenow/T000/B000/XYZ",
                 "signing_secret": "whsec_real_secret_value",
             },
         )
 
         public = cfg.public_webhook_config()
 
-        assert public["url"] == "https://hooks.example.invalid/servicenow"
+        assert public["url"] == "configured"
         assert public["signing_secret"] == "configured"
 
     def test_public_config_empty_or_none_passes_through(self, db_session, org):
@@ -371,18 +491,27 @@ class TestApiGetConnectorNeverLeaksSecretValues:
         self, db_session, org, admin, client, login_as
     ):
         """The literal regression test for the credential-leak: a connector
-        whose config has a password, an API key, and a token nested inside
-        another dict. The route must still return 200, and -- critically --
-        none of the seeded secret VALUES may appear anywhere in the raw
-        response body. Checking the masked keys individually would not catch
-        a masking bug that touched the wrong key while leaving the real
-        secret value reachable under another key or in stringified form, so
-        this searches the full raw response text for each secret value.
+        whose config has a password, an API key, a token nested inside
+        another dict, a Slack-style webhook URL, a URL carrying userinfo,
+        and a URL carrying a ?token= query secret -- plus webhook_config's
+        own signing secret and endpoint URL. The route must still return
+        200, and -- critically -- none of the seeded secret VALUES may
+        appear anywhere in the raw response body. Checking the masked keys
+        individually would not catch a masking bug that touched the wrong
+        key while leaving the real secret value reachable under another key
+        or in stringified form, so this searches the full raw response text
+        for each secret value.
         """
         secret_password = "hunter2-super-secret-value-9f3a"
         secret_api_key = "sk-live-abcdef0123456789"
         secret_nested_token = "nested-oauth-token-xyz-77213"
         secret_webhook_signing = "whsec_do_not_leak_this_either"
+        secret_slack_webhook_url = (
+            "https://hooks.slack.com/services/T0000AAAA/B1111BBBB/"
+            "cccccccccccccccccccccccc"
+        )
+        secret_url_userinfo = "report-user:sup3r-s3cr3t-pw@"
+        secret_url_token_param = "token=qqq888zzz777querysecrettoken"
 
         cfg = _make_connector_config(
             db_session,
@@ -395,6 +524,9 @@ class TestApiGetConnectorNeverLeaksSecretValues:
                 "password": secret_password,
                 "api_key": secret_api_key,
                 "oauth": {"token": secret_nested_token},
+                "webhook_url": secret_slack_webhook_url,
+                "callback_url": f"https://{secret_url_userinfo}api.example.com/callback",
+                "sync_endpoint_url": f"https://api.example.com/sync?{secret_url_token_param}",
             },
             webhook_config={
                 "url": "https://hooks.example.invalid/servicenow",
@@ -414,20 +546,27 @@ class TestApiGetConnectorNeverLeaksSecretValues:
             secret_api_key,
             secret_nested_token,
             secret_webhook_signing,
+            secret_slack_webhook_url,
+            secret_url_userinfo,
+            secret_url_token_param,
         ):
             assert secret_value not in raw_body, (
                 f"secret value {secret_value!r} was found in the raw API "
                 "response body -- a credential leaked"
             )
 
-        # And the masked keys are genuinely present as "configured", not
-        # just absent (proving the fields render, masked, not dropped).
+        # And the masked/sanitized keys are genuinely present with their
+        # expected safe form, not just absent (proving the fields render,
+        # masked or sanitized, not silently dropped).
         body = resp.get_json()
         config = body["connector"]["config"]
         assert config["password"] == "configured"
         assert config["api_key"] == "configured"
         assert config["oauth"]["token"] == "configured"
         assert config["instance_url"] == "https://prod.service-now.com"
+        assert config["webhook_url"] == "configured"
+        assert config["callback_url"] == "https://api.example.com/callback"
+        assert config["sync_endpoint_url"] == "https://api.example.com/sync"
 
     def test_list_connectors_response_contains_no_secret_values(
         self, db_session, org, admin, client, login_as
