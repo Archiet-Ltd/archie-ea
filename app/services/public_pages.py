@@ -166,29 +166,29 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
 USE_CASE_SCREENSHOT_CAPTURES: list[tuple[str, str, str, str, str]] = []
 
 USE_CASE_SCREENSHOT_PENDING: dict[str, str] = {
-    "uc-s3-06-capability-maturity-heatmap": (
+    "capability-maturity-heatmap": (
         "same capability-maturity heat map issue as the module above -- "
         "\"No capabilities yet\""
     ),
 }
 
-# Four multi-step use cases keyed by file stem (not by URL -- a pending URL
-# rewrite from /use-cases/uc-* to a readable /use-cases/<slug> form had not
-# landed on main as of this capture, so a future rename is a rename, not a
-# recapture). Each entry: (slug, steps, persona_email, caption, alt_text) --
-# steps themselves only matter to the capture script. Empty for round 1 --
-# see USE_CASE_VIDEO_PENDING below; round 2 restores these once each
-# recording actually performs the use case it claims rather than touring
-# past it.
+# Four multi-step use cases keyed by the readable /use-cases/<slug> form --
+# the pending URL rewrite from /use-cases/uc-* to this readable form has
+# since landed, so these are keyed the same way USE_CASE_SCREENSHOT_PENDING
+# above is: a rename, not a recapture. Each entry: (slug, steps,
+# persona_email, caption, alt_text) -- steps themselves only matter to the
+# capture script. Empty for round 1 -- see USE_CASE_VIDEO_PENDING below;
+# round 2 restores these once each recording actually performs the use case
+# it claims rather than touring past it.
 USE_CASE_VIDEO_CAPTURES: list[tuple[str, list, str, str, str]] = []
 
 USE_CASE_VIDEO_PENDING: dict[str, str] = {
-    "uc-s3-01-import-your-model": "recording never selects or uploads a file",
-    "uc-s2-01-what-breaks": (
+    "import-archimate-model": "recording never selects or uploads a file",
+    "what-breaks-and-who-gets-called": (
         "recording ends on the Twin map's empty \"pick a system\" prompt"
     ),
-    "uc-s3-07-review-board": "recording never submits or decides a change",
-    "uc-s3-05-business-case-for-the-cio": "recording never opens an actual business case",
+    "architecture-review-board": "recording never submits or decides a change",
+    "business-case-for-the-cio": "recording never opens an actual business case",
 }
 
 # uc-s4-02-set-up-in-an-afternoon.md ("set it up from our spreadsheet in an
