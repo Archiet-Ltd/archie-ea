@@ -825,10 +825,11 @@ def test_non_comparison_no_canonical():
 
 def test_waiting_list_cta_renders_link(app):
     """Pages with cta=waiting_list show the waiting list link."""
-    # ai-chat moved to cta: plans (feature shipped), so use /contact instead,
-    # which still carries cta: waiting_list.
+    # ai-chat moved to cta: plans (feature shipped) and /contact moved to
+    # cta: inquiry (a sales enquiry form), so use a not-yet-built use-case
+    # page instead, which still carries cta: waiting_list.
     with app.test_client() as client:
-        rv = client.get("/contact")
+        rv = client.get("/use-cases/uc-s1-01-canvas-dependencies")
         html = rv.data.decode()
         assert "/#waitlist" in html
         assert "Join the waiting list" in html

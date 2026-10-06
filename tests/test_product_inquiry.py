@@ -14,6 +14,9 @@ What these tests check:
    redirect for anonymous, 200 with rows for a platform admin.
 6. Both CSV exports escape a cell that would otherwise open as a spreadsheet
    formula.
+7. A new inquiry e-mails SALES_NOTIFY_EMAIL once (mail mocked); when that
+   setting is unset the inquiry still stores, just without an e-mail; a
+   resubmitted duplicate does not send a second e-mail.
 """
 
 import uuid
@@ -394,3 +397,80 @@ class TestAdminProductInquiriesCsv:
         csv_text = resp.data.decode()
         assert "Jo Example" in csv_text
         assert "'Jo Example" not in csv_text
+
+
+@pytest.fixture
+def outbox(app):
+    from app.extensions import mail
+
+    with mail.record_messages() as messages:
+        yield messages
+
+
+@pytest.fixture
+def sales_notify_on(app, monkeypatch):
+    """SALES_NOTIFY_EMAIL set, and mail actually available (a sender configured)."""
+    monkeypatch.setitem(app.config, "SALES_NOTIFY_EMAIL", "founder@example.com")
+    monkeypatch.setitem(app.config, "MAIL_DEFAULT_SENDER", "no-reply@example.com")
+
+
+@pytest.fixture
+def sales_notify_off(app, monkeypatch):
+    """SALES_NOTIFY_EMAIL unset -- mail availability must not matter either way."""
+    monkeypatch.setitem(app.config, "SALES_NOTIFY_EMAIL", None)
+    monkeypatch.setitem(app.config, "MAIL_DEFAULT_SENDER", "no-reply@example.com")
+
+
+class TestSalesNotificationEmail:
+    def test_new_inquiry_emails_sales_notify_email_once(
+        self, client, db_session, sales_notify_on, outbox
+    ):
+        from app.models.product_inquiry import ProductInquiry
+
+        email = "notify-me@example.com"
+        resp = _submit(
+            client,
+            url=HEALTH_CHECK_URL,
+            offer="architecture_health_check",
+            email=email,
+            name="Jo Example",
+        )
+        assert resp.status_code == 200
+        assert ProductInquiry.query.filter_by(email=email).first() is not None
+
+        assert len(outbox) == 1
+        message = outbox[0]
+        assert message.recipients == ["founder@example.com"]
+        assert "architecture_health_check" in message.body
+        assert "Jo Example" in message.body
+        assert email in message.body
+        assert HEALTH_CHECK_URL in message.body
+
+    def test_unset_sales_notify_email_stores_without_sending(
+        self, client, db_session, sales_notify_off, outbox
+    ):
+        from app.models.product_inquiry import ProductInquiry
+
+        email = "no-notify@example.com"
+        resp = _submit(
+            client,
+            url=HEALTH_CHECK_URL,
+            offer="architecture_health_check",
+            email=email,
+        )
+        assert resp.status_code == 200
+        assert ProductInquiry.query.filter_by(email=email).first() is not None
+        assert len(outbox) == 0
+
+    def test_duplicate_submission_does_not_send_a_second_email(
+        self, client, db_session, sales_notify_on, outbox
+    ):
+        email = "dup-notify@example.com"
+        _submit(client, url=HEALTH_CHECK_URL, offer="architecture_health_check", email=email)
+        assert len(outbox) == 1
+
+        resp = _submit(
+            client, url=HEALTH_CHECK_URL, offer="architecture_health_check", email=email
+        )
+        assert resp.status_code == 200
+        assert len(outbox) == 1
