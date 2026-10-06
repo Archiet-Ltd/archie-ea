@@ -1,8 +1,12 @@
 {# smoke-coverage-ok: covered by tests/test_public_content_pages.py (32 tests, all page families, JSON-LD, sitemap, llms.txt)
+   and tests/test_module_screenshots.py (module/use-case screenshots and recordings)
    Template: public/page.html — Renders a single public content page.
    Extends layouts/public_base.html, reuses components/public_navbar.html and
    components/public_footer.html.
-   Receives a `page` object (PublicPage dataclass) and `jsonld` string.
+   Receives a `page` object (PublicPage dataclass), a `jsonld` string, and
+   optional `screenshot` / `recording` dicts (app/services/public_pages.py
+   get_page_screenshot()/get_page_recording()) -- absent (None) on every
+   route that doesn't pass them.
 #}
 {% extends 'layouts/public_base.html' %}
 {% block title %}{{ page.title }}{% endblock %}
@@ -47,6 +51,35 @@
   <article class="public-page-content prose max-w-none">
     {{ page.body_html }}
   </article>
+
+  {% if screenshot %}
+  {# A real captured screen of this module/use case -- see
+     app/services/public_pages.py:get_page_screenshot(). Only ever set for a
+     capture_status: live page whose captured file exists on disk. #}
+  <figure class="mt-10" data-testid="page-screenshot">
+    <img src="{{ screenshot.url }}" alt="{{ screenshot.alt }}"
+         width="{{ screenshot.width }}" height="{{ screenshot.height }}"
+         loading="lazy" decoding="async"
+         class="w-full rounded-lg border border-border shadow-sm">
+    <figcaption class="mt-2 text-sm text-muted-foreground">{{ screenshot.caption }}</figcaption>
+  </figure>
+  {% endif %}
+
+  {% if recording %}
+  {# A short recording of a multi-step answer -- see
+     app/services/public_pages.py:get_page_recording(). Never autoplays: no
+     autoplay attribute, preload="none" so nothing fetches until the visitor
+     presses play. #}
+  <figure class="mt-10" data-testid="page-recording">
+    <video controls muted playsinline preload="none"
+           poster="{{ recording.poster_url }}" aria-label="{{ recording.alt }}"
+           width="{{ recording.width }}" height="{{ recording.height }}"
+           class="w-full rounded-lg border border-border shadow-sm">
+      <source src="{{ recording.video_url }}" type="video/webm">
+    </video>
+    <figcaption class="mt-2 text-sm text-muted-foreground">{{ recording.caption }}</figcaption>
+  </figure>
+  {% endif %}
 
   {% if page.cta == 'plans' %}
   {# Buy buttons. Each opens the plan's checkout step on the billing page;
