@@ -71,9 +71,11 @@ def new_version(formula_key):
         name = (name or "").strip()
         raw_weight = (raw_weight or "").strip()
         if not name or not raw_weight:
-            # A blank weight means "unset for this version", not an error --
-            # the form always renders one row per known dimension, and a
-            # reviewer need not provide every one in a single submission.
+            # A blank weight is refused below (every known dimension is
+            # required) rather than silently dropped -- a version missing a
+            # dimension would otherwise go "active" while never actually
+            # being used to score anything (review finding C), which
+            # misleads the page's own "Active version" label.
             continue
         if known_dimensions and name not in known_dimensions:
             errors.append(f"'{name}' is not a known input for this formula (expected one of: {', '.join(sorted(known_dimensions))})")
@@ -87,6 +89,26 @@ def new_version(formula_key):
             errors.append(f"{name}: weight must be a finite number >= 0")
             continue
         inputs[name] = weight
+
+    if known_dimensions:
+        missing = known_dimensions - set(inputs)
+        if missing:
+            errors.append(
+                "Every input needs a weight before this version can be activated "
+                f"(missing: {', '.join(sorted(missing))})"
+            )
+        # Review finding B: the scorer applies these weights directly (no
+        # percentage normalisation like ScoringConfiguration's), so an
+        # unnormalised set -- 1/1/1/1, or percentages left at 30/30/20/20 --
+        # would silently saturate or crush every application's score the
+        # moment this version activates. Require the weights to actually
+        # sum to 1.0 rather than let a copy-pasted percentage convention
+        # through unchecked.
+        elif abs(sum(inputs.values()) - 1.0) > 1e-6:
+            errors.append(
+                f"Weights must sum to 1.0 (got {sum(inputs.values()):.4f}) -- "
+                "this formula is applied directly, not as a percentage."
+            )
 
     if not inputs:
         errors.append("At least one input/weight pair is required.")

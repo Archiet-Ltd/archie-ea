@@ -77,6 +77,40 @@ class TestScoreRecordsFormulaVersion:
 
             assert score.formula_version == 1
 
+    def test_evidence_trail_agrees_with_the_saved_score_when_a_formula_is_active(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        """Review finding A: get_evidence_trail must re-derive the same
+        overall score calculate_app_score saved, not quietly fall back to
+        ScoringConfiguration's weights while a formula is active."""
+        from app.models.application_portfolio import ApplicationComponent
+        from app.services.rationalization_scoring_service import RationalizationScoringService
+
+        org = make_org("formula-trail-agreement")
+        # Deliberately NOT ScoringConfiguration's own default split, so the
+        # two surfaces could only agree by both reading the formula.
+        FormulaRegister.activate_new_version(
+            org.id, "rationalization_overall",
+            inputs={"technical_health": 0.7, "business_value": 0.1, "cost_efficiency": 0.1, "vendor_risk": 0.1},
+        )
+        db_session.flush()
+
+        with tenant_ctx(org.id):
+            comp = ApplicationComponent(name=f"App {uuid.uuid4().hex[:6]}", organization_id=org.id)
+            db_session.add(comp)
+            db_session.flush()
+
+            score = RationalizationScoringService.calculate_app_score(comp.id, app=comp)
+            db_session.flush()
+            assert score.formula_version == 1
+
+            trail = RationalizationScoringService.get_evidence_trail(comp.id, app=comp)
+            # overall_health_score is stored as an Integer column (a
+            # pre-existing storage choice, not something this PR touches),
+            # so compare at that same precision rather than against the
+            # trail's unrounded float.
+            assert round(trail["overall_score"]) == score.overall_health_score
+
     def test_an_incomplete_registered_formula_is_never_used_or_recorded(
         self, app, db_session, make_org, tenant_ctx
     ):
@@ -159,8 +193,8 @@ class TestFormulaRegisterRoutes:
             "/admin/formula-register/rationalization_overall/new-version",
             data={
                 "csrf_token": token,
-                "input_name": ["technical_health", "business_value"],
-                "input_weight": ["0.5", "0.5"],
+                "input_name": ["technical_health", "business_value", "cost_efficiency", "vendor_risk"],
+                "input_weight": ["0.3", "0.3", "0.2", "0.2"],
             },
         )
         assert resp2.status_code == 302
@@ -170,7 +204,65 @@ class TestFormulaRegisterRoutes:
         active = FormulaRegister.active_for(org.id, "rationalization_overall")
         assert active is not None
         assert active.version == 1
-        assert active.inputs == {"technical_health": 0.5, "business_value": 0.5}
+        assert active.inputs == {
+            "technical_health": 0.3, "business_value": 0.3, "cost_efficiency": 0.2, "vendor_risk": 0.2,
+        }
+
+    def test_a_partial_submission_is_refused_not_silently_activated(
+        self, app, db_session, make_org, client, login_as
+    ):
+        """Review finding C: a version missing a dimension must never become
+        active -- it would show as "Active version" on the page while the
+        scorer silently ignores it and falls back to ScoringConfiguration."""
+        import re as _re
+
+        org, user = _org_with_user(db_session, make_org, "route-partial")
+        db_session.commit()
+        login_as(client, user)
+
+        resp = client.get("/admin/formula-register/")
+        token = _re.search(rb'name="csrf_token" value="([^"]+)"', resp.data).group(1).decode()
+
+        resp2 = client.post(
+            "/admin/formula-register/rationalization_overall/new-version",
+            data={
+                "csrf_token": token,
+                "input_name": ["technical_health"],
+                "input_weight": ["0.6"],
+            },
+        )
+        assert resp2.status_code == 302
+
+        from app.models.formula_register import FormulaRegister
+
+        assert FormulaRegister.active_for(org.id, "rationalization_overall") is None
+
+    def test_weights_must_sum_to_one(self, app, db_session, make_org, client, login_as):
+        """Review finding B: these weights are applied directly by the
+        scorer, not normalised as a percentage -- an unnormalised set must
+        be refused rather than silently distort every score."""
+        import re as _re
+
+        org, user = _org_with_user(db_session, make_org, "route-sum")
+        db_session.commit()
+        login_as(client, user)
+
+        resp = client.get("/admin/formula-register/")
+        token = _re.search(rb'name="csrf_token" value="([^"]+)"', resp.data).group(1).decode()
+
+        resp2 = client.post(
+            "/admin/formula-register/rationalization_overall/new-version",
+            data={
+                "csrf_token": token,
+                "input_name": ["technical_health", "business_value", "cost_efficiency", "vendor_risk"],
+                "input_weight": ["30", "30", "20", "20"],  # percentage convention, not normalised
+            },
+        )
+        assert resp2.status_code == 302
+
+        from app.models.formula_register import FormulaRegister
+
+        assert FormulaRegister.active_for(org.id, "rationalization_overall") is None
 
     def test_a_non_portfolio_manager_cannot_activate_a_new_version(
         self, app, db_session, make_org, client, login_as

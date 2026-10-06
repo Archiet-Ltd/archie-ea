@@ -3,11 +3,13 @@ score, and a second organisation never sees it.
 
 From the Formula Register (/admin/formula-register) the portfolio manager of
 a brand-new organisation sees "no version registered yet" for the
-rationalization score, activates a version with two weighted inputs, and
-after a reload sees that version named with its weights and in the version
-history. A second new organisation's portfolio manager still sees "no
-version registered yet" -- activating a formula in one organisation never
-leaks into another's.
+rationalization score, activates a version with every required weight
+(summing to 1.0, as the scorer requires -- a partial or unnormalised
+submission is refused, not silently activated), and after a reload sees
+that version named with its weights and in the version history. A second
+new organisation's portfolio manager still sees "no version registered
+yet" -- activating a formula in one organisation never leaks into
+another's.
 """
 
 import pytest
@@ -38,9 +40,14 @@ def test_portfolio_manager_activates_a_formula_version_and_it_stays_scoped(brows
     expect(page.get_by_test_id("formula-no-version")).to_be_visible(timeout=PAGE_TIMEOUT)
 
     # Input names are fixed to the formula's known dimensions (readonly);
-    # only the weight fields are editable.
+    # only the weight fields are editable. Every dimension needs a weight
+    # and they must sum to 1.0, or the server refuses to activate it.
     form = page.get_by_test_id("formula-new-version-form").first
-    form.get_by_test_id("formula-input-weight").first.fill("0.6")
+    weight_inputs = form.get_by_test_id("formula-input-weight")
+    weight_inputs.nth(0).fill("0.6")
+    weight_inputs.nth(1).fill("0.2")
+    weight_inputs.nth(2).fill("0.1")
+    weight_inputs.nth(3).fill("0.1")
     form.get_by_test_id("formula-activate-button").click()
     page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
 
