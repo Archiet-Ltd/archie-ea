@@ -27,6 +27,11 @@ jobs:
           - platform_admin
           - security_architect
           - data_architect
+          - finance
+          - compliance
+          - risk
+          - operations
+          - non_technical_owner
     services:
       postgres:
         image: postgres:16
