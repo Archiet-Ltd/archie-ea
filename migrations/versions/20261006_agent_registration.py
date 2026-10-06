@@ -3,14 +3,14 @@ AgentCharter reuse note says is missing -- owner, charter version and
 delegated limits per agent, with activation refused until all three exist.
 
 Revision ID: 20261006_agent_registration
-Revises: 20261006_formula_registers
+Revises: 20261006_initiative_capabilities
 Create Date: 2026-10-06
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261006_agent_registration"
-down_revision = "20261006_formula_registers"
+down_revision = "20261006_initiative_capabilities"
 branch_labels = None
 depends_on = None
 
