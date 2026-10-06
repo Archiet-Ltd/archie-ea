@@ -289,6 +289,8 @@ def test_cto_my_work_membership():
         "Tech Radar",
         # Ownership coverage by business unit — CTO accountability.
         "Ownership Coverage",
+        # R1-B03 PR 2: the one ownership record now also covers capabilities.
+        "Capabilities With No Owner",
         # R1-B85: supported-estate share, open exceptions, the store-
         # agreement disagreement finder.
         "CTO Scorecard",
@@ -352,6 +354,8 @@ def test_portfolio_manager_my_work_membership():
         "Duplicate Detection",
         # Ownership coverage by business unit — portfolio manager.
         "Ownership Coverage",
+        # R1-B03 PR 2: the one ownership record now also covers capabilities.
+        "Capabilities With No Owner",
     ]
 
 
