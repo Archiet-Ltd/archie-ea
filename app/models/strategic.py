@@ -14,6 +14,7 @@ from typing import Any, Dict
 
 from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import relationship
+from sqlalchemy import event
 
 from app import db
 from app.models.mixins import TenantMixin
@@ -39,6 +40,28 @@ strategic_initiative_goals = db.Table(
         primary_key=True,
     ),
     db.Column("contribution_level", db.String(20)),  # 'primary', 'supporting', 'indirect'
+    db.Column("created_at", db.DateTime, default=datetime.utcnow),
+)
+
+# R1-B38 PR 2: an initiative's capability assignment, mirroring the goals
+# table above -- same pattern, no capability-assignment table currently
+# reaches initiatives. Each link also gets a real "serving" ArchiMateRelationship
+# (initiative -> capability), written through ArchiMateRelationshipService, so
+# the strategy answer page reads this the same way it reads goal links -- not
+# a second, text-only record of the assignment.
+strategic_initiative_capabilities = db.Table(
+    "strategic_initiative_capabilities",
+    db.Column(
+        "strategic_initiative_id", db.Integer,
+        db.ForeignKey("strategic_initiatives.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    db.Column(
+        "capability_id", db.Integer,
+        db.ForeignKey("business_capability.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    db.Column("contribution_level", db.String(20)),
     db.Column("created_at", db.DateTime, default=datetime.utcnow),
 )
 
@@ -97,6 +120,14 @@ class StrategicInitiative(TenantMixin, db.Model):
     # the real, queryable linkage. Not written to by new code.
     strategic_alignment = Column(Text)  # JSON list: ["goal1", "goal2"]
 
+    # R1-B38 PR 2: this model's own docstring claims ArchiMate 3.2 Strategy
+    # Layer support, but no ArchiMateElement was ever created for it -- the
+    # initiative-to-capability link this brief adds needs a real "serving"
+    # relationship, which needs a real element on both ends. Added via
+    # reconcile-schema (ADD COLUMN, nullable), not a migration -- this table
+    # is marked migration-exempt above and evolves through that path.
+    archimate_element_id = Column(Integer, ForeignKey("archimate_elements.id"), nullable=True)
+
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -113,6 +144,10 @@ class StrategicInitiative(TenantMixin, db.Model):
     )
     roadmap_items = relationship("RoadmapItem", back_populates="initiative", lazy="dynamic")
     goals = relationship("Goal", secondary=strategic_initiative_goals, backref="strategic_initiatives")
+    capabilities = relationship(
+        "BusinessCapability", secondary=strategic_initiative_capabilities,
+        backref="strategic_initiatives",
+    )
     raid_items = relationship("RaidItem", back_populates="strategic_initiative")
 
     def __repr__(self):
@@ -787,6 +822,45 @@ class SolutionMigrationRoadmap(TenantMixin, db.Model):
             "plateau_count": self.plateau_count,
             "plateaus": self.plateaus or [],
         }
+
+
+@event.listens_for(StrategicInitiative, "after_insert")
+def create_strategic_initiative_archimate(mapper, connection, target):
+    """Auto-create the ArchiMateElement this model's own docstring claims
+    ("Supports ArchiMate 3.2 Strategy Layer concepts") but never actually
+    created. Course of Action is the ArchiMate 3.2 Strategy-layer element
+    for a planned initiative -- the same type R1-B38's initiative-to-
+    capability "serving" relationship needs on this end.
+
+    after_insert runs once the row is already INSERTed: setting
+    target.archimate_element_id here only changes the in-memory object,
+    never the row, unless a second statement writes it back explicitly --
+    exactly the bug this PR found pre-existing in R1-B81's identical
+    create_meaning_archimate listener (app/models/motivation.py), merged
+    and deployed, flagged separately. The explicit UPDATE below is the fix
+    this listener needs that one does not have.
+    """
+    from sqlalchemy import insert, update
+
+    from .archimate_core import ArchiMateElement
+
+    if not target.archimate_element_id:
+        result = connection.execute(
+            insert(ArchiMateElement.__table__).values(
+                name=target.name,
+                type="CourseOfAction",
+                layer="Strategy",
+                description=target.description or f"Strategic initiative: {target.name}",
+                organization_id=target.organization_id,
+            )
+        )
+        element_id = result.inserted_primary_key[0]
+        connection.execute(
+            update(StrategicInitiative.__table__)
+            .where(StrategicInitiative.__table__.c.id == target.id)
+            .values(archimate_element_id=element_id)
+        )
+        target.archimate_element_id = element_id
 
 
 # Convenience exports
