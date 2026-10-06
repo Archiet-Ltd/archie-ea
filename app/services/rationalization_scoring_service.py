@@ -790,6 +790,16 @@ class RationalizationScoringService:
             score.assessment_date = datetime.utcnow().date()
             score.scoring_model_version = scoring_config.configuration_version
 
+            # R1-B34 (TB-0135): record the FormulaRegister version this score
+            # was computed with, when one is registered for this organisation.
+            # None when nothing is registered yet -- the score itself still
+            # computes from ScoringConfiguration's weights either way; this
+            # column is provenance, not a gate on whether scoring runs.
+            from app.models.formula_register import FormulaRegister
+
+            active_formula = FormulaRegister.active_for(app.organization_id, "rationalization_overall")
+            score.formula_version = active_formula.version if active_formula else None
+
             # Record which policy was applied (nullable — None when no policy exists).
             score.policy_id = active_policy.id if active_policy else None
             score.policy_name = active_policy.name if active_policy else None
