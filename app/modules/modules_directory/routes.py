@@ -43,11 +43,19 @@ _SECTION_BY_ENDPOINT_PREFIX = {
     # matched it -- without this entry it leaked to every role the same way
     # the admin zone itself did before this table existed.
     "agent_registry.": "administration",
-    # R1-B34 (TB-0135): same gap, different blueprint -- Formula Register
-    # lives under /admin/formula-register but its endpoints are
+    # R1-B34 (TB-0135): same leak class, different blueprint -- Formula
+    # Register lives under /admin/formula-register but its endpoints are
     # "formula_register.*", not "admin.*", so it leaked to every role the
-    # same way agent_registry did above.
-    "formula_register.": "administration",
+    # same way agent_registry did above. NOT mapped to "administration":
+    # its own index() route is @login_required only (open to any signed-in
+    # org member) and its sidebar link lives in the portfolio_manager zone,
+    # not the admin one -- only its new_version() POST is role-gated, to
+    # portfolio_manager. Mapping it to "administration" would have hidden
+    # it from the persona who is actually meant to use it while only
+    # incidentally fixing the test. "portfolio_management" (role_access.py)
+    # grants portfolio_manager and platform_admin, matching that reality;
+    # the /admin/ URL prefix itself is misleading but out of scope here.
+    "formula_register.": "portfolio_management",
 }
 
 
