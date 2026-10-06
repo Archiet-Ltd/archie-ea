@@ -289,6 +289,9 @@ def test_cto_my_work_membership():
         "Tech Radar",
         # Ownership coverage by business unit — CTO accountability.
         "Ownership Coverage",
+        # R1-B85: supported-estate share, open exceptions, the store-
+        # agreement disagreement finder.
+        "CTO Scorecard",
     ]
 
 

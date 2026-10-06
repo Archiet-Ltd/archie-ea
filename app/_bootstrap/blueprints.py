@@ -270,6 +270,14 @@ def _register_optional_standalone(app):
             "data_governance_bp",
             None,
         ),
+        # R1-B85: supported-estate share, open exceptions and the
+        # store-agreement disagreement panel for the CTO (and the business
+        # architect, for the disagreement panel).
+        (
+            "app.modules.architecture.routes.cto_scorecard_routes",
+            "cto_scorecard_bp",
+            None,
+        ),
         # ARCH-123 (Data Lineage) is NOT a new blueprint: it extends the
         # existing app.modules.architecture.routes.data_architecture_routes
         # (blueprint "data_architecture", already registered elsewhere) with
