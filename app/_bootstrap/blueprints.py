@@ -271,6 +271,12 @@ def _register_optional_standalone(app):
             "data_governance_bp",
             None,
         ),
+        # R1-B56: agent owner/charter/lifecycle registry.
+        (
+            "app.modules.ai_chat.routes.agent_registry_routes",
+            "agent_registry_bp",
+            None,
+        ),
         # R1-B85: supported-estate share, open exceptions and the
         # store-agreement disagreement panel for the CTO (and the business
         # architect, for the disagreement panel).

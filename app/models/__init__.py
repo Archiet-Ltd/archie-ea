@@ -227,6 +227,12 @@ else:
     from .dashboard_edit import *  # noqa
     from .data_governance import *  # noqa - DataCatalog, DataQualityMetrics, DataGovernanceWorkflow, DataAccessControl, DataRetentionPolicy
     from .data_issue import *  # noqa - DataIssue (R1-B81)
+    # agent_charter (R1-B22) was never imported here, so AgentRegistration's
+    # relationship to it only resolved when something else happened to
+    # import agent_charter.py first -- fixed by registering it properly,
+    # before the model that references it.
+    from .agent_charter import *  # noqa - AgentCharter (R1-B22)
+    from .agent_registration import *  # noqa - AgentRegistration (R1-B56)
 
     # Derivation Audit Models - APQC to ArchiMate derivation tracking (Phase 6.1)
 
