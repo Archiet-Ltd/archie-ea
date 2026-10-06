@@ -166,3 +166,62 @@ class TestCharterChangeReview:
         })
         assert v2.version == 2
         assert AgentCharter.current_for("ops_bot", org.id).id == v2.id
+
+
+class TestOwnerSecurityAndLimitValidation:
+    """Security fix (6 Oct 2026 review): set_owner previously stored any
+    owner_user_id with no organisation check, and the detail page then
+    rendered that user's email -- enumerable across tenants."""
+
+    def test_set_owner_refuses_a_user_from_another_organisation(
+        self, app, db_session, make_org
+    ):
+        from app.modules.ai_chat.services.agent_registry_service import CrossOrganisationOwner
+
+        org_a = make_org("agent-owner-fence-a")
+        org_b = make_org("agent-owner-fence-b")
+        reg = create_registration(organization_id=org_a.id, name="A's Agent")
+        user_b = _user(db_session, org_b)
+
+        with pytest.raises(CrossOrganisationOwner):
+            set_owner(reg, user_b.id)
+
+        assert reg.owner_user_id is None
+
+    def test_set_owner_accepts_a_user_from_the_same_organisation(
+        self, app, db_session, make_org
+    ):
+        org = make_org("agent-owner-same-org")
+        reg = create_registration(organization_id=org.id, name="Agent")
+        owner = _user(db_session, org)
+
+        set_owner(reg, owner.id)
+
+        assert reg.owner_user_id == owner.id
+
+    def test_set_delegated_limits_refuses_zero(self, db_session, make_org):
+        from app.modules.ai_chat.services.agent_registry_service import InvalidDelegatedLimit
+
+        org = make_org("agent-limit-zero")
+        reg = create_registration(organization_id=org.id, name="Agent")
+
+        with pytest.raises(InvalidDelegatedLimit):
+            set_delegated_limits(reg, {"max_writes_per_day": 0})
+        assert reg.delegated_limits is None
+
+    def test_set_delegated_limits_refuses_negative(self, db_session, make_org):
+        from app.modules.ai_chat.services.agent_registry_service import InvalidDelegatedLimit
+
+        org = make_org("agent-limit-negative")
+        reg = create_registration(organization_id=org.id, name="Agent")
+
+        with pytest.raises(InvalidDelegatedLimit):
+            set_delegated_limits(reg, {"max_writes_per_day": -5})
+
+    def test_set_delegated_limits_accepts_a_positive_integer(self, db_session, make_org):
+        org = make_org("agent-limit-ok")
+        reg = create_registration(organization_id=org.id, name="Agent")
+
+        set_delegated_limits(reg, {"max_writes_per_day": 10})
+
+        assert reg.delegated_limits == {"max_writes_per_day": 10}

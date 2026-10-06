@@ -37,6 +37,21 @@ class CharterChangeRefused(ValueError):
     """A proposed charter version would weaken a non-removable rule."""
 
 
+class CrossOrganisationOwner(ValueError):
+    """The chosen owner does not belong to the registration's organisation.
+
+    Security fix (6 Oct 2026 review): set_owner previously stored any
+    owner_user_id from the form with no organisation check, and the detail
+    page then rendered that user's email -- any administrator could type
+    another organisation's user id and read their email, and enumerate ids
+    to read every user's email across tenants.
+    """
+
+
+class InvalidDelegatedLimit(ValueError):
+    """A delegated limit value is not a usable positive integer."""
+
+
 def create_registration(
     *, organization_id: int, name: str, purpose: str = ""
 ) -> AgentRegistration:
@@ -49,11 +64,29 @@ def create_registration(
 
 
 def set_owner(registration: AgentRegistration, owner_user_id: int) -> None:
+    """Refuses (CrossOrganisationOwner) rather than store an owner from
+    another organisation -- see that exception's docstring."""
+    from app.models.user import User
+
+    owner = User.query.filter_by(
+        id=owner_user_id, organization_id=registration.organization_id,
+    ).first()
+    if owner is None:
+        raise CrossOrganisationOwner(
+            "That user does not belong to this organisation."
+        )
     registration.owner_user_id = owner_user_id
     db.session.commit()
 
 
 def set_delegated_limits(registration: AgentRegistration, limits: Dict[str, Any]) -> None:
+    """Refuses (InvalidDelegatedLimit) a non-positive max_writes_per_day --
+    0 or negative is not a usable write budget, and silently accepting one
+    would read as "activation is fine" while actually permitting nothing or
+    something nonsensical."""
+    max_writes = limits.get("max_writes_per_day")
+    if max_writes is not None and (not isinstance(max_writes, int) or max_writes <= 0):
+        raise InvalidDelegatedLimit("max_writes_per_day must be a positive integer.")
     registration.delegated_limits = limits
     db.session.commit()
 

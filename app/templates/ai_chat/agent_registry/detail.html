@@ -25,13 +25,47 @@
     {% endif %}
   </div>
 
-  <div class="rounded-lg border border-border bg-card p-4">
+  <div class="rounded-lg border border-border bg-card p-4"
+       x-data="{
+         term: '', results: [], selected: null, searching: false,
+         async runSearch() {
+           const q = this.term.trim();
+           if (!q) { this.results = []; return; }
+           this.searching = true;
+           try {
+             const data = await Platform.fetch.get('{{ url_for('organization.stakeholder_search') }}', { q: q });
+             this.results = (data.results || []).filter(r => r.type === 'user');
+           } catch (e) {
+             this.results = [];
+           } finally {
+             this.searching = false;
+           }
+         },
+         choose(r) { this.selected = r; this.term = r.name; this.results = []; }
+       }">
     <h2 class="text-sm font-semibold text-muted-foreground mb-2">Owner</h2>
     <p class="text-sm text-foreground mb-2">{{ reg.owner.email if reg.owner else 'Not set' }}</p>
-    <form method="post" action="{{ url_for('agent_registry.set_owner', registration_id=reg.id) }}" class="flex gap-2">
+    <form method="post" action="{{ url_for('agent_registry.set_owner', registration_id=reg.id) }}" class="space-y-2" data-testid="owner-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="number" name="owner_user_id" placeholder="User id" required data-testid="owner-user-id-input" class="rounded-md border border-border bg-background px-3 py-2 text-sm flex-1">
-      <button type="submit" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Set owner</button>
+      <input type="hidden" name="owner_user_id" :value="selected ? selected.id : ''">
+      <div class="relative">
+        <input type="text" x-model="term" @input.debounce.300ms="runSearch()"
+               placeholder="Search this organisation's people by name or email..."
+               data-testid="owner-search-input"
+               class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+        <div class="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-card divide-y divide-border"
+             x-show="results.length > 0" x-cloak>
+          <template x-for="r in results" :key="r.id">
+            <button type="button" @click="choose(r)" data-testid="owner-search-result"
+                    class="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent transition-colors">
+              <span x-text="r.name"></span>
+              <span class="text-xs text-muted-foreground" x-text="r.sublabel"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+      <button type="submit" :disabled="!selected" data-testid="set-owner-button"
+              class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50">Set owner</button>
     </form>
   </div>
 
@@ -40,7 +74,7 @@
     <p class="text-sm text-foreground mb-2">{{ reg.delegated_limits.max_writes_per_day if reg.delegated_limits else 'Not set' }} writes/day</p>
     <form method="post" action="{{ url_for('agent_registry.set_limits', registration_id=reg.id) }}" class="flex gap-2">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="number" name="max_writes_per_day" placeholder="Max writes/day" required data-testid="max-writes-input" class="rounded-md border border-border bg-background px-3 py-2 text-sm flex-1">
+      <input type="number" name="max_writes_per_day" placeholder="Max writes/day" required min="1" data-testid="max-writes-input" class="rounded-md border border-border bg-background px-3 py-2 text-sm flex-1">
       <button type="submit" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Set limits</button>
     </form>
   </div>

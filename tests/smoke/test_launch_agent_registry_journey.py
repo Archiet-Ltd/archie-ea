@@ -36,9 +36,13 @@ def test_platform_admin_registers_and_activates_an_agent(browser, live_server):
     page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id("activation-missing")).to_be_visible(timeout=PAGE_TIMEOUT)
 
-    owner_id = org["user_ids"]["platform_admin"]
-    page.fill("[data-testid=owner-user-id-input]", str(owner_id))
-    page.get_by_role("button", name="Set owner").click()
+    # Security fix (6 Oct 2026): owner is chosen from a search of this
+    # organisation's own users (Platform.fetch.get against
+    # organization.stakeholder_search), not typed as a raw user id.
+    page.fill("[data-testid=owner-search-input]", "Launch")
+    expect(page.get_by_test_id("owner-search-result").first).to_be_visible(timeout=PAGE_TIMEOUT)
+    page.get_by_test_id("owner-search-result").first.click()
+    page.get_by_test_id("set-owner-button").click()
     page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
 
     page.fill("[data-testid=max-writes-input]", "10")

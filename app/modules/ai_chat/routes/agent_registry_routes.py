@@ -6,7 +6,11 @@ from flask import Blueprint, flash, g, redirect, render_template, request, url_f
 from flask_login import current_user, login_required
 
 from app.modules.ai_chat.services import agent_registry_service as svc
-from app.modules.ai_chat.services.agent_registry_service import CharterChangeRefused
+from app.modules.ai_chat.services.agent_registry_service import (
+    CharterChangeRefused,
+    CrossOrganisationOwner,
+    InvalidDelegatedLimit,
+)
 from app.utils.role_access import can_access_section
 
 agent_registry_bp = Blueprint("agent_registry", __name__, url_prefix="/admin/agent-registry")
@@ -73,8 +77,11 @@ def set_owner(registration_id):
         return render_template("errors/404.html"), 404
     owner_user_id = request.form.get("owner_user_id", type=int)
     if owner_user_id:
-        svc.set_owner(reg, owner_user_id)
-        flash("Owner set.", "success")
+        try:
+            svc.set_owner(reg, owner_user_id)
+            flash("Owner set.", "success")
+        except CrossOrganisationOwner as exc:
+            flash(str(exc), "error")
     return redirect(url_for("agent_registry.detail", registration_id=registration_id))
 
 
@@ -88,9 +95,12 @@ def set_limits(registration_id):
     if reg is None:
         return render_template("errors/404.html"), 404
     max_writes = request.form.get("max_writes_per_day", type=int)
-    if max_writes:
-        svc.set_delegated_limits(reg, {"max_writes_per_day": max_writes})
-        flash("Delegated limits set.", "success")
+    if max_writes is not None:
+        try:
+            svc.set_delegated_limits(reg, {"max_writes_per_day": max_writes})
+            flash("Delegated limits set.", "success")
+        except InvalidDelegatedLimit as exc:
+            flash(str(exc), "error")
     return redirect(url_for("agent_registry.detail", registration_id=registration_id))
 
 
