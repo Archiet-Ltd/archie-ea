@@ -6854,7 +6854,7 @@ Instructions:
                 """ + _org_clause), {"vid": vid, **_org_params}).scalar() or 0
 
                 # Capability coverage
-                # tenant-filtered: scoped via parent FK (vendor_product_capabilities)
+                # tenancy-ok: scoped via vendor_organization_id in the WHERE clause
                 cap_count = db.session.execute(text(  # tenant-filtered: scoped via parent FK (vendor_product_capabilities)
                     """
                     SELECT COUNT(DISTINCT vpc.business_capability_id)

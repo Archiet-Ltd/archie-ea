@@ -132,6 +132,27 @@ def test_contact_page_has_no_invented_email(app):
         assert "https://archiet.com" in html
 
 
+def test_contact_page_has_no_waiting_list_or_launch_framing(app):
+    """/contact answers sales questions directly; no waiting-list or
+    pre-launch framing (the product is live and priced)."""
+    with app.test_client() as client:
+        html = client.get("/contact").data.decode()
+        assert "waiting list" not in html.lower()
+        assert "when Entelim launches" not in html
+        assert "/#waitlist" not in html
+
+
+def test_contact_page_has_sales_enquiry_form(app):
+    """/contact offers the same enquiry form as the paid offer pages, and
+    keeps the AGPL/security-report routing and the sign-in link."""
+    with app.test_client() as client:
+        html = client.get("/contact").data.decode()
+        assert 'data-testid="offer-inquiry-form"' in html
+        assert "AGPL" in html
+        assert "security issue" in html
+        assert "/account/login" in html
+
+
 def test_load_page_site_family_known_and_unknown_slug():
     """load_page('site', slug) resolves every listed page and returns None for the unknown."""
     for slug in SITE_PAGES:

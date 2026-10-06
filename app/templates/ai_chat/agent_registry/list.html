@@ -1,0 +1,43 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+
+{% block title %}Agent Registry — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6">
+  {{ page_shell(
+      title='Agent Registry',
+      subtitle='Every AI agent: owner, charter version and lifecycle state.',
+      breadcrumb=[('Home', url_for('main.index')), ('Agent Registry', None)]
+  ) }}
+  <div class="mb-4">
+    <a href="{{ url_for('agent_registry.new') }}" class="inline-flex items-center rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors">Register agent</a>
+  </div>
+  {% if registrations %}
+  <table class="w-full rounded-lg border border-border bg-card text-sm" data-testid="agent-registry-table">
+    <thead>
+      <tr class="border-b border-border text-left text-muted-foreground">
+        <th class="p-3">Name</th>
+        <th class="p-3">Status</th>
+        <th class="p-3">Owner</th>
+        <th class="p-3">Charter</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for reg in registrations %}
+      <tr class="border-b border-border" data-testid="agent-row-{{ reg.id }}">
+        <td class="p-3 font-medium text-foreground">
+          <a href="{{ url_for('agent_registry.detail', registration_id=reg.id) }}" class="hover:underline">{{ reg.name }}</a>
+        </td>
+        <td class="p-3" data-testid="agent-status-{{ reg.id }}">{{ reg.status }}</td>
+        <td class="p-3">{{ reg.owner.email if reg.owner else '—' }}</td>
+        <td class="p-3">{{ reg.charter_persona or '—' }}{% if reg.charter_version %} (v{{ reg.charter_version.version }}){% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {{ empty_state(icon='bot', headline='No agents registered', body='Register an agent to give it an owner and a charter.', cta_label='Register agent', cta_href=url_for('agent_registry.new')) }}
+  {% endif %}
+</div>
+{% endblock %}

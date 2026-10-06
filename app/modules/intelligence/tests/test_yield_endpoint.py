@@ -510,16 +510,17 @@ def test_recompute_and_yield_agree_on_explicit_derived_ratio(app, db_session, ma
 # --- Acceptance criterion 13: NFR-8 / Release 1 completeness ----------------
 
 
-def test_exactly_thirteen_intelligence_routes_registered(app):
+def test_exactly_sixteen_intelligence_routes_registered(app):
     rules = [
         rule for rule in app.url_map.iter_rules()
         if str(rule).startswith("/api/v1/intelligence")
     ]
-    assert len(rules) == 13, (
-        f"expected exactly 13 /api/v1/intelligence/* rules (recompute POST, "
+    assert len(rules) == 16, (
+        f"expected exactly 16 /api/v1/intelligence/* rules (recompute POST, "
         f"derived GET, impact GET, risk GET, portfolio GET, programme GET, "
         f"strategy GET, accountability GET, data GET, compliance GET, "
-        f"traceability GET, value-streams-at-risk GET, yield GET) -- "
+        f"traceability GET, value-streams-at-risk GET, yield GET, "
+        f"catalogue GET, catalogue/<entry_id> GET, ask POST) -- "
         f"found {len(rules)}: {[str(r) for r in rules]}"
     )
 

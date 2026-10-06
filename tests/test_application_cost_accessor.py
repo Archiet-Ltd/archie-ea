@@ -20,6 +20,8 @@ from app.services.application_cost_accessor import (
     PERIOD_VALUES,
     get_annual_cost,
     get_annual_cost_float,
+    get_annual_cost_with_source,
+    has_recorded_cost,
     set_annual_cost,
     parse_cost_cell,
     map_import_cost_columns,
@@ -995,3 +997,117 @@ class TestConsolidationRouteCostGuard:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+class TestLegacyCostTransitionHelpers:
+    """R1-B08 PR 2: has_recorded_cost / get_annual_cost_with_source, the
+    transitional helpers rationalization_scoring_service.py now reads
+    through instead of inlining a legacy-column fallback at each site."""
+
+    def test_has_recorded_cost_false_when_nothing_set(self, app, db_session, make_org, tenant_ctx):
+        org = make_org("cost-legacy-1")
+        with tenant_ctx(org.id):
+            app_comp = ApplicationComponent(name="Test App", organization_id=org.id)
+            db_session.add(app_comp)
+            db_session.commit()
+
+            assert has_recorded_cost(app_comp) is False
+            assert get_annual_cost_with_source(app_comp) == (None, None)
+
+    def test_has_recorded_cost_true_from_canonical_column(self, app, db_session, make_org, tenant_ctx):
+        org = make_org("cost-legacy-2")
+        with tenant_ctx(org.id):
+            app_comp = ApplicationComponent(name="Test App", organization_id=org.id)
+            db_session.add(app_comp)
+            db_session.commit()
+            set_annual_cost(app_comp, Decimal("50000"))
+            db_session.commit()
+
+            assert has_recorded_cost(app_comp) is True
+            value, source = get_annual_cost_with_source(app_comp)
+            assert value == 50000.0
+            assert source == "ApplicationComponent.total_cost_of_ownership"
+
+    def test_has_recorded_cost_true_from_legacy_columns_alone(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        """A row never re-imported since PR 1 -- only the pre-existing
+        per-category columns are populated, not total_cost_of_ownership.
+        Must still read as having cost data, not as a gap."""
+        org = make_org("cost-legacy-3")
+        with tenant_ctx(org.id):
+            app_comp = ApplicationComponent(
+                name="Test App", organization_id=org.id,
+                license_cost=1000.0, maintenance_cost=500.0, infrastructure_cost=250.0,
+            )
+            db_session.add(app_comp)
+            db_session.commit()
+
+            assert has_recorded_cost(app_comp) is True
+            value, source = get_annual_cost_with_source(app_comp)
+            assert value == 1750.0
+            assert "license_cost" in source
+
+    def test_canonical_column_takes_priority_over_legacy_columns(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        org = make_org("cost-legacy-4")
+        with tenant_ctx(org.id):
+            app_comp = ApplicationComponent(
+                name="Test App", organization_id=org.id, license_cost=999.0,
+            )
+            db_session.add(app_comp)
+            db_session.commit()
+            set_annual_cost(app_comp, Decimal("40000"))
+            db_session.commit()
+
+            value, source = get_annual_cost_with_source(app_comp)
+            assert value == 40000.0
+            assert source == "ApplicationComponent.total_cost_of_ownership"
+
+    def test_zero_or_negative_legacy_values_do_not_count_as_recorded(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        org = make_org("cost-legacy-5")
+        with tenant_ctx(org.id):
+            app_comp = ApplicationComponent(
+                name="Test App", organization_id=org.id,
+                license_cost=0.0, maintenance_cost=0.0, infrastructure_cost=0.0,
+            )
+            db_session.add(app_comp)
+            db_session.commit()
+
+            assert has_recorded_cost(app_comp) is False
+
+
+class TestRationalizationScoringReadsThroughAccessor:
+    """R1-B08 PR 2: evaluate_readiness's "cost" data-quality dimension now
+    reads through has_recorded_cost, not an inlined four-field OR-check --
+    a legacy-only row (never re-imported since PR 1) must still count."""
+
+    def test_cost_dimension_true_for_legacy_only_app(self, app, db_session, make_org, tenant_ctx):
+        from app.services.rationalization_scoring_service import RationalizationScoringService
+
+        org = make_org("cost-legacy-scoring")
+        with tenant_ctx(org.id):
+            app_comp = ApplicationComponent(
+                name="Test App", organization_id=org.id, maintenance_cost=200.0,
+            )
+            db_session.add(app_comp)
+            db_session.commit()
+
+            readiness = RationalizationScoringService.evaluate_readiness(app_comp)
+            assert readiness["dimensions"]["cost"] is True
+
+    def test_cost_dimension_false_for_app_with_no_cost_at_all(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        from app.services.rationalization_scoring_service import RationalizationScoringService
+
+        org = make_org("cost-legacy-scoring-2")
+        with tenant_ctx(org.id):
+            app_comp = ApplicationComponent(name="Test App", organization_id=org.id)
+            db_session.add(app_comp)
+            db_session.commit()
+
+            readiness = RationalizationScoringService.evaluate_readiness(app_comp)
+            assert readiness["dimensions"]["cost"] is False

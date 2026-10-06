@@ -95,6 +95,7 @@ PLATFORM_JOBS: frozenset[str] = frozenset({
     "capability_projection",   # all-tenant lock-guarded pass
     "abacus_incremental_sync", # ExternalSystem has no organisation predicate
     "approval_escalation",     # groups overdue rows by their own organization_id internally
+    "event_log_partition_maintenance",  # partitions are shared across all orgs
 })
 
 TENANT_JOBS: frozenset[str] = frozenset({
