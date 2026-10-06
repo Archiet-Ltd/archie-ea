@@ -29,6 +29,75 @@ logger = logging.getLogger(__name__)
 # stored value predates this fix and is plaintext, not a Fernet token.
 _FERNET_PREFIX = b"gAAAAA"
 
+# ConnectorConfig.config and .webhook_config are plain JSON columns that can
+# hold real secrets alongside harmless settings (their own column comments:
+# "API endpoints, credentials, etc." and "Webhook endpoints and secrets") --
+# there is no separate encrypted-credentials column on this model. Returning
+# either raw from an API response leaks whatever secret was stored in it,
+# even to an admin of the connector's own organisation. public_config() /
+# public_webhook_config() below mask any key that looks like it holds a
+# secret before either column is ever serialised.
+#
+# Matched by case-insensitive substring, which is deliberately broad (an
+# unrecognised key shaped like a secret is safer masked than leaked). The
+# one documented exception is "auth": it's broad enough to also match
+# clearly-harmless metadata fields such as "auth_header_name" (the NAME of
+# a header, not a credential) or "basic_auth_enabled" (a boolean flag), so a
+# key containing "auth" is only treated as sensitive when it does not end in
+# one of _AUTH_METADATA_SUFFIXES. Every other term here (password, secret,
+# token, api_key/apikey, client_secret, private_key, credential) has no such
+# exception -- e.g. "token_type" still gets masked even though it is usually
+# just a label like "Bearer", because the cost of over-masking a label is
+# cosmetic while the cost of under-masking a real secret is not.
+_SENSITIVE_KEY_TERMS = (
+    "password",
+    "secret",
+    "token",
+    "api_key",
+    "apikey",
+    "client_secret",
+    "private_key",
+    "auth",
+    "credential",
+)
+_AUTH_METADATA_SUFFIXES = ("_name", "_type", "_method", "_id", "_url", "_enabled")
+_MASKED_VALUE = "configured"
+
+
+def _is_sensitive_key(key: str) -> bool:
+    """True if *key* looks like it names a secret rather than a setting."""
+    if not isinstance(key, str):
+        return False
+    lowered = key.lower()
+    for term in _SENSITIVE_KEY_TERMS:
+        if term not in lowered:
+            continue
+        if term == "auth" and lowered.endswith(_AUTH_METADATA_SUFFIXES):
+            continue
+        return True
+    return False
+
+
+def _mask_sensitive(value):
+    """Recursively mask sensitive-looking dict keys in a JSON-like value.
+
+    Any dict key for which :func:`_is_sensitive_key` is true has its value
+    replaced outright with the literal string "configured", regardless of
+    that value's own shape -- a nested dict or list under a sensitive key is
+    not partially revealed. Non-sensitive keys are walked recursively (into
+    nested dicts, and into lists, so a secret nested one or more levels deep
+    -- e.g. a list of per-environment credential blocks -- is still caught).
+    The input is never mutated; a new structure is returned.
+    """
+    if isinstance(value, dict):
+        return {
+            k: _MASKED_VALUE if _is_sensitive_key(k) else _mask_sensitive(v)
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_mask_sensitive(item) for item in value]
+    return value
+
 
 def _decrypt_or_legacy_plaintext(encrypted: str) -> str | None:
     """Decrypt a stored credential, tolerating a pre-fix plaintext value.
@@ -156,6 +225,33 @@ class ConnectorConfig(TenantMixin, db.Model):
         if has_webhook:
             return "event"
         return "manual"
+
+    def public_config(self):
+        """``config``, safe to serialise in an API response.
+
+        ``config`` is a plain JSON column that can hold real credentials
+        (its own comment: "API endpoints, credentials, etc."); returning it
+        raw -- as api_get_connector() used to -- leaks whatever secret was
+        stored in it, even to an admin of the connector's own organisation.
+        This masks every key that looks like it names a secret (see
+        ``_is_sensitive_key``) with the literal string "configured",
+        recursively, so a nested credential is masked too. Everything else
+        (instance URLs, flags, non-secret settings) passes through
+        unchanged. Returns ``None``/``{}`` unchanged if ``config`` is falsy.
+        """
+        return _mask_sensitive(self.config) if self.config else self.config
+
+    def public_webhook_config(self):
+        """``webhook_config``, safe to serialise in an API response.
+
+        Same masking as :meth:`public_config` -- webhook_config's own
+        comment is "Webhook endpoints and secrets", and a webhook signing
+        secret is exactly the kind of value this exists to keep out of a
+        response. No route currently serialises webhook_config directly
+        (only derived_sync_mode()'s boolean presence check reads it), but
+        this is provided so it is never a future leak if one starts to.
+        """
+        return _mask_sensitive(self.webhook_config) if self.webhook_config else self.webhook_config
 
 
 class SyncLog(db.Model):

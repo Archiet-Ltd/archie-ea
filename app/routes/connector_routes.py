@@ -102,7 +102,7 @@ def api_get_connector(connector_id):
                         "connector_type": conn.connector_type,
                         "status": conn.status,
                         "sync_mode": conn.derived_sync_mode(),
-                        "config": conn.config,  # API endpoints, credentials, etc.
+                        "config": conn.public_config(),  # secrets masked -- see ConnectorConfig.public_config
                         "created_at": conn.created_at.isoformat(),
                         "updated_at": conn.updated_at.isoformat(),
                     },
