@@ -186,6 +186,57 @@ def test_existing_schema_reconciles_additive_columns_idempotently(app, _schema):
         db.metadata.remove(model_table)
 
 
+@pytest.mark.timeout(60)
+def test_reconcile_reflects_full_schema_without_one_connection_per_table(app, _schema):
+    """Regression: reconciling the whole mapped schema used to hang.
+
+    `_reconcile` used to build its top-level Inspector from `db.engine`, and
+    then call `get_columns()` with it once per table in `db.metadata.tables`
+    across two full passes (the NOT-NULL drift scan, then the ADD COLUMN
+    scan). `db.engine.connect()` opens a brand-new physical connection every
+    time it's called, and the test suite's engine is configured with
+    `NullPool` (every checkout is a fresh connect, nothing stays pooled), so
+    on the ~800-table model that was roughly 1,600 extra physical
+    PostgreSQL connections for one `_reconcile()` call. That turned a merely
+    slow operation into something that blew straight through a 90 second
+    test timeout - the failure mode reported against this file - rather than
+    completing (if slowly).
+
+    The fix reflects off `db.session`'s own already-open connection instead,
+    so this counts how many *new* physical connections a single dry-run
+    reconciliation opens and asserts it stays in the range the remaining,
+    untouched single-table call sites in this module account for (measured
+    at roughly 100-115 on the current model) rather than regressing back
+    into the thousands. The `@pytest.mark.timeout` above is a second,
+    independent signal: a real regression would not finish inside it.
+    """
+    from sqlalchemy import event
+
+    connect_count = {"n": 0}
+
+    def _count_connect(dbapi_connection, connection_record):  # noqa: ARG001
+        connect_count["n"] += 1
+
+    with app.app_context():
+        event.listen(db.engine, "connect", _count_connect)
+        try:
+            added, failed, _missing, _blocking = _reconcile(dry_run=True)
+            assert failed == []
+            assert added is not None  # a real result, not a short-circuited no-op
+        finally:
+            event.remove(db.engine, "connect", _count_connect)
+
+    assert connect_count["n"] < 300, (
+        f"reconcile-schema opened {connect_count['n']} new physical "
+        "connections during a single dry run over the full schema - that is "
+        "in the range a per-table inspect(db.engine) reflection call would "
+        "produce again (roughly 1,600+ on this model), not the ~100-115 the "
+        "remaining single-table call sites account for. See the fix for "
+        "PR132's inspect(db.engine) deadlock/connection-churn pattern in "
+        "_reconcile()."
+    )
+
+
 def test_existing_command_table_is_upgraded_before_new_guarded_tables(
     app, pre_feature_transformation_schema
 ):
