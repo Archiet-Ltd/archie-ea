@@ -311,10 +311,10 @@ def test_approval_inbox_escalation_notifies_only_own_org(app, db_session, make_o
     approval_a.expires_at = datetime.utcnow() - timedelta(minutes=1)
     db_session.commit()
 
-    sent_recipient_lists = []
+    sent = []  # list of (recipients, html_body)
 
     def _fake_send(app, subject, recipients, html_body):
-        sent_recipient_lists.append(recipients)
+        sent.append((recipients, html_body))
         return True
 
     monkeypatch.setattr(
@@ -324,6 +324,7 @@ def test_approval_inbox_escalation_notifies_only_own_org(app, db_session, make_o
     stats = escalate_overdue_approvals(current_app._get_current_object())
 
     assert stats["organisations_notified"] >= 1
+    sent_recipient_lists = [recipients for recipients, _ in sent]
     assert [admin_a.email] in sent_recipient_lists, (
         "org A's admin was never notified of org A's own overdue approval"
     )
@@ -333,6 +334,28 @@ def test_approval_inbox_escalation_notifies_only_own_org(app, db_session, make_o
     )
     assert not any(admin_b.email in recipients for recipients in sent_recipient_lists), (
         "org B's admin was notified of org A's overdue approval"
+    )
+
+    # Lead review (6 Oct 2026): the test must also check WHAT the email to
+    # org A's admin actually names -- its own overdue item, and no item
+    # belonging to any other organisation, including the shared database's
+    # own leftover rows (the exact leak the old exact-count assertion could
+    # never have caught either).
+    import re
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+
+    admin_a_body = next(body for recipients, body in sent if recipients == [admin_a.email])
+    assert "Org A overdue" in admin_a_body
+    referenced_ids = {int(n) for n in re.findall(r"#(\d+):", admin_a_body)}
+    assert approval_a.id in referenced_ids
+    referenced_orgs = {
+        row.organization_id
+        for row in AIChatCRUDApproval.query.filter(AIChatCRUDApproval.id.in_(referenced_ids)).all()
+    }
+    assert referenced_orgs == {org_a.id}, (
+        "org A's escalation email named an item belonging to another organisation: %s"
+        % (referenced_orgs - {org_a.id})
     )
 
 
