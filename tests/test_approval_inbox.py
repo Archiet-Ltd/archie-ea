@@ -271,7 +271,22 @@ def test_approval_inbox_overdue_item_still_visible(app, db_session, make_org, te
 
 
 def test_approval_inbox_escalation_notifies_only_own_org(app, db_session, make_org, monkeypatch):
-    """Escalation emails only the overdue items' organisation administrators."""
+    """Escalation emails only the overdue items' organisation administrators.
+
+    escalate_overdue_approvals() runs outside any request/tenant context and
+    deliberately scans every organisation's overdue rows (its own docstring:
+    "same shape as app/_bootstrap/_digest_emails.py's scheduled digests").
+    This test's db_session fixture rolls its own two orgs back cleanly, but
+    the shared persistent test database this suite runs against also carries
+    real, legitimately-committed overdue approvals from the live_server/
+    Playwright smoke suite's own runs (those commit for real; they are not
+    wrapped in a rolled-back transaction) -- so asserting an exact
+    organisations_notified count, or that the single most-recently-sent
+    email belongs to this test's own org, is fragile against the shared
+    database's real state rather than against this test's own behaviour.
+    Assert instead that org A's admin is genuinely notified and org B's
+    admin genuinely is not, among however many organisations are overdue.
+    """
     from app.modules.ai_chat.services.ai_chat_approval_service import (
         create_approval_record,
         escalate_overdue_approvals,
@@ -282,7 +297,7 @@ def test_approval_inbox_escalation_notifies_only_own_org(app, db_session, make_o
     org_b = make_org("esc-inbox-b")
     admin_a = _make_user(db_session, org_a.id, "AdminA", can_approve=True)
     admin_a.is_org_admin = True
-    _make_user(db_session, org_b.id, "AdminB", can_approve=True)
+    admin_b = _make_user(db_session, org_b.id, "AdminB", can_approve=True)
 
     approval_a = create_approval_record(
         organization_id=org_a.id,
@@ -296,10 +311,10 @@ def test_approval_inbox_escalation_notifies_only_own_org(app, db_session, make_o
     approval_a.expires_at = datetime.utcnow() - timedelta(minutes=1)
     db_session.commit()
 
-    sent = {}
+    sent_recipient_lists = []
 
     def _fake_send(app, subject, recipients, html_body):
-        sent["recipients"] = recipients
+        sent_recipient_lists.append(recipients)
         return True
 
     monkeypatch.setattr(
@@ -308,8 +323,17 @@ def test_approval_inbox_escalation_notifies_only_own_org(app, db_session, make_o
 
     stats = escalate_overdue_approvals(current_app._get_current_object())
 
-    assert stats["organisations_notified"] == 1
-    assert sent["recipients"] == [admin_a.email]
+    assert stats["organisations_notified"] >= 1
+    assert [admin_a.email] in sent_recipient_lists, (
+        "org A's admin was never notified of org A's own overdue approval"
+    )
+    assert not any(admin_a.email in recipients and len(recipients) > 1 for recipients in sent_recipient_lists), (
+        "org A's admin appeared in a multi-recipient send, which would mean "
+        "another organisation's admin was mixed into the same email"
+    )
+    assert not any(admin_b.email in recipients for recipients in sent_recipient_lists), (
+        "org B's admin was notified of org A's overdue approval"
+    )
 
 
 def test_approval_inbox_template_has_required_elements(app, approval_inbox_setup, login_as):
