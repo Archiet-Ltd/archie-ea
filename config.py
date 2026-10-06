@@ -207,6 +207,10 @@ class Config:
     # Seconds to wait on the SMTP server before an account message counts as
     # not delivered; a hung relay must not hold a request open.
     MAIL_TIMEOUT = _env_optional_positive_int("MAIL_TIMEOUT") or 15
+    # Who hears about a new sales enquiry from /offers/inquire (every offer
+    # page, including /contact). Unset means enquiries are still stored, just
+    # not emailed — see app/main/views.py:product_inquiry_submit.
+    SALES_NOTIFY_EMAIL = os.environ.get("SALES_NOTIFY_EMAIL")
 
     # Analytics
     SEGMENT_API_KEY = os.environ.get("SEGMENT_API_KEY", "")

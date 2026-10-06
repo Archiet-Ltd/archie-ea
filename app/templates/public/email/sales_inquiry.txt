@@ -1,0 +1,4 @@
+Offer: {{ inquiry.offer }}
+Name: {{ inquiry.name or "(not given)" }}
+Email: {{ inquiry.email }}
+Page: {{ page_url }}
