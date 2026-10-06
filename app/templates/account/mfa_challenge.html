@@ -10,6 +10,7 @@
     Administrator accounts require a code from your authenticator app on every sign-in.
   </p>
   <form method="post" action="{{ url_for('account.mfa_challenge') }}" class="mt-6 space-y-4" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
       <label for="mfa-code" class="block text-sm font-medium text-foreground">6-digit code</label>
       <input

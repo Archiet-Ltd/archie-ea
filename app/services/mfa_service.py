@@ -37,10 +37,48 @@ def required_for(user) -> bool:
     Administrators (either flag -- see app/models/user.py's reconciled
     is_org_admin/is_platform_admin pair, R1-B12 PR 1) must always complete
     MFA, whether or not they have enrolled yet: an unenrolled administrator
-    is sent to enrol, not let through."""
+    is sent to enrol, not let through.
+
+    The one exception is ``_admin_mfa_bypass_active()`` below -- see its own
+    docstring for exactly what that is and is not."""
     if user is None:
         return False
-    return bool(getattr(user, "is_org_admin", False) or getattr(user, "is_platform_admin", False))
+    is_admin = bool(
+        getattr(user, "is_org_admin", False) or getattr(user, "is_platform_admin", False)
+    )
+    if not is_admin:
+        return False
+    return not _admin_mfa_bypass_active()
+
+
+def _admin_mfa_bypass_active() -> bool:
+    """True only for the browser-smoke subprocess's own boot, never in a real
+    deployment.
+
+    This is the ONLY way ``required_for()`` can ever return ``False`` for an
+    administrator. It requires BOTH:
+
+    - ``current_app.config["ADMIN_MFA_BYPASS"]``, a hardcoded class attribute
+      declared on ``config.py``'s ``SmokeTestingConfig`` alone -- never read
+      from an environment variable, a request, a header, a query parameter,
+      a session key or a database setting; and
+    - ``current_app.testing`` (Flask's own ``TESTING`` flag), so a config
+      class that copies the attribute without genuinely being a testing
+      config is still refused -- ``app/__init__.py``'s ``create_app()``
+      raises at boot in that case and never reaches a point where this
+      function could be called.
+
+    Returns False with no app context at all (e.g. a plain function call in
+    a unit test with no request in flight), which is the safe default: the
+    gate is enforced unless an app explicitly says otherwise.
+    """
+    try:
+        from flask import current_app
+
+        app = current_app._get_current_object()
+    except RuntimeError:
+        return False
+    return bool(app.config.get("ADMIN_MFA_BYPASS")) and bool(app.testing)
 
 
 def generate_secret() -> str:
