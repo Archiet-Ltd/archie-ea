@@ -93,7 +93,12 @@ PERSONA_ALIASES: Dict[str, str] = {
     "finance": "procurement",
     "compliance": "security_architect",
     "risk": "enterprise_architect",
-    "operations": "platform_admin",
+    # NOT platform_admin: review fix (6 Oct 2026) -- _platform_admin_context's
+    # last_import() reads ImportHistory with no organisation filter, so an
+    # operations user aliased there would see another organisation's latest
+    # import filename. enterprise_architect's live context is
+    # organisation-scoped.
+    "operations": "enterprise_architect",
     "non_technical_owner": "application_manager",
 }
 
@@ -128,7 +133,7 @@ ROLE_DEFAULT_PERSONAS: Dict[str, str] = {
     "finance": "procurement",
     "compliance": "security_architect",
     "risk": "enterprise_architect",
-    "operations": "platform_admin",
+    "operations": "enterprise_architect",
     "non_technical_owner": "application_manager",
 }
 

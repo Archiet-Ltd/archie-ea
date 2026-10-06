@@ -37,7 +37,9 @@ ROLE_DEFAULT_PERSONAS = {
     "finance": "procurement",
     "compliance": "security_architect",
     "risk": "enterprise_architect",
-    "operations": "platform_admin",
+    # NOT platform_admin: _platform_admin_context's last_import() is not
+    # organisation-scoped (see 6 Oct 2026 review fix).
+    "operations": "enterprise_architect",
     "non_technical_owner": "application_manager",
 }
 
