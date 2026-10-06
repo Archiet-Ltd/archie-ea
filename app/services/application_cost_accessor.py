@@ -61,6 +61,45 @@ def get_annual_cost_float(app: ApplicationComponent) -> Optional[float]:
     return float(d) if d is not None else None
 
 
+# R1-B08 PR 2: the legacy per-category columns (license_cost, maintenance_cost,
+# infrastructure_cost) predate this accessor and are not backfilled into
+# total_cost_of_ownership for rows imported before PR 1 landed -- only rows
+# imported through set_annual_cost since then are. A caller that switched to
+# get_annual_cost() alone would read every pre-PR-1 app as having no cost data
+# at all, which is worse than the scattered-columns status quo it replaces.
+# These two helpers are the one home for "does this app have recorded cost at
+# all" and "what number, from where" during that transition; Release 2's Cost
+# Fact consolidation retires them once every row is backfilled.
+_LEGACY_COST_FIELDS = ("license_cost", "maintenance_cost", "infrastructure_cost")
+
+
+def has_recorded_cost(app: ApplicationComponent) -> bool:
+    """True if the canonical column or any pre-consolidation legacy column
+    carries a positive cost value."""
+    canonical = get_annual_cost(app)
+    if canonical is not None and canonical > 0:
+        return True
+    for field in _LEGACY_COST_FIELDS:
+        value = getattr(app, field, None)
+        if value is not None and float(value) > 0:
+            return True
+    return False
+
+
+def get_annual_cost_with_source(app: ApplicationComponent):
+    """(value, source_label). Prefers the canonical column; falls back to
+    the sum of the legacy per-category columns for a row never re-imported
+    through set_annual_cost, labelled so the caller can show its provenance."""
+    canonical = get_annual_cost(app)
+    if canonical is not None and canonical > 0:
+        return float(canonical), "ApplicationComponent.total_cost_of_ownership"
+    legacy_values = [getattr(app, field, None) for field in _LEGACY_COST_FIELDS]
+    if any(v is not None for v in legacy_values):
+        total = sum(float(v or 0) for v in legacy_values)
+        return total, "ApplicationComponent (" + " + ".join(_LEGACY_COST_FIELDS) + ")"
+    return None, None
+
+
 def set_annual_cost(app: ApplicationComponent, value: Optional[Decimal]) -> None:
     """
     Write the application's annual cost through the accessor.

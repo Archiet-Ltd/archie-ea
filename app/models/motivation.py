@@ -547,8 +547,22 @@ def create_meaning_archimate(mapper, connection, target):
     creates -- the synced element must carry the same organisation as the
     Meaning it mirrors (NULL included, since a NOT NULL insert of NULL
     fails outright rather than quietly defaulting to the wrong tenant).
+
+    Bug fix (found 6 Oct 2026, building R1-B38 PR 2's near-identical
+    listener for StrategicInitiative and hitting the same bug first):
+    after_insert runs once the Meaning row has ALREADY been INSERTed, so
+    the plain `target.archimate_element_id = ...` assignment below only
+    ever changed the in-memory object -- it was never written back to the
+    row. Every Meaning created since this listener shipped has had
+    archimate_element_id = NULL in the actual database despite showing a
+    value on the object that created it, until something re-fetched the
+    row fresh (a new request, a CLI command). The explicit UPDATE is the
+    fix; BusinessCapability's own sync listener
+    (app/models/business_capabilities.py) sidesteps the same trap by using
+    before_insert instead, where attribute changes are picked up into the
+    still-pending INSERT automatically.
     """
-    from sqlalchemy import insert
+    from sqlalchemy import insert, update
 
     from .archimate_core import ArchiMateElement
 
@@ -562,7 +576,13 @@ def create_meaning_archimate(mapper, connection, target):
                 organization_id=target.organization_id,
             )
         )
-        target.archimate_element_id = result.inserted_primary_key[0]
+        element_id = result.inserted_primary_key[0]
+        connection.execute(
+            update(Meaning.__table__)
+            .where(Meaning.__table__.c.id == target.id)
+            .values(archimate_element_id=element_id)
+        )
+        target.archimate_element_id = element_id
 
 
 @event.listens_for(Value, "after_insert")

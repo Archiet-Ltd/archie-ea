@@ -537,25 +537,37 @@ def public_vision():
 @main.route("/modules/<slug>")
 def public_module(slug):
     """A module content page."""
-    from app.services.public_pages import build_jsonld, load_page
+    from app.services.public_pages import build_jsonld, get_page_screenshot, load_page
 
     page = load_page("module", slug=slug)
     if page is None:
         from flask import abort
         abort(404)
-    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        screenshot=get_page_screenshot(page),
+    )
 
 
 @main.route("/use-cases/<slug>")
 def public_use_case(slug):
     """A function-per-segment content page."""
-    from app.services.public_pages import build_jsonld, load_page
+    from app.services.public_pages import (
+        build_jsonld,
+        get_page_recording,
+        get_page_screenshot,
+        load_page,
+    )
 
     page = load_page("function-per-segment", slug=slug)
     if page is None:
         from flask import abort
         abort(404)
-    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        screenshot=get_page_screenshot(page),
+        recording=get_page_recording(page),
+    )
 
 
 @main.route("/vs")
