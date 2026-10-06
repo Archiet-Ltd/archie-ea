@@ -199,6 +199,7 @@ def _overlapping_contracts(organization_id: int, **_: Any) -> Dict[str, Any]:
     if app_ids:
         mapping_rows = (
             ApplicationCapabilityMapping.query.filter(
+                ApplicationCapabilityMapping.organization_id == organization_id,
                 ApplicationCapabilityMapping.application_component_id.in_(app_ids),
             )
             .all()
