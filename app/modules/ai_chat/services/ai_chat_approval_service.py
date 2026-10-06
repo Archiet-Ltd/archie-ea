@@ -702,6 +702,17 @@ class AIChatApprovalService:
                 else:
                     return {"success": False, "error": f"Unknown entity type: {approval.entity_type}"}
 
+            elif approval.operation_type == "end_of_support_alert":
+                # R1-B85: approving the alert is the acknowledgement that a
+                # refresh owner has been assigned (via the existing
+                # ApplicationOwner flow on the affected application's own
+                # page -- this is not a second owner-assignment mechanism).
+                # There is nothing further to execute against the vendor
+                # product itself, so this is a deliberate no-op dispatch
+                # rather than falling through to "Unsupported operation
+                # type", which would leave the claim permanently stuck.
+                result = {"success": True, "acknowledged": True}
+
             elif approval.operation_type == "tool_use":
                 # AgentRunner._queue_approval (agent_runner.py) writes exactly this
                 # operation_type for every queued agent tool call — both the
@@ -950,6 +961,17 @@ class AIChatApprovalService:
                     "arguments": json.loads(approval.operation_payload),
                     "created_at": approval.created_at.isoformat() if approval.created_at else None,
                     "expires_at": approval.expires_at.isoformat() if approval.expires_at else None,
+                    # The queue query filters to PENDING only, so every item
+                    # here is "pending". The inbox template's isOverdue()
+                    # checks this field to decide whether to show the Overdue
+                    # indicator — without it the indicator never renders even
+                    # for genuinely overdue items.
+                    "status": approval.status.value if approval.status else "pending",
+                    # Source table/id for backfilled items (e.g. confidence
+                    # reviews). The inbox template renders a source badge when
+                    # these are present; without them the badge is always dead.
+                    "source_table": getattr(approval, "source_table", None),
+                    "source_id": getattr(approval, "source_id", None),
                     "requester": {
                         "id": approval.user_id,
                         "display_name": " ".join(

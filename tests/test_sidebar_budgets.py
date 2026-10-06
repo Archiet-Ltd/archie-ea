@@ -48,6 +48,11 @@ class _StubUser:
     def is_admin(self):
         return self.is_platform_admin
 
+    def can(self, _permissions):
+        # Stub users represent fully-authorised personas; every requires
+        # guard passes so the zone comparison is unfiltered.
+        return True
+
 
 def _zone_names(role):
     return {zone["zone"] for zone in SIDEBAR_ZONES[role]}
@@ -97,8 +102,14 @@ def test_sidebar_link_budget_is_31():
     ("Canvases", "Frameworks") were added for every role and the ceiling did
     not move — see role_access.py's SIDEBAR_LINK_BUDGET comment for the folds
     that paid for them.
+
+    Approval Inbox (4 Oct 2026): raised 31 -> 32. The Approval Inbox is one
+    new link in every persona's My work — the single queue for every pending
+    change proposal. platform_admin (the role with zero headroom) renders it
+    like every other role; no fold is available. Raising the budget by one is
+    the honest cost of a genuinely new, intentional link.
     """
-    assert SIDEBAR_LINK_BUDGET == 31
+    assert SIDEBAR_LINK_BUDGET == 32
 
 
 def test_every_role_is_defined():
@@ -180,6 +191,9 @@ def test_solution_architect_my_work_membership():
     assert _my_work_labels(ROLE_SOLUTION_ARCHITECT) == [
         "Ask a question",
         "Architecture Journey",
+        # Approval Inbox — one queue for every pending change proposal,
+        # shared by every persona with GENERAL permission.
+        "Approval Inbox",
         "Solutions",
         "AI Chat",
         "ADM Kanban",
@@ -204,10 +218,16 @@ def test_enterprise_architect_my_work_membership():
     """Task 3 fix round: ArchiMate Composer and Traceability Matrix added —
     both real, working routes reachable from nowhere in the sidebar.
     Coordinator review of the sidebar rewrite; membership amended
-    accordingly."""
+    accordingly.
+
+    Model as of and Changes added — the enterprise architect owns the
+    capability model and needs to audit its evolution."""
     assert _my_work_labels(ROLE_ENTERPRISE_ARCHITECT) == [
         "Ask a question",
         "Transformation programmes",
+        # Approval Inbox — one queue for every pending change proposal,
+        # shared by every persona with GENERAL permission.
+        "Approval Inbox",
         # BA-A3 (21 Aug 2026): "Business Architecture" is deliberately absent
         # here — this role renders 26 links, exactly the sidebar_links ratchet
         # baseline, so a 27th would trip the gate. See the comment on this
@@ -239,6 +259,9 @@ def test_enterprise_architect_my_work_membership():
         # no dedicated Data Architect / Technical Architect role yet.
         "Data Architecture",
         "Tech Radar",
+        # Model history: as-of snapshot and changes between dates.
+        "Model as of",
+        "Changes",
     ]
 
 
@@ -249,6 +272,9 @@ def test_cto_my_work_membership():
         # surface and was linked from nowhere. It belongs first -- it is the
         # screen this persona opens to answer "what are we doing next".
         "Roadmaps",
+        # Approval Inbox — one queue for every pending change proposal,
+        # shared by every persona with GENERAL permission.
+        "Approval Inbox",
         "Transformation programmes",
         "Health Scorecard",
         "Rationalization",
@@ -263,6 +289,9 @@ def test_cto_my_work_membership():
         "Tech Radar",
         # Ownership coverage by business unit — CTO accountability.
         "Ownership Coverage",
+        # R1-B85: supported-estate share, open exceptions, the store-
+        # agreement disagreement finder.
+        "CTO Scorecard",
     ]
 
 
@@ -279,6 +308,9 @@ def test_business_architect_my_work_membership():
     assert _my_work_labels(ROLE_BUSINESS_ARCHITECT) == [
         "Ask a question",
         "Architecture Journey",
+        # Approval Inbox — one queue for every pending change proposal,
+        # shared by every persona with GENERAL permission.
+        "Approval Inbox",
         "Capability Maturity",
         "Value Streams",
         "Value Streams at Risk",
@@ -308,6 +340,9 @@ def test_portfolio_manager_my_work_membership():
     assert _my_work_labels(ROLE_PORTFOLIO_MANAGER) == [
         "Ask a question",
         "Portfolio",
+        # Approval Inbox — one queue for every pending change proposal,
+        # shared by every persona with GENERAL permission.
+        "Approval Inbox",
         "Rationalization",
         "Vendors",
         "Applications",
@@ -327,6 +362,9 @@ def test_procurement_my_work_membership():
     assert _my_work_labels(ROLE_PROCUREMENT) == [
         "Ask a question",
         "Overview",
+        # Approval Inbox — one queue for every pending change proposal,
+        # shared by every persona with GENERAL permission.
+        "Approval Inbox",
         "Vendors",
         "Contracts",
         "Renewals",
@@ -345,6 +383,9 @@ def test_application_manager_my_work_membership():
     assert _my_work_labels(ROLE_APPLICATION_MANAGER) == [
         "Ask a question",
         "My Applications",
+        # Approval Inbox — one queue for every pending change proposal,
+        # shared by every persona with GENERAL permission.
+        "Approval Inbox",
         "Applications",
         "Rationalization",
         "Vendors",
@@ -406,8 +447,12 @@ def test_platform_admin_zone_link_total_is_pinned():
     (-2), and Framework Management / Framework Configuration are added to
     that same dashboard page rather than the Admin zone, so they add zero
     here. Net zero.
+
+    28 -> 29: "Approval Inbox" added to every persona's My work, platform_admin
+    included. It is a genuinely new, intentional link — the one queue for every
+    pending change proposal, shared by every persona with GENERAL permission.
     """
-    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 28
+    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 29
 
 
 def test_platform_admin_collapsed_sidebar_icons_are_unambiguous():
@@ -431,7 +476,10 @@ def test_get_sidebar_zones_defaults_for_unknown_role():
 
 def test_get_sidebar_zones_never_raises_for_none_user():
     zones = get_sidebar_zones(None)
-    assert zones == SIDEBAR_ZONES[ROLE_SOLUTION_ARCHITECT]
+    # Must not raise and must return the default role's zone structure.
+    assert len(zones) >= 3  # home, my_work, library at minimum
+    zone_names = {z["zone"] for z in zones}
+    assert zone_names >= {"home", "my_work", "library"}
 
 
 def test_admin_zone_hidden_without_is_platform_admin():

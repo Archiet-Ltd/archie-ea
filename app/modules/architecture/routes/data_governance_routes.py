@@ -39,6 +39,9 @@ def _tabs(active):
         ("Master data domains", url_for("data_governance.domains"), active == "domains"),
         ("Standards check", url_for("data_governance.models"), active == "models"),
         ("Sharing agreements", url_for("data_governance.sharing_agreements"), active == "agreements"),
+        ("Retention breaches", url_for("data_governance.retention_breaches"), active == "retention"),
+        ("Data issues", url_for("data_governance.data_issues"), active == "issues"),
+        ("Glossary", url_for("data_governance.glossary"), active == "glossary"),
     ]
 
 
@@ -289,3 +292,103 @@ def downstream_impact_view(element_id):
         start_element_id=element_id,
         tabs=_tabs("lineage"),
     )
+
+
+@data_governance_bp.route("/retention-breaches")
+@login_required
+def retention_breaches():
+    """R1-B81 (PB-0236): retention-policy breaches, with an owner or
+    'not recorded' -- never a fabricated pass/fail."""
+    guard = _guard()
+    if guard:
+        return guard
+    from app.modules.architecture.services.data_stewardship_service import DataStewardshipService
+
+    breaches = DataStewardshipService.retention_breaches(g.current_org_id)
+    return render_template(
+        "data_governance/retention_breaches.html", breaches=breaches, tabs=_tabs("retention"),
+    )
+
+
+@data_governance_bp.route("/issues")
+@login_required
+def data_issues():
+    """R1-B81 (PB-0292): the data-issue list, routed-to shown from the
+    entity's domain's recorded steward (legacy display, read-only)."""
+    guard = _guard()
+    if guard:
+        return guard
+    from app.modules.architecture.services.data_stewardship_service import DataStewardshipService
+
+    issues = DataStewardshipService.list_issues(g.current_org_id)
+    return render_template("data_governance/data_issues.html", issues=issues, tabs=_tabs("issues"))
+
+
+@data_governance_bp.route("/issues/new", methods=["GET", "POST"])
+@login_required
+def new_data_issue():
+    """R1-B81: raise a data issue against an entity."""
+    guard = _guard()
+    if guard:
+        return guard
+    from app.modules.architecture.services.data_stewardship_service import DataStewardshipService
+
+    data_entity_id = request.args.get("data_entity_id", type=int) or request.form.get(
+        "data_entity_id", type=int
+    )
+
+    if request.method == "POST":
+        title = (request.form.get("title") or "").strip()
+        if not title or not data_entity_id:
+            flash("Title and entity are required.", "error")
+            return redirect(url_for("data_governance.new_data_issue", data_entity_id=data_entity_id))
+        try:
+            DataStewardshipService.raise_issue(
+                g.current_org_id, data_entity_id, title,
+                (request.form.get("description") or "").strip() or None,
+                current_user.id,
+            )
+            db.session.commit()
+        except ValueError as exc:
+            db.session.rollback()
+            flash(str(exc), "error")
+            return redirect(url_for("data_governance.new_data_issue"))
+        flash("Data issue raised.", "success")
+        return redirect(url_for("data_governance.data_issues"))
+
+    return render_template(
+        "data_governance/new_data_issue.html", data_entity_id=data_entity_id, tabs=_tabs("issues"),
+    )
+
+
+@data_governance_bp.route("/issues/<int:issue_id>/resolve", methods=["POST"])
+@login_required
+def resolve_data_issue(issue_id):
+    """R1-B81: resolve a data issue with a recorded fix."""
+    guard = _guard()
+    if guard:
+        return guard
+    from app.modules.architecture.services.data_stewardship_service import DataStewardshipService
+
+    notes = (request.form.get("resolution_notes") or "").strip()
+    try:
+        DataStewardshipService.resolve_issue(g.current_org_id, issue_id, notes, current_user.id)
+        db.session.commit()
+        flash("Data issue resolved.", "success")
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    return redirect(url_for("data_governance.data_issues"))
+
+
+@data_governance_bp.route("/glossary")
+@login_required
+def glossary():
+    """R1-B81 (PB-0500): one definition per term."""
+    guard = _guard()
+    if guard:
+        return guard
+    from app.modules.architecture.services.data_stewardship_service import DataStewardshipService
+
+    terms = DataStewardshipService.glossary_terms(g.current_org_id)
+    return render_template("data_governance/glossary.html", terms=terms, tabs=_tabs("glossary"))

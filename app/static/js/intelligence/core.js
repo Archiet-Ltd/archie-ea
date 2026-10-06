@@ -20,6 +20,7 @@
     var STRATEGY_URL = '/api/v1/intelligence/strategy/';
     var ACCOUNTABILITY_URL = '/api/v1/intelligence/accountability/';
     var DATA_URL = '/api/v1/intelligence/data/';
+    var COMPLIANCE_URL = '/api/v1/intelligence/compliance/';
     var RECOMPUTE_URL = '/api/v1/intelligence/derivation/recompute';
     var DERIVED_URL = '/api/v1/intelligence/derived/';
 
@@ -302,11 +303,16 @@
     }
 
     function flowModel(flow, elements) {
+        // The server sends other_element_name directly on the flow AND (now
+        // that the elements map exists) a fuller record keyed by id in
+        // elements -- prefer the direct field when present, fall back to
+        // the map so a caller that only has elements (the new graph
+        // rendering) still resolves a name.
         var entry = elements ? elements[String(flow.other_element_id)] : null;
         return {
             direction: flow.direction,
             otherElementId: flow.other_element_id,
-            otherElementName: entry && entry.name ? entry.name : null,
+            otherElementName: flow.other_element_name || (entry && entry.name) || null,
             lineageType: flow.lineage_type || null,
             frequency: flow.frequency || null
         };
@@ -321,6 +327,44 @@
         return (payload.flows || []).map(function (flow) {
             return flowModel(flow, elements);
         });
+    }
+
+    /* Compliance (under L6): the controls the element's application is mapped
+       to, open policy violations and the last scan time. A control with no
+       evidence says so; nothing is shown as a percentage or a zero. */
+    function fetchCompliance(elementId) {
+        return Platform.fetch.get(COMPLIANCE_URL + elementId, {}, { silent: true }).then(function (resp) {
+            return resp && resp.data ? resp.data : {};
+        });
+    }
+
+    function controlModel(c) {
+        return {
+            code: c.code || null,
+            name: c.name,
+            frameworkName: c.framework_name || null,
+            status: c.implementation_status,
+            evidenceRecorded: !!c.evidence_url_recorded,
+            verified: !!c.verified,
+            verifiedDate: c.verified_date || null,
+            noEvidence: !!c.no_evidence
+        };
+    }
+
+    function violationModel(v) {
+        return {
+            policyName: v.policy_name || 'Unnamed policy',
+            severity: v.severity || null,
+            detectedAt: v.detected_at || null
+        };
+    }
+
+    function buildControls(payload) {
+        return (payload.controls || []).map(controlModel);
+    }
+
+    function buildViolations(payload) {
+        return (payload.open_violations || []).map(violationModel);
     }
 
     // ── small helpers ─────────────────────────────────────────────────────
@@ -576,6 +620,9 @@
         fetchData: fetchData,
         buildDataObjects: buildDataObjects,
         buildFlows: buildFlows,
+        fetchCompliance: fetchCompliance,
+        buildControls: buildControls,
+        buildViolations: buildViolations,
         recompute: recompute,
         fetchExplanation: fetchExplanation,
         timeText: timeText,

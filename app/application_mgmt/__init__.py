@@ -18,6 +18,7 @@ from . import (
     architecture_api_routes,  # noqa: F401
     business_layer_routes,  # noqa: F401
     compliance_routes,
+    framework_catalogue_routes,
     consolidation_routes,  # noqa: F401
     crud_routes,  # noqa: F401
     custom_field_routes,

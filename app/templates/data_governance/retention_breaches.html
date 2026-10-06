@@ -1,0 +1,41 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+
+{% block title %}Retention breaches — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6">
+  {{ page_shell(
+      title='Retention breaches',
+      subtitle='Data entities older than their retention policy allows.',
+      breadcrumb=[('Home', url_for('main.index')), ('Data governance', url_for('data_governance.entities')), ('Retention breaches', None)],
+      tabs=tabs
+  ) }}
+  {% if breaches %}
+  <table class="w-full rounded-lg border border-border bg-card text-sm" data-testid="retention-breaches">
+    <thead>
+      <tr class="border-b border-border text-left text-muted-foreground">
+        <th class="p-3">Entity</th>
+        <th class="p-3">Policy</th>
+        <th class="p-3">Age (days)</th>
+        <th class="p-3">Allowed (days)</th>
+        <th class="p-3">Owner</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in breaches %}
+      <tr class="border-b border-border" data-testid="breach-{{ b.entity_id }}">
+        <td class="p-3 font-medium text-foreground">{{ b.entity_name }}</td>
+        <td class="p-3">{{ b.policy_name }}</td>
+        <td class="p-3">{{ b.age_days }}</td>
+        <td class="p-3">{{ b.retention_period_days }}</td>
+        <td class="p-3">{{ b.owner }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {{ empty_state(icon='shield-check', headline='No retention breaches', body='No data entity exceeds its retention policy right now.') }}
+  {% endif %}
+</div>
+{% endblock %}

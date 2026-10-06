@@ -1,5 +1,19 @@
 {% extends 'layouts/public_base.html' %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
-{% block full_title %}Entelim{% endblock %}
+{% block full_title %}Entelim — your whole company, one model you can ask{% endblock %}
+{% block meta_description %}
+<meta name="description" content="Entelim is the open-source Enterprise Intelligence Model: enter your website address and see your company's architecture, applications, risks and gaps as one model you can ask. Self-host free under AGPL-3.0.">
+<meta property="og:title" content="Entelim — your whole company, one model you can ask">
+<meta property="og:description" content="Enter your website address and see your company as one model you can ask. Open source, self-host free, forever.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://entelim.org/">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "The open-source Enterprise Intelligence Model."}</script>
+{% if config.GOOGLE_SITE_VERIFICATION %}
+<meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">
+{% endif %}
+{% if config.BING_SITE_VERIFICATION %}
+<meta name="msvalidate.01" content="{{ config.BING_SITE_VERIFICATION }}">
+{% endif %}
+{% endblock %}
 
 {% block header %}
 {% with brand_name = "Entelim" %}
@@ -153,7 +167,7 @@
       <div class="rounded-lg border border-border bg-card p-6 ring-2 ring-primary">
         <h3 class="text-lg font-semibold text-foreground mb-1">Team</h3>
         <p class="text-2xl font-bold text-foreground mb-1">$29<span class="text-sm font-normal text-muted-foreground">/editor/month</span></p>
-        <p class="text-sm text-muted-foreground mb-3">Or $290/month for fifteen editors. Askers free.</p>
+        <p class="text-sm text-muted-foreground mb-3">$290/editor/year. Askers free.</p>
         <p class="text-sm text-muted-foreground">For scale-ups and services companies, 50 to 500 people. SSO, review-board workflow, own model key, usage history.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">

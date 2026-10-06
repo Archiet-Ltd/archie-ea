@@ -147,10 +147,11 @@ def test_lineage_in_and_out_is_returned_and_names_the_other_end(app, db_session,
 
     result = _run(app, org.id, el.id)
 
-    flows = {(f["direction"], f["other_element_id"]): f for f in result["flows"]}
-    assert set(flows) == {("in", upstream.id), ("out", downstream.id)}
-    assert flows[("in", upstream.id)]["frequency"] == "Daily"
-    # Names are now in the elements map
+    flows = {(f["direction"], f["other_element_name"]): f for f in result["flows"]}
+    assert set(flows) == {("in", "Upstream"), ("out", "Downstream")}
+    assert flows[("in", "Upstream")]["frequency"] == "Daily"
+    # The same name is also reachable through the elements map (added
+    # alongside, for the graph rendering that needs more than a name).
     assert result["elements"][str(upstream.id)]["name"] == "Upstream"
     assert result["elements"][str(downstream.id)]["name"] == "Downstream"
     assert "no_lineage_recorded" not in result["reasons"]
