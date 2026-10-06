@@ -52,14 +52,30 @@ def _initiative_and_element(initiative_id: int):
     return initiative, element
 
 
-def _link_dict(capability: BusinessCapability) -> Dict[str, Any]:
-    return {"capability_id": capability.id, "name": capability.name}
+def _contribution_level(initiative_id: int, capability_id: int) -> Optional[str]:
+    row = db.session.execute(
+        db.select(strategic_initiative_capabilities.c.contribution_level).where(
+            strategic_initiative_capabilities.c.strategic_initiative_id == initiative_id,
+            strategic_initiative_capabilities.c.capability_id == capability_id,
+        )
+    ).scalar_one_or_none()
+    return row
+
+
+def _link_dict(initiative_id: int, capability: BusinessCapability) -> Dict[str, Any]:
+    return {
+        "capability_id": capability.id,
+        "name": capability.name,
+        "contribution_level": _contribution_level(initiative_id, capability.id),
+    }
 
 
 def list_links(initiative_id: int) -> List[Dict[str, Any]]:
     """This initiative's linked capabilities, by name."""
     initiative, _ = _initiative_and_element(initiative_id)
-    return [_link_dict(c) for c in sorted(initiative.capabilities, key=lambda c: c.name)]
+    return [
+        _link_dict(initiative_id, c) for c in sorted(initiative.capabilities, key=lambda c: c.name)
+    ]
 
 
 def add_link(
@@ -107,16 +123,23 @@ def add_link(
         raise InitiativeCapabilityLinkError("The link could not be saved.", 500)
 
     initiative.capabilities.append(capability)
-    db.session.execute(
-        strategic_initiative_capabilities.update()
-        .where(
-            strategic_initiative_capabilities.c.strategic_initiative_id == initiative.id,
-            strategic_initiative_capabilities.c.capability_id == capability.id,
-        )
-        .values(contribution_level=contribution_level)
-    )
+    # The relationship-append above only queues the join-table INSERT; a
+    # Core UPDATE statement does not autoflush the session first (review
+    # finding, SQLAlchemy 2.0), so without this explicit flush the UPDATE
+    # below ran before the row existed, matched zero rows, and silently
+    # dropped contribution_level with no error.
     db.session.flush()
-    return _link_dict(capability)
+    if contribution_level is not None:
+        db.session.execute(
+            strategic_initiative_capabilities.update()
+            .where(
+                strategic_initiative_capabilities.c.strategic_initiative_id == initiative.id,
+                strategic_initiative_capabilities.c.capability_id == capability.id,
+            )
+            .values(contribution_level=contribution_level)
+        )
+        db.session.flush()
+    return _link_dict(initiative.id, capability)
 
 
 def remove_link(initiative_id: int, capability_id: int) -> None:

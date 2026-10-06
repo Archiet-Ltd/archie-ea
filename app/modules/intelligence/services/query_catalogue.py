@@ -205,7 +205,11 @@ def _overlapping_contracts(organization_id: int, **_: Any) -> Dict[str, Any]:
             .all()
         )
         for m in mapping_rows:
-            capability_by_app.setdefault(m.application_component_id, []).append(m.business_capability_id)
+            bucket = capability_by_app.setdefault(m.application_component_id, [])
+            # A repeated (application, capability) mapping row must not
+            # repeat the contract row the loop below builds from it.
+            if m.business_capability_id not in bucket:
+                bucket.append(m.business_capability_id)
 
     groups: Dict[str, Dict[str, Any]] = {}
     for contract_app, contract, app in contract_apps:
@@ -238,9 +242,15 @@ def _overlapping_contracts(organization_id: int, **_: Any) -> Dict[str, Any]:
         capability = BusinessCapability.query.filter_by(
             id=bucket["capability_id"], organization_id=organization_id,
         ).first()
-        combined_value = sum(
-            float(row["contract_value"]) for row in bucket["rows"] if row["contract_value"] is not None
-        )
+        # Review finding: a single contract can cover several applications
+        # (contract_applications is a many-to-many join), so summing one row
+        # per (app, contract) double-counts that contract's value for every
+        # extra application sharing it. Sum each distinct contract once.
+        distinct_contracts = {
+            row["contract_id"]: row["contract_value"]
+            for row in bucket["rows"] if row["contract_value"] is not None
+        }
+        combined_value = sum(float(v) for v in distinct_contracts.values())
         end_dates = [row["end_date"] for row in bucket["rows"] if row["end_date"]]
         result_groups.append(
             {

@@ -4,14 +4,14 @@ pattern. Nullable, TenantMixin-free association (scoping comes from the
 initiative and capability rows it joins, same as strategic_initiative_goals).
 
 Revision ID: 20261006_initiative_capabilities
-Revises: 20261004_acr_escalated_at
+Revises: 20261006_formula_registers
 Create Date: 2026-10-06
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261006_initiative_capabilities"
-down_revision = "20261004_acr_escalated_at"
+down_revision = "20261006_formula_registers"
 branch_labels = None
 depends_on = None
 
