@@ -3,25 +3,38 @@ use-case pages.
 
 Covers the "Screenshots on the public module pages" brief, widened
 2026-10-06 to include use-case pages and short recordings for four
-multi-step use cases:
+multi-step use cases, then revised 2026-10-06 after lead review of PR #402
+rejected 11 of the 26 captured images and all 4 recordings (empty data, the
+wrong screen, or a recording that never performed the use case it claimed):
 
   - Every live module page (content/pages/modules/*.md, capture_status: live)
-    has a captured image file under the 200 KB cap, and the /modules/<slug>
-    page renders it with descriptive alt text, explicit width/height and
-    lazy loading.
+    either has a captured image file under the 200 KB cap and renders it
+    with descriptive alt text, explicit width/height and lazy loading, OR
+    is named explicitly in MODULE_CAPTURE_PENDING with a reason -- there is
+    no third option. A live module silently missing from both fails this
+    suite, which is what keeps the pending list from becoming a place
+    things quietly go to be forgotten.
   - get_page_screenshot() never returns an image for a page whose
     capture_status is not "live", and never returns one for a slug with no
     captured file on disk, even if the registry lists it (checked directly
     against the helper function, not only incidentally through content).
-  - The one live use-case page gets its screenshot the same way.
-  - The four recorded use-case pages render a <video> with controls, muted,
-    playsinline, preload="none" and a poster, never an autoplay attribute,
-    and their VideoObject JSON-LD carries name/description/thumbnailUrl/
-    uploadDate/duration/contentUrl.
-  - Every captured recording is under the 3 MB cap, 15-40 seconds (read from
-    the sidecar manifest scripts/capture_screenshots.py --modules writes --
-    no ffmpeg/ffprobe dependency at test time), and has a poster under the
-    200 KB image cap.
+  - capture_status on every pending page stays "live" -- capture-pending
+    and feature-pending are different things, and flipping the former to
+    say the latter is exactly the mistake a prior round of this same brief
+    made and had to revert.
+  - The one live use-case page follows the identical pending-or-captured
+    rule as modules.
+  - The four recorded use-case pages, once captured, render a <video> with
+    controls, muted, playsinline, preload="none" and a poster, never an
+    autoplay attribute, and their VideoObject JSON-LD carries name/
+    description/thumbnailUrl/uploadDate/duration/contentUrl. All four are
+    capture-pending as of this revision (see USE_CASE_VIDEO_PENDING); the
+    tests that assert those properties on a captured file skip cleanly,
+    with a reason, rather than pass vacuously on an empty list.
+  - Every captured recording, once restored, is under the 3 MB cap, 15-40
+    seconds (read from the sidecar manifest scripts/capture_screenshots.py
+    --modules writes -- no ffmpeg/ffprobe dependency at test time), and has
+    a poster under the 200 KB image cap.
 """
 
 from __future__ import annotations
@@ -30,12 +43,17 @@ import html
 import json
 import re
 
+import pytest
+
 from app.services.public_pages import (
     IMG_MODULES_DIR,
     IMG_USE_CASES_DIR,
+    MODULE_CAPTURE_PENDING,
     MODULE_CAPTURES,
     USE_CASE_SCREENSHOT_CAPTURES,
+    USE_CASE_SCREENSHOT_PENDING,
     USE_CASE_VIDEO_CAPTURES,
+    USE_CASE_VIDEO_PENDING,
     VIDEO_USE_CASES_DIR,
     PublicPage,
     get_page_recording,
@@ -47,6 +65,16 @@ from app.services.public_pages import (
 MAX_IMAGE_BYTES = 200 * 1024
 MAX_VIDEO_BYTES = 3 * 1024 * 1024
 
+_VIDEO_PENDING_REASON = (
+    "all four use-case recordings are capture-pending as of the 2026-10-06 lead "
+    "review -- see USE_CASE_VIDEO_PENDING in app/services/public_pages.py; round 2 "
+    "moves entries back to USE_CASE_VIDEO_CAPTURES as each is properly recorded"
+)
+_USE_CASE_SCREENSHOT_PENDING_REASON = (
+    "the one live use-case screenshot is capture-pending as of the 2026-10-06 lead "
+    "review -- see USE_CASE_SCREENSHOT_PENDING in app/services/public_pages.py"
+)
+
 
 def _jsonld_from(html: str) -> dict:
     match = re.search(
@@ -56,47 +84,54 @@ def _jsonld_from(html: str) -> dict:
     return json.loads(match.group(1))
 
 
-# ── registry stays in sync with content ─────────────────────────────────
+# ── registry stays in sync with content, strictly ───────────────────────
 
 
 def test_module_capture_registry_matches_every_live_module_content_file():
-    """Every module page marked capture_status: live has a MODULE_CAPTURES
-    entry, and vice versa -- the registry can't silently fall behind
-    content/pages/modules/ (or claim a page that isn't actually live) --
-    except the one documented case in public_pages.py's MODULE_CAPTURES
-    comment: "integrations" stays capture_status: live (it is a real,
-    sellable feature) but has no captured image, because the one screen
-    its content maps to 500s on any data due to a pre-existing bug in
-    app/routes/connector_routes.py, unrelated to this brief."""
+    """Every module page marked capture_status: live is in exactly one of
+    MODULE_CAPTURES (captured) or MODULE_CAPTURE_PENDING (named, with a
+    reason, as not yet captured) -- never neither, never both. A live
+    module quietly missing from both fails here: the pending list is an
+    explicit, reviewed roster, not a loophole that silently grows."""
     live_slugs = {
         p.slug
         for p in load_all_pages()
         if p.family == "module" and p.front_matter.get("capture_status") == "live"
     }
     registry_slugs = {entry[0] for entry in MODULE_CAPTURES}
-    documented_exceptions = {"integrations"}
-    assert live_slugs - documented_exceptions == registry_slugs, (
-        f"content says live but missing from MODULE_CAPTURES (and not a documented "
-        f"exception): {live_slugs - registry_slugs - documented_exceptions}; "
-        f"MODULE_CAPTURES has slugs content doesn't mark live: {registry_slugs - live_slugs}"
-    )
-    assert documented_exceptions <= live_slugs, (
-        "the integrations exception assumes content/pages/modules/integrations.md "
-        "is still capture_status: live -- update this test if that ever changes"
+    pending_slugs = set(MODULE_CAPTURE_PENDING)
+
+    overlap = registry_slugs & pending_slugs
+    assert not overlap, f"slugs in both MODULE_CAPTURES and MODULE_CAPTURE_PENDING: {overlap}"
+
+    assert live_slugs == registry_slugs | pending_slugs, (
+        f"live module(s) in neither MODULE_CAPTURES nor MODULE_CAPTURE_PENDING: "
+        f"{live_slugs - registry_slugs - pending_slugs}; "
+        f"MODULE_CAPTURES/MODULE_CAPTURE_PENDING name slug(s) content doesn't mark live: "
+        f"{(registry_slugs | pending_slugs) - live_slugs}"
     )
 
 
-def test_live_module_with_no_capture_entry_is_the_documented_integrations_exception():
-    """No OTHER live module is silently missing from MODULE_CAPTURES --
-    "integrations" is the only name this test (and the registry's own
-    comment) allows through."""
-    live_slugs = {
-        p.slug
-        for p in load_all_pages()
-        if p.family == "module" and p.front_matter.get("capture_status") == "live"
-    }
-    registry_slugs = {entry[0] for entry in MODULE_CAPTURES}
-    assert live_slugs - registry_slugs == {"integrations"}
+def test_module_capture_pending_entries_all_have_a_reason():
+    for slug, reason in MODULE_CAPTURE_PENDING.items():
+        assert isinstance(reason, str) and len(reason) > 10, (
+            f"{slug}: MODULE_CAPTURE_PENDING reason is missing or too short to be useful"
+        )
+
+
+def test_module_capture_pending_pages_stay_capture_status_live():
+    """Capture-pending and feature-pending are different things. A page
+    named in MODULE_CAPTURE_PENDING describes a real, shipped feature whose
+    screenshot capture hasn't landed yet -- its own capture_status must
+    stay "live", never flipped to awaiting_capture or anything else, and
+    its cta must be untouched by this list's existence."""
+    for slug in MODULE_CAPTURE_PENDING:
+        page = load_page("module", slug=slug)
+        assert page is not None, f"{slug}: no content page found"
+        assert page.front_matter.get("capture_status") == "live", (
+            f"{slug}: capture_status is {page.front_matter.get('capture_status')!r}, "
+            f"not 'live' -- being capture-pending must never change this"
+        )
 
 
 # ── module screenshots: files on disk ───────────────────────────────────
@@ -112,6 +147,17 @@ def test_every_live_module_has_a_captured_image_file_under_the_size_cap():
             f"{slug}.webp is {size} bytes, over the {MAX_IMAGE_BYTES}-byte cap"
         )
         assert size > 0, f"{slug}.webp is a zero-byte file"
+
+
+def test_no_stray_image_file_for_a_pending_module():
+    """A rejected capture's file must actually be gone, not just dropped
+    from the registry -- a stray file on disk would still fail the "never
+    ship an empty/wrong screen" rule even though nothing links to it."""
+    for slug in MODULE_CAPTURE_PENDING:
+        image_path = IMG_MODULES_DIR / f"{slug}.webp"
+        assert not image_path.is_file(), (
+            f"{slug}.webp still exists on disk despite being capture-pending"
+        )
 
 
 # ── module pages render the image ───────────────────────────────────────
@@ -132,6 +178,21 @@ def test_every_live_module_page_renders_its_screenshot_with_alt_text(app):
             # width/height both present as explicit attributes somewhere on the img tag
             assert re.search(r'width="\d+"', page_html)
             assert re.search(r'height="\d+"', page_html)
+
+
+def test_capture_pending_module_pages_render_no_screenshot(app):
+    """Every MODULE_CAPTURE_PENDING page renders with no media at all --
+    capture_status stays live (previous test), but get_page_screenshot()'s
+    file-exists gate means the removed file renders nothing rather than a
+    broken <img> or a stale picture."""
+    with app.test_client() as client:
+        for slug in MODULE_CAPTURE_PENDING:
+            page = load_page("module", slug=slug)
+            assert page is not None
+            assert get_page_screenshot(page) is None, f"{slug}: expected no screenshot"
+            rv = client.get(f"/modules/{slug}")
+            assert rv.status_code == 200
+            assert 'data-testid="page-screenshot"' not in rv.data.decode()
 
 
 # ── the screenshot gate itself, independent of real content files ──────
@@ -173,35 +234,48 @@ def test_get_page_screenshot_returns_none_for_other_page_families():
     assert get_page_screenshot(page) is None
 
 
-def test_live_module_with_no_captured_file_renders_no_screenshot(app):
-    """content/pages/modules/integrations.md is capture_status: live (it is
-    a real, sellable feature -- see the MODULE_CAPTURES comment in
-    app/services/public_pages.py) but deliberately has no entry in
-    MODULE_CAPTURES and so no captured file: its one in-product screen 500s
-    on any data, a pre-existing bug unrelated to this brief. The file-exists
-    half of get_page_screenshot()'s gate must still hold for a page whose
-    capture_status alone would otherwise pass."""
-    page = load_page("module", slug="integrations")
-    assert page is not None
-    assert page.front_matter.get("capture_status") == "live"
-    assert get_page_screenshot(page) is None
+# ── the one live use-case screenshot (capture-pending, see module above) ─
+
+
+def test_use_case_screenshot_registry_matches_pending_list():
+    """Same strict either/or rule as modules, applied to the one live
+    use-case page."""
+    live_slugs = {
+        p.slug
+        for p in load_all_pages()
+        if p.family == "function-per-segment"
+        and p.front_matter.get("capture_status") == "live"
+    }
+    registry_slugs = {entry[0] for entry in USE_CASE_SCREENSHOT_CAPTURES}
+    pending_slugs = set(USE_CASE_SCREENSHOT_PENDING)
+    assert not (registry_slugs & pending_slugs)
+    assert live_slugs == registry_slugs | pending_slugs, (
+        f"live use-case page(s) in neither list: {live_slugs - registry_slugs - pending_slugs}; "
+        f"named but not actually live: {(registry_slugs | pending_slugs) - live_slugs}"
+    )
+
+
+def test_use_case_screenshot_pending_page_stays_capture_status_live_and_renders_nothing(app):
     with app.test_client() as client:
-        rv = client.get("/modules/integrations")
-        assert rv.status_code == 200
-        assert 'data-testid="page-screenshot"' not in rv.data.decode()
+        for slug in USE_CASE_SCREENSHOT_PENDING:
+            page = load_page("function-per-segment", slug=slug)
+            assert page is not None
+            assert page.front_matter.get("capture_status") == "live"
+            assert get_page_screenshot(page) is None
+            rv = client.get(f"/use-cases/{slug}")
+            assert rv.status_code == 200
+            assert 'data-testid="page-screenshot"' not in rv.data.decode()
 
 
-# ── the one live use-case screenshot ────────────────────────────────────
-
-
+@pytest.mark.skipif(not USE_CASE_SCREENSHOT_CAPTURES, reason=_USE_CASE_SCREENSHOT_PENDING_REASON)
 def test_live_use_case_has_a_captured_image_under_the_size_cap():
-    assert len(USE_CASE_SCREENSHOT_CAPTURES) > 0
     for slug, _path, _persona, _caption, _alt in USE_CASE_SCREENSHOT_CAPTURES:
         image_path = IMG_USE_CASES_DIR / f"{slug}.webp"
         assert image_path.is_file(), f"missing captured image for use case {slug}"
         assert image_path.stat().st_size <= MAX_IMAGE_BYTES
 
 
+@pytest.mark.skipif(not USE_CASE_SCREENSHOT_CAPTURES, reason=_USE_CASE_SCREENSHOT_PENDING_REASON)
 def test_live_use_case_page_renders_its_screenshot(app):
     with app.test_client() as client:
         for slug, _path, _persona, caption, alt in USE_CASE_SCREENSHOT_CAPTURES:
@@ -214,11 +288,12 @@ def test_live_use_case_page_renders_its_screenshot(app):
 
 
 def test_awaiting_capture_use_case_page_renders_no_screenshot(app):
-    """A use-case page whose capture_status is awaiting_capture (every
-    function-per-segment page except the one live one) must never render a
-    screenshot block, even though it has its own body copy and may carry a
-    recording instead."""
-    live_slugs = {entry[0] for entry in USE_CASE_SCREENSHOT_CAPTURES}
+    """A use-case page whose capture_status is awaiting_capture must never
+    render a screenshot block, even though it has its own body copy and
+    may (once round 2 lands) carry a recording instead."""
+    live_slugs = {entry[0] for entry in USE_CASE_SCREENSHOT_CAPTURES} | set(
+        USE_CASE_SCREENSHOT_PENDING
+    )
     recorded_slugs = {entry[0] for entry in USE_CASE_VIDEO_CAPTURES}
     pages = [
         p
@@ -240,11 +315,39 @@ def test_awaiting_capture_use_case_page_renders_no_screenshot(app):
                 assert 'data-testid="page-recording"' not in page_html
 
 
-# ── the four recorded use cases ─────────────────────────────────────────
+# ── the four recorded use cases (all capture-pending, see module docstring) ─
 
 
+def test_use_case_video_pending_entries_all_have_a_reason():
+    for slug, reason in USE_CASE_VIDEO_PENDING.items():
+        assert isinstance(reason, str) and len(reason) > 10, (
+            f"{slug}: USE_CASE_VIDEO_PENDING reason is missing or too short to be useful"
+        )
+
+
+def test_no_stray_recording_files_for_a_pending_use_case():
+    for slug in USE_CASE_VIDEO_PENDING:
+        for suffix, path in (
+            (".webm", VIDEO_USE_CASES_DIR / f"{slug}.webm"),
+            ("-poster.webp", VIDEO_USE_CASES_DIR / f"{slug}-poster.webp"),
+            (".json", VIDEO_USE_CASES_DIR / f"{slug}.json"),
+        ):
+            assert not path.is_file(), f"{slug}{suffix} still exists on disk despite being capture-pending"
+
+
+def test_use_case_video_pending_pages_render_no_recording(app):
+    with app.test_client() as client:
+        for slug in USE_CASE_VIDEO_PENDING:
+            page = load_page("function-per-segment", slug=slug)
+            assert page is not None, f"{slug}: no content page found"
+            assert get_page_recording(page) is None
+            rv = client.get(f"/use-cases/{slug}")
+            assert rv.status_code == 200
+            assert 'data-testid="page-recording"' not in rv.data.decode()
+
+
+@pytest.mark.skipif(not USE_CASE_VIDEO_CAPTURES, reason=_VIDEO_PENDING_REASON)
 def test_every_recorded_use_case_has_video_poster_and_sidecar_under_caps():
-    assert len(USE_CASE_VIDEO_CAPTURES) == 4
     for slug, _steps, _persona, _caption, _alt in USE_CASE_VIDEO_CAPTURES:
         video_path = VIDEO_USE_CASES_DIR / f"{slug}.webm"
         poster_path = VIDEO_USE_CASES_DIR / f"{slug}-poster.webp"
@@ -269,6 +372,7 @@ def test_every_recorded_use_case_has_video_poster_and_sidecar_under_caps():
         assert meta["captured_date"]
 
 
+@pytest.mark.skipif(not USE_CASE_VIDEO_CAPTURES, reason=_VIDEO_PENDING_REASON)
 def test_recorded_use_case_page_renders_video_with_required_attributes(app):
     with app.test_client() as client:
         for slug, _steps, _persona, caption, alt in USE_CASE_VIDEO_CAPTURES:
@@ -289,6 +393,7 @@ def test_recorded_use_case_page_renders_video_with_required_attributes(app):
             assert caption in page_html
 
 
+@pytest.mark.skipif(not USE_CASE_VIDEO_CAPTURES, reason=_VIDEO_PENDING_REASON)
 def test_recorded_use_case_video_object_jsonld_has_required_fields(app):
     with app.test_client() as client:
         for slug, _steps, _persona, caption, _alt in USE_CASE_VIDEO_CAPTURES:
@@ -311,6 +416,7 @@ def test_recorded_use_case_video_object_jsonld_has_required_fields(app):
             assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T00:00:00Z", video["uploadDate"])
 
 
+@pytest.mark.skipif(not USE_CASE_VIDEO_CAPTURES, reason=_VIDEO_PENDING_REASON)
 def test_get_page_recording_ignores_capture_status():
     """A recorded use case is independent of capture_status -- three of the
     four recorded pages are still (rightly) marked awaiting_capture for the
@@ -336,7 +442,8 @@ def test_get_page_recording_returns_none_for_module_pages():
 def test_get_page_recording_returns_none_for_an_unrecorded_use_case():
     page = PublicPage(
         family="function-per-segment",
-        slug="uc-s3-06-capability-maturity-heatmap",  # live screenshot, but no recording
+        slug="uc-s3-06-capability-maturity-heatmap",  # not in USE_CASE_VIDEO_CAPTURES,
+        # regardless of its own screenshot's pending status
         url="/use-cases/uc-s3-06-capability-maturity-heatmap",
         title="Capability maturity",
         body_html="",

@@ -68,58 +68,21 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("architecture-model", "/architecture/", DEMO_PERSONA,
      "The ArchiMate element browser, spanning the business, application, technology and motivation layers.",
      "Screenshot of the Architecture Model module's ArchiMate element browser."),
-    ("batch-import", "/batch-import/", DEMO_PERSONA,
-     "The batch import dashboard, showing recent bulk import jobs.",
-     "Screenshot of the Batch Import module's dashboard."),
     ("business-case", "/business-case/", DEMO_PERSONA,
      "Business cases with their status, three-year TCO and return on investment.",
      "Screenshot of the Business Case module's list of business cases."),
     ("business-model-canvas", "/business-model/", DEMO_PERSONA,
      "The business model canvas library, with each canvas's operating-model archetype.",
      "Screenshot of the Business Model Canvas module's canvas library."),
-    ("capability-maturity", "/capability-maturity/heatmap", DEMO_PERSONA,
-     "A capability maturity heat map, coloured by recorded current and target maturity levels.",
-     "Screenshot of the Capability Maturity module's heat map."),
     ("compliance-frameworks", "/dashboard/compliance", DEMO_PERSONA,
      "The compliance frameworks dashboard, tracking framework coverage across the estate.",
      "Screenshot of the Compliance Frameworks module's dashboard."),
-    ("diagrams", "/archimate/diagrams", DEMO_PERSONA,
-     "The diagrams library, listing saved ArchiMate diagrams.",
-     "Screenshot of the Diagrams and Composer module's diagram library."),
     ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,
      "The duplicate detection dashboard, flagging applications that may overlap in function.",
      "Screenshot of the Duplicate Detection module's dashboard."),
-    ("gap-analysis", "/enterprise/implementation/gap-analysis", DEMO_PERSONA,
-     "The gap analysis view, listing recorded capability gaps by severity.",
-     "Screenshot of the Gap Analysis module."),
-    ("industry-apqc", "/industry-apqc/", DEMO_PERSONA,
-     "The APQC industry reference framework dashboard.",
-     "Screenshot of the Industry Reference Frameworks module."),
-    # "integrations" is deliberately absent here even though
-    # content/pages/modules/integrations.md is capture_status: live (left
-    # live on purpose -- the sellable feature the page describes, syncing
-    # Jira/GitHub/ServiceNow data in, is not what's broken). The one screen
-    # this module's content maps to, the admin-only connector health
-    # dashboard, has its own pre-existing bug: app/routes/connector_routes.py
-    # api_list_connectors() calls .value on connector_type/status/sync_mode
-    # as though they were Enum columns, but app/models/connector_config.py
-    # declares all three as plain strings, so the call throws the moment any
-    # row exists in connector_configs -- out of this brief's scope to fix.
-    # Capturing it today would mean shipping a screenshot of "An internal
-    # error occurred", which the brief's empty/error-state refusal rules out
-    # just as plainly as an empty one. See
-    # tests/test_module_screenshots.py::test_live_module_with_no_capture_entry_is_the_documented_integrations_exception
-    # for the one case this intentionally carries; revisit once the bug has
-    # its own fix.
-    ("investment-analysis", "/architecture/investment-priorities", DEMO_PERSONA,
-     "Investment priorities ranked by cost and strategic impact.",
-     "Screenshot of the Investment Analysis module's priority ranking."),
     ("my-applications", "/my-applications/", APP_MANAGER_PERSONA,
      "An application owner's personal dashboard of the applications they're responsible for.",
      "Screenshot of the My Applications module's owner dashboard."),
-    ("org-chart", "/organization/", DEMO_PERSONA,
-     "The Org Chart module's hub, linking to the organisation chart, RACI matrix and workforce transition view.",
-     "Screenshot of the Org Chart and RACI module's hub page."),
     ("portfolio", "/portfolio/", DEMO_PERSONA,
      "The portfolio dashboard, summarising active initiatives and programmes.",
      "Screenshot of the Portfolio module's dashboard."),
@@ -129,65 +92,111 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("projects", "/enterprise/implementation/work-packages", DEMO_PERSONA,
      "The work packages list, tracking delivery programmes in progress.",
      "Screenshot of the Projects module's work packages list."),
-    ("rationalization", "/applications/rationalization", DEMO_PERSONA,
-     "The rationalization dashboard, with duplicate groups detected and consolidation steps ready to work through.",
-     "Screenshot of the Rationalization module's dashboard."),
     ("risk-register", "/risks/", DEMO_PERSONA,
      "The risk register, with likelihood, impact and a mitigation plan recorded for each risk.",
      "Screenshot of the Risk Register module."),
-    ("roadmaps", "/capability-roadmap", DEMO_PERSONA,
-     "The capability roadmap, sequencing transformation work across plateaus.",
-     "Screenshot of the Roadmaps module's capability roadmap."),
     ("solutions", "/solutions/", DEMO_PERSONA,
      "The solutions list, tracking each solution's design progress and next action.",
      "Screenshot of the Solutions module's solution list."),
-    ("value-streams", "/value-streams/", DEMO_PERSONA,
-     "The value streams view, with each stream's type and strategic importance.",
-     "Screenshot of the Value Streams module."),
     ("vendors", "/applications/vendors", DEMO_PERSONA,
      "The vendor catalogue, with each vendor's type, products and contract status.",
      "Screenshot of the Vendors module's vendor catalogue."),
 ]
 
+# ── capture-pending: named explicitly, by design (lead review 2026-10-06) ──
+# Every slug below is genuinely capture_status: live in its own content file
+# -- the FEATURE is real and shipped, cta: plans stays untouched, and
+# nothing here ever flips that front-matter. What's pending is only the
+# capture: each one's first screenshot/recording was reviewed and rejected
+# (empty data, the wrong screen, or a recording that never performs the use
+# case it claims), the file was removed, and round 2 reseeds what each
+# screen actually needs and recaptures it properly.
+#
+# This dict (not just an absence from MODULE_CAPTURES) is what keeps the
+# registry-completeness tests strict: test_module_screenshots.py asserts
+# every live module/use-case is in MODULE_CAPTURES **or** named here, so a
+# module that quietly loses its capture without being added to this list
+# still fails the test, exactly as it would have before any pending list
+# existed. Round 2 deletes a name from here the same moment it adds the
+# slug back to the matching *_CAPTURES list above -- the two are meant to
+# be mutually exclusive, never both.
+MODULE_CAPTURE_PENDING: dict[str, str] = {
+    "integrations": (
+        "connector health dashboard throws \"An internal error occurred\" on any "
+        "data: app/routes/connector_routes.py api_list_connectors() calls .value "
+        "on connector_type/status/sync_mode as though they were Enum columns, but "
+        "app/models/connector_config.py declares all three as plain strings -- "
+        "pre-existing bug, unrelated file, out of scope to fix here"
+    ),
+    "capability-maturity": (
+        "heat map showed \"No capabilities yet\" for an organisation that has 24 "
+        "capabilities elsewhere (investment-analysis) -- this screen reads a "
+        "different capability store than the one seeded; a reuse-register-shaped "
+        "bug, separate brief owed"
+    ),
+    "batch-import": (
+        "completed jobs rendered at 0% progress and 0 elements generated -- "
+        "reads broken, not done; needs a real completed run with actual elements"
+    ),
+    "org-chart": (
+        "captured screen was the module's hub page (three link cards), not the "
+        "organisation chart itself -- needs actors/hierarchy seeded and the "
+        "/organization/chart route captured instead"
+    ),
+    "diagrams": (
+        "captured screen was a list of diagram names, not a rendered diagram -- "
+        "needs a diagram actually open in the Composer"
+    ),
+    "industry-apqc": "0 processes shown on every seeded framework",
+    "investment-analysis": "domain Unknown and 0 apps coverage on every capability row",
+    "gap-analysis": "type None on every row",
+    "rationalization": (
+        "captured screen was the \"Get started\" onboarding panel, not the "
+        "rationalization view itself -- needs scores past onboarding"
+    ),
+    "roadmaps": "0 gaps detected; plateaus with no description and 0 gaps",
+    "value-streams": "0 stages and 0 capabilities on every value stream",
+}
+
 # The one live use-case page: same screen as the capability-maturity module
-# (its own url_slug front-matter field points at the identical route),
-# captured again under the use-case slug so each family's image lives in its
-# own static directory.
-USE_CASE_SCREENSHOT_CAPTURES: list[tuple[str, str, str, str, str]] = [
-    ("uc-s3-06-capability-maturity-heatmap", "/capability-maturity/heatmap", DEMO_PERSONA,
-     "A capability maturity heat map that leaves a cell blank rather than inventing a score.",
-     "Screenshot of the capability maturity heat map, used to answer this use case."),
-]
+# (its own url_slug front-matter field points at the identical route). Empty
+# for the same reason as capability-maturity above -- see
+# USE_CASE_SCREENSHOT_PENDING.
+USE_CASE_SCREENSHOT_CAPTURES: list[tuple[str, str, str, str, str]] = []
+
+USE_CASE_SCREENSHOT_PENDING: dict[str, str] = {
+    "uc-s3-06-capability-maturity-heatmap": (
+        "same capability-maturity heat map issue as the module above -- "
+        "\"No capabilities yet\""
+    ),
+}
 
 # Four multi-step use cases keyed by file stem (not by URL -- a pending URL
 # rewrite from /use-cases/uc-* to a readable /use-cases/<slug> form had not
 # landed on main as of this capture, so a future rename is a rename, not a
 # recapture). Each entry: (slug, steps, persona_email, caption, alt_text) --
-# steps themselves only matter to the capture script.
-USE_CASE_VIDEO_CAPTURES: list[tuple[str, list, str, str, str]] = [
-    ("uc-s3-01-import-your-model",
-     [("/archimate/import", 6.0), ("/architecture/", 7.0)], DEMO_PERSONA,
-     "An ArchiMate import lands directly in the element browser, across every layer.",
-     "Recording of importing an ArchiMate model and viewing it in the element browser."),
-    ("uc-s2-01-what-breaks",
-     [("/enterprise/analysis/impact-analysis", 6.0), ("/intelligence/twin-map", 7.0)], DEMO_PERSONA,
-     "Tracing what breaks if a service fails, from the impact view through to the visual twin map.",
-     "Recording of tracing what breaks if a service fails, ending on the visual twin map."),
-    ("uc-s3-07-review-board",
-     [("/solutions/", 6.0), ("/arb/", 7.0)], DEMO_PERSONA,
-     "A solution moving from the solutions list into the Architecture Review Board's queue.",
-     "Recording of a solution moving from the solutions list into the Architecture Review Board."),
-    ("uc-s3-05-business-case-for-the-cio",
-     [("/business-case/", 6.0), ("/architecture/investment-priorities", 7.0)], DEMO_PERSONA,
-     "A business case's cost figures carried through to the investment priority ranking.",
-     "Recording of a business case's figures carried through to investment priority ranking."),
-]
+# steps themselves only matter to the capture script. Empty for round 1 --
+# see USE_CASE_VIDEO_PENDING below; round 2 restores these once each
+# recording actually performs the use case it claims rather than touring
+# past it.
+USE_CASE_VIDEO_CAPTURES: list[tuple[str, list, str, str, str]] = []
+
+USE_CASE_VIDEO_PENDING: dict[str, str] = {
+    "uc-s3-01-import-your-model": "recording never selects or uploads a file",
+    "uc-s2-01-what-breaks": (
+        "recording ends on the Twin map's empty \"pick a system\" prompt"
+    ),
+    "uc-s3-07-review-board": "recording never submits or decides a change",
+    "uc-s3-05-business-case-for-the-cio": "recording never opens an actual business case",
+}
 
 # uc-s4-02-set-up-in-an-afternoon.md ("set it up from our spreadsheet in an
-# afternoon") is deliberately not in USE_CASE_VIDEO_CAPTURES: its own content
-# says plainly "What Entelim is building ... Coming soon. Join the waiting
-# list" (capture_status: not_applicable_not_yet_built, state: briefed, not
-# on_main). There is no built screen behind that page to record.
+# afternoon") is deliberately in neither USE_CASE_VIDEO_CAPTURES nor
+# USE_CASE_VIDEO_PENDING: its own content says plainly "What Entelim is
+# building ... Coming soon. Join the waiting list" (capture_status:
+# not_applicable_not_yet_built, state: briefed, not on_main). There is no
+# built screen behind that page to record, which is a different thing from
+# a capture being merely pending.
 
 FAMILY_DIR_MAP = {
     "vision": "vision",
