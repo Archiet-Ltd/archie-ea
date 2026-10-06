@@ -84,6 +84,11 @@ POLICY = {
     # is refused -- inviting people into an organisation is not a persona's
     # job, it is its administrator's.
     "/admin/team":             set(),
+    # R1-B56: Agent Registry (owner/charter/delegated-limits per agent) is
+    # gated to platform_admin via @requires_role / _guard in
+    # agent_registry_routes.py -- registering and activating an agent is
+    # not a persona's job.
+    "/admin/agent-registry/":  set(),
     # Agent oversight: pause/resume all agent writes, view refused-call log,
     # and check classification status — all gated by org_admin, which no
     # seeded archetype except platform_admin holds.

@@ -87,6 +87,40 @@ class TestActivationGating:
         assert len(rows_a) == 1
         assert rows_b == []
 
+    def test_org_bs_platform_admin_cannot_reach_org_as_registration(
+        self, app, db_session, make_org, client, login_as
+    ):
+        """Review finding: the test above only proves a SQL WHERE clause
+        works, not that the route itself refuses cross-org access. This
+        drives the real route."""
+        import uuid
+
+        from app.models.user import Role, User
+
+        Role.insert_roles()
+        architect_role = Role.query.filter_by(name="Architect").one()
+        org_a = make_org("agent-reg-route-fence-a")
+        org_b = make_org("agent-reg-route-fence-b")
+        reg_a = create_registration(organization_id=org_a.id, name="A's Agent")
+
+        admin_b = User(
+            email=f"admin.b.{uuid.uuid4().hex[:8]}@example.com", first_name="Admin",
+            last_name="B", organization_id=org_b.id, enterprise_role="platform_admin",
+            confirmed=True, is_org_admin=True,
+        )
+        admin_b.role = architect_role
+        db_session.add(admin_b)
+        db_session.commit()
+        login_as(client, admin_b)
+
+        resp = client.get(f"/admin/agent-registry/{reg_a.id}")
+        assert resp.status_code == 404
+
+        resp2 = client.post(f"/admin/agent-registry/{reg_a.id}/activate")
+        assert resp2.status_code in (403, 404)
+        db_session.refresh(reg_a)
+        assert reg_a.status != "active"
+
 
 class TestCharterChangeReview:
     def test_a_proposed_charter_change_is_not_current_until_approved(
