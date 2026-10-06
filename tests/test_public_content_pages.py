@@ -1486,23 +1486,38 @@ def test_use_case_slugs_are_unique():
     assert len(urls) == len(set(urls)), "duplicate use-case page URLs"
 
 
-def test_use_case_pages_no_longer_served_at_internal_filename_slug(app):
-    """A use-case page whose public slug differs from its uc-sN-NN-* filename
-    is no longer served (as a 200) at the old filename-based URL -- it must
-    redirect instead (see the redirect tests below), not quietly double-serve
-    at two paths."""
+def test_every_use_case_page_redirects_from_its_old_filename_url(app):
+    """Every use-case page whose public slug differs from its uc-sN-NN-*
+    filename 301-redirects from that old filename-based URL to its current
+    url_slug -- not a hand-picked sample, every file under
+    content/pages/function-per-segment/, with the expected target read from
+    that file's own front matter at test time (not a hardcoded mapping), so
+    this cannot drift out of sync with a future slug change.
+
+    Also asserts the redirect was actually exercised for every file in the
+    family (none silently skipped), so this test cannot quietly shrink to a
+    no-op as pages are added, renamed or removed.
+    """
     seg_dir = CONTENT_ROOT / "function-per-segment"
+    md_files = sorted(seg_dir.glob("*.md"))
+    assert len(md_files) > 0, "no function-per-segment files found"
+
+    checked = 0
     with app.test_client() as client:
-        for md_file in sorted(seg_dir.glob("*.md")):
+        for md_file in md_files:
             filename_slug = md_file.stem
             raw = md_file.read_text(encoding="utf-8")
             front_matter, _ = _parse_front_matter(raw)
             url_slug = front_matter.get("url_slug", "")
-            if not (isinstance(url_slug, str) and url_slug.startswith("/use-cases/")):
-                continue
+            assert isinstance(url_slug, str) and url_slug.startswith("/use-cases/"), (
+                f"{md_file.name}: url_slug is {url_slug!r}, expected a "
+                "/use-cases/<slug> path -- every use-case file must carry one"
+            )
             public_slug = url_slug[len("/use-cases/"):]
             if public_slug == filename_slug:
-                continue  # nothing moved for this page
+                continue  # this file's filename already is its public slug
+
+            checked += 1
             rv = client.get(f"/use-cases/{filename_slug}", follow_redirects=False)
             assert rv.status_code == 301, (
                 f"/use-cases/{filename_slug}: expected a 301 redirect to "
@@ -1512,6 +1527,15 @@ def test_use_case_pages_no_longer_served_at_internal_filename_slug(app):
                 f"/use-cases/{filename_slug}: redirected to {rv.location!r}, "
                 f"expected {url_slug!r}"
             )
+
+    # Every file in the family migrated its slug, so every file must have
+    # been checked above -- if this ever reads 0, the loop above stopped
+    # actually testing anything and the test would otherwise pass vacuously.
+    assert checked == len(md_files), (
+        f"expected to check all {len(md_files)} use-case files' redirects, "
+        f"only checked {checked} -- some file's filename already equals its "
+        "public slug, which should not happen for this family yet"
+    )
 
 
 def test_use_case_old_filename_url_redirects_to_new_slug_sample(app):
@@ -1540,6 +1564,54 @@ def test_use_case_unknown_slug_still_404s(app):
     with app.test_client() as client:
         rv = client.get("/use-cases/this-page-does-not-exist-xyz")
         assert rv.status_code == 404
+
+
+# Directories scanned for stale "/use-cases/uc-s" references (the old,
+# internal-filename-based URL form). Binary/vendor assets are skipped: they
+# cannot contain a hand-written link to a content page and some are not
+# valid UTF-8.
+_STALE_REFERENCE_ROOTS = ["app", "content"]
+_STALE_REFERENCE_SKIP_DIR_NAMES = {
+    "vendor", "node_modules", "__pycache__", ".git", "dist", "build",
+}
+_STALE_REFERENCE_SKIP_SUFFIXES = {
+    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".ttf",
+    ".eot", ".pdf", ".svg", ".zip", ".pyc", ".map",
+}
+
+
+def test_no_stale_internal_use_case_uc_slug_references():
+    """No file under app/ or content/ (which covers app/static/) contains
+    the string "/use-cases/uc-s" -- the old, internal-filename-based URL
+    form. A hit here would be a leftover internal link, fixture or doc still
+    pointing at the pre-migration URL instead of the current readable slug.
+    """
+    repo_root = Path(__file__).resolve().parent.parent
+    needle = "/use-cases/uc-s"
+    offenders: list[str] = []
+
+    for root_name in _STALE_REFERENCE_ROOTS:
+        root = repo_root / root_name
+        if not root.is_dir():
+            continue
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            if path.suffix.lower() in _STALE_REFERENCE_SKIP_SUFFIXES:
+                continue
+            if _STALE_REFERENCE_SKIP_DIR_NAMES & set(path.relative_to(root).parts[:-1]):
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            if needle in text:
+                offenders.append(str(path.relative_to(repo_root)))
+
+    assert not offenders, (
+        "stale '/use-cases/uc-s' reference(s) found (old filename-based URL "
+        "form) -- update to the current readable slug:\n" + "\n".join(offenders)
+    )
 
 
 def test_use_cases_index_returns_200_and_lists_every_page(app):
