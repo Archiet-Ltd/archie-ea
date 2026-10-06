@@ -53,8 +53,11 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261005_bf_capability_fk"
-# down_revision: lead re-chains this at merge time, do not resequence yourself
-down_revision = "20261004_arb_review_source_cols"
+# down_revision: lead re-chains this at merge time, do not resequence yourself.
+# Updated 2026-10-06 to chain after 20261004_acr_escalated_at (PR387), which
+# merged to main's head after this revision was first written against
+# 20261004_arb_review_source_cols.
+down_revision = "20261004_acr_escalated_at"
 branch_labels = None
 depends_on = None
 
