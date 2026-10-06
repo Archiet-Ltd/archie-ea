@@ -22,6 +22,7 @@ def get_enterprise_canvas():
     try:
         db = current_app.extensions["sqlalchemy"].db
 
+        # tenancy-ok: enterprise planning table, cross-organizational by design
         # tenant-exempt: enterprise_initiatives is a system/planning table
         # Get all enterprise initiatives
         initiatives_query = text(
@@ -55,6 +56,7 @@ def get_enterprise_canvas():
         capabilities_result = db.session.execute(capabilities_query)
         capabilities = [dict(row) for row in capabilities_result]
 
+        # tenancy-ok: enterprise planning table, cross-organizational by design
         # tenant-exempt: archimate_components is a planning table
         # Get ArchiMate components
         archimate_query = text(
@@ -68,6 +70,7 @@ def get_enterprise_canvas():
         archimate_result = db.session.execute(archimate_query)
         archimate_components = [dict(row) for row in archimate_result]
 
+        # tenancy-ok: enterprise planning table, cross-organizational by design
         # tenant-exempt: initiative_dependencies is a planning table
         # Get dependencies
         dependencies_query = text(
@@ -84,6 +87,7 @@ def get_enterprise_canvas():
         dependencies_result = db.session.execute(dependencies_query)
         dependencies = [dict(row) for row in dependencies_result]
 
+        # tenancy-ok: enterprise planning table, cross-organizational by design
         # tenant-exempt: initiative_resources is a planning table
         # Get resource allocation
         resources_query = text(
@@ -152,6 +156,7 @@ def synchronize_timelines():
     try:
         db = current_app.extensions["sqlalchemy"].db
 
+        # tenancy-ok: enterprise planning table, cross-organizational by design
         # tenant-exempt: enterprise_initiatives is a planning table
         # Get current timeline bounds
         timeline_query = text(
@@ -173,6 +178,7 @@ def synchronize_timelines():
         # Generate synchronized timeline periods
         timeline_periods = generate_timeline_periods(timeline.min_start, timeline.max_end, "months")
 
+        # tenancy-ok: enterprise planning table, cross-organizational by design
         # tenant-exempt: enterprise_initiatives is a planning table
         # Update all roadmap systems with synchronized timeline
         update_query = text(
@@ -216,6 +222,7 @@ def manage_dependencies():
         db = current_app.extensions["sqlalchemy"].db
 
         if request.method == "GET":
+            # tenancy-ok: enterprise planning table, cross-organizational by design
             # tenant-exempt: initiative_dependencies is a planning table
             # Get all dependencies with initiative details
             query = text(
@@ -273,6 +280,7 @@ def get_analytics():
     try:
         db = current_app.extensions["sqlalchemy"].db
 
+        # tenancy-ok: enterprise planning table, cross-organizational by design
         # tenant-exempt: enterprise_initiatives is a planning table
         # Portfolio analytics
         portfolio_query = text(
@@ -310,6 +318,7 @@ def get_analytics():
         capability_result = db.session.execute(capability_query)
         capability_analytics = dict(capability_result.fetchone())
 
+        # tenancy-ok: enterprise planning table, cross-organizational by design
         # tenant-exempt: enterprise_initiatives is a planning table
         # Risk assessment
         risk_query = text(
@@ -331,6 +340,7 @@ def get_analytics():
         risk_result = db.session.execute(risk_query)
         risk_analytics = [dict(row) for row in risk_result]
 
+        # tenancy-ok: enterprise planning table, cross-organizational by design
         # tenant-exempt: enterprise_initiatives is a planning table
         # Timeline analysis
         timeline_query = text(

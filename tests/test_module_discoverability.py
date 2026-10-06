@@ -39,6 +39,7 @@ _INFRA_RULES = {
     "/robots.txt",
     "/sitemap.xml",
     "/llms.txt",  # crawler/agent meta file, same category as robots.txt
+    "/llms-full.txt",  # crawler/agent meta file, same category as robots.txt
     "/apidocs/",
     "/apispec.json",
     "/oauth2-redirect.html",
@@ -55,6 +56,7 @@ _INFRA_RULES = {
     # family, not because they need an in-app nav entry.
     "/vision",
     "/how-archiet-runs-on-entelim",
+    "/vs",  # the public comparison hub (app/main/views.py::public_comparison_hub)
 }
 
 _SINGLE_SEGMENT = re.compile(r"^/[^/]+/?$")

@@ -233,6 +233,13 @@ def init_cli(app):
         app.logger.warning(f"\u26a0\ufe0f  Failed to register integration flow columns CLI: {e}")
 
     try:
+        from app.commands.backfill_meaning_tenancy import init_app as init_backfill_meaning
+        init_backfill_meaning(app)
+        app.logger.info("Meaning tenancy backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"\u26a0\ufe0f  Failed to register meaning tenancy backfill CLI: {e}")
+
+    try:
         from app.commands.reconcile_schema import init_app as init_reconcile_schema
         init_reconcile_schema(app)
         app.logger.info("\u2705 Schema reconcile CLI command registered")
@@ -509,6 +516,13 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register clear foreign assignees CLI: {e}")
 
+    try:
+        from app.commands.scan_eol_alerts import init_app as init_scan_eol_alerts
+        init_scan_eol_alerts(app)
+        app.logger.info("✅ End-of-support alert scan CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register end-of-support alert scan CLI: {e}")
+
 # One risk register: copy solution_risks rows into the canonical risks table
     try:
         from app.commands.backfill_solution_risk_merge import init_app as init_solution_risk_merge
@@ -516,6 +530,14 @@ def init_cli(app):
         app.logger.info("✅ Solution risk merge backfill CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register solution risk merge backfill CLI: {e}")
+
+    # Gap register consolidation: merge roadmap_gaps, implementation_gaps and compliance_gaps into gaps
+    try:
+        from app.commands.consolidate_gaps import init_app as init_consolidate_gaps
+        init_consolidate_gaps(app)
+        app.logger.info("✅ Gap register consolidation CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register gap register consolidation CLI: {e}")
 
     # unified_work_packages gained TenantMixin; four other stores merge into it
     try:

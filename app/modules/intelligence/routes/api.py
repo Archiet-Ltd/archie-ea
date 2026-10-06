@@ -940,4 +940,130 @@ def derivation_yield():
     return success_response(result)
 
 
+@intelligence_api.route("/catalogue", methods=["GET"])
+@login_required
+def query_catalogue_list():
+    """R1-B39: list the named questions a Portfolio Manager or Business
+    Owner can ask or run directly."""
+    from app.modules.intelligence.services.query_catalogue import list_entries
+
+    return success_response({"entries": list_entries()})
+
+
+@intelligence_api.route("/catalogue/<string:entry_id>", methods=["GET"])
+@login_required
+def query_catalogue_run(entry_id):
+    """R1-B39: run one catalogue entry by id, with its declared parameters
+    taken from the query string. Serves both the screen and this API with
+    the same rows (TB-0107) -- the entry itself is the only query engine."""
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    from app.modules.intelligence.services.query_catalogue import CATALOGUE, run_entry
+
+    entry = CATALOGUE.get(entry_id)
+    if entry is None:
+        return not_found_response(f"no catalogue entry named '{entry_id}'")
+
+    params = {name: request.args.get(name) for name in entry.params if request.args.get(name) is not None}
+    result = run_entry(entry_id, organization_id, **params)
+    return success_response({"entry_id": entry_id, "title": entry.title, "params": params, **result})
+
+
+@intelligence_api.route("/ask", methods=["POST"])
+@login_required
+def ask_nl_question():
+    """R1-B39: a plain-language question, interpreted onto one catalogue
+    entry and run. The interpretation (which entry, which parameters) is
+    always returned alongside the answer so the caller can show it and
+    let the user correct a misread parameter by re-POSTing with
+    ``entry_id``/``params`` set directly (TB-0108)."""
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    body = request.get_json(silent=True) or {}
+    question = body.get("question", "")
+
+    from app.modules.intelligence.services.query_catalogue import CATALOGUE, run_entry
+    from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+    if body.get("entry_id"):
+        # The user corrected the interpretation -- run exactly what they
+        # chose. ``entry_id`` and ``params`` come straight off the request
+        # body, so both are checked before anything touches them: an
+        # unhashable ``entry_id`` (a list/dict) would raise at the first
+        # ``in CATALOGUE`` lookup below, and a non-dict ``params`` would
+        # raise on the ``**`` spread into ``run_entry`` further down.
+        raw_entry_id = body["entry_id"]
+        if not isinstance(raw_entry_id, str):
+            return error_response(
+                "entry_id must be a string",
+                code="INVALID_ENTRY_ID",
+                status_code=400,
+            )
+
+        raw_params = body.get("params")
+        if raw_params is not None and not isinstance(raw_params, dict):
+            return error_response(
+                "params must be an object",
+                code="INVALID_PARAMS",
+                status_code=400,
+            )
+        caller_params = raw_params or {}
+
+        # Same filtering the GET /catalogue/<entry_id> route already does:
+        # only the entry's own declared parameter names, and only string
+        # values, ever reach ``run_entry`` -- this is what keeps a caller
+        # from smuggling ``organization_id``/``entry_id`` (or anything else)
+        # into the ``**params`` spread below. An unknown entry_id simply
+        # yields no params; the existing "not in CATALOGUE" check further
+        # down is what turns that into the honest "could not map" response.
+        entry = CATALOGUE.get(raw_entry_id)
+        safe_params = (
+            {
+                name: caller_params[name]
+                for name in entry.params
+                if isinstance(caller_params.get(name), str)
+            }
+            if entry is not None
+            else {}
+        )
+
+        interpretation = {
+            "entry_id": raw_entry_id,
+            "params": safe_params,
+            "confidence": 1.0,
+            "method": "corrected",
+            "title": entry.title if entry is not None else None,
+        }
+    else:
+        interpretation = interpret(question)
+
+    entry_id = interpretation["entry_id"]
+    if entry_id is None or entry_id not in CATALOGUE:
+        return success_response(
+            {
+                "question": question,
+                "interpretation": interpretation,
+                "answer": None,
+                "reason": "could not map this question to a known catalogue entry",
+            }
+        )
+
+    result = run_entry(entry_id, organization_id, **interpretation["params"])
+    return success_response({"question": question, "interpretation": interpretation, **result})
+
+
 __all__ = ["intelligence_api"]

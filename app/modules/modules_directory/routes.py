@@ -38,6 +38,11 @@ _SECTION_BY_ENDPOINT_PREFIX = {
     "admin.": "administration",
     "procurement.": "procurement",
     "my_applications.": "my_applications",
+    # R1-B56: lives under /admin/agent-registry but is its own blueprint
+    # ("agent_registry", not "admin"), so the "admin." prefix above never
+    # matched it -- without this entry it leaked to every role the same way
+    # the admin zone itself did before this table existed.
+    "agent_registry.": "administration",
 }
 
 

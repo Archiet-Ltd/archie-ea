@@ -6,14 +6,14 @@ capability it realises, through unified_capabilities (ADR 0008's
 canonical capability store), not a second one.
 
 Revision ID: 20261004_req_capability
-Revises: 20261004_agten_cascade
+Revises: 20261006_agent_registration
 Create Date: 2026-10-04
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261004_req_capability"
-down_revision = "20261004_agten_cascade"
+down_revision = "20261006_agent_registration"
 branch_labels = None
 depends_on = None
 
