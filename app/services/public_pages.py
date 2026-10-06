@@ -149,9 +149,48 @@ def _build_canonical(front_matter: dict[str, Any]) -> str | None:
     return None
 
 
+def _use_case_slug_and_url(front_matter: dict[str, Any], filename_slug: str) -> tuple[str, str]:
+    """A use-case (function-per-segment) page's real, crawlable address is its
+    own ``url_slug`` front-matter -- ``/use-cases/<slug>`` for every page in
+    this family -- not its internal ``uc-sN-NN-*`` filename, which was never
+    meant to be public. A page with no ``url_slug`` yet (should not happen
+    once every file carries one, but kept as a safety fallback so a brand new
+    file is still reachable immediately) falls back to its filename slug.
+    """
+    prefix = FAMILY_URL_PREFIX["function-per-segment"] + "/"
+    url_slug = front_matter.get("url_slug")
+    if isinstance(url_slug, str) and url_slug.startswith(prefix):
+        return url_slug[len(prefix):], url_slug
+    return filename_slug, f"{FAMILY_URL_PREFIX['function-per-segment']}/{filename_slug}"
+
+
+def use_case_redirect_target(old_filename_slug: str) -> str | None:
+    """The new ``/use-cases/<slug>`` URL for a use-case page previously
+    served at its internal ``uc-sN-NN-*`` filename slug, or ``None`` if
+    ``old_filename_slug`` is not a known filename in this family, or is one
+    whose public slug was never different (nothing to redirect).
+
+    Lets the ``/use-cases/<slug>`` route 301 an already-indexed old URL to
+    its new one instead of just 404ing it.
+    """
+    family_dir = CONTENT_ROOT / FAMILY_DIR_MAP["function-per-segment"]
+    if not family_dir.is_dir():
+        return None
+    file_path = family_dir / f"{old_filename_slug}.md"
+    if not file_path.is_file():
+        return None
+    front_matter, _ = _parse_front_matter(file_path.read_text(encoding="utf-8"))
+    public_slug, public_url = _use_case_slug_and_url(front_matter, old_filename_slug)
+    if public_slug == old_filename_slug:
+        return None
+    return public_url
+
+
 def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     raw = file_path.read_text(encoding="utf-8")
     front_matter, body_md = _parse_front_matter(raw)
+    if family == "function-per-segment":
+        slug, url = _use_case_slug_and_url(front_matter, slug)
     body_html = _sanitize_html(_md.reset().convert(body_md))
     title = _extract_title(body_html, front_matter)
     canonical = _build_canonical(front_matter)
@@ -221,6 +260,18 @@ def load_page(family: str, slug: str | None = None) -> PublicPage | None:
         return _load_page(file_path, family, slug_val, url)
 
     if slug is None:
+        return None
+
+    if family == "function-per-segment":
+        # The public slug is this family's own url_slug front-matter, not
+        # the internal uc-sN-NN-* filename -- find the file whose public
+        # slug (see _use_case_slug_and_url) matches the one requested.
+        for md_file in sorted(family_dir.glob("*.md")):
+            filename_slug = _slug_from_filename(md_file.name)
+            front_matter, _ = _parse_front_matter(md_file.read_text(encoding="utf-8"))
+            public_slug, public_url = _use_case_slug_and_url(front_matter, filename_slug)
+            if public_slug == slug:
+                return _load_page(md_file, family, filename_slug, public_url)
         return None
 
     file_path = family_dir / f"{slug}.md"

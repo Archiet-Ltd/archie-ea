@@ -43,7 +43,7 @@ never surface.
 
 ## Where you'll meet it
 
-- [Which contracts renew soon, and what depends on them?](/services-ops/contract-renewals)
+- [Which contracts renew soon, and what depends on them?](/use-cases/contract-renewals)
 
 ## Related modules
 

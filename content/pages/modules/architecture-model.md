@@ -23,7 +23,7 @@ needing to be a separate destination.
 
 ## Where you'll meet it
 
-- [Import our existing model](/enterprise-architecture/import)
+- [Import our existing model](/use-cases/import-archimate-model)
 
 ## Related modules
 

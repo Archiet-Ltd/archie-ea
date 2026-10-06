@@ -5,7 +5,7 @@ segment_id: S2
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /scale-up/duplicate-spend
+url_slug: /use-cases/duplicate-software-spend
 ---
 
 # What are we paying for twice?
@@ -27,4 +27,4 @@ visible as the waste was.
 
 - [Rationalization](/modules/rationalization)
 - [Duplicate Detection](/modules/duplicate-detection)
-- [What breaks if this service fails, and who gets called?](/scale-up/what-breaks-and-who-gets-called)
+- [What breaks if this service fails, and who gets called?](/use-cases/what-breaks-and-who-gets-called)

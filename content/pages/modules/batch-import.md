@@ -24,8 +24,8 @@ in and when.
 
 ## Where you'll meet it
 
-- [Import our existing model](/enterprise-architecture/import)
-- [Set it up from our spreadsheet in an afternoon](/services-ops/set-up-in-an-afternoon)
+- [Import our existing model](/use-cases/import-archimate-model)
+- [Set it up from our spreadsheet in an afternoon](/use-cases/set-up-in-an-afternoon)
 
 ## Related modules
 

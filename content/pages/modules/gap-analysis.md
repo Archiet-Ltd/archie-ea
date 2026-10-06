@@ -23,7 +23,7 @@ the tech-lead view read from, so they never disagree about what's actually missi
 
 ## Where you'll meet it
 
-- [Show the path from today's estate to the target state](/enterprise-architecture/target-state-roadmap)
+- [Show the path from today's estate to the target state](/use-cases/target-state-roadmap)
 
 ## Related modules
 

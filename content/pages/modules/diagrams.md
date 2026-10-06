@@ -24,7 +24,7 @@ no hunting through layers to find it.
 
 ## Where you'll meet it
 
-- [Give the acquirer a current architecture picture we didn't draw by hand](/scale-up/twin-map)
+- [Give the acquirer a current architecture picture we didn't draw by hand](/use-cases/architecture-map-for-due-diligence)
 
 ## Related modules
 

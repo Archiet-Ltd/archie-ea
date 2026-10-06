@@ -225,9 +225,10 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     homepage = [(loc, rest) for loc, rest in entries if urlparse(loc).path == "/"]
     assert len(homepage) == 1
     assert "<priority>1.0</priority>" in homepage[0][1]
-    # Listing it does not displace any content page. +2 non-content URLs:
-    # the homepage and the /vs comparison hub (a view, not a load_all_pages() page).
-    assert len(entries) == len(load_all_pages()) + 2
+    # Listing it does not displace any content page. +3 non-content URLs:
+    # the homepage, the /vs comparison hub and the /use-cases index (views,
+    # not load_all_pages() pages).
+    assert len(entries) == len(load_all_pages()) + 3
 
 
 def _strings_in(value):
@@ -782,7 +783,7 @@ def test_load_page_dogfood():
 
 def test_build_jsonld_webpage():
     """build_jsonld returns valid JSON for a function-per-segment page."""
-    page = load_page("function-per-segment", slug="uc-s1-02-canvas-on-one-page")
+    page = load_page("function-per-segment", slug="canvas-dependencies")
     assert page is not None
     ld_str = build_jsonld(page)
     ld = json.loads(ld_str)
@@ -1449,3 +1450,219 @@ def test_cta_plans_url_slug_matches_a_real_route(app):
         "no cta: plans page with a same-origin url_slug was found to check -- "
         "this test would pass vacuously; update it alongside whatever changed"
     )
+
+
+# ── Use-case pages: readable slugs, old-URL redirects, /use-cases index ───
+#
+# Every function-per-segment (use-case) page used to be served at
+# /use-cases/<internal uc-sN-NN-* filename slug>. Some of those URLs are
+# already indexed, so the old route now 301-redirects to the new, readable
+# slug (each page's own url_slug front-matter, rewritten to /use-cases/<slug>)
+# instead of just 404ing.
+
+
+def _redirect_path(rv) -> str:
+    """The path a Werkzeug test-client redirect response points at, whether
+    its Location header came back relative or absolute."""
+    from urllib.parse import urlparse
+
+    return urlparse(rv.location).path
+
+
+def test_use_case_slugs_are_unique():
+    """Every function-per-segment page's public slug is unique -- two pages
+    must never resolve to the same /use-cases/<slug> URL."""
+    pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+    assert len(pages) > 0, "no function-per-segment pages loaded"
+
+    slugs = [p.slug for p in pages]
+    from collections import Counter
+
+    counts = Counter(slugs)
+    duplicates = {slug: count for slug, count in counts.items() if count > 1}
+    assert not duplicates, f"duplicate use-case slugs: {duplicates}"
+
+    urls = [p.url for p in pages]
+    assert len(urls) == len(set(urls)), "duplicate use-case page URLs"
+
+
+def test_use_case_pages_no_longer_served_at_internal_filename_slug(app):
+    """A use-case page whose public slug differs from its uc-sN-NN-* filename
+    is no longer served (as a 200) at the old filename-based URL -- it must
+    redirect instead (see the redirect tests below), not quietly double-serve
+    at two paths."""
+    seg_dir = CONTENT_ROOT / "function-per-segment"
+    with app.test_client() as client:
+        for md_file in sorted(seg_dir.glob("*.md")):
+            filename_slug = md_file.stem
+            raw = md_file.read_text(encoding="utf-8")
+            front_matter, _ = _parse_front_matter(raw)
+            url_slug = front_matter.get("url_slug", "")
+            if not (isinstance(url_slug, str) and url_slug.startswith("/use-cases/")):
+                continue
+            public_slug = url_slug[len("/use-cases/"):]
+            if public_slug == filename_slug:
+                continue  # nothing moved for this page
+            rv = client.get(f"/use-cases/{filename_slug}", follow_redirects=False)
+            assert rv.status_code == 301, (
+                f"/use-cases/{filename_slug}: expected a 301 redirect to "
+                f"{url_slug}, got {rv.status_code}"
+            )
+            assert _redirect_path(rv) == url_slug, (
+                f"/use-cases/{filename_slug}: redirected to {rv.location!r}, "
+                f"expected {url_slug!r}"
+            )
+
+
+def test_use_case_old_filename_url_redirects_to_new_slug_sample(app):
+    """Spot-check: a handful of already-indexed old uc-* URLs 301 to their
+    new, readable slug -- including the one page that had no url_slug at all
+    before this migration (uc-s1-07)."""
+    samples = {
+        "uc-s2-01-what-breaks": "/use-cases/what-breaks-and-who-gets-called",
+        "uc-s3-06-capability-maturity-heatmap": "/use-cases/capability-maturity-heatmap",
+        "uc-s1-07-reference-packs": "/use-cases/reference-packs",
+        "uc-s4-06-what-we-can-and-cannot-tell": "/use-cases/what-we-can-and-cannot-tell",
+    }
+    with app.test_client() as client:
+        for old_slug, new_url in samples.items():
+            rv = client.get(f"/use-cases/{old_slug}", follow_redirects=False)
+            assert rv.status_code == 301, f"{old_slug}: expected 301, got {rv.status_code}"
+            assert _redirect_path(rv) == new_url, f"{old_slug}: redirected to {rv.location!r}"
+            # And the new URL actually renders.
+            rv2 = client.get(new_url)
+            assert rv2.status_code == 200, f"{new_url}: expected 200, got {rv2.status_code}"
+
+
+def test_use_case_unknown_slug_still_404s(app):
+    """A slug that was never a real page (old filename or new) still 404s --
+    the redirect lookup must not turn every unknown path into a catch-all."""
+    with app.test_client() as client:
+        rv = client.get("/use-cases/this-page-does-not-exist-xyz")
+        assert rv.status_code == 404
+
+
+def test_use_cases_index_returns_200_and_lists_every_page(app):
+    """/use-cases returns 200 and links every live use-case page by its
+    current (post-migration) URL and title."""
+    pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+    assert len(pages) > 0
+
+    with app.test_client() as client:
+        rv = client.get("/use-cases")
+        assert rv.status_code == 200
+        html = rv.data.decode()
+        # Unescape first: a title with an apostrophe renders as &#39; in the
+        # template's auto-escaped output (same handling as
+        # test_all_pages_have_title_in_html_title above).
+        import html as _html_mod
+
+        unescaped = _html_mod.unescape(html)
+        for page in pages:
+            assert f'href="{page.url}"' in html, f"/use-cases missing link to {page.url}"
+            assert page.title in unescaped, f"/use-cases missing title for {page.url}"
+
+
+def test_use_cases_index_groups_by_segment(app):
+    """/use-cases groups pages under a segment heading, not one flat list."""
+    with app.test_client() as client:
+        rv = client.get("/use-cases")
+        html = rv.data.decode()
+    for label in ["Startups", "Scale-ups", "Enterprise architecture teams", "Services and operations"]:
+        assert label in html, f"/use-cases missing segment heading '{label}'"
+
+
+def test_use_cases_index_in_robots_and_sitemap(app):
+    """/use-cases (the index) is allowed by robots.txt and listed in the
+    sitemap, same as every other public index."""
+    rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
+    assert _robots_allows(rules, "/use-cases"), "robots.txt blocks /use-cases"
+
+    with app.test_client() as client:
+        xml = client.get("/sitemap.xml").data.decode()
+    assert "<loc>https://entelim.org/use-cases</loc>" in xml
+
+
+# ── Home page: curated use-case highlights per segment, plus the /vs hub ──
+
+
+def test_home_page_links_curated_use_cases_and_vs_hub(app):
+    """The home page links at least one use case per persona segment, plus
+    the /vs comparison hub, with real working URLs."""
+    with app.test_client() as client:
+        rv = client.get("/")
+        html = rv.data.decode()
+
+    assert 'href="/use-cases"' in html
+    assert 'href="/vs"' in html
+
+    # Every curated slug on the home page resolves to a real page.
+    from app.main.views import _HOME_USE_CASE_HIGHLIGHTS
+
+    for slugs in _HOME_USE_CASE_HIGHLIGHTS.values():
+        for slug in slugs:
+            page = load_page("function-per-segment", slug=slug)
+            assert page is not None, f"curated home-page slug {slug!r} does not resolve"
+            assert f'href="{page.url}"' in html, (
+                f"home page missing link to curated use case {page.url}"
+            )
+
+
+# ── Header/footer: every public page links Features, Use cases, Compare, ──
+# Pricing, and the two offers -- the two-click reachability test below is
+# the real acceptance check; this test documents which links carry it.
+
+
+def test_public_footer_links_use_cases_compare_pricing_and_offers(app):
+    """The shared public footer (every public page) links Use cases, Compare,
+    Pricing and both offers."""
+    with app.test_client() as client:
+        html = client.get("/").data.decode()
+
+    for href in ["/use-cases", "/vs", "/pricing", "/architecture-health-check", "/team-annual-onboarding"]:
+        assert f'href="{href}"' in html, f"public footer missing link to {href}"
+
+
+def test_two_click_reachability_from_home_page(app):
+    """Every URL in the sitemap is reachable within two ordinary links from
+    the home page: either linked directly from '/', or linked from a page
+    that '/' links to.
+
+    This is the brief's actual acceptance test -- it does not special-case
+    any one page family, it walks real anchor hrefs the way a visitor or a
+    crawler would.
+    """
+    import re
+    from urllib.parse import urlparse
+
+    def same_site_links(html: str) -> set[str]:
+        hrefs = re.findall(r'href="([^"]+)"', html)
+        paths = set()
+        for href in hrefs:
+            if href.startswith("https://entelim.org"):
+                href = href[len("https://entelim.org"):] or "/"
+            if href.startswith("/") and not href.startswith("//"):
+                paths.add(urlparse(href).path)
+        return paths
+
+    with app.test_client() as client:
+        sitemap_xml = client.get("/sitemap.xml").data.decode()
+        must_reach = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml))
+        must_reach.discard("/")  # the home page itself, not a link target
+
+        home_html = client.get("/").data.decode()
+        one_click = same_site_links(home_html)
+
+        two_click = set(one_click)
+        for path in one_click:
+            if path in ("/", "") or path.startswith("/api/") or path.startswith("/static/"):
+                continue
+            rv = client.get(path)
+            if rv.status_code != 200:
+                continue
+            two_click |= same_site_links(rv.data.decode())
+
+        unreachable = sorted(p for p in must_reach if p not in two_click and p not in one_click)
+        assert not unreachable, (
+            "not reachable within two clicks of the home page: " + ", ".join(unreachable)
+        )

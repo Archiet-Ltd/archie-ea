@@ -21,7 +21,7 @@ context, tracked from proposal through to decision.
 
 ## Where you'll meet it
 
-- [Take a change through the review board with the impact evidence attached](/enterprise-architecture/review-board)
+- [Take a change through the review board with the impact evidence attached](/use-cases/architecture-review-board)
 
 ## Related modules
 
