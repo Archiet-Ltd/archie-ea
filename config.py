@@ -207,6 +207,10 @@ class Config:
     # Seconds to wait on the SMTP server before an account message counts as
     # not delivered; a hung relay must not hold a request open.
     MAIL_TIMEOUT = _env_optional_positive_int("MAIL_TIMEOUT") or 15
+    # Who hears about a new sales enquiry from /offers/inquire (every offer
+    # page, including /contact). Unset means enquiries are still stored, just
+    # not emailed — see app/main/views.py:product_inquiry_submit.
+    SALES_NOTIFY_EMAIL = os.environ.get("SALES_NOTIFY_EMAIL")
 
     # Analytics
     SEGMENT_API_KEY = os.environ.get("SEGMENT_API_KEY", "")
@@ -576,6 +580,35 @@ class TestingConfig(Config):
         print("THIS APP IS IN TESTING MODE. YOU SHOULD NOT SEE THIS IN PRODUCTION.")
 
 
+class SmokeTestingConfig(TestingConfig):
+    """Identical to ``TestingConfig`` except for one switch, used only to boot
+    the browser-smoke subprocess (``tests/smoke/conftest.py``'s
+    ``boot_live_server``, which sets ``FLASK_CONFIG=smoke``).
+
+    R1-B12 PR 2 (TB-0144/PB-0100) requires administrators to complete MFA on
+    every sign-in. Dozens of smoke-suite fixtures across 20+ files log in as
+    an admin archetype and expect to land straight in the app shell; making
+    each of them drive a real TOTP round trip through the browser is not
+    this fix. ``ADMIN_MFA_BYPASS`` lets ``app.services.mfa_service`` skip the
+    gate for exactly this harness, and nowhere else:
+
+    - It is a hardcoded class attribute, declared only here. It is never
+      read from an environment variable, a request, a header or a database
+      setting, and it is not set (so it is absent/falsy) on ``TestingConfig``
+      itself -- the ~2350-test non-browser pytest suite (``tests/conftest.py``'s
+      session-scoped ``app`` fixture) keeps exercising the real gate
+      unchanged.
+    - ``app/__init__.py``'s ``create_app()`` refuses to start if this switch
+      is ever true while ``TESTING`` is not also true, so a config class that
+      copies this attribute without also being a genuine testing config can
+      never boot.
+    - ``ProductionConfig`` (and every other non-testing config) never sets
+      this attribute at all.
+    """
+
+    ADMIN_MFA_BYPASS = True
+
+
 class ProductionConfig(Config):
     DEBUG = False
     USE_RELOADER = False
@@ -790,6 +823,7 @@ class CurrencyConfig:
 config = {
     "development": DevelopmentConfig,
     "testing": TestingConfig,
+    "smoke": SmokeTestingConfig,
     "production": ProductionConfig,
     "default": DevelopmentConfig,
     "heroku": HerokuConfig,

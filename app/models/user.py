@@ -183,6 +183,18 @@ class User(UserMixin, db.Model):
     external_id = db.Column(db.String(255), index=True)
     sso_provider = db.Column(db.String(50))
 
+    # Multi-factor authentication (R1-B12 PR 2, TB-0144/PB-0100). Required
+    # for administrators (app.services.mfa_service.required_for) regardless
+    # of sign-in path (password, OIDC or SAML); an administrator who has not
+    # enrolled yet is sent to enrol, not let through. Not Fernet-encrypted
+    # like SSOConfig.client_secret: pyotp secrets are base32, high-entropy,
+    # and rotated by re-enrolling -- a mirror of the existing
+    # password_hash column's own protection level, not a lesser one.
+    mfa_secret = db.Column(db.String(64))
+    mfa_enabled = db.Column(
+        db.Boolean, default=False, nullable=False, server_default=db.text("false")
+    )
+
     # Onboarding fields
     role_archetype = db.Column(
         db.String(50)
