@@ -255,22 +255,42 @@ def test_migration_keeps_a_real_ensure_function_row_unchanged(scratch_db):
                 "INSERT INTO organizations (name, slug) "
                 "VALUES ('Fixture Org', :slug) RETURNING id"
             ), {"slug": f"fixture-org-{uuid.uuid4().hex[:8]}"}).scalar()
-            unified_id = conn.execute(text(
+            # Explicit id, not captured from an auto-increment RETURNING:
+            # this value is reused below to seed a business_capability row
+            # with the SAME id, and that match must be exact and intentional
+            # rather than something that happens to fall out of whatever
+            # sequence state a shared or previously-used database is in.
+            unified_id = 500001
+            conn.execute(text(
                 "INSERT INTO unified_capabilities "
-                "(name, level, organization_id) "
-                "VALUES ('Real Cap', 1, :org) RETURNING id"
-            ), {"org": org_id}).scalar()
+                "(id, name, level, organization_id) "
+                "VALUES (:id, 'Real Cap', 1, :org)"
+            ), {"id": unified_id, "org": org_id})
+            # The old FK (reverted above, matching every database deployed
+            # before this migration) only ever let ensure_function()'s write
+            # succeed where a UnifiedCapability.id happened to collide with
+            # a business_capability.id -- the two tables have independent id
+            # sequences, so this row recreates that coincidence explicitly
+            # (same id, inserted by hand) rather than relying on chance (a
+            # fresh database has no such row lying around to coincide with,
+            # which is exactly what a clean CI run surfaced: this insert
+            # failed there with "Key (capability_id)=(500001) is not present
+            # in table business_capability" until this row was added).
+            conn.execute(text(
+                "INSERT INTO business_capability (id, name, organization_id, level) "
+                "VALUES (:id, 'Coincidental Legacy Cap', :org, 1)"
+            ), {"id": unified_id, "org": org_id})
             # A row that also happens to have a unified_capabilities row
             # whose source_id matches this same numeric string -- the exact
             # shape that tricked the old, corrupting migration into
             # rewriting an already-correct value. This row proves the fix
             # leaves it alone regardless.
-            decoy_unified_id = conn.execute(text(
+            decoy_unified_id = 500002
+            conn.execute(text(
                 "INSERT INTO unified_capabilities "
-                "(name, level, organization_id, source_table, source_id) "
-                "VALUES ('Decoy Projected Cap', 1, :org, 'business_capability', :source_id) "
-                "RETURNING id"
-            ), {"org": org_id, "source_id": str(unified_id)}).scalar()
+                "(id, name, level, organization_id, source_table, source_id) "
+                "VALUES (:id, 'Decoy Projected Cap', 1, :org, 'business_capability', :source_id) "
+            ), {"id": decoy_unified_id, "org": org_id, "source_id": str(unified_id)})
             function_id = conn.execute(text(
                 "INSERT INTO business_function (name, capability_id, organization_id) "
                 "VALUES ('Real Function', :cap, :org) RETURNING id"
@@ -363,11 +383,26 @@ def test_migration_is_idempotent_on_a_second_run(scratch_db):
                 "INSERT INTO organizations (name, slug) "
                 "VALUES ('Fixture Org', :slug) RETURNING id"
             ), {"slug": f"fixture-org-{uuid.uuid4().hex[:8]}"}).scalar()
-            unified_id = conn.execute(text(
+            # Explicit id (see test_migration_keeps_a_real_ensure_function_
+            # row_unchanged above for why): reused below to seed a matching
+            # business_capability row, recreating the coincidental id
+            # overlap the old FK required, rather than relying on whatever
+            # a fresh vs. previously-used database's sequence happens to
+            # produce.
+            unified_id = 500003
+            conn.execute(text(
                 "INSERT INTO unified_capabilities "
-                "(name, level, organization_id) "
-                "VALUES ('Real Cap', 1, :org) RETURNING id"
-            ), {"org": org_id}).scalar()
+                "(id, name, level, organization_id) "
+                "VALUES (:id, 'Real Cap', 1, :org)"
+            ), {"id": unified_id, "org": org_id})
+            # Satisfy the reverted (old-shape) FK with the same coincidental
+            # id overlap described above -- without this row, this INSERT
+            # fails on any database that doesn't happen to already have a
+            # business_capability row at this id (every fresh CI database).
+            conn.execute(text(
+                "INSERT INTO business_capability (id, name, organization_id, level) "
+                "VALUES (:id, 'Coincidental Legacy Cap', :org, 1)"
+            ), {"id": unified_id, "org": org_id})
             function_id = conn.execute(text(
                 "INSERT INTO business_function (name, capability_id, organization_id) "
                 "VALUES ('Real Function', :cap, :org) RETURNING id"
