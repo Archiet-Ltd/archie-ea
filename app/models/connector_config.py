@@ -136,6 +136,27 @@ class ConnectorConfig(TenantMixin, db.Model):
     def __repr__(self) -> str:
         return f"<ConnectorConfig {self.connector_type} org={self.organization_id}>"
 
+    def derived_sync_mode(self) -> str:
+        """Derive a human-readable sync mode from what's actually configured.
+
+        There is no ``sync_mode`` column on this model -- only ``sync_schedule``
+        (cron expressions for batch sync) and ``webhook_config`` (webhook
+        endpoints/secrets). A connector can have either, both, or neither
+        configured, so the mode is computed here rather than stored, and both
+        the API routes and the dashboard card read it from this one place so
+        they never disagree with each other.
+        """
+        has_schedule = bool(self.sync_schedule)
+        has_webhook = bool(self.webhook_config)
+
+        if has_schedule and has_webhook:
+            return "scheduled, event"
+        if has_schedule:
+            return "scheduled"
+        if has_webhook:
+            return "event"
+        return "manual"
+
 
 class SyncLog(db.Model):
     """Synchronization log entries for :class:`ConnectorConfig`."""

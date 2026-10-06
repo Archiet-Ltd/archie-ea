@@ -57,9 +57,9 @@ def api_list_connectors():
                 {
                     "id": conn.id,
                     "name": conn.name,
-                    "connector_type": conn.connector_type.value,
-                    "status": conn.status.value,
-                    "sync_mode": conn.sync_mode.value,
+                    "connector_type": conn.connector_type,
+                    "status": conn.status,
+                    "sync_mode": conn.derived_sync_mode(),
                     "last_sync": latest_sync.completed_at.isoformat()
                     if latest_sync and latest_sync.completed_at
                     else None,
@@ -99,10 +99,10 @@ def api_get_connector(connector_id):
                     "connector": {
                         "id": conn.id,
                         "name": conn.name,
-                        "connector_type": conn.connector_type.value,
-                        "status": conn.status.value,
-                        "sync_mode": conn.sync_mode.value,
-                        "config": conn.config_data,  # Field mappings, etc.
+                        "connector_type": conn.connector_type,
+                        "status": conn.status,
+                        "sync_mode": conn.derived_sync_mode(),
+                        "config": conn.config,  # API endpoints, credentials, etc.
                         "created_at": conn.created_at.isoformat(),
                         "updated_at": conn.updated_at.isoformat(),
                     },
