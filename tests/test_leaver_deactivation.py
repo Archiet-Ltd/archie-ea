@@ -90,26 +90,25 @@ def test_the_session_policy_alone_refuses_a_deactivated_user_with_a_live_session
     assert again.status_code == 401
 
 
-def test_password_sign_in_is_refused_with_a_neutral_message_and_no_session(client, db_session, org, token):
+def test_password_sign_in_is_refused_like_a_wrong_password_and_mints_no_session(client, db_session, org, token):
+    """F-08: a deactivated account answers exactly like a wrong password."""
     user = _member(db_session, org)
     call(client, "DELETE", f"/Users/{user.id}", token)
     before = len(_sessions(user.id))
     resp = _login(client, user)
-    assert resp.status_code in (302, 303)
-    assert "login" in resp.headers["Location"]
-    assert "dashboard" not in resp.headers["Location"]
-    page = client.get("/account/login")
-    assert b"This account is not active. Contact your administrator." in page.data
+    assert b"Invalid email or password." in resp.data
+    assert b"This account is not active" not in resp.data
+    assert "dashboard" not in (resp.headers.get("Location") or "")
     assert len(_sessions(user.id)) == before
 
 
-def test_json_sign_in_is_refused(client, db_session, org, token):
+def test_json_sign_in_is_refused_like_a_wrong_password(client, db_session, org, token):
     user = _member(db_session, org)
     call(client, "DELETE", f"/Users/{user.id}", token)
     _clear_g()
     resp = client.post("/api/auth/login", json={"email": user.email, "password": PASSWORD})
-    assert resp.status_code == 403
-    assert resp.get_json()["success"] is False
+    assert resp.status_code == 401
+    assert resp.get_json() == {"success": False, "error": "Invalid email or password"}
     assert _sessions(user.id) == []
 
 
