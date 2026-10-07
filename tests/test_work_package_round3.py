@@ -894,7 +894,10 @@ def test_enterprise_create_keeps_every_field(db_session, make_org, client, login
     only_summary = _json(client, "post", "/enterprise/api/work-packages",
                          {"name": "Summary only", "summary": "Only a summary"})
     row = svc.get_work_package(only_summary.get_json()["id"], org.id)
-    assert row.description == "Only a summary" and row.summary == "Only a summary"
+    # Round 5 (N4-01): the summary is a column of its own; it is not copied onto the
+    # description, so the description stays empty and the screens show the summary.
+    assert row.summary == "Only a summary" and row.description is None
+    assert svc.to_roadmap_dict(row, org.id)["summary"] == "Only a summary"
 
 
 # -- idempotency of the whole deploy sequence -------------------------------------

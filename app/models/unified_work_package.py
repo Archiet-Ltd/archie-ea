@@ -203,6 +203,12 @@ class UnifiedWorkPackage(TenantMixin, db.Model):
     # writer). Lets the merge's dependency remap run exactly once per row.
     dependencies_remapped_at = Column(DateTime, nullable=True)
 
+    # Set once the plateau and gap links held in the old store's association tables
+    # (gap_work_packages, work_package_plateaus) have become relationships. A marked
+    # row is never migrated again, so a link removed on a new screen cannot return.
+    # Bookkeeping for the deploy migration (IW-85); PR 3 drops it with the tables.
+    association_links_migrated_at = Column(DateTime, nullable=True)
+
     # Hierarchy (a child work package under a parent), carried from the
     # work_packages store; filled by the merge and the bridge.
     parent_id = Column(

@@ -1268,9 +1268,6 @@ def api_roadmap_work_packages():
         include_children: If true, include nested children
     """
     try:
-        from sqlalchemy import or_, select
-
-        from app.models.relationship_tables import gap_work_packages
         from app.models.unified_work_package import UnifiedWorkPackage as UWP
         from app.services import work_package_service
         from app.utils.tenant import current_organization_id
@@ -1285,16 +1282,9 @@ def api_roadmap_work_packages():
             if root_only:
                 query = query.filter(UWP.parent_id.is_(None))
             if gap_id:
-                # Rows made here are linked to the gap by an ArchiMate relationship;
-                # rows carried over from the older work package list are linked
-                # through gap_work_packages by that list's id.
-                linked = select(gap_work_packages.c.work_package_id).where(
-                    gap_work_packages.c.gap_id == gap_id
-                )
-                query = query.filter(or_(
-                    UWP.id.in_(work_package_service.work_package_ids_for_gap(gap_id, org_id)),
-                    (UWP.source_table == "work_packages") & UWP.source_id.in_(linked),
-                ))
+                # The one reader of a work package's gap links (the relationships).
+                query = query.filter(UWP.id.in_(
+                    work_package_service.work_package_ids_for_gap(gap_id, org_id)))
             work_packages = query.order_by(UWP.start_date, UWP.id).all()
         except Exception as qe:
             current_app.logger.warning(f"Work packages query failed: {qe}", exc_info=True)

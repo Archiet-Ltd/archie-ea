@@ -345,9 +345,36 @@ def _link_targets(wp: UnifiedWorkPackage, key: str, organization_id: int):
     return out
 
 
+def lock_work_package(work_package_id: int) -> None:
+    """SELECT ... FOR UPDATE on the unified row, held to the end of the transaction.
+    Every path that changes a work package's links takes it before reading them."""
+    db.session.execute(
+        db.select(UnifiedWorkPackage.id).where(UnifiedWorkPackage.id == work_package_id)
+        .with_for_update()
+    ).first()
+
+
+def remove_link_targets(wp: UnifiedWorkPackage, key: str, organization_id: int, target_ids) -> int:
+    """Remove the relationships from ``wp`` to these plateaus or gaps (``key`` names
+    the kind). Returns how many were removed."""
+    from app.models.models import ArchiMateRelationship
+
+    wanted = set(target_ids)
+    removed = 0
+    for rel_id, tid in _link_targets(wp, key, organization_id):
+        if tid in wanted:
+            rel = db.session.get(ArchiMateRelationship, rel_id)
+            if rel is not None:
+                db.session.delete(rel)
+                removed += 1
+    if removed:
+        db.session.flush()
+    return removed
+
+
 def _apply_links(
     wp: UnifiedWorkPackage, links: Dict[str, Any], organization_id: int, replace: bool = True,
-    rollback: bool = True, round_trip: bool = True,
+    rollback: bool = True, round_trip: bool = True, keep=None,
 ) -> None:
     """Record the links in ``links`` ({'plateau_id': Plateau|None, 'gap_id': Gap|None})
     as relationships. Only a kind that is a key of ``links`` is touched: a missing
@@ -355,18 +382,23 @@ def _apply_links(
     target replaces the others of its kind. ``rollback=False`` is for a caller
     that holds a savepoint and rolls it back itself. With ``round_trip`` the id a
     screen sends back unchanged (the first linked id) leaves the other links of
-    that kind alone; the bridge passes False, as an old screen holds one link."""
+    that kind alone; the bridge passes False, as an old screen holds one link.
+    ``keep`` is {'plateau_id': {ids}, 'gap_id': {ids}}: targets a replace leaves
+    linked (the ones the old store's association tables still hold). The unified
+    row is locked before its links are read, so two edits of one work package's
+    links run one after the other and the second reads what the first wrote."""
     if not links:
         return
     if organization_id is None:
         raise WorkPackageError("A work package link needs an organisation.")
+    _ensure_element(wp)
+    lock_work_package(wp.id)
     from app.models.archimate_core import ArchiMateElement
     from app.models.models import ArchiMateRelationship
     from app.modules.architecture.services.archimate_relationship_service import (
         ArchiMateRelationshipService,
     )
 
-    _ensure_element(wp)
     for key, target in links.items():
         _model, rel_type = _link_models()[key]
         current = _link_targets(wp, key, organization_id)
@@ -376,8 +408,9 @@ def _apply_links(
         # no change, whatever else the work package is linked to.
         unchanged = round_trip and bool(current_ids) and wanted == current_ids[0]
         if replace and not unchanged:
+            kept = (keep or {}).get(key) or ()
             for rel_id, tid in current:
-                if tid != wanted:
+                if tid != wanted and tid not in kept:
                     rel = db.session.get(ArchiMateRelationship, rel_id)
                     if rel is not None:
                         db.session.delete(rel)
@@ -462,8 +495,8 @@ def from_form(data: Dict[str, Any]) -> Dict[str, Any]:
     older forms send them) as the one store names them. Keys the store does not
     know are ignored by create and update."""
     mapped = dict(data)
-    if "summary" in data and "description" not in data:
-        mapped["description"] = data.get("summary")
+    # ``summary`` is a column of its own: it is not copied onto ``description``,
+    # so a screen that sends the summary back unchanged cannot wipe the description.
     if "architecture_id" in data and "context_id" not in data:
         mapped["context_id"] = data.get("architecture_id")
     if "estimated_effort_hours" in data and data.get("estimated_effort_hours") == "":

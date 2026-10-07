@@ -113,7 +113,8 @@ def _changes_of(obj, table):
       * {"dependencies"|"capabilities": (ids added, ids removed)} for the roadmap
         store's association tables."""
     from app.commands.consolidate_work_packages import (
-        _DEP_SOURCE_COLUMN, _LINK_RELATIONSHIPS, _LINK_SOURCE_COLUMNS)
+        _ASSOCIATION_SOURCE, _ASSOCIATIONS, _DEP_SOURCE_COLUMN, _LINK_RELATIONSHIPS,
+        _LINK_SOURCE_COLUMNS)
 
     state = inspect(obj)
     columns = set()
@@ -141,6 +142,13 @@ def _changes_of(obj, table):
             history = state.attrs[key].history
             if history.has_changes():
                 relation_change[key] = (_ids_of(history.added), _ids_of(history.deleted))
+    if table == _ASSOCIATION_SOURCE:
+        # WorkPackage.gaps / .plateaus: the ids an old screen added and removed.
+        for key in _ASSOCIATIONS:
+            if key in state.mapper.relationships:
+                history = state.attrs[key].history
+                if history.has_changes():
+                    relation_change[key] = (_ids_of(history.added), _ids_of(history.deleted))
     for column in link_columns:
         # The link set through the relationship (obj.plateau = ...) rather than the id.
         rel = column[:-3]
@@ -244,7 +252,15 @@ def _defer_links(session, wanted):
     value for the same work package replaces an earlier one."""
     pending = session.info.setdefault(_PENDING_LINKS, {})
     for uid, values in wanted.items():
-        pending.setdefault(uid, {}).update(values)
+        entry = pending.setdefault(uid, {})
+        for key, value in values.items():
+            if key == "_association_changes" and key in entry:
+                # Two flushes before the link step: add up the ids added and removed.
+                for attr, (added, removed) in value.items():
+                    old_added, old_removed = entry[key].get(attr, ((), ()))
+                    entry[key][attr] = (list(old_added) + list(added), list(old_removed) + list(removed))
+            else:
+                entry[key] = value
 
 
 @contextlib.contextmanager
