@@ -36,7 +36,9 @@ def _delivered_ten(service, org_id):
     return subscription
 
 
-def test_replay_from_sequence_5_of_10_creates_six_ordered_replay_deliveries(monkeypatch, tenant_ctx, make_org, db_session):
+def test_replay_from_sequence_5_of_10_creates_six_ordered_replay_deliveries(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     org = make_org("replay")
     transport = install_transport(monkeypatch)
     service = WebhookService()
@@ -55,7 +57,9 @@ def test_replay_from_sequence_5_of_10_creates_six_ordered_replay_deliveries(monk
     assert transport.sequences()[10:] == [5, 6, 7, 8, 9, 10]
 
 
-def test_replay_since_a_time_selects_by_the_logs_created_at(monkeypatch, tenant_ctx, make_org, db_session):
+def test_replay_since_a_time_selects_by_the_logs_created_at(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     org = make_org("replay-since")
     install_transport(monkeypatch)
     service = WebhookService()
@@ -64,7 +68,11 @@ def test_replay_since_a_time_selects_by_the_logs_created_at(monkeypatch, tenant_
         emit_events(org.id, 6)
         service.fan_out(org.id)
         service.dispatch_due(org.id, now=NOW)
-        rows = EventLogRecord.query.filter_by(organization_id=org.id).order_by(EventLogRecord.ordinal).all()
+        rows = (
+            EventLogRecord.query.filter_by(organization_id=org.id)
+            .order_by(EventLogRecord.ordinal)
+            .all()
+        )
         # Space the log's timestamps a minute apart so "since" has an unambiguous midpoint.
         base = datetime.now(timezone.utc) - timedelta(hours=1)
         for index, row in enumerate(rows):
@@ -78,7 +86,12 @@ def test_replay_since_a_time_selects_by_the_logs_created_at(monkeypatch, tenant_
         future = datetime.now(timezone.utc) + timedelta(hours=1)
         assert service.replay(subscription.id, since=future, actor="tester")["count"] == 0
         # a bare time is read as UTC
-        assert service.replay(subscription.id, since=datetime.utcnow() - timedelta(hours=2), actor="tester")["count"] == 6
+        assert (
+            service.replay(
+                subscription.id, since=datetime.utcnow() - timedelta(hours=2), actor="tester"
+            )["count"]
+            == 6
+        )
 
 
 def test_replay_needs_exactly_one_starting_point(monkeypatch, tenant_ctx, make_org, db_session):
@@ -93,7 +106,9 @@ def test_replay_needs_exactly_one_starting_point(monkeypatch, tenant_ctx, make_o
             service.replay(subscription.id, from_ordinal=1, since=NOW)
 
 
-def test_replay_only_includes_events_the_subscription_matches(monkeypatch, tenant_ctx, make_org, db_session):
+def test_replay_only_includes_events_the_subscription_matches(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     org = make_org("replay-match")
     install_transport(monkeypatch)
     service = WebhookService()
@@ -117,7 +132,9 @@ def test_replay_is_capped_and_says_so(monkeypatch, tenant_ctx, make_org, db_sess
         assert sorted(d.event_ordinal for d in _all(subscription.id) if d.is_replay) == [1, 2, 3]
 
 
-def test_replay_does_not_overtake_an_event_that_is_still_being_retried(monkeypatch, tenant_ctx, make_org, db_session):
+def test_replay_does_not_overtake_an_event_that_is_still_being_retried(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     """Live deliveries stay ahead of replays in the queue, so order for live events is never disturbed."""
     org = make_org("replay-order")
     install_transport(monkeypatch, lambda call: 500)
@@ -132,13 +149,17 @@ def test_replay_does_not_overtake_an_event_that_is_still_being_retried(monkeypat
         assert head.event_ordinal == 1 and head.is_replay is False
 
 
-def test_redeliver_copies_one_delivery_and_links_it_to_the_original(monkeypatch, tenant_ctx, make_org, db_session):
+def test_redeliver_copies_one_delivery_and_links_it_to_the_original(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     org = make_org("redeliver")
     transport = install_transport(monkeypatch)
     service = WebhookService()
     with tenant_ctx(org.id):
         subscription = _delivered_ten(service, org.id)
-        original = WebhookDelivery.query.filter_by(subscription_id=subscription.id, event_ordinal=3).one()
+        original = WebhookDelivery.query.filter_by(
+            subscription_id=subscription.id, event_ordinal=3
+        ).one()
         copy = service.redeliver(original.id, actor="tester")
         assert copy.id != original.id
         assert copy.replay_of_id == original.id
@@ -158,7 +179,9 @@ def test_redeliver_of_an_unknown_delivery_is_none(monkeypatch, tenant_ctx, make_
         assert WebhookService().redeliver("00000000-0000-0000-0000-000000000000") is None
 
 
-def test_retrying_an_event_redelivers_its_dead_or_retrying_deliveries(monkeypatch, tenant_ctx, make_org, db_session):
+def test_retrying_an_event_redelivers_its_dead_or_retrying_deliveries(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     org = make_org("retry-event")
     install_transport(monkeypatch, lambda call: 500)
     service = WebhookService()

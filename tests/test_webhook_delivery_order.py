@@ -99,7 +99,16 @@ def test_a_subscriber_down_for_an_hour_receives_every_event_in_order_afterwards(
 
 
 def test_the_back_off_schedule():
-    assert [next_backoff(n, jitter=False) for n in range(1, 9)] == [30, 60, 120, 300, 600, 900, 900, 900]
+    assert [next_backoff(n, jitter=False) for n in range(1, 9)] == [
+        30,
+        60,
+        120,
+        300,
+        600,
+        900,
+        900,
+        900,
+    ]
     for n, base in [(1, 30), (2, 60), (3, 120), (4, 300), (5, 600), (6, 900), (40, 900)]:
         for _ in range(50):
             assert base <= next_backoff(n) <= base * 1.10 + 1e-9
@@ -180,7 +189,10 @@ def test_a_timeout_is_a_failed_attempt(monkeypatch, tenant_ctx, make_org, db_ses
     assert delivery.next_attempt_at >= T0 + timedelta(seconds=30)
 
 
-@pytest.mark.parametrize("status,delivered", [(200, True), (201, True), (204, True), (299, True), (400, False), (404, False), (500, False)])
+@pytest.mark.parametrize(
+    "status,delivered",
+    [(200, True), (201, True), (204, True), (299, True), (400, False), (404, False), (500, False)],
+)
 def test_success_is_any_2xx(monkeypatch, tenant_ctx, make_org, db_session, status, delivered):
     org = make_org("status")
     install_transport(monkeypatch, lambda call: status)
@@ -235,7 +247,9 @@ def test_subscriptions_receive_only_matching_events(monkeypatch, tenant_ctx, mak
         elements = make_subscription(service, org.id, events=["archimate_element.*"])
         exact = make_subscription(service, org.id, events=["archimate_relationship.created"])
         everything = make_subscription(service, org.id, events=["*"])
-        deleted_only = make_subscription(service, org.id, events=["*"], filters={"action": "deleted"})
+        deleted_only = make_subscription(
+            service, org.id, events=["*"], filters={"action": "deleted"}
+        )
         emit_events(org.id, 2)
         emit_events(org.id, 1, start=3, event_type="archimate_relationship.created")
         service.fan_out(org.id)
@@ -245,7 +259,9 @@ def test_subscriptions_receive_only_matching_events(monkeypatch, tenant_ctx, mak
         assert _deliveries(deleted_only.id) == []
 
 
-def test_an_inactive_subscription_is_not_delivered_to(monkeypatch, tenant_ctx, make_org, db_session):
+def test_an_inactive_subscription_is_not_delivered_to(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     org = make_org("inactive")
     transport = install_transport(monkeypatch)
     service = WebhookService()
@@ -258,7 +274,9 @@ def test_an_inactive_subscription_is_not_delivered_to(monkeypatch, tenant_ctx, m
     assert transport.calls == []
 
 
-def test_a_test_event_is_one_synchronous_attempt_with_no_retry(monkeypatch, tenant_ctx, make_org, db_session):
+def test_a_test_event_is_one_synchronous_attempt_with_no_retry(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     org = make_org("test-event")
     transport = install_transport(monkeypatch, lambda call: 500)
     service = WebhookService()

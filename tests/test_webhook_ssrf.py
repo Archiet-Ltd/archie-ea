@@ -81,11 +81,16 @@ def test_updating_a_subscription_to_a_refused_url_is_a_400_and_changes_nothing(
     assert response.status_code == 400
     login_as(client, user)
     with tenant_ctx(org.id):
-        assert WebhookSubscription.query.filter_by(id=subscription_id).one().url == "https://hooks.example.com/ok"
+        assert (
+            WebhookSubscription.query.filter_by(id=subscription_id).one().url
+            == "https://hooks.example.com/ok"
+        )
 
 
 @pytest.mark.parametrize("url", BAD_URLS)
-def test_the_service_raises_a_validation_error_for_a_refused_url(monkeypatch, tenant_ctx, make_org, db_session, url):
+def test_the_service_raises_a_validation_error_for_a_refused_url(
+    monkeypatch, tenant_ctx, make_org, db_session, url
+):
     install_dns(monkeypatch, DNS)
     org = make_org("ssrf-svc")
     with tenant_ctx(org.id):
@@ -99,7 +104,9 @@ def test_a_public_https_url_is_accepted(monkeypatch, tenant_ctx, make_org, db_se
     install_dns(monkeypatch, DNS)
     org = make_org("ssrf-ok")
     with tenant_ctx(org.id):
-        subscription = make_subscription(WebhookService(), org.id, url="https://hooks.example.com/ok")
+        subscription = make_subscription(
+            WebhookService(), org.id, url="https://hooks.example.com/ok"
+        )
         assert subscription.url == "https://hooks.example.com/ok"
 
 
@@ -154,7 +161,9 @@ def _legacy_http_subscription(org_id, url):
     return row
 
 
-def test_a_legacy_plain_http_subscription_still_delivers_to_a_public_host(monkeypatch, tenant_ctx, make_org, db_session):
+def test_a_legacy_plain_http_subscription_still_delivers_to_a_public_host(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     org = make_org("ssrf-http")
     transport = install_transport(monkeypatch)
     service = WebhookService()
@@ -188,7 +197,9 @@ def test_nothing_in_config_or_environment_turns_the_check_off(app, monkeypatch):
         with pytest.raises(BlockedOutboundURL):
             validate_outbound_url(url, require_https=True)
     for name in ("_check_url", "attempt"):
-        source = inspect.getsource(getattr(webhook_service, name, None) or getattr(WebhookService, name))
+        source = inspect.getsource(
+            getattr(webhook_service, name, None) or getattr(WebhookService, name)
+        )
         assert "config" not in source.lower()
         assert "environ" not in source
     assert not [key for key in app.config if "SSRF" in key.upper()]

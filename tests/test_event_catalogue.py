@@ -70,13 +70,20 @@ def test_every_product_event_type_is_present():
 def test_the_committed_file_is_what_the_generator_writes(tmp_path):
     out = tmp_path / "catalogue.json"
     subprocess.run(
-        [sys.executable, str(REPO / "scripts" / "gen_event_catalogue.py"), str(EVENT_MODEL), str(out)],
+        [
+            sys.executable,
+            str(REPO / "scripts" / "gen_event_catalogue.py"),
+            str(EVENT_MODEL),
+            str(out),
+        ],
         check=True,
         capture_output=True,
         cwd=str(REPO),
     )
     committed = REPO / "app" / "seed_data" / "event_catalogue" / "catalogue-v1.json"
-    assert json.loads(out.read_text(encoding="utf-8")) == json.loads(committed.read_text(encoding="utf-8"))
+    assert json.loads(out.read_text(encoding="utf-8")) == json.loads(
+        committed.read_text(encoding="utf-8")
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -85,7 +92,9 @@ def test_the_committed_file_is_what_the_generator_writes(tmp_path):
 
 
 def test_validate_accepts_a_valid_product_payload():
-    event_catalogue.validate("archimate_element.created", {"action": "created", "id": 7, "name": "x"})
+    event_catalogue.validate(
+        "archimate_element.created", {"action": "created", "id": 7, "name": "x"}
+    )
     event_catalogue.validate("archimate_element.deleted", {"action": "deleted", "id": None})
 
 
@@ -168,14 +177,18 @@ def test_emit_event_refuses_a_bad_payload_and_writes_no_row(db_session, make_org
     org = make_org("cat")
     before = _outbox_count(org)
     with pytest.raises(event_catalogue.EventSchemaError) as caught:
-        emit_event(organization_id=org.id, event_type="archimate_element.created", payload={"id": 1})
+        emit_event(
+            organization_id=org.id, event_type="archimate_element.created", payload={"id": 1}
+        )
     assert caught.value.event_type == "archimate_element.created"
     assert "action" in caught.value.detail
     db_session.flush()
     assert _outbox_count(org) == before
 
 
-def test_saving_an_element_still_succeeds_when_validation_would_fail(db_session, make_org, monkeypatch, caplog):
+def test_saving_an_element_still_succeeds_when_validation_would_fail(
+    db_session, make_org, monkeypatch, caplog
+):
     from app.models.archimate_core import ArchiMateElement
 
     def refuse(event_type, payload):
@@ -185,7 +198,10 @@ def test_saving_an_element_still_succeeds_when_validation_would_fail(db_session,
     org = make_org("cat")
     before = _outbox_count(org)
     element = ArchiMateElement(
-        name="Saved anyway", type="ApplicationComponent", layer="Application", organization_id=org.id
+        name="Saved anyway",
+        type="ApplicationComponent",
+        layer="Application",
+        organization_id=org.id,
     )
     db_session.add(element)
     db_session.commit()
@@ -246,13 +262,17 @@ def _publish(client, login_as, user, body):
     return client.post("/api/webhooks/public/events", json=body)
 
 
-def test_publish_with_a_bad_payload_answers_400_and_creates_nothing(app, db_session, make_org, client, login_as):
+def test_publish_with_a_bad_payload_answers_400_and_creates_nothing(
+    app, db_session, make_org, client, login_as
+):
     from app.models.webhook import WebhookEvent
 
     org = make_org("cat")
     user = make_org_user(db_session, org)
     before = _outbox_count(org)
-    response = _publish(client, login_as, user, {"event_type": "archimate_element.created", "payload": {"id": 1}})
+    response = _publish(
+        client, login_as, user, {"event_type": "archimate_element.created", "payload": {"id": 1}}
+    )
     assert response.status_code == 400
     body = response.get_json()
     assert body["success"] is False
@@ -283,7 +303,10 @@ def test_publish_with_a_good_payload_creates_one_outbox_row_for_the_callers_orga
     other = make_org("other")
     user = make_org_user(db_session, org)
     response = _publish(
-        client, login_as, user, {"event_type": "archimate_element.updated", "payload": {"action": "updated", "id": 3}}
+        client,
+        login_as,
+        user,
+        {"event_type": "archimate_element.updated", "payload": {"action": "updated", "id": 3}},
     )
     assert response.status_code == 201
     rows = OperationOutboxEvent.query.filter_by(event_type="archimate_element.updated").all()

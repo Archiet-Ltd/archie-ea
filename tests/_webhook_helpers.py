@@ -81,7 +81,9 @@ def install_guards(app) -> None:
         ensure_transformation_db_guards(connection)
 
 
-def emit_events(org_id: int, count: int, *, start: int = 1, event_type: str = "archimate_element.created") -> None:
+def emit_events(
+    org_id: int, count: int, *, start: int = 1, event_type: str = "archimate_element.created"
+) -> None:
     """Emit *count* catalogued events for *org_id* and relay them into the event log."""
     from flask import g
 
@@ -139,6 +141,4 @@ def make_org_user(db_session, org, *, is_org_admin=True, is_platform_admin=False
 def make_subscription(service, org_id, url="https://hooks.example.com/in", **kwargs):
     """Create a generic subscription through the one writer, in *org_id*'s context."""
     kwargs.setdefault("events", ["*"])
-    return service.create_subscription(
-        user_id="1", url=url, organization_id=org_id, **kwargs
-    )
+    return service.create_subscription(user_id="1", url=url, organization_id=org_id, **kwargs)

@@ -11,7 +11,12 @@ from sqlalchemy import text
 from app.models.webhook import WebhookSubscription
 from app.modules.codegen.services.credential_encryption import decrypt_credential
 from app.services.webhook_service import WebhookSecretUnavailable, WebhookService
-from tests._webhook_helpers import install_guards, install_transport, make_org_user, make_subscription
+from tests._webhook_helpers import (
+    install_guards,
+    install_transport,
+    make_org_user,
+    make_subscription,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -44,7 +49,9 @@ def _legacy(org_id, secret):
     return row
 
 
-def test_a_generated_secret_is_stored_encrypted_and_returned_once(monkeypatch, tenant_ctx, make_org, db_session):
+def test_a_generated_secret_is_stored_encrypted_and_returned_once(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     org = make_org("secret")
     install_transport(monkeypatch)
     with tenant_ctx(org.id):
@@ -80,7 +87,9 @@ def test_to_dict_never_carries_the_secret(monkeypatch, tenant_ctx, make_org, db_
     assert "mine-123" not in repr(data)
 
 
-def test_a_legacy_plaintext_secret_is_migrated_on_first_use(monkeypatch, tenant_ctx, make_org, db_session):
+def test_a_legacy_plaintext_secret_is_migrated_on_first_use(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     org = make_org("secret-legacy")
     install_transport(monkeypatch)
     with tenant_ctx(org.id):
@@ -112,7 +121,9 @@ def test_the_command_migrates_every_legacy_row_and_never_prints_a_secret(app, ma
     assert again.output.strip() == "Encrypted 0 webhook secret(s)."
 
 
-def test_nothing_is_stored_when_encryption_is_not_configured(monkeypatch, tenant_ctx, make_org, db_session):
+def test_nothing_is_stored_when_encryption_is_not_configured(
+    monkeypatch, tenant_ctx, make_org, db_session
+):
     org = make_org("secret-nokey")
     install_transport(monkeypatch)
 
@@ -123,7 +134,9 @@ def test_nothing_is_stored_when_encryption_is_not_configured(monkeypatch, tenant
     with tenant_ctx(org.id):
         existing = make_subscription(service, org.id, secret="before")
         before = WebhookSubscription.query.count()
-        monkeypatch.setattr("app.modules.codegen.services.credential_encryption.encrypt_credential", no_key)
+        monkeypatch.setattr(
+            "app.modules.codegen.services.credential_encryption.encrypt_credential", no_key
+        )
         with pytest.raises(WebhookSecretUnavailable):
             make_subscription(service, org.id)
         with pytest.raises(WebhookSecretUnavailable):
@@ -145,9 +158,13 @@ def test_the_api_answers_503_when_encryption_is_not_configured(
     def no_key(_value):
         raise RuntimeError("CREDENTIAL_ENCRYPTION_KEY is not configured")
 
-    monkeypatch.setattr("app.modules.codegen.services.credential_encryption.encrypt_credential", no_key)
+    monkeypatch.setattr(
+        "app.modules.codegen.services.credential_encryption.encrypt_credential", no_key
+    )
     login_as(client, user)
-    created = client.post("/api/webhooks/subscriptions", json={"url": "https://hooks.example.com/in", "events": ["*"]})
+    created = client.post(
+        "/api/webhooks/subscriptions", json={"url": "https://hooks.example.com/in", "events": ["*"]}
+    )
     assert created.status_code == 503
     assert created.get_json()["success"] is False
     login_as(client, user)
@@ -183,12 +200,20 @@ def test_the_secret_appears_once_in_the_api_and_nowhere_after(
     seen.append(client.get("/api/webhooks/subscriptions").get_data(as_text=True))
     login_as(client, user)
     seen.append(
-        client.put(f"/api/webhooks/subscriptions/{subscription_id}", json={"description": "renamed"}).get_data(as_text=True)
+        client.put(
+            f"/api/webhooks/subscriptions/{subscription_id}", json={"description": "renamed"}
+        ).get_data(as_text=True)
     )
     login_as(client, user)
-    seen.append(client.post(f"/api/webhooks/subscriptions/{subscription_id}/test").get_data(as_text=True))
+    seen.append(
+        client.post(f"/api/webhooks/subscriptions/{subscription_id}/test").get_data(as_text=True)
+    )
     login_as(client, user)
-    seen.append(client.get(f"/api/webhooks/subscriptions/{subscription_id}/deliveries").get_data(as_text=True))
+    seen.append(
+        client.get(f"/api/webhooks/subscriptions/{subscription_id}/deliveries").get_data(
+            as_text=True
+        )
+    )
     assert all(secret not in body for body in seen)
 
     login_as(client, user)
@@ -205,4 +230,8 @@ def test_the_secret_appears_once_in_the_api_and_nowhere_after(
     assert secret not in audit_text and new_secret not in audit_text
     names = {row.action for row in AuditLog.query.all() if "webhook" in (row.action or "")}
     assert {"webhook_sub_create", "webhook_test", "webhook_sec_rotate"} <= names
-    assert all(len(name) <= 20 for name in names if name.startswith("webhook_sub") or name in {"webhook_test", "webhook_sec_rotate"})
+    assert all(
+        len(name) <= 20
+        for name in names
+        if name.startswith("webhook_sub") or name in {"webhook_test", "webhook_sec_rotate"}
+    )
