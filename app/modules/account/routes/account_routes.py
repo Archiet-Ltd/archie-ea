@@ -86,12 +86,6 @@ def login():
             _log.debug("SSO domain check failed (non-fatal): %s", _sso_exc)
 
         user = _svc.authenticate(form.email.data, form.password.data)
-        if user is not None and not user.is_active:
-            # R1-B26: a deactivated user is refused at every sign-in path.
-            from app.services.session_registry import INACTIVE_ACCOUNT_MESSAGE
-
-            flash(INACTIVE_ACCOUNT_MESSAGE, "form-error")
-            return redirect(url_for("account.login"))
         if user is not None:
             # R1-B12 PR 2 (TB-0144/PB-0100): an administrator must complete
             # multi-factor before the login finishes, whether they are
@@ -671,36 +665,37 @@ def sso_callback(provider):
         flash("SSO provider did not return required user information.", "error")
         return redirect(url_for("account.login"))
 
-    # Find or create user by external_id
-    from app import db
-    from app.models.user import User
+    # Find, link or create the user through the one provisioning service.
+    from app.services import mfa_service, provisioning_service, session_registry
 
-    # tenant-scoping-ok: pre-auth SSO callback, no org context yet -- scoped
-    # by the (external_id, sso_provider) pair, which is unique per IdP.
-    user = User.query.filter_by(external_id=external_id, sso_provider=provider).first()
-    if user is None:
-        # Try matching by email for existing password-auth users linking SSO
-        user = User.find_by_email(email)
-        if user is not None:
-            user.external_id = external_id
-            user.sso_provider = provider
-        else:
-            # Create new user
-            user = User(
-                email=email,
-                first_name=first_name,
-                last_name=last_name,
-                external_id=external_id,
-                sso_provider=provider,
-                confirmed=True,
-            )
-            db.session.add(user)
+    try:
+        user, _created, _changed = provisioning_service.create_or_update_user(
+            None,
+            {
+                "email": email,
+                "first_name": first_name,
+                "last_name": last_name,
+                "external_id": external_id or None,
+                "sso_provider": provider,
+            },
+            source=provisioning_service.SOURCE_SSO,
+            link_only=True,
+        )
+    except provisioning_service.ProvisioningError as exc:
+        current_app.logger.error("SSO provisioning refused for %s: %s", provider, exc.detail)
+        flash("SSO authentication failed. Please try again.", "error")
+        return redirect(url_for("account.login"))
 
-        db.session.commit()
+    if not user.is_active:
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
+
+    if mfa_service.required_for(user):
+        session["_mfa_pending_user_id"] = user.id
+        session["_mfa_pending_remember"] = True
+        return redirect(url_for("account.mfa_challenge"))
 
     # Establish Flask-Login session (same as password login)
-    from app.services import session_registry
-
     if not session_registry.login_and_register(user, remember=True):
         flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
         return redirect(url_for("account.login"))

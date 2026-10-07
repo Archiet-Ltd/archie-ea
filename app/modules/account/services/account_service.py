@@ -88,6 +88,11 @@ class AccountService:
             and user.password_hash is not None
             and user.verify_password(password)
         ):
+            if not user.is_active:
+                # Same work and same answer as a wrong password, so a
+                # deactivated account cannot be told apart by its password.
+                _log.info("account_service: sign-in refused for deactivated user %s", user.id)
+                return None
             return user
         return None
 
@@ -204,7 +209,7 @@ class AccountService:
         if not mail_available():
             return "mail_unavailable"
         user = User.find_by_email(email)
-        if user is not None and user.password_hash is not None:
+        if user is not None and user.password_hash is not None and user.is_active:
             row, raw = AccountToken.issue(user, PURPOSE_PASSWORD_RESET)
             db.session.commit()
             token_id = row.id
@@ -233,7 +238,8 @@ class AccountService:
     def reset_link_usable(token):
         from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
 
-        return AccountToken.find_usable(token, PURPOSE_PASSWORD_RESET) is not None
+        row = AccountToken.find_usable(token, PURPOSE_PASSWORD_RESET)
+        return row is not None and row.user is not None and row.user.is_active
 
     @staticmethod
     def reset_password(token, new_password):
@@ -243,6 +249,10 @@ class AccountService:
         """
         from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
 
+        usable = AccountToken.find_usable(token, PURPOSE_PASSWORD_RESET)
+        if usable is not None and usable.user is not None and not usable.user.is_active:
+            # A leaver's link is as dead as an expired one.
+            return False, "This reset link has expired or has already been used."
         row = AccountToken.consume(token, PURPOSE_PASSWORD_RESET)
         if row is None:
             return False, "This reset link has expired or has already been used."
