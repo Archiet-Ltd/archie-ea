@@ -317,6 +317,10 @@ def delete_work_package(
     # Do not leave a dangling id on the work packages that depended on it.
     for other in dependents_of(work_package_id, organization_id):
         other.work_dependencies = [d for d in _dependency_ids(other) if d != work_package_id]
+    # Its deliverables go with it, whether or not the database cascades.
+    from app.models.implementation_migration import Deliverable
+
+    Deliverable.query.filter_by(unified_work_package_id=wp.id).delete(synchronize_session=False)
     db.session.delete(wp)
     if flush:
         db.session.flush()

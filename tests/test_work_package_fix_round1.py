@@ -575,3 +575,20 @@ def test_roadmap_breakdown_matches_totals(db_session, make_org, client, login_as
     domains = {i["name"]: i["domain_name"] for i in data["items"] if i["type"] == "work_package"}
     assert domains["Three"] == "Payments"
     assert domains["One"] != "Architecture"
+
+
+def test_rows_merged_before_the_tombstone_existed_get_one(app, db_session, make_org, bridge_off):
+    """A retired row copied by the first merge has retired_into_id but no
+    retired_at; the next merge marks it, so deleting its copy later keeps it deleted."""
+    from sqlalchemy import text
+
+    org, _user = _org_with_user(db_session, make_org, "tomb")
+    legacy = _legacy(db_session, org, "Merged long ago")
+    _merge(app)
+    db_session.execute(text("UPDATE work_packages SET retired_at = NULL WHERE id = :i"),
+                       {"i": legacy.id})
+    out = _merge(app)
+    assert "work_packages: retired_at set: 1" in out
+    assert db_session.execute(text("SELECT retired_at IS NOT NULL FROM work_packages WHERE id = :i"),
+                              {"i": legacy.id}).scalar() is True
+    assert "changed=0" in _merge(app)

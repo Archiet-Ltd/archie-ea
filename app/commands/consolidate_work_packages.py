@@ -680,7 +680,11 @@ def merge_work_package_stores(dry_run, verify):
         if _table_exists(conn, "deliverables") and _ensure_deliverable_legacy_key_nullable(conn):
             click.echo("  + deliverables.work_package_id: dropped NOT NULL")
             total.add("constraint", 1)
-    _backfill_retired_at(conn, dry_run, total)
+    marked = _Stats()
+    _backfill_retired_at(conn, dry_run, marked)
+    for key, n in marked.items():
+        click.echo(f"  {'-' if dry_run else '+'} {key}: {n}")
+    total.merge(marked)
 
     for spec in _MERGE_SOURCES:
         total.merge(_merge_one(conn, spec, dry_run))
