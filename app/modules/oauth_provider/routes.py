@@ -13,7 +13,7 @@ import logging
 import re
 import urllib.parse
 
-from flask import Blueprint, current_app, jsonify, redirect, render_template, request
+from flask import Blueprint, current_app, g, jsonify, redirect, render_template, request
 from flask_login import current_user, login_required
 
 from app.extensions import csrf
@@ -133,6 +133,21 @@ def authorize():
     if request.method == "GET":
         scopes = _filter_granted_scopes(requested_scope, current_user)
         parsed_redirect = urllib.parse.urlsplit(redirect_uri)
+        # The consent form's Allow/Deny decision POSTs back to this same
+        # origin, which then 302-redirects to the client's redirect_uri --
+        # by design, an origin the CSP's blanket "form-action 'self'"
+        # (app/_bootstrap/security.py, ARCH-070) does not otherwise permit.
+        # Chromium enforces form-action against the whole redirect chain a
+        # form submission produces, not just its initial target, so without
+        # this the browser silently blocks the redirect after Allow/Deny is
+        # clicked -- confirmed in a real browser, not assumed (the consent
+        # POST itself succeeds; the external hop is what gets blocked, with
+        # Chromium's own console message naming the *original* form target
+        # rather than the redirect, which is what makes this easy to miss).
+        # Safe to widen only to this one, already-registered redirect_uri:
+        # the check above (redirect_uri in client.redirect_uri_list) has
+        # already run, so this is never attacker-controlled free text.
+        g.csp_form_action_extra = f"{parsed_redirect.scheme}://{parsed_redirect.netloc}"
         return render_template(
             "oauth/consent.html",
             client_name=client.client_name or client.client_id,

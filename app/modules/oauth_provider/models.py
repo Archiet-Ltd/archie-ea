@@ -95,7 +95,18 @@ class OAuthAuthorizationCode(TenantMixin, db.Model):
             organization_id=organization_id,
         )
         db.session.add(auth_code)
-        db.session.flush()
+        # Commit, not flush: the authorization-code grant is always redeemed
+        # from a SEPARATE HTTP request (POST /oauth/token) than the one that
+        # issues it (POST /oauth/authorize). Flask's teardown_appcontext hook
+        # (app/__init__.py's shutdown_session) does not commit a successful
+        # request -- it only rolls back on exception, otherwise just removes
+        # the session -- so a flush-only write here is silently discarded the
+        # instant this request ends, before the token request ever has a
+        # chance to see it. Confirmed by reproduction, not assumed: a
+        # flush-only write here does not survive a real teardown_appcontext
+        # cycle under any of this codebase's engine configs (pool_reset_on_
+        # return made no difference), while an explicit commit does.
+        db.session.commit()
         return raw_code, auth_code
 
     @classmethod
@@ -171,7 +182,12 @@ class OAuthClient(db.Model):
             token_endpoint_auth_method="none",
         )
         db.session.add(client)
-        db.session.flush()
+        # Commit, not flush -- see the matching note on
+        # OAuthAuthorizationCode.issue above: registration happens in its own
+        # request, and every subsequent use of this client (the consent
+        # screen, the token exchange) is a later, separate request that must
+        # still be able to find it.
+        db.session.commit()
         return client
 
     @property
@@ -249,7 +265,14 @@ class OAuthToken(db.Model):
             refresh_expires_at=refresh_expires_at,
         )
         db.session.add(token)
-        db.session.flush()
+        # Commit, not flush -- see the matching note on
+        # OAuthAuthorizationCode.issue above: every MCP tool call that
+        # presents this token arrives in its own later, separate request.
+        # This commit also persists any earlier flush-only work still
+        # pending in this same request's session (e.g. the authorization
+        # code just consumed, or the refresh token just revoked), since a
+        # commit always covers the whole transaction, not just this insert.
+        db.session.commit()
         return raw_access, raw_refresh, token
 
     def revoke(self) -> None:

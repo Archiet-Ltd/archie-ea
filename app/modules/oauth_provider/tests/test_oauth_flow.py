@@ -51,7 +51,14 @@ def _make_user(db_session, org, email, role_name="Administrator"):
         last_name="User",
         organization_id=org.id,
         role=role,
-        is_org_admin=True,
+        # Only grant org-admin for role_name="Administrator". User.is_org_admin
+        # is a setter: passing True unconditionally called grant_org_admin(),
+        # which silently overwrites `role` back to Administrator regardless of
+        # what role_name asked for -- a role_name="Viewer" caller got an
+        # Administrator in disguise. False is a no-op (see
+        # app/models/user.py's is_org_admin setter), so this leaves the
+        # requested role intact for every other role_name.
+        is_org_admin=(role_name == "Administrator"),
         confirmed=True,
     )
     user.password = "test"

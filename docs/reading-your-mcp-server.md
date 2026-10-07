@@ -39,7 +39,7 @@ or an estimate. The assistant never invents data to fill a gap.
 
 ## Connecting an assistant
 
-The MCP endpoint is at `https://app.entelim.com/mcp`. Authentication uses
+The MCP endpoint is at `https://entelim.org/mcp`. Authentication uses
 OAuth 2.1 with PKCE (S256), the standard flow both ChatGPT and Claude
 support for remote MCP servers.
 

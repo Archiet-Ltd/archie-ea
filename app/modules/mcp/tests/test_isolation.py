@@ -48,8 +48,22 @@ def _make_element(db_session, org_id, name_hint, type_="ApplicationComponent"):
     return row
 
 
-def _mint_oauth_token(client, db_session, org, user, login_as_fn) -> str:
+def _mcp_resource(app) -> str:
+    """The one configured resource identifier (see oauth_provider.routes._mcp_resource_url).
+
+    POST /oauth/authorize and POST /oauth/token both now make ``resource``
+    mandatory (it must match this value exactly) -- omitting it, which this
+    helper used to do, gets every request a 400 invalid_target instead of a
+    code/token.
+    """
+    base = (app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+    return f"{base}/mcp"
+
+
+def _mint_oauth_token(client, db_session, org, user, login_as_fn, app=None) -> str:
     """Mint an OAuth access token through the real authorization-code flow."""
+    from flask import current_app
+
     from app.modules.oauth_provider.models import OAuthClient
 
     oauth_client = OAuthClient.register(
@@ -65,6 +79,8 @@ def _mint_oauth_token(client, db_session, org, user, login_as_fn) -> str:
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
     challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 
+    resource = _mcp_resource(app if app is not None else current_app)
+
     login_as_fn(client, user)
 
     resp = client.post(
@@ -75,6 +91,12 @@ def _mint_oauth_token(client, db_session, org, user, login_as_fn) -> str:
             "code_challenge": challenge,
             "code_challenge_method": "S256",
             "scope": "mcp:read",
+            "resource": resource,
+            # The POST branch of authorize() requires an explicit "allow"/
+            # "deny" decision (the consent form's two buttons) -- without it,
+            # it 400s with "decision is required" before ever reaching the
+            # code-issuing path. Missing alongside the resource field.
+            "decision": "allow",
         },
         follow_redirects=False,
     )
@@ -91,20 +113,64 @@ def _mint_oauth_token(client, db_session, org, user, login_as_fn) -> str:
             "redirect_uri": "http://localhost/callback",
             "client_id": oauth_client.client_id,
             "code_verifier": verifier,
+            "resource": resource,
         },
     )
     return resp.get_json()["access_token"]
 
 
+def _clear_cached_identity():
+    """Clear flask-login's and the tenant middleware's per-app-context
+    identity cache before a bearer-only call.
+
+    ``db_session`` (tests/conftest.py) holds ONE app context open for the
+    whole test, so ``g._login_user``/``g.current_org_id`` survive across
+    nested ``client.post()`` calls -- the exact trap ``login_as``'s own
+    docstring describes for session-cookie identity. This test mints tokens
+    for two different users on the same client in the same test, so a bearer
+    call for org A's token made right after org B's login/token-minting dance
+    would otherwise silently resolve as org B's cached identity instead of
+    the token's own -- which would read as a tenancy leak that does not
+    exist (or, as happened here, mask a real isolation failure behind the
+    wrong user's data). A bearer call has no cookie to set, so it must clear
+    the same cache directly instead of going through ``login_as``.
+    """
+    from flask import g, has_app_context
+
+    if not has_app_context():
+        return
+    for cached in ("_login_user", "_current_user", "current_org_id", "current_org"):
+        if hasattr(g, cached):
+            delattr(g, cached)
+
+
 def _mcp_call(client, token: str, tool_name: str, arguments: dict) -> dict:
-    """Call an MCP tool through the JSON-RPC endpoint."""
+    """Call an MCP tool through the JSON-RPC endpoint.
+
+    Uses a brand-new, cookie-less test client bound to the same Flask app
+    rather than the passed-in ``client``. A genuine MCP client authenticates
+    with ONLY a bearer token -- no session cookie, no "_sid", ever -- but
+    ``client`` here always carries a live, non-revoked session cookie left
+    over from whichever ``login_as`` call ``_mint_oauth_token`` drove through
+    it (for this test, possibly a *different* org's user than ``token``
+    belongs to). flask-login resolves session-based identity before it ever
+    tries the bearer request_loader (see LoginManager._load_user), so reusing
+    ``client`` would silently authenticate via that stale session instead of
+    the token -- which is exactly how two of these isolation checks passed
+    for the wrong reason (and one of them masked a real cross-tenant leak
+    behind org B's own identity) before this fix. ``_clear_cached_identity``
+    additionally clears the per-app-context g cache db_session's single
+    shared app context would otherwise also serve stale across these calls.
+    """
+    _clear_cached_identity()
+    bearer_client = client.application.test_client()
     payload = {
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/call",
         "params": {"name": tool_name, "arguments": arguments},
     }
-    resp = client.post(
+    resp = bearer_client.post(
         "/mcp",
         data=json.dumps(payload),
         content_type="application/json",

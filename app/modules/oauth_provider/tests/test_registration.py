@@ -239,6 +239,17 @@ class TestPruneOauthClients:
         old_unused.created_at = datetime.now(timezone.utc) - timedelta(days=60)
         recent = OAuthClient.register(client_name="Recent", redirect_uris="https://b.example/cb")
         db_session.flush()
+        # OAuthClient.register() now commits (see models.py -- registration
+        # must survive into a later, separate request, same reasoning as the
+        # authorization-code/token issue() fix), and a commit expires every
+        # object in the session. Capture the plain string ids now, before
+        # prune deletes old_unused's row below: reading the expired
+        # old_unused.client_id attribute *after* its row is gone would force
+        # a reload that finds nothing and raises ObjectDeletedError, which is
+        # a test-harness-object-lifetime issue, not the thing this test is
+        # actually checking (whether the row was deleted).
+        old_unused_client_id = old_unused.client_id
+        recent_client_id = recent.client_id
 
         from click.testing import CliRunner
         from app.commands.prune_oauth_clients import prune_oauth_clients
@@ -248,8 +259,8 @@ class TestPruneOauthClients:
             result = runner.invoke(prune_oauth_clients, ["--days", "30"])
         assert result.exit_code == 0, result.output
 
-        assert OAuthClient.query.filter_by(client_id=old_unused.client_id).first() is None
-        assert OAuthClient.query.filter_by(client_id=recent.client_id).first() is not None
+        assert OAuthClient.query.filter_by(client_id=old_unused_client_id).first() is None
+        assert OAuthClient.query.filter_by(client_id=recent_client_id).first() is not None
 
     def test_prune_dry_run_deletes_nothing(self, app, db_session):
         from datetime import datetime, timedelta, timezone
