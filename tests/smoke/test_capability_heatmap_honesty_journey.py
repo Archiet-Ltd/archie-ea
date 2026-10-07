@@ -626,6 +626,9 @@ def test_keyboard_reaches_every_row_and_opens_the_detail_panel(browser, live_ser
         page.keyboard.press("Enter")
         panel = _panel(page)
         expect(panel.get_by_role("heading", name="No domain", exact=True)).to_be_visible()
+        # The panel is reused: its heading can switch a moment before the figures
+        # re-render from the previous domain's, so wait for this row's figure.
+        expect(panel.get_by_text("Avg Maturity", exact=True).locator("..")).to_contain_text("2 (1 measured)")
         assert _panel_figure(panel, "Avg Maturity")[0] == "2 (1 measured)"
         assert _panel_column(panel, "Not assessed") == [names["nodomain_unassessed"]]
 

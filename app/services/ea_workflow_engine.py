@@ -70,7 +70,6 @@ class EAWorkflowEngine:
             "vendor_matching": self._handle_vendor_matching,
             "apqc_mapping": self._handle_apqc_mapping,
             "capability_linking": self._handle_capability_linking,
-            "archimate_derivation": self._handle_archimate_derivation,
             "compliance_scan": self._handle_compliance_scan,
             "notification": self._handle_notification,
             "create_suggestion": self._handle_create_suggestion,
@@ -92,7 +91,6 @@ class EAWorkflowEngine:
             "policy_loader": self._handle_policy_loader,
             "violation_classification": self._handle_violation_classification,
             "auto_remediation": self._handle_auto_remediation,
-            "cross_layer_derivation": self._handle_cross_layer_derivation,
             "quality_scoring": self._handle_quality_scoring,
             "quality_assessment": self._handle_quality_assessment,
             "completeness_validation": self._handle_completeness_validation,
@@ -2319,56 +2317,6 @@ class EAWorkflowEngine:
             "coverage_analysis": coverage_analysis,
         }
 
-    def _handle_archimate_derivation(self, instance, step_def, input_data) -> Dict:
-        """Handle ArchiMate relationship derivation step.
-
-        Derives ArchiMate architecture elements and relationships from
-        APQC process mappings using the UnifiedDerivationService.
-        """
-        from app.services.archimate.unified_derivation_service import (
-            UnifiedDerivationService,
-        )
-
-        service = UnifiedDerivationService()
-
-        apqc_process_ids = input_data.get("apqc_process_ids", [])
-        if not apqc_process_ids:
-            return {
-                "derived_relationships": [],
-                "derivation_log": ["No APQC process IDs provided"],
-            }
-
-        model = service.derive_complete_model_from_apqc(apqc_process_ids)
-
-        derived_relationships = []
-        derivation_log = []
-
-        for rel in model.relationships:
-            derived_relationships.append(
-                {
-                    "source": getattr(
-                        rel, "source_name", str(getattr(rel, "source_id", ""))
-                    ),
-                    "target": getattr(
-                        rel, "target_name", str(getattr(rel, "target_id", ""))
-                    ),
-                    "type": getattr(rel, "relationship_type", "association"),
-                }
-            )
-
-        for issue in model.validation_issues:
-            derivation_log.append(getattr(issue, "message", str(issue)))
-
-        derivation_log.insert(
-            0,
-            f"Derived {len(model.elements)} elements and {len(derived_relationships)} relationships",
-        )
-
-        return {
-            "derived_relationships": derived_relationships,
-            "derivation_log": derivation_log,
-        }
-
     def _handle_compliance_scan(self, instance, step_def, input_data) -> Dict:
         """Handle compliance scanning step. Uses PolicyMonitoringService.scan_all_applications.
         Persists ComplianceScanReport artifact (WFT-013).
@@ -3509,38 +3457,6 @@ provides foundation for subsequent architecture development phases.
             )
             return {"auto_remediated": len(remediable), "suggestions_created": len(suggestions), "batch_id": batch_id}
         return {"auto_remediated": 0, "suggestions_created": 0}
-
-    def _handle_cross_layer_derivation(self, instance, step_def, input_data) -> Dict:
-        """Derive cross-layer ArchiMate relationships (Business→Application→Technology)."""
-        from app.services.archimate.unified_derivation_service import UnifiedDerivationService
-
-        element_ids = input_data.get("elements", input_data.get("element_ids", []))
-        if not element_ids:
-            element_ids = (instance.context or {}).get("element_ids", [])
-
-        if not element_ids:
-            return {"cross_layer_links": [], "layers_connected": []}
-
-        service = UnifiedDerivationService()
-        try:
-            model = service.derive_complete_model_from_apqc(element_ids[:20])
-            cross_layer = []
-            for rel in model.relationships:
-                src_layer = getattr(rel, "source_layer", "unknown")
-                tgt_layer = getattr(rel, "target_layer", "unknown")
-                if src_layer != tgt_layer:
-                    cross_layer.append({
-                        "source": getattr(rel, "source_name", str(getattr(rel, "source_id", ""))),
-                        "target": getattr(rel, "target_name", str(getattr(rel, "target_id", ""))),
-                        "source_layer": src_layer,
-                        "target_layer": tgt_layer,
-                        "relationship_type": getattr(rel, "relationship_type", "association"),
-                    })
-            layers = list(set(r["source_layer"] for r in cross_layer) | set(r["target_layer"] for r in cross_layer))
-            return {"cross_layer_links": cross_layer, "layers_connected": layers, "link_count": len(cross_layer)}
-        except Exception as e:
-            logger.warning("Cross-layer derivation failed: %s", e)
-            return {"cross_layer_links": [], "layers_connected": [], "error": str(e)}
 
     def _handle_quality_scoring(self, instance, step_def, input_data) -> Dict:
         """Score every element on a transparent 100-point scale.
@@ -6261,7 +6177,15 @@ provides foundation for subsequent architecture development phases.
         """TD-003: Fetch active RoadmapTask entries for Phase D roadmap generation."""
         try:
             from app.models.roadmap import RoadmapTask
-            tasks = RoadmapTask.query.filter_by(status="active").all()
+            # Background thread, no request context, so the tenant listener
+            # does not filter; the predicate is explicit, as on this engine's
+            # other background sites.
+            org_id = instance.organization_id
+            if org_id is None:
+                logger.warning("_handle_roadmap_generation: instance %s has no organization; reading nothing", instance.id)
+                tasks = []
+            else:
+                tasks = RoadmapTask.query.filter_by(status="active", organization_id=org_id).all()
             result = [{"id": t.id, "title": getattr(t, "title", str(t.id))} for t in tasks]
         except Exception as exc:
             logger.warning("_handle_roadmap_generation: query failed: %s", exc)

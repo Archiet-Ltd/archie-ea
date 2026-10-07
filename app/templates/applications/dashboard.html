@@ -31,6 +31,11 @@
 ───────────────────────────────────────────────────────────────────────────── #}
 {% block extra_head_js %}
 <script src="/static/vendor/mermaid.min.js"></script>
+{% if app is defined and app and 'intelligence_ui.twin_map' in flask.current_app.view_functions %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/applications/technology_links.js') }}"></script>
+{% endif %}
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     if (typeof mermaid !== 'undefined') {
@@ -231,9 +236,10 @@
   {'id': 'ea-workflows',    'label': 'EA Workflows',     'count': none},
 ] %}
 {# Conditionally add tabs only when the app has relevant data #}
-{% if app.technology_stack or app.programming_languages or app.primary_database %}
-  {% set _ = tabs.append({'id': 'technology', 'label': 'Technology', 'count': none}) %}
-{% endif %}
+{# Technology is always offered: it is where the nodes and system software an
+   application runs on are mapped, so an application with nothing recorded yet
+   still needs the tab to record the first one. #}
+{% set _ = tabs.append({'id': 'technology', 'label': 'Technology', 'count': none}) %}
 {% if app.compliance_status or app.data_classification %}
   {% set _ = tabs.append({'id': 'compliance', 'label': 'Compliance', 'count': none}) %}
 {% endif %}
@@ -1162,6 +1168,8 @@
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Technology Details
       </a>
     </div>
+
+    {% include "applications/_technology_stack_links.html" %}
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 

@@ -1452,9 +1452,11 @@ def seed_canvas_templates(org_id=None):
     profile_created = 0
     profile_updated = 0
     for archimate_type, options in sorted(CANVAS_PROFILE_OPTIONS_BY_TYPE.items()):
+        # Only the shared platform row: an organisation's own definition with
+        # the same key is that organisation's, never updated by the seed.
         existing = AcmPropertyTemplate.query.filter_by(
             archimate_type=archimate_type, property_key="profile",
-        ).first()
+        ).filter(AcmPropertyTemplate.organization_id.is_(None)).first()
         if existing:
             existing.display_name = "Profile"
             existing.property_type = "enum"

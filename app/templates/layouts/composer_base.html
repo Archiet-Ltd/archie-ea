@@ -32,7 +32,7 @@
 
     {% block extra_head_js %}{% endblock %}
 </head>
-<body class="h-full bg-background antialiased overflow-hidden"{% if session_idle_timeout_seconds %} data-session-idle-seconds="{{ session_idle_timeout_seconds }}"{% endif %}
+<body class="h-full bg-background text-foreground antialiased overflow-hidden"{% if session_idle_timeout_seconds %} data-session-idle-seconds="{{ session_idle_timeout_seconds }}"{% endif %}
       data-suppress-global-search-shortcut="true">
     <a href="#main-content"
        class="skip-link sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md">

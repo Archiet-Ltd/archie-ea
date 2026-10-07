@@ -1,0 +1,72 @@
+{% extends "layouts/admin_base.html" %}
+{% from "components/page_header.html" import page_header %}
+
+{% block title %}Precedent Search{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {{ page_header(
+        title='Precedent Search',
+        description='What did we decide last time something like this came up?',
+        breadcrumbs=[
+            {'label': 'Dashboard', 'href': url_for('main.index')},
+            {'label': 'Governance'},
+            {'label': 'Architecture Decisions', 'href': url_for('arch_decisions.list_decisions')},
+            {'label': 'Precedent Search'}
+        ]
+    ) }}
+
+    <form method="GET" action="{{ url_for('arch_decisions.precedent_search') }}"
+          class="bg-card border border-border rounded-lg p-4 mb-6 flex gap-3">
+        {% if element_id %}<input type="hidden" name="element_id" value="{{ element_id }}">{% endif %}
+        <input type="text" name="q" value="{{ query_text }}" placeholder="Search title, context, decision, rationale..."
+               class="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        <button type="submit"
+                class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+            Search
+        </button>
+    </form>
+
+    <div class="bg-card border border-border rounded-lg overflow-hidden">
+        {% if not query_text and not element_id %}
+        <div class="text-center py-16">
+            <i data-lucide="search" class="h-10 w-10 text-muted-foreground mx-auto mb-3" aria-hidden="true"></i>
+            <h3 class="text-lg font-semibold text-foreground mb-1">Search for precedent</h3>
+            <p class="text-sm text-muted-foreground">Enter a term to find decisions already made on a similar question.</p>
+        </div>
+        {% elif results %}
+        <table class="w-full text-sm">
+            <thead class="bg-muted/50 border-b border-border">
+                <tr>
+                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Decision ID</th>
+                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Title</th>
+                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Decided</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                {% for d in results %}
+                <tr class="hover:bg-muted/30 transition-colors">
+                    <td class="px-4 py-3">
+                        <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
+                           class="font-mono text-primary hover:underline text-sm font-semibold">{{ d.decision_id }}</a>
+                    </td>
+                    <td class="px-4 py-3">
+                        <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
+                           class="text-foreground hover:text-primary font-medium">{{ d.title }}</a>
+                    </td>
+                    <td class="px-4 py-3 text-muted-foreground">{{ d.status|title }}</td>
+                    <td class="px-4 py-3 text-muted-foreground">{{ d.created_at.strftime('%Y-%m-%d') if d.created_at else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-16">
+            <h3 class="text-lg font-semibold text-foreground mb-1">No precedent found</h3>
+            <p class="text-sm text-muted-foreground">No existing decision matches "{{ query_text }}".</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

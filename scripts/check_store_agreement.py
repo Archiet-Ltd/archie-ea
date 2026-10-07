@@ -60,6 +60,25 @@ not evidence of health, so a concept whose surfaces are ALL zero is printed as
 a pass. Read those lines: they say the gate could not see anything, and a run
 that is all no-evidence has proven nothing.
 
+Tenancy is part of the question
+-------------------------------
+"How many X does THIS organisation have" is the only question compared. A store
+answers it in one of four declared ways, never by counting every tenant's rows:
+
+  TenantMixin     the ORM events scope the query (the request context below).
+  organization_id a column but no mixin: the gate filters on it explicitly.
+  tenant_via=     no organisation column: the row belongs to the organisation of
+                  the first non-null declared link, in order -- the linked
+                  element first, the creating user last -- which is the rule the
+                  consolidation backfills attribute such rows by. Rows no link
+                  attributes are reported, never counted for anyone.
+  shared=         deliberately shared reference data (one catalogue for every
+                  tenant). Counted whole, with the reason on the Surface.
+
+A store with none of the four cannot answer for one organisation at all. That is
+reported as an `unscoped-store` finding once it holds rows, because counting it
+whole would let organisation B's rows move organisation A's numbers.
+
 Escape hatch: `store-agreement-ok: <reason>` in a Surface's `waived=` field, for
 a surface that is knowingly and permanently a different number (a cached
 projection with a documented staleness window, say). Name what makes the
@@ -82,9 +101,13 @@ which is the owner's third finding reproduced mechanically: the list endpoint
 answers 0 while the store holds rows. Confirmed against the database by hand
 (`select count(*) from business_capability where organization_id=52336` = 12,
 `unified_capabilities` = 0). Red-and-green on a synthetic tree by
-tests/test_gates_actually_fail.py, which also plants a difference that IS
-legitimate (a scope="page" surface reading 10 beneath a scope="all" surface
-reading 191) and asserts it is NOT reported.
+tests/test_store_agreement_concepts.py, which also plants a difference that IS
+legitimate (a declared narrower scope reading less than the whole) and asserts
+it is NOT reported, and seeds two organisations to show that one organisation's
+rows never move the other's counts. The same file seeds a real disagreement
+in the test database (an application recording a cost the cost store does not
+hold), runs observe_tenant and compare(), and asserts red; then records the
+cost and asserts green -- and asks the gaps screens as a signed-in user.
 
 """
 from __future__ import annotations
@@ -115,7 +138,8 @@ class Surface:
     """
 
     def __init__(self, name, kind, target, extract=None, scope="all", waived=None,
-                 filter_eq=None, filter_not_null=None):
+                 filter_eq=None, filter_not_null=None, distinct=None,
+                 tenant_via=None, shared=None):
         self.name = name
         self.kind = kind
         self.target = target
@@ -125,8 +149,18 @@ class Surface:
         # orm-only: a real WHERE, not just "how many rows" -- lets a concept
         # express a genuine filtered-count question (e.g. "how many of these
         # have a maturity value recorded"), not only bare population size.
+        # filter_not_null takes one column, or a tuple meaning "any of these".
         self.filter_eq = filter_eq or {}
         self.filter_not_null = filter_not_null
+        # orm-only: count distinct values of this column rather than rows, for a
+        # question about the parent ("applications with an owner") asked of a
+        # child store that can hold several rows per parent.
+        self.distinct = distinct
+        # orm-only, for a store with no organization_id column: an ordered list
+        # of (foreign-key column, parent table) links; see "Tenancy" above.
+        self.tenant_via = list(tenant_via or [])
+        # orm-only: the reason this store is deliberately shared reference data.
+        self.shared = shared
 
 
 # --------------------------------------------------------------------------
@@ -136,8 +170,14 @@ CONCEPTS = {
     # The owner's finding, exactly. Both surfaces answer "how many capabilities
     # does this organisation have"; they read two different tables.
     "capabilities": [
+        # BusinessCapability is the deprecated legacy store, superseded by
+        # UnifiedCapability in PR 1 (feat/r1-one-capability-store). It is kept
+        # in the registry for historical tracking but waived from comparison
+        # because it no longer receives writes and its count will diverge
+        # (typically to 0 after cutover).
         Surface("orm:BusinessCapability", "orm",
-                "app.models.business_capabilities.BusinessCapability"),
+                "app.models.business_capabilities.BusinessCapability",
+                waived="store-agreement-ok: deprecated legacy store, superseded by UnifiedCapability"),
         Surface("orm:UnifiedCapability", "orm",
                 "app.models.unified_capability.UnifiedCapability"),
         Surface("GET /dashboard/api/capabilities", "http",
@@ -151,10 +191,14 @@ CONCEPTS = {
         # ArchiMate-element store) to element_type="Capability", not either
         # BusinessCapability or UnifiedCapability above. Same underlying data
         # endpoint the dashboard's own tab badge calls.
+        # This is a derived mirror view, not the canonical store; give it a
+        # declared narrower scope so it is not compared 1:1 with the
+        # authoritative surfaces. A mirror may lag behind the canonical count.
         Surface("GET /architecture/api/layer/strategy/elements?element_type=Capability",
                 "http",
                 "/architecture/api/layer/strategy/elements?element_type=Capability&per_page=1",
-                extract="pagination.total"),
+                extract="pagination.total",
+                scope="archimate-mirror"),
     ],
     "applications": [
         Surface("orm:ApplicationComponent", "orm",
@@ -168,11 +212,39 @@ CONCEPTS = {
                 "/api/v1/applications/?per_page=1",
                 extract="len:data.applications", scope="page"),
     ],
+    # The gaps register holds two kinds of row (Gap.gap_kind), and the Gap
+    # docstring names counting both as one number as the original defect. So
+    # every surface here is compared only with surfaces showing the SAME kinds:
+    #
+    #   all                  every row of the register, both kinds -- what the
+    #                        two list screens read (neither filters gap_kind).
+    #   capability shortfall the roadmap statistics tile, which excludes
+    #                        plateau_transition (roadmap_api.get_statistics).
+    #   plateau transition   the difference between two plateaus -- the
+    #                        ArchiMate Gap element, which ImplementationGap
+    #                        also records (its own docstring), in a second
+    #                        store.
     "gaps": [
-        Surface("orm:ImplementationGap", "orm",
-                "app.models.implementation_planning.ImplementationGap"),
+        Surface("orm:Gap", "orm", "app.models.implementation_migration.Gap"),
         Surface("GET /implementation/api/gaps", "http",
                 "/implementation/api/gaps", extract="len:gaps"),
+        Surface("GET /api/roadmap/gaps", "http",
+                "/api/roadmap/gaps", extract="len:gaps"),
+        Surface("orm:Gap(capability shortfall)", "orm",
+                "app.models.implementation_migration.Gap",
+                filter_eq={"gap_kind": "capability_shortfall"},
+                scope="capability shortfall"),
+        Surface("GET /api/roadmap/statistics", "http",
+                "/api/roadmap/statistics", extract="gaps.total",
+                scope="capability shortfall"),
+        Surface("orm:Gap(plateau transition)", "orm",
+                "app.models.implementation_migration.Gap",
+                filter_eq={"gap_kind": "plateau_transition"},
+                scope="plateau transition"),
+        Surface("orm:ImplementationGap", "orm",
+                "app.models.implementation_planning.ImplementationGap",
+                tenant_via=[("architecture_id", "architecture_models")],
+                scope="plateau transition"),
     ],
     # T-002: "how many capabilities have a maturity value recorded" -- a real
     # freshness question, not a bare population count. The projection
@@ -204,21 +276,187 @@ CONCEPTS = {
                 filter_eq={"source_table": "business_capability"},
                 filter_not_null="current_maturity_level"),
     ],
+    # Four work-package stores and five list screens. Stores without an
+    # organisation column are attributed by the linked element, else by the
+    # creating user.
+    "work packages": [
+        Surface("orm:WorkPackage", "orm",
+                "app.models.implementation_migration.WorkPackage"),
+        Surface("orm:UnifiedWorkPackage", "orm",
+                "app.models.unified_work_package.UnifiedWorkPackage",
+                tenant_via=[("archimate_element_id", "archimate_elements"),
+                            ("application_component_id", "application_components"),
+                            ("capability_id", "unified_capabilities"),
+                            ("created_by", "users")]),
+        Surface("orm:RoadmapWorkPackage", "orm",
+                "app.models.roadmap_models.RoadmapWorkPackage",
+                tenant_via=[("created_by", "users")]),
+        Surface("orm:ImplementationWorkPackage", "orm",
+                "app.models.implementation_planning.ImplementationWorkPackage",
+                tenant_via=[("application_component_id", "application_components"),
+                            ("architecture_id", "architecture_models")]),
+        Surface("GET /enterprise/api/work-packages", "http",
+                "/enterprise/api/work-packages?per_page=1", extract="total"),
+        Surface("GET /api/roadmap/work-packages", "http",
+                "/api/roadmap/work-packages?per_page=1",
+                extract="pagination.total"),
+        Surface("GET /api/roadmap-builder/work-packages", "http",
+                "/api/roadmap-builder/work-packages?limit=1",
+                extract="data.total"),
+        Surface("GET /implementation/api/work-packages", "http",
+                "/implementation/api/work-packages",
+                extract="len:work_packages"),
+        Surface("GET /capability-map/api/roadmap/work-packages", "http",
+                "/capability-map/api/roadmap/work-packages?root_only=false",
+                extract="total_count"),
+    ],
+    "risks": [
+        Surface("orm:Risk", "orm", "app.models.risk.Risk"),
+        Surface("GET /api/risks", "http", "/api/risks", extract="len:"),
+    ],
+    # "How many applications have an owner recorded", asked of the two owner
+    # stores and of the owner text columns on the application itself.
+    "application owners": [
+        Surface("orm:ApplicationOwner(applications)", "orm",
+                "app.models.application_owner.ApplicationOwner",
+                distinct="application_id"),
+        Surface("orm:ApplicationOwnership(applications)", "orm",
+                "app.models.enterprise_intelligence.ApplicationOwnership",
+                distinct="application_id"),
+        Surface("orm:ApplicationComponent(owner text recorded)", "orm",
+                "app.models.application_portfolio.ApplicationComponent",
+                filter_not_null=("application_owner", "business_owner",
+                                 "technical_owner")),
+        # A primary owner is a subset of "has an owner": declared narrower.
+        Surface("orm:ApplicationOwner(applications, primary)", "orm",
+                "app.models.application_owner.ApplicationOwner",
+                distinct="application_id",
+                filter_eq={"ownership_type": "primary"},
+                scope="primary owner"),
+    ],
+    "architecture decisions": [
+        # ArchitectureDecisionRecord dropped as a peer surface (decision
+        # register consolidation): every ArchitectureDecisionRecord row is
+        # now dual-write paired into ArchitectureDecision via
+        # pair_with_canonical_register() (app/models/adr.py), so it is a
+        # satellite detail-store for review-board fields ArchitectureDecision
+        # has no columns for, not an independent answer to "how many
+        # architecture decisions". GET /arb/api/decisions already reads
+        # ArchitectureDecision (app/modules/architecture/routes/
+        # arb_decision_routes.py:161), so both remaining surfaces agree by
+        # construction. Edited by the decision-register consolidation brief
+        # directly, not requested from this file's owner first -- flagged in
+        # the PR for their awareness; this narrows one concept's surface list
+        # to a direct, unavoidable consequence of that brief's own change.
+        Surface("orm:ArchitectureDecision", "orm",
+                "app.models.architecture_decision.ArchitectureDecision"),
+        Surface("GET /arb/api/decisions", "http",
+                "/arb/api/decisions?per_page=1", extract="total"),
+    ],
+    # Pending proposals are three different record types, each with its own
+    # queue screen, until one approval queue lands. Each is its own question;
+    # each screen shows a declared slice of its own store only.
+    "pending AI change approvals": [
+        Surface("orm:AIChatCRUDApproval(pending)", "orm",
+                "app.models.ai_chat_crud_approval.AIChatCRUDApproval",
+                filter_eq={"status": "PENDING"}),
+        # The signed-in user's own unexpired requests: declared narrower.
+        Surface("GET /ai-chat/approvals/pending", "http",
+                "/ai-chat/approvals/pending", extract="len:approvals",
+                scope="own unexpired requests"),
+    ],
+    "pending review queue items": [
+        Surface("orm:ReviewQueueItem(pending)", "orm",
+                "app.models.confidence_review.ReviewQueueItem",
+                filter_eq={"status": "PENDING"}),
+        Surface("GET /api/confidence/queue?status=pending", "http",
+                "/api/confidence/queue?status=pending&limit=100",
+                extract="len:items", scope="first 100"),
+    ],
+    "pending relationship suggestions": [
+        Surface("orm:RelationshipSuggestion(pending)", "orm",
+                "app.models.archimate_core.RelationshipSuggestion",
+                filter_eq={"status": "pending"},
+                tenant_via=[("source_element_id", "archimate_elements"),
+                            ("target_element_id", "archimate_elements")]),
+        Surface("GET /capability-map/api/archimate/relationship-suggestions",
+                "http",
+                "/capability-map/api/archimate/relationship-suggestions"
+                "?status=pending&limit=100",
+                extract="len:suggestions",
+                scope="confidence at least 0.3, first 100"),
+    ],
+    "applications with a recorded annual cost": [
+        Surface("orm:ApplicationComponent(annual cost recorded)", "orm",
+                "app.models.application_portfolio.ApplicationComponent",
+                filter_not_null=("total_cost_of_ownership", "license_cost",
+                                 "license_cost_annual", "maintenance_cost",
+                                 "infrastructure_cost", "support_cost",
+                                 "development_cost_annual")),
+        Surface("orm:ApplicationCost(applications)", "orm",
+                "app.models.enterprise_intelligence.ApplicationCost",
+                distinct="application_id",
+                tenant_via=[("application_id", "application_components"),
+                            ("created_by_id", "users")]),
+    ],
+    # /procurement/contracts renders VendorContract for the organisation as
+    # HTML; its query is the orm:VendorContract surface.
+    "contracts": [
+        Surface("orm:VendorContract", "orm",
+                "app.models.application_portfolio.VendorContract"),
+        Surface("orm:Contract", "orm", "app.models.archimate_business.Contract"),
+    ],
+    "vendors": [
+        Surface("orm:VendorOrganization", "orm",
+                "app.models.vendor.vendor_organization.VendorOrganization",
+                shared="one vendor catalogue for every organisation; "
+                       "VendorOrganization's own docstring"),
+        Surface("GET /api/v1/vendors/", "http",
+                "/api/v1/vendors/?per_page=1", extract="data.pagination.total"),
+    ],
 }
 
-# Concepts deliberately NOT registered, and why -- naming the exclusion is the
-# point, because a hollow entry here would defeat the file:
+# Concepts and surfaces deliberately NOT registered, and why -- naming the
+# exclusion is the point, because a hollow entry here would defeat the file:
 #
-#   capability gaps   CapabilityGapDetail, CapabilityGapAnalysis and
-#                     ImplementationGap are three stores, but they are not three
-#                     answers to ONE question: detail rows hang off analysis
-#                     rows (a parent/child cardinality, so unequal counts are
-#                     correct), and the portfolio gap-analysis API computes gaps
-#                     from a live analyzer rather than reading a store. Comparing
-#                     them would manufacture findings. What the owner saw (173
-#                     vs 0) is real, but proving WHICH pair disagrees needs the
-#                     two definitions reconciled first -- that is a product
-#                     decision about what "a gap" is, not a gate.
+#   maturity gaps     CapabilityGapAnalysis and CapabilityGapDetail
+#                     (capability_gap_analysis, capability_gap_details) are
+#                     not the planned-gap register above. They are the
+#                     maturity-gap concept, owned by
+#                     app/services/capability_heatmap_service.py: the distance
+#                     between a capability's current and target maturity, with
+#                     detail rows hanging off analysis rows (a parent/child
+#                     cardinality, so unequal counts are correct). Registering
+#                     them under "gaps" would manufacture findings.
+#   live gaps         /capability-map/api/roadmap/gaps (the "173 gaps"
+#                     tile) computes gaps live from capability coverage
+#                     rather than reading a store, and RoadmapGap holds the
+#                     rows converted out of that analysis. Whether one of
+#                     those is the same "gap" as a row of the gaps register
+#                     is a product decision about what a gap is, not a gate:
+#                     registering either would manufacture findings.
+#   compliance gaps   ComplianceGap is a control a compliance framework
+#                     requires and the organisation does not meet -- not an
+#                     architecture gap.
+#   roadmap           TechnologyRoadmapInitiative is a technology roadmap
+#   initiatives       initiative, not a work package.
+#   decision ledger   DecisionLedger is an append-only log of governance
+#                     events, several per capability; it is not a register of
+#                     decisions, so its row count answers another question.
+#   blueprint         SolutionBlueprintProposal has no organisation-wide
+#   proposals         queue screen (it is read per solution), so there is no
+#                     second surface asking its question.
+#   RAID risks        RaidItem has no risk kind. Its kinds are issue and
+#                     dependency; the R of RAID is the Risk store registered
+#                     under "risks" (see RaidItem's own docstring).
+#   risk assessments  /strategic/api/risks lists RiskAssessment, a scored
+#                     assessment of a capability, not a register entry. It
+#                     answers a different question from "which risks does this
+#                     organisation hold".
+#   HTML listings     /architecture/decisions/ and /procurement/contracts
+#                     render HTML, which this gate cannot read. Each one's
+#                     query is a registered orm surface (ArchitectureDecision,
+#                     VendorContract for the organisation).
 #   capability        the coverage percentages (48% vs 0%) are ratios of two
 #   coverage          populations each of which is itself contested. Fix the
 #                     populations first; the ratio follows.
@@ -274,13 +512,29 @@ def _extract(payload, spec):
 # live run and by --root, so the synthetic test exercises the real judgement.
 # --------------------------------------------------------------------------
 def compare(observations):
-    """observations: {concept: [(surface_name, count, scope), ...]}
+    """observations: {concept: [(surface_name, count, scope[, unscoped]), ...]}
+
+    A row whose fourth element is true came from a store that cannot be scoped
+    to one organisation; its count is the store's whole population. It is a
+    finding once that is non-zero and is never compared with the others.
 
     Returns (findings, notes).
     """
     findings, notes = [], []
     for concept in sorted(observations):
-        rows = [r for r in observations[concept] if r[1] is not None]
+        rows = []
+        for row in observations[concept]:
+            if row[1] is None:
+                continue
+            if len(row) > 3 and row[3]:
+                if row[1]:
+                    findings.append(
+                        "  %s [unscoped-store] %s holds %d rows and has no "
+                        "organisation column, declared link or shared "
+                        "declaration, so it cannot say which of them belong "
+                        "to one organisation." % (concept, row[0], row[1]))
+                continue
+            rows.append(tuple(row[:3]))
         if len(rows) < 2:
             notes.append(
                 "  %s [no-evidence] fewer than two surfaces answered; nothing "
@@ -414,7 +668,6 @@ def _pick_tenant(db):
 
 def observe_live():
     """Ask every registered surface, inside one tenant. Returns (obs, notes)."""
-    notes = []
     os.environ.setdefault("FLASK_CONFIG", "testing")
     if ROOT not in sys.path:
         sys.path.insert(0, ROOT)
@@ -432,7 +685,6 @@ def observe_live():
         return {}, ["  [no-evidence] the application could not be booted: %s"
                     % str(exc)[:200]]
 
-    observations = {}
     # A test REQUEST context, not a bare app context. tests/conftest.py's
     # tenant_ctx fixture does the same, and the reason is load-bearing: the
     # hybrid capability scoping in app/models/unified_capability.py returns
@@ -462,24 +714,7 @@ def observe_live():
         # makes the two halves answer the same question.
         g.current_org_id = org.id
 
-        client = app.test_client()
-        if user is not None:
-            with client.session_transaction() as sess:
-                sess["_user_id"] = str(user.id)
-                sess["_fresh"] = True
-
-        for concept, surfaces in CONCEPTS.items():
-            rows = []
-            for surface in surfaces:
-                if surface.waived and ALLOW_MARKER in surface.waived:
-                    continue
-                count, why = _ask(surface, db, client)
-                if count is None:
-                    notes.append("  %s [unanswered] %s: %s"
-                                 % (concept, surface.name, why))
-                    continue
-                rows.append((surface.name, count, surface.scope))
-            observations[concept] = rows
+        observations, notes = observe_tenant(app, db, org.id, user)
 
         notes.insert(0, "  tenant: organization id=%s%s"
                      % (org.id, "" if user else " (no user; HTTP surfaces will "
@@ -487,25 +722,189 @@ def observe_live():
     return observations, notes
 
 
-def _ask(surface, db, client):
+def observe_tenant(app, db, org_id, user=None, concepts=None, http=True):
+    """Ask every surface of `concepts` as organisation `org_id`.
+
+    Runs inside the caller's request context with g.current_org_id already set
+    to `org_id`. HTTP surfaces are asked as `user`; `http=False` skips them. Returns (observations, notes) in the shape compare() reads.
+    """
+    concepts = CONCEPTS if concepts is None else concepts
+    notes = []
+    client = app.test_client()
+    sid = None
+    if user is not None and http:
+        # Every authenticated request is checked against the server-side
+        # session registry and fails closed without a registered `_sid`, so a
+        # cookie carrying only `_user_id` is answered 401 on every surface.
+        # Register the session the way a real sign-in does, and revoke it
+        # when the run ends.
+        from app.services import session_registry
+
+        with app.test_request_context("/"):
+            sid = session_registry.issue(user)
+        with client.session_transaction() as sess:
+            sess["_user_id"] = str(user.id)
+            sess["_fresh"] = True
+            sess["_sid"] = sid
+
+    try:
+        observations = _observe_concepts(concepts, db, client, org_id, http,
+                                         notes)
+    finally:
+        if sid is not None:
+            from app.services import session_registry
+
+            session_registry.revoke(sid, "store-agreement run finished")
+    return observations, notes
+
+
+def _observe_concepts(concepts, db, client, org_id, http, notes):
+    observations = {}
+    for concept, surfaces in concepts.items():
+        rows = []
+        for surface in surfaces:
+            if surface.waived and ALLOW_MARKER in surface.waived:
+                continue
+            if surface.kind == "orm":
+                count, why, unscoped, unattributed = _count_orm(
+                    surface, db, org_id)
+                if unattributed:
+                    notes.append(
+                        "  %s [unattributed] %s: %d rows link to no "
+                        "organisation by any declared link, so they count "
+                        "for none" % (concept, surface.name, unattributed))
+            elif not http:
+                continue
+            else:
+                with _fresh_identity(org_id):
+                    count, why = _ask(surface, db, client, org_id)
+                unscoped = False
+            if count is None:
+                notes.append("  %s [unanswered] %s: %s"
+                             % (concept, surface.name, why))
+                continue
+            rows.append((surface.name, count, surface.scope, unscoped))
+        observations[concept] = rows
+    return observations
+
+
+class _fresh_identity:
+    """Ask a screen as the signed-in session, not as whoever `g` remembers.
+
+    The test client reuses an app context that is already active, and with it
+    `g`. Flask-Login caches the resolved user there (`_login_user`) and the
+    tenant middleware caches the organisation, so a screen asked inside the
+    caller's context runs as whatever identity that context resolved first --
+    measured: an anonymous user, cached before the session was registered,
+    turned every screen into a 302 to the login page. Clear both before the
+    request and put the organisation back after it, for the stores that follow.
+    """
+
+    _CACHED = ("_login_user", "_current_user", "current_org_id", "current_org")
+
+    def __init__(self, org_id):
+        self.org_id = org_id
+
+    def _clear(self):
+        from flask import g, has_app_context
+
+        if not has_app_context():
+            return None
+        for cached in self._CACHED:
+            if hasattr(g, cached):
+                delattr(g, cached)
+        return g
+
+    def __enter__(self):
+        self._clear()
+        return self
+
+    def __exit__(self, *exc):
+        g = self._clear()
+        if g is not None:
+            g.current_org_id = self.org_id
+        return False
+
+
+def _session_scoped(model):
+    """True when the ORM events already scope this model to the tenant."""
+    try:
+        from app.models.mixins.core import TenantMixin
+        if issubclass(model, TenantMixin):
+            return True
+    except Exception:
+        pass
+    try:
+        from app.models.unified_capability import HybridCapabilityTenantMixin
+        return issubclass(model, HybridCapabilityTenantMixin)
+    except Exception:
+        return False
+
+
+def _count_orm(surface, db, org_id):
+    """(count, reason, unscoped, unattributed) for one orm surface.
+
+    `unattributed` is the number of rows a tenant_via store could not attribute
+    to any organisation; None when the question does not arise.
+    """
+    from sqlalchemy import func, or_
+
+    module, _, cls = surface.target.rpartition(".")
+    try:
+        model = getattr(__import__(module, fromlist=[cls]), cls)
+    except Exception as exc:
+        return None, "model %s could not be imported (%s)" % (
+            surface.target, str(exc)[:120]), False, None
+
+    table = model.__table__
+    if surface.distinct:
+        counted = func.count(func.distinct(getattr(model, surface.distinct)))
+    else:
+        counted = func.count()
+
+    def filtered(query):
+        for attr, value in surface.filter_eq.items():
+            query = query.filter(getattr(model, attr) == value)
+        if surface.filter_not_null:
+            names = surface.filter_not_null
+            if isinstance(names, str):
+                names = (names,)
+            query = query.filter(or_(*[getattr(model, n).isnot(None)
+                                       for n in names]))
+        return query
+
+    try:
+        query = filtered(db.session.query(counted).select_from(model))
+        if _session_scoped(model) or surface.shared:
+            return int(query.scalar()), None, False, None
+        if "organization_id" in table.c:
+            query = query.filter(model.organization_id == org_id)
+            return int(query.scalar()), None, False, None
+        if not surface.tenant_via:
+            return int(query.scalar()), None, True, None
+        # Plain table aliases, not mapped entities: the parent's own tenant
+        # criteria must not rewrite the join, or a row linked to another
+        # organisation's element would fall through to its creator.
+        owners = []
+        for fk_column, parent_table in surface.tenant_via:
+            parent = db.metadata.tables[parent_table].alias()
+            query = query.outerjoin(
+                parent, parent.c.id == getattr(model, fk_column))
+            owners.append(parent.c.organization_id)
+        owner = func.coalesce(*owners) if len(owners) > 1 else owners[0]
+        unattributed = int(query.filter(owner.is_(None)).scalar())
+        return (int(query.filter(owner == org_id).scalar()), None, False,
+                unattributed)
+    except Exception as exc:
+        db.session.rollback()
+        return None, "the query failed: %s" % str(exc)[:160], False, None
+
+
+def _ask(surface, db, client, org_id=None):
     """(count, reason-it-could-not-answer)."""
     if surface.kind == "orm":
-        module, _, cls = surface.target.rpartition(".")
-        try:
-            model = getattr(__import__(module, fromlist=[cls]), cls)
-        except Exception as exc:
-            return None, "model %s could not be imported (%s)" % (
-                surface.target, str(exc)[:120])
-        try:
-            query = db.session.query(model)
-            for attr, value in surface.filter_eq.items():
-                query = query.filter(getattr(model, attr) == value)
-            if surface.filter_not_null:
-                query = query.filter(getattr(model, surface.filter_not_null).isnot(None))
-            return int(query.count()), None
-        except Exception as exc:
-            db.session.rollback()
-            return None, "the query failed: %s" % str(exc)[:160]
+        count, why, _unscoped, _unattributed = _count_orm(surface, db, org_id)
+        return count, why
 
     try:
         response = client.get(surface.target)
@@ -545,7 +944,7 @@ def observe_synthetic(root):
             if ALLOW_MARKER in str(row.get("waived", "")):
                 continue
             kept.append((row["surface"], row.get("count"),
-                         row.get("scope", "all")))
+                         row.get("scope", "all"), bool(row.get("unscoped"))))
         observations[concept] = kept
     return observations, []
 

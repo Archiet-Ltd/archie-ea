@@ -111,6 +111,15 @@
                       class="text-2xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-semibold">fallback</span>
             </div>
         </template>
+        {# The server refused the type just picked: why, and what is allowed. #}
+        <template x-if="relPickerRejection">
+            <div role="alert" data-rel-rejection class="mx-2 my-1 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+                <p class="text-xs font-medium text-destructive-emphasis" x-text="relPickerRejection.message"></p>
+                <p class="mt-1 text-2xs text-foreground" data-rel-suggestions>
+                    Allowed here: <span class="capitalize" x-text="relPickerRejection.validTypes.join(', ')"></span>
+                </p>
+            </div>
+        </template>
         <template x-if="relPickerTypes.length === 0 && relPickerInvalidTypes.length === 0">
             <div class="p-3 text-xs text-muted-foreground">Loading valid types...</div>
         </template>
@@ -156,10 +165,17 @@
             <div>
                 <div class="h-px bg-border my-1 mx-2"></div>
                 <div class="text-2xs text-muted-foreground/60 px-3 py-1 font-semibold uppercase tracking-wide">Not valid for this pair</div>
+                {# Still clickable: the attempt goes to the server, which is the
+                   metamodel authority, and its refusal is shown below with the
+                   types that are allowed. A greyed item that did nothing on click
+                   told the person nothing. #}
                 <template x-for="irt in relPickerInvalidTypes" :key="irt">
-                    <div class="rel-picker-item opacity-30 cursor-not-allowed capitalize"
-                         :title="'Not valid per ArchiMate 3.2 between these element types'"
-                         x-text="irt"></div>
+                    <button type="button" class="rel-picker-item w-full text-left opacity-50 capitalize"
+                            data-invalid-rel-type
+                            :title="'Not valid per ArchiMate 3.2 between these element types'"
+                            :aria-label="irt + ' (not valid for this pair)'"
+                            @click="createRelationship(irt)"
+                            x-text="irt"></button>
                 </template>
             </div>
         </template>

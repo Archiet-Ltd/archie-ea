@@ -12,6 +12,14 @@ def init_extensions(app):
 
     mail.init_app(app)
     db.init_app(app)
+
+    # Request/job/assistant-run tracing (app/utils/tracing.py). Registered
+    # before every other request hook so a request that an earlier hook turns
+    # away (rate limit, session timeout, tenant check) still gets its id.
+    from app.utils.tracing import install_tracing
+
+    install_tracing(app)
+
     login_manager.init_app(app)
 
     # JSON 401 for API endpoints instead of redirect
@@ -30,7 +38,12 @@ def init_extensions(app):
             resp = jsonify({"success": False, "error": "Authentication required"})
             resp.status_code = 401
             return resp
-        return redirect(url_for("account.login", next=request.url))
+        # Site-relative, with the query string: the login view only follows a
+        # rooted path (safe_next_url), so an absolute request.url here was
+        # always discarded and every signed-out visitor landed on the dashboard
+        # instead of the page they asked for.
+        next_path = request.full_path.rstrip("?") if request.query_string else request.path
+        return redirect(url_for("account.login", next=next_path))
 
     csrf.init_app(app)
 
@@ -161,6 +174,42 @@ def init_extensions(app):
             },
         ), 409
 
+    from app.services.billing_plans import PlanLimitReached
+
+    @app.errorhandler(PlanLimitReached)
+    def handle_plan_limit_reached(e):
+        """Someone could not be added because the organisation's plan is full.
+
+        Raised by the flush-time guard, so it reaches here from any path that
+        adds a person: single sign-on, invitations, signup, an API. The person
+        who triggered it is told why and nothing is saved.
+        """
+        from flask import jsonify, render_template, request
+
+        db.session.rollback()
+        logger.info("plan limit refused an addition: path=%s status=%s", request.path, e.status)
+        wants_json = (
+            "/api/" in request.path
+            or request.content_type == "application/json"
+            or request.accept_mimetypes.best == "application/json"
+            or request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        )
+        if wants_json:
+            return jsonify({
+                "success": False,
+                "error": str(e),
+                "error_type": "plan_limit_reached",
+            }), 409
+        return render_template(
+            "errors/generic_error.html",
+            status_code=409,
+            error={
+                "error": str(e),
+                "recovery_action": "Ask an administrator of the organisation to upgrade "
+                                   "its plan, then try again.",
+            },
+        ), 409
+
     compress.init_app(app)
 
     # Optional: Flask-Migrate
@@ -221,9 +270,40 @@ def init_extensions(app):
         app.logger.warning(f"Redis cache initialization failed (non-critical): {e}")
 
 
+def _scheduler_belongs_in_this_process() -> bool:
+    """Whether THIS process (web or worker) should own the APScheduler jobs.
+
+    Every job below is registered exactly once, in whichever process calls
+    ``init_scheduler`` — there is no separate registration path for a worker.
+    Historically that call happened unconditionally inside ``create_app()``,
+    so a deployment with a dedicated jobs worker (``app/jobs/worker.py``,
+    built from ``Dockerfile.worker``) would run every job TWICE: once in the
+    web process and once in the worker.
+
+    ``JOBS_RUN_IN_WORKER`` opts a deployment into the split: set on the web
+    process only, it makes the web process skip registration entirely.
+    ``RUNNING_AS_JOBS_WORKER`` is set only by ``app/jobs/worker.py`` itself, so
+    that process registers unconditionally regardless of the first flag.
+    Neither var set (today's default, and every existing test) preserves the
+    original single-process behaviour exactly — the web process keeps running
+    the scheduler until a deployment sets ``JOBS_RUN_IN_WORKER=1`` on it.
+    """
+    import os
+
+    if os.environ.get("RUNNING_AS_JOBS_WORKER") == "1":
+        return True
+    return os.environ.get("JOBS_RUN_IN_WORKER") != "1"
+
+
 def init_scheduler(app):
     """Initialize APScheduler for background workflow execution."""
     if app.testing:
+        return
+    if not _scheduler_belongs_in_this_process():
+        app.logger.info(
+            "APScheduler not started in this process — JOBS_RUN_IN_WORKER=1 and "
+            "this is not the jobs worker; app/jobs/worker.py owns these jobs instead."
+        )
         return
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
@@ -233,17 +313,34 @@ def init_scheduler(app):
         scheduler = BackgroundScheduler()
 
         def run_scheduled_workflows():
-            """APScheduler job: execute due EA workflow schedules."""
+            """APScheduler job: execute due EA workflow schedules per tenant.
+
+            EAWorkflowSchedule is a TenantMixin model, so the due-schedule
+            read and every downstream query (workflow definition, phase gate)
+            must run inside each organisation's tenant scope.  This function
+            visits every active organisation through run_for_each_tenant so
+            the ORM isolation listeners filter rows automatically.
+            """
             with app.app_context():
                 try:
+                    from app.jobs.tenant_safe_job import run_for_each_tenant
                     from app.services.ea_workflow_engine import EAWorkflowEngine
-                    engine = EAWorkflowEngine()
-                    result = engine.run_due_schedules()
-                    if result["schedules_run"] > 0:
-                        import logging
-                        logging.getLogger(__name__).info(
-                            "APScheduler: ran %d EA workflow schedules", result["schedules_run"]
-                        )
+
+                    def _log_failure(result):
+                        if not result.ok:
+                            import logging
+                            logging.getLogger(__name__).error(
+                                "APScheduler ea-workflows failed for org %s: %s",
+                                result.organization_id,
+                                result.error,
+                            )
+
+                    run_for_each_tenant(
+                        app,
+                        "ea-workflow-schedules",
+                        lambda organization_id: EAWorkflowEngine().run_due_schedules(),
+                        on_result=_log_failure,
+                    )
                 except Exception as exc:
                     import logging
                     logging.getLogger(__name__).error("APScheduler ea-workflows error: %s", exc)
@@ -257,7 +354,10 @@ def init_scheduler(app):
             max_instances=1,
         )
 
-        # PLT-009: Weekly data maturity digest (Monday 8am UTC)
+        # PLT-009: Weekly data maturity digest (Monday 8am UTC). Declares its
+        # organisation per run: send_data_maturity_digest calls
+        # app.jobs.tenant_safe_job.run_for_each_tenant, which sets
+        # g.current_org_id via tenant_scope() for every active organisation.
         def run_data_maturity_digest():
             with app.app_context():
                 try:
@@ -280,7 +380,9 @@ def init_scheduler(app):
             max_instances=1,
         )
 
-        # PLT-031: Weekly executive summary (Monday 7am UTC)
+        # PLT-031: Weekly executive summary (Monday 7am UTC). Declares its
+        # organisation per run via run_for_each_tenant / tenant_scope, same as
+        # the maturity digest above.
         def run_executive_summary():
             with app.app_context():
                 try:
@@ -308,6 +410,11 @@ def init_scheduler(app):
         # other digests here, because catching degradation promptly is the
         # whole point; _digest_emails.send_error_digest no-ops (and sends
         # nothing) when there is nothing new since the last run.
+        #
+        # Named platform job, deliberately: error_events carries no
+        # organisation predicate (an error is a platform fact, not a tenant
+        # one -- see _digest_emails._get_platform_admin_recipients), so there
+        # is no per-organisation tenant_scope to run this inside.
         def run_error_digest():
             with app.app_context():
                 try:
@@ -328,26 +435,85 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # An approval past its 15-minute review-by time stays pending and
+        # actionable (never auto-expires) but must not go unseen —
+        # this notifies each affected organisation's administrators once per
+        # overdue row. Platform-wide job (groups by organization_id itself,
+        # same shape as run_error_digest above), 15 minutes to match the
+        # window it is watching.
+        def run_approval_escalation():
+            with app.app_context():
+                try:
+                    from app.modules.ai_chat.services.ai_chat_approval_service import (
+                        escalate_overdue_approvals,
+                    )
+                    escalate_overdue_approvals(app)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error(
+                        "APScheduler approval-escalation error: %s", exc
+                    )
+
+        scheduler.add_job(
+            func=run_approval_escalation,
+            trigger=IntervalTrigger(minutes=15),
+            id="approval_escalation",
+            name="Overdue Approval Escalation",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # Teams meeting intelligence: Graph callRecords subscriptions expire
         # every 3 days — renew twice daily; renew_if_needed re-creates the
         # subscription if Graph has already dropped it. No-op when the
         # integration was never configured.
+        #
+        # Declares its organisation per run: TeamsMeetingService reads its
+        # M365 configuration from APISettings, a TenantMixin model. Called
+        # with no tenant context (as this job previously did), the isolation
+        # listener applies no organisation predicate at all, so the query
+        # silently resolves whichever organisation's row the database happens
+        # to return first -- every other organisation's subscription then
+        # never renews. Looping through run_for_each_tenant fixes that
+        # without changing TeamsMeetingService itself: each iteration runs
+        # inside tenant_scope(organization_id), so the existing APISettings
+        # query is correctly filtered by that organisation.
         def run_teams_subscription_renewal():
             with app.app_context():
-                try:
+                import logging
+
+                from app.jobs.tenant_safe_job import run_for_each_tenant
+
+                log = logging.getLogger(__name__)
+
+                def _renew_one_tenant(organization_id):
                     from app.services.teams_meeting_service import TeamsMeetingService
-                    result = TeamsMeetingService.renew_if_needed()
-                    if result.get("status") == "ok":
-                        import logging
-                        logging.getLogger(__name__).info(
-                            "APScheduler: Teams subscription renewed until %s",
-                            result.get("expiry"),
+                    return TeamsMeetingService.renew_if_needed()
+
+                def _log_result(result):
+                    if not result.ok:
+                        log.error(
+                            "APScheduler teams-renewal error for organization_id=%s: %s",
+                            result.organization_id, result.error,
                         )
-                except Exception as exc:
-                    import logging
-                    logging.getLogger(__name__).error(
-                        "APScheduler teams-renewal error: %s", exc
+                        return
+                    status = (result.value or {}).get("status")
+                    if status == "ok":
+                        log.info(
+                            "APScheduler: Teams subscription renewed for "
+                            "organization_id=%s until %s",
+                            result.organization_id, (result.value or {}).get("expiry"),
+                        )
+
+                try:
+                    run_for_each_tenant(
+                        app,
+                        "teams-subscription-renewal",
+                        _renew_one_tenant,
+                        on_result=_log_result,
                     )
+                except Exception as exc:
+                    log.error("APScheduler teams-renewal error: %s", exc)
 
         scheduler.add_job(
             func=run_teams_subscription_renewal,
@@ -413,6 +579,9 @@ def init_scheduler(app):
         # T-002: recurring capability-maturity projection. Closes the gap PR
         # #23's write-time ORM sync listeners cannot: the three raw-SQL
         # maturity writers in maturity_routes.py never fire an ORM event.
+        # Named platform job (see the module docstring on
+        # app/jobs/capability_projection_job.py): the projection is
+        # deliberately all-tenant in one pass, guarded by job_lock alone.
         capability_projection_registered = False
         try:
             def run_capability_projection():
@@ -451,6 +620,8 @@ def init_scheduler(app):
         # T-003: recurring recompute of stale derived facts (DE-4, ADR-003).
         # The on-demand endpoint (POST /api/v1/intelligence/derivation/recompute)
         # covers the immediate case; this covers everything nobody clicked.
+        # Declares its organisation per run: recompute_derived_facts calls
+        # run_for_each_tenant, visiting only stale-carrying organisations.
         derived_recompute_registered = False
         try:
             def run_derived_recompute():
@@ -489,6 +660,145 @@ def init_scheduler(app):
                 "Derived-facts recompute scheduler job was not registered: %s", exc
             )
 
+# Event-log relay: copies undelivered outbox rows into event_log
+        # per organisation. Runs every 5 seconds so consumers see events
+        # with at most a few seconds of latency.
+        def run_event_log_relay():
+            with app.app_context():
+                import logging
+
+                from app.jobs.tenant_safe_job import run_for_each_tenant
+
+                log = logging.getLogger(__name__)
+
+                def _relay_one_tenant(_organization_id):
+                    from app.services.event_log_service import relay_outbox_batch
+                    return relay_outbox_batch()
+
+                def _log_result(result):
+                    if not result.ok:
+                        log.error(
+                            "event_log relay failed for org %s: %s",
+                            result.organization_id, result.error,
+                        )
+
+                try:
+                    run_for_each_tenant(
+                        app,
+                        "event-log-relay",
+                        _relay_one_tenant,
+                        on_result=_log_result,
+                    )
+                except Exception as exc:
+                    log.error("event_log relay error: %s", exc)
+
+        scheduler.add_job(
+            func=run_event_log_relay,
+            trigger=IntervalTrigger(seconds=5),
+            id="event_log_relay",
+            name="Event Log Outbox Relay",
+            replace_existing=True,
+            max_instances=1,
+        )
+
+        # Event-log partition maintenance: creates the next three months'
+        # partitions if missing. Runs daily so partitions exist before any
+        # outbox event needs them.  Platform job — partitions are shared
+        # across all organisations.
+        event_log_partition_registered = False
+        try:
+            def run_event_log_partition_maintenance():
+                with app.app_context():
+                    from app.services.event_log_service import (
+                        ensure_future_partitions,
+                    )
+                    created = ensure_future_partitions(months_ahead=3)
+                    app.logger.info(
+                        "event_log partition maintenance: %s partitions created",
+                        created,
+                    )
+
+            scheduler.add_job(
+                func=run_event_log_partition_maintenance,
+                trigger=CronTrigger(hour=3, minute=0),
+                id="event_log_partition_maintenance",
+                name="Event Log Partition Maintenance",
+                replace_existing=True,
+                max_instances=1,
+            )
+            event_log_partition_registered = True
+        except Exception as exc:
+            app.logger.error(
+                "Event-log partition maintenance job was not registered: %s",
+                exc,
+            )
+
+        # Per-organisation model-health / drift scan. Runs the
+        # deterministic drift detector for every active organisation and
+        # stores the report so the page reads a single row rather than
+        # scanning the whole genome on every page load.
+        model_health_registered = False
+        try:
+            def run_model_health_scan():
+                with app.app_context():
+                    from app.jobs.tenant_safe_job import run_for_each_tenant
+                    from app.models.drift_report import DriftReport
+                    from app.modules.genome.services.drift_detector import (
+                        detect_model_drift,
+                    )
+
+                    def _scan_one(organization_id):
+                        report = detect_model_drift(organization_id)
+                        DriftReport.upsert(organization_id, report)
+                        return report.get("summary", {}).get("total", 0)
+
+                    run = run_for_each_tenant(
+                        app, "model_health_scan", _scan_one
+                    )
+                    if run.failed:
+                        app.logger.error(
+                            "APScheduler model-health scan partial failure: %s",
+                            run.as_dict(),
+                        )
+                    else:
+                        app.logger.info(
+                            "APScheduler model-health scan: %s", run.as_dict()
+                        )
+
+            model_health_interval_minutes = int(
+                app.config["MODEL_HEALTH_SCAN_INTERVAL_MINUTES"]
+            )
+            if model_health_interval_minutes <= 0:
+                raise ValueError("interval must be positive")
+            scheduler.add_job(
+                func=run_model_health_scan,
+                trigger=IntervalTrigger(minutes=model_health_interval_minutes),
+                id="model_health_scan",
+                name="Model Health Drift Scan",
+                replace_existing=True,
+                max_instances=1,
+            )
+            model_health_registered = True
+        except Exception as exc:
+            app.logger.error(
+                "Model-health scan scheduler job was not registered: %s", exc
+            )
+
+        # Remove any undeclared job ids BEFORE starting the scheduler —
+        # every job must be in PLATFORM_JOBS or TENANT_JOBS in
+        # app/jobs/tenant_safe_job.py, or it runs unfiltered.  If enforcement
+        # raises, the scheduler is not started (fail closed).
+        try:
+            from app.jobs.tenant_safe_job import _remove_undeclared_jobs
+
+            _remove_undeclared_jobs(scheduler)
+        except Exception as exc:
+            logger.exception(
+                "init_scheduler: _remove_undeclared_jobs failed — scheduler not started: %s",
+                exc,
+            )
+            raise
+
         scheduler.start()
 
         def _shutdown_scheduler():
@@ -502,7 +812,8 @@ def init_scheduler(app):
         app.extensions["ea_workflow_scheduler"] = scheduler
         scheduled_jobs = (
             "EA workflows (5 min), maturity digest (Mon 8am), "
-            "executive summary (Mon 7am), Teams subscription renewal (12h)"
+            "executive summary (Mon 7am), Teams subscription renewal (12h), "
+            "approval escalation (15 min), event log relay (5s)"
         )
         if arb_expiry_registered:
             scheduled_jobs += ", typed ARB waiver expiry (configured)"
@@ -510,6 +821,10 @@ def init_scheduler(app):
             scheduled_jobs += ", capability maturity projection (interval)"
         if derived_recompute_registered:
             scheduled_jobs += ", derived-facts recompute (interval)"
+        if model_health_registered:
+            scheduled_jobs += ", model-health drift scan (interval)"
+        if event_log_partition_registered:
+            scheduled_jobs += ", event log partition maintenance (daily)"
         app.logger.info("APScheduler started: %s", scheduled_jobs)
     except ImportError:
         app.logger.warning("APScheduler not available — EA workflow schedules disabled")

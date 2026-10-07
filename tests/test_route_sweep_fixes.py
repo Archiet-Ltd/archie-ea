@@ -16,7 +16,9 @@ import uuid
 
 import pytest
 
-pytestmark = pytest.mark.usefixtures("db_session")
+# Every fixture-using test below reaches db_session through its fixtures. The
+# isolation-sweep tests at the end deliberately do not: each route they drive
+# opens and discards a transaction of its own (tests/_isolation_sweep.py).
 
 
 def _login(client, user_id):
@@ -212,3 +214,170 @@ def test_architectural_analysis_other_org_id_returns_404(other_org_application):
         f"Expected 404 for another organisation's application id; got "
         f"{resp.status_code}: {resp.get_data(as_text=True)[:500]}"
     )
+
+
+# =============================================================================
+# Leaks found by the isolation sweep (tests/test_tenant_isolation_matrix.py)
+# and fixed here. Each route acted on a child row -- a solution's TCO line, an
+# application's process link, a board's sprint -- found by its own id and the
+# parent id from the URL, without ever loading the parent through the tenant
+# filter. So another organisation's pair of ids reached another organisation's
+# row. Each is driven through the same engine as the sweep, and each of these
+# answered "leak" before its fix.
+# =============================================================================
+
+from tests import _isolation_sweep as sweep  # noqa: E402
+from tests.test_tenant_isolation_matrix import POLICY  # noqa: E402
+
+FIXED_LEAKS = {
+    # app/modules/solutions_strategic/v2/routes/solution_phase_routes.py
+    "PUT /solutions/<int:solution_id>/tco/<int:tco_id>": "solution TCO line",
+    "DELETE /solutions/<int:solution_id>/tco/<int:tco_id>": "solution TCO line",
+    "PUT /solutions/<int:solution_id>/plateaus/<int:plateau_id>": "solution plateau",
+    "DELETE /solutions/<int:solution_id>/plateaus/<int:plateau_id>": "solution plateau",
+    "DELETE /solutions/<int:solution_id>/business-elements/<int:row_id>": "solution business element",
+    "DELETE /solutions/<int:solution_id>/app-elements/<int:row_id>": "solution application element",
+    "DELETE /solutions/<int:solution_id>/tech-elements/<int:row_id>": "solution technology element",
+    "DELETE /solutions/<int:solution_id>/quality-attributes/<int:row_id>": "solution quality attribute",
+    "DELETE /solutions/<int:solution_id>/slas/<int:row_id>": "solution SLA",
+    "PUT /solutions/<int:solution_id>/capabilities/<int:mapping_id>": "solution capability mapping",
+    # app/api/application_routes.py and app/application_mgmt/business_layer_routes.py
+    "DELETE /api/applications/<int:app_id>/process-links/<int:link_id>": "application process link",
+    "DELETE /dashboard/api/applications/<int:app_id>/process-links/<int:link_id>": "application process link",
+    # app/modules/architecture/routes/sprint_routes.py, app/services/sprint_service.py
+    "GET /api/sprints/<int:sprint_id>/burndown": "sprint",
+    "GET /api/sprints/<int:sprint_id>/analytics": "sprint",
+    "GET /sprints/<int:sprint_id>/analytics": "sprint",
+    # app/modules/codegen/routes/rules_routes.py
+    "DELETE /solutions/<int:solution_id>/codegen/rules/<int:rule_id>": "solution business rule",
+    "POST /solutions/<int:solution_id>/codegen/rules/compile": "solution business rules",
+    # app/modules/codegen/routes/workflow_routes.py
+    "GET /api/codegen/workflow-designs/<int:design_id>": "workflow design",
+    "PUT /api/codegen/workflow-designs/<int:design_id>": "workflow design",
+    # app/modules/solutions_product/routes/product_routes.py
+    "PUT /api/solutions/<int:solution_id>/webhooks/<int:webhook_id>": "solution webhook",
+    "DELETE /api/solutions/<int:solution_id>/webhooks/<int:webhook_id>": "solution webhook",
+    "POST /api/solutions/<int:solution_id>/webhooks/<int:webhook_id>/test": (
+        "solution webhook: firing it sent a request to another organisation's endpoint"),
+    # app/modules/solutions_strategic/v2/routes/programme_routes.py
+    "DELETE /solutions/programmes/<int:initiative_id>/api/snapshots/<int:snapshot_id>": "programme snapshot",
+    # app/modules/capabilities/routes/enterprise_api_routes.py
+    "DELETE /api/enterprise/requirements/<int:req_id>/dependencies/<int:dep_id>": "requirement dependency",
+    # app/modules/solutions_strategic/v2/routes/strategic_routes.py
+    "GET /strategic/api/capability-health/overrides/<int:override_id>": "capability health override",
+    "PUT /strategic/api/capability-health/overrides/<int:override_id>": "capability health override",
+    "DELETE /strategic/api/capability-health/overrides/<int:override_id>": "capability health override",
+}
+
+
+@pytest.fixture
+def sweep_app(app, _schema):
+    previous = app.config.get("WTF_CSRF_ENABLED")
+    app.config["WTF_CSRF_ENABLED"] = False
+    yield app
+    app.config["WTF_CSRF_ENABLED"] = previous
+
+
+@pytest.mark.parametrize("route", sorted(FIXED_LEAKS))
+def test_fixed_leak_refuses_another_organisation(sweep_app, login_as, route):
+    """Another organisation's ids are refused, and the owner is still served."""
+    cases, _excluded = sweep.run_sweep(sweep_app, login_as, POLICY, only=lambda c: c.key == route)
+    assert cases, "%s is no longer an identifier-bearing route" % route
+    for case in cases:
+        assert case.status == sweep.PROVEN, (
+            "%s (%s): %s -- B answered %s, owner answered %s. %s"
+            % (case.key, FIXED_LEAKS[route], case.status, case.b_status, case.a_status, case.detail))
+
+
+def _two_orgs(db_session, make_org):
+    from app.models.user import Permission, Role, User
+
+    role = Role.query.filter_by(permissions=Permission.ADMINISTER).first()
+    orgs, users = [], []
+    for tag in ("a", "b"):
+        org = make_org("sweep_list_" + tag)
+        user = User(
+            email="sweep-list-%s-%s@example.test" % (tag, uuid.uuid4().hex[:8]),
+            first_name="Sweep", last_name=tag.upper(), organization_id=org.id,
+            confirmed=True, enterprise_role="platform_admin", role=role,
+        )
+        db_session.add(user)
+        orgs.append(org)
+        users.append(user)
+    db_session.flush()
+    return orgs, users
+
+
+def _seed_in(db_session, model, org, user):
+    """One row of ``model`` in ``org``, built the way the sweep builds it."""
+    token = "zq" + uuid.uuid4().hex[:6]
+    row = sweep.Seeder(db_session, org.id, user.id, token, POLICY.shared_models).seed(model, {})
+    db_session.commit()
+    return row, token
+
+
+def test_workflow_design_list_holds_only_the_callers_organisation(
+    app, db_session, make_org, client, login_as
+):
+    """The list beside the fixed detail route read every organisation's designs."""
+    from app.modules.codegen.models import WorkflowDesign
+
+    (org_a, _org_b), (user_a, user_b) = _two_orgs(db_session, make_org)
+    _design, token = _seed_in(db_session, WorkflowDesign, org_a, user_a)
+
+    a_id, b_id = user_a.id, user_b.id
+    db_session.expunge_all()
+    login_as(client, b_id)
+    resp = client.get("/api/codegen/workflow-designs")
+    assert resp.status_code == 200
+    assert token not in resp.get_data(as_text=True)
+
+    login_as(client, a_id)
+    resp = client.get("/api/codegen/workflow-designs")
+    assert token in resp.get_data(as_text=True)
+
+
+def test_capability_health_override_list_holds_only_the_callers_organisation(
+    app, db_session, make_org, client, login_as
+):
+    from app.models.strategic import CapabilityHealthOverride
+
+    (org_a, _org_b), (user_a, user_b) = _two_orgs(db_session, make_org)
+    _override, token = _seed_in(db_session, CapabilityHealthOverride, org_a, user_a)
+
+    a_id, b_id = user_a.id, user_b.id
+    db_session.expunge_all()
+    login_as(client, b_id)
+    resp = client.get("/strategic/api/capability-health/overrides")
+    assert resp.status_code == 200
+    assert token not in resp.get_data(as_text=True)
+
+    login_as(client, a_id)
+    resp = client.get("/strategic/api/capability-health/overrides")
+    assert token in resp.get_data(as_text=True)
+
+
+def test_sprints_cannot_be_listed_or_created_under_another_organisations_board(
+    app, db_session, make_org, client, login_as
+):
+    from app.models.adm_kanban import KanbanBoard
+    from app.models.sprint import Sprint
+
+    (org_a, _org_b), (user_a, user_b) = _two_orgs(db_session, make_org)
+    sprint, token = _seed_in(db_session, Sprint, org_a, user_a)
+    board_id = sprint.board_id
+    assert db_session.get(KanbanBoard, board_id).organization_id == org_a.id
+
+    a_id, b_id = user_a.id, user_b.id
+    db_session.expunge_all()
+    login_as(client, b_id)
+    listed = client.get("/api/sprints?board_id=%d" % board_id)
+    created = client.post("/api/sprints", json={"board_id": board_id, "name": "intruder sprint"})
+    assert listed.status_code == 404
+    assert created.status_code == 404
+    assert token not in listed.get_data(as_text=True)
+
+    login_as(client, a_id)
+    listed = client.get("/api/sprints?board_id=%d" % board_id)
+    assert listed.status_code == 200
+    assert token in listed.get_data(as_text=True)

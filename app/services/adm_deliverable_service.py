@@ -177,7 +177,11 @@ def toggle_deliverable(
 
     Creates the check row on first use. Returns the updated check dict.
     """
-    from app.models.adm_deliverable import ADMDeliverableCheck
+    from app.models.adm_deliverable import ADMDeliverable, ADMDeliverableCheck
+
+    deliverable = ADMDeliverable.query.get(deliverable_id)
+    if deliverable is None:
+        raise ValueError(f"Deliverable {deliverable_id} not found")
 
     check = ADMDeliverableCheck.query.filter_by(
         deliverable_id=deliverable_id, board_id=board_id

@@ -1106,6 +1106,34 @@ def gate_raw_sql_tenancy(baseline: int) -> Result:
     return Result("raw-sql-tenancy", PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_raw_sql_tenancy_writes(baseline: int) -> Result:
+    """organization_id written on a tenant table outside the one command allowed to.
+
+    A ratchet, not a hard zero: the dedicated commands that predate
+    app/commands/backfill_layer_tenancy.py as the single policy home are
+    counted here, not excused, and fall out of this baseline one at a time as
+    they retire. A new write outside that one file raises the count and fails
+    the build; the fix is to move the write into the canonical command, not
+    to raise the baseline.
+
+    This is rule 2 of the same file rule 1 (raw-sql-tenancy, above) already
+    registers -- one cached tenant-table list, two shapes of the same
+    problem: a raw SQL string naming a tenant table, found by walking string
+    literals rather than trusting a comment.
+    """
+    proc = _run([sys.executable, "scripts/check_raw_sql_tenancy.py", "--count", "--rule", "writes"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("raw-sql-tenancy-writes", FAIL, f"could not parse: {proc.stdout!r}")
+    detail = ""
+    if count > baseline:
+        detail = _run(
+            [sys.executable, "scripts/check_raw_sql_tenancy.py", "--rule", "writes"]
+        ).stdout[-1500:]
+    return Result("raw-sql-tenancy-writes", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
 def gate_tenant_scoping(baseline: int) -> Result:
     """ORM queries over a tenant-owned-but-unmixed model with no org predicate.
 
@@ -1433,6 +1461,38 @@ def gate_dependency_cves() -> Result:
     return Result("dependency-cves", PASS, detail, found, accepted)
 
 
+BANDIT_GATE = os.path.join("scripts", "ci", "bandit_gate.py")
+
+
+def gate_high_findings(targets: list[str] | None = None) -> Result:
+    """No release while a HIGH-severity static-analysis finding is open.
+
+    The security-sast job fails only on findings NEW against .bandit-baseline.json,
+    which is right for the medium backlog and wrong for a high one: fourteen HIGH
+    findings sat accepted in that baseline, so every change passed over them. This
+    counts every HIGH finding whether or not the baseline knows it, and does not
+    honour a bare `# nosec` -- a finding is dispositioned only by
+    `# nosec <test id> -- <reason>` on its own lines, which a reviewer can read.
+    Secrets and dependency advisories need no equivalent: gitleaks fails on any
+    leak, and dependency-cves on any advisory not deliberately accepted.
+    """
+    try:
+        import bandit  # noqa: F401
+    except ImportError:
+        return Result("high-findings", FAIL, "bandit is not installed",
+                      remediation="pip install -r requirements-test.txt (it pins bandit)")
+    cmd = [sys.executable, BANDIT_GATE, "--high"]
+    if targets:
+        cmd += ["--targets", *targets]
+    proc = _run(cmd, timeout=900)
+    output = (proc.stdout + proc.stderr).strip()
+    match = re.search(r"high-severity findings open: (\d+)", output)
+    if not match:
+        return Result("high-findings", FAIL, "bandit did not run:\n" + output[-1200:])
+    count = int(match.group(1))
+    return Result("high-findings", PASS if count == 0 else FAIL, output[-1800:], count, 0)
+
+
 def gate_boot_health() -> Result:
     """Boot + wiring. Database-free by design — see tests/test_boot_health.py."""
     proc = _run([sys.executable, "-m", "pytest", "tests/test_boot_health.py", "-q", "-p", "no:cacheprovider"])
@@ -1651,6 +1711,11 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("raw-sql-tenancy", "raw SQL on tenant tables without an org predicate",
              "ratchet", lambda: gate_raw_sql_tenancy(baseline["raw_sql_tenancy"]),
              remediation="scope the query, or append 'tenancy-ok: <reason>'",
+             tags=["static", "security"]),
+        Gate("raw-sql-tenancy-writes", "organization_id written outside the one backfill command",
+             "ratchet", lambda: gate_raw_sql_tenancy_writes(baseline["raw_sql_tenancy_writes"]),
+             remediation="derive or assign organization_id only in "
+                         "app/commands/backfill_layer_tenancy.py",
              tags=["static", "security"]),
         Gate("tenant-scoping", "ORM queries on tenant-owned-but-unmixed models without an org predicate",
              "ratchet", lambda: gate_tenant_scoping(baseline["tenant_scoping"]),
@@ -1919,6 +1984,12 @@ def build_gates(baseline: dict) -> list[Gate]:
              gate_vendor_integrity,
              remediation="run: python scripts/vendor_assets.py",
              tags=["static", "ui", "airgap", "security"]),
+        Gate("high-findings", "No HIGH-severity static-analysis finding is open", "zero",
+             gate_high_findings,
+             remediation="run: python scripts/ci/bandit_gate.py --high; fix each finding, or "
+                         "disposition one that is not a vulnerability with "
+                         "# nosec <test id> -- <reason> on its own line",
+             tags=["static", "security"]),
         Gate("dependency-cves", "No NEW known CVEs in shipped dependencies", "ratchet",
              gate_dependency_cves,
              remediation="bump the affected package (watch for blocking upper bounds)",

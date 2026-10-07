@@ -7,7 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 roadmap_citation: "roadmap-v2.md 'Later: 2027' — 'Imports from LeanIX and Ardoq exports, for teams moving their portfolio across in one step'"
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /enterprise-architecture/leanix-ardoq-import
+url_slug: /use-cases/leanix-ardoq-import
 ---
 
 # Bring our LeanIX or Ardoq fact sheets across
@@ -28,7 +28,7 @@ wrangle. Your fact sheets become elements in your model you can work with immedi
 Coming 2027. Join the waiting list and we'll tell you the day it ships.
 
 In the meantime, importing a model from another architecture tool already works today — see
-[Import our existing model](/enterprise-architecture/import).
+[Import our existing model](/use-cases/import-archimate-model).
 
 ## Related
 
