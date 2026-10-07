@@ -430,6 +430,7 @@ KNOWN_LEAKS = {
 # into work_package_service (R1-B04 PR 2): the work package and deliverable routes.
 PARAM_MODELS = {
     "wp_id": "unified_work_packages",
+    "work_package_id": "unified_work_packages",
     "deliverable_id": "deliverables",
 }
 
