@@ -1004,7 +1004,7 @@ _MY_WORK_LINKS = {
         _link("Architecture Model", "archimate_crud.dashboard", "boxes"),
         _link("Traceability Matrix", "architect_ui.traceability_matrix", "git-compare"),
         _link("Interface Register", "interface_register.index", "cable"),
-        _link("Impact Analysis", "strategic.impact_analysis", "crosshair"),
+        _APPROVAL_INBOX_LINK,
     ],
     ROLE_APPLICATION_ARCHITECT: [
         _link("Applications", "unified_applications.application_list", "list"),
@@ -1012,7 +1012,7 @@ _MY_WORK_LINKS = {
         _link("Capability Map", "capability_map.index", "layers"),
         _link("Traceability Matrix", "architect_ui.traceability_matrix", "git-compare"),
         _link("Interface Register", "interface_register.index", "cable"),
-        _link("Impact Analysis", "strategic.impact_analysis", "crosshair"),
+        _APPROVAL_INBOX_LINK,
     ],
     # R1-B36 (TB-0146): finance, compliance, risk, operations and
     # non_technical_owner promoted from unassignable to assignable, each
