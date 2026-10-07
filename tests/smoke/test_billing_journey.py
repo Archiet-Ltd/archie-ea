@@ -25,8 +25,13 @@ def test_pricing_buy_button_leads_a_visitor_to_that_plans_checkout(browser, live
         expect(page.get_by_test_id("buy-enterprise")).to_have_attribute("href", "/contact")
 
         buy.click()
-        # Not signed in yet: the button asks for a sign-in and keeps the plan.
-        page.wait_for_url(lambda url: "/account/login" in url, timeout=PAGE_TIMEOUT)
+        # Not signed in yet: the button opens registration and keeps the plan;
+        # someone with an account signs in from there and keeps it too.
+        page.wait_for_url(lambda url: "/account/register" in url and "plan=startup" in url,
+                          timeout=PAGE_TIMEOUT)
+        page.get_by_test_id("register-signin").get_by_role("link", name="Sign in").click()
+        page.wait_for_url(lambda url: "/account/login" in url and "plan=startup" in url,
+                          timeout=PAGE_TIMEOUT)
         page.fill("#email", seeded["emails"]["platform_admin"])
         page.fill("#password", PASSWORD)
         page.locator("#submit").click()
