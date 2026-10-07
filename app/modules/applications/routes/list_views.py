@@ -29,6 +29,7 @@ from app.models.unified_capability import UnifiedCapability
 from app.modules.my_applications.services import has_assigned_owner
 from app.security.import_decorators import with_import_security
 from app.utils.pagination import safe_int_arg
+from app.utils.tenant_users import escape_like_literal
 
 # Import performance utilities (conditionally available)  # dead-code-ok
 try:
@@ -69,11 +70,6 @@ _LIFECYCLE_ABACUS_CODES = (
     "4.4 STOPPED",
     "5. DECOMMISSIONED",
 )
-
-
-def _escape_like(value):
-    """Escape SQL LIKE wildcards (%, _) to prevent data enumeration."""
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 @unified_applications_bp.route("/roadmap")
@@ -260,7 +256,7 @@ def application_list():
             ).filter(ApplicationBusinessActorMapping.business_actor_id == _user_bu_id)
 
         if search:
-            safe_search = f"%{_escape_like(search)}%"
+            safe_search = f"%{escape_like_literal(search)}%"
             query = query.filter(
                 ApplicationComponent.name.ilike(safe_search, escape="\\")
                 | ApplicationComponent.description.ilike(safe_search, escape="\\")
@@ -568,7 +564,7 @@ def api_list():
         # Base query — exclude decommissioned when searching for picker use
         query = ApplicationComponent.query
         if search:
-            safe_search = f"%{_escape_like(search)}%"
+            safe_search = f"%{escape_like_literal(search)}%"
             query = query.filter(ApplicationComponent.name.ilike(safe_search, escape="\\"))
 
         if status_filter:
@@ -684,7 +680,7 @@ def api_table_data():
 
         # Apply filters
         if search:
-            safe_search = f"%{_escape_like(search)}%"
+            safe_search = f"%{escape_like_literal(search)}%"
             query = query.filter(
                 ApplicationComponent.name.ilike(safe_search, escape="\\")
                 | ApplicationComponent.description.ilike(safe_search, escape="\\")
@@ -711,7 +707,7 @@ def api_table_data():
             fallback_query = ApplicationComponent.query
 
             if search:
-                safe_search = f"%{_escape_like(search)}%"
+                safe_search = f"%{escape_like_literal(search)}%"
                 fallback_query = fallback_query.filter(
                     ApplicationComponent.name.ilike(safe_search, escape="\\")
                     | ApplicationComponent.description.ilike(safe_search, escape="\\")

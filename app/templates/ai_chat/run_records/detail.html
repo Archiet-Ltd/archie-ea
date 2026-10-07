@@ -1,0 +1,192 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}Run Record #{{ record.id }}{% endblock %}
+
+{% block content %}
+{% set breadcrumb = [
+    ('Home', '/'),
+    ('Agent Run Records', url_for('unified_ai_chat.run_record_list')),
+    ('Run #{}'.format(record.id), none)
+] %}
+{{ page_shell(
+    title='Run Record #{}'.format(record.id),
+    breadcrumb=breadcrumb,
+    subtitle='Persona: {} — {}'.format(record.persona or 'unknown', record.created_at.strftime('%Y-%m-%d %H:%M UTC') if record.created_at else '')
+) }}
+
+<div class="grid gap-6 lg:grid-cols-2">
+    <!-- Summary card -->
+    <div class="rounded-md border p-4">
+        <h2 class="mb-3 text-sm font-semibold">Summary</h2>
+        <dl class="grid gap-2 text-sm">
+            <div class="flex justify-between">
+                <dt class="text-muted-foreground">Persona</dt>
+                <dd>{{ record.persona or '—' }}</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-muted-foreground">Charter version</dt>
+                <dd>{{ record.charter_version or '—' }}</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-muted-foreground">Domain</dt>
+                <dd>{{ record.domain or '—' }}</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-muted-foreground">Model</dt>
+                <dd>{{ record.model_used or '—' }}</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-muted-foreground">Success</dt>
+                <dd>
+                    {% if record.success %}
+                    <span class="text-success">Yes</span>
+                    {% else %}
+                    <span class="text-destructive">No</span>
+                    {% endif %}
+                </dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-muted-foreground">Cost (USD)</dt>
+                <dd>{{ '%.6f'|format(record.estimated_cost_usd) if record.estimated_cost_usd else '—' }}</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-muted-foreground">Created</dt>
+                <dd>{{ record.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') if record.created_at else '—' }}</dd>
+            </div>
+        </dl>
+    </div>
+
+    <!-- Inputs card -->
+    <div class="rounded-md border p-4">
+        <h2 class="mb-3 text-sm font-semibold">Inputs</h2>
+        {% if record.inputs %}
+            <div class="rounded bg-muted/30 p-3 text-sm">
+                <p class="mb-1"><span class="font-medium">User message:</span></p>
+                <pre class="whitespace-pre-wrap break-words text-xs">{{ record.inputs.get('user_message', '—') }}</pre>
+                {% if record.inputs.get('context') %}
+                <p class="mb-1 mt-2"><span class="font-medium">Context:</span></p>
+                <pre class="whitespace-pre-wrap break-words text-xs">{{ record.inputs.context | tojson(indent=2) if record.inputs.context is not string else record.inputs.context }}</pre>
+                {% endif %}
+            </div>
+        {% else %}
+            <p class="text-sm text-muted-foreground">No input data recorded.</p>
+        {% endif %}
+    </div>
+
+    <!-- Tools called -->
+    <div class="rounded-md border p-4 lg:col-span-2">
+        <h2 class="mb-3 text-sm font-semibold">Tools Called</h2>
+        {% if record.tools_called %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="border-b bg-muted/50">
+                        <tr>
+                            <th class="px-3 py-2 text-left font-medium">Tool</th>
+                            <th class="px-3 py-2 text-left font-medium">Mutates</th>
+                            <th class="px-3 py-2 text-left font-medium">Arguments</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        {% for tc in record.tools_called %}
+                        <tr class="hover:bg-muted/20">
+                            <td class="px-3 py-2 font-mono text-xs">{{ tc.tool }}</td>
+                            <td class="px-3 py-2">
+                                {% if tc.mutates %}
+                                <span class="text-warning text-xs">Yes</span>
+                                {% else %}
+                                <span class="text-success text-xs">No</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-3 py-2">
+                                <pre class="whitespace-pre-wrap break-words text-xs">{{ tc.arguments | tojson(indent=2) if tc.arguments is not string else tc.arguments }}</pre>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-sm text-muted-foreground">No tools were called in this run.</p>
+        {% endif %}
+    </div>
+
+    <!-- Records read -->
+    <div class="rounded-md border p-4">
+        <h2 class="mb-3 text-sm font-semibold">Records Read</h2>
+        {% if record.records_read %}
+            <ul class="space-y-1 text-sm">
+                {% for s in record.records_read %}
+                <li class="rounded bg-muted/30 px-3 py-1.5">
+                    <span class="text-xs text-muted-foreground uppercase">{{ s.type }}</span>
+                    <span class="ml-2">{{ s.name }}</span>
+                    <span class="ml-1 text-xs text-muted-foreground">#{{ s.id }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-sm text-muted-foreground">No records were read in this run.</p>
+        {% endif %}
+    </div>
+
+    <!-- Proposals -->
+    <div class="rounded-md border p-4">
+        <h2 class="mb-3 text-sm font-semibold">Proposals</h2>
+        {% if record.proposals %}
+            <ul class="space-y-1 text-sm">
+                {% for p in record.proposals %}
+                <li class="rounded bg-muted/30 px-3 py-1.5">
+                    <span class="font-mono text-xs">{{ p.tool }}</span>
+                    {% if p.summary %}<br><span class="text-xs text-muted-foreground">{{ p.summary }}</span>{% endif %}
+                    <span class="ml-2 text-xs text-muted-foreground">(approval #{{ p.approval_id }})</span>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-sm text-muted-foreground">No proposals were queued in this run.</p>
+        {% endif %}
+    </div>
+
+    <!-- Charter used -->
+    {% if charter %}
+    <div class="rounded-md border p-4 lg:col-span-2">
+        <h2 class="mb-3 text-sm font-semibold">Charter: {{ charter.persona }} v{{ charter.version }}</h2>
+        <div class="grid gap-4 lg:grid-cols-2">
+            <div>
+                <p class="text-xs font-medium text-muted-foreground mb-1">Purpose</p>
+                <p class="text-sm">{{ charter.purpose }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-muted-foreground mb-1">Readable entities</p>
+                <p class="text-sm font-mono">{{ charter.readable_entities | join(', ') }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-muted-foreground mb-1">Proposable actions</p>
+                <p class="text-sm font-mono">
+                    {% if charter.proposable_actions is string %}
+                        {{ charter.proposable_actions }}
+                    {% else %}
+                        {{ charter.proposable_actions | join(', ') }}
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-muted-foreground mb-1">Forbidden actions</p>
+                <p class="text-sm font-mono">{{ charter.forbidden_actions | join(', ') if charter.forbidden_actions else 'none' }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Outcome -->
+    <div class="rounded-md border p-4 lg:col-span-2">
+        <h2 class="mb-3 text-sm font-semibold">Outcome</h2>
+        {% if record.outcome %}
+            <pre class="whitespace-pre-wrap break-words rounded bg-muted/30 p-3 text-sm">{{ record.outcome }}</pre>
+        {% else %}
+            <p class="text-sm text-muted-foreground">No outcome text recorded.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

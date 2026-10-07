@@ -92,6 +92,14 @@ if _FAST_INIT:
         overlay_code = db.Column(db.String(32), nullable=True)
         acm_properties = db.Column(db.JSON, default=dict)
 
+        # Model history -- same columns as the normal-runtime twin
+        # in app/models/models.py; see that docstring for the full rationale.
+        valid_from = db.Column(db.DateTime, nullable=True)
+        valid_to = db.Column(db.DateTime, nullable=True)
+        recorded_at = db.Column(db.DateTime, nullable=True)
+        superseded_at = db.Column(db.DateTime, nullable=True)
+        last_confirmed = db.Column(db.DateTime, nullable=True)
+
         # Relationships
         # Note: app_component relationship is handled in the main ArchiMateElement model
         # to avoid conflicts with the duplicate class definition
@@ -168,6 +176,14 @@ if _FAST_INIT:
         # of being dropped for lacking a value reconcile-schema cannot backfill.
         sequence_order = db.Column(db.Integer, nullable=True)
 
+        # Model history -- same columns as the normal-runtime twin
+        # in app/models/models.py.
+        valid_from = db.Column(db.DateTime, nullable=True)
+        valid_to = db.Column(db.DateTime, nullable=True)
+        recorded_at = db.Column(db.DateTime, nullable=True)
+        superseded_at = db.Column(db.DateTime, nullable=True)
+        last_confirmed = db.Column(db.DateTime, nullable=True)
+
         def __repr__(self):
             return f"<ArchiMateRelationship {self.source_id} -> {self.target_id}>"
 
@@ -210,6 +226,21 @@ class RelationshipSuggestion(db.Model):  # migration-exempt — uses db.create_a
     reviewed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(
         db.DateTime, nullable=False, server_default=db.func.now()
+    )
+
+    # Consolidation: set by `flask backfill-review-queue-approvals` on
+    # the row's canonical ai_chat_crud_approvals copy. NULL until backfilled.
+    # This ORM model has no live writer today: only ever queried (.query /
+    # .query.get(), in archimate_relationship_service.py and
+    # archimate_cap_routes.py), never constructed, in this codebase. Do not
+    # confuse this with the unrelated, same-named plain @dataclass in
+    # app/modules/architecture/services/archimate_mapping_agent.py (its own
+    # local class, never imported here, never added to a session, returned
+    # as an in-memory suggestion list, not this table) — added for parity
+    # with the other two consolidated stores and in case historical rows
+    # exist.
+    retired_into_id = db.Column(
+        db.Integer, db.ForeignKey("ai_chat_crud_approvals.id"), nullable=True
     )
 
     def __repr__(self):

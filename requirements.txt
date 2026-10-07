@@ -197,6 +197,13 @@ opentelemetry-exporter-otlp-proto-http>=1.20.0,<2.0.0
 # COM-005: OIDC federation for enterprise SSO — no existing OIDC library in codebase
 authlib>=1.8.0,<2
 joserfc>=1.7,<2
+# R1-B12 PR 2: SAML 2.0 assertion signature verification. signxml builds on
+# lxml + cryptography (both already present) rather than python3-saml's
+# xmlsec1 system library, which this platform's containers do not install.
+signxml>=4.0.0,<6
+# R1-B12 PR 2: TOTP multi-factor authentication for administrators — no
+# existing MFA library in codebase.
+pyotp>=2.9.0,<3
 
 # Load Testing (S1-04)
 locust>=2.20.0

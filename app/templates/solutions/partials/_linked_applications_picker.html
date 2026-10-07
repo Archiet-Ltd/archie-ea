@@ -1,3 +1,5 @@
+{% from 'data_governance/_app_picker.html' import app_picker_script with context %}
+
 {# Linked Applications Picker — search enterprise catalog and link/unlink apps to this solution.
    Included within application_cooperation section of blueprint.html.
    Requires: solution.id, linked_apps (list of serialized app dicts) #}
@@ -111,6 +113,7 @@
 
 <script>
 function appPicker(solutionId, initialApps) {
+    const searchHelper = applicationPickerSearch({ endpoint: '/applications/api/list' });
     return {
         solutionId,
         linkedApps: initialApps || [],
@@ -130,19 +133,15 @@ function appPicker(solutionId, initialApps) {
 
         async search() {
             const q = this.searchQuery.trim();
-            if (q.length < 2) { this.results = []; this.searchError = ''; return; }
+            searchHelper.query = q;
             this.searching = true;
             try {
-                const data = await Platform.fetch.get('/api/enterprise/applications', {
-                    search: q,
-                    limit: 20
-                }, { silent: true });
-                this.results = data.applications || data.results || data || [];
-                this.searchError = '';
+                await searchHelper.search();
+                this.results = searchHelper.results;
+                this.searchError = searchHelper.searchError;
             } catch (e) {
-                // Debounced typeahead: inline message, not a toast per keystroke.
                 this.results = [];
-                this.searchError = e.message || 'Application search failed';
+                this.searchError = searchHelper.searchError || e.message || 'Application search failed';
             } finally {
                 this.searching = false;
             }
@@ -190,3 +189,4 @@ function appPicker(solutionId, initialApps) {
     };
 }
 </script>
+{{ app_picker_script() }}

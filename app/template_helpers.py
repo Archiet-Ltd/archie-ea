@@ -326,11 +326,13 @@ def register_template_filters(app):
         """Make plain-language vocabulary and user setting available to JS.
 
         Only injected when a user is signed in — public pages (landing,
-        login, password reset) never render these values, so serialising
-        ~3 KB of JSON on every unauthenticated request is wasted work.
+        login, password reset) never render these values, so building
+        ~3 KB of vocabulary data on every unauthenticated request is wasted
+        work. Returned as plain Python objects, not pre-serialised JSON: the
+        template renders them with ``|tojson|safe``, which does the
+        escaping Jinja's autoescape otherwise can't see through a bare
+        ``|safe`` (see tests/test_template_escaping.py).
         """
-        import json
-
         from flask_login import current_user
 
         try:
@@ -339,18 +341,26 @@ def register_template_filters(app):
                 and hasattr(current_user, "is_authenticated")
                 and current_user.is_authenticated
             ):
-                return {}
+                return {
+                    "plain_language_names": {},
+                    "plain_layer_names": {},
+                    "show_archimate_names": False,
+                }
         except Exception:
-            return {}
+            return {
+                "plain_language_names": {},
+                "plain_layer_names": {},
+                "show_archimate_names": False,
+            }
 
         from app.models.archimate_element_types import PLAIN_LANGUAGE_NAMES, PLAIN_LAYER_NAMES
 
         show_archimate = _get_show_archimate(current_user)
 
         return {
-            "plain_language_names_json": json.dumps(PLAIN_LANGUAGE_NAMES),
-            "plain_layer_names_json": json.dumps(PLAIN_LAYER_NAMES),
-            "show_archimate_names_js": json.dumps(show_archimate),
+            "plain_language_names": PLAIN_LANGUAGE_NAMES,
+            "plain_layer_names": PLAIN_LAYER_NAMES,
+            "show_archimate_names": show_archimate,
         }
 
 
