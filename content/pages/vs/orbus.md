@@ -21,8 +21,8 @@ compliance_note: >
 
 OrbusInfinity is a proprietary, Microsoft 365-integrated SaaS EA platform supporting ArchiMate 3.2,
 TOGAF's ADM phases, BPMN 2.0 and ITIL process mapping. Entelim is open source under AGPL,
-self-hostable, and built specifically on ArchiMate 3.2. Orbus publishes no list prices; neither does
-Entelim beyond "free to self-host."
+self-hostable, and built specifically on ArchiMate 3.2. Orbus publishes no list prices; Entelim's are
+published at /pricing, and it is also free to self-host under AGPL.
 
 If your team works inside Microsoft 365 day to day, OrbusInfinity's integration is a real reason to
 stay there -- Entelim's own ArchiMate 3.2 import makes it straightforward to compare the two directly
@@ -34,7 +34,7 @@ on the same model regardless.
 |---|---|---|
 | Licence | Proprietary, SaaS | Open source, AGPL, plus a commercial licence |
 | Self-hostable | No -- Microsoft 365-integrated SaaS | Yes |
-| Pricing | Not published on orbussoftware.com | Not published; free to self-host under AGPL |
+| Pricing | Not published on orbussoftware.com | Published at /pricing (Startup $49/month, Team $29/editor/month); also free to self-host under AGPL |
 | ArchiMate support | Full ArchiMate 3.2 notation, layered viewpoints | ArchiMate 3.2, specifically |
 | TOGAF support | Preconfigured ADM phases, content metamodel, governance artifacts | Framework content mapped, not ADM-certified |
 | Other frameworks | BPMN 2.0, ITIL process mapping | -- |

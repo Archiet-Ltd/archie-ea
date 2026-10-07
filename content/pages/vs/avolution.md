@@ -35,7 +35,7 @@ makes a side-by-side import straightforward.
 |---|---|---|
 | Licence | Proprietary | Open source, AGPL, plus a commercial licence |
 | Self-hostable | Yes -- on-premise, cloud or hybrid | Yes |
-| Pricing | Not published; per-user contracts, bundled by team size | Not published; free to self-host under AGPL |
+| Pricing | Not published; per-user contracts, bundled by team size | Published at /pricing (Startup $49/month, Team $29/editor/month); also free to self-host under AGPL |
 | ArchiMate support | Certified for ArchiMate 3.0 | ArchiMate 3.2, specifically |
 | TOGAF support | Certified for TOGAF 9.1 | Framework content mapped, not ADM-certified |
 
