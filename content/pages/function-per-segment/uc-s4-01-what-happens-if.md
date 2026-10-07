@@ -5,7 +5,7 @@ segment_id: S4
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /services-ops/what-happens-if
+url_slug: /use-cases/what-happens-if-a-supplier-fails
 ---
 
 # What happens to my business if this person, supplier or system underperforms?
@@ -26,5 +26,5 @@ the whole interaction.
 
 ## Related
 
-- [Which contracts renew soon, and what depends on them?](/services-ops/contract-renewals)
-- [Which of my people is a single point of failure?](/services-ops/key-person-risk)
+- [Which contracts renew soon, and what depends on them?](/use-cases/contract-renewals)
+- [Which of my people is a single point of failure?](/use-cases/key-person-risk)

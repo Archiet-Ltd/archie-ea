@@ -23,7 +23,7 @@ that you pass an audit.
 
 ## Where you'll meet it
 
-- [Which risks touch this part of the architecture?](/enterprise-architecture/risk-and-controls)
+- [Which risks touch this part of the architecture?](/use-cases/risk-and-control-gaps)
 
 ## Related modules
 

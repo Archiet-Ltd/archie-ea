@@ -100,6 +100,10 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
         "roadmaps",
         "governance",
         "procurement",  # Read-only access to procurement for cost visibility
+        # R1-B34 (TB-0135): owns the Formula Register (reviews/versions the
+        # composite-score weights) -- see its _link() in this persona's zone
+        # below.
+        "portfolio_management",
     },
     ROLE_CTO: {
         "home",
@@ -134,6 +138,7 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
         "my_applications",
         "data_integration",
         "administration",
+        "portfolio_management",
     },
     # G6 (register close, 1 Sep 2026): security_architect and data_architect
     # were promoted to first-class roles (VALID_ROLES, own charters, own sidebar
@@ -184,11 +189,23 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
     },
 }
 
-# Sections that require specific roles (exclusive access)
+# Sections that require specific roles (exclusive access).
+#
+# Documentary only: can_access_section() below reads ROLE_SECTION_ACCESS (role
+# -> set of sections), not this dict, and nothing in the codebase reads
+# EXCLUSIVE_SECTIONS itself (confirmed by search) -- the actual gate for every
+# section named here is its membership in ROLE_SECTION_ACCESS[role] above.
+# Kept in the same role-list shape as a human-readable index of which
+# sections are role-exclusive; if you are adding a new exclusive section,
+# the line that must change is the role's entry in ROLE_SECTION_ACCESS, not
+# this one.
 EXCLUSIVE_SECTIONS: Dict[str, List[str]] = {
     "administration": [ROLE_PLATFORM_ADMIN],
     "procurement": [ROLE_PROCUREMENT, ROLE_PORTFOLIO_MANAGER, ROLE_PLATFORM_ADMIN],
     "my_applications": [ROLE_APPLICATION_MANAGER, ROLE_PLATFORM_ADMIN],
+    # R1-B34 (TB-0135): Formula Register -- reviewed/versioned by
+    # portfolio_manager; platform_admin sees everything.
+    "portfolio_management": [ROLE_PORTFOLIO_MANAGER, ROLE_PLATFORM_ADMIN],
 }
 
 # Default role if user has no enterprise_role set
@@ -432,7 +449,11 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # round, and the My-work zone carries only four links (plus Ask). Raising the
 # budget by one is the honest cost of adding a genuinely new, intentional link
 # that every persona needs.
-SIDEBAR_LINK_BUDGET = 32
+# R1-B56: Agent Registry (owner, charter, delegated limits per registered
+# agent) is a new, genuinely needed platform_admin-only screen, not a
+# duplicate of anything already in the Admin zone. No fold is available for
+# the same reason as above; taking the budget 32 -> 33.
+SIDEBAR_LINK_BUDGET = 33
 
 _ZONE_TITLES = {
     "home": "Home",
@@ -789,6 +810,11 @@ _MY_WORK_LINKS = {
         _link("Portfolio", "portfolio.index", "briefcase"),
         _APPROVAL_INBOX_LINK,
         _link("Rationalization", "unified_applications.rationalization_dashboard", "git-merge"),
+        # R1-B34 (TB-0135): the reviewer of a composite score's weights is
+        # this persona -- the rationalization scorecard's own number now
+        # names a formula version, so the page that edits it belongs next
+        # to the dashboard that reads it.
+        _link("Formula Register", "formula_register.index", "calculator"),
         _link("Vendors", "unified_applications.vendors", "building"),
         _link("Applications", "unified_applications.application_list", "list"),
         # S-11 remainder: directory-only, never in a sidebar zone.
@@ -858,6 +884,8 @@ _MY_WORK_LINKS = {
         # roles is invisible to most real accounts. Rendered total for this
         # role goes 25 -> 26, still under SIDEBAR_LINK_BUDGET (27).
         _link("Architecture Journey", "architecture_journey.index", "compass"),
+        # R1-B56: agent owner/charter/lifecycle registry.
+        _link("Agent Registry", "agent_registry.index", "bot"),
     ],
     # Promoted from charter-only, 31 Aug 2026. The blueprint scores a Security
     # Viewpoint as one of its fifteen sections and nobody owned it; every link

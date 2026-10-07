@@ -22,7 +22,7 @@ you go from blank page to something real fast.
 
 ## Where you'll meet it
 
-- [Put our business model on one page we can keep current](/startups/canvas-on-one-page)
+- [Put our business model on one page we can keep current](/use-cases/business-model-canvas-on-one-page)
 
 ## Related modules
 
