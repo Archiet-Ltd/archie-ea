@@ -179,11 +179,39 @@ def init_session_policy(app):
         if endpoint in _EXEMPT_ENDPOINTS or request.path.startswith("/static/"):
             return None
 
+        # SCIM (R1-B26) is bearer-token only and never reads the session
+        # cookie, so a stale cookie sent alongside must not turn a
+        # provisioning call into a sign-in redirect.
+        if request.blueprint == "scim":
+            return None
+
         try:
             authenticated = bool(current_user and current_user.is_authenticated)
+            # R1-B26: Flask-Login's ``is_authenticated`` is ``is_active`` on a
+            # User, so a deactivated user reads as anonymous here. Look at the
+            # loaded user itself so the session, the remember-me cookie and the
+            # audit trail are all dealt with, not just left to ``login_required``.
+            _deactivated = (
+                current_user._get_current_object()
+                if getattr(current_user, "deactivated_at", None) is not None
+                else None
+            )
         except Exception as exc:
             logger.debug("session policy: current_user unavailable: %s", exc)
             return None
+
+        if _deactivated is not None:
+            session.clear()
+            logout_user()
+            logger.info("Request refused for deactivated user %s", _deactivated.get_id())
+            from app.services import auth_audit
+
+            auth_audit.record_session_rejected(_deactivated, "user_deactivated")
+            resp = _reject_response(
+                request, "deactivated", "This account is not active. Contact your administrator."
+            )
+            _force_clear_remember_cookie(resp)
+            return resp
 
         if not authenticated:
             return None

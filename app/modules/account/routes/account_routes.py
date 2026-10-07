@@ -86,6 +86,12 @@ def login():
             _log.debug("SSO domain check failed (non-fatal): %s", _sso_exc)
 
         user = _svc.authenticate(form.email.data, form.password.data)
+        if user is not None and not user.is_active:
+            # R1-B26: a deactivated user is refused at every sign-in path.
+            from app.services.session_registry import INACTIVE_ACCOUNT_MESSAGE
+
+            flash(INACTIVE_ACCOUNT_MESSAGE, "form-error")
+            return redirect(url_for("account.login"))
         if user is not None:
             # R1-B12 PR 2 (TB-0144/PB-0100): an administrator must complete
             # multi-factor before the login finishes, whether they are
@@ -106,7 +112,11 @@ def login():
             _landing = buy_intent.next_candidate(consume=True)
             session.clear()
             session.modified = True
-            _svc.login(user, form.remember_me.data)
+            if not _svc.login(user, form.remember_me.data):
+                from app.services.session_registry import INACTIVE_ACCOUNT_MESSAGE
+
+                flash(INACTIVE_ACCOUNT_MESSAGE, "form-error")
+                return redirect(url_for("account.login"))
             session.permanent = True
             try:
                 audit_logger.log_authentication(success=True)
@@ -186,7 +196,11 @@ def _complete_login_after_mfa(user):
 
     session.clear()
     session.modified = True
-    _svc.login(user, remember)
+    if not _svc.login(user, remember):
+        from app.services.session_registry import INACTIVE_ACCOUNT_MESSAGE
+
+        flash(INACTIVE_ACCOUNT_MESSAGE, "form-error")
+        return redirect(url_for("account.login"))
     session.permanent = True
     try:
         audit_logger.log_authentication(success=True)
@@ -687,7 +701,9 @@ def sso_callback(provider):
     # Establish Flask-Login session (same as password login)
     from app.services import session_registry
 
-    session_registry.login_and_register(user, remember=True)
+    if not session_registry.login_and_register(user, remember=True):
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
 
     flash("Successfully signed in via SSO.", "success")
     return redirect(url_for("main.index"))

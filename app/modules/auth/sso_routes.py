@@ -241,16 +241,21 @@ def _finish_sso(config, org, claims, *, test_mode: bool):
 
     user = _svc.provision_user(org, claims)
 
-    from app.services import mfa_service
+    from app.services import mfa_service, session_registry
+
+    if not user.is_active:
+        # R1-B26: a deactivated user is refused before any MFA step or session.
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
 
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False
         return redirect(url_for("account.mfa_challenge"))
 
-    from app.services import session_registry
-
-    session_registry.login_and_register(user)
+    if not session_registry.login_and_register(user):
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
     return redirect(url_for("dashboard.overview"))
 
 

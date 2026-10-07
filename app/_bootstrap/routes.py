@@ -476,7 +476,10 @@ def _register_api_auth(app, csrf):
             ), 401
 
         # Fix Session Fixation: Regenerate session ID after successful authentication
-        session_registry.login_and_register(user, remember=remember_me)
+        if not session_registry.login_and_register(user, remember=remember_me):
+            return jsonify(
+                {"success": False, "error": session_registry.INACTIVE_ACCOUNT_MESSAGE}
+            ), 403
 
         return (
             jsonify(

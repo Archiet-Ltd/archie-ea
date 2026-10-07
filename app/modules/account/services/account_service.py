@@ -93,8 +93,10 @@ class AccountService:
 
     @staticmethod
     def login(user, remember_me=False):
-        """Log in a user via flask-login and mint a server-side session record."""
-        session_registry.login_and_register(user, remember=remember_me)
+        """Log in a user via flask-login and mint a server-side session record.
+
+        Returns False, with no session minted, when the user is deactivated."""
+        return session_registry.login_and_register(user, remember=remember_me)
 
     @staticmethod
     def logout():
