@@ -17,6 +17,29 @@
     var UNNAMED_HEADING = 'Name not available';
     var UNAVAILABLE_HEADING = 'Detail not available';
 
+    /* The recorded links behind a worked-out connection, before any is asked for. */
+    function emptyWhy() {
+        return { state: 'idle', rule: null, links: [], decisions: [], forId: null };
+    }
+
+    /* One drawn link as the drawer shows it. Every value is the server's; a
+       missing one stays null so the drawer shows it as not recorded. */
+    function whyLink(link) {
+        var source = link.source || {};
+        var target = link.target || {};
+        return {
+            position: link.position,
+            resolved: link.resolved === true,
+            sentence: link.sentence || null,
+            sourceName: source.name || null,
+            sourceHref: source.href || null,
+            targetName: target.name || null,
+            targetHref: target.href || null,
+            drawnBy: link.drawn_by || null,
+            drawnAt: global.Intelligence.timeText(link.drawn_at)
+        };
+    }
+
     function drawerState() {
         return {
             drawer: {
@@ -27,6 +50,7 @@
                 plainTerms: null,
                 staleLine: null,
                 detail: global.Intelligence.emptyDetail(),
+                why: emptyWhy(),
                 forKey: null
             },
 
@@ -58,6 +82,7 @@
                     drawer.plainTerms = null;
                     drawer.staleLine = null;
                     drawer.detail = global.Intelligence.emptyDetail();
+                    drawer.why = emptyWhy();
                     return;
                 }
                 drawer.state = 'ready';
@@ -69,6 +94,35 @@
                 drawer.plainTerms = row.plainTerms;
                 drawer.staleLine = row.staleLine;
                 drawer.detail = row.detail;
+                this.loadWhy(row);
+            },
+
+            /* A worked-out row is explained by the links it was worked out from.
+               Asked for once per opening; an answer for a row the drawer has
+               since left is dropped. */
+            loadWhy(row) {
+                var drawer = this.drawer;
+                var derivedId = row.derived && row.detail ? row.detail.derivedId : null;
+                if (derivedId == null) {
+                    drawer.why = emptyWhy();
+                    return;
+                }
+                if (drawer.why.forId === derivedId && drawer.why.state !== 'unavailable') return;
+                drawer.why = emptyWhy();
+                drawer.why.forId = derivedId;
+                drawer.why.state = 'loading';
+                global.Intelligence.fetchExplanation(derivedId).then(function (explanation) {
+                    if (drawer.why.forId !== derivedId) return;
+                    drawer.why.rule = explanation.rule || null;
+                    drawer.why.links = (explanation.links || []).map(whyLink);
+                    drawer.why.decisions = (explanation.decisions || []).filter(function (d) {
+                        return d.href && d.title;
+                    });
+                    drawer.why.state = 'ready';
+                }, function () {
+                    if (drawer.why.forId !== derivedId) return;
+                    drawer.why.state = 'unavailable';
+                });
             }
         };
     }

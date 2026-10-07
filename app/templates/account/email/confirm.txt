@@ -2,13 +2,12 @@ Dear {{ user.full_name() }},
 
 Welcome to {{ config.APP_NAME }}!
 
-To confirm your account, please click on the following link:
+To confirm your e-mail address, open this link:
 
 {{ confirm_link }}
 
-Sincerely,
+The link works once{% if expires_at %} and until {{ expires_at.strftime('%d %b %Y %H:%M') }} UTC{% endif %}.
 
 The {{ config.APP_NAME }} Team
 
 Note: replies to this email address are not monitored.
-

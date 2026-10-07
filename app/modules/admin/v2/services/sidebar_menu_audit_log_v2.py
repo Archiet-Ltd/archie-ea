@@ -9,14 +9,21 @@ from flask_login import current_user
 logger = logging.getLogger(__name__)
 
 
+def _actor():
+    """(id, label) of the signed-in user for the audit line. ``User`` has no ``username`` column, so the
+    label is the e-mail; a signed-out caller is ``(None, "unknown")``."""
+    if not getattr(current_user, "is_authenticated", False):
+        return None, "unknown"
+    return current_user.id, getattr(current_user, "email", None) or "unknown"
+
+
 class SidebarMenuAuditLog:
     """Detailed audit logging for sidebar menu operations."""
     
     @staticmethod
     def log_toggle(item_key: str, new_state: bool, reason: str = None):
         """Log when a menu item is toggled."""
-        user_id = current_user.id if current_user else None
-        user_name = current_user.username if current_user else "unknown"
+        user_id, user_name = _actor()
         ip_address = request.remote_addr if request else "unknown"
         
         audit_data = {
@@ -37,8 +44,7 @@ class SidebarMenuAuditLog:
     @staticmethod
     def log_update(item_key: str, changes: dict, reason: str = None):
         """Log when a menu item is updated."""
-        user_id = current_user.id if current_user else None
-        user_name = current_user.username if current_user else "unknown"
+        user_id, user_name = _actor()
         ip_address = request.remote_addr if request else "unknown"
         
         audit_data = {

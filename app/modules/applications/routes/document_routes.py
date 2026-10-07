@@ -203,6 +203,7 @@ def upload_document_file(application_id):
 
         document = ApplicationDocument(
             application_component_id=app.id,
+            organization_id=app.organization_id,
             title=document_title,
             description=document_description,
             file_name=file.filename,
@@ -210,6 +211,7 @@ def upload_document_file(application_id):
             file_path=None,
             file_size=None,
             uploaded_by=uploaded_by,
+            uploaded_by_id=current_user.id if current_user.is_authenticated else None,
         )
         db.session.add(document)
         db.session.flush()
@@ -297,6 +299,20 @@ def download_document_file(doc_id):
     return redirect(url_for("unified_applications.application_list"))
 
 
+def _may_delete_document(doc, user):
+    """Return True when *user* may delete *doc*.
+
+    The caller must already have passed tenant isolation (the document belongs
+    to the same organisation as the caller, or the caller is a platform
+    administrator).  This function checks only the ownership rule within that
+    organisation: the uploader may delete, and any user carrying the
+    ADMINISTER permission may delete.
+    """
+    if user.is_admin():
+        return True
+    return doc.uploaded_by_id is not None and doc.uploaded_by_id == user.id
+
+
 @unified_applications_bp.route("/documents/<int:doc_id>/delete", methods=["POST"])
 @login_required
 @audit_log("document_delete")
@@ -320,6 +336,17 @@ def delete_document_file(doc_id):
     if not verify_file_access(doc.organization_id):
         flash("Access denied.", "danger")
         return redirect(url_for("unified_applications.application_list"))
+
+    # Ownership check: only the uploader (by user id) or an administrator can delete.
+    if not _may_delete_document(doc, current_user):
+        flash("You do not have permission to delete this document.", "error")
+        return redirect(
+            url_for(
+                "unified_applications.application_detail",
+                id=app_id,
+                tab="architecture",
+            )
+        )
 
     # Validate CSRF token manually (consistent with other doc routes in this file)
     try:
@@ -350,24 +377,6 @@ def delete_document_file(doc_id):
                 "unified_applications.application_detail", id=app_id, tab="architecture"
             )
         )
-
-    # Ownership check: only the uploader or an admin can delete
-    if current_user.is_authenticated:
-        is_owner = (
-            hasattr(doc, "uploaded_by")
-            and doc.uploaded_by
-            and doc.uploaded_by == current_user.full_name()
-        )
-        is_admin = hasattr(current_user, "role") and current_user.role in ("admin", "architect")
-        if not is_owner and not is_admin:
-            flash("You do not have permission to delete this document.", "error")
-            return redirect(
-                url_for(
-                    "unified_applications.application_detail",
-                    id=app_id,
-                    tab="architecture",
-                )
-            )
 
     try:
         if doc.file_path and os.path.exists(doc.file_path):

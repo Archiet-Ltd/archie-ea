@@ -99,18 +99,22 @@ def test_no_archie_trace_in_codegen_workbench():
 
 
 def test_account_flash_welcome_uses_app_name():
-    """The registration flash message reads APP_NAME from config, not a hardcoded string."""
-    account_routes = APP_DIR / "modules" / "account" / "routes" / "account_routes.py"
-    text = account_routes.read_text(encoding="utf-8")
+    """The registration welcome reads APP_NAME from config, not a hardcoded string.
+
+    Both account tiers register through one shared view in mail_views.py.
+    """
+    mail_views = APP_DIR / "modules" / "account" / "routes" / "mail_views.py"
+    text = mail_views.read_text(encoding="utf-8")
     assert "current_app.config['APP_NAME']" in text
     assert '"Welcome to Entelim!"' not in text
 
 
 def test_account_v2_flash_welcome_uses_app_name():
-    account_routes = APP_DIR / "modules" / "account" / "v2" / "routes" / "account_routes.py"
-    text = account_routes.read_text(encoding="utf-8")
-    assert "current_app.config['APP_NAME']" in text
-    assert '"Welcome to Entelim!"' not in text
+    for tier in ("routes", "v2/routes"):
+        account_routes = APP_DIR / "modules" / "account" / tier / "account_routes.py"
+        text = account_routes.read_text(encoding="utf-8")
+        assert "mail_views.register_view()" in text
+        assert '"Welcome to Entelim!"' not in text
 
 
 def test_onboarding_descriptions_use_app_name():

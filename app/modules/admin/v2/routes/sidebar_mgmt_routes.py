@@ -17,6 +17,7 @@ from flask import Blueprint, jsonify, request
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
 from app.decorators import admin_required, audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 from app.extensions import db
 from app.models.sidebar_menu import SidebarMenuItem
 from app.modules.admin.v2.services.sidebar_menu_audit_log_v2 import SidebarMenuAuditLog
@@ -70,7 +71,7 @@ def list_sidebar_items():
 
 @sidebar_mgmt_bp_v2.route("/items/<int:item_id>/toggle", methods=["POST"])
 @timed_route
-@admin_required
+@platform_admin_required
 @audit_log("toggle_sidebar_item")
 def toggle_sidebar_item(item_id):
     """Toggle a sidebar item on/off."""
@@ -97,7 +98,7 @@ def toggle_sidebar_item(item_id):
 
 @sidebar_mgmt_bp_v2.route("/items/section/<section>/toggle", methods=["POST"])
 @timed_route
-@admin_required
+@platform_admin_required
 @audit_log("toggle_sidebar_section")
 def toggle_section(section):
     """Toggle all items in a section."""
@@ -136,7 +137,7 @@ def toggle_section(section):
 
 @sidebar_mgmt_bp_v2.route("/items/subsection/<section>/<subsection>/toggle", methods=["POST"])
 @timed_route
-@admin_required
+@platform_admin_required
 @audit_log("toggle_sidebar_subsection")
 def toggle_subsection(section, subsection):
     """Toggle all items in a subsection."""
@@ -170,7 +171,7 @@ def toggle_subsection(section, subsection):
 
 @sidebar_mgmt_bp_v2.route("/items/reset", methods=["POST"])
 @timed_route
-@admin_required
+@platform_admin_required
 @audit_log("reset_sidebar_items")
 def reset_all_items():
     """Reset all items to enabled state."""

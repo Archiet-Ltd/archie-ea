@@ -54,6 +54,7 @@ os.environ.setdefault("TRANSFORMATION_COMMAND_CAPABILITY_SECRET", "74" * 32)
 
 
 _CLEANUP_TABLES = (
+    "subscriptions",
     "archie_command_claim_challenges",
     "arb_condition_events",
     "arb_canonical_conditions",
@@ -174,6 +175,9 @@ def _seed_typed_cycle(db_session, make_org, label="l1"):
     _install_guards(db_session)
     org = make_org(label)
     db_session.info.setdefault("l1_cleanup_org_ids", set()).add(org.id)
+    from app.services.billing_plans import set_contract_plan
+
+    set_contract_plan(org, "enterprise", None)  # more people than Community admits
     suffix = uuid.uuid4().hex[:10]
 
     role = Role(name=f"L1 ARB {suffix}", permissions=Permission.GENERAL)
@@ -1211,6 +1215,15 @@ def route_scope(app, _schema, request):
                     )
                 connection.execute(
                     db.text(
+                        "DELETE FROM subscriptions WHERE organization_id IN (:own, :foreign)"
+                    ),
+                    {
+                        "own": scope.organization_id,
+                        "foreign": scope.foreign_organization_id,
+                    },
+                )
+                connection.execute(
+                    db.text(
                         "DELETE FROM users WHERE organization_id IN (:own, :foreign)"
                     ),
                     {
@@ -1247,6 +1260,9 @@ def route_scope(app, _schema, request):
         db.session.flush()
         scope.organization_id = org.id
         scope.foreign_organization_id = foreign_org.id
+        from app.services.billing_plans import set_contract_plan
+
+        set_contract_plan(org, "enterprise", None)  # more people than Community admits
         write_role = _write_role(db.session)
         scope.role_id = write_role.id
         submitter = _user(db.session, org, write_role=write_role)

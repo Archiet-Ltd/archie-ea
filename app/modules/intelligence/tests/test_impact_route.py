@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 # Fixtures (app, db_session, make_org, tenant_ctx, client, login_as) are
-# discovered via app/modules/intelligence/tests/conftest.py's own import of
+# discovered via app/modules/conftest.py's import of
 # tests.conftest -- pytest resolves fixtures by name without this module
 # importing them itself (see test_derivation_runner.py for the same
 # pattern). No import needed here.

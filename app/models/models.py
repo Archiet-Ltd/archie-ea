@@ -10,6 +10,7 @@ from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import validates
 
 from .. import db  # main SQLAlchemy object
+from .constants import ArchiMateLayer
 from .mixins import TenantMixin
 
 _key_log = logging.getLogger(__name__)
@@ -161,7 +162,8 @@ def canonical_archimate_layer(value):
     """
     if not isinstance(value, str):
         return value
-    return _LayerName(value.strip().lower())
+    canonical = ArchiMateLayer.normalize(value)
+    return _LayerName(canonical) if isinstance(canonical, str) else canonical
 
 
 class _ArchiMateLayerType(types.TypeDecorator):
@@ -179,7 +181,8 @@ class _ArchiMateLayerType(types.TypeDecorator):
         if not isinstance(value, str):
             return value
         # Deliberately a plain str — the DBAPI should never see a subclass.
-        return value.strip().lower()
+        canonical = canonical_archimate_layer(value)
+        return str(canonical) if canonical is not None else canonical
 
     def process_result_value(self, value, dialect):
         return canonical_archimate_layer(value)
@@ -258,7 +261,9 @@ else:
         __table_args__ = {"extend_existing": True}
 
         id = db.Column(db.Integer, primary_key=True)
-        name = db.Column(db.String(100), nullable=False)
+        # Width 500 per migrations/versions/20260926_widen_element_name.py
+        # (ADR 0002 expand step).
+        name = db.Column(db.String(500), nullable=False)
         type = db.Column(db.String(50), index=True)
         # VARCHAR(30) on the database side, exactly as before — see
         # _ArchiMateLayerType above for why the casing is mediated here.
@@ -329,6 +334,25 @@ else:
         # columns together instead of recreating the element from scratch.
         deleted_at = db.Column(db.DateTime, nullable=True)
         deleted_by = db.Column(db.Integer, nullable=True)
+
+        # Model history: the interval this row's
+        # current state has held, and when it was recorded. Nullable per
+        # ADR-0002 (reconcile-schema is add-only/nullable) -- valid_from and
+        # recorded_at are backfilled for existing rows (from the audit log
+        # where an entry exists, NULL/"unknown" otherwise) by
+        # backfill-entity-history; new rows are stamped by the same trigger
+        # that writes entity_history (app/models/entity_history.py). A row
+        # with valid_to set has been superseded by a later version and is no
+        # longer the current state, which superseded_at also records, once,
+        # for the version that ended it; last_confirmed is the latest time
+        # any read or re-import observed this row unchanged, letting a very
+        # old, never-touched row be told apart from one that simply never
+        # changed and was reconfirmed recently.
+        valid_from = db.Column(db.DateTime, nullable=True)
+        valid_to = db.Column(db.DateTime, nullable=True)
+        recorded_at = db.Column(db.DateTime, nullable=True)
+        superseded_at = db.Column(db.DateTime, nullable=True)
+        last_confirmed = db.Column(db.DateTime, nullable=True)
 
         # Relationship tracking
         parent_id = db.Column(db.Integer, db.ForeignKey("archimate_elements.id"), nullable=True)
@@ -496,6 +520,12 @@ else:
         # BUG-CMP-002: Relationship metadata — persists properties across diagrams
         description = db.Column(db.Text, nullable=True)
         access_mode = db.Column(db.String(20), nullable=True)
+        # Which of Create/Read/Update/Delete an access relationship performs,
+        # as the letters in that order ("CU", "R", "CRUD"). ArchiMate's own
+        # access_mode above only says read/write; this is the finer record a
+        # data entity's CRUD matrix reads, with access_mode kept consistent
+        # with it. NULL means no CRUD detail was recorded.
+        crud_operations = db.Column(db.String(4), nullable=True)
         flow_label = db.Column(db.String(200), nullable=True)
         custom_label = db.Column(db.String(200), nullable=True)
         created_by_id = db.Column(db.Integer, nullable=True)
@@ -516,6 +546,14 @@ else:
         # provenance was computed on import and then dropped on the way into the
         # database, which left the import review queue with nothing to triage.
         derived_from = db.Column(db.String(40), nullable=True, index=True)
+
+        # Model history: same columns and rationale as
+        # ArchiMateElement's above.
+        valid_from = db.Column(db.DateTime, nullable=True)
+        valid_to = db.Column(db.DateTime, nullable=True)
+        recorded_at = db.Column(db.DateTime, nullable=True)
+        superseded_at = db.Column(db.DateTime, nullable=True)
+        last_confirmed = db.Column(db.DateTime, nullable=True)
 
         # When a person confirmed an inferred relationship. NULL with a
         # derived_from set means "still to be looked at" - that pair is the whole
@@ -609,7 +647,7 @@ class WorkflowInstanceArchiMateElement(db.Model):
         )
 
 
-class Requirement(db.Model):
+class Requirement(TenantMixin, db.Model):
     __tablename__ = "requirements"
 
     # In fast-init/test contexts we may define a lightweight Requirement in
@@ -1125,6 +1163,20 @@ class LLMInteraction(db.Model):
     cost = db.Column(db.Numeric(10, 4))
     latency_ms = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=db.func.now())
+
+    # Gateway fields on llm_interactions for provider register
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    prompt_version = db.Column(
+        db.String(32), nullable=True,
+        comment="Semver-style version string, e.g. v1.3; references LLMPromptVersion.version",
+    )
+    retention_setting = db.Column(
+        db.String(50), nullable=True,
+        comment="Data retention policy: forever, 30d, 90d, 1y",
+    )
 
     def __repr__(self):
         input_tokens = self.token_count_input or 0

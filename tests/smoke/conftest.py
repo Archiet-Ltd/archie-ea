@@ -171,13 +171,72 @@ def live_server(request, ai_protocol_stub, app):
     Integrity - which is precisely the class of defect these journeys exist to
     catch.
     """
+    server = boot_live_server(request, ai_protocol_stub, app)
+    yield server
+
+    if request.session.testsfailed:
+        print("\n[smoke] server log after journey failure:\n%s" % server.tail(300))
+
+
+def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
+    """Start one app subprocess and return its SmokeServer; stopped by `request`'s finalizer.
+
+    `extra_env` overrides configuration for this server only, so a module can
+    exercise a feature flag without switching it on for every other journey.
+    """
+    # The smoke server starts against the shared candidate database before the
+    # ORM seeding below runs. When a branch adds nullable columns to existing
+    # tables, requests can 500 on the first SELECT unless the add-only repair
+    # path runs first. Production already does init-db -> reconcile-schema on
+    # boot; mirror that here so browser journeys observe the real branch code,
+    # not drift left behind by an older local schema.
+    from app.commands.reconcile_schema import _reconcile
+
+    with app.app_context():
+        _added, failed, _missing, _blocking = _reconcile(dry_run=False)
+        assert not failed, "smoke live_server could not reconcile schema: %s" % failed
+
     port = _free_port()
     env = dict(os.environ)
+    env.update(extra_env or {})
+    # PUBLIC_BASE_URL (config.py) is the one source of the OAuth/MCP
+    # "resource" identifier -- every oauth_provider route that validates a
+    # resource parameter (POST /oauth/authorize, POST /oauth/token) checks it
+    # against *this server's own* PUBLIC_BASE_URL, which tests/smoke/
+    # test_mcp_consent.py builds dynamically as `live_server + "/mcp"` (it
+    # cannot know this subprocess's port in advance, since _free_port() picks
+    # it above). This subprocess's PUBLIC_BASE_URL must match that exact
+    # ephemeral port, so it is always set here -- not setdefault -- to
+    # override whatever fixed value (or none at all) the caller's own shell
+    # happens to carry, which running any MCP-enabled test module alongside
+    # this one requires regardless (tests/conftest.py's `app` fixture, a
+    # dependency of `live_server` itself, fails fast when MCP_ENABLED is true
+    # and PUBLIC_BASE_URL is empty). A caller that genuinely needs a
+    # different value for one journey (e.g. testing a real mismatch) can
+    # still win via `extra_env`, applied above and so already present in
+    # `env` by the time this checks it.
+    if "PUBLIC_BASE_URL" not in (extra_env or {}):
+        env["PUBLIC_BASE_URL"] = "http://127.0.0.1:%d" % port
     _require_explicit_test_database(env)
     if ai_protocol_stub is not None:
         env = ai_protocol_stub.child_environment(env)
     env.setdefault("SECRET_KEY", "smoke-only-not-secret-" + "x" * 16)
-    env.setdefault("FLASK_CONFIG", "testing")
+    # "smoke", not "testing": config.py's SmokeTestingConfig is identical to
+    # TestingConfig except for ADMIN_MFA_BYPASS, which lets the dozens of
+    # admin-archetype fixtures in this suite reach the app shell without a
+    # browser driving a real TOTP round trip (R1-B12 PR 2). The hardcoded
+    # switch lives only on that one config class -- see its docstring and
+    # app/services/mfa_service.py's required_for().
+    #
+    # An explicit assignment, not setdefault: tests/conftest.py's session-
+    # scoped `app` fixture (a dependency of `live_server` below) already ran
+    # `os.environ.setdefault("FLASK_CONFIG", "testing")` in this same process
+    # before this function is ever called, so `os.environ` here already has
+    # FLASK_CONFIG="testing" -- a setdefault on `env` would silently keep
+    # that inherited value and never select the smoke config at all. A caller
+    # that genuinely needs a different config for one journey can still win,
+    # since `extra_env` was folded into `env` above and is preserved here.
+    env["FLASK_CONFIG"] = (extra_env or {}).get("FLASK_CONFIG", "smoke")
     env["FLASK_DEBUG"] = "0"
     # TestingConfig reads TEST_DATABASE_URL, not DATABASE_URL. Without this the
     # subprocess silently falls back to the default DSN on port 5432 and every
@@ -272,11 +331,7 @@ def live_server(request, ai_protocol_stub, app):
     except Exception as exc:
         print("[smoke] live_server at %s NOT serving: %s" % (base, exc))
 
-    server = SmokeServer(base, log_path, app)
-    yield server
-
-    if request.session.testsfailed:
-        print("\n[smoke] server log after journey failure:\n%s" % server.tail(300))
+    return SmokeServer(base, log_path, app)
 
 
 def _delete_api_settings(**filters):
@@ -378,8 +433,18 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
         if ai_protocol_stub is not None:
             from app.models.models import APISettings
 
+            # Clean up any stale protocol-stub records from interrupted runs.
+            # The live_server subprocess may have created a record, then the
+            # seeder's own app_context reads the same database.  Without this
+            # cleanup a previous run whose finalizer did not execute leaves an
+            # enabled provider behind, and every smoke test errors at setup.
+            for stale in APISettings.query.filter_by(key_label="ci-protocol-stub").all():
+                db.session.delete(stale)
+            db.session.commit()
+
             # This app context is intentionally unscoped: reject ANY existing
-            # enabled provider before exercising AI in a candidate database.
+            # enabled provider (other than our own, which was just removed)
+            # before exercising AI in a candidate database.
             if APISettings.query.filter_by(enabled=True).count():
                 pytest.fail("AI protocol qualification requires a candidate database without enabled provider records")
         Role.insert_roles()
@@ -388,8 +453,32 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
 
         org = Organization(name="Smoke Org %s" % suffix, slug="smoke-%s" % suffix)
         db.session.add(org)
+        db.session.flush()
+        # One person per archetype is more than Community admits; the plan is
+        # recorded where every limit is read from, the subscriptions row.
+        from app.services.billing_plans import set_contract_plan
+
+        set_contract_plan(org, "enterprise", None)
         db.session.commit()
         out["ids"]["org"] = org.id
+
+        # Enable the implementation_planning feature flag so /implementation/ routes work
+        from app.models.feature_flags import FeatureFlag, FeatureState
+        impl_flag = FeatureFlag.query.filter_by(key="architecture_implementation_planning").first()
+        if not impl_flag:
+            impl_flag = FeatureFlag(
+                key="architecture_implementation_planning",
+                name="Architecture Implementation Planning",
+                description="Enable the Implementation Planning module (gap discovery, work packages, plateaus)",
+                enabled=True,
+                state=FeatureState.STABLE,
+            )
+            db.session.add(impl_flag)
+            db.session.commit()
+        elif not impl_flag.enabled or impl_flag.state != FeatureState.STABLE:
+            impl_flag.enabled = True
+            impl_flag.state = FeatureState.STABLE
+            db.session.commit()
 
         if ai_protocol_stub is not None:
             from tests.smoke.ai_protocol_stub import MODEL, TOKEN
@@ -703,4 +792,6 @@ ARCHETYPES = [
     "arb_member", "portfolio_manager", "cto", "procurement",
     "application_manager", "platform_admin", "security_architect",
     "data_architect",
+    # R1-B36 (TB-0146): promoted from unassignable to assignable.
+    "finance", "compliance", "risk", "operations", "non_technical_owner",
 ]

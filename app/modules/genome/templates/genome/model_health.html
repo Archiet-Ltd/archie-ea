@@ -5,7 +5,8 @@
 {% block content %}
 <div class="p-6 space-y-6 mx-auto">
     {% macro _ps_actions() %}
-    <form method="get" action="{{ url_for('genome_drift.index') }}">
+    <form method="post" action="{{ url_for('genome_drift.rescan') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit"
                 class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
             <i data-lucide="refresh-cw" class="w-4 h-4"></i>
@@ -19,13 +20,18 @@
         actions_caller=_ps_actions) }}
 
     {% if error %}
-    <div class="p-4 border border-destructive/50 bg-destructive/10 rounded-lg text-sm text-destructive">
+    <div role="alert" class="p-4 border border-destructive/50 bg-destructive/10 rounded-lg text-sm text-destructive-emphasis">
         {{ error }}
     </div>
     {% endif %}
 
     {% if report_html %}
     <div class="bg-card border border-border rounded-lg p-4">
+        <div class="mb-3 text-xs text-muted-foreground">
+            {% if computed_at %}
+            Last computed: <span class="font-medium text-foreground">{{ computed_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>
+            {% endif %}
+        </div>
         {{ report_html }}
     </div>
     <p class="text-xs text-muted-foreground">
@@ -37,8 +43,13 @@
     {% if not error %}
     <div class="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
         <i data-lucide="activity" class="w-8 h-8 mx-auto mb-3 opacity-60"></i>
-        <p>No report yet. Click <span class="font-medium text-foreground">Re-scan for drift</span>
+        {% if pending %}
+        <p>The first health scan is being prepared. Reload this page in a moment
+        to see the deterministic model-health report for your organization.</p>
+        {% else %}
+        <p>Not yet computed. Click <span class="font-medium text-foreground">Re-scan for drift</span>
         to build the deterministic model-health report for your organization.</p>
+        {% endif %}
     </div>
     {% endif %}
     {% endif %}

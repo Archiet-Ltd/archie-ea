@@ -3,7 +3,7 @@ Tests for the vendors module migration.
 
 Verifies:
 - The register() function is importable and callable
-- All 13 vendor blueprints are importable with correct .name attributes
+- All 9 vendor blueprints are importable with correct .name attributes
 - Blueprint URL prefixes are correct
 - Route counts match expectations
 - Module registers correctly with a Flask app
@@ -78,21 +78,7 @@ class TestVendorsModuleImports:
             f"Expected 'unified_vendors_api', got '{unified_vendors_api_bp.name}'"
         )
 
-    def test_vendor_comparison_bp_importable(self):
-        """vendor_comparison_bp has name 'vendor_comparison'."""
-        from app.modules.vendors.routes.vendor_comparison_routes import vendor_comparison_bp
 
-        assert vendor_comparison_bp.name == "vendor_comparison", (
-            f"Expected 'vendor_comparison', got '{vendor_comparison_bp.name}'"
-        )
-
-    def test_legacy_vendor_redirects_bp_importable(self):
-        """legacy_vendor_redirects_bp has name 'legacy_vendor_redirects'."""
-        from app.modules.vendors.routes.legacy_vendor_redirects import legacy_vendor_redirects_bp
-
-        assert legacy_vendor_redirects_bp.name == "legacy_vendor_redirects", (
-            f"Expected 'legacy_vendor_redirects', got '{legacy_vendor_redirects_bp.name}'"
-        )
 
     def test_vendor_product_bp_importable(self):
         """vendor_product_bp has name 'vendor_product'."""
@@ -118,21 +104,7 @@ class TestVendorsModuleImports:
             f"Expected 'vendor_discovery', got '{vendor_discovery_bp.name}'"
         )
 
-    def test_ai_vendor_discovery_bp_importable(self):
-        """ai_vendor_discovery_bp has name 'ai_vendor_discovery'."""
-        from app.modules.vendors.api.ai_vendor_discovery_routes import ai_vendor_discovery_bp
 
-        assert ai_vendor_discovery_bp.name == "ai_vendor_discovery", (
-            f"Expected 'ai_vendor_discovery', got '{ai_vendor_discovery_bp.name}'"
-        )
-
-    def test_advanced_vendor_bp_importable(self):
-        """advanced_vendor_bp has name 'advanced_vendor'."""
-        from app.modules.vendors.api.advanced_vendor_api import advanced_vendor_bp
-
-        assert advanced_vendor_bp.name == "advanced_vendor", (
-            f"Expected 'advanced_vendor', got '{advanced_vendor_bp.name}'"
-        )
 
 
 class TestVendorsBlueprintConfig:
@@ -168,11 +140,6 @@ class TestVendorsBlueprintConfig:
 
         assert unified_vendors_api_bp.url_prefix == "/api/vendors"
 
-    def test_vendor_comparison_prefix(self):
-        """vendor_comparison_bp has url_prefix='/api/vendor-comparison'."""
-        from app.modules.vendors.routes.vendor_comparison_routes import vendor_comparison_bp
-
-        assert vendor_comparison_bp.url_prefix == "/api/vendor-comparison"
 
     def test_vendor_product_prefix(self):
         """vendor_product_bp has url_prefix='/api/vendor'."""
@@ -192,11 +159,6 @@ class TestVendorsBlueprintConfig:
 
         assert vendor_discovery_bp.url_prefix == "/api/vendor-discovery"
 
-    def test_advanced_vendor_prefix(self):
-        """advanced_vendor_bp has url_prefix='/api/advanced-vendor'."""
-        from app.modules.vendors.api.advanced_vendor_api import advanced_vendor_bp
-
-        assert advanced_vendor_bp.url_prefix == "/api/advanced-vendor"
 
 
 class TestVendorsRouteCount:
@@ -211,14 +173,6 @@ class TestVendorsRouteCount:
             f"Expected >= 9 deferred functions on vendor_management_bp, got {count}"
         )
 
-    def test_vendor_comparison_route_count(self):
-        """vendor_comparison_bp should have routes."""
-        from app.modules.vendors.routes.vendor_comparison_routes import vendor_comparison_bp
-
-        count = len(vendor_comparison_bp.deferred_functions)
-        assert count >= 6, (
-            f"Expected >= 6 deferred functions on vendor_comparison_bp, got {count}"
-        )
 
     def test_vendor_product_route_count(self):
         """vendor_product_bp should have routes."""
@@ -247,23 +201,7 @@ class TestVendorsRouteCount:
             f"Expected >= 5 deferred functions on vendor_discovery_bp, got {count}"
         )
 
-    def test_ai_vendor_discovery_route_count(self):
-        """ai_vendor_discovery_bp should have routes."""
-        from app.modules.vendors.api.ai_vendor_discovery_routes import ai_vendor_discovery_bp
 
-        count = len(ai_vendor_discovery_bp.deferred_functions)
-        assert count >= 7, (
-            f"Expected >= 7 deferred functions on ai_vendor_discovery_bp, got {count}"
-        )
-
-    def test_advanced_vendor_route_count(self):
-        """advanced_vendor_bp should have routes."""
-        from app.modules.vendors.api.advanced_vendor_api import advanced_vendor_bp
-
-        count = len(advanced_vendor_bp.deferred_functions)
-        assert count >= 10, (
-            f"Expected >= 10 deferred functions on advanced_vendor_bp, got {count}"
-        )
 
     def test_unified_vendors_route_count(self):
         """unified_vendors_bp should have routes."""
@@ -310,7 +248,7 @@ class TestVendorsModuleRegistration:
     """Test that the module registers correctly with a Flask app."""
 
     def test_all_vendor_blueprints_in_app(self, app):
-        """All 13 vendor blueprints should be registered in the app."""
+        """All 9 vendor blueprints should be registered in the app."""
         bp_names = list(app.blueprints.keys())
 
         expected = [
@@ -320,13 +258,13 @@ class TestVendorsModuleRegistration:
             "vendor_management",
             "unified_vendors",
             "unified_vendors_api",
-            "vendor_comparison",
-            "legacy_vendor_redirects",
+
+
             "vendor_product",
             "vendor",
             "vendor_discovery",
-            "ai_vendor_discovery",
-            "advanced_vendor",
+
+
         ]
         for name in expected:
             assert name in bp_names, (
@@ -341,8 +279,8 @@ class TestVendorsModuleRegistration:
             f"Expected >= 50 vendor URL rules, found {len(vendor_rules)}"
         )
 
-    def test_all_13_blueprints_present(self, app):
-        """Exactly 13 vendor-related blueprints should be present."""
+    def test_all_9_blueprints_present(self, app):
+        """Exactly 9 vendor-related blueprints should be present."""
         vendor_bp_names = [
             "vendors_api",
             "vendor_analysis",
@@ -350,15 +288,15 @@ class TestVendorsModuleRegistration:
             "vendor_management",
             "unified_vendors",
             "unified_vendors_api",
-            "vendor_comparison",
-            "legacy_vendor_redirects",
+
+
             "vendor_product",
             "vendor",
             "vendor_discovery",
-            "ai_vendor_discovery",
-            "advanced_vendor",
+
+
         ]
         registered = [name for name in vendor_bp_names if name in app.blueprints]
-        assert len(registered) == 13, (
-            f"Expected 13 vendor blueprints registered, found {len(registered)}: {registered}"
+        assert len(registered) == 9, (
+            f"Expected 9 vendor blueprints registered, found {len(registered)}: {registered}"
         )

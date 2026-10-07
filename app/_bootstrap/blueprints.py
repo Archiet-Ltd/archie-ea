@@ -11,22 +11,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _csrf_exempt_blueprint(app, blueprint):
-    """Exempt all routes in a blueprint from CSRF protection."""
-    # Iterate through all routes registered in the app
-    # Find routes that belong to this blueprint and mark their view functions as exempt
-    for rule in app.url_map.iter_rules():
-        if rule.endpoint.startswith(blueprint.name + "."):
-            view_func = app.view_functions.get(rule.endpoint)
-            if view_func is not None:
-                # Set the csrf_exempt attribute directly on the view function
-                view_func.csrf_exempt = True
-                logger.debug(f"[CSRF] Marked view as exempt: {rule.endpoint}")
-    
-    count = len([r for r in app.url_map.iter_rules() if r.endpoint.startswith(blueprint.name + ".")])
-    logger.info(f"[CSRF] Exempted {count} routes in blueprint '{blueprint.name}'")
-
-
 
 class _RegistrationFailureCapture(logging.Handler):
     """Collect WARNING+ records emitted while blueprints register.
@@ -172,6 +156,8 @@ def _init_blueprints(app):
     _ff_industry_apqc = _register_industry_apqc(app)
     _register_solution_product(app)
     _register_intelligence(app)
+    _register_metamodel_properties(app)
+    _register_formula_register(app)
 
     # --- North Star Persona MVP modules (NS-008, NS-009, NS-010, NS-011, NS-012, NS-013) ---
     _register_persona_modules(app)
@@ -261,6 +247,28 @@ def _register_optional_standalone(app):
         # scope comes from the share row, never from the URL. See the module
         # docstring in app/modules/sharing/routes.py.
         ("app.modules.sharing.routes", "artefact_share_bp", None),
+        # System of record per data entity, undeclared copies, master data
+        # domain register and the logical-model standards check. Tier-
+        # independent: the blueprint carries its own /data-governance prefix.
+        (
+            "app.modules.architecture.routes.data_governance_routes",
+            "data_governance_bp",
+            None,
+        ),
+        # R1-B56: agent owner/charter/lifecycle registry.
+        (
+            "app.modules.ai_chat.routes.agent_registry_routes",
+            "agent_registry_bp",
+            None,
+        ),
+        # R1-B85: supported-estate share, open exceptions and the
+        # store-agreement disagreement panel for the CTO (and the business
+        # architect, for the disagreement panel).
+        (
+            "app.modules.architecture.routes.cto_scorecard_routes",
+            "cto_scorecard_bp",
+            None,
+        ),
         # ARCH-123 (Data Lineage) is NOT a new blueprint: it extends the
         # existing app.modules.architecture.routes.data_architecture_routes
         # (blueprint "data_architecture", already registered elsewhere) with
@@ -544,6 +552,25 @@ def _register_always_on_apis(app, csrf):
     app.register_blueprint(error_events_bp)
     app.logger.info("[BLUEPRINT] Error aggregation registered at /api/client-error, /admin/errors")
 
+    # Capability merge report (ADR 0008 consolidation): platform-admin view of
+    # which duplicate capability records were merged. Registered here rather
+    # than under app.modules.governance's own register() because that module
+    # is reached only when USE_NEW_GOVERNANCE (or USE_GOVERNANCE_GUARDRAILS,
+    # which registers app.modules.governance.v2 instead) is enabled -- this
+    # report must exist regardless of that flag.
+    from app.modules.governance.routes.capability_merge_report_routes import (
+        init_app as init_capability_merge_report,
+    )
+
+    init_capability_merge_report(app)
+    app.logger.info("[BLUEPRINT] Capability merge report registered at /admin/capability-merges")
+
+    # Service status: current health, incident history, subscribe (any signed-in user).
+    from app.modules.monitoring.routes.status_routes import status_bp
+
+    app.register_blueprint(status_bp)
+    app.logger.info("[BLUEPRINT] Service status registered at /status")
+
     # Security API
     from app.routes.security_api import security_bp
 
@@ -573,26 +600,72 @@ def _register_always_on_apis(app, csrf):
     app.register_blueprint(api_v1_bp)
     app.logger.info("[BLUEPRINT] API v1 registered at /api/v1")
 
-    # OAuth 2.1 authorization server — the provider side of authlib
-    # (the client side is already in app/modules/account/ for SSO).
-    # CSRF-exempt: the /oauth/token endpoint is called by OAuth clients
-    # with a Bearer token or no session cookie at all.
-    from app.modules.oauth_provider import oauth_provider_bp, oauth_metadata_bp
+    # Bearer-token identity resolution for the MCP endpoint (flask-login
+    # request_loader). Registered unconditionally — it checks MCP_ENABLED
+    # itself and is a no-op while the flag is off — so the mechanism exists
+    # in every build regardless of which blueprints below actually register.
+    from app.modules.oauth_provider import identity as _oauth_identity  # noqa: F401
 
-    app.register_blueprint(oauth_provider_bp)
-    app.logger.info("[BLUEPRINT] OAuth provider registered at /oauth")
-    app.register_blueprint(oauth_metadata_bp)
-    app.logger.info("[BLUEPRINT] OAuth metadata registered at /.well-known")
-    _csrf_exempt_blueprint(app, oauth_provider_bp)
-    _csrf_exempt_blueprint(app, oauth_metadata_bp)
+    # OAuth 2.1 authorization server (the provider side; the client side is
+    # already in app/modules/account/ for SSO) and the MCP Streamable HTTP
+    # endpoint. Both are gated behind MCP_ENABLED: with the flag off, neither
+    # blueprint registers at all, so there is no OAuth or MCP route in
+    # url_map and the bearer loader above never has a request to act on.
+    #
+    # CSRF: each blueprint exempts only the specific views that cannot carry
+    # a session-bound token (POST /oauth/token, POST /oauth/revoke). POST
+    # /mcp is exempted from flask-wtf's own blanket check too, but only so
+    # that app.modules.mcp.blueprint's own before_request can re-apply the
+    # real check for every shape of request except a genuine bearer-only
+    # call — see that module's CSRF docstring section and
+    # app/_bootstrap/csrf_coverage.py's VIEW_OPT_OUT entries for why. The
+    # consent screen (POST /oauth/authorize) stays CSRF-protected like any
+    # other session-authenticated form.
+    if app.config.get("MCP_ENABLED"):
+        if not (app.config.get("PUBLIC_BASE_URL") or "").strip():
+            raise RuntimeError(
+                "MCP_ENABLED is true but PUBLIC_BASE_URL is empty. The OAuth "
+                "issuer, every metadata URL and the MCP 'resource' identifier "
+                "are built from PUBLIC_BASE_URL — set it to this server's "
+                "externally-reachable origin (e.g. https://app.example.com) "
+                "before enabling MCP_ENABLED."
+            )
 
-    # MCP Streamable HTTP endpoint — the read-only lens tools
-    from app.modules.mcp import mcp_bp
+        from app.modules.oauth_provider import oauth_provider_bp, oauth_metadata_bp
 
-    app.register_blueprint(mcp_bp)
-    app.logger.info("[BLUEPRINT] MCP endpoint registered at /mcp")
-    _csrf_exempt_blueprint(app, mcp_bp)
-    
+        app.register_blueprint(oauth_provider_bp)
+        app.logger.info("[BLUEPRINT] OAuth provider registered at /oauth")
+        app.register_blueprint(oauth_metadata_bp)
+        app.logger.info("[BLUEPRINT] OAuth metadata registered at /.well-known")
+
+        # Rate-limit dynamic client registration, applied here rather than at
+        # routes.py's module import time: app.modules.oauth_provider is a
+        # package whose __init__ eagerly imports routes.py, and that import
+        # can be triggered (by pytest collecting a conftest.py that lives
+        # under this package, for instance) before init_rate_limiting(app)
+        # above has ever run for any app — binding the limiter at module
+        # scope would silently capture None forever. Rewriting
+        # app.view_functions here happens after this app's own
+        # init_rate_limiting() call, every time, and Flask looks the view up
+        # from this dict fresh on every request.
+        from app._bootstrap.rate_limiting import limiter as _rate_limiter
+        from app.modules.oauth_provider.routes import registration_rate_limit_string
+
+        if _rate_limiter is not None:
+            _register_endpoint = "oauth_provider.register"
+            _register_view = app.view_functions.get(_register_endpoint)
+            if _register_view is not None:
+                app.view_functions[_register_endpoint] = _rate_limiter.limit(
+                    registration_rate_limit_string
+                )(_register_view)
+
+        from app.modules.mcp import mcp_bp
+
+        app.register_blueprint(mcp_bp)
+        app.logger.info("[BLUEPRINT] MCP endpoint registered at /mcp")
+    else:
+        app.logger.info("[BLUEPRINT] MCP_ENABLED is false — OAuth/MCP blueprints not registered")
+
     # api_v1 blueprint is NOT CSRF-exempt. Audited 2026-08-18 (finding A-04/ARCH-051/C-10):
     # every route under app/api/v1/ authenticates with @login_required (the browser
     # session cookie), not a Bearer token — there is no token-based auth path in this
@@ -905,6 +978,17 @@ def _register_architecture(app, csrf):
         app.logger.info("[BLUEPRINT] SA-008 completeness routes registered")
     except ImportError as e:
         app.logger.warning(f"Completeness blueprint not available: {e}")
+
+    # Motivation traceability API — tier-independent (no v2 equivalent)
+    try:
+        from app.modules.architecture.routes.motivation_traceability_routes import (
+            motivation_api,
+        )
+
+        app.register_blueprint(motivation_api)
+        app.logger.info("[BLUEPRINT] Motivation traceability API registered at /api/v1/motivation")
+    except ImportError as e:
+        app.logger.warning(f"Motivation traceability API blueprint not available: {e}")
 
     # --- Tier 1: v2 (guardrail-enabled) ---
     if _is_flag("USE_ARCHITECTURE_GUARDRAILS"):
@@ -1351,6 +1435,19 @@ def _register_industry_apqc(app):
         return False
 
 
+def _register_metamodel_properties(app):
+    """Register the element properties pages (an organisation's governed
+    property definitions), non-fatally like every other module here."""
+    try:
+        from app.modules.architecture_assistant.routes.metamodel_property_routes import (
+            metamodel_properties_bp,
+        )
+
+        app.register_blueprint(metamodel_properties_bp)
+    except Exception as e:
+        app.logger.warning("Failed to register element properties pages: %s", e)
+
+
 def _register_intelligence(app):
     """Register the intelligence module (T-001 skeleton — mounts nothing yet).
 
@@ -1368,6 +1465,20 @@ def _register_intelligence(app):
         )
     except Exception as e:
         app.logger.warning("Failed to register intelligence module: %s", e)
+
+
+def _register_formula_register(app):
+    """R1-B34: Formula register — where a reviewer views and versions a
+    composite score's weights (TB-0135)."""
+    try:
+        from app.modules.formula_register import register as register_formula_register
+
+        register_formula_register(app)
+        app.logger.info(
+            "[BLUEPRINT] Formula Register registered at /admin/formula-register"
+        )
+    except Exception as e:
+        app.logger.warning(f"[BLUEPRINT] Formula Register registration failed: {e}")
 
 
 def _register_solution_product(app):

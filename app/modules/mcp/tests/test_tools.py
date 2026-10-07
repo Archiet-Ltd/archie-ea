@@ -50,8 +50,22 @@ def _make_element(db_session, org_id, name_hint, type_="ApplicationComponent"):
     return row
 
 
-def _mint_oauth_token(client, db_session, org, user, login_as_fn) -> str:
+def _mcp_resource(app) -> str:
+    """The one configured resource identifier (see oauth_provider.routes._mcp_resource_url).
+
+    POST /oauth/authorize and POST /oauth/token both now make ``resource``
+    mandatory (it must match this value exactly) -- omitting it, which this
+    helper used to do, gets every request a 400 invalid_target instead of a
+    code/token.
+    """
+    base = (app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+    return f"{base}/mcp"
+
+
+def _mint_oauth_token(client, db_session, org, user, login_as_fn, app=None) -> str:
     """Mint an OAuth access token through the real authorization-code flow."""
+    from flask import current_app
+
     from app.modules.oauth_provider.models import OAuthClient
 
     oauth_client = OAuthClient.register(
@@ -67,6 +81,8 @@ def _mint_oauth_token(client, db_session, org, user, login_as_fn) -> str:
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
     challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 
+    resource = _mcp_resource(app if app is not None else current_app)
+
     login_as_fn(client, user)
 
     resp = client.post(
@@ -77,6 +93,12 @@ def _mint_oauth_token(client, db_session, org, user, login_as_fn) -> str:
             "code_challenge": challenge,
             "code_challenge_method": "S256",
             "scope": "mcp:read",
+            "resource": resource,
+            # The POST branch of authorize() requires an explicit "allow"/
+            # "deny" decision (the consent form's two buttons) -- without it,
+            # it 400s with "decision is required" before ever reaching the
+            # code-issuing path. Missing alongside the resource field.
+            "decision": "allow",
         },
         follow_redirects=False,
     )
@@ -93,20 +115,60 @@ def _mint_oauth_token(client, db_session, org, user, login_as_fn) -> str:
             "redirect_uri": "http://localhost/callback",
             "client_id": oauth_client.client_id,
             "code_verifier": verifier,
+            "resource": resource,
         },
     )
     return resp.get_json()["access_token"]
 
 
+def _clear_cached_identity():
+    """Clear flask-login's and the tenant middleware's per-app-context
+    identity cache before a bearer-only call.
+
+    ``db_session`` (tests/conftest.py) holds ONE app context open for the
+    whole test, so ``g._login_user``/``g.current_org_id`` survive across
+    nested ``client.post()`` calls -- the exact trap ``login_as``'s own
+    docstring describes for session-cookie identity. Every test in this
+    module calls ``login_as`` (directly, or through ``_mint_oauth_token``)
+    immediately before a REST comparison call, so a bearer call made right
+    afterwards must not silently inherit that cached identity instead of
+    resolving fresh from its own token. A bearer call has no cookie to set,
+    so it must clear the same cache directly instead of going through
+    ``login_as``.
+    """
+    from flask import g, has_app_context
+
+    if not has_app_context():
+        return
+    for cached in ("_login_user", "_current_user", "current_org_id", "current_org"):
+        if hasattr(g, cached):
+            delattr(g, cached)
+
+
 def _mcp_call(client, token: str, tool_name: str, arguments: dict) -> dict:
-    """Call an MCP tool through the JSON-RPC endpoint."""
+    """Call an MCP tool through the JSON-RPC endpoint.
+
+    Uses a brand-new, cookie-less test client bound to the same Flask app
+    rather than the passed-in ``client``. A genuine MCP client authenticates
+    with ONLY a bearer token -- no session cookie, no "_sid", ever -- but
+    ``client`` here always carries a live, non-revoked session cookie left
+    over from the ``login_as`` call ``_mint_oauth_token`` drove through it.
+    flask-login resolves session-based identity before it ever tries the
+    bearer request_loader (see LoginManager._load_user), so every call this
+    helper made before this fix was actually authenticated by that lingering
+    session cookie, not by ``token`` -- the tool-parity assertions still held
+    because it was the same user either way, but it never actually exercised
+    the bearer-only path PR #225 needed proven.
+    """
+    _clear_cached_identity()
+    bearer_client = client.application.test_client()
     payload = {
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/call",
         "params": {"name": tool_name, "arguments": arguments},
     }
-    resp = client.post(
+    resp = bearer_client.post(
         "/mcp",
         data=json.dumps(payload),
         content_type="application/json",
@@ -116,9 +178,12 @@ def _mcp_call(client, token: str, tool_name: str, arguments: dict) -> dict:
 
 
 def _mcp_tools_list(client, token: str) -> list:
-    """List registered tools."""
+    """List registered tools. See _mcp_call's docstring for why this uses a
+    fresh, cookie-less client rather than the passed-in ``client``."""
+    _clear_cached_identity()
+    bearer_client = client.application.test_client()
     payload = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
-    resp = client.post(
+    resp = bearer_client.post(
         "/mcp",
         data=json.dumps(payload),
         content_type="application/json",
@@ -130,11 +195,33 @@ def _mcp_tools_list(client, token: str) -> list:
 class TestMCPInitialize:
     """MCP lifecycle: initialize and tools/list."""
 
-    def test_initialize(self, client):
-        """POST /mcp with initialize returns protocol version and capabilities."""
+    def test_initialize(self, client, db_session, make_org, login_as):
+        """POST /mcp with initialize, authenticated via a bearer token,
+        returns protocol version and capabilities.
+
+        An initialize call with no credentials at all now gets 401 with
+        WWW-Authenticate instead of 200 -- see
+        app/modules/mcp/tests/test_csrf.py's
+        TestNoAuthGetsRealUnauthorizedNotCsrf for that regression test. A
+        standard MCP client is expected to trigger OAuth on exactly that
+        401 (both on first connection and on an expired token), so the
+        handshake this test exercises is the one a real client completes
+        after that: retrying initialize with the token it just obtained.
+        """
+        org = make_org("mcp")
+        user = _make_user(db_session, org, "mcp-initialize@example.com")
+        token = _mint_oauth_token(client, db_session, org, user, login_as)
+
+        _clear_cached_identity()
+        bearer_client = client.application.test_client()
         payload = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
-        resp = client.post("/mcp", data=json.dumps(payload), content_type="application/json")
-        assert resp.status_code == 200
+        resp = bearer_client.post(
+            "/mcp",
+            data=json.dumps(payload),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
         data = resp.get_json()
         assert data["result"]["protocolVersion"] == "2025-11-25"
         assert "tools" in data["result"]["capabilities"]
@@ -174,6 +261,95 @@ class TestMCPInitialize:
             assert "annotations" in tool, f"Tool {tool['name']} missing annotations"
             assert tool["annotations"].get("readOnlyHint") is True, \
                 f"Tool {tool['name']} missing readOnlyHint"
+
+
+class TestBearerOnlySessionLess:
+    """A genuine MCP client authenticates with a bearer token ONLY -- no
+    browser session, no cookie at all, ever. Before the session_policy.py fix
+    (see app/_bootstrap/session_policy.py's bearer-request exemption), a
+    request shaped exactly like this was rejected 401 "revoked" by the
+    session idle-timeout/revocation policy, which ran on every authenticated
+    request and failed closed on the missing "_sid" a bearer-only request
+    never has. ``_mcp_call``/``_mcp_tools_list`` above now always build their
+    own fresh, cookie-less client rather than reusing the session-bearing
+    ``client`` fixture (see their docstrings), so every test in this module
+    already exercises this path -- these two tests make that guarantee
+    explicit and would fail first if that stopped being true.
+    """
+
+    def test_tools_list_with_no_session_cookie_succeeds(self, client, db_session, make_org, login_as):
+        """tools/list over a bearer token, on a client that has never once
+        carried a session cookie, succeeds."""
+        org = make_org("mcp-bearer-only")
+        user = _make_user(db_session, org, "mcp-bearer-only-list@example.com")
+        token = _mint_oauth_token(client, db_session, org, user, login_as)
+
+        # db_session (tests/conftest.py) holds ONE app context open for the
+        # whole test, so flask-login's g._login_user cache from the login_as
+        # call above (inside _mint_oauth_token) would otherwise survive into
+        # this request and short-circuit flask-login's _load_user() before it
+        # ever tries the bearer request_loader -- see _clear_cached_identity's
+        # docstring above. A real, separate production HTTP request has no
+        # such leftover g to begin with; this is purely this test harness's
+        # shared-app-context artifact, not a product behaviour.
+        _clear_cached_identity()
+        bearer_only_client = client.application.test_client()
+        session_cookie_name = client.application.config.get("SESSION_COOKIE_NAME", "session")
+        assert bearer_only_client.get_cookie(session_cookie_name) is None, (
+            "precondition: this client must never have carried a session cookie"
+        )
+
+        payload = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        resp = bearer_only_client.post(
+            "/mcp",
+            data=json.dumps(payload),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        data = resp.get_json()
+        assert len(data["result"]["tools"]) == 10
+
+    def test_tools_call_with_no_session_cookie_succeeds(self, client, db_session, make_org, login_as):
+        """A real tools/call (ask_impact) over a bearer token, on a client
+        that has never once carried a session cookie, succeeds end-to-end --
+        including the tool handler's internal
+        call_internal_api(pass_session=True) hop to the REST intelligence
+        route. This is the acceptance proof that a genuine MCP client (no
+        cookie, ever) can actually use this connector, not just that the
+        bearer loader itself resolves a user."""
+        org = make_org("mcp-bearer-only")
+        user = _make_user(db_session, org, "mcp-bearer-only-call@example.com")
+        element = _make_element(db_session, org.id, "bearer-only-call-test")
+        token = _mint_oauth_token(client, db_session, org, user, login_as)
+
+        # See the matching comment in test_tools_list_with_no_session_cookie_
+        # succeeds above: clears this test-harness-only g cache, not a
+        # product behaviour.
+        _clear_cached_identity()
+        bearer_only_client = client.application.test_client()
+        session_cookie_name = client.application.config.get("SESSION_COOKIE_NAME", "session")
+        assert bearer_only_client.get_cookie(session_cookie_name) is None, (
+            "precondition: this client must never have carried a session cookie"
+        )
+
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "ask_impact", "arguments": {"element_id": element.id}},
+        }
+        resp = bearer_only_client.post(
+            "/mcp",
+            data=json.dumps(payload),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        body = resp.get_json()
+        assert "error" not in body, body
+        result = json.loads(body["result"]["content"][0]["text"])
+        assert result["success"] is True, result
 
 
 class TestLensToolParity:

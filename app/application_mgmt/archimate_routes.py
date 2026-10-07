@@ -515,7 +515,7 @@ def archimate_element_generation():
 @login_required
 def archimate_element_correct(element_id):
     """Record a user correction for a single ArchiMate element (flywheel)."""
-    from app.models.archimate_models import ArchiMateElement
+    from app.models.archimate_core import ArchiMateElement
     from app.services.archimate.feedback_learning_service import FeedbackLearningService
 
     data = request.get_json(silent=True) or {}

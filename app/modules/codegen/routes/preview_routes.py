@@ -646,7 +646,7 @@ def _patch_missing_ui_components(pdir: str) -> None:
     (e.g. Progress, Tabs added after initial generation).
     """
     import os
-    from jinja2 import Environment, FileSystemLoader
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
 
     # Locate the template directory for shadcn/ui components
     tmpl_dir = os.path.normpath(os.path.join(
@@ -696,7 +696,12 @@ def _patch_missing_ui_components(pdir: str) -> None:
 
     # Inject any referenced component that doesn't exist on disk
     try:
-        env = Environment(loader=FileSystemLoader(tmpl_dir), autoescape=False)
+        # These templates emit TSX, which HTML escaping would corrupt; escaping
+        # is scoped to HTML templates so one added here is not left raw.
+        env = Environment(
+            loader=FileSystemLoader(tmpl_dir),
+            autoescape=select_autoescape(("html.j2", "htm.j2"), default_for_string=False, default=False),
+        )
     except Exception:
         return
 

@@ -175,6 +175,12 @@ scripts/prune/db_cleanup*.py
 scripts/prune/execute_db_cleanup.py
 scripts/prune/db_analysis.json
 scripts/prune/*.txt
+
+# scripts/capture_screenshots.py --modules's own server log and raw (pre-
+# encoding) video capture scratch space -- the committed outputs are the
+# encoded app/static/img/ and app/static/video/ files, not this.
+scripts/_capture_scratch/
+
 .aider*
 
 .claude/
@@ -209,6 +215,7 @@ scripts/check_*.py
 !scripts/check_sri.py
 !scripts/check_deployed_deps.py
 !scripts/check_raw_sql_tenancy.py
+!scripts/check_untenanted_reads.py
 !scripts/check_fabricated_data.py
 !scripts/check_macro_import_context.py
 !scripts/check_dead_interactions.py
