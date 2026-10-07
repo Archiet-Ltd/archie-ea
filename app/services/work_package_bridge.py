@@ -99,16 +99,29 @@ def _history_list(history, which):
     return None
 
 
+def _ids_of(values):
+    return [getattr(v, "id", v) for v in values or ()]
+
+
 def _changes_of(obj, table):
-    """({source column, ...}, (old dependency ids, new ids) or None) for a row of a
-    retired store that was edited: its changed mapped columns, named as the
-    source store names them, read from the attribute history."""
-    from app.commands.consolidate_work_packages import _DEP_SOURCE_COLUMN, _LINK_RELATIONSHIPS
+    """(changed source columns, dependency change, link change, relation change) for
+    a row of a retired store that was edited, read from the attribute history:
+      * the changed mapped columns, named as the source store names them;
+      * (old dependency ids, new ids) when the store's dependency list changed;
+      * {"plateau_id": value or None} when a plateau/gap link column changed -- the
+        value the old screen set, None when it cleared it;
+      * {"dependencies"|"capabilities": (ids added, ids removed)} for the roadmap
+        store's association tables."""
+    from app.commands.consolidate_work_packages import (
+        _DEP_SOURCE_COLUMN, _LINK_RELATIONSHIPS, _LINK_SOURCE_COLUMNS)
 
     state = inspect(obj)
     columns = set()
     dependency_change = None
+    link_change = {}
+    relation_change = {}
     dep_column = _DEP_SOURCE_COLUMN.get(table)
+    link_columns = _LINK_SOURCE_COLUMNS.get(table, ())
     for attr in state.mapper.column_attrs:
         history = state.attrs[attr.key].history
         if not history.has_changes():
@@ -119,12 +132,21 @@ def _changes_of(obj, table):
             if new is None:
                 new = list(getattr(obj, attr.key) or [])
             dependency_change = (_history_list(history, "deleted"), new)
+        elif name in link_columns:
+            link_change[name] = getattr(obj, attr.key)
         else:
             columns.add(name)
     for key in _LINK_RELATIONSHIPS:
-        if key in state.mapper.relationships and state.attrs[key].history.has_changes():
-            columns.add(key)
-    return columns, dependency_change
+        if key in state.mapper.relationships:
+            history = state.attrs[key].history
+            if history.has_changes():
+                relation_change[key] = (_ids_of(history.added), _ids_of(history.deleted))
+    for column in link_columns:
+        # The link set through the relationship (obj.plateau = ...) rather than the id.
+        rel = column[:-3]
+        if column not in link_change and rel in state.mapper.relationships                 and state.attrs[rel].history.has_changes():
+            link_change[column] = getattr(obj, column)
+    return columns, dependency_change, link_change, relation_change
 
 
 def _table_of(tables, obj):
@@ -171,17 +193,23 @@ def _after_flush(session, flush_context):
     pending = {}
     changed = {}
     dependency_changes = {}
+    link_changes = {}
+    relation_changes = {}
     new_objects = set(session.new)
     for obj in list(session.new) + [o for o in session.dirty if session.is_modified(o)]:
         table = _table_of(tables, obj)
         if table is not None and getattr(obj, "id", None) is not None:
             pending.setdefault(table, {})[obj.id] = obj
             if obj not in new_objects:
-                columns, dependency_change = _changes_of(obj, table)
+                columns, dependency_change, link_change, relation_change = _changes_of(obj, table)
                 if columns:
                     changed.setdefault(table, {})[obj.id] = columns
                 if dependency_change is not None:
                     dependency_changes.setdefault(table, {})[obj.id] = dependency_change
+                if link_change:
+                    link_changes.setdefault(table, {})[obj.id] = link_change
+                if relation_change:
+                    relation_changes.setdefault(table, {})[obj.id] = relation_change
     if not pending:
         return
 
@@ -193,7 +221,8 @@ def _after_flush(session, flush_context):
         sync_source_rows(
             conn, table, list(objs), update_existing=True, fallback_org_id=caller,
             changed=changed.get(table), dependency_changes=dependency_changes.get(table),
-            defer_links=lambda uids, _s=session: _s.info.setdefault(_PENDING_LINKS, set()).update(uids),
+            link_changes=link_changes.get(table), relation_changes=relation_changes.get(table),
+            defer_links=lambda wanted, _s=session: _defer_links(_s, wanted),
         )
         marks = {
             row[0]: row[1:] for row in conn.execute(
@@ -210,16 +239,55 @@ def _after_flush(session, flush_context):
 _PENDING_LINKS = "work_package_bridge_pending_links"
 
 
-def _run_pending_links(session):
-    """Turn the plateau and gap values the copies carry into relationships. A
-    session cannot flush inside its own flush, so the copy only notes the ids and
-    this runs as soon as the outermost flush has returned, in the same transaction."""
-    uids = session.info.pop(_PENDING_LINKS, None)
-    if not uids:
-        return
-    from app.commands.consolidate_work_packages import _Stats, _link_columns_to_relationships
+def _defer_links(session, wanted):
+    """Note {unified id: {"plateau_id": value or None}} for the link step. A later
+    value for the same work package replaces an earlier one."""
+    pending = session.info.setdefault(_PENDING_LINKS, {})
+    for uid, values in wanted.items():
+        pending.setdefault(uid, {}).update(values)
 
-    _link_columns_to_relationships(_Stats(), unified_ids=sorted(uids))
+
+@contextlib.contextmanager
+def _using_session(session):
+    """Make ``db.session`` the session that flushed, for the duration. The link step
+    reads and writes through the ordinary services, which use ``db.session``; a
+    copy written in another session's transaction is only visible to that session.
+    The scoped registry is put back as it was (or left empty if it was), so the
+    application's own session never joins this transaction."""
+    from app import db
+
+    registry = db.session.registry
+    had = registry.has()
+    previous = registry() if had else None
+    if had and previous is session:
+        yield
+        return
+    registry.set(session)
+    try:
+        yield
+    finally:
+        if had:
+            registry.set(previous)
+        else:
+            registry.clear()
+
+
+def _run_pending_links(session):
+    """Turn the plateau and gap values an old screen set into relationships. A
+    session cannot flush inside its own flush, so the copy only notes them and this
+    runs as soon as the outermost flush has returned, in the same transaction and on
+    the session that flushed. Each work package's links run in a savepoint: a failure
+    rolls back those links only, is logged, and leaves the transaction usable."""
+    wanted = session.info.pop(_PENDING_LINKS, None)
+    if not wanted:
+        return
+    from app.commands.consolidate_work_packages import apply_link_changes
+
+    try:
+        with _using_session(session):
+            apply_link_changes(wanted)
+    except Exception as exc:  # noqa: BLE001 - never break the caller's flush for a link
+        logger.warning("plateau/gap link step failed for work packages %s: %s", sorted(wanted), exc)
 
 
 def _flush_then_link(original):

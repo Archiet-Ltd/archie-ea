@@ -267,7 +267,7 @@ def test_merge_turns_link_columns_into_relationships(app, db_session, make_org, 
     assert svc.plateau_and_gap_links([mine], org.id)[mine.id] == {
         "plateau_ids": [plateau.id], "gap_ids": [gap.id]}
     assert svc.plateau_and_gap_links([stray], org.id)[stray.id]["plateau_ids"] == []
-    assert mine.plateau_id == plateau.id, "the columns themselves are left as they were"
+    assert mine.plateau_id is None and mine.gap_id is None, "the migration sets the columns to NULL (round 4)"
 
     count = len(_relationships_of(mine))
     out = _merge(app)

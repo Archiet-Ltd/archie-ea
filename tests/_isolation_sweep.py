@@ -64,7 +64,12 @@ class Policy:
     """What the sweep treats as in scope. Built by the test module."""
 
     def __init__(self, *, non_identifier_ints, string_identifier, excluded_params,
-                 excluded_endpoint_prefixes, excluded_endpoints, shared_models):
+                 excluded_endpoint_prefixes, excluded_endpoints, shared_models,
+                 param_models=None):
+        # Explicit overrides: {path parameter name: table name of the record it names}.
+        # They win over what the codebase reading finds, so a repointed lookup (a view
+        # that hands the id to a service the resolver cannot follow) is still proven.
+        self.param_models = dict(param_models or {})
         self.non_identifier_ints = frozenset(non_identifier_ints)
         self.string_identifier = re.compile(string_identifier)
         self.excluded_params = dict(excluded_params)
@@ -877,6 +882,9 @@ def run_sweep(app, login, policy, only=None):
     """Drive every identifier-bearing route (or those ``only`` accepts)."""
     by_name = mapped_classes()
     param_models = codebase_param_models(by_name)
+    tables = table_models()
+    param_models.update({
+        param: tables[table] for param, table in policy.param_models.items() if table in tables})
     cases, excluded = enumerate_cases(app, policy)
     if only is not None:
         cases = [c for c in cases if only(c)]

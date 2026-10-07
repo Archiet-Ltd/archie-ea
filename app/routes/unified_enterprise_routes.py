@@ -579,7 +579,7 @@ def api_list_work_packages():
             "id": wp.id,
             "row_number": offset + idx + 1,
             "name": wp.name or "",
-            "summary": wp.description or "",
+            "summary": wp.summary,
             "status": wp.status or "Planned",
             "priority": wp.priority or "Normal",
             "percent_complete": wp.progress_percentage or 0,

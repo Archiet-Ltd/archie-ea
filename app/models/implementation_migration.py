@@ -415,6 +415,11 @@ class Deliverable(db.Model):
     approval_status = db.Column(db.String(20), nullable=True, default="pending")
     related_task_ids = db.Column(db.Text, nullable=True)  # JSON list of RoadmapTask ids
     assigned_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
+    # Provenance kept from the retired roadmap deliverable store.
+    auto_generated = db.Column(db.Boolean, nullable=True, default=False)
+    generation_method = db.Column(db.String(100), nullable=True)
+    created_by = db.Column(db.Integer, nullable=True)
+    updated_by = db.Column(db.Integer, nullable=True)
 
     artifact_references = db.Column(db.JSON)
 

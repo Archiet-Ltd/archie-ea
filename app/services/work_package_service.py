@@ -285,32 +285,83 @@ def _resolve_links(fields: Dict[str, Any], organization_id: int) -> Dict[str, An
     return out
 
 
-def _link_targets(wp: UnifiedWorkPackage, key: str, organization_id: int):
-    """The relationships from this work package's element of the kind ``key`` names
-    that end at a plateau (or gap) of this organisation, as (relationship, target)."""
+def _link_rows(
+    organization_id: int, wp_ids=None, plateau_ids=None, gap_ids=None
+) -> List[tuple]:
+    """The one reader of the plateau and gap link encoding.
+
+    Rows of (work package id, relationship id, relationship type, plateau id, gap
+    id) for the relationships from a work package's element to a plateau
+    (realization) or a gap (association), ordered by relationship id. The one
+    organisation predicate sits here: the relationship, the work package and the
+    plateau or gap must all belong to ``organization_id``; another organisation's
+    rows never appear. ``wp_ids``, ``plateau_ids`` and ``gap_ids`` narrow the read."""
+    from app.models.implementation_migration import Gap, Plateau
     from app.models.models import ArchiMateRelationship
 
-    model, rel_type = _link_models()[key]
-    if not wp.archimate_element_id:
+    if organization_id is None:
         return []
-    rows = db.session.execute(
-        db.select(ArchiMateRelationship, model)
-        .join(model, model.archimate_element_id == ArchiMateRelationship.target_id)
-        .where(
-            ArchiMateRelationship.source_id == wp.archimate_element_id,
-            ArchiMateRelationship.type == rel_type,
-            model.organization_id == organization_id,
+    query = (
+        db.select(
+            UnifiedWorkPackage.id, ArchiMateRelationship.id, ArchiMateRelationship.type,
+            Plateau.id, Gap.id,
         )
-    ).all()
-    return [(row[0], row[1]) for row in rows]
+        .join(ArchiMateRelationship,
+              ArchiMateRelationship.source_id == UnifiedWorkPackage.archimate_element_id)
+        .outerjoin(Plateau, db.and_(
+            Plateau.archimate_element_id == ArchiMateRelationship.target_id,
+            Plateau.organization_id == organization_id))
+        .outerjoin(Gap, db.and_(
+            Gap.archimate_element_id == ArchiMateRelationship.target_id,
+            Gap.organization_id == organization_id))
+        .where(
+            UnifiedWorkPackage.organization_id == organization_id,
+            ArchiMateRelationship.organization_id == organization_id,
+            ArchiMateRelationship.type.in_((_PLATEAU_REL, _GAP_REL)),
+            db.or_(
+                db.and_(ArchiMateRelationship.type == _PLATEAU_REL, Plateau.id.isnot(None)),
+                db.and_(ArchiMateRelationship.type == _GAP_REL, Gap.id.isnot(None)),
+            ),
+        )
+        .order_by(ArchiMateRelationship.id)
+    )
+    if wp_ids is not None:
+        query = query.where(UnifiedWorkPackage.id.in_(list(wp_ids)))
+    if plateau_ids is not None:
+        query = query.where(Plateau.id.in_(list(plateau_ids)))
+    if gap_ids is not None:
+        query = query.where(Gap.id.in_(list(gap_ids)))
+    return [tuple(row) for row in db.session.execute(query).all()]
+
+
+def _link_targets(wp: UnifiedWorkPackage, key: str, organization_id: int):
+    """(relationship id, plateau or gap id) for the links of the kind ``key`` names
+    from this work package, through the one reader."""
+    rel_type = _link_models()[key][1]
+    out = []
+    for _wp_id, rel_id, kind, plateau_id, gap_id in _link_rows(organization_id, wp_ids=[wp.id]):
+        if kind == rel_type:
+            out.append((rel_id, plateau_id if key == "plateau_id" else gap_id))
+    return out
 
 
 def _apply_links(
-    wp: UnifiedWorkPackage, links: Dict[str, Any], organization_id: int, replace: bool = True
+    wp: UnifiedWorkPackage, links: Dict[str, Any], organization_id: int, replace: bool = True,
+    rollback: bool = True, round_trip: bool = True,
 ) -> None:
+    """Record the links in ``links`` ({'plateau_id': Plateau|None, 'gap_id': Gap|None})
+    as relationships. Only a kind that is a key of ``links`` is touched: a missing
+    key leaves that kind alone, and None clears it. With ``replace`` the new
+    target replaces the others of its kind. ``rollback=False`` is for a caller
+    that holds a savepoint and rolls it back itself. With ``round_trip`` the id a
+    screen sends back unchanged (the first linked id) leaves the other links of
+    that kind alone; the bridge passes False, as an old screen holds one link."""
     if not links:
         return
+    if organization_id is None:
+        raise WorkPackageError("A work package link needs an organisation.")
     from app.models.archimate_core import ArchiMateElement
+    from app.models.models import ArchiMateRelationship
     from app.modules.architecture.services.archimate_relationship_service import (
         ArchiMateRelationshipService,
     )
@@ -320,10 +371,17 @@ def _apply_links(
         _model, rel_type = _link_models()[key]
         current = _link_targets(wp, key, organization_id)
         wanted = target.id if target is not None else None
-        for rel, existing in current:
-            if replace and existing.id != wanted:
-                db.session.delete(rel)
-        if target is None or any(existing.id == wanted for _rel, existing in current):
+        current_ids = [tid for _rid, tid in current]
+        # The modal sends back the one id it shows (the first linked): that is
+        # no change, whatever else the work package is linked to.
+        unchanged = round_trip and bool(current_ids) and wanted == current_ids[0]
+        if replace and not unchanged:
+            for rel_id, tid in current:
+                if tid != wanted:
+                    rel = db.session.get(ArchiMateRelationship, rel_id)
+                    if rel is not None:
+                        db.session.delete(rel)
+        if target is None or wanted in current_ids:
             continue
         _ensure_element(target)
         db.session.flush()
@@ -332,7 +390,7 @@ def _apply_links(
         created = ArchiMateRelationshipService.create_relationship(
             source, end, rel_type,
             architecture_id=source.architecture_id or end.architecture_id,
-            organization_id=organization_id,
+            organization_id=organization_id, rollback=rollback,
         )
         if created is None:
             raise WorkPackageError("Could not link the work package to its %s." % key[:-3])
@@ -343,79 +401,35 @@ def plateau_and_gap_links(wps, organization_id: int) -> Dict[int, Dict[str, List
     """{work package id: {"plateau_ids": [...], "gap_ids": [...]}} for these work
     packages, read from the relationships in one query. Another organisation's
     plateaus and gaps never appear."""
-    from app.models.implementation_migration import Gap, Plateau
-    from app.models.models import ArchiMateRelationship
-
+    wps = list(wps)
     out = {wp.id: {"plateau_ids": [], "gap_ids": []} for wp in wps}
-    by_element = {wp.archimate_element_id: wp.id for wp in wps if wp.archimate_element_id}
-    if not by_element:
+    if not out:
         return out
-    rows = db.session.execute(
-        db.select(ArchiMateRelationship.source_id, ArchiMateRelationship.type, Plateau.id, Gap.id)
-        .outerjoin(Plateau, db.and_(
-            Plateau.archimate_element_id == ArchiMateRelationship.target_id,
-            Plateau.organization_id == organization_id))
-        .outerjoin(Gap, db.and_(
-            Gap.archimate_element_id == ArchiMateRelationship.target_id,
-            Gap.organization_id == organization_id))
-        .where(
-            ArchiMateRelationship.source_id.in_(list(by_element)),
-            ArchiMateRelationship.type.in_((_PLATEAU_REL, _GAP_REL)),
-            ArchiMateRelationship.organization_id == organization_id,
-        )
-        .order_by(ArchiMateRelationship.id)
-    ).all()
-    for source_id, rel_type, plateau_id, gap_id in rows:
-        entry = out[by_element[source_id]]
-        if rel_type == _PLATEAU_REL and plateau_id is not None and plateau_id not in entry["plateau_ids"]:
+    for wp_id, _rel_id, rel_type, plateau_id, gap_id in _link_rows(
+            organization_id, wp_ids=list(out)):
+        entry = out[wp_id]
+        if rel_type == _PLATEAU_REL and plateau_id not in entry["plateau_ids"]:
             entry["plateau_ids"].append(plateau_id)
-        if rel_type == _GAP_REL and gap_id is not None and gap_id not in entry["gap_ids"]:
+        if rel_type == _GAP_REL and gap_id not in entry["gap_ids"]:
             entry["gap_ids"].append(gap_id)
     return out
 
 
 def work_package_ids_for_gap(gap_id: int, organization_id: int) -> List[int]:
     """Ids of this organisation's work packages linked to a gap."""
-    from app.models.implementation_migration import Gap
-    from app.models.models import ArchiMateRelationship
-
-    rows = db.session.execute(
-        db.select(UnifiedWorkPackage.id)
-        .join(ArchiMateRelationship, ArchiMateRelationship.source_id == UnifiedWorkPackage.archimate_element_id)
-        .join(Gap, Gap.archimate_element_id == ArchiMateRelationship.target_id)
-        .where(
-            Gap.id == gap_id,
-            Gap.organization_id == organization_id,
-            ArchiMateRelationship.type == _GAP_REL,
-            ArchiMateRelationship.organization_id == organization_id,
-            UnifiedWorkPackage.organization_id == organization_id,
-        )
-    ).all()
-    return sorted({row[0] for row in rows})
+    rows = _link_rows(organization_id, gap_ids=[gap_id])
+    return sorted({row[0] for row in rows if row[2] == _GAP_REL})
 
 
 def plateau_work_package_ids(plateau_ids, organization_id: int) -> Dict[int, set]:
     """{plateau id: {ids of this organisation's work packages that realise it}}."""
-    from app.models.implementation_migration import Plateau
-    from app.models.models import ArchiMateRelationship
-
     out: Dict[int, set] = {pid: set() for pid in plateau_ids}
     if not out:
         return out
-    rows = db.session.execute(
-        db.select(Plateau.id, UnifiedWorkPackage.id)
-        .join(ArchiMateRelationship, ArchiMateRelationship.target_id == Plateau.archimate_element_id)
-        .join(UnifiedWorkPackage, UnifiedWorkPackage.archimate_element_id == ArchiMateRelationship.source_id)
-        .where(
-            Plateau.id.in_(list(out)),
-            Plateau.organization_id == organization_id,
-            ArchiMateRelationship.type == _PLATEAU_REL,
-            ArchiMateRelationship.organization_id == organization_id,
-            UnifiedWorkPackage.organization_id == organization_id,
-        )
-    ).all()
-    for plateau_id, wp_id in rows:
-        out[plateau_id].add(wp_id)
+    for wp_id, _rel_id, rel_type, plateau_id, _gap in _link_rows(
+            organization_id, plateau_ids=list(out)):
+        if rel_type == _PLATEAU_REL:
+            out[plateau_id].add(wp_id)
     return out
 
 
@@ -507,6 +521,9 @@ def to_roadmap_dict(
         "owner_id": wp.owner_id,
         "owner_name": owner_name,
         "is_overdue": wp.is_overdue(),
+        # The modal reads and sends back the singular keys (the first linked id).
+        "gap_id": links["gap_ids"][0] if links["gap_ids"] else None,
+        "plateau_id": links["plateau_ids"][0] if links["plateau_ids"] else None,
         "gap_ids": list(links["gap_ids"]),
         "plateau_ids": list(links["plateau_ids"]),
         "deliverable_count": Deliverable.query.filter_by(unified_work_package_id=wp.id).count(),
@@ -821,9 +838,9 @@ def deliverable_to_roadmap_dict(deliverable) -> Dict[str, Any]:
         "archimate_element_type": "Deliverable",
         "deliverable_type": deliverable.deliverable_type,
         "related_task_ids": deliverable.related_task_ids,
-        "auto_generated": False,
-        "source_application_id": None,
-        "generation_method": None,
+        "auto_generated": bool(deliverable.auto_generated),
+        "source_application_id": deliverable.application_component_id,
+        "generation_method": deliverable.generation_method,
         "created_at": deliverable.created_at.isoformat() if deliverable.created_at else None,
         "updated_at": deliverable.updated_at.isoformat() if deliverable.updated_at else None,
     }

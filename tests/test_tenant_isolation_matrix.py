@@ -426,7 +426,15 @@ KNOWN_LEAKS = {
     "GET /solutions/api/registry/specs/<int:spec_id>": _PR274,
 }
 
+# Parameters whose record the codebase reading no longer finds, because the lookup moved
+# into work_package_service (R1-B04 PR 2): the work package and deliverable routes.
+PARAM_MODELS = {
+    "wp_id": "unified_work_packages",
+    "deliverable_id": "deliverables",
+}
+
 POLICY = sweep.Policy(
+    param_models=PARAM_MODELS,
     non_identifier_ints=NON_IDENTIFIER_INTS,
     string_identifier=STRING_IDENTIFIER,
     excluded_params=EXCLUDED_PARAMS,

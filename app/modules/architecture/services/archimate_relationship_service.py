@@ -162,6 +162,7 @@ class ArchiMateRelationshipService:
         architecture_id: int,
         properties: Optional[Dict] = None,
         organization_id: Optional[int] = None,
+        rollback: bool = True,
     ) -> Optional[ArchiMateRelationship]:
         """
         Create a validated ArchiMate relationship.
@@ -175,6 +176,9 @@ class ArchiMateRelationshipService:
                 (see WRITABLE_PROPERTIES)
             organization_id: The owning organisation, for a caller with no
                 request context (the tenant default only reads the request)
+            rollback: roll the session's transaction back when the write fails
+                (the default). A caller that holds a savepoint passes False and
+                gets the exception, so only its savepoint is rolled back.
 
         Returns:
             Created ArchiMateRelationship or None if validation failed
@@ -231,6 +235,8 @@ class ArchiMateRelationshipService:
 
         except Exception as e:
             logger.error(f"Failed to create relationship: {e}")
+            if not rollback:
+                raise
             db.session.rollback()
             return None
 
