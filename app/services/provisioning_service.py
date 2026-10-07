@@ -22,6 +22,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from flask import current_app
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models.account_token import AccountToken, digest
@@ -137,6 +138,8 @@ def create_or_update_user(org_id, attrs, *, source, user=None, actor=None):
     scim = source == SOURCE_SCIM
     actor = actor or (f"scim:{source}" if scim else "sso")
     email = User.normalize_email(attrs.get("email")) if attrs.get("email") is not None else None
+    if scim:
+        _check_lengths(email, attrs)
     if scim and email is not None and not _EMAIL_RE.match(email):
         raise ProvisioningError("userName must be an email address.", scim_type="invalidValue")
     if scim and email is not None and email == _admin_email():
@@ -183,6 +186,12 @@ def create_or_update_user(org_id, attrs, *, source, user=None, actor=None):
 
     try:
         db.session.commit()
+    except IntegrityError as exc:
+        # Two requests for the same address raced: the second loses.
+        db.session.rollback()
+        raise EmailInOtherOrganisation(
+            "A user with that userName already exists.", status=409
+        ) from exc
     except Exception:
         db.session.rollback()
         raise
@@ -194,6 +203,22 @@ def create_or_update_user(org_id, attrs, *, source, user=None, actor=None):
         elif changed:
             auth_audit.record_scim_user_updated(org_id, user, actor, changed)
     return user, created, changed
+
+
+#: Column widths on ``users`` (email, first_name, last_name, external_id).
+_MAX_LENGTHS = {"email": 64, "first_name": 64, "last_name": 64, "external_id": 255}
+
+
+def _check_lengths(email, attrs):
+    values = dict(attrs)
+    if email is not None:
+        values["email"] = email
+    for field, limit in _MAX_LENGTHS.items():
+        value = values.get(field)
+        if isinstance(value, str) and len(value) > limit:
+            raise ProvisioningError(
+                f"{field} is longer than {limit} characters.", scim_type="invalidValue"
+            )
 
 
 _ATTR_FIELDS = {

@@ -175,6 +175,11 @@ class TestCreateGetListReplacePatchDelete:
         assert call(client, "POST", "/Users", token, {"name": {"givenName": "x"}}).status_code == 400
         assert call(client, "POST", "/Users", token, {"userName": "not-an-email"}).status_code == 400
 
+    def test_overlong_values_are_a_400_not_a_500(self, client, token):
+        assert call(client, "POST", "/Users", token, user_body(external_id="x" * 300)).status_code == 400
+        assert call(client, "POST", "/Users", token, user_body(given="g" * 80)).status_code == 400
+        assert call(client, "POST", "/Users", token, user_body("a" * 60 + "@example.com")).status_code == 400
+
     def test_create_with_active_false_creates_a_deactivated_user(self, client, token):
         data = call(client, "POST", "/Users", token, user_body(active=False)).get_json(force=True)
         assert data["active"] is False
@@ -419,6 +424,16 @@ class TestAudit:
 
 
 class TestRateLimits:
+    @pytest.fixture(autouse=True)
+    def _frozen_clock(self, monkeypatch):
+        """The limiter is a token bucket that refills with the clock; freeze it
+        so the count of calls, not the speed of the machine, decides."""
+        import types
+
+        monkeypatch.setattr(
+            "app.services.rate_limiter.time", types.SimpleNamespace(time=lambda: 1_000_000.0)
+        )
+
     def test_the_601st_call_in_a_minute_is_429_and_another_token_is_unaffected(
         self, app, client, db_session, org, make_org
     ):
@@ -430,9 +445,9 @@ class TestRateLimits:
         _rate_limiter.reset(f"scim:{row.id}")
         app.config["RATE_LIMITING_ENABLED"] = True
         try:
-            statuses = [call(client, "GET", "/ServiceProviderConfig", raw).status_code for _ in range(640)]
+            statuses = [call(client, "GET", "/ServiceProviderConfig", raw).status_code for _ in range(601)]
             assert statuses[:600] == [200] * 600
-            assert 429 in statuses
+            assert statuses[600] == 429
             limited = call(client, "GET", "/ServiceProviderConfig", raw)
             assert limited.status_code == 429
             assert limited.get_json(force=True)["schemas"] == ["urn:ietf:params:scim:api:messages:2.0:Error"]
@@ -452,10 +467,10 @@ class TestRateLimits:
         try:
             statuses = [
                 call(client, "GET", "/Users", "scim_bad", environ_overrides={"REMOTE_ADDR": address}).status_code
-                for _ in range(30)
+                for _ in range(21)
             ]
             assert statuses[:20] == [401] * 20
-            assert statuses[-1] == 429
+            assert statuses[20] == 429
             other = call(client, "GET", "/Users", "scim_bad", environ_overrides={"REMOTE_ADDR": "203.0.113.78"})
             assert other.status_code == 401
         finally:
