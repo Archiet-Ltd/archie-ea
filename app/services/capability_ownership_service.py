@@ -55,18 +55,18 @@ def set_capability_owner(
     owner = User.query.filter_by(
         id=user_id, organization_id=organization_id,
     ).first()
-    if owner is None:
+    if owner is None or not owner.is_active:
         raise CrossOrganisationCapabilityOwner(
             "That user does not belong to this organisation."
         )
 
-    existing = ApplicationOwner.query.filter_by(
+    existing = ApplicationOwner.find_duplicate(
+        user_id,
+        ownership_type,
+        organization_id,
         element_type=ELEMENT_TYPE_CAPABILITY,
         element_id=capability_id,
-        user_id=user_id,
-        ownership_type=ownership_type,
-        organization_id=organization_id,
-    ).first()
+    )
     if existing is not None:
         return existing
 

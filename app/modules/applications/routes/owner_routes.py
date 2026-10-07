@@ -68,7 +68,7 @@ def add_owner(app_id: int):
         }), 400
 
     user = user_in_org(user_id, org_id)
-    if user is None:
+    if user is None or not user.is_active:
         return jsonify({
             "success": False,
             "error": "User not found in your organisation",
