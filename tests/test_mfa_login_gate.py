@@ -253,3 +253,122 @@ def test_api_login_still_succeeds_for_a_plain_user_no_regression(app, db_session
 
     with client.session_transaction() as sess:
         assert sess.get("_user_id") == str(user.id)
+
+
+# ---------------------------------------------------------------------------
+# /account/sso/callback/<provider> (v1 account blueprint): the same MFA gate,
+# applied to the SSO callback -- hot-fix alongside the /api/auth/login bypass
+# above and the v2 SSO callback crash fix in
+# tests/test_account_v2_sso_callback_audit_fix.py. This route's own
+# sso_callback() called session_registry.login_and_register(user,
+# remember=True) unconditionally after resolving/creating the user, with no
+# check at all for whether the user needs to complete MFA first -- the same
+# bug class as the API-login bypass, for the IdP-driven sign-in path.
+#
+# _get_sso_oauth() is this file's own helper (app.modules.account.routes
+# .account_routes), separate from the v2 blueprint's helper of the same
+# name -- monkeypatched the same way the v2 crash-fix test does, the
+# smallest substitution that exercises the real route body.
+# ---------------------------------------------------------------------------
+
+
+def _enable_sso_flag(db_session):
+    from app.models.feature_flags import FeatureFlag
+
+    flag = FeatureFlag.query.filter_by(key="sso_authentication").first()
+    if flag is None:
+        flag = FeatureFlag(key="sso_authentication", name="SSO authentication", enabled=True)
+        db_session.add(flag)
+    else:
+        flag.enabled = True
+    db_session.commit()
+    return flag
+
+
+class _FakeSSOClient:
+    """Stands in for the authlib client sso_callback() calls -- only the two
+    methods the route actually uses."""
+
+    def __init__(self, userinfo):
+        self._userinfo = userinfo
+
+    def authorize_access_token(self):
+        # Mirrors the real shape: token.get("userinfo") is tried first.
+        return {"userinfo": self._userinfo}
+
+    def userinfo(self):  # pragma: no cover - not reached, token already has it
+        return self._userinfo
+
+
+class _FakeSSOOAuth:
+    def __init__(self, userinfo):
+        self._userinfo = userinfo
+
+    def create_client(self, provider):
+        return _FakeSSOClient(self._userinfo)
+
+
+def _sso_callback(client, monkeypatch, db_session, userinfo):
+    from app.modules.account.routes import account_routes
+
+    _enable_sso_flag(db_session)
+    monkeypatch.setattr(
+        account_routes, "_get_sso_oauth", lambda: _FakeSSOOAuth(userinfo)
+    )
+
+    with client.session_transaction() as sess:
+        sess["sso_state"] = "state-abc"
+
+    return client.get(
+        "/account/sso/callback/azure?state=state-abc", follow_redirects=False
+    )
+
+
+def test_sso_callback_sends_an_mfa_enrolled_administrator_to_the_challenge(
+    app, db_session, make_org, monkeypatch
+):
+    secret = pyotp.random_base32()
+    org = make_org("sso-mfa-gate-enrolled")
+    admin = _make_admin(db_session, org, mfa_enabled=True, mfa_secret=secret)
+
+    client = app.test_client()
+    userinfo = {
+        "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "email": admin.email,
+        "given_name": "Ada",
+        "family_name": "Lovelace",
+    }
+    resp = _sso_callback(client, monkeypatch, db_session, userinfo)
+
+    assert resp.status_code in (302, 303), resp.get_data(as_text=True)
+    assert "/mfa-challenge" in resp.headers.get("Location", "")
+
+    # No real session was established: the pending-MFA key is set, there is
+    # no logged-in user id, and an authenticated-only route still refuses
+    # the follow-up request.
+    with client.session_transaction() as sess:
+        assert sess.get("_mfa_pending_user_id") == admin.id
+        assert "_user_id" not in sess
+    dash = client.get("/dashboard/overview")
+    assert dash.status_code in (302, 401)
+
+
+def test_sso_callback_still_logs_in_a_plain_user_no_regression(
+    app, db_session, make_org, monkeypatch
+):
+    org = make_org("sso-mfa-gate-plain")
+    user = _make_plain_user(db_session, org)
+
+    client = app.test_client()
+    userinfo = {
+        "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "email": user.email,
+        "given_name": "Grace",
+        "family_name": "Hopper",
+    }
+    resp = _sso_callback(client, monkeypatch, db_session, userinfo)
+
+    assert resp.status_code in (302, 303), resp.get_data(as_text=True)
+
+    with client.session_transaction() as sess:
+        assert sess.get("_user_id") == str(user.id)
