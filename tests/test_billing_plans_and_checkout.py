@@ -727,9 +727,9 @@ def test_pricing_page_has_a_buy_button_per_plan(app, client):
         resp = client.get("/pricing")
     html = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    assert "/admin/billing/?plan=startup&amp;interval=year#checkout" in html
-    assert "/admin/billing/?plan=team&amp;interval=year#checkout" in html
-    assert "/admin/billing/?plan=team&amp;interval=month#checkout" in html
+    assert "/account/register?plan=startup&amp;interval=year" in html
+    assert "/account/register?plan=team&amp;interval=year" in html
+    assert "/account/register?plan=team&amp;interval=month" in html
     assert 'data-testid="buy-enterprise"' in html
 
 
