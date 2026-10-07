@@ -100,6 +100,12 @@ POLICY = {
     # is refused -- inviting people into an organisation is not a persona's
     # job, it is its administrator's.
     "/admin/team":             set(),
+    # R1-B88: access review and export investigation. Readers are the audit
+    # trail's readers (organisation administrators and security architects);
+    # opening, deciding, scanning and restricting are organisation
+    # administrators only and are pinned in tests/test_access_review.py.
+    "/admin/access/reviews":   {"security_architect"},
+    "/admin/access/exports":   {"security_architect"},
     # R1-B56: Agent Registry (owner/charter/delegated-limits per agent) is
     # gated to platform_admin via @requires_role / _guard in
     # agent_registry_routes.py -- registering and activating an agent is
