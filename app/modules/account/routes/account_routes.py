@@ -31,6 +31,7 @@ from flask_login import current_user, login_required
 from app.security.audit import audit_logger
 
 _log = logging.getLogger(__name__)
+from app.services import buy_intent
 from app.services.rate_limiter import rate_limit
 
 from . import mail_views
@@ -66,7 +67,7 @@ def login():
         from app.utils.safe_redirect import safe_next_url
 
         return redirect(
-            safe_next_url(request.args.get("next"), url_for("dashboard.overview"))
+            safe_next_url(buy_intent.next_candidate(consume=True), url_for("dashboard.overview"))
         )
     form = LoginForm()
     if form.validate_on_submit():
@@ -97,10 +98,12 @@ def login():
             if mfa_service.required_for(user):
                 session["_mfa_pending_user_id"] = user.id
                 session["_mfa_pending_remember"] = bool(form.remember_me.data)
-                session["_mfa_pending_next"] = request.args.get("next", "")
+                session["_mfa_pending_next"] = buy_intent.next_candidate(consume=True) or ""
                 return redirect(url_for("account.mfa_challenge"))
 
             # Fix Session Fixation: Regenerate session ID after successful authentication
+            # Read before the session is cleared: the chosen plan lives in it.
+            _landing = buy_intent.next_candidate(consume=True)
             session.clear()
             session.modified = True
             _svc.login(user, form.remember_me.data)
@@ -124,7 +127,7 @@ def login():
             from app.utils.safe_redirect import safe_next_url
 
             return redirect(
-                safe_next_url(request.args.get("next"), url_for("dashboard.overview"))
+                safe_next_url(_landing, url_for("dashboard.overview"))
             )
         else:
             try:

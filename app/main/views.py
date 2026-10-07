@@ -733,6 +733,22 @@ def public_comparison(slug):
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 
+@main.route("/vs/avolution")
+def vs_avolution_redirect():
+    """/vs/avolution and /vs/avolution-abacus covered the same comparison,
+    added separately by two uncoordinated changes. The merged page lives at
+    avolution-abacus; this old URL 301s there rather than 404ing."""
+    return redirect("/vs/avolution-abacus", code=301)
+
+
+@main.route("/vs/orbus")
+def vs_orbus_redirect():
+    """/vs/orbus and /vs/orbus-iserver covered the same comparison, added
+    separately by two uncoordinated changes. The merged page lives at
+    orbus-iserver; this old URL 301s there rather than 404ing."""
+    return redirect("/vs/orbus-iserver", code=301)
+
+
 @main.route("/how-archiet-runs-on-entelim")
 def public_dogfood():
     """The dogfood / proof story page."""
@@ -796,9 +812,10 @@ def track_plan_click():
     """Log a pricing-plan click, then send the visitor on to the real link.
 
     The "Choose a plan" buttons on the pricing page and every module page
-    (app/templates/public/page.html) are plain GET links to /signup or to
-    billing -- there is no form submit and no JS beacon to hang the event
-    on, so this view is the event: it logs which plan was clicked and
+    (app/templates/public/page.html) are plain GET links to registration
+    (carrying the chosen plan through sign-up, see app/services/buy_intent.py)
+    or to /contact -- there is no form submit and no JS beacon to hang the
+    event on, so this view is the event: it logs which plan was clicked and
     redirects on to *next* (validated as a safe, site-relative path, same
     rule the sign-in flow already uses for its own ?next=).
     """
