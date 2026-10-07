@@ -613,9 +613,12 @@ def _register_always_on_apis(app, csrf):
     # url_map and the bearer loader above never has a request to act on.
     #
     # CSRF: each blueprint exempts only the specific views that cannot carry
-    # a session-bound token (POST /oauth/token, POST /oauth/revoke, the
-    # POST /mcp endpoint itself — see their own @csrf.exempt decorators and
-    # app/_bootstrap/csrf_coverage.py's VIEW_OPT_OUT entries for why). The
+    # a session-bound token (POST /oauth/token, POST /oauth/revoke). POST
+    # /mcp is exempted from flask-wtf's own blanket check too, but only so
+    # that app.modules.mcp.blueprint's own before_request can re-apply the
+    # real check for every shape of request except a genuine bearer-only
+    # call — see that module's CSRF docstring section and
+    # app/_bootstrap/csrf_coverage.py's VIEW_OPT_OUT entries for why. The
     # consent screen (POST /oauth/authorize) stays CSRF-protected like any
     # other session-authenticated form.
     if app.config.get("MCP_ENABLED"):

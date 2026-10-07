@@ -207,6 +207,14 @@ class Config:
     # loudly instead of quietly serving relative or wrong-host metadata.
     PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
     MCP_ENABLED = _env_bool("MCP_ENABLED", False)
+
+    # DNS rebinding protection for POST /mcp (app/modules/mcp/blueprint.py):
+    # when a request carries an Origin header, it is compared against this
+    # value and refused (403) on a mismatch. Empty by default -- a request
+    # with no Origin header at all (every genuine non-browser MCP client)
+    # is unaffected either way; this only ever rejects a browser-originated
+    # request from an origin that was never allow-listed.
+    MCP_ALLOWED_ORIGIN = os.environ.get("MCP_ALLOWED_ORIGIN", "")
     OAUTH_REFRESH_TOKEN_DAYS = int(os.environ.get("OAUTH_REFRESH_TOKEN_DAYS", "30"))
     OAUTH_CLIENT_REGISTRATION_RATE_LIMIT = os.environ.get(
         "OAUTH_CLIENT_REGISTRATION_RATE_LIMIT", "10 per hour"

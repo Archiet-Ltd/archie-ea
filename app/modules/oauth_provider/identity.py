@@ -2,19 +2,30 @@
 
 This is a flask-login ``request_loader`` — the seam flask-login calls when a
 request carries no session cookie. It resolves ``current_user`` from an
-``Authorization: Bearer`` header for exactly two kinds of request:
+``Authorization: Bearer`` header for exactly one kind of request: a direct
+call to the public ``/mcp`` endpoint.
 
-* a direct call to the public ``/mcp`` endpoint, and
-* an internal bridge call (``app.utils.internal_api.call_internal_api`` in
-  bearer mode) made on that same caller's behalf, identified by the
-  ``MCP_BRIDGE_MARKER`` header this module defines and the bridge sets.
+A prior version of this module also authenticated an *internal* bridge call
+(``app.utils.internal_api.call_internal_api`` in bearer mode) made on that
+same caller's behalf, identified by a hardcoded, non-secret marker header
+(``X-Entelim-MCP-Bridge: internal-bearer-bridge-v1``). That header and its
+value were a literal constant committed in source, so anyone holding ANY
+valid MCP bearer token could add the header to a request against ANY other
+route in the app and be authenticated as that token's user there too —
+privilege escalation past the intended MCP-only scope. It was also
+unnecessary: ``call_internal_api``'s nested internal call already inherits
+the outer request's resolved ``current_user``/``g`` state directly, via
+Flask's own app-context stack, because the nested call happens in-process
+while the outer request's context is still open — none of the existing
+read-only tools ever needed the header, and ``call_internal_api`` never set
+it. The marker mechanism has been removed outright rather than hardened.
 
-Every other request is left alone — the loader returns ``None`` and whatever
-session-cookie handling already exists proceeds exactly as before. The loader
-never calls ``login_user()`` and never touches the session: flask-login's
-request-loader contract is already "resolve a user for *this* request only,"
-which is exactly the no-session-written behaviour a bearer-authenticated API
-caller needs.
+Every request other than a direct call to ``/mcp`` is left alone — the
+loader returns ``None`` and whatever session-cookie handling already exists
+proceeds exactly as before. The loader never calls ``login_user()`` and
+never touches the session: flask-login's request-loader contract is already
+"resolve a user for *this* request only," which is exactly the
+no-session-written behaviour a bearer-authenticated API caller needs.
 
 Registered unconditionally at boot (see ``app/_bootstrap/blueprints.py``), but
 inert — returns ``None`` immediately — while ``MCP_ENABLED`` is false, so the
@@ -27,22 +38,14 @@ from flask import current_app, g, request
 
 from app.extensions import login_manager
 
-# The header an internal bridge call sets to mark itself as carrying a
-# caller's bearer token on the caller's behalf, so this loader authenticates
-# the *inner* request the same way it authenticated the outer one.
-# app.utils.internal_api.call_internal_api's bearer mode sets this header;
-# nothing outside the bridge should ever send it, since the real guard is
-# that the header alone grants nothing — the Authorization header still has
-# to carry a valid bearer token.
-MCP_BRIDGE_MARKER_HEADER = "X-Entelim-MCP-Bridge"
-MCP_BRIDGE_MARKER_VALUE = "internal-bearer-bridge-v1"
-
 
 def _is_mcp_scoped_request() -> bool:
-    """True when this request is the public /mcp endpoint or a bridge call."""
-    if request.path == "/mcp":
-        return True
-    return request.headers.get(MCP_BRIDGE_MARKER_HEADER) == MCP_BRIDGE_MARKER_VALUE
+    """True only for a direct call to the public /mcp endpoint.
+
+    No header-based alternate path: see this module's docstring for why one
+    existed before and why it was removed rather than hardened.
+    """
+    return request.path == "/mcp"
 
 
 def load_user_from_bearer_token(req):

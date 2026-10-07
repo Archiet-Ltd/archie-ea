@@ -10,6 +10,29 @@ runs lazily the first time anything asks for ``current_user`` — which happens
 inside the app's existing tenant-context ``before_request`` hook, before this
 view ever runs — ``g.current_org_id`` is already correctly set by the time
 any of the code below executes; nothing here needs to set it by hand.
+
+CSRF
+----
+``mcp_endpoint`` is marked ``@csrf.exempt`` from flask-wtf's own blanket
+``before_request`` check (see ``app/_bootstrap/csrf_coverage.py``'s
+``VIEW_OPT_OUT`` for the recorded justification) because that global check
+runs too early to judge this route correctly: it fires before the app's
+tenant-context hook has ever touched ``current_user``, so ``g.auth_mode`` is
+never set yet at that point, and a blanket CSRF check would reject every
+genuine bearer-only call outright. ``_csrf_guard`` below is this blueprint's
+own ``before_request``, which Flask runs *after* every app-level hook
+(tenant-context included) for any request this blueprint handles — so
+``g.auth_mode`` is already correctly set by the time it runs. It re-enables
+the real check for everything except the one case CSRF has nothing to
+protect against: a request that resolved via the bearer loader
+(``g.auth_mode == "bearer"``), to this exact path, carrying no session
+cookie at all. CSRF exists to stop a browser silently replaying a victim's
+*session cookie* cross-site; an explicit ``Authorization: Bearer`` header is
+not an ambient credential a cross-site page can read or forge, so there is
+nothing here for CSRF to protect once all three of those hold. Any request
+shape that fails even one of them — including a request that happens to
+carry a valid session cookie — falls through to the ordinary check,
+unchanged.
 """
 
 from __future__ import annotations
@@ -21,6 +44,7 @@ import time
 from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user
 
+from app.extensions import csrf
 from app.modules.mcp.tools import TOOL_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -43,7 +67,69 @@ def _jsonrpc_result(id_, result: dict) -> dict:
     return {"jsonrpc": "2.0", "id": id_, "result": result}
 
 
+def _request_carries_session_cookie() -> bool:
+    """True when this request's own wire data includes the app's session
+    cookie -- the ambient credential CSRF exists to stop a forged cross-site
+    request from silently replaying. Checked directly against
+    ``request.cookies`` (not against whether the cookie actually
+    authenticated anything), so a session cookie that is present but stale,
+    expired or otherwise failed to authenticate still counts: the point is
+    whether a browser sent one on the wire, not whether it worked, since a
+    cross-site forgery rides whatever the browser attaches regardless of
+    whether it was still valid.
+    """
+    cookie_name = current_app.config.get("SESSION_COOKIE_NAME", "session")
+    return cookie_name in request.cookies
+
+
+def is_bearer_only_mcp_request() -> bool:
+    """True only when ALL THREE hold: this request is addressed at the
+    public /mcp endpoint itself, it resolved to a real, already-validated
+    bearer token (``g.auth_mode == "bearer"``, set only by
+    ``app.modules.oauth_provider.identity`` after checking the token's
+    validity, resource and organization -- never set here), and it carries
+    no session cookie at all. The session-cookie check is deliberate
+    defense in depth rather than redundant with the ``auth_mode`` check:
+    flask-login resolves a session-based user before it ever falls back to
+    the bearer request_loader, so in the ordinary case a request that
+    carries a *valid* session cookie never reaches ``auth_mode == "bearer"``
+    in the first place -- but this function must not quietly assume that
+    stays true (an expired or otherwise-rejected session cookie can still be
+    present on the wire alongside a valid bearer header), so it checks the
+    cookie's presence explicitly rather than inferring it from
+    ``auth_mode`` alone.
+    """
+    return (
+        request.path == "/mcp"
+        and getattr(g, "auth_mode", None) == "bearer"
+        and not _request_carries_session_cookie()
+    )
+
+
+@mcp_bp.before_request
+def _csrf_guard():
+    """Run the real CSRF check for every request to this blueprint except a
+    genuine bearer-only call to /mcp -- see the module docstring's "CSRF"
+    section for why this has to be a blueprint-level hook rather than relying
+    on flask-wtf's own blanket check.
+    """
+    if is_bearer_only_mcp_request():
+        return None
+    if not current_app.config.get("WTF_CSRF_ENABLED", True):
+        return None
+    if not current_app.config.get("WTF_CSRF_CHECK_DEFAULT", True):
+        return None
+    # apply_exemptions=False: this view is marked @csrf.exempt for flask-wtf's
+    # own automatic pass (so that earlier, auth-blind pass never rejects a
+    # genuine bearer-only call), but here -- having just determined this is
+    # NOT that case -- the real check must run unconditionally rather than
+    # finding the same static exemption and skipping again.
+    csrf.protect(apply_exemptions=False)
+    return None
+
+
 @mcp_bp.route("", methods=["POST"])
+@csrf.exempt
 def mcp_endpoint():
     """Streamable HTTP MCP endpoint — accepts JSON-RPC messages."""
     # Validate Origin header for DNS rebinding protection
