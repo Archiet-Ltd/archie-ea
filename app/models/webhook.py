@@ -56,6 +56,7 @@ class WebhookSubscription(TenantMixin, db.Model):
 
         self.secret_encrypted = encrypt_credential(raw)
         self.secret = None
+        self.__dict__.pop("_usable_secret_cache", None)
 
     def get_secret(self) -> Optional[str]:
         """The signing secret, or None when there is none.
@@ -83,6 +84,23 @@ class WebhookSubscription(TenantMixin, db.Model):
         return legacy
 
     @property
+    def has_usable_secret(self) -> bool:
+        """True when a signing secret exists and can be read now.
+
+        Decrypts at most once per loaded row (the answer is kept on the
+        instance), so a template loop or ``to_dict`` can ask freely. The
+        secret itself is never kept or returned.
+        """
+        cached = self.__dict__.get("_usable_secret_cache")
+        if cached is None:
+            try:
+                cached = bool(self.get_secret())
+            except Exception:  # unreadable ciphertext or no encryption key
+                cached = False
+            self.__dict__["_usable_secret_cache"] = cached
+        return cached
+
+    @property
     def is_plain_http(self) -> bool:
         return (self.url or "").lower().startswith("http://")
 
@@ -93,6 +111,7 @@ class WebhookSubscription(TenantMixin, db.Model):
             "user_id": self.user_id,
             "url": self.url,
             "has_secret": bool(self.secret_encrypted or self.secret),
+            "has_usable_secret": self.has_usable_secret,
             "last_ordinal": self.last_ordinal or 0,
             "events": self.events,
             "description": self.description,

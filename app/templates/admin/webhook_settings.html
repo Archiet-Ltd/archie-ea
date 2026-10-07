@@ -94,6 +94,9 @@
                                             <button type="submit" class="text-xs font-medium hover:underline"
                                                     aria-label="Rotate the signing secret for {{ sub.url }}">Rotate secret</button>
                                         </form>
+                                        {% if not sub.has_usable_secret %}
+                                        <span class="text-xs text-warning-emphasis" role="status">No signing secret: deliveries are paused until you rotate the secret.</span>
+                                        {% endif %}
                                         <form method="POST" action="{{ url_for('admin.webhook_settings_delete', subscription_id=sub.id) }}" class="inline"
                                               @submit="Platform.modal.confirmSubmit($event, 'Delete this webhook subscription? This cannot be undone.')">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>

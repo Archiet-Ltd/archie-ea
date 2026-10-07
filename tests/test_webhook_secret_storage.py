@@ -235,3 +235,71 @@ def test_the_secret_appears_once_in_the_api_and_nowhere_after(
         for name in names
         if name.startswith("webhook_sub") or name in {"webhook_test", "webhook_sec_rotate"}
     )
+
+
+def test_a_subscription_with_no_usable_secret_says_so_on_the_api_and_the_screen(
+    monkeypatch, app, db_session, make_org, client, login_as, tenant_ctx
+):
+    install_transport(monkeypatch)
+    org = make_org("secret-warning")
+    user = make_org_user(db_session, org)
+    with tenant_ctx(org.id):
+        signed = WebhookService().create_subscription(
+            user_id=str(user.id),
+            url="https://hooks.example.com/a",
+            events=["*"],
+            secret="shown-once",
+            organization_id=org.id,
+        )
+        unsigned = WebhookService().create_subscription(
+            user_id=str(user.id),
+            url="https://hooks.example.com/b",
+            events=["*"],
+            organization_id=org.id,
+        )
+        signed_id, unsigned_id = signed.id, unsigned.id
+        unsigned_row = WebhookSubscription.query.filter_by(id=unsigned_id).first()
+        unsigned_row.secret_encrypted = None
+        unsigned_row.secret = None
+        db_session.commit()
+
+    login_as(client, user)
+    listed = client.get("/api/webhooks/subscriptions").get_json()["data"]
+    flags = {row["id"]: row["has_usable_secret"] for row in listed}
+    assert flags == {signed_id: True, unsigned_id: False}
+    assert "shown-once" not in str(listed)
+
+    warning = "No signing secret: deliveries are paused until you rotate the secret."
+    login_as(client, user)
+    page = client.get("/admin/webhook-settings").get_data(as_text=True)
+    assert page.count(warning) == 1, "only the subscription without a secret is warned about"
+    assert page.index(warning) > page.index(unsigned_id)
+
+    # Rotating gives it a secret and the warning goes.
+    login_as(client, user)
+    assert client.post(f"/api/webhooks/subscriptions/{unsigned_id}/rotate-secret").status_code == 200
+    login_as(client, user)
+    assert warning not in client.get("/admin/webhook-settings").get_data(as_text=True)
+
+
+def test_usability_is_decided_once_per_loaded_row(monkeypatch, tenant_ctx, make_org, db_session):
+    install_transport(monkeypatch)
+    org = make_org("secret-once")
+    calls = []
+    real = decrypt_credential
+
+    def counting(value):
+        calls.append(1)
+        return real(value)
+
+    monkeypatch.setattr(
+        "app.modules.codegen.services.credential_encryption.decrypt_credential", counting
+    )
+    with tenant_ctx(org.id):
+        row = WebhookSubscription.query.filter_by(
+            id=make_subscription(WebhookService(), org.id).id
+        ).first()
+        calls.clear()
+        assert row.has_usable_secret and row.has_usable_secret
+        row.to_dict()
+        assert len(calls) == 1
