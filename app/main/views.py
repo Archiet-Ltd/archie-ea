@@ -36,6 +36,22 @@ main.register_blueprint(capability_framework_bp)
 main.register_blueprint(framework_management_bp)
 
 
+@main.before_app_request
+def _redirect_www_to_apex():
+    """301 any request to www.entelim.org to the same path on entelim.org.
+
+    A host check, not server config -- the app owns this redirect the same
+    way it owns every other canonicalisation decision in this module. Only
+    ever fires for that exact host, so local/dev/test requests (localhost,
+    127.0.0.1, the test client's default "localhost") are untouched.
+    """
+    host = (request.host or "").split(":", 1)[0].lower()
+    if host == "www.entelim.org":
+        target = request.url.replace("www.entelim.org", "entelim.org", 1)
+        return redirect(target, code=301)
+    return None
+
+
 def _csv_safe(value):
     """Escape one CSV cell against spreadsheet formula injection.
 
@@ -52,17 +68,25 @@ def _csv_safe(value):
     return text
 
 
-# The home page's "see it for your segment" section: three use-case pages
-# curated per segment to match that segment's existing persona blurb above
-# it on the page (see main/index.html, "Who it is for"), not every page in
-# the family -- the full, generated list lives at /use-cases. Each page's
-# own title (loaded live, not copied here) is the link text, so this never
-# drifts from the page it points to.
+# The home page's "see it for your segment" section: use-case pages curated
+# per segment to match that segment's existing persona blurb above it on the
+# page (see main/index.html, "Who it is for"), not every page in the family
+# -- the full, generated list lives at /use-cases. Each page's own title
+# (loaded live, not copied here) is the link text, so this never drifts from
+# the page it points to.
+#
+# Every slug below must be a REWRITE-verdict page in the SEO/GEO audit (live,
+# ranking, not folded into another page) -- never a HOLD slug (not built yet)
+# or a MERGE slug (its own URL now 301s elsewhere): a curated "see it
+# answered" showcase should never be the dead end or extra redirect hop
+# those two verdicts exist to avoid. Startup founders and Operations leads
+# each only have two REWRITE use cases today, so those two groups list two,
+# not three -- a short, accurate list over padding it with a page that isn't
+# ready yet.
 _HOME_USE_CASE_HIGHLIGHTS = {
     "Startup founders": [
         "business-model-canvas-on-one-page",
-        "website-full-profile",
-        "show-investors-what-we-run",
+        "single-point-of-failure",
     ],
     "Scale-up CTOs": [
         "what-breaks-and-who-gets-called",
@@ -72,11 +96,10 @@ _HOME_USE_CASE_HIGHLIGHTS = {
     "Enterprise architects": [
         "import-archimate-model",
         "value-streams-at-risk",
-        "derivation-yield",
+        "architecture-review-board",
     ],
     "Operations leads": [
         "what-happens-if-a-supplier-fails",
-        "key-person-risk",
         "contract-renewals",
     ],
 }
@@ -217,26 +240,42 @@ def _notify_sales_of_inquiry(inquiry, page):
 @main.route("/offers/inquire", methods=["POST"])
 @rate_limit(10, "1m", methods=("POST",))
 def product_inquiry_submit():
-    """Submit an inquiry from one of the fixed-price offer pages.
+    """Submit an inquiry from one of the fixed-price offer pages, or a
+    "tell us you need this" enquiry from a HOLD-verdict (not built yet)
+    page's waiting-list box.
 
-    One route serves every offer page; hidden fields say which page and
-    family to reload. The offer identifier and the consent sentence shown
-    next to the checkbox both come from that page's own front-matter, so
+    One route serves both: hidden fields say which page and family to
+    reload. For an offer page (``cta: inquiry``) the offer identifier and
+    the consent sentence both come from that page's own front-matter, so
     what gets stored can never say something the visitor was not shown.
+    For a waiting-list page (``cta: waiting_list``) there is no per-page
+    front-matter for either -- PublicPage.feature_interest_offer and
+    FEATURE_INTEREST_CONSENT_TEXT supply the same two things generically,
+    one named offer per page so a second, different request from the same
+    address is never silently dropped as a duplicate (product_inquiries
+    has a UNIQUE(email, offer) constraint).
     """
     from flask import abort
 
     from app.models.product_inquiry import ProductInquiry
-    from app.services.public_pages import build_jsonld, load_page
+    from app.services.public_pages import (
+        FEATURE_INTEREST_CONSENT_TEXT,
+        build_jsonld,
+        load_page,
+    )
 
     page_family = request.form.get("family", "")
     page_slug = request.form.get("slug", "")
     page = load_page(page_family, slug=page_slug) if page_family and page_slug else None
-    if page is None or page.cta != "inquiry":
+    if page is None or page.cta not in ("inquiry", "waiting_list"):
         abort(404)
 
-    offer = page.front_matter.get("offer")
-    consent_text = page.front_matter.get("inquiry_consent_text")
+    if page.cta == "inquiry":
+        offer = page.front_matter.get("offer")
+        consent_text = page.front_matter.get("inquiry_consent_text")
+    else:
+        offer = page.feature_interest_offer
+        consent_text = FEATURE_INTEREST_CONSENT_TEXT
     submitted_offer = request.form.get("offer", "")
 
     thanks = False
@@ -389,12 +428,28 @@ def robots_txt():
     return send_from_directory("static", "robots.txt")
 
 
+def _indexable_pages():
+    """Every public content page, minus the pages the SEO/GEO audit holds
+    (not built yet -- stay reachable, noindex, but out of every crawler
+    file and nav listing) or merges into a parent (301 from the old URL,
+    so the old URL is not a second entry for the same content)."""
+    from app.services.public_pages import HELD_PAGE_URLS, MERGED_PAGES, load_all_pages
+
+    return [
+        p for p in load_all_pages()
+        if p.url not in MERGED_PAGES and p.url not in HELD_PAGE_URLS
+    ]
+
+
 @main.route("/sitemap.xml")
 def sitemap_xml():
-    """Serve sitemap.xml for SEO — generated from public content pages."""
-    from app.services.public_pages import load_all_pages
+    """Serve sitemap.xml for SEO — generated from public content pages.
 
-    pages = load_all_pages()
+    Excludes MERGE-verdict pages (301 elsewhere -- the old URL is not a
+    second entry for content that now lives at the target) and HOLD-verdict
+    pages (not built yet -- noindex, kept out of every crawler file until
+    they are)."""
+    pages = _indexable_pages()
     base_url = "https://entelim.org"
     urls = []
     # Homepage is not a content page but is the most important URL
@@ -421,16 +476,17 @@ def sitemap_xml():
 
 @main.route("/llms.txt")
 def llms_txt():
-    """Serve llms.txt listing every public content page with a Capabilities section."""
-    from app.services.public_pages import load_all_pages
-
-    pages = load_all_pages()
+    """Serve llms.txt listing every indexable public content page with a
+    Capabilities section. Held and merged pages are excluded, same as
+    sitemap.xml -- see _indexable_pages()."""
+    pages = _indexable_pages()
     base_url = "https://entelim.org"
     lines = ["# Entelim"]
     lines.append("")
     lines.append(
         "> Entelim is the open-source Enterprise Intelligence Model: "
-        "enter your website address and see your company."
+        "one ArchiMate model of what you run, what depends on it and who "
+        "owns it, that you can ask plain questions."
     )
     lines.append("")
 
@@ -456,16 +512,17 @@ def llms_txt():
 
 @main.route("/llms-full.txt")
 def llms_full_txt():
-    """Serve llms-full.txt with the full text of every public module, use-case and comparison page."""
-    from app.services.public_pages import load_all_pages
-
-    pages = load_all_pages()
+    """Serve llms-full.txt with the full text of every indexable public
+    module, use-case and comparison page. Held and merged pages are
+    excluded, same as sitemap.xml -- see _indexable_pages()."""
+    pages = _indexable_pages()
     base_url = "https://entelim.org"
     lines = ["# Entelim — Full Content"]
     lines.append("")
     lines.append(
         "> Entelim is the open-source Enterprise Intelligence Model: "
-        "enter your website address and see your company."
+        "one ArchiMate model of what you run, what depends on it and who "
+        "owns it, that you can ask plain questions."
     )
     lines.append("")
 
@@ -583,8 +640,16 @@ def _html_to_plain_text(html: str) -> str:
 
 @main.route("/vision")
 def public_vision():
-    """The vision / home narrative page."""
-    from app.services.public_pages import build_jsonld, load_page
+    """The vision / home narrative page.
+
+    MERGE verdict (SEO/GEO audit): /vision duplicates /about and the home
+    page, so it 301s to /about rather than rendering -- see MERGED_PAGES.
+    """
+    from app.services.public_pages import MERGED_PAGES, build_jsonld, load_page
+
+    merge_target = MERGED_PAGES.get("/vision")
+    if merge_target:
+        return redirect(merge_target, code=301)
 
     page = load_page("vision")
     if page is None:
@@ -595,8 +660,22 @@ def public_vision():
 
 @main.route("/modules/<slug>")
 def public_module(slug):
-    """A module content page."""
-    from app.services.public_pages import build_jsonld, get_page_screenshot, load_page
+    """A module content page.
+
+    MERGE-verdict modules (SEO/GEO audit) 301 to their parent page instead
+    of rendering, checked against MERGED_PAGES by this exact URL before
+    the file is even loaded -- see MERGED_PAGES.
+    """
+    from app.services.public_pages import (
+        MERGED_PAGES,
+        build_jsonld,
+        get_page_screenshot,
+        load_page,
+    )
+
+    merge_target = MERGED_PAGES.get(f"/modules/{slug}")
+    if merge_target:
+        return redirect(merge_target, code=301)
 
     page = load_page("module", slug=slug)
     if page is None:
@@ -618,10 +697,22 @@ _USE_CASE_SEGMENT_LABELS = {
 
 @main.route("/use-cases")
 def public_use_cases_index():
-    """The /use-cases index: every live use-case page, grouped by segment."""
-    from app.services.public_pages import load_all_pages
+    """The /use-cases index: every live use-case page, grouped by segment.
 
-    pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+    HOLD-verdict pages (SEO/GEO audit) are left out of this listing
+    entirely -- they stay reachable at their own URL, just not promoted
+    from here, same as every other nav/index listing. MERGE-verdict pages
+    are left out too: their own URL now 301s to a parent page, so listing
+    them here would just be an extra redirect hop for a nav link.
+    """
+    from app.services.public_pages import HELD_PAGE_URLS, MERGED_PAGES, load_all_pages
+
+    pages = [
+        p for p in load_all_pages()
+        if p.family == "function-per-segment"
+        and p.url not in HELD_PAGE_URLS
+        and p.url not in MERGED_PAGES
+    ]
 
     groups: dict[str, list] = {}
     for page in pages:
@@ -641,18 +732,24 @@ def public_use_cases_index():
 def public_use_case(slug):
     """A function-per-segment content page.
 
-    A slug that no longer resolves is checked against the family's old,
-    internal uc-sN-NN-* filename slugs before 404ing: some of those URLs are
-    already indexed, so a page that moved gets a real redirect, not a dead
-    link.
+    MERGE-verdict use cases (SEO/GEO audit) 301 to their parent page
+    instead of rendering -- see MERGED_PAGES. A slug that no longer
+    resolves is checked against the family's old, internal uc-sN-NN-*
+    filename slugs before 404ing: some of those URLs are already indexed,
+    so a page that moved gets a real redirect, not a dead link.
     """
     from app.services.public_pages import (
+        MERGED_PAGES,
         build_jsonld,
         get_page_recording,
         get_page_screenshot,
         load_page,
         use_case_redirect_target,
     )
+
+    merge_target = MERGED_PAGES.get(f"/use-cases/{slug}")
+    if merge_target:
+        return redirect(merge_target, code=301)
 
     page = load_page("function-per-segment", slug=slug)
     if page is None:
@@ -684,13 +781,13 @@ def public_comparison_hub():
     entries = [
         {
             "competitor": p.front_matter.get("competitor", p.title),
-            "real_url": p.canonical_url or f"{site_url}{p.url}",
+            "real_url": p.external_url or f"{site_url}{p.url}",
             # The entelim.org page itself, so a visitor who stays on this
             # site (and a crawler following only entelim.org links) can
             # still reach it even when real_url points at archiet.ai --
             # only shown when it differs from real_url, to avoid a second,
             # identical link.
-            "same_origin_url": p.url if p.canonical_url else None,
+            "same_origin_url": p.url if p.external_url else None,
         }
         for p in pages
     ]
