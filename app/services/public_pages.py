@@ -268,6 +268,7 @@ class PublicPage:
     front_matter: dict[str, Any] = field(default_factory=dict)
     source_path: Path | None = None
     canonical_url: str | None = None
+    description: str = ""
 
     @property
     def cta(self) -> str | None:
@@ -276,6 +277,16 @@ class PublicPage:
     @property
     def page_family(self) -> str:
         return self.front_matter.get("page_family", self.family)
+
+    @property
+    def effective_canonical_url(self) -> str:
+        """The canonical link every page must carry.
+
+        ``canonical_url`` (set only for a legacy archiet.ai url_slug, see
+        _build_canonical()) wins when present; every other page is
+        self-referencing -- its own current URL on this domain.
+        """
+        return self.canonical_url or (CANONICAL_BASE_URL + self.url)
 
 
 def _parse_front_matter(raw: str) -> tuple[dict[str, Any], str]:
@@ -313,6 +324,32 @@ def _build_canonical(front_matter: dict[str, Any]) -> str | None:
     if isinstance(url_slug, str) and url_slug.startswith("archiet.ai/"):
         return "https://" + url_slug
     return None
+
+
+# The one canonical host for every self-referencing canonical link and meta
+# description below -- same literal already used by sitemap_xml()/llms_txt()
+# in app/main/views.py, kept here too rather than introducing a second source
+# of truth for it.
+CANONICAL_BASE_URL = "https://entelim.org"
+
+
+def _derive_description(front_matter: dict[str, Any], title: str) -> str:
+    """A one-line meta description, always non-empty.
+
+    An explicit front-matter ``description:`` wins once a page sets one --
+    the content-writer standard's place to put a real, considered summary.
+    Until a page has one, this falls back to the page's own title rather
+    than excerpting body copy: body text was written to be read as an
+    article, not audited for standing alone, out of context, inside an HTML
+    attribute (one page's own reassurance that sales is "not on a waiting
+    list" is exactly the kind of sentence that reads fine as a paragraph and
+    badly as a six-word snippet). The title is always short, always exists,
+    and never says anything the page itself does not already say in <title>.
+    """
+    explicit = front_matter.get("description")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    return title
 
 
 def _use_case_slug_and_url(front_matter: dict[str, Any], filename_slug: str) -> tuple[str, str]:
@@ -455,6 +492,7 @@ def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     body_html = _sanitize_html(_md.reset().convert(body_md))
     title = _extract_title(body_html, front_matter)
     canonical = _build_canonical(front_matter)
+    description = _derive_description(front_matter, title)
     return PublicPage(
         family=family,
         slug=slug,
@@ -464,6 +502,7 @@ def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
         front_matter=front_matter,
         source_path=file_path,
         canonical_url=canonical,
+        description=description,
     )
 
 

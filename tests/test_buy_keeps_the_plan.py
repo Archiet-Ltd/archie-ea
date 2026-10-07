@@ -63,14 +63,19 @@ def _follow_to_billing(client, resp):
 
 
 def test_pricing_buttons_lead_to_registration_with_plan_and_interval(app, client):
+    """The registration URL below travels inside the click-tracking redirect's
+    "next" parameter (app/main/views.py::track_plan_click), so a click both
+    logs the plan and still keeps it through sign-up."""
     html = client.get("/pricing").get_data(as_text=True)
-    assert "/account/register?plan=startup&amp;interval=year" in html
-    assert "/account/register?plan=startup&amp;interval=month" in html
-    assert "/account/register?plan=team&amp;interval=year" in html
-    assert "/account/register?plan=team&amp;interval=month" in html
-    assert re.search(r'<a href="/contact"[^>]*data-testid="buy-enterprise"', html)
+    assert "/t/plan-click?plan=startup&amp;next=/account/register?plan%3Dstartup%26interval%3Dyear" in html
+    assert "/t/plan-click?plan=startup&amp;next=/account/register?plan%3Dstartup%26interval%3Dmonth" in html
+    assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dyear" in html
+    assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dmonth" in html
+    assert re.search(
+        r'<a href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
     # Start free carries no plan.
-    assert re.search(r'<a href="/account/register"[^>]*>Start free</a>', html)
+    assert re.search(
+        r'<a href="/t/plan-click\?plan=community&amp;next=/account/register"[^>]*>Start free</a>', html)
 
 
 @pytest.mark.parametrize("plan,interval", CHOICES)

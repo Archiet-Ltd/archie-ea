@@ -275,6 +275,11 @@ def product_inquiry_submit():
                 db.session.commit()
                 _notify_sales_of_inquiry(inquiry, page)
             thanks = True
+            from app.services.public_analytics_service import (
+                log_offer_enquiry_submitted,
+            )
+
+            log_offer_enquiry_submitted(offer)
 
     return render_template(
         "public/page.html",
@@ -417,6 +422,24 @@ def sitemap_xml():
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
     from flask import Response
     return Response(xml, mimetype="application/xml")
+
+
+@main.route("/<key>.txt")
+def indexnow_key_file(key):
+    """IndexNow domain-ownership proof: the configured key's own text file.
+
+    IndexNow (api.indexnow.org) proves ownership of a domain the same way
+    Google/Bing site verification already does elsewhere in this app: by
+    hosting a file at a path derived from the key, containing the key. 404s
+    unless INDEXNOW_API_KEY is set and *key* matches it exactly, so this
+    route does nothing beyond a normal 404 for every other "*.txt" request.
+    """
+    from flask import Response, abort
+
+    configured_key = (current_app.config.get("INDEXNOW_API_KEY") or "").strip()
+    if not configured_key or key != configured_key:
+        abort(404)
+    return Response(configured_key, mimetype="text/plain")
 
 
 @main.route("/llms.txt")
@@ -782,6 +805,27 @@ def public_signup_redirect():
 def public_register_redirect():
     """/register is not a second form — it redirects to the real sign-up page."""
     return redirect(url_for("account.register"), code=301)
+
+
+@main.route("/t/plan-click")
+def track_plan_click():
+    """Log a pricing-plan click, then send the visitor on to the real link.
+
+    The "Choose a plan" buttons on the pricing page and every module page
+    (app/templates/public/page.html) are plain GET links to registration
+    (carrying the chosen plan through sign-up, see app/services/buy_intent.py)
+    or to /contact -- there is no form submit and no JS beacon to hang the
+    event on, so this view is the event: it logs which plan was clicked and
+    redirects on to *next* (validated as a safe, site-relative path, same
+    rule the sign-in flow already uses for its own ?next=).
+    """
+    from app.services.public_analytics_service import log_pricing_plan_click
+    from app.utils.safe_redirect import safe_next_url
+
+    plan = (request.args.get("plan") or "")[:40]
+    dest = safe_next_url(request.args.get("next"), url_for("main.index"))
+    log_pricing_plan_click(plan)
+    return redirect(dest)
 
 
 # ============================================================================
