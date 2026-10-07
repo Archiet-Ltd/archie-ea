@@ -710,6 +710,22 @@ def public_comparison(slug):
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 
+@main.route("/vs/avolution")
+def vs_avolution_redirect():
+    """/vs/avolution and /vs/avolution-abacus covered the same comparison,
+    added separately by two uncoordinated changes. The merged page lives at
+    avolution-abacus; this old URL 301s there rather than 404ing."""
+    return redirect("/vs/avolution-abacus", code=301)
+
+
+@main.route("/vs/orbus")
+def vs_orbus_redirect():
+    """/vs/orbus and /vs/orbus-iserver covered the same comparison, added
+    separately by two uncoordinated changes. The merged page lives at
+    orbus-iserver; this old URL 301s there rather than 404ing."""
+    return redirect("/vs/orbus-iserver", code=301)
+
+
 @main.route("/how-archiet-runs-on-entelim")
 def public_dogfood():
     """The dogfood / proof story page."""

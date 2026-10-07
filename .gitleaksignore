@@ -1,0 +1,4 @@
+# Fake credentials seeded by the connector masking regression test (PR 413). They exist only so the test can prove
+# the API response never echoes a secret; none is a real key. Fingerprints: commit:file:rule:line.
+a7e65b340340b779bfe5c61372f467bddcba15f5:tests/test_connector_sync_mode_derivation.py:generic-api-key:329
+a7e65b340340b779bfe5c61372f467bddcba15f5:tests/test_connector_sync_mode_derivation.py:generic-api-key:383
