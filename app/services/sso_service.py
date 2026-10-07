@@ -420,9 +420,6 @@ class SSOService:
         Raises:
             :class:`SSONotConfiguredError` if email is missing from claims.
         """
-        from app import db
-        from app.models.user import User
-
         email = (userinfo.get("email") or "").strip().lower()
         if not email:
             raise SSONotConfiguredError("IdP did not provide an email claim")
@@ -446,48 +443,32 @@ class SSOService:
 
         sub = userinfo.get("sub", email)
 
-        user = User.query.filter_by(email=email).first()
-        if user is not None and org and user.organization_id != org.id:
-            # The email matched an existing user who belongs to a different
-            # organisation than the one whose SSO config produced this login.
+        # The lookup, the cross-organisation refusal and the creation live in
+        # the one provisioning service (R1-B26), shared with SCIM.
+        from app.services import provisioning_service
+
+        try:
+            user, _created, _changed = provisioning_service.create_or_update_user(
+                org.id if org else None,
+                {
+                    "email": email,
+                    "first_name": given_name or None,
+                    "last_name": family_name or None,
+                    "external_id": sub or None,
+                    "sso_provider": "oidc",
+                },
+                source=provisioning_service.SOURCE_SSO,
+            )
+        except provisioning_service.EmailInOtherOrganisation as exc:
             # email_domain on SSOConfig is operator-entered with no ownership
             # verification, so one organisation's admin can configure it to
-            # claim another organisation's real domain; without this check,
-            # a login through that config would silently attach to and take
-            # over the other organisation's existing user (updating their
-            # external_id/sso_provider) rather than being refused. Refuse
-            # rather than create a second account under the same email too,
-            # since email is the identity email/password sign-in already
-            # keys on elsewhere in this codebase.
+            # claim another organisation's real domain; a login through that
+            # config must be refused, never attached to the other
+            # organisation's existing user.
             raise SSONotConfiguredError(
                 "This email address belongs to a different organisation's "
                 "account and cannot sign in through this organisation's SSO."
-            )
-        if user is None:
-            user = User(
-                email=email,
-                first_name=given_name,
-                last_name=family_name,
-                confirmed=True,
-                sso_provider="oidc",
-                external_id=sub,
-            )
-            if org:
-                user.organization_id = org.id
-            db.session.add(user)
-        else:
-            # Update mutable IdP-owned fields
-            if given_name:
-                user.first_name = given_name
-            if family_name:
-                user.last_name = family_name
-            user.sso_provider = "oidc"
-            if sub:
-                user.external_id = sub
-            if org and not user.organization_id:
-                user.organization_id = org.id
-
-        db.session.commit()
+            ) from exc
         return user
 
     # ------------------------------------------------------------------
