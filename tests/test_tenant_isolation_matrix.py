@@ -104,6 +104,18 @@ INTENTIONALLY_GLOBAL = {
         "(llm_cost_tracker.py's _get_organization_spending, "
         "LLMService's decision-log query, TRNT-072)"
     ),
+    "ImportSessionLog": (
+        "organization_id is nullable (rows written before the column existed "
+        "stay valid, and the model's own comment says a row with no "
+        "organisation is never offered as a restore point); every real query "
+        "already adds an explicit organization_id filter "
+        "(import_restore_service.py's restore lookup, "
+        "import_snapshot_service.py's snapshot listing/creation, "
+        "import_sophisticated_routes.py's idempotency check) — adding "
+        "TenantMixin on top would need to decide how it treats those "
+        "existing nullable-org rows, which is its own deliberate change, "
+        "not something to fold into documenting the current state"
+    ),
 }
 
 

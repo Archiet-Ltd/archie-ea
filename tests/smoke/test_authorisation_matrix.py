@@ -41,8 +41,24 @@ DENIED = "denied"
 # covers it, which matters because the chat sees the whole portfolio.
 POLICY = {
     "/procurement/contracts":  {"procurement", "portfolio_manager"},
-    "/procurement/licenses":   {"procurement", "portfolio_manager"},
+    # R1-B36 (TB-0146): finance added via requires_procurement_or_finance --
+    # licences/spend are a finance persona's own numbers. Deliberately NOT
+    # extended to contracts/renewals/compliance below, which stay
+    # requires_procurement-only.
+    "/procurement/licenses":   {"procurement", "portfolio_manager", "finance"},
+    "/procurement/spend":      {"procurement", "portfolio_manager", "finance"},
     "/procurement/compliance": {"procurement", "portfolio_manager"},
+    # R1-B34 (TB-0135): viewing the register is @login_required only (every
+    # archetype can see a formula's active version); activating a new one
+    # is gated to portfolio_manager by @requires_role in
+    # app/modules/formula_register/routes.py. This row is the view page.
+    "/admin/formula-register/": set(ARCHETYPES),
+    # application_mgmt.compliance_frameworks_dashboard is @login_required only
+    # (RegulatoryFramework/ComplianceControl, a different store from the
+    # procurement compliance page above) -- every persona can reach it.
+    "/dashboard/compliance":   set(ARCHETYPES),
+    # risk.risk_register is @login_required only.
+    "/risks/":                 set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
@@ -74,10 +90,6 @@ POLICY = {
     # shows up as a row change, and a further widening (e.g. an
     # unauthenticated route) would also be visible.
     "/solutions/import/archimate": set(ARCHETYPES),
-    # Restore before a model import: lists the organisation's imports that can
-    # be undone. Gated to organisation administrators and enterprise
-    # architects; platform_admin is added to every row below.
-    "/architecture/import/oef/restore-points": {"enterprise_architect"},
     # Error telemetry (10 Sep 2026): cross-tenant by design -- an error is an
     # operational fact about the platform, not a per-org one -- so gated by
     # platform_admin_required rather than the ordinary admin_required.
@@ -88,6 +100,19 @@ POLICY = {
     # is refused -- inviting people into an organisation is not a persona's
     # job, it is its administrator's.
     "/admin/team":             set(),
+    # R1-B56: Agent Registry (owner/charter/delegated-limits per agent) is
+    # gated to platform_admin via @requires_role / _guard in
+    # agent_registry_routes.py -- registering and activating an agent is
+    # not a persona's job.
+    "/admin/agent-registry/":  set(),
+    # Agent oversight: pause/resume all agent writes, view refused-call log,
+    # and check classification status — all gated by org_admin, which no
+    # seeded archetype except platform_admin holds.
+    "/ai-chat/oversight/state":          set(),
+    "/ai-chat/oversight/refused-calls":  set(),
+    "/ai-chat/oversight/classification/status": set(),
+    # Tool catalogue export: gated by security_architect or platform_admin.
+    "/ai-chat/oversight/catalogue/export": {"security_architect"},
     # Billing: plan, checkout, limits, invoices. Gated by admin_required, which
     # no ordinary persona role carries; only the administrator can buy, change
     # or cancel the organisation's plan.
@@ -172,6 +197,10 @@ POLICY = {
     # persona reaches it from the sidebar footer. The state it shows is
     # platform-wide; the only thing a user changes is their own subscription.
     "/status":                 set(ARCHETYPES),
+    # Gap register: @login_required and no role gate on the
+    # implementation_planning blueprint, so every signed-in persona reaches
+    # it; the gaps it shows are fenced per organisation by Gap's TenantMixin.
+    "/implementation/gaps":    set(ARCHETYPES),
 }
 for _allowed in POLICY.values():
     _allowed.add("platform_admin")
@@ -179,6 +208,14 @@ for _allowed in POLICY.values():
 ACCOUNT_POST_POLICY = {
     "/account/switch-organization": set(ARCHETYPES),
 }
+
+OVERSIGHT_POST_POLICY = {
+    "/ai-chat/oversight/pause":  set(),
+    "/ai-chat/oversight/resume": set(),
+}
+
+for _allowed in OVERSIGHT_POST_POLICY.values():
+    _allowed.add("platform_admin")
 
 # The versioned Transformation Room collection is portfolio data.  These are
 # the persisted enterprise roles admitted by TransformationProgrammeService;
@@ -279,15 +316,6 @@ def transformation_users(seeded):
     recognises that persisted role as transformation authority, so those users
     cannot measure the enterprise-role matrix.  For these final API probes use
     the ordinary Architect primary role, then restore the shared seed exactly.
-
-    The platform_admin persona is deliberately excluded: it must keep the
-    Administrator role so that ``is_platform_admin()`` (which requires both the
-    ``is_platform_admin`` flag and ``Permission.ADMINISTER``) continues to
-    return True for other tests in the same module (restore gate, admin routes).
-    The transformation API's ``_server_roles`` reads ``user.is_platform_admin``
-    directly (not via ``is_platform_admin()``), so the platform_admin persona
-    still reaches the transformation endpoint with its Administrator role
-    intact.
     """
     from app import create_app, db
     from app.models.user import Role, User
@@ -674,6 +702,28 @@ def test_account_switch_organization_authorisation(
     )
 
 
+@pytest.mark.parametrize("path,allowed", OVERSIGHT_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_oversight_post_routes_authorisation(
+    archetype, path, allowed, page, live_server, seeded
+):
+    """Oversight POST routes (pause, resume) are gated by org_admin, which
+    no seeded archetype except platform_admin holds."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + path,
+        data={"reason": "Auth-matrix probe", "csrf_token": csrf},
+        max_redirects=0,
+    )
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = ALLOWED if response.status < 400 else DENIED
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
+    )
+
+
 @pytest.fixture(scope="module")
 def other_org_interface_initiative(seeded):
     """SDD §8.2 negative case: a TechnologyRoadmapInitiative rooted at an
@@ -909,6 +959,26 @@ def test_application_technology_links_refuse_a_read_only_account(
     assert _observe(page, live_server, path) == ALLOWED
     response = _post_technology_link(page, live_server, seeded["ids"]["application"])
     assert response.status == 403, "a Viewer wrote a technology link: %s" % response.status
+
+
+OVERSIGHT_CLASSIFICATION_PERMITTED = {
+    "platform_admin",
+}
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_oversight_classification_check_route_authorisation(
+    archetype, page, live_server, seeded
+):
+    """GET /ai-chat/oversight/classification/check/<tool_name> is gated by
+    org_admin, which no seeded archetype except platform_admin holds."""
+    _login(page, live_server, seeded["emails"][archetype])
+    path = "/ai-chat/oversight/classification/check/create_solution"
+    expected = ALLOWED if archetype in OVERSIGHT_CLASSIFICATION_PERMITTED else DENIED
+    actual = _observe(page, live_server, path)
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
+    )
 
 
 # Restore-before-an-import preview and confirm: enterprise_architect plus

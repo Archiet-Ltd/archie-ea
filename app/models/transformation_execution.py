@@ -175,7 +175,13 @@ class CommandMaterialisation(TenantMixin, db.Model):
 
 
 class OperationOutboxEvent(TenantMixin, db.Model):
-    """Append-only, at-least-once delivery payload with a deduplication ID."""
+    """Append-only, at-least-once delivery payload with a deduplication ID.
+
+    When ``operation_result_id`` is set this is a transformation-command event;
+    when ``entity_type`` and ``entity_id`` are set it is an entity-mutation event
+    produced by ``app/services/outbox.py``.  Both kinds are relayed into
+    ``event_log`` by the outbox-relay job.
+    """
 
     __tablename__ = "transformation_outbox_events"
 
@@ -183,9 +189,11 @@ class OperationOutboxEvent(TenantMixin, db.Model):
     operation_result_id = db.Column(
         db.Integer,
         db.ForeignKey("operation_results.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
+    entity_type = db.Column(db.String(80), nullable=True)
+    entity_id = db.Column(db.Integer, nullable=True)
     event_id = db.Column(db.String(36), nullable=False, unique=True)
     ordinal = db.Column(db.Integer, nullable=False)
     event_type = db.Column(db.String(160), nullable=False)

@@ -357,6 +357,14 @@ class Seeder:
         self.token = token
         self.shared_models = shared_models
         self.n = 0
+        # A seeded row's primary-key value, captured the moment it is flushed.
+        # A retry (tests/_isolation_sweep.py's _drive, well after the first
+        # commit and the session churn _request causes between requests) may
+        # call seed() again for a table already in ``context``; by then that
+        # row is expired and detached, and reading an attribute off it raises
+        # DetachedInstanceError. The id itself was already a plain value the
+        # moment it was flushed, so keep that instead of the row.
+        self.pks = {}
 
     def marker(self):
         self.n += 1
@@ -369,8 +377,8 @@ class Seeder:
             return self.org_id
         if ttable == "users":
             return self.user_id
-        if ttable in context:
-            return getattr(context[ttable], _attr_for(context[ttable], fk.column))
+        if ttable in self.pks:
+            return self.pks[ttable]
         target = table_models().get(ttable)
         if target is None or depth >= 3:
             if col.nullable:
@@ -379,12 +387,12 @@ class Seeder:
         if col.nullable and not tenant_owned(target, self.shared_models):
             return None
         try:
-            parent = self.seed(target, context, depth + 1)
+            self.seed(target, context, depth + 1)
         except Unseedable:
             if col.nullable:
                 return None
             raise
-        return getattr(parent, _attr_for(parent, fk.column))
+        return self.pks[target.__table__.name]
 
     def _value(self, col, marker, context, depth):
         import sqlalchemy as sa
@@ -476,6 +484,7 @@ class Seeder:
             first = (str(exc).splitlines() or [""])[0][:200]
             raise Unseedable("%s: %s" % (type(exc).__name__, first)) from exc
         context[table_name] = row
+        self.pks[table_name] = getattr(row, _attr_for(row, list(model.__table__.primary_key.columns)[0]))
         return row
 
 
@@ -798,15 +807,33 @@ def _drive(case, ctx, shared_models, param_models=None):
             if len(added) >= MAX_RETRY_FIELDS:
                 break
             if field.endswith("_id"):
-                # Seeding a fresh row mid-drive and committing it before the
-                # retried request measurably caused new DetachedInstanceErrors
-                # inside the view's own session on the routes this would have
-                # covered (verified against the full sweep before shipping) --
-                # not yet safe. Left unproven with the reason, per the same
-                # "cannot infer/build it" rule as a model that cannot be
-                # named at all, rather than risk it.
-                stop_reason = "seeding a row for %r during retry is not yet supported" % field
-                break
+                # A real row, not a bare number: a made-up id would just move
+                # the route from "unproven" to a false "not_refused" if it
+                # resolves to nothing, or a false LEAK if it collides with
+                # someone else's row. Resolved through the same codebase-wide
+                # param-name reading enumerate_cases uses for URL params
+                # (codebase_param_models), since a JSON field is named the
+                # same way the model it refers to is everywhere else. The
+                # earlier attempt at this read the seeded row's attribute
+                # straight off Seeder's ``context`` after the drive's first
+                # commit and several _request-driven session churns, by
+                # which point that row is expired and detached --
+                # DetachedInstanceError. Seeder now keeps each row's primary
+                # key as a plain value (``self.pks``) the moment it is
+                # flushed, so nothing here ever reads an attribute off a row
+                # that might have outlived its session.
+                model = (param_models or {}).get(field)
+                if model is None:
+                    stop_reason = "no model inferred for %r" % field
+                    break
+                try:
+                    seeder.seed(model, context)
+                except Unseedable as exc:
+                    stop_reason = "%s: %s" % (field, exc)
+                    break
+                kwargs["json"][field] = seeder.pks[model.__table__.name]
+                added.append(field)
+                continue
             kwargs["json"][field] = probe
             added.append(field)
         if stop_reason:
