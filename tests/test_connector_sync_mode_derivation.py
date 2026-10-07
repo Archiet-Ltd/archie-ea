@@ -399,10 +399,10 @@ class TestPublicConfigMasking:
             org.id,
             config={
                 "instance_url": "https://prod.service-now.com",
-                "password": "hunter2-super-secret",
-                "api_key": "sk-live-abcdef123456",
+                "password": "test-value-not-a-real-secret",  # gitleaks:allow
+                "api_key": "test-fixture-apikey-value",  # gitleaks:allow
                 "oauth": {
-                    "client_secret": "cs-nested-secret-value",
+                    "client_secret": "test-fixture-clientsecret-value",  # gitleaks:allow
                     "token_endpoint": "https://prod.service-now.com/oauth/token",
                 },
             },
@@ -419,7 +419,7 @@ class TestPublicConfigMasking:
         assert public["oauth"]["client_secret"] == "configured"
         assert public["oauth"]["token_endpoint"] == "configured"
         # The real config column is untouched -- public_config() returns a copy.
-        assert cfg.config["password"] == "hunter2-super-secret"
+        assert cfg.config["password"] == "test-value-not-a-real-secret"  # gitleaks:allow
 
     def test_public_config_sanitizes_non_webhook_urls_instead_of_masking(
         self, db_session, org
@@ -432,8 +432,8 @@ class TestPublicConfigMasking:
             org.id,
             config={
                 "instance_url": "https://prod.service-now.com",
-                "callback_url": "https://user:s3cr3tpass@api.example.com/callback",
-                "sync_endpoint_url": "https://api.example.com/sync?token=zzz999secrettoken",
+                "callback_url": "https://user:test-userinfo-value@api.example.com/callback",  # gitleaks:allow
+                "sync_endpoint_url": "https://api.example.com/sync?token=test-query-token-value",  # gitleaks:allow
             },
         )
 
@@ -453,7 +453,7 @@ class TestPublicConfigMasking:
             org.id,
             config={
                 "webhook_url": (
-                    "https://hooks.slack.com/services/T000/B000/"
+                    "https://hooks.example.invalid/services/T000/B000/"  # gitleaks:allow
                     "XXXXXXXXXXXXXXXXXXXXXXXX"
                 ),
             },
@@ -472,7 +472,7 @@ class TestPublicConfigMasking:
             org.id,
             webhook_config={
                 "url": "https://hooks.example.invalid/servicenow/T000/B000/XYZ",
-                "signing_secret": "whsec_real_secret_value",
+                "signing_secret": "test-fixture-signingsecret-value",  # gitleaks:allow
             },
         )
 
@@ -502,16 +502,16 @@ class TestApiGetConnectorNeverLeaksSecretValues:
         or in stringified form, so this searches the full raw response text
         for each secret value.
         """
-        secret_password = "hunter2-super-secret-value-9f3a"
-        secret_api_key = "sk-live-abcdef0123456789"
-        secret_nested_token = "nested-oauth-token-xyz-77213"
-        secret_webhook_signing = "whsec_do_not_leak_this_either"
+        secret_password = "test-fixture-password-value-9f3a"  # gitleaks:allow
+        secret_api_key = "test-fixture-apikey-value-0123456789"  # gitleaks:allow
+        secret_nested_token = "test-fixture-nested-token-value-77213"  # gitleaks:allow
+        secret_webhook_signing = "test-fixture-signingsecret-value-2"  # gitleaks:allow
         secret_slack_webhook_url = (
-            "https://hooks.slack.com/services/T0000AAAA/B1111BBBB/"
+            "https://hooks.example.invalid/services/T0000AAAA/B1111BBBB/"  # gitleaks:allow
             "cccccccccccccccccccccccc"
         )
-        secret_url_userinfo = "report-user:sup3r-s3cr3t-pw@"
-        secret_url_token_param = "token=qqq888zzz777querysecrettoken"
+        secret_url_userinfo = "test-user:test-userinfo-pw@"  # gitleaks:allow
+        secret_url_token_param = "token=test-query-token-fixture-value"  # gitleaks:allow
 
         cfg = _make_connector_config(
             db_session,
@@ -574,7 +574,7 @@ class TestApiGetConnectorNeverLeaksSecretValues:
         """api_list_connectors() doesn't currently serialise config at all,
         but prove it stays that way under a row with real secrets set --
         nothing about this route should ever leak them either."""
-        secret_password = "hunter2-list-route-secret-4471"
+        secret_password = "test-fixture-password-value-4471"  # gitleaks:allow
 
         _make_connector_config(
             db_session,
