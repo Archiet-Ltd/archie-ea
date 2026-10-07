@@ -17,6 +17,8 @@ import uuid
 from html.parser import HTMLParser
 from pathlib import Path
 
+from app.datetime_helpers import utcnow
+
 import pytest
 
 # Fixtures (app, db_session, make_org, client, login_as) come from this
@@ -150,14 +152,17 @@ def test_the_read_only_pages_are_the_only_routes_this_blueprint_serves(app):
         for rule in app.url_map.iter_rules()
         if rule.endpoint.startswith("intelligence_ui.")
     }
-    required = {
+    assert rules == {
         "/intelligence/ask": ["GET"],
         "/intelligence/twin-map": ["GET"],
+        "/intelligence/value-streams-at-risk": ["GET"],
         "/intelligence/traceability": ["GET"],
+        "/intelligence/history/as-of": ["GET"],
+        "/intelligence/history/changes": ["GET"],
+        "/intelligence/api/history/as-of": ["GET"],
+        "/intelligence/api/history/changes": ["GET"],
+        "/intelligence/api/history/element/<int:element_id>": ["GET"],
     }
-    optional = {"/intelligence/traceability": ["GET"]}
-    assert all(rules.get(path) == methods for path, methods in required.items())
-    assert set(rules) in (set(required), set(required) | set(optional))
     assert not [r for r in rules if r.startswith("/api/")]
 
 
@@ -292,7 +297,6 @@ def test_the_gate_reads_counts_taken_now_not_a_cached_empty_workspace(
     {"applications": 1, "elements": 0, "capabilities": 0, "vendors": 0},
     {"applications": 0, "elements": 5, "capabilities": 0, "vendors": 0},
     {"applications": 0, "elements": 0, "capabilities": 2, "vendors": 0},
-    {"applications": 0, "elements": 0, "capabilities": 0, "vendors": 3},
 ])
 def test_a_populated_workspace_shows_the_picker_and_no_setup_state(
     app, db_session, make_org, client, login_as, monkeypatch, path, counts
@@ -304,6 +308,20 @@ def test_a_populated_workspace_shows_the_picker_and_no_setup_state(
     html = _main_html(client.get(path).get_data(as_text=True))
     assert 'role="combobox"' in html
     assert "Nothing is modelled yet" not in html
+
+
+@pytest.mark.parametrize("path", PAGES)
+def test_global_vendor_counts_do_not_hide_the_empty_workspace_state(
+    app, db_session, make_org, client, login_as, monkeypatch, path
+):
+    _patch_counts(monkeypatch, {"applications": 0, "elements": 0, "capabilities": 0, "vendors": 3})
+    org = make_org("ui-vendors-only")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    html = _main_html(client.get(path).get_data(as_text=True))
+    text = _visible_text(html)
+    assert "Nothing is modelled yet" in text
+    assert 'role="combobox"' not in html
 
 
 @pytest.mark.parametrize("path", PAGES)
@@ -405,7 +423,9 @@ def test_names_come_only_from_the_impact_answers_element_map():
     # fix -- the L3/L5/L6 briefs each added a fetch URL to core.js (risk,
     # portfolio, programme) without updating it. Found while adding the L2
     # brief's own strategy URL; corrected to the real, current set rather
-    # than bumped by one on top of a stale base.
+    # than bumped by one on top of a stale base. L7 (Data lens) adds its
+    # own endpoint which now returns an elements map for name lookups.
+    # Compliance (under L6) adds its own endpoint the same way.
     urls = set(re.findall(r"'(/[a-z0-9_/.-]*)'", _scripts()["core.js"]))
     assert urls == {
         "/archimate/api/elements/search",
@@ -417,6 +437,8 @@ def test_names_come_only_from_the_impact_answers_element_map():
         "/api/v1/intelligence/strategy/",
         "/api/v1/intelligence/accountability/",
         "/api/v1/intelligence/derived/",
+        "/api/v1/intelligence/data/",
+        "/api/v1/intelligence/compliance/",
     }
 
 
@@ -461,17 +483,20 @@ def test_no_second_show_more_affordance_exists():
     for name, source in _scripts().items():
         assert not re.search(r"Show more|More questions", source, re.I), name
     # The only controls that carry aria-expanded: the one disclosure control,
-    # the combobox, the question card that opens the picker, and the button
-    # that collapses the Twin map's side panel.
+    # the combobox, the question card that opens the picker, the button
+    # that collapses the Twin map's side panel, and the Value streams at risk
+    # row toggle that opens one value stream's own capabilities.
     owners = {}
     for name, source in _templates().items():
         for tag in re.findall(r"<(?:button|input)[^>]*aria-expanded[^>]*>", source, re.S):
             key = ("full-detail" if "data-full-detail-toggle" in tag else
                    "combobox" if 'role="combobox"' in tag else
                    "question" if "ask-question-" in tag else
-                   "rail" if "twin-rail-toggle" in tag else "OTHER")
+                   "rail" if "twin-rail-toggle" in tag else
+                   "vsr-row" if "data-vsr-toggle" in tag else "OTHER")
             owners.setdefault(key, []).append(name)
-    assert set(owners) == {"full-detail", "combobox", "question", "rail"}, owners
+    assert set(owners) == {"full-detail", "combobox", "question", "rail", "vsr-row"}, owners
+    assert owners["vsr-row"] == ["_value_streams_at_risk_table.html"], owners
 
 
 def test_the_map_table_is_present_without_a_toggle():
@@ -629,8 +654,6 @@ def test_the_impact_answer_carries_the_names_and_derived_fields_the_pages_read(
     """The pages read four things from the impact answer and invent none of them:
     an element map whose entries hold exactly id, name, type and layer, and on a
     worked-out row its record id, engine version and sentence."""
-    import datetime
-
     from app.modules.intelligence.models.derived_relationship import DerivedRelationship
 
     org = make_org("ui-contract")
@@ -645,7 +668,7 @@ def test_the_impact_answer_carries_the_names_and_derived_fields_the_pages_read(
         derived_type="Serving", rule_id="serving-through-serving",
         chain=[first.id, second.id], chain_element_ids=[a.id, b.id, c.id], depth=2,
         confidence=0.82, provenance="derivation", engine_version="1.0",
-        computed_at=datetime.datetime.utcnow(), stale=False,
+        computed_at=utcnow(), stale=False,
     ))
     db_session.flush()
 

@@ -1,8 +1,12 @@
 {# smoke-coverage-ok: covered by tests/test_public_content_pages.py (32 tests, all page families, JSON-LD, sitemap, llms.txt)
+   and tests/test_module_screenshots.py (module/use-case screenshots and recordings)
    Template: public/page.html — Renders a single public content page.
    Extends layouts/public_base.html, reuses components/public_navbar.html and
    components/public_footer.html.
-   Receives a `page` object (PublicPage dataclass) and `jsonld` string.
+   Receives a `page` object (PublicPage dataclass), a `jsonld` string, and
+   optional `screenshot` / `recording` dicts (app/services/public_pages.py
+   get_page_screenshot()/get_page_recording()) -- absent (None) on every
+   route that doesn't pass them.
 #}
 {% extends 'layouts/public_base.html' %}
 {% block title %}{{ page.title }}{% endblock %}
@@ -41,16 +45,46 @@
   {% endif %}
 
   {% if jsonld %}
-  <script type="application/ld+json">{{ jsonld | safe }}</script>
+  <script type="application/ld+json">{{ jsonld }}</script>
   {% endif %}
 
   <article class="public-page-content prose max-w-none">
-    {{ page.body_html | safe }}
+    {{ page.body_html }}
   </article>
 
+  {% if screenshot %}
+  {# A real captured screen of this module/use case -- see
+     app/services/public_pages.py:get_page_screenshot(). Only ever set for a
+     capture_status: live page whose captured file exists on disk. #}
+  <figure class="mt-10" data-testid="page-screenshot">
+    <img src="{{ screenshot.url }}" alt="{{ screenshot.alt }}"
+         width="{{ screenshot.width }}" height="{{ screenshot.height }}"
+         loading="lazy" decoding="async"
+         class="w-full rounded-lg border border-border shadow-sm">
+    <figcaption class="mt-2 text-sm text-muted-foreground">{{ screenshot.caption }}</figcaption>
+  </figure>
+  {% endif %}
+
+  {% if recording %}
+  {# A short recording of a multi-step answer -- see
+     app/services/public_pages.py:get_page_recording(). Never autoplays: no
+     autoplay attribute, preload="none" so nothing fetches until the visitor
+     presses play. #}
+  <figure class="mt-10" data-testid="page-recording">
+    <video controls muted playsinline preload="none"
+           poster="{{ recording.poster_url }}" aria-label="{{ recording.alt }}"
+           width="{{ recording.width }}" height="{{ recording.height }}"
+           class="w-full rounded-lg border border-border shadow-sm">
+      <source src="{{ recording.video_url }}" type="video/webm">
+    </video>
+    <figcaption class="mt-2 text-sm text-muted-foreground">{{ recording.caption }}</figcaption>
+  </figure>
+  {% endif %}
+
   {% if page.cta == 'plans' %}
-  {# Buy buttons. Each opens the plan's checkout step on the billing page;
-     a visitor who is not signed in is asked to sign in first and lands there. #}
+  {# Buy buttons. A visitor who is not signed in goes to registration with the
+     plan and interval carried, and lands on that plan's checkout step on the
+     billing page afterwards (signing in instead leads to the same place). #}
   {% set _billing = 'billing.billing_index' in flask.current_app.view_functions %}
   {% set _btn = 'inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 transition-colors' %}
   <section aria-labelledby="buy-heading" class="mt-12 space-y-4" data-testid="pricing-buy">
@@ -60,16 +94,16 @@
       <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
         <p class="font-semibold text-foreground">Community</p>
         <p class="text-sm text-muted-foreground">Free, with no trial clock.</p>
-        <a href="/signup" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Start free</a>
+        <a href="{{ url_for('account.register') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Start free</a>
       </div>
       {% for key, name in [('startup', 'Startup'), ('team', 'Team')] %}
       <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
         <p class="font-semibold text-foreground">{{ name }}</p>
         {% if _billing %}
-        <a href="{{ url_for('billing.billing_index', plan=key, interval='year') }}#checkout"
+        <a href="{{ url_for('account.register', plan=key, interval='year') }}"
            class="{{ _btn }} mt-auto bg-primary text-primary-foreground hover:bg-primary/90"
            data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
-        <a href="{{ url_for('billing.billing_index', plan=key, interval='month') }}#checkout"
+        <a href="{{ url_for('account.register', plan=key, interval='month') }}"
            class="text-sm text-primary underline text-center">or pay monthly</a>
         {% else %}
         <a href="/contact" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Contact us to buy {{ name }}</a>
@@ -93,6 +127,45 @@
       Join the waiting list
     </a>
   </div>
+  {% endif %}
+
+  {% if page.cta == 'inquiry' %}
+  {# A single inquiry form, reused by every fixed-price offer page. The
+     offer id and the consent sentence both come from this page's own
+     front-matter (see app/main/views.py:product_inquiry_submit), so the
+     checkbox below always matches what gets stored. #}
+  <section aria-labelledby="inquiry-heading" class="mt-12 p-6 border border-border rounded-lg bg-card" data-testid="offer-inquiry">
+    <h2 id="inquiry-heading" class="text-2xl font-semibold text-foreground mb-2">Ask about this</h2>
+    {% if thanks %}
+    <p class="text-muted-foreground" data-testid="offer-inquiry-thanks">Thank you. We will be in touch to arrange next steps.</p>
+    {% else %}
+    {% if error %}
+    <p class="text-sm text-destructive mb-4" role="alert">{{ error }}</p>
+    {% endif %}
+    <form method="POST" action="{{ url_for('main.product_inquiry_submit') }}" class="space-y-4" data-testid="offer-inquiry-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="offer" value="{{ page.front_matter.get('offer', '') }}">
+      <input type="hidden" name="family" value="{{ page.family }}">
+      <input type="hidden" name="slug" value="{{ page.slug }}">
+      <div>
+        <label for="inquiry-email" class="block text-sm font-medium text-foreground mb-1">Email</label>
+        <input type="email" id="inquiry-email" name="email" required
+               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label for="inquiry-name" class="block text-sm font-medium text-foreground mb-1">Name (optional)</label>
+        <input type="text" id="inquiry-name" name="name"
+               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+      </div>
+      <p class="text-sm text-muted-foreground">{{ page.front_matter.get('offer_summary', "I'd like to talk about this.") }}</p>
+      <div class="flex items-start gap-2">
+        <input type="checkbox" id="inquiry-consent" name="consent" value="1" required class="mt-1">
+        <label for="inquiry-consent" class="text-sm text-muted-foreground">{{ page.front_matter.get('inquiry_consent_text', '') }}</label>
+      </div>
+      <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" data-testid="offer-inquiry-submit">Request this</button>
+    </form>
+    {% endif %}
+  </section>
   {% endif %}
 </div>
 

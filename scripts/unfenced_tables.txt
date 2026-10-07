@@ -17,8 +17,10 @@ adm_phases
 adm_stakeholder_concurrences
 adr_capability_links
 adr_process_links
+agent_charters
 agent_configurations
 agent_execution_history
+agent_run_records
 agent_schedules
 ai_audit_logs
 ai_chat_approval_audit_log
@@ -77,7 +79,6 @@ archimate_element_comments
 archimate_metamodel_violations
 archimate_patterns
 archimate_relationship_rules
-archimate_resources
 archimate_viewpoint_snapshots
 archimate_viewpoint_templates
 architecture_change_notices
@@ -89,7 +90,6 @@ architecture_relationships
 architecture_review_findings
 architecture_vision_documents
 artefact_share_links
-assessments
 audit_events
 audit_trail
 autogen_override
@@ -110,10 +110,8 @@ business_interactions
 capability_actor_raci
 capability_archimate_classifications
 capability_domain_definitions
-capability_framework_configuration
 capability_gap_dashboard
 capability_gap_details
-capability_health_overrides
 capability_investment_plans
 capability_level_definitions
 capability_maturity_level
@@ -193,7 +191,6 @@ document_analyses
 document_analysis_edits
 dod_checks
 dod_templates
-drivers
 duplicate_analyses
 duplicate_app_process_mapping
 duplicate_detection_runs
@@ -203,8 +200,6 @@ ea_workflow_definitions
 element_template_recommendations
 element_template_usage
 element_templates
-enterprise_architecture_frameworks
-enterprise_briefings
 enterprise_capabilities
 equipment
 error_events
@@ -213,11 +208,6 @@ experience_elements
 external_systems
 extraction_feedback
 feature_flags
-framework_configuration_templates
-framework_extensions
-framework_instances
-framework_migration_mappings
-framework_validation_rules
 frontend_configuration
 functional_requirement
 gap_analysis_recommendations
@@ -225,7 +215,6 @@ gap_remediation_reports
 gap_solution_options
 generation_event
 generation_pipelines
-goals
 governance_capability_links
 governance_system_links
 governance_workflows
@@ -238,10 +227,6 @@ import_audit_logs
 import_checkpoints
 import_history
 import_sessions
-industry_apqc_framework
-industry_apqc_process
-industry_frameworks
-industry_process_recommendation
 initiative_success_metrics
 integration_contracts
 integration_impact_registers
@@ -271,14 +256,10 @@ manufacturing_processes
 manufacturing_value_stream_stages
 manufacturing_value_streams
 mapping_metrics
-meanings
 migration_plan_documents
 milestones
 model_providers
-monitoring_alerts
-monitoring_baselines
 motivation_assessments
-motivation_bridge_links
 motivation_constraints
 motivation_drivers
 motivation_meanings
@@ -309,16 +290,15 @@ process_actor_raci
 process_application_mapping
 process_embeddings
 process_role_raci
+product_inquiries
 product_taxonomy
 production_lines
 production_orders
-programme_snapshots
 project_constraints
 project_notes
 project_resources
 published_api_specs
 quality_attributes
-quality_frameworks
 rag_metrics
 rag_queries
 rag_results
@@ -326,9 +306,6 @@ rationalization_audit_entries
 rationalization_benefits
 rationalization_policies
 refactoring_tracking
-reference_model
-reference_model_capability
-reference_model_import
 regulatory_frameworks
 relationship_suggestions
 replacement_plans
@@ -336,7 +313,6 @@ required_capabilities
 requirement_change_log
 requirement_dependencies
 requirement_template
-requirements
 requirements_traceability_matrices
 resources
 review_decisions
@@ -369,7 +345,6 @@ soc2_audit_log
 software_dependencies
 software_modules
 solution_adr_direct
-solution_adr_links
 solution_ai_backtesting
 solution_ai_reasoning_states
 solution_app_elements
@@ -396,7 +371,6 @@ solution_investment_phases
 solution_layer_elements
 solution_lessons_learned
 solution_migration_dependencies
-solution_migration_roadmaps
 solution_notifications
 solution_org_impacts
 solution_outcome_tracking
@@ -420,9 +394,6 @@ sso_configs
 staging_elements
 stakeholder_communications
 stakeholder_inputs
-stakeholders
-strategic_milestones
-strategic_recommendations
 strategy_resources
 structural_groupings
 structural_junctions
@@ -472,7 +443,6 @@ user_sessions
 users
 validation_gates
 validation_violations
-values
 vendor_archimate_templates
 vendor_capability_hierarchy
 vendor_comparison_criteria

@@ -167,7 +167,7 @@
 
                     <div class="mt-4 text-center text-sm text-muted-foreground">
                         Don't have an account?
-                        <a href="{{ url_for('account.register') }}" class="text-primary font-medium hover:underline">
+                        <a href="{{ url_for('account.register', plan=request.args.get('plan'), interval=request.args.get('interval')) if request.args.get('plan') else url_for('account.register') }}" class="text-primary font-medium hover:underline">
                             Register
                         </a>
                     </div>

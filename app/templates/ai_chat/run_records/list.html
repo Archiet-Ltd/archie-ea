@@ -1,0 +1,84 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}Agent Run Records{% endblock %}
+
+{% block content %}
+{{ page_shell(
+    title='Agent Run Records',
+    breadcrumb=[('Home', '/'), ('Agent Run Records', none)],
+    subtitle='Every agent invocation recorded with its persona, tools called, records read, and outcome.'
+) }}
+
+{% if records %}
+<div class="overflow-x-auto rounded-md border">
+    <table class="w-full text-sm">
+        <thead class="border-b bg-muted/50">
+            <tr>
+                <th class="px-4 py-3 text-left font-medium">ID</th>
+                <th class="px-4 py-3 text-left font-medium">Persona</th>
+                <th class="px-4 py-3 text-left font-medium">Domain</th>
+                <th class="px-4 py-3 text-left font-medium">Tools</th>
+                <th class="px-4 py-3 text-left font-medium">Outcome</th>
+                <th class="px-4 py-3 text-left font-medium">Created</th>
+                <th class="px-4 py-3 text-left font-medium"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for r in records %}
+            <tr class="hover:bg-muted/30">
+                <td class="px-4 py-3">{{ r.id }}</td>
+                <td class="px-4 py-3">{{ r.persona or '—' }}</td>
+                <td class="px-4 py-3">{{ r.domain or '—' }}</td>
+                <td class="px-4 py-3">
+                    {% if r.tools_called %}
+                        {{ r.tools_called|length }}
+                    {% else %}
+                        0
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                    {% if r.success %}
+                        <span class="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Success</span>
+                    {% else %}
+                        <span class="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">Error</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-muted-foreground">
+                    {{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '—' }}
+                </td>
+                <td class="px-4 py-3">
+                    <a href="{{ url_for('unified_ai_chat.run_record_detail', record_id=r.id) }}"
+                       class="text-primary hover:underline text-sm">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination and pagination.pages > 1 %}
+<div class="mt-4 flex items-center justify-between text-sm">
+    <span class="text-muted-foreground">
+        Page {{ pagination.page }} of {{ pagination.pages }}
+    </span>
+    <div class="flex gap-2">
+        {% if pagination.has_prev %}
+        <a href="{{ url_for('unified_ai_chat.run_record_list', page=pagination.prev_num) }}"
+           class="rounded-md border px-3 py-1 hover:bg-accent">Previous</a>
+        {% endif %}
+        {% if pagination.has_next %}
+        <a href="{{ url_for('unified_ai_chat.run_record_list', page=pagination.next_num) }}"
+           class="rounded-md border px-3 py-1 hover:bg-accent">Next</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="rounded-md border p-8 text-center text-muted-foreground">
+    No agent run records have been recorded yet.
+</div>
+{% endif %}
+
+{% endblock %}

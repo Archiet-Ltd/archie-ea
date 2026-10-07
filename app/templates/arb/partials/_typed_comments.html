@@ -1,0 +1,82 @@
+{#
+  Review discussion comments.
+
+  Comments are written by the existing arb.add_comment route (unchanged by
+  the typed consolidation) and now displayed through the same read model as
+  every other typed section — see ARBReadModel._comments. Oldest first, same
+  convention as _typed_history.html's event ledger.
+
+  Context: review (typed_arb_review_view mapping), decision_action_url's
+  sibling review id.
+#}
+{% from 'arb/partials/_typed_macros.html' import dash, ts %}
+{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% set _comments = review.comments or [] %}
+{% set _rid = (review.identity or {}).get('review_item_id') %}
+{% set _comment_types = ['general', 'concern', 'recommendation', 'condition', 'approval'] %}
+
+<section id="comments" aria-labelledby="comments-heading" class="mb-6">
+{% call card() %}
+    {% call card_header() %}
+        {% call card_title(class='text-lg') %}
+            <span id="comments-heading">Comments</span>
+        {% endcall %}
+    {% endcall %}
+    {% call card_content(class='space-y-4') %}
+    {% if _comments %}
+    <ol class="divide-y divide-border" role="list">
+        {% for comment in _comments %}
+        <li class="py-3 first:pt-0 last:pb-0">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <p class="text-sm font-medium text-foreground">
+                    {{ dash(comment.actor_display) }}
+                    <span class="ml-1 text-xs font-normal text-muted-foreground">({{ dash(comment.comment_type) }})</span>
+                </p>
+                <p class="text-xs text-muted-foreground">{{ ts(comment.created_at) }}</p>
+            </div>
+            <p class="mt-1 whitespace-pre-wrap break-words text-sm text-foreground">{{ dash(comment.content) }}</p>
+        </li>
+        {% endfor %}
+    </ol>
+    {% else %}
+    {# empty-state-ok: derived comment list, filled by the form directly below it #}
+    {{ empty_state(
+        icon='message-square',
+        title='No comments yet.',
+        description='Add a comment below to start the discussion on this review.'
+    ) }}
+    {% endif %}
+
+    {% if _rid %}
+    <form method="post" action="{{ url_for('arb.add_comment', id=_rid) }}" class="space-y-3 border-t border-border pt-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+            <label for="arb-comment-type" class="mb-1.5 block text-sm font-medium text-foreground">Comment type</label>
+            <select id="arb-comment-type" name="comment_type"
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:w-64">
+                {% for ct in _comment_types %}
+                <option value="{{ ct }}">{{ ct | replace('_', ' ') | capitalize }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="arb-comment-content" class="mb-1.5 block text-sm font-medium text-foreground">
+                Comment <span class="text-destructive" aria-hidden="true">*</span>
+            </label>
+            <textarea id="arb-comment-content" name="content" rows="3" required maxlength="4000"
+                      placeholder="Add your comment…"
+                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+        </div>
+        <div class="flex justify-end">
+            <button type="submit"
+                    class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                Add comment
+            </button>
+        </div>
+    </form>
+    {% endif %}
+    {% endcall %}
+{% endcall %}
+</section>

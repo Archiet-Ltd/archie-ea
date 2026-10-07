@@ -89,7 +89,12 @@ def _create_archimate_element(name, el_type, description=None, organization_id=N
 
 
 def _find_or_create_driver(sd, name, org_id=None):
-    existing = Driver.query.filter_by(name=name).first()
+    # Driver is tenant-scoped (TenantMixin). Without the organisation filter,
+    # two organisations' drivers of the same name (plausible for AI-generated
+    # names like "Cost reduction") collide: the second organisation's bridge
+    # silently reuses the first's driver and element instead of creating its
+    # own (refuter finding H1 on PR 317).
+    existing = Driver.query.filter_by(name=name, organization_id=org_id).first()
     if existing:
         return existing, False
 
@@ -102,6 +107,7 @@ def _find_or_create_driver(sd, name, org_id=None):
         driver_type=driver_type,
         source=sd.source,
         status="active",
+        organization_id=org_id,
     )
     db.session.add(driver)
     sync_archimate_element(driver)
@@ -110,7 +116,9 @@ def _find_or_create_driver(sd, name, org_id=None):
 
 
 def _find_or_create_goal(sg, name, org_id=None):
-    existing = Goal.query.filter_by(name=name).first()
+    # Goal is tenant-scoped (TenantMixin); same cross-organisation collision
+    # risk as the driver lookup above (refuter finding H1 on PR 317).
+    existing = Goal.query.filter_by(name=name, organization_id=org_id).first()
     if existing:
         return existing, False
 
@@ -141,6 +149,7 @@ def _find_or_create_goal(sg, name, org_id=None):
         measurable_metrics=json.dumps(sg.kpis) if getattr(sg, "kpis", None) else None,
         notes=sg.measurement_criteria,
         status="active",
+        organization_id=org_id,
     )
     db.session.add(goal)
     sync_archimate_element(goal)
@@ -149,7 +158,9 @@ def _find_or_create_goal(sg, name, org_id=None):
 
 
 def _find_or_create_outcome(so, name, org_id=None):
-    existing = Outcome.query.filter_by(name=name).first()
+    # Outcome is tenant-scoped (TenantMixin); same cross-organisation
+    # collision risk as the driver lookup above (refuter finding H1 on PR 317).
+    existing = Outcome.query.filter_by(name=name, organization_id=org_id).first()
     if existing:
         return existing, False
 
@@ -182,7 +193,9 @@ def _find_or_create_outcome(so, name, org_id=None):
 
 
 def _find_or_create_principle(sp, name, org_id=None):
-    existing = Principle.query.filter_by(name=name).first()
+    # Principle is tenant-scoped (TenantMixin); same cross-organisation
+    # collision risk as the driver lookup above (refuter finding H1 on PR 317).
+    existing = Principle.query.filter_by(name=name, organization_id=org_id).first()
     if existing:
         return existing, False
 
@@ -244,6 +257,7 @@ def _promote_one(element, sol_type, ent_type, solution, summary):
         enterprise_element_type=ent_type,
         enterprise_element_id=enterprise_obj.id,
         archimate_element_id=getattr(enterprise_obj, "archimate_element_id", None),
+        organization_id=solution.organization_id,
     )
     db.session.add(link)
     db.session.flush()
