@@ -1014,6 +1014,61 @@ SIDEBAR_ZONES: Dict[str, List[Dict]] = {
 }
 
 
+def persona_preview(persona: str, org_role: str) -> Dict:
+    """R1-B88: what someone invited as ``persona`` with ``org_role`` will see.
+
+    Built from the same SIDEBAR_ZONES the sidebar renders from, so the preview
+    cannot drift from what the invitee is shown. Links a person with this
+    organisation role could not open are left out. Raises ``ValueError`` for an
+    unknown persona or organisation role.
+    """
+    from app.models.org_role import VALID_ORG_ROLES
+    from app.models.user import ROLE_PLAIN_DESCRIPTIONS
+
+    if persona not in SIDEBAR_ZONES or persona not in ROLE_PLAIN_DESCRIPTIONS:
+        raise ValueError("Unknown persona '{}'.".format(persona))
+    if org_role not in VALID_ORG_ROLES:
+        raise ValueError("Unknown role '{}'.".format(org_role))
+
+    can_change = org_role in ("architect", "org_admin")
+    can_administer = org_role == "org_admin"
+
+    def _shown(link):
+        requires = link.get("requires")
+        if requires is None:
+            return True
+        if requires == "general":
+            return can_change
+        if requires == "admin":
+            return can_administer
+        return False
+
+    will_see = []
+    for zone in SIDEBAR_ZONES[persona]:
+        labels = [link["label"] for link in zone["links"] if _shown(link)]
+        if labels:
+            will_see.append({"zone": zone["title"], "links": labels})
+
+    if can_administer:
+        summary = (
+            "Can add and change records, and can manage the team and settings."
+        )
+    elif can_change:
+        summary = "Can add and change records, but cannot manage the team or settings."
+    else:
+        summary = "Can look at everything listed here but cannot change records."
+
+    return {
+        "persona": persona,
+        "display_name": get_role_display_name(persona),
+        "description": ROLE_PLAIN_DESCRIPTIONS[persona],
+        "will_see": will_see,
+        "can_change": can_change,
+        "can_administer": can_administer,
+        "summary": summary,
+    }
+
+
 def get_sidebar_zones(user) -> List[Dict]:
     """Resolve the current user's role and return their ordered sidebar zones.
 

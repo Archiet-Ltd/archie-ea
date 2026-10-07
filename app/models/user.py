@@ -92,6 +92,72 @@ ROLE_DISPLAY_NAMES = {
     ROLE_NON_TECHNICAL_OWNER: "Non-Technical Owner",
 }
 
+# R1-B88: what each persona is for, in plain words, shown to an administrator
+# before an invitation is sent. User-facing text: no jargon, one or two sentences.
+ROLE_PLAIN_DESCRIPTIONS = {
+    ROLE_SOLUTION_ARCHITECT: (
+        "Designs how a specific solution is put together and checks it against "
+        "the standards the organisation has set."
+    ),
+    ROLE_ENTERPRISE_ARCHITECT: (
+        "Looks after the overall shape of the organisation's applications, "
+        "capabilities and technology, and how they fit together."
+    ),
+    ROLE_BUSINESS_ARCHITECT: (
+        "Describes what the business does and how value flows through it, and "
+        "links that to the applications that support it."
+    ),
+    ROLE_ARB_MEMBER: (
+        "Reviews proposed changes for the architecture review board and records "
+        "the decision and any conditions."
+    ),
+    ROLE_PORTFOLIO_MANAGER: (
+        "Looks across all applications to decide which to keep, combine or "
+        "retire, and tracks the plan."
+    ),
+    ROLE_CTO: (
+        "Gets the technology picture for the whole organisation: health, risk, "
+        "cost and where the roadmap is heading."
+    ),
+    ROLE_PROCUREMENT: (
+        "Sees vendors, contracts and renewals, and what the organisation spends "
+        "with each supplier."
+    ),
+    ROLE_APPLICATION_MANAGER: (
+        "Looks after a set of applications day to day: owners, versions, health "
+        "and upcoming changes."
+    ),
+    ROLE_PLATFORM_ADMIN: "Runs the platform itself and every organisation on it.",
+    ROLE_SECURITY_ARCHITECT: (
+        "Checks how applications and data are protected, and follows up security "
+        "findings and policies."
+    ),
+    ROLE_DATA_ARCHITECT: (
+        "Describes what data the organisation holds, where it lives and how it "
+        "moves between applications."
+    ),
+    ROLE_FINANCE: (
+        "Sees what each application and contract costs and which renewals are "
+        "coming up. Does not change the architecture model."
+    ),
+    ROLE_COMPLIANCE: (
+        "Follows the rules the organisation must meet, which controls cover "
+        "which applications, and what is still open."
+    ),
+    ROLE_RISK: (
+        "Sees what could go wrong, how serious it is and who is looking after "
+        "each risk."
+    ),
+    ROLE_OPERATIONS: (
+        "Keeps an eye on how services are running: incidents, connections to "
+        "other systems and what needs attention today."
+    ),
+    ROLE_NON_TECHNICAL_OWNER: (
+        "Owns an application or a business capability without being an "
+        "architect. Sees the facts about what they own and what is asked of them."
+    ),
+}
+
 
 class Permission:
     GENERAL = 0x01

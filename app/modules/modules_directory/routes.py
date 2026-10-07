@@ -105,6 +105,9 @@ def _link_visible(endpoint: str, requires: str | None = None) -> bool:
 _MORE_TOOLS_REQUIRES = {
     "framework_config_ui.framework_config_dashboard": "platform_admin",
     "main.framework_management.dashboard": "platform_admin",
+    # R1-B88: opened from the Team page's header; administrators only.
+    "access_review.reviews": "admin",
+    "access_review.exports": "admin",
 }
 
 _MORE_TOOLS = [
@@ -201,6 +204,10 @@ _MORE_TOOLS = [
     # no persona zone owns it since it is the same page for every
     # organisation, so this directory is its one discoverability-test home.
     ("Service Status", "service_status.status_page", "activity"),
+    # R1-B88: reached from the Team page's header buttons; no sidebar link (the
+    # platform-admin sidebar is at its budget). Administrators only.
+    ("Access review", "access_review.reviews", "shield-check"),
+    ("Export activity", "access_review.exports", "download"),
 ]
 
 # Endpoints present in _MORE_TOOLS / SIDEBAR_ZONES that must never be rendered
