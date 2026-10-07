@@ -449,7 +449,7 @@ def _register_api_auth(app, csrf):
         from flask import jsonify, request
 
         from app.models import User
-        from app.services import session_registry
+        from app.services import mfa_service, session_registry
 
         data = request.get_json()
         if not data:
@@ -473,6 +473,22 @@ def _register_api_auth(app, csrf):
         ):
             return jsonify(
                 {"success": False, "error": "Invalid email or password"}
+            ), 401
+
+        # CRITICAL fix: an administrator with MFA required must never get a
+        # real session from a password alone. This endpoint is a pure JSON
+        # API with no API-based TOTP-code submission step (out of scope to
+        # add here), so the only safe behaviour is to refuse the login
+        # outright -- never call login_and_register -- and tell the caller
+        # why. Mirrors the gate app/modules/account/v2/routes/account_routes.py's
+        # login() already applies to the form-based login.
+        if mfa_service.required_for(user):
+            return jsonify(
+                {
+                    "success": False,
+                    "error": "mfa_required",
+                    "message": "This account requires multi-factor authentication, which this API endpoint does not support. Sign in through the web application instead.",
+                }
             ), 401
 
         # Fix Session Fixation: Regenerate session ID after successful authentication

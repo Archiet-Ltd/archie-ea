@@ -638,5 +638,5 @@ def sso_callback(provider):
         db.session.commit()
 
     session_registry.login_and_register(user)
-    audit_logger.log("sso_login", user_id=user.id, detail=f"provider={provider}")
+    audit_logger.log_authentication(success=True, method=f"sso:{provider}")
     return redirect(url_for("main.index"))

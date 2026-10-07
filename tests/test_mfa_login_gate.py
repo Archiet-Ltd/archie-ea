@@ -177,3 +177,79 @@ def test_mfa_challenge_with_no_pending_login_redirects_to_login(app):
     resp = client.get("/account/mfa-challenge", follow_redirects=False)
     assert resp.status_code in (302, 303)
     assert "/login" in resp.headers.get("Location", "")
+
+
+# ---------------------------------------------------------------------------
+# /api/auth/login: the same MFA gate, applied to the JSON API endpoint
+# (hot-fix for a complete MFA bypass -- this endpoint used to call
+# session_registry.login_and_register unconditionally after a correct
+# password, with no check at all for whether the user has MFA enabled).
+# ---------------------------------------------------------------------------
+
+
+def _api_login(client, email, password):
+    return client.post(
+        "/api/auth/login",
+        json={"email": email, "password": password},
+    )
+
+
+def test_api_login_refuses_an_mfa_enrolled_administrator(app, db_session, make_org):
+    secret = pyotp.random_base32()
+    org = make_org("api-mfa-gate-enrolled")
+    admin = _make_admin(db_session, org, mfa_enabled=True, mfa_secret=secret)
+
+    client = app.test_client()
+    resp = _api_login(client, admin.email, _PASSWORD)
+
+    assert resp.status_code == 401, resp.get_json()
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["error"] == "mfa_required"
+
+    # No real session was established: the session has no logged-in user id,
+    # and an authenticated-only route still refuses the follow-up request.
+    with client.session_transaction() as sess:
+        assert "_user_id" not in sess
+    dash = client.get("/dashboard/overview")
+    assert dash.status_code in (302, 401)
+
+
+def test_api_login_refuses_an_administrator_who_has_not_enrolled_mfa_either(
+    app, db_session, make_org
+):
+    """mfa_service.required_for() treats an unenrolled administrator the same
+    as an enrolled one -- MFA is required either way, and this API endpoint
+    cannot complete enrolment, so it must refuse rather than ever let an
+    unenrolled administrator through on a password alone."""
+    org = make_org("api-mfa-gate-unenrolled")
+    admin = _make_admin(db_session, org, mfa_enabled=False)
+
+    client = app.test_client()
+    resp = _api_login(client, admin.email, _PASSWORD)
+
+    assert resp.status_code == 401, resp.get_json()
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["error"] == "mfa_required"
+
+    with client.session_transaction() as sess:
+        assert "_user_id" not in sess
+    dash = client.get("/dashboard/overview")
+    assert dash.status_code in (302, 401)
+
+
+def test_api_login_still_succeeds_for_a_plain_user_no_regression(app, db_session, make_org):
+    org = make_org("api-mfa-gate-plain")
+    user = _make_plain_user(db_session, org)
+
+    client = app.test_client()
+    resp = _api_login(client, user.email, _PASSWORD)
+
+    assert resp.status_code == 200, resp.get_json()
+    body = resp.get_json()
+    assert body["success"] is True
+    assert body["user"]["email"] == user.email
+
+    with client.session_transaction() as sess:
+        assert sess.get("_user_id") == str(user.id)
