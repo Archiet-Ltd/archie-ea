@@ -6,14 +6,14 @@ This migration adds the organization_id column (nullable for legacy rows)
 to every table that does not already have it.
 
 Revision ID: 20261002_dd_tenancy
-Revises: 20261002_data_domain_org_unique
+Revises: 20261006_owner_element_ref
 Create Date: 2026-10-03
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261002_dd_tenancy"
-down_revision = "20261002_data_domain_org_unique"
+down_revision = "20261006_owner_element_ref"
 branch_labels = None
 depends_on = None
 
