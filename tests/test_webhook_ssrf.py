@@ -44,8 +44,9 @@ def _guards(app, _schema):
     install_guards(app)
 
 
-def _count():
-    return WebhookSubscription.query.count()
+def _count(org_id):
+    """One organisation's subscriptions (explicit filter: other sessions commit rows of their own)."""
+    return WebhookSubscription.query.filter_by(organization_id=org_id).count()
 
 
 @pytest.mark.parametrize("url", BAD_URLS)
@@ -55,13 +56,13 @@ def test_creating_a_subscription_with_a_refused_url_is_a_400_and_stores_nothing(
     install_dns(monkeypatch, DNS)
     user = make_org_user(db_session, make_org("ssrf"))
     login_as(client, user)
-    before = _count()
+    before = _count(user.organization_id)
     response = client.post("/api/webhooks/subscriptions", json={"url": url, "events": ["*"]})
     assert response.status_code == 400
     body = response.get_json()
     assert body["success"] is False and body["error"]
     login_as(client, user)
-    assert _count() == before
+    assert _count(user.organization_id) == before
 
 
 @pytest.mark.parametrize("url", BAD_URLS)
@@ -94,10 +95,10 @@ def test_the_service_raises_a_validation_error_for_a_refused_url(
     install_dns(monkeypatch, DNS)
     org = make_org("ssrf-svc")
     with tenant_ctx(org.id):
-        before = _count()
+        before = _count(org.id)
         with pytest.raises(WebhookValidationError):
             make_subscription(WebhookService(), org.id, url=url)
-        assert _count() == before
+        assert _count(org.id) == before
 
 
 def test_a_public_https_url_is_accepted(monkeypatch, tenant_ctx, make_org, db_session):

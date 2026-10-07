@@ -133,7 +133,7 @@ def test_nothing_is_stored_when_encryption_is_not_configured(
     service = WebhookService()
     with tenant_ctx(org.id):
         existing = make_subscription(service, org.id, secret="before")
-        before = WebhookSubscription.query.count()
+        before = WebhookSubscription.query.filter_by(organization_id=org.id).count()
         monkeypatch.setattr(
             "app.modules.codegen.services.credential_encryption.encrypt_credential", no_key
         )
@@ -141,7 +141,7 @@ def test_nothing_is_stored_when_encryption_is_not_configured(
             make_subscription(service, org.id)
         with pytest.raises(WebhookSecretUnavailable):
             service.rotate_secret(existing.id)
-        assert WebhookSubscription.query.count() == before
+        assert WebhookSubscription.query.filter_by(organization_id=org.id).count() == before
 
 
 def test_the_api_answers_503_when_encryption_is_not_configured(
@@ -171,7 +171,7 @@ def test_the_api_answers_503_when_encryption_is_not_configured(
     rotated = client.post(f"/api/webhooks/subscriptions/{existing_id}/rotate-secret")
     assert rotated.status_code == 503
     login_as(client, user)
-    assert WebhookSubscription.query.count() == 1
+    assert WebhookSubscription.query.filter_by(organization_id=org.id).count() == 1
 
 
 def test_the_secret_appears_once_in_the_api_and_nowhere_after(

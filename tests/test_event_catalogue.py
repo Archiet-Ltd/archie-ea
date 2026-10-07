@@ -280,7 +280,7 @@ def test_publish_with_a_bad_payload_answers_400_and_creates_nothing(
     assert body["event_type"] == "archimate_element.created"
     assert "action" in body["detail"]
     assert _outbox_count(org) == before
-    assert WebhookEvent.query.count() == 0
+    assert WebhookEvent.query.filter_by(organization_id=org.id).count() == 0
 
 
 def test_publish_with_an_unknown_type_answers_400(app, db_session, make_org, client, login_as):
@@ -312,4 +312,4 @@ def test_publish_with_a_good_payload_creates_one_outbox_row_for_the_callers_orga
     rows = OperationOutboxEvent.query.filter_by(event_type="archimate_element.updated").all()
     assert [r.organization_id for r in rows] == [org.id]
     assert OperationOutboxEvent.query.filter_by(organization_id=other.id).count() == 0
-    assert WebhookEvent.query.count() == 0
+    assert WebhookEvent.query.filter_by(organization_id=org.id).count() == 0
