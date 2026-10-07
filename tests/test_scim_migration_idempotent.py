@@ -26,7 +26,7 @@ from tests.test_schema_migrations import (
 )
 
 REVISION = "20261007_scim_provisioning"
-PREVIOUS = "20261006_owner_element_ref"
+PREVIOUS = "20261007_public_visitor_events"
 USER_COLUMNS = {"deactivated_at", "deactivation_reason", "provisioned_via"}
 
 
