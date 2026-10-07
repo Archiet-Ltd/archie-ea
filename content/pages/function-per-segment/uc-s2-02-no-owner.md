@@ -6,7 +6,7 @@ state: in_review
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: not_applicable_not_yet_built
 cta: waiting_list
-url_slug: /scale-up/no-owner
+url_slug: /use-cases/systems-with-no-owner
 ---
 
 # Which systems have no owner, and which owner is a single point of failure?
@@ -29,4 +29,4 @@ Coming soon. Join the waiting list and we'll tell you the day it ships.
 ## Related
 
 - [Org Chart & RACI](/modules/org-chart)
-- [What breaks if this service fails, and who gets called?](/scale-up/what-breaks-and-who-gets-called)
+- [What breaks if this service fails, and who gets called?](/use-cases/what-breaks-and-who-gets-called)

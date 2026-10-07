@@ -23,7 +23,7 @@ stays empty rather than showing a plausible-looking guess.
 
 ## Where you'll meet it
 
-- [Build the business case for the CIO from the model's own figures](/enterprise-architecture/business-case)
+- [Build the business case for the CIO from the model's own figures](/use-cases/business-case-for-the-cio)
 
 ## Related modules
 

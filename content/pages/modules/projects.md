@@ -24,7 +24,7 @@ on-budget.
 
 ## Where you'll meet it
 
-- [Is the programme on time and on budget?](/enterprise-architecture/programme-tracking)
+- [Is the programme on time and on budget?](/use-cases/programme-tracking)
 
 ## Related modules
 

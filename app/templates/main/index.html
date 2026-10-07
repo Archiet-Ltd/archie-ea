@@ -125,6 +125,38 @@
   </div>
 </section>
 
+<!-- See it for your segment: curated use cases, plus the comparison hub -->
+<section class="relative py-20 sm:py-32 bg-muted/30">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="text-center mb-16 space-y-4">
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+        See it answered for where you are.
+      </h2>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+      {% for group in use_case_highlights %}
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-3">{{ group.label }}</h3>
+        <ul class="space-y-2 text-sm">
+          {% for page in group.pages %}
+          <li><a href="{{ page.url }}" class="text-primary underline hover:no-underline">{{ page.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="text-center mt-10 space-y-3">
+      <p class="text-muted-foreground">
+        <a href="/use-cases" class="text-primary underline hover:no-underline">See every use case</a>
+        or
+        <a href="/vs" class="text-primary underline hover:no-underline">compare Entelim to other enterprise architecture tools</a>.
+      </p>
+    </div>
+  </div>
+</section>
+
 <!-- Open source and self-hosting -->
 <section class="relative py-20 sm:py-32 bg-muted/30">
   <div class="mx-auto max-w-4xl px-4 sm:px-6 text-center space-y-6">

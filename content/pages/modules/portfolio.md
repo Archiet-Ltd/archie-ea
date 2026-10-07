@@ -26,8 +26,8 @@ missing cost plainly rather than defaulting to zero.
 
 ## Where you'll meet it
 
-- [Which value streams are at risk?](/enterprise-architecture/value-streams-at-risk)
-- [Is the programme on time and on budget?](/enterprise-architecture/programme-tracking)
+- [Which value streams are at risk?](/use-cases/value-streams-at-risk)
+- [Is the programme on time and on budget?](/use-cases/programme-tracking)
 
 ## Related modules
 
