@@ -165,7 +165,7 @@ def populate_solution_from_template(solution_id):
 
         templates = RequirementTemplate.query.filter(
             RequirementTemplate.layer == layer_lower,
-            RequirementTemplate.is_active == True
+            RequirementTemplate.is_system == True
         ).limit(3).all()
 
         for tpl in templates:
@@ -176,13 +176,12 @@ def populate_solution_from_template(solution_id):
             req = SolutionRequirement(
                 solution_id=solution_id,
                 name=tpl.name,
-                description=tpl.description or '',
+                description=tpl.description_hint or '',
                 layer=tpl.layer,
                 template_id=tpl.id,
                 acceptance_criteria=tpl.ac_hint or '',
                 moscow_priority='SHOULD',
                 status='open',
-                created_by_id=current_user.id
             )
             db.session.add(req)
             sync_archimate_element(req)
@@ -720,8 +719,8 @@ def generate_requirement_test_cases(req_id):
         return jsonify({"error": "No acceptance criteria to generate tests from"}), 400
 
     layer = getattr(req, 'layer', None)
-    test_cases = _generate_layer_tests(req.requirement_name, req.acceptance_criteria, layer)
-    return jsonify({'test_cases': test_cases, 'requirement_id': req_id, 'layer': layer, 'test_type': _detect_test_type(layer, req.requirement_name)}), 200
+    test_cases = _generate_layer_tests(req.name, req.acceptance_criteria, layer)
+    return jsonify({'test_cases': test_cases, 'requirement_id': req_id, 'layer': layer, 'test_type': _detect_test_type(layer, req.name)}), 200
 
 
 @enterprise_api_bp.route("/requirements/<int:req_id>/dod", methods=["PATCH"])
@@ -3060,8 +3059,11 @@ def add_requirement_dependency(req_id):
 @login_required
 def remove_requirement_dependency(req_id, dep_id):
     """PRQ-001: Remove a dependency."""
-    from app.models.solution_architect_models import RequirementDependency
+    from app.models.solution_architect_models import RequirementDependency, SolutionRequirement
 
+    # A dependency carries no organisation of its own; its requirement does. Resolve
+    # it first, as adding a dependency already does.
+    SolutionRequirement.query.get_or_404(req_id)
     dep = RequirementDependency.query.filter_by(id=dep_id, req_id=req_id).first_or_404()
     db.session.delete(dep)
     db.session.commit()

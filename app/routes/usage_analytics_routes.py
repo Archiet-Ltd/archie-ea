@@ -20,6 +20,18 @@ def analytics_root():
     return redirect(url_for('usage_analytics.analytics_dashboard'))
 
 
+def _visible_events(query):
+    """Events carry user, session, route and metadata, so a user sees only their own; a platform
+    admin sees everyone's."""
+    from flask_login import current_user
+
+    from app.middleware.tenant_decorators import is_platform_admin
+
+    if is_platform_admin(current_user):
+        return query
+    return query.filter(UsageAnalytics.user_id == current_user.id)
+
+
 @usage_analytics_bp.route('/dashboard', methods=['GET'])
 @login_required
 def analytics_dashboard():
@@ -28,9 +40,9 @@ def analytics_dashboard():
     summary = UsageAnalytics.get_usage_summary()
 
     # Get recent events for timeline
-    recent_events = UsageAnalytics.query.order_by(
+    recent_events = _visible_events(UsageAnalytics.query.order_by(
         UsageAnalytics.timestamp.desc()
-    ).limit(100).all()
+    )).limit(100).all()
 
     return render_template(
         'usage_analytics/dashboard.html',
@@ -58,7 +70,7 @@ def api_usage_events():
     event_type = request.args.get('event_type')
     limit = safe_int_arg('limit', 100, minimum=1, maximum=500)
 
-    query = UsageAnalytics.query.order_by(UsageAnalytics.timestamp.desc())
+    query = _visible_events(UsageAnalytics.query.order_by(UsageAnalytics.timestamp.desc()))
 
     if feature_name:
         query = query.filter_by(feature_name=feature_name)

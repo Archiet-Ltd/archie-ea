@@ -1,13 +1,23 @@
 """
-PendingInvitation — invitation a user must accept before role is granted (COM-007).
+PendingInvitation — the one record of an invitation to join an organisation
+(COM-007, ADR 0008).
 
-An existing user invited to another organisation gets a pending row here instead
-of an immediate OrgRole. The row is removed on accept (OrgRole created) or
-decline (nothing granted).
+Every invitation an organisation has sent and nobody has taken up is a row
+here, whether the invitee already has an account or not. Nothing is granted
+while the row exists; it is removed when the invitation is accepted (the
+OrgRole is created), declined or withdrawn.
+
+The e-mailed link's secret is stored only as a SHA-256 digest
+(``token_hash``). Sending a new link replaces the digest, so only the newest
+link works, and taking an invitation up deletes the row in one conditional
+statement, so a link works once.
 """
 
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
 
 from app import db
@@ -17,6 +27,10 @@ from app.models.org_role import VALID_ORG_ROLES
 def _utcnow():
     """Naive UTC, matching how the other timestamp columns are stored."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def link_digest(raw_token):
+    return hashlib.sha256((raw_token or "").encode("utf-8")).hexdigest()
 
 
 class PendingInvitation(db.Model):  # migration-exempt
@@ -50,6 +64,16 @@ class PendingInvitation(db.Model):  # migration-exempt
     invited_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=_utcnow)
     expires_at = db.Column(db.DateTime, nullable=True)
+    # Digest of the secret in the newest e-mailed link; None when no link was sent.
+    token_hash = db.Column(db.String(64), nullable=True, index=True)
+    # What happened when that link was handed to the mail server:
+    # "sent" or "failed" (with the reason in delivery_error).
+    delivery_status = db.Column(db.String(20), nullable=True)
+    delivery_error = db.Column(db.String(255), nullable=True)
+    delivered_at = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship("User", foreign_keys=[user_id], lazy="joined")
+    inviter = db.relationship("User", foreign_keys=[invited_by], lazy="select")
 
     @property
     def effective_expiry(self):
@@ -64,6 +88,64 @@ class PendingInvitation(db.Model):  # migration-exempt
 
     def is_expired(self, now=None):
         return (now or _utcnow()) >= self.effective_expiry
+
+    @property
+    def state(self):
+        return "expired" if self.is_expired() else "pending"
+
+    def issue_link(self):
+        """Give this invitation a new link and return its secret.
+
+        The earlier link stops working, and the invitation runs for another
+        ``LIFETIME`` from now. The caller commits.
+        """
+        raw = secrets.token_urlsafe(32)
+        now = _utcnow()
+        self.token_hash = link_digest(raw)
+        self.created_at = now
+        self.expires_at = now + self.LIFETIME
+        self.delivery_status = None
+        self.delivery_error = None
+        self.delivered_at = None
+        db.session.flush()
+        return raw
+
+    def record_delivery(self, delivered, error=None):
+        self.delivery_status = "sent" if delivered else "failed"
+        self.delivery_error = None if delivered else (error or "")[:255]
+        self.delivered_at = _utcnow() if delivered else None
+
+    @classmethod
+    def find_by_link(cls, raw_token):
+        """The open invitation behind an e-mailed link, or None."""
+        if not raw_token:
+            return None
+        # tenant-scoping-ok: an anonymous link redemption has no organisation yet;
+        # the digest, which only the holder of the message can produce, scopes the read
+        row = cls.query.filter_by(token_hash=link_digest(raw_token)).first()
+        if row is None or row.is_expired():
+            return None
+        return row
+
+    @classmethod
+    def take_up(cls, raw_token):
+        """Remove the open invitation behind a link and return what it offered.
+
+        One conditional DELETE, so two submissions of the same link race
+        safely: exactly one of them gets the row. Returns a dict of the
+        row's organization_id, user_id, role and invited_by, or None.
+        """
+        if not raw_token:
+            return None
+        row = db.session.execute(
+            delete(cls)
+            .where(cls.token_hash == link_digest(raw_token), cls.expires_at > _utcnow())
+            .returning(cls.organization_id, cls.user_id, cls.role, cls.invited_by)
+            .execution_options(synchronize_session=False)
+        ).first()
+        if row is None:
+            return None
+        return dict(row._mapping)
 
     @classmethod
     def create_for(cls, org_id, user_id, role, invited_by_id=None):
@@ -88,6 +170,11 @@ class PendingInvitation(db.Model):  # migration-exempt
             existing.invited_by = invited_by_id
             existing.created_at = now
             existing.expires_at = now + cls.LIFETIME
+            # The expired invitation's link must not come back to life.
+            existing.token_hash = None
+            existing.delivery_status = None
+            existing.delivery_error = None
+            existing.delivered_at = None
             db.session.flush()
             return existing, True
         invitation = cls(

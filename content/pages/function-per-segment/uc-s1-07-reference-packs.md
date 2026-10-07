@@ -7,6 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 roadmap_citation: "roadmap-v2.md 'Next: December 2026 to February 2027' band — reference-pack adoption sits there (peer confirmation 2026-09-23), no finer quarter is published"
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
+url_slug: /use-cases/reference-packs
 ---
 
 # Pick the products you use and see what breaks if one fails, before typing anything
@@ -36,4 +37,4 @@ that question: fewer things to type, so Entelim has something to answer from day
 
 ## Related
 
-- [If our one cloud platform or payment provider goes down, what stops?](/startups/single-point-of-failure)
+- [If our one cloud platform or payment provider goes down, what stops?](/use-cases/single-point-of-failure)

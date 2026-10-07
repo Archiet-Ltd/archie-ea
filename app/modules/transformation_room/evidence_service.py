@@ -1745,9 +1745,10 @@ class TransformationEvidenceService:
         ]
         if unresolved and not corrected_to_agreement:
             raise CommandConflict("evidence_conflict_unresolved")
+        accepted_now = CommandService._database_now(session)
         request.status = "accepted"
         request.accepted_evidence_id = evidence.id
-        request.accepted_at = CommandService._database_now(session)
+        request.accepted_at = accepted_now
         request.revision += 1
         session.flush()
         response = {

@@ -155,6 +155,12 @@ class Config:
         "DERIVED_RECOMPUTE_INTERVAL_MINUTES", "10"
     )
 
+    # Per-organisation model-health drift scan — recurring interval,
+    # configurable downward. Default 60 minutes.
+    MODEL_HEALTH_SCAN_INTERVAL_MINUTES = os.environ.get(
+        "MODEL_HEALTH_SCAN_INTERVAL_MINUTES", "60"
+    )
+
     # Session security — 8-hour session lifetime, 30-day remember-me cookie
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
     # F-07: the 8 hours above is an ABSOLUTE cap; it is not an idle timeout and
@@ -208,16 +214,29 @@ class Config:
 
     # Email
     MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.sendgrid.net")
-    MAIL_PORT = os.environ.get("MAIL_PORT", 587)
-    MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", True)
-    MAIL_USE_SSL = os.environ.get("MAIL_USE_SSL", False)
+    # Parsed, not passed through: any non-empty string is truthy, so
+    # MAIL_USE_TLS=false used to switch STARTTLS on.
+    MAIL_PORT = _env_optional_positive_int("MAIL_PORT") or 587
+    MAIL_USE_TLS = _env_bool("MAIL_USE_TLS", True)
+    MAIL_USE_SSL = _env_bool("MAIL_USE_SSL", False)
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
+    # Seconds to wait on the SMTP server before an account message counts as
+    # not delivered; a hung relay must not hold a request open.
+    MAIL_TIMEOUT = _env_optional_positive_int("MAIL_TIMEOUT") or 15
+    # Who hears about a new sales enquiry from /offers/inquire (every offer
+    # page, including /contact). Unset means enquiries are still stored, just
+    # not emailed — see app/main/views.py:product_inquiry_submit.
+    SALES_NOTIFY_EMAIL = os.environ.get("SALES_NOTIFY_EMAIL")
 
     # Analytics
-    GOOGLE_ANALYTICS_ID = os.environ.get("GOOGLE_ANALYTICS_ID", "")
     SEGMENT_API_KEY = os.environ.get("SEGMENT_API_KEY", "")
+    # Public analytics (GA4, Clarity) and search verification — behind consent
+    GA4_MEASUREMENT_ID = os.environ.get("GA4_MEASUREMENT_ID", "")
+    CLARITY_PROJECT_ID = os.environ.get("CLARITY_PROJECT_ID", "")
+    GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "")
+    BING_SITE_VERIFICATION = os.environ.get("BING_SITE_VERIFICATION", "")
 
     # Admin account
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
@@ -265,8 +284,8 @@ class Config:
     # Stripe Billing (COM-001) — platform works without these; set in production .env
     STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
     STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
-    STRIPE_PRICE_PRO = os.environ.get("STRIPE_PRICE_PRO", "")
-    STRIPE_PRICE_ENTERPRISE = os.environ.get("STRIPE_PRICE_ENTERPRISE", "")
+    # Price ids are read from the environment by app/services/billing_plans.py
+    # (STRIPE_PRICE_{STARTUP,TEAM}_{MONTHLY,ANNUAL}); Enterprise is sold by contract.
 
     # Jira inbound webhook (TPM-008). POST /webhooks/jira is unauthenticated and
     # csrf-exempt by necessity, so this HMAC secret is its ONLY access control.
@@ -397,6 +416,10 @@ class Config:
     # flag is explicitly enabled.
     ARCHITECTURE_MONITORING_API_ENABLED = _env_bool("ARCHITECTURE_MONITORING_API_ENABLED", False)
 
+    # Data processing agreement, cookie, refund and commercial licence pages
+    # stay unpublished (404, unlinked) until their text is approved.
+    LEGAL_PAGES_ENABLED = _env_bool("LEGAL_PAGES_ENABLED", False)
+
     # File Upload Settings
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
     ALLOWED_EXTENSIONS = {
@@ -481,7 +504,20 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     TESTING = True
+    # Pinned explicitly rather than left to inherit Flask's own default, which
+    # falls back to the ambient FLASK_DEBUG/FLASK_ENV environment variables
+    # (get_debug_flag()) whenever a config class leaves DEBUG unset. A
+    # contributor's shell commonly exports FLASK_DEBUG=1 for convenient `flask
+    # run` use; without this, that ambient value silently flips
+    # app.debug/CSP to the permissive development policy under "testing" too,
+    # so tests/test_capability_map_cache_nonce_regression.py (which asserts a
+    # nonce'd CSP -- the production/testing policy) fails or passes depending
+    # on the operator's shell, not on the code.
+    DEBUG = False
     WTF_CSRF_ENABLED = False
+    # Flask-Mail records instead of sending under TESTING. A browser journey
+    # that reads the real message from a local SMTP sink turns this off.
+    MAIL_SUPPRESS_SEND = _env_bool("MAIL_SUPPRESS_SEND", True)
     TRANSFORMATION_COMMAND_CAPABILITY_SECRET = "74" * 32
     TRANSFORMATION_COMMAND_CAPABILITY_PREVIOUS_SECRETS = ""
 
@@ -560,6 +596,35 @@ class TestingConfig(Config):
             )
 
         print("THIS APP IS IN TESTING MODE. YOU SHOULD NOT SEE THIS IN PRODUCTION.")
+
+
+class SmokeTestingConfig(TestingConfig):
+    """Identical to ``TestingConfig`` except for one switch, used only to boot
+    the browser-smoke subprocess (``tests/smoke/conftest.py``'s
+    ``boot_live_server``, which sets ``FLASK_CONFIG=smoke``).
+
+    R1-B12 PR 2 (TB-0144/PB-0100) requires administrators to complete MFA on
+    every sign-in. Dozens of smoke-suite fixtures across 20+ files log in as
+    an admin archetype and expect to land straight in the app shell; making
+    each of them drive a real TOTP round trip through the browser is not
+    this fix. ``ADMIN_MFA_BYPASS`` lets ``app.services.mfa_service`` skip the
+    gate for exactly this harness, and nowhere else:
+
+    - It is a hardcoded class attribute, declared only here. It is never
+      read from an environment variable, a request, a header or a database
+      setting, and it is not set (so it is absent/falsy) on ``TestingConfig``
+      itself -- the ~2350-test non-browser pytest suite (``tests/conftest.py``'s
+      session-scoped ``app`` fixture) keeps exercising the real gate
+      unchanged.
+    - ``app/__init__.py``'s ``create_app()`` refuses to start if this switch
+      is ever true while ``TESTING`` is not also true, so a config class that
+      copies this attribute without also being a genuine testing config can
+      never boot.
+    - ``ProductionConfig`` (and every other non-testing config) never sets
+      this attribute at all.
+    """
+
+    ADMIN_MFA_BYPASS = True
 
 
 class ProductionConfig(Config):
@@ -776,6 +841,7 @@ class CurrencyConfig:
 config = {
     "development": DevelopmentConfig,
     "testing": TestingConfig,
+    "smoke": SmokeTestingConfig,
     "production": ProductionConfig,
     "default": DevelopmentConfig,
     "heroku": HerokuConfig,

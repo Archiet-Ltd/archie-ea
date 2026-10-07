@@ -80,21 +80,21 @@ def _write_audit(connection, action, table_label, record_id, old_value=None, new
     ``connection`` records the row in the same transaction as the mutation that
     triggered it.
     """
-    from app.models.audit_log import AuditLog
+    from app.models.audit_log import chain_insert
 
     user_id, org_id, ip, ua = _get_request_context()
-    connection.execute(
-        AuditLog.__table__.insert().values(
-            action=str(action)[:20],
-            table_name=table_label,
-            record_id=record_id,
-            old_value=old_value,
-            new_value=new_value,
-            user_id=user_id,
-            organization_id=org_id,
-            ip_address=ip,
-            user_agent=ua,
-        )
+    # Sealed into the organisation's integrity chain like every other entry.
+    chain_insert(
+        connection,
+        action=str(action)[:20],
+        table_name=table_label,
+        record_id=record_id,
+        old_value=old_value,
+        new_value=new_value,
+        user_id=user_id,
+        organization_id=org_id,
+        ip_address=ip,
+        user_agent=ua,
     )
 
 

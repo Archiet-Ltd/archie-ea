@@ -1,0 +1,223 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% block title %}{{ req.type_label }} request — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+{% set items = scope.get('items') or [] %}
+{% set review = (req.erasure_evidence_json or {}).get('review') %}
+{% set result = (req.erasure_evidence_json or {}).get('result') %}
+<div class="space-y-6">
+    {{ page_header(
+        title=req.type_label ~ ' request',
+        description='Recorded ' ~ (req.requested_at.strftime('%Y-%m-%d %H:%M') if req.requested_at else '—') ~ '. Status: ' ~ req.status ~ '.',
+        breadcrumbs=[
+            {'label': 'Home', 'href': url_for('main.index')},
+            {'label': 'Data Subject Requests', 'href': url_for('gdpr_bp.dsr_index')},
+            {'label': req.type_label ~ ' request'}
+        ]
+    ) }}
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="rounded-lg border border-border bg-card p-4">
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Subject</p>
+            <p class="text-sm font-semibold mt-1" data-testid="dsr-subject">
+                {% if subject %}{{ subject.email or 'Erased platform user' }}{% elif req.has_platform_account %}Erased platform user{% else %}{{ req.subject_reference or '—' }}{% endif %}
+            </p>
+        </div>
+        <div class="rounded-lg border border-border bg-card p-4">
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Systems and suppliers in scope</p>
+            <p class="text-2xl font-semibold mt-1" data-testid="dsr-scope-count">{{ items | length if req.scope_json else '—' }}</p>
+        </div>
+        <div class="rounded-lg border border-border bg-card p-4">
+            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Searches done</p>
+            <p class="text-2xl font-semibold mt-1" data-testid="dsr-done-count">{{ items | selectattr('status', 'equalto', 'done') | list | length if req.scope_json else '—' }}</p>
+        </div>
+    </div>
+
+    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="dsr-scope">
+        <div class="p-4 border-b border-border bg-muted/30">
+            <h2 class="text-lg font-semibold">Where to search</h2>
+            <p class="text-xs text-muted-foreground mt-1">Each system is listed because a personal-data category's data object is recorded as used by it; each supplier because it is recorded against one of those systems.</p>
+        </div>
+        {% if items %}
+        <ul class="divide-y divide-border">
+            {% for item in items %}
+            <li class="px-4 py-3 space-y-2" data-testid="dsr-item-{{ loop.index }}" data-key="{{ item.key }}">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <span class="text-xs rounded-full border border-border px-2 py-0.5 text-muted-foreground">{{ 'System' if item.kind == 'system' else 'Supplier' }}</span>
+                        <span class="font-medium ml-1" data-testid="dsr-item-name">{{ item.name }}</span>
+                        {% if item.kind == 'system' %}
+                        <span class="text-xs text-muted-foreground ml-2">Recorded owner: {{ item.recorded_owner or '—' }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-sm" data-testid="dsr-item-status">
+                        {% if item.status == 'done' %}Search done{% else %}Open{% endif %}
+                        {% if item.assignee_id %} · assigned to <span data-testid="dsr-item-assignee">{{ people_by_id[item.assignee_id].email if item.assignee_id in people_by_id else '—' }}</span>{% endif %}
+                    </div>
+                </div>
+                <ul class="text-xs text-muted-foreground space-y-0.5">
+                    {% for hop in item.via %}
+                    <li>
+                        {% if item.kind == 'system' %}
+                        {{ hop.path | join(' → ') }}{% if hop.relationship %} ({{ hop.relationship }}){% endif %}
+                        {% else %}
+                        {{ hop.system }} → {{ item.name }} ({{ hop.link }})
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if item.status != 'done' %}
+                <div class="flex flex-wrap gap-3">
+                    <form method="POST" action="{{ url_for('gdpr_bp.dsr_assign', request_id=req.id) }}" class="flex items-center gap-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="key" value="{{ item.key }}">
+                        <label for="assignee-{{ loop.index }}" class="sr-only">Search owner for {{ item.name }}</label>
+                        <select id="assignee-{{ loop.index }}" name="assignee_id" required data-testid="dsr-assignee-{{ loop.index }}"
+                            class="flex h-8 rounded-md border border-input bg-transparent px-2 text-xs">
+                            <option value="" selected disabled>Search owner…</option>
+                            {% for p in people %}
+                            <option value="{{ p.id }}" {% if p.id == item.assignee_id %}selected{% endif %}>{{ p.email }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" data-testid="dsr-assign-{{ loop.index }}"
+                            class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input hover:bg-muted h-8 px-3">
+                            Assign
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('gdpr_bp.dsr_complete', request_id=req.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="key" value="{{ item.key }}">
+                        <button type="submit" data-testid="dsr-complete-{{ loop.index }}"
+                            class="inline-flex items-center justify-center rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3">
+                            Mark search done
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        {{ empty_state(
+            icon='search',
+            title='No system is recorded as holding this personal data',
+            description='Link the personal-data categories to the applications that use them in the model, then record the request again.',
+            cta_text=None
+        ) }}
+        {% endif %}
+        {% if scope.get('unlinked_categories') %}
+        <div class="px-4 py-3 border-t border-border text-xs text-muted-foreground" data-testid="dsr-unlinked">
+            Categories with no recorded system: {{ scope.get('unlinked_categories') | map(attribute='name') | join(', ') }}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if req.canonical_type == 'access' and req.has_platform_account %}
+    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="dsr-access">
+        <div class="p-4 border-b border-border bg-muted/30">
+            <h2 class="text-lg font-semibold">Data this platform holds</h2>
+            <p class="text-xs text-muted-foreground mt-1">Download the subject's profile, AI chat history and uploaded document list.</p>
+        </div>
+        <div class="p-4 text-sm">
+            {% if scope.get('access_fulfilled_at') %}
+            <p data-testid="dsr-access-fulfilled">Provided {{ scope.get('access_fulfilled_at') }}.</p>
+            {% endif %}
+            <form method="POST" action="{{ url_for('gdpr_bp.dsr_access', request_id=req.id) }}" class="mt-2">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" data-testid="dsr-access-run"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4">
+                    Download the subject's data
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if req.canonical_type == 'erasure' and req.has_platform_account %}
+    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="dsr-erasure">
+        <div class="p-4 border-b border-border bg-muted/30">
+            <h2 class="text-lg font-semibold">Erase data this platform holds</h2>
+            <p class="text-xs text-muted-foreground mt-1">Review what will be removed, then run the erasure. It removes the person's name, e-mail address and sign-in credentials, their AI chat history and the documents they uploaded, and signs them out everywhere. It cannot be undone.</p>
+        </div>
+        <div class="p-4 text-sm space-y-3">
+            {% if result %}
+            <p class="font-medium" data-testid="dsr-erasure-done">Erased {{ result.removed_at }}.</p>
+            {% elif preview %}
+            <dl class="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="dsr-erasure-preview">
+                <div><dt class="text-xs text-muted-foreground">Fields</dt><dd>{{ preview.fields | join(', ') if preview.fields else '—' }}</dd></div>
+                <div><dt class="text-xs text-muted-foreground">Chat conversations</dt><dd>{{ preview.conversation_threads }} ({{ preview.conversation_messages }} messages)</dd></div>
+                <div><dt class="text-xs text-muted-foreground">Uploaded documents</dt><dd>{{ preview.uploaded_documents }}</dd></div>
+            </dl>
+            {% if not review %}
+            <form method="POST" action="{{ url_for('gdpr_bp.dsr_erasure_review', request_id=req.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" data-testid="dsr-erasure-review"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input hover:bg-muted h-9 px-4">
+                    I have reviewed what will be removed
+                </button>
+            </form>
+            {% else %}
+            <p class="text-xs text-muted-foreground" data-testid="dsr-erasure-reviewed">Reviewed {{ review.reviewed_at }}.</p>
+            <form method="POST" action="{{ url_for('gdpr_bp.dsr_erasure_run', request_id=req.id) }}" class="space-y-2">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label class="inline-flex items-center gap-2">
+                    <input type="checkbox" name="confirm" value="erase" required data-testid="dsr-erasure-confirm" class="rounded border-input">
+                    Erase this person's data now
+                </label>
+                <div>
+                    <button type="submit" data-testid="dsr-erasure-run"
+                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4">
+                        Run erasure
+                    </button>
+                </div>
+            </form>
+            {% endif %}
+            {% else %}
+            <p class="text-muted-foreground">This person is no longer in your organisation.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="dsr-evidence">
+        <div class="p-4 border-b border-border bg-muted/30">
+            <h2 class="text-lg font-semibold">Evidence</h2>
+            <p class="text-xs text-muted-foreground mt-1">Entries in the organisation's audit trail for this request.</p>
+        </div>
+        {% if evidence %}
+        <ul class="divide-y divide-border">
+            {% for e in evidence %}
+            <li class="px-4 py-3 text-sm" data-testid="dsr-evidence-{{ e.action }}">
+                <span class="font-medium">
+                    {% if e.action == 'dsr_scoped' %}Scoped
+                    {% elif e.action == 'dsr_assigned' %}Search assigned
+                    {% elif e.action == 'dsr_search_done' %}Search done
+                    {% elif e.action == 'gdpr_access' %}Data provided
+                    {% elif e.action == 'dsr_erasure_review' %}Erasure reviewed
+                    {% elif e.action == 'gdpr_delete' %}Erasure run
+                    {% else %}{{ e.action }}{% endif %}
+                </span>
+                <span class="text-muted-foreground"> · {{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') if e.created_at else '—' }} · {{ people_by_id[e.user_id].email if e.user_id in people_by_id else '—' }}</span>
+                {% set nv = e.new_value or {} %}
+                {% if e.action == 'gdpr_delete' %}
+                <p class="text-xs text-muted-foreground mt-1">
+                    Fields cleared: {{ nv.get('fields_cleared') | join(', ') if nv.get('fields_cleared') else '—' }};
+                    chat conversations deleted: {{ nv.get('conversation_threads_deleted', '—') }} ({{ nv.get('conversation_messages_deleted', '—') }} messages);
+                    uploaded documents deleted: {{ nv.get('uploaded_documents_deleted', '—') }};
+                    signed out everywhere: {{ 'yes' if nv.get('sessions_revoked') else 'no' }}.
+                </p>
+                {% elif nv.get('item') %}
+                <p class="text-xs text-muted-foreground mt-1">{{ nv.get('item') }}</p>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="px-4 py-6 text-sm text-muted-foreground">—</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

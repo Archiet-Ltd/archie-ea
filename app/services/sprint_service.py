@@ -26,9 +26,30 @@ def get_sprints(board_id: int) -> list:
     return Sprint.query.filter_by(board_id=board_id).order_by(Sprint.id).all()
 
 
+def get_sprint_or_404(sprint_id: int) -> Sprint:
+    """The sprint, only when its board belongs to the caller's organisation.
+
+    A sprint carries no organisation column; its kanban board does. The inner join
+    lets the automatic tenant filter on ``KanbanBoard`` decide, so another
+    organisation's sprint id is a 404 rather than its data.
+    """
+    from flask import abort
+
+    from app.models.adm_kanban import KanbanBoard
+
+    sprint = (
+        Sprint.query.join(KanbanBoard, Sprint.board_id == KanbanBoard.id)
+        .filter(Sprint.id == sprint_id)
+        .first()
+    )
+    if sprint is None:
+        abort(404)
+    return sprint
+
+
 def update_sprint_status(sprint_id: int, status: str) -> Sprint:
     """Transition sprint to a new status."""
-    sprint = Sprint.query.get_or_404(sprint_id)
+    sprint = get_sprint_or_404(sprint_id)
     sprint.status = SprintStatus(status)
     db.session.commit()
     return sprint
@@ -40,7 +61,7 @@ def assign_card_to_sprint(sprint_id: int, card_ref: str) -> Sprint:
     In this implementation the sprint goal is annotated with the card reference.
     A full implementation would use a junction table; this satisfies the API contract.
     """
-    sprint = Sprint.query.get_or_404(sprint_id)
+    sprint = get_sprint_or_404(sprint_id)
     tag = f"[card:{card_ref}]"
     if sprint.goal:
         if tag not in sprint.goal:

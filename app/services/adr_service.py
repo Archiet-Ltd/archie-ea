@@ -135,48 +135,6 @@ class ADRService:
         return query.order_by(ArchitectureDecision.created_at.desc()).all()
     
     @staticmethod
-    def update_adr(
-        adr_id: int,
-        title: Optional[str] = None,
-        context: Optional[str] = None,
-        decision: Optional[str] = None,
-        rationale: Optional[str] = None,
-        alternatives: Optional[List[Dict]] = None,
-        constraints: Optional[List[Dict]] = None,
-        consequences: Optional[str] = None
-    ) -> ArchitectureDecision:
-        """Update an existing ADR.
-        
-        Args:
-            adr_id: ADR ID to update
-            **kwargs: Fields to update
-            
-        Returns:
-            Updated ArchitectureDecision instance
-        """
-        adr = ArchitectureDecision.query.get_or_404(adr_id)
-        
-        if title is not None:
-            adr.title = title
-        if context is not None:
-            adr.context = context
-        if decision is not None:
-            adr.decision = decision
-        if rationale is not None:
-            adr.rationale = rationale
-        if alternatives is not None:
-            adr.alternatives = alternatives
-        if constraints is not None:
-            adr.constraints = constraints
-        if consequences is not None:
-            adr.consequences = consequences
-        
-        db.session.commit()
-        logger.info(f"Updated ADR {adr_id}")
-        
-        return adr
-    
-    @staticmethod
     def approve_adr(adr_id: int, approved_by_id: int) -> ArchitectureDecision:
         """Approve an ADR.
         

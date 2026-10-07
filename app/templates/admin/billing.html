@@ -1,23 +1,26 @@
 {% extends 'layouts/admin_base.html' %}
-{% block title %}Billing & Subscription{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% block title %}Billing & plan{% endblock %}
+{% from 'macros/page_shell.html' import page_shell, empty_state, section_card %}
+
+{% set btn_primary = 'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 transition-colors disabled:opacity-50 disabled:pointer-events-none' %}
+{% set btn_outline = 'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 transition-colors disabled:opacity-50 disabled:pointer-events-none' %}
+{% set btn_destructive = 'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4 py-2 transition-colors disabled:opacity-50 disabled:pointer-events-none' %}
+{% set input_cls = 'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50' %}
 
 {% block content %}
-<div class="space-y-6">
-    {{ page_header(
-        title='Billing & Subscription',
-        description='Manage your organisation plan, seats, and payment details.',
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Billing'}
-        ]
+<div class="space-y-6" data-testid="billing-page">
+    {{ page_shell(
+        title='Billing & plan',
+        subtitle='Your organisation\'s plan, its limits, payment and invoices.',
+        breadcrumb=[('Admin', url_for('admin.index')), ('Billing', None)],
+        icon='credit-card'
     ) }}
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            <div class="space-y-2">
+            <div class="space-y-2" role="status">
                 {% for category, message in messages %}
-                    <div class="rounded-md border p-4 {% if category == 'success' %}bg-success/5 border-success/20 text-success-emphasis{% elif category == 'error' %}bg-destructive/5 border-destructive/20 text-destructive-emphasis{% else %}bg-primary/5 border-primary/20 text-primary{% endif %}">
+                    <div class="rounded-md border p-4 text-sm {% if category == 'success' %}bg-success/5 border-success/20 text-success-emphasis{% elif category == 'error' %}bg-destructive/5 border-destructive/20 text-destructive-emphasis{% else %}bg-primary/5 border-primary/20 text-primary{% endif %}">
                         {{ message }}
                     </div>
                 {% endfor %}
@@ -26,60 +29,63 @@
     {% endwith %}
 
     {% if error %}
-        <div class="rounded-md border p-4 bg-destructive/5 border-destructive/20 text-destructive-emphasis">
+        <div class="rounded-md border p-4 text-sm bg-destructive/5 border-destructive/20 text-destructive-emphasis">
             {{ error }}
         </div>
     {% endif %}
 
     {% if subscription %}
-    <!-- Current Plan Card -->
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
-        <div class="flex items-start justify-between gap-4">
-            <div>
-                <h2 class="text-lg font-semibold leading-none tracking-tight mb-1">Current Plan</h2>
-                <p class="text-sm text-muted-foreground">Your organisation's active subscription</p>
-            </div>
-            <!-- Plan Badge -->
-            {% set plan_val = subscription.plan.value %}
-            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold
-                {% if plan_val == 'enterprise' %}bg-primary/10 text-primary border border-primary/20
-                {% elif plan_val == 'pro' %}bg-success/10 text-success-emphasis border border-success/20
-                {% else %}bg-muted text-muted-foreground border border-border{% endif %}">
-                {{ plan_val | capitalize }}
-            </span>
-        </div>
+    {% set status_val = subscription.status.value %}
 
-        <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <!-- Status -->
-            <div class="rounded-lg border border-border bg-background p-4">
+    {% if not stripe_configured %}
+    <div class="rounded-md border p-4 text-sm bg-warning/5 border-warning/20 text-warning-emphasis" data-testid="billing-not-configured">
+        <p class="font-medium">Online payment is not set up on this installation.</p>
+        <p class="mt-1">Plans cannot be bought or changed here yet, and invoices cannot be shown.
+            <a href="{{ contact_sales_url }}" class="underline">Contact sales</a> to buy a plan.</p>
+        {% if config.missing and current_user.is_platform_admin %}
+        <p class="mt-2 text-xs">Settings the operator has not provided: {{ config.missing | join(', ') }}.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# ---- Current plan and limits ---- #}
+    {% call section_card(title='Current plan') %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="rounded-lg border border-border bg-background p-4 min-w-0">
+                <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Plan</p>
+                <p class="text-sm font-semibold" data-testid="billing-current-plan">{{ plan.name }}</p>
+                {% if subscription.billing_interval %}
+                <p class="text-xs text-muted-foreground mt-1">Billed {{ 'annually' if subscription.billing_interval == 'year' else 'monthly' }}</p>
+                {% endif %}
+            </div>
+            <div class="rounded-lg border border-border bg-background p-4 min-w-0">
                 <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Status</p>
-                {% set status_val = subscription.status.value %}
                 <p class="text-sm font-semibold
                     {% if status_val == 'active' %}text-success-emphasis
                     {% elif status_val == 'past_due' %}text-warning-emphasis
                     {% elif status_val == 'cancelled' %}text-destructive-emphasis
                     {% else %}text-foreground{% endif %}">
-                    {{ status_val | replace('_', ' ') | title }}
+                    {% if status_val == 'past_due' %}Payment overdue{% elif status_val == 'trialing' %}Trial{% else %}{{ status_val | title }}{% endif %}
                 </p>
-            </div>
-
-            <!-- Seats -->
-            <div class="rounded-lg border border-border bg-background p-4">
-                <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Seats</p>
-                <p class="text-sm font-semibold">
-                    {{ seats_used }} / {{ subscription.seats_purchased }}
-                    <span class="text-muted-foreground font-normal">used</span>
-                </p>
-                {% if seats_used >= subscription.seats_purchased %}
-                    <p class="text-xs text-destructive-emphasis mt-1">Seat limit reached — upgrade to add users</p>
+                {% if status_val == 'past_due' %}
+                <p class="text-xs text-muted-foreground mt-1">The last payment failed. Update the card in Manage billing.</p>
                 {% endif %}
             </div>
-
-            <!-- Renewal Date -->
-            <div class="rounded-lg border border-border bg-background p-4">
-                <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Next Renewal</p>
+            <div class="rounded-lg border border-border bg-background p-4 min-w-0">
+                <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">{{ 'Editors' if limits.counts == 'editors' else 'People' }}</p>
+                <p class="text-sm font-semibold" data-testid="billing-people-limit">
+                    {{ limits.used }} of {{ limits.limit if limits.limit is not none else 'no limit' }}
+                </p>
+                {% if limits.counts == 'editors' %}
+                <p class="text-xs text-muted-foreground mt-1">People who only read and ask are free.</p>
+                {% endif %}
+            </div>
+            <div class="rounded-lg border border-border bg-background p-4 min-w-0">
+                <p class="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">
+                    {% if subscription.cancel_at_period_end %}Ends on{% elif status_val == 'trialing' %}Trial ends{% else %}Next renewal{% endif %}
+                </p>
                 <p class="text-sm font-semibold">
-                    {% if subscription.current_period_end %}
+                    {% if subscription.current_period_end and has_live_subscription %}
                         {{ subscription.current_period_end.strftime('%d %b %Y') }}
                     {% else %}
                         <span class="text-muted-foreground">—</span>
@@ -88,157 +94,217 @@
             </div>
         </div>
 
-        <!-- Actions -->
+        {% if limits.limit_reached %}
+        <div class="mt-4 rounded-md border p-4 text-sm bg-warning/5 border-warning/20 text-warning-emphasis" data-testid="billing-limit-reached">
+            <p>Your organisation has reached the {{ limits.plan_name }} limit of {{ limits.limit }} {{ 'editors' if limits.counts == 'editors' else 'people' }}. No one new can be added until you upgrade.</p>
+            <a href="#plans" class="mt-2 inline-block font-medium underline">See plans and upgrade</a>
+        </div>
+        {% endif %}
+
         <div class="mt-6 flex flex-wrap gap-3">
-            {% if stripe_configured %}
-                <a href="{{ url_for('billing.billing_portal') }}"
-                   class="inline-flex items-center gap-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 transition-colors">
+            {% if config.ready and subscription.stripe_customer_id %}
+                <a href="{{ url_for('billing.billing_portal') }}" class="{{ btn_primary }}">
                     <i data-lucide="credit-card" class="w-4 h-4" aria-hidden="true"></i>
-                    Manage Billing
+                    Manage billing
                 </a>
             {% endif %}
-            {% if subscription.plan.value != 'enterprise' %}
-                <button type="button"
-                        id="btn-toggle-upgrade-panel"
-                        class="inline-flex items-center gap-2 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 transition-colors">
-                    <i data-lucide="zap" class="w-4 h-4" aria-hidden="true"></i>
-                    Upgrade Plan
-                </button>
+            {% if config.ready and has_live_subscription %}
+                {% if subscription.cancel_at_period_end %}
+                <form method="post" action="{{ url_for('billing.billing_resume') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="{{ btn_outline }}">Keep my subscription</button>
+                </form>
+                {% else %}
+                <details class="w-full">
+                    <summary class="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">Cancel subscription</summary>
+                    <div class="mt-3 rounded-md border border-border p-4 space-y-3">
+                        <p class="text-sm text-muted-foreground">The plan stays in place until the end of the period already paid for, then your organisation moves to Community. Nothing you have recorded is deleted.</p>
+                        <form method="post" action="{{ url_for('billing.billing_cancel') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="{{ btn_destructive }}">Cancel at the end of the period</button>
+                        </form>
+                    </div>
+                </details>
+                {% endif %}
             {% endif %}
         </div>
-    </div>
+    {% endcall %}
 
-    <!-- Upgrade Panel (hidden by default) -->
-    {% if subscription.plan.value != 'enterprise' %}
-    <div id="upgrade-panel" class="hidden">
-        <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
-            <h2 class="text-lg font-semibold leading-none tracking-tight mb-4">Upgrade Your Plan</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-                <!-- Starter -->
-                <div class="rounded-lg border border-border bg-background p-5 flex flex-col gap-3">
-                    <div>
-                        <p class="font-semibold text-base">Starter</p>
-                        <p class="text-2xl font-bold mt-1">£24K <span class="text-sm font-normal text-muted-foreground">/ year</span></p>
-                    </div>
-                    <ul class="text-sm text-muted-foreground space-y-1">
-                        <li class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-success" aria-hidden="true"></i> Up to 5 architect seats</li>
-                        <li class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-success" aria-hidden="true"></i> 50 blueprints / year</li>
-                        <li class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-success" aria-hidden="true"></i> Email support</li>
-                    </ul>
-                    {% if stripe_configured %}
-                    <form method="post" action="{{ url_for('billing.billing_upgrade') }}" class="mt-auto">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="plan" value="pro">
-                        <input type="hidden" name="seats" value="5">
-                        <button type="submit"
-                                class="w-full rounded-md text-sm font-medium border border-primary text-primary hover:bg-primary hover:text-primary-foreground h-9 px-3 transition-colors">
-                            Upgrade to Starter
-                        </button>
-                    </form>
-                    {% else %}
-                    <p class="text-xs text-muted-foreground mt-auto">Contact sales to upgrade</p>
+    {# ---- Plans ---- #}
+    <section id="plans" aria-labelledby="plans-heading" class="space-y-4">
+        <h2 id="plans-heading" class="text-lg font-semibold text-foreground">Plans</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {% for p in plans %}
+            {% set is_current = p.key == plan.key %}
+            <div class="rounded-lg border {% if selected_plan and selected_plan.key == p.key %}border-2 border-primary{% else %}border-border{% endif %} bg-card p-5 flex flex-col gap-3 min-w-0" data-testid="plan-card-{{ p.key }}">
+                <div class="flex items-start justify-between gap-2">
+                    <p class="font-semibold text-base">{{ p.name }}</p>
+                    {% if is_current %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border shrink-0">Current plan</span>
                     {% endif %}
                 </div>
-
-                <!-- Professional -->
-                <div class="rounded-lg border-2 border-primary bg-primary/5 p-5 flex flex-col gap-3">
-                    <div>
-                        <span class="inline-flex items-center rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-xs font-medium mb-2">Recommended</span>
-                        <p class="font-semibold text-base">Professional</p>
-                        <p class="text-2xl font-bold mt-1">£80K <span class="text-sm font-normal text-muted-foreground">/ year</span></p>
-                    </div>
-                    <ul class="text-sm text-muted-foreground space-y-1">
-                        <li class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-success" aria-hidden="true"></i> Up to 20 architect seats</li>
-                        <li class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-success" aria-hidden="true"></i> Unlimited blueprints</li>
-                        <li class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-success" aria-hidden="true"></i> ServiceNow connector</li>
-                        <li class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-success" aria-hidden="true"></i> Priority support</li>
-                    </ul>
-                    {% if stripe_configured %}
-                    <form method="post" action="{{ url_for('billing.billing_upgrade') }}" class="mt-auto">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="plan" value="pro">
-                        <input type="hidden" name="seats" value="20">
-                        <button type="submit"
-                                class="w-full rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3 transition-colors">
-                            Upgrade to Pro
-                        </button>
-                    </form>
-                    {% else %}
-                    <p class="text-xs text-muted-foreground mt-auto">Contact sales to upgrade</p>
+                <p class="text-sm text-muted-foreground">{{ p.summary }}</p>
+                <p class="text-sm">
+                    {% if p.per_seat %}Limit: the number of editor seats you buy
+                    {% elif p.user_limit is not none %}Limit: {{ p.user_limit }} people
+                    {% else %}No limit on people{% endif %}
+                </p>
+                <div class="mt-auto">
+                    {% if p.purchasable and not is_current %}
+                        <a href="{{ url_for('billing.billing_index', plan=p.key, interval=selected_interval) }}#checkout" class="{{ btn_outline }} w-full">
+                            Choose {{ p.name }}
+                        </a>
+                    {% elif p.purchasable and is_current and p.per_seat %}
+                        <a href="{{ url_for('billing.billing_index', plan=p.key, interval=subscription.billing_interval or selected_interval) }}#checkout" class="{{ btn_outline }} w-full">
+                            Change seats
+                        </a>
+                    {% elif p.key == 'enterprise' and not is_current %}
+                        <a href="{{ contact_sales_url }}" class="{{ btn_outline }} w-full">Contact sales</a>
                     {% endif %}
-                </div>
-
-                <!-- Enterprise -->
-                <div class="rounded-lg border border-border bg-background p-5 flex flex-col gap-3">
-                    <div>
-                        <p class="font-semibold text-base">Enterprise</p>
-                        <p class="text-2xl font-bold mt-1">£250K+ <span class="text-sm font-normal text-muted-foreground">/ year</span></p>
-                    </div>
-                    <ul class="text-sm text-muted-foreground space-y-1">
-                        <li class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-success" aria-hidden="true"></i> Unlimited seats</li>
-                        <li class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-success" aria-hidden="true"></i> All connectors</li>
-                        <li class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-success" aria-hidden="true"></i> Dedicated SLA support</li>
-                        <li class="flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5 text-success" aria-hidden="true"></i> Custom data residency</li>
-                    </ul>
-                    <a href="mailto:sales@entelim.com?subject=Enterprise%20Enquiry"
-                       class="mt-auto inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 transition-colors">
-                        Contact Sales
-                    </a>
                 </div>
             </div>
+            {% endfor %}
         </div>
+    </section>
+
+    {# ---- Checkout / change confirmation for the chosen plan ---- #}
+    {% if selected_plan %}
+    <div id="checkout">
+    {% call section_card(title=('Switch to ' if has_live_subscription else 'Buy ') ~ selected_plan.name) %}
+        {% if not selected_plan.purchasable %}
+            <p class="text-sm text-muted-foreground">{{ selected_plan.name }} is not sold online.
+            {% if selected_plan.key == 'enterprise' %}<a href="{{ contact_sales_url }}" class="text-primary underline">Contact sales</a> for an annual contract.{% endif %}</p>
+        {% elif not config.ready %}
+            <p class="text-sm text-muted-foreground" data-testid="checkout-unavailable">Online payment is not set up on this installation, so {{ selected_plan.name }} cannot be bought here yet. <a href="{{ contact_sales_url }}" class="text-primary underline">Contact sales</a>.</p>
+        {% else %}
+            <nav aria-label="Billing interval" class="flex gap-2 mb-4">
+                {% for iv, label in [('year', 'Annual'), ('month', 'Monthly')] %}
+                <a href="{{ url_for('billing.billing_index', plan=selected_plan.key, interval=iv) }}#checkout"
+                   class="{{ btn_primary if selected_interval == iv else btn_outline }}"
+                   {% if selected_interval == iv %}aria-current="true"{% endif %}>{{ label }}</a>
+                {% endfor %}
+            </nav>
+            <dl class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm mb-4">
+                <div>
+                    <dt class="text-muted-foreground">Price</dt>
+                    <dd class="font-semibold" data-testid="checkout-price">
+                        {% if price and price.amount is not none %}
+                            {{ price.currency }} {{ '%.2f' | format(price.amount) }}{% if selected_plan.per_seat %} per editor{% endif %} per {{ price.interval or selected_interval }}
+                        {% else %}—{% endif %}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-muted-foreground">Tax</dt>
+                    <dd>Any tax due is shown on the payment page before you pay</dd>
+                </div>
+                <div>
+                    <dt class="text-muted-foreground">Renews</dt>
+                    <dd>Every {{ 'year' if selected_interval == 'year' else 'month' }} until you cancel</dd>
+                </div>
+            </dl>
+            {% if price is none %}
+            <p class="text-xs text-muted-foreground mb-4">The price could not be read from the payment provider; it is shown on the payment page before you pay.</p>
+            {% endif %}
+            <form method="post" action="{{ url_for('billing.billing_change_plan') if has_live_subscription else url_for('billing.billing_upgrade') }}" class="space-y-4" data-testid="checkout-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="plan" value="{{ selected_plan.key }}">
+                <input type="hidden" name="interval" value="{{ selected_interval }}">
+                {% if selected_plan.per_seat %}
+                <div class="max-w-xs space-y-2">
+                    <label for="seats" class="text-sm font-medium leading-none block">Editor seats</label>
+                    <input type="number" id="seats" name="seats" min="1" max="10000" required
+                           value="{{ subscription.seats_purchased if (plan.key == selected_plan.key) else selected_plan.default_seats }}"
+                           class="{{ input_cls }}">
+                </div>
+                {% endif %}
+                <button type="submit" class="{{ btn_primary }}" data-testid="checkout-submit">
+                    {% if has_live_subscription %}Switch to {{ selected_plan.name }}{% else %}Continue to payment{% endif %}
+                </button>
+            </form>
+        {% endif %}
+        {% if selected_plan.purchasable %}
+        <p class="mt-4 text-xs text-muted-foreground" data-checkout-legal>
+            Upgrading means you accept the terms that apply to your plan. Read them before you pay:
+            {% for link in legal_links %}<a href="{{ link.href }}" target="_blank" rel="noopener" class="text-primary hover:underline" data-legal-link="{{ link.slug }}">{{ link.label }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
+        </p>
+        {% endif %}
+    {% endcall %}
     </div>
     {% endif %}
 
-    <!-- Invoice History -->
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
-        <h2 class="text-lg font-semibold leading-none tracking-tight mb-4">Invoice History</h2>
-        <div class="rounded-md border border-border overflow-hidden">
-            <table class="w-full text-sm">
+    {# ---- Billing details ---- #}
+    <div id="billing-details">
+    {% call section_card(title='Billing details') %}
+        {% if not config.ready %}
+            <p class="text-sm text-muted-foreground">Billing details can be recorded once online payment is set up.</p>
+        {% elif details_error %}
+            <p class="text-sm text-destructive-emphasis">Billing details could not be read: {{ details_error }}</p>
+        {% else %}
+            <form method="post" action="{{ url_for('billing.billing_details') }}" class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl" data-testid="billing-details-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="space-y-2">
+                    <label for="billing_email" class="text-sm font-medium leading-none block">Invoice e-mail</label>
+                    <input type="email" id="billing_email" name="billing_email" maxlength="254" autocomplete="email"
+                           value="{{ details.email or '' }}" class="{{ input_cls }}">
+                </div>
+                <div class="space-y-2">
+                    <label for="po_number" class="text-sm font-medium leading-none block">Purchase-order number</label>
+                    <input type="text" id="po_number" name="po_number" maxlength="140"
+                           value="{{ details.po_number or '' }}" class="{{ input_cls }}">
+                </div>
+                <p class="sm:col-span-2 text-xs text-muted-foreground">Printed on every invoice issued from now on. Change the card, billing address or tax number in Manage billing.</p>
+                <div class="sm:col-span-2">
+                    <button type="submit" class="{{ btn_outline }}">Save billing details</button>
+                </div>
+            </form>
+        {% endif %}
+    {% endcall %}
+    </div>
+
+    {# ---- Invoices ---- #}
+    {% call section_card(title='Invoices') %}
+        {% if not config.ready %}
+            {{ empty_state('receipt', 'Invoices are not available', 'Invoices appear here once online payment is set up on this installation.') }}
+        {% elif invoice_error %}
+            <p class="text-sm text-destructive-emphasis" role="alert">Invoices could not be read: {{ invoice_error }}</p>
+        {% elif not invoices %}
+            {{ empty_state('receipt', 'No invoices yet', 'An invoice appears here after each payment.') }}
+        {% else %}
+        <div class="rounded-md border border-border overflow-x-auto">
+            <table class="w-full text-sm" data-testid="invoice-table">
                 <thead>
                     <tr class="border-b border-border bg-muted/40">
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Amount</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Invoice</th>
+                        <th scope="col" class="px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
+                        <th scope="col" class="px-4 py-3 text-left font-medium text-muted-foreground">Invoice</th>
+                        <th scope="col" class="px-4 py-3 text-right font-medium text-muted-foreground">Total</th>
+                        <th scope="col" class="px-4 py-3 text-right font-medium text-muted-foreground">Tax</th>
+                        <th scope="col" class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+                        <th scope="col" class="px-4 py-3 text-left font-medium text-muted-foreground">Download</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {# Populated via Stripe portal — stub empty state #}
-                    <tr>
-                        <td colspan="4" class="px-4 py-8 text-center text-muted-foreground">
-                            <i data-lucide="receipt" class="w-8 h-8 mx-auto mb-2 opacity-40" aria-hidden="true"></i>
-                            <p class="text-sm">No invoices yet.</p>
-                            {% if stripe_configured %}
-                                <a href="{{ url_for('billing.billing_portal') }}"
-                                   class="text-primary hover:underline text-sm mt-1 inline-block">
-                                    View full invoice history in the billing portal →
-                                </a>
-                            {% endif %}
+                    {% for inv in invoices %}
+                    <tr class="border-b border-border last:border-0">
+                        <td class="px-4 py-3 whitespace-nowrap">{{ inv.date.strftime('%d %b %Y') if inv.date else '—' }}</td>
+                        <td class="px-4 py-3">{{ inv.number or '—' }}</td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap">{% if inv.total is not none %}{{ inv.currency }} {{ '%.2f' | format(inv.total) }}{% else %}—{% endif %}</td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap">{% if inv.tax is not none %}{{ inv.currency }} {{ '%.2f' | format(inv.tax) }}{% else %}—{% endif %}</td>
+                        <td class="px-4 py-3">{{ (inv.status or '—') | replace('_', ' ') | capitalize }}</td>
+                        <td class="px-4 py-3">
+                            {% if inv.pdf_url %}<a href="{{ inv.pdf_url }}" class="text-primary underline" rel="noopener">PDF</a>{% elif inv.hosted_url %}<a href="{{ inv.hosted_url }}" class="text-primary underline" rel="noopener">View</a>{% else %}—{% endif %}
                         </td>
                     </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
-    </div>
+        {% endif %}
+    {% endcall %}
 
     {% else %}
-    <!-- No subscription found fallback -->
     <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
         <p class="text-muted-foreground text-sm">No subscription record found for your organisation.</p>
     </div>
     {% endif %}
 </div>
 {% endblock %}
-<script>
-(function() {
-    let upgradeBtn = document.getElementById('btn-toggle-upgrade-panel');
-    if (upgradeBtn) {
-        upgradeBtn.addEventListener('click', function() {
-            let panel = document.getElementById('upgrade-panel');
-            if (panel) panel.classList.toggle('hidden');
-        });
-    }
-})();
-</script>

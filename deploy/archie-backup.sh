@@ -46,7 +46,9 @@ docker exec "$CONTAINER" pg_dumpall -U postgres --globals-only > "$DIR/globals.$
 find "$DIR" -name 'archie.*.dump'  -mtime +$KEEP_DAILY -delete
 find "$DIR" -name 'globals.*.sql'  -mtime +$KEEP_DAILY -delete
 
-echo "$(ts) size=$SIZE objects=$OBJECTS file=$OUT" > "$MARKER"
+# Shared with the production backup step (deploy/README.md) so the marker
+# format is written in exactly one place, not reimplemented a second time.
+sh "$(dirname "$0")/write-backup-marker.sh" "$MARKER" "$SIZE" "$OBJECTS" "$OUT"
 log "OK  size=$(numfmt --to=iec "$SIZE" 2>/dev/null || echo "$SIZE") objects=$OBJECTS retained=$(ls -1 "$DIR"/archie.*.dump 2>/dev/null | wc -l)"
 
 # NOTE: these backups live on the SAME DISK as the database they protect. That

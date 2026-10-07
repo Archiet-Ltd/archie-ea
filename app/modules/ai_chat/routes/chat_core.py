@@ -945,9 +945,17 @@ def send_message_stream():
             "run with the same unscoped context this user would see in-request"
         )
 
+    # The assistant run on the worker thread keeps this request's trace id, so
+    # its queries and model calls are followed from the same id.
+    from app.utils.tracing import current_trace_id, trace_scope
+
+    trace_id_for_thread = current_trace_id()
+
     def run_agent():
         try:
-            with app.app_context():
+            with app.app_context(), trace_scope(
+                "agent-run", "assistant", trace_id=trace_id_for_thread
+            ):
                 # Re-establish the tenant before anything queries. Must precede
                 # AgentRunner construction: context assembly reads on import-time
                 # paths inside run().

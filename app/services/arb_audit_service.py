@@ -20,7 +20,6 @@ from app.models.architecture_review_board import (
     ARBException,
     ARBReviewItem,
 )
-from app.models.audit_log import AuditLog
 
 logger = logging.getLogger(__name__)
 
@@ -130,11 +129,18 @@ class ARBAuditService:
         Returns:
             Created ARBAuditLog instance
         """
-        from app.models.user import User
+        from app.middleware.tenant_context import current_org_id
+        from app.utils.tenant_users import user_in_org
 
         # Get user email for denormalization. user_id may legitimately be
         # None for a system/refusal event (e.g. "no resolvable approver").
-        user = db.session.get(User, user_id) if user_id is not None else None
+        # user_id can also arrive here from request-supplied or stored data
+        # (an exception's requested_by_id/approved_by_id, forwarded by a
+        # caller with no organisation check of its own), so it is resolved
+        # only inside the acting session's own organisation, never by a
+        # bare id lookup.
+        acting_org_id = current_org_id() if has_request_context() else None
+        user = user_in_org(user_id, acting_org_id) if user_id is not None else None
         user_email = user.email if user else None
 
         # Get request context if available
@@ -170,31 +176,9 @@ class ARBAuditService:
 
         logger.info(f"Audit log: {action} on {entity_type}:{entity_id} by user {user_id}")
 
-        # F-01: /admin/audit-log (soc2_audit_log) never queried ARBAuditLog,
-        # so ARB decisions were recorded but invisible on the compliance
-        # page. Mirror the two decision-recording actions onto AuditLog —
-        # ARBAuditLog keeps the richer before/after detail, this just makes
-        # "who approved this change" answerable from one page.
-        if action in (ARBAuditAction.DECISION.value, ARBAuditAction.EXCEPTION_DECISION.value):
-            try:
-                org_id = getattr(audit_log, "organization_id", None)
-                AuditLog.log(
-                    action=str(action)[:20],
-                    table_name=f"arb:{entity_type}",
-                    record_id=entity_id,
-                    organization_id=org_id,
-                    user_id=user_id,
-                    new_value={
-                        "entity_reference": entity_reference,
-                        "description": description,
-                        "new_value": new_value,
-                    },
-                )
-            except Exception:
-                logger.warning(
-                    "AuditLog mirror-write failed for ARB action %s on %s:%s (non-blocking)",
-                    action, entity_type, entity_id, exc_info=True,
-                )
+        # Every ARB entry is copied into the one audit store (soc2_audit_log,
+        # read by /admin/audit-log) by the AuditLog model's insert hook, with
+        # source_table/source_id, so it is not mirrored again here.
 
         return audit_log
 

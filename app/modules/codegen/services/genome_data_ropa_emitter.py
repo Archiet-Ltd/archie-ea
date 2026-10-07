@@ -41,6 +41,8 @@ _ROPA_TEMPLATE = _ENV.from_string(
       <th scope="col" class="py-2 pr-4 font-semibold">Processing activity</th>
       <th scope="col" class="py-2 pr-4 font-semibold">Data categories</th>
       <th scope="col" class="py-2 pr-4 font-semibold">Accessing elements</th>
+      <th scope="col" class="py-2 pr-4 font-semibold">Suppliers</th>
+      <th scope="col" class="py-2 pr-4 font-semibold">Flows</th>
       <th scope="col" class="py-2 pr-4 font-semibold">Lawful basis</th>
       <th scope="col" class="py-2 pr-4 font-semibold">Retention</th>
       <th scope="col" class="py-2 font-semibold">Source element</th>
@@ -59,6 +61,17 @@ _ROPA_TEMPLATE = _ENV.from_string(
             <span class="text-muted-foreground">({{ s.archimate_type | replace('_', ' ') if s.archimate_type else dash }} · {{ s.access_mode }})</span>{% if not loop.last %}; {% endif %}</span>{% endfor %}
         {% else %}{{ dash }}{% endif %}
       </td>
+      <td class="py-2 pr-4">
+        {% if a.suppliers %}
+          {% for sup in a.suppliers %}<span class="inline-block">{{ sup.name }}{% if not loop.last %}; {% endif %}</span>{% endfor %}
+        {% else %}{{ dash }}{% endif %}
+      </td>
+      <td class="py-2 pr-4">
+        {% if a.flows %}
+          {% for f in a.flows %}<span class="inline-block">{{ f.name }}
+            <span class="text-muted-foreground">({{ f.archimate_type | replace('_', ' ') if f.archimate_type else dash }})</span>{% if not loop.last %}; {% endif %}</span>{% endfor %}
+        {% else %}{{ dash }}{% endif %}
+      </td>
       <td class="py-2 pr-4">{{ a.lawful_basis if a.lawful_basis else dash }}</td>
       <td class="py-2 pr-4">{{ a.retention if a.retention else dash }}</td>
       <td class="py-2 text-muted-foreground">
@@ -66,7 +79,7 @@ _ROPA_TEMPLATE = _ENV.from_string(
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="6" class="py-4 text-muted-foreground">
+    <tr><td colspan="8" class="py-4 text-muted-foreground">
       No information objects modelled for this organization.
     </td></tr>
     {% endfor %}

@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S3-05, segment: S3}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Business Case
@@ -22,7 +23,7 @@ stays empty rather than showing a plausible-looking guess.
 
 ## Where you'll meet it
 
-- [Build the business case for the CIO from the model's own figures](/enterprise-architecture/business-case)
+- [Build the business case for the CIO from the model's own figures](/use-cases/business-case-for-the-cio)
 
 ## Related modules
 

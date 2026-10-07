@@ -6,6 +6,7 @@ Blueprint: tech_radar_bp, url_prefix="/technology/radar".
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 from flask import (
     Blueprint,
@@ -88,7 +89,9 @@ def classify():
     a radar entry can never be created out of thin air."""
     element_id = request.form.get("archimate_element_id", type=int)
     ring = (request.form.get("ring") or "").strip().lower()
-    rationale = request.form.get("rationale") or ""
+    # Absent fields are left as recorded (the "Move" control sends only the
+    # ring); a field sent empty clears what was recorded.
+    rationale = request.form.get("rationale")
 
     def _fail(message, status):
         if _wants_json():
@@ -99,8 +102,21 @@ def classify():
     if not element_id or ring not in RADAR_RINGS:
         return _fail("archimate_element_id and a valid ring are required", 400)
 
+    details = {}
+    if "review_date" in request.form:
+        raw = (request.form.get("review_date") or "").strip()
+        try:
+            details["review_date"] = date.fromisoformat(raw) if raw else None
+        except ValueError:
+            return _fail("review_date must be a date (YYYY-MM-DD)", 400)
+    if "requesting_initiative_id" in request.form:
+        raw = (request.form.get("requesting_initiative_id") or "").strip()
+        if raw and not raw.isdigit():
+            return _fail("requesting_initiative_id must be an initiative id", 400)
+        details["requesting_initiative_id"] = int(raw) if raw else None
+
     try:
-        entry = service.classify(element_id, ring, rationale, current_user.id)
+        entry = service.classify(element_id, ring, rationale, current_user.id, **details)
     except ValueError as exc:
         return _fail(str(exc), 400)
     except Exception:  # noqa: BLE001

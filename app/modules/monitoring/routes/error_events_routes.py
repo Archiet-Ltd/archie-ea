@@ -66,11 +66,15 @@ def client_error():
     fingerprint = _fingerprint("client", location, message)
     now = datetime.utcnow()
 
+    # tenant-scoping-ok: platform-wide aggregate by design (see ErrorEvent's docstring); events
+    # are deduplicated across organisations and only platform admins read them.
     existing = ErrorEvent.query.filter_by(fingerprint=fingerprint, resolved=False).first()
     if existing:
         existing.occurrence_count = (existing.occurrence_count or 0) + 1
         existing.last_seen_at = now
-        if stack:
+        # This endpoint is unauthenticated, so a repeat report must not replace a stack
+        # an operator may read: it only fills one in when none was recorded.
+        if stack and not existing.stack:
             existing.stack = stack
     else:
         db.session.add(ErrorEvent(
