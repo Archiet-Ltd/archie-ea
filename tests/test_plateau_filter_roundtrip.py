@@ -154,9 +154,12 @@ def test_work_package_target_plateau_round_trips(app, db_session, make_org, tena
             assert resp.status_code == 200, resp.get_data(as_text=True)
 
             # Read back independently — the update actually persisted.
+            # The link is an ArchiMate relationship (the plateau column is not written).
             reloaded = db_session.get(UnifiedWorkPackage, wp_id)
             db_session.refresh(reloaded)
-            assert reloaded.plateau_id == plateau_id
+            assert reloaded.plateau_id is None
+            links = work_package_service.plateau_and_gap_links([reloaded], org.id)
+            assert links[wp_id]["plateau_ids"] == [plateau_id]
 
 
 @pytest.mark.usefixtures("db_session")

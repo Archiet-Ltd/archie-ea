@@ -84,7 +84,10 @@ def test_a_derived_gap_can_be_turned_into_planned_work(app, client):
         ).scalar_one_or_none()
         assert work_package is not None, "the work package did not persist"
         assert work_package.organization_id == org_id
-        assert work_package.gap_id is not None, "the work package is not linked to its gap"
+        from app.services import work_package_service
+
+        links = work_package_service.plateau_and_gap_links([work_package], org_id)
+        assert links[work_package.id]["gap_ids"], "the work package is not linked to its gap"
         assert _gap_count(db) == gaps_before + 1, (
             "no Gap row was materialised, so the work package has nothing to "
             "trace back to"
