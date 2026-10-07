@@ -178,18 +178,22 @@ POLICY = {
     "/data-governance/entities": {
         "solution_architect", "enterprise_architect", "business_architect",
         "security_architect", "data_architect",
+        "technology_architect", "application_architect",
     },
     "/data-governance/undeclared-copies": {
         "solution_architect", "enterprise_architect", "business_architect",
         "security_architect", "data_architect",
+        "technology_architect", "application_architect",
     },
     "/data-governance/domains": {
         "solution_architect", "enterprise_architect", "business_architect",
         "security_architect", "data_architect",
+        "technology_architect", "application_architect",
     },
     "/data-governance/models": {
         "solution_architect", "enterprise_architect", "business_architect",
         "security_architect", "data_architect",
+        "technology_architect", "application_architect",
     },
     # The organisation's audit trail (query, export, verify). Gated by
     # governance_gate_reader_required: administrators, plus security
