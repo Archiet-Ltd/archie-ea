@@ -38,9 +38,34 @@ _DELIVERY_COLUMNS = (
 )
 
 
+def _subscription_cursor_exists() -> bool:
+    row = (
+        op.get_bind()
+        .exec_driver_sql(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_schema = current_schema() "
+            "AND table_name = 'webhook_subscriptions' AND column_name = 'last_ordinal'"
+        )
+        .first()
+    )
+    return row is not None
+
+
 def upgrade():
+    # Subscriptions that exist before this revision must not receive the
+    # organisation's whole event history on the first dispatch run, so their
+    # cursor starts at the organisation's current end of log. Only done when
+    # the column is being added here: a rerun, or a database whose column was
+    # created from the models, is left exactly as it is.
+    cursor_was_missing = not _subscription_cursor_exists()
     for column in _SUBSCRIPTION_COLUMNS:
         op.execute(f"ALTER TABLE webhook_subscriptions ADD COLUMN IF NOT EXISTS {column}")
+    if cursor_was_missing:
+        op.execute(
+            "UPDATE webhook_subscriptions AS s SET last_ordinal = COALESCE("
+            "(SELECT MAX(e.ordinal) FROM event_log AS e "
+            "WHERE e.organization_id = s.organization_id), 0)"
+        )
     for column in _DELIVERY_COLUMNS:
         op.execute(f"ALTER TABLE webhook_deliveries ADD COLUMN IF NOT EXISTS {column}")
     op.execute(
