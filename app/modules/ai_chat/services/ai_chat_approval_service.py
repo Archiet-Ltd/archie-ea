@@ -131,6 +131,39 @@ def create_approval_record(
     return approval
 
 
+def _restrict_access_refusal(approval, actor) -> Optional[Dict[str, Any]]:
+    """R1-B88: who may decide an export flag (``restrict_access`` on a user).
+
+    None when the decision may go ahead; otherwise the refusal to return. Run
+    before an approval is claimed, so a refused attempt (the flagged person
+    deciding their own flag, or someone who is not an administrator) leaves the
+    flag open instead of burning it.
+    """
+    if approval.operation_type != "restrict_access" or approval.entity_type != "user":
+        return None
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    refusal = {"success": False, "code": "FORBIDDEN"}
+    if actor.id == approval.entity_id:
+        return {**refusal, "error": "You cannot decide a flag about your own downloads."}
+    if not (
+        is_platform_admin(actor)
+        or rbac_service.is_org_admin(actor, approval.organization_id)
+    ):
+        return {**refusal, "error": "Only an organisation administrator can decide this flag."}
+    # tenant-scoping-ok: User is not TenantMixin; organization_id is in the predicate.
+    target = User.query.filter(
+        User.id == approval.entity_id,
+        User.organization_id == approval.organization_id,
+    ).first()
+    if target is None:
+        return {"success": False, "code": "NOT_FOUND", "error": "The flagged person is not a member."}
+    if getattr(target, "is_platform_admin", False):
+        return {**refusal, "error": "A platform administrator's access is not managed here."}
+    return None
+
+
 class AIChatApprovalService:
     """
     Service for managing AI chat CRUD operation approvals.
@@ -602,6 +635,10 @@ class AIChatApprovalService:
                     "error": f"Approval is already {approval.status.value}",
                 }
 
+            restricted_refusal = _restrict_access_refusal(approval, actor)
+            if restricted_refusal is not None:
+                return restricted_refusal
+
             # Overdue-not-expired: an item past expires_at is overdue, not expired —
             # it stays actionable indefinitely (escalate_overdue_approvals, run
             # periodically, notifies the organisation's administrators the first
@@ -752,6 +789,23 @@ class AIChatApprovalService:
                 tc = ToolCall(id=str(approval_id), name=approval.entity_type, arguments=payload)
                 result = executor.execute(tc)
 
+            elif approval.operation_type == "restrict_access":
+                # R1-B88: an export flag. Approving reduces the flagged member to
+                # view-only and signs them out; the decider was checked above.
+                from app.services.rbac_service import MemberAccessError, rbac_service
+
+                try:
+                    rbac_service.revoke_member_access(
+                        approval.organization_id,
+                        approval.entity_id,
+                        actor_id=effective_approver_id,
+                        reason="export_spike_restricted",
+                        end_sessions=True,
+                    )
+                    result = {"success": True, "restricted_user_id": approval.entity_id}
+                except MemberAccessError as exc:
+                    result = {"success": False, "error": exc.message}
+
             elif approval.operation_type == "delete":
                 # Hard delete — admin-only at execution time (double guard)
                 # tenant-scoping-ok: self.user_id is the acting user's own id.
@@ -845,6 +899,10 @@ class AIChatApprovalService:
                     "code": "NOT_FOUND",
                     "error": f"Approval {approval_id} not found",
                 }
+
+            restricted_refusal = _restrict_access_refusal(approval, actor)
+            if restricted_refusal is not None:
+                return restricted_refusal
 
             # A requester can always cancel their own change. A separate
             # reviewer may reject it only with the same GENERAL permission the

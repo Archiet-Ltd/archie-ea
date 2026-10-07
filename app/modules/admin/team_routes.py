@@ -39,7 +39,7 @@ from app.middleware.tenant_decorators import is_platform_admin
 from app.models.user import ROLE_DISPLAY_NAMES, User
 from app.models.org_role import OrgRole, VALID_ORG_ROLES
 from app.services.rate_limiter import rate_limit
-from app.services.rbac_service import rbac_service
+from app.services.rbac_service import MemberAccessError, rbac_service
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,18 @@ def _require_org_or_platform_admin(org_id):
     abort(403)
 
 
+def _preview_blocks(personas):
+    """R1-B88: the plain-words preview of every persona and role pairing, so the
+    page can show the chosen one before Send with or without script."""
+    from app.utils.role_access import persona_preview
+
+    return [
+        {**persona_preview(persona, role), "role": role}
+        for persona, _label in personas
+        for role in VALID_ORG_ROLES
+    ]
+
+
 def _render_team(org_id, error=None, status=200):
     from app.modules.account.services import invitation_service
 
@@ -79,14 +91,25 @@ def _render_team(org_id, error=None, status=200):
     role_map = {
         m.id: rbac_service.get_user_role(org_id, m.id) for m in members
     }
+    personas = [(p, ROLE_DISPLAY_NAMES.get(p, p)) for p in invitation_service.INVITABLE_PERSONAS]
+    chosen_persona = request.values.get("persona") or ""
+    if chosen_persona not in invitation_service.INVITABLE_PERSONAS:
+        chosen_persona = personas[0][0]
+    chosen_role = request.values.get("role") or ""
+    if chosen_role not in VALID_ORG_ROLES:
+        chosen_role = "viewer"
     return render_template(
         "admin/team.html",
         members=members,
+        previews=_preview_blocks(personas),
+        chosen_persona=chosen_persona,
+        chosen_role=chosen_role,
+        chosen_email=(request.values.get("email") or "").strip()[:254],
         role_map=role_map,
         valid_roles=VALID_ORG_ROLES,
         invitations=invitations,
         has_account_ids=has_account_ids,
-        personas=[(p, ROLE_DISPLAY_NAMES.get(p, p)) for p in invitation_service.INVITABLE_PERSONAS],
+        personas=personas,
         mail_is_available=mail_available(),
         invite_error=error,
     ), status
@@ -99,6 +122,20 @@ def team():
     org_id = _require_org_id()
     _require_org_or_platform_admin(org_id)
     return _render_team(org_id)
+
+
+@team_bp.route("/team/persona-preview")
+@login_required
+def team_persona_preview():
+    """What someone invited as this persona and role will see, as JSON."""
+    from app.utils.role_access import persona_preview
+
+    org_id = _require_org_id()
+    _require_org_or_platform_admin(org_id)
+    try:
+        return jsonify(persona_preview(request.args.get("persona", ""), request.args.get("role", "")))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
 
 @team_bp.route("/team/invite", methods=["POST"])
@@ -261,18 +298,13 @@ def team_remove_member(user_id):
     if user_id == current_user.id:
         return jsonify({"error": "Cannot remove yourself from the org"}), 400
 
-    record = OrgRole.query.filter_by(
-        organization_id=org_id, user_id=user_id
-    ).first()
-    if record:
-        db.session.delete(record)
-        # Revoke the Administrator role for a user being removed from this
-        # organisation (a no-op for a platform admin — see
-        # User.revoke_org_admin), so rbac_service.is_org_admin() (which falls
-        # back to user.is_admin() for the user's own org) no longer answers
-        # True after membership is deleted.
-        user = db.session.get(User, user_id)
-        if user is not None and user.is_admin():
-            user.revoke_org_admin()
-        db.session.commit()
+    try:
+        rbac_service.revoke_member_access(
+            org_id, user_id, actor_id=current_user.id,
+            reason="team_member_removed", end_sessions=False,
+        )
+    except MemberAccessError:
+        # An id with no place in this organisation changes nothing and still
+        # answers "removed", as it always did.
+        db.session.rollback()
     return jsonify({"status": "removed"})

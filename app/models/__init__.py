@@ -475,6 +475,9 @@ else:
     from .pending_invitation import PendingInvitation  # noqa: F401
     from .account_token import AccountToken  # noqa: F401
 
+    # R1-B88: quarterly access recertification.
+    from .access_review import AccessReviewCycle, AccessReviewItem  # noqa: F401
+
     # Stored model-health / drift report per organisation.
     from .drift_report import DriftReport  # noqa: F401
 

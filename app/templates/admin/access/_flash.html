@@ -1,0 +1,15 @@
+{# Flash messages and an inline error for the access screens. #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="mb-6 space-y-2">
+            {% for category, message in messages %}
+                <div class="rounded-md p-4 {% if category == 'error' %}bg-destructive/5 text-destructive-emphasis{% else %}bg-success/5 text-success-emphasis{% endif %}" role="status">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+{% if error %}
+<div role="alert" data-access-error class="mb-6 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive-emphasis">{{ error }}</div>
+{% endif %}

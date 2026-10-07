@@ -11,6 +11,10 @@
         breadcrumbs=[
             {'label': 'Admin', 'href': url_for('admin.index')},
             {'label': 'Team'}
+        ],
+        actions=[
+            {'text': 'Access review', 'href': url_for('access_review.reviews'), 'variant': 'outline'},
+            {'text': 'Export activity', 'href': url_for('access_review.exports'), 'variant': 'outline'}
         ]
     ) }}
 
@@ -46,7 +50,7 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="w-full sm:w-auto">
                 <label for="email" class="block text-sm font-medium text-foreground mb-1">Email</label>
-                <input id="email" name="email" type="email" required autocomplete="off"
+                <input id="email" name="email" type="email" required autocomplete="off" value="{{ chosen_email }}"
                     class="flex h-9 w-full sm:w-64 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     placeholder="user@example.com">
             </div>
@@ -55,7 +59,7 @@
                 <select id="persona" name="persona"
                     class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     {% for value, label in personas %}
-                        <option value="{{ value }}">{{ label }}</option>
+                        <option value="{{ value }}"{% if value == chosen_persona %} selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -64,10 +68,36 @@
                 <select id="role" name="role"
                     class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     {% for r in valid_roles %}
-                        <option value="{{ r }}"{% if r == 'viewer' %} selected{% endif %}>{{ r }}</option>
+                        <option value="{{ r }}"{% if r == chosen_role %} selected{% endif %}>{{ r }}</option>
                     {% endfor %}
                 </select>
             </div>
+            {# R1-B88: the preview sits before Send. Every persona and role pairing is rendered
+               on the server; the one chosen shows, and a script switches between them. Without
+               script, Preview re-renders the page with the chosen pair. #}
+            <div class="w-full" data-persona-previews aria-live="polite">
+                <p class="text-sm font-medium text-foreground mb-2">What this person will see</p>
+                {% for pv in previews %}
+                <section data-persona-preview data-persona="{{ pv.persona }}" data-role="{{ pv.role }}"
+                         {% if not (pv.persona == chosen_persona and pv.role == chosen_role) %}hidden{% endif %}
+                         class="rounded-md border border-border bg-muted/30 p-4 text-sm">
+                    <p class="font-medium text-foreground">{{ pv.display_name }}</p>
+                    <p class="mt-1 text-muted-foreground">{{ pv.description }}</p>
+                    <p class="mt-2 text-foreground">{{ pv.summary }}</p>
+                    <ul class="mt-3 space-y-2">
+                        {% for zone in pv.will_see %}
+                        <li><span class="font-medium text-foreground">{{ zone.zone }}:</span>
+                            <span class="text-muted-foreground">{{ zone.links | join(', ') }}</span></li>
+                        {% endfor %}
+                    </ul>
+                </section>
+                {% endfor %}
+            </div>
+            <button type="submit" formmethod="get" formaction="{{ url_for('team.team') }}" formnovalidate
+                data-preview-submit
+                class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
+                Preview
+            </button>
             <button type="submit"
                 class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
                 Send invitation
@@ -194,6 +224,28 @@
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+    var persona = document.getElementById('persona');
+    var role = document.getElementById('role');
+    var blocks = document.querySelectorAll('[data-persona-preview]');
+    var preview = document.querySelector('[data-preview-submit]');
+    if (!persona || !role || !blocks.length) return;
+    // With script, the page switches the preview itself; the Preview button is only for no-script use.
+    if (preview) preview.style.display = 'none';
+    function show() {
+        blocks.forEach(function (b) {
+            b.hidden = !(b.dataset.persona === persona.value && b.dataset.role === role.value);
+        });
+    }
+    persona.addEventListener('change', show);
+    role.addEventListener('change', show);
+    show();
+})();
+</script>
 {% endblock %}
 <script>
 (function() {

@@ -23,6 +23,15 @@ ROLE_HIERARCHY = {
 }
 
 
+class MemberAccessError(Exception):
+    """A member's access could not be reduced. ``status`` is the HTTP answer."""
+
+    def __init__(self, message, status=400):
+        super().__init__(message)
+        self.message = message
+        self.status = status
+
+
 class RBACService:
     """Service for evaluating org-scoped RBAC permissions."""
 
@@ -61,6 +70,69 @@ class RBACService:
         if user.organization_id == org_id and user.is_admin():
             return True
         return False
+
+    def revoke_member_access(self, org_id, user_id, *, actor_id, reason, end_sessions):
+        """The one place a member's access to ``org_id`` is reduced (R1-B88).
+
+        Deletes the member's OrgRole row (they then answer as a viewer) and
+        takes away organisation-admin authority they held. With
+        ``end_sessions`` it also signs them out everywhere
+        (``session_registry.revoke_all_for_user``, ``reason`` at most 32
+        characters) and records an ``access_restricted`` audit row; the Team
+        page's Remove button passes ``end_sessions=False`` and behaves as it
+        always did.
+
+        Refuses the actor's own account (400), with ``end_sessions`` a platform
+        administrator (403), and a user who has no place in this organisation (404, the same answer
+        as a missing id). Does not delete the account.
+        Returns True when an OrgRole row was removed.
+
+        When PR 424 lands, the export-flag path calls ``deactivate_user`` here.
+        """
+        from app import db
+        from app.models.org_role import OrgRole
+        from app.models.user import User
+
+        if user_id == actor_id:
+            raise MemberAccessError("You cannot reduce your own access.", 400)
+        # tenant-scoping-ok: User is not TenantMixin; the organisation is checked below.
+        user = User.query.filter_by(id=user_id).first()
+        record = OrgRole.query.filter_by(organization_id=org_id, user_id=user_id).first()
+        in_this_org = user is not None and (user.organization_id == org_id or record is not None)
+        if end_sessions:
+            # Signing someone out everywhere is only for people whose home is this organisation.
+            in_this_org = user is not None and user.organization_id == org_id
+        if not in_this_org:
+            raise MemberAccessError("Member not found.", 404)
+        if end_sessions and getattr(user, "is_platform_admin", False):
+            # The Team page's Remove button never refused one (revoke_org_admin
+            # leaves a platform admin's authority alone); the restricting paths do.
+            raise MemberAccessError("A platform administrator's access is not managed here.", 403)
+
+        removed = record is not None
+        if record is not None:
+            db.session.delete(record)
+        # Revoke the Administrator role for a user being removed from this
+        # organisation (a no-op for a platform admin -- see User.revoke_org_admin),
+        # so is_org_admin() no longer answers True after the grant is gone.
+        if (removed or end_sessions) and user.is_admin():
+            user.revoke_org_admin()
+        db.session.commit()
+
+        if end_sessions:
+            from app.models.audit_log import AuditLog
+            from app.services.session_registry import revoke_all_for_user
+
+            AuditLog.log(
+                action="access_restricted",
+                table_name="org_roles",
+                record_id=user_id,
+                organization_id=org_id,
+                user_id=actor_id,
+                extra_json={"member_id": user_id, "reason": reason, "role_removed": removed},
+            )
+            revoke_all_for_user(user_id, reason[:32])
+        return removed
 
     def can_edit(self, org_id, user_id):
         """True if role is org_admin or architect (hierarchy level >= 1)."""

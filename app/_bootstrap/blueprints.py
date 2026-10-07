@@ -236,6 +236,8 @@ def _register_optional_standalone(app):
         ("app.modules.admin.security_routes", "admin_security_bp", None),
         ("app.modules.admin.billing_routes", "billing_bp", "/admin/billing"),
         ("app.modules.admin.team_routes", "team_bp", "/admin"),
+        # R1-B88: quarterly access recertification and export investigation.
+        ("app.modules.admin.v2.routes.access_review_routes", "access_review_bp", None),
         ("app.modules.business_model_canvas.routes", "business_model_bp", "/business-model"),
         ("app.modules.organization.routes", "organization_bp", "/organization"),
         ("app.modules.business_case.routes", "business_case_bp", "/business-case"),

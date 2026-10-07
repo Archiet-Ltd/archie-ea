@@ -1,0 +1,61 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block title %}Access review{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    {{ page_header(
+        title='Access review',
+        description='Every quarter, check that each person still needs the access they have.',
+        breadcrumbs=[
+            {'label': 'Admin', 'href': url_for('admin.index')},
+            {'label': 'Team', 'href': url_for('team.team')},
+            {'label': 'Access review'}
+        ]
+    ) }}
+    {% include 'admin/access/_flash.html' %}
+
+    {% if can_act %}
+    <div class="bg-background shadow rounded-lg mb-8 p-6">
+        <h2 class="text-lg font-semibold text-foreground mb-1">Start a review</h2>
+        <p class="text-sm text-muted-foreground mb-4">Everyone in the organisation is listed once. Access nobody has used in 90 days is marked, and you keep or remove each one. You have 30 days to finish.</p>
+        <form method="POST" action="{{ url_for('access_review.review_open') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" {% if has_open %}disabled{% endif %}
+                class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                Start a review
+            </button>
+            {% if has_open %}<span class="ml-3 text-sm text-muted-foreground">A review is already open.</span>{% endif %}
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="bg-background shadow rounded-lg overflow-x-auto" data-access-reviews>
+        <table class="min-w-full divide-y divide-border">
+            <thead class="bg-muted/30">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Started</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Finish by</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">People</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider"><span class="sr-only">Open</span></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                {% for cycle in cycles %}
+                <tr data-review-id="{{ cycle.id }}" data-review-status="{{ cycle.status }}">
+                    <td class="px-6 py-4 text-sm text-foreground">{{ cycle.opened_at.strftime('%d %b %Y') }}</td>
+                    <td class="px-6 py-4 text-sm text-muted-foreground">{{ cycle.due_at.strftime('%d %b %Y') }}</td>
+                    <td class="px-6 py-4 text-sm text-foreground">{{ 'Open' if cycle.is_open else 'Closed' }}</td>
+                    <td class="px-6 py-4 text-sm text-muted-foreground">{{ cycle.items | length }}</td>
+                    <td class="px-6 py-4 text-right text-sm"><a class="text-primary hover:underline" href="{{ url_for('access_review.review_detail', cycle_id=cycle.id) }}">Open</a></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="px-6 py-4 text-center text-sm text-muted-foreground">No reviews yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
