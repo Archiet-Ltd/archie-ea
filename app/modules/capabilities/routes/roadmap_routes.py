@@ -1728,7 +1728,10 @@ def api_roadmap_create_child_work_package(wp_id):
 
         child_fields = work_package_service.from_form(data)
         child_fields["parent_id"] = parent.id
-        child_fields.setdefault("gap_id", parent.gap_id)
+        if not child_fields.get("gap_id"):
+            parent_gaps = work_package_service.plateau_and_gap_links([parent], org_id)[parent.id]["gap_ids"]
+            if parent_gaps:
+                child_fields["gap_id"] = parent_gaps[0]
         child = work_package_service.create_work_package(
             organization_id=org_id,
             user_id=current_user.id if current_user.is_authenticated else None,

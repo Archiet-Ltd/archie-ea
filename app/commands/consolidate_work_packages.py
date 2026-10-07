@@ -656,7 +656,7 @@ def _union_roadmap_links(conn, ids, stats):
 
 
 def sync_source_rows(conn, table, ids=None, *, update_existing=False, fallback_org_id=None,
-                     changed=None, dependency_changes=None):
+                     changed=None, dependency_changes=None, defer_links=None):
     """Copy rows of a retired store into unified_work_packages.
 
     The one per-row copy path. `ids` restricts it to those source ids (the
@@ -669,7 +669,10 @@ def sync_source_rows(conn, table, ids=None, *, update_existing=False, fallback_o
 
     Applies the same organisation attribution as backfill-work-package-org to
     the rows it touches, remaps dependencies, and fills the fields earlier
-    merges did not copy. Returns a dict of counts (empty when nothing changed).
+    merges did not copy. The plateau and gap values copied with a row become
+    ArchiMate relationships in the same transaction: at once, or, when the caller
+    is inside a session flush and cannot flush again, through `defer_links(uids)`.
+    Returns a dict of counts (empty when nothing changed).
     """
     stats = _Stats()
     spec = _SPEC_BY_TABLE[table]
@@ -695,6 +698,11 @@ def sync_source_rows(conn, table, ids=None, *, update_existing=False, fallback_o
         ]
         if uids:
             stats.add(f"{table}: attributed", _attribute_org(conn, unified_ids=uids, emit=False))
+            if table == "work_packages":
+                if defer_links is not None:
+                    defer_links(uids)
+                else:
+                    _link_columns_to_relationships(stats, unified_ids=uids)
             for source_id in [
                 row[0] for row in conn.execute(
                     text("SELECT source_id FROM unified_work_packages "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
@@ -946,21 +954,23 @@ def _merge_roadmap_deliverables(conn, stats, dry_run=False):
 
 
 # --- plateau and gap links ------------------------------------------------------
-def _link_columns_to_relationships(stats, dry_run=False):
+def _link_columns_to_relationships(stats, dry_run=False, unified_ids=None):
     """Turn each unified_work_packages.plateau_id / gap_id value into the ArchiMate
     relationship the writer makes (realization to the plateau's element,
     association to the gap's element). A relationship that exists is skipped; a
     plateau or gap of another organisation, or one that no longer exists, is
     counted and left. The columns themselves are neither cleared nor read by any
-    product code: this step is the one-time migration read."""
+    product code: this step is the one-time migration read. `unified_ids`
+    restricts it to those unified rows (the bridge's per-row copy)."""
     from app.models.unified_work_package import UnifiedWorkPackage
     from app.services import work_package_service as svc
 
+    scope = "AND id = ANY(:uids) " if unified_ids is not None else ""
     rows = db.session.execute(text(
         "SELECT id, organization_id, plateau_id, gap_id FROM unified_work_packages "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
         "WHERE organization_id IS NOT NULL AND (plateau_id IS NOT NULL OR gap_id IS NOT NULL) "
-        "ORDER BY id"
-    )).fetchall()
+        + scope + "ORDER BY id"
+    ), {"uids": list(unified_ids)} if unified_ids is not None else {}).fetchall()
     for wp_id, org_id, plateau_id, gap_id in rows:
         wp = db.session.execute(  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
             db.select(UnifiedWorkPackage).where(UnifiedWorkPackage.id == wp_id)).scalar_one()

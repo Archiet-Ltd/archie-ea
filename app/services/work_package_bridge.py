@@ -193,6 +193,7 @@ def _after_flush(session, flush_context):
         sync_source_rows(
             conn, table, list(objs), update_existing=True, fallback_org_id=caller,
             changed=changed.get(table), dependency_changes=dependency_changes.get(table),
+            defer_links=lambda uids, _s=session: _s.info.setdefault(_PENDING_LINKS, set()).update(uids),
         )
         marks = {
             row[0]: row[1:] for row in conn.execute(
@@ -206,8 +207,37 @@ def _after_flush(session, flush_context):
                 set_committed_value(obj, "retired_at", marks[source_id][1])
 
 
+_PENDING_LINKS = "work_package_bridge_pending_links"
+
+
+def _run_pending_links(session):
+    """Turn the plateau and gap values the copies carry into relationships. A
+    session cannot flush inside its own flush, so the copy only notes the ids and
+    this runs as soon as the outermost flush has returned, in the same transaction."""
+    uids = session.info.pop(_PENDING_LINKS, None)
+    if not uids:
+        return
+    from app.commands.consolidate_work_packages import _Stats, _link_columns_to_relationships
+
+    _link_columns_to_relationships(_Stats(), unified_ids=sorted(uids))
+
+
+def _flush_then_link(original):
+    def flush(self, objects=None):
+        outer = not self._flushing
+        result = original(self, objects)
+        if outer and self.info.get(_PENDING_LINKS):
+            _run_pending_links(self)
+        return result
+
+    flush._wp_bridge_wrapped = True
+    return flush
+
+
 def register(app=None):
     """Install the session listeners once per process (create_app may run many times)."""
     for name, fn in (("before_flush", _before_flush), ("after_flush", _after_flush)):
         if not event.contains(Session, name, fn):
             event.listen(Session, name, fn)
+    if not getattr(Session.flush, "_wp_bridge_wrapped", False):
+        Session.flush = _flush_then_link(Session.flush)

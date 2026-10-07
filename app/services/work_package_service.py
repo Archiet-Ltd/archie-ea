@@ -395,9 +395,8 @@ def work_package_ids_for_gap(gap_id: int, organization_id: int) -> List[int]:
 
 
 def plateau_work_package_ids(plateau_ids, organization_id: int) -> Dict[int, set]:
-    """{plateau id: {ids of this organisation's work packages that realise it}}.
-    Work packages still held by the older list are counted through their copy."""
-    from app.models.implementation_migration import Plateau, WorkPackage
+    """{plateau id: {ids of this organisation's work packages that realise it}}."""
+    from app.models.implementation_migration import Plateau
     from app.models.models import ArchiMateRelationship
 
     out: Dict[int, set] = {pid: set() for pid in plateau_ids}
@@ -416,18 +415,6 @@ def plateau_work_package_ids(plateau_ids, organization_id: int) -> Dict[int, set
         )
     ).all()
     for plateau_id, wp_id in rows:
-        out[plateau_id].add(wp_id)
-    older = db.session.execute(
-        db.select(WorkPackage.plateau_id, UnifiedWorkPackage.id)
-        .join(UnifiedWorkPackage, db.and_(
-            UnifiedWorkPackage.source_table == "work_packages",
-            UnifiedWorkPackage.source_id == WorkPackage.id))
-        .where(
-            WorkPackage.plateau_id.in_(list(out)),
-            UnifiedWorkPackage.organization_id == organization_id,
-        )
-    ).all()
-    for plateau_id, wp_id in older:
         out[plateau_id].add(wp_id)
     return out
 

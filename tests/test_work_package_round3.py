@@ -928,3 +928,44 @@ def test_round3_deploy_sequence_idempotent(app, db_session, make_org, bridge_off
     dry = _merge(app, "--dry-run")
     assert "would merge" not in dry
     assert "copied" not in dry
+
+
+# -- round 3b: child gap and bridged plateau come from relationships -------------
+
+
+def test_child_inherits_parent_gap_from_relationship(db_session, make_org, client, login_as):
+    from app.services import work_package_service as svc
+
+    org, user = _org_with_user(db_session, make_org, "r3b-child")
+    gap = _gap(db_session, org)
+    parent = svc.create_work_package(organization_id=org.id, name="Parent", gap_id=gap.id)
+    db_session.commit()
+    login_as(client, user)
+    resp = _json(client, "post", "/capability-map/api/roadmap/work-packages/%s/children" % parent.id,
+                 {"name": "Child"})
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    child_id = resp.get_json()["work_package"]["id"]
+    child = svc.require_work_package(child_id, org.id)
+    assert child.gap_id is None
+    assert svc.plateau_and_gap_links([child], org.id)[child.id]["gap_ids"] == [gap.id]
+    assert [kind for kind, _t in _relationships_of(child)] == ["association"]
+
+
+def test_bridged_plateau_link_is_a_relationship_at_once(app, db_session, make_org):
+    from app.services import work_package_service as svc
+
+    org = make_org("r3b-bridge")
+    plateau = _plateau(db_session, org)
+    legacy = _legacy(db_session, org, "Bridged", plateau_id=plateau.id)
+    db_session.flush()
+    copy = _copy("work_packages", legacy.id, org)
+    assert copy is not None
+    assert [kind for kind, _t in _relationships_of(copy)] == ["realization"]
+    assert svc.plateau_work_package_ids([plateau.id], org.id)[plateau.id] == {copy.id}
+
+    db_session.commit()
+    before = len(_relationships_of(copy))
+    out = _merge(app)
+    assert "relationships created" not in out
+    db_session.expire_all()
+    assert len(_relationships_of(copy)) == before
