@@ -145,6 +145,31 @@ def test_deploy_does_not_restore_moved_or_cleared_links(app, db_session, make_or
     assert _links(db_session, org, copy) == {"plateau_ids": [p2.id], "gap_ids": []}
 
 
+def test_new_screen_link_change_survives_old_screen_status_edit(db_session, make_org):
+    from app.services import work_package_service as svc
+
+    org, _user = _org_with_user(db_session, make_org, "n302b")
+    p1, p2 = _plateau(db_session, org, "P1"), _plateau(db_session, org, "P2")
+    gap = _gap(db_session, org)
+    legacy = _legacy(db_session, org, "Old store row", plateau_id=p1.id, status="planned")
+    copy = _copy("work_packages", legacy.id, org)
+    svc.update_work_package(copy.id, organization_id=org.id, gap_id=gap.id)
+    assert _links(db_session, org, copy) == {"plateau_ids": [p1.id], "gap_ids": [gap.id]}
+
+    # Moved and cleared on the new screens.
+    svc.update_work_package(copy.id, organization_id=org.id, plateau_id=p2.id, gap_id=None)
+    db_session.flush()
+    assert _links(db_session, org, copy) == {"plateau_ids": [p2.id], "gap_ids": []}
+
+    # An old-screen status-only edit (bridged) restores nothing.
+    legacy.status = "in_progress"
+    db_session.flush()
+    assert _links(db_session, org, copy) == {"plateau_ids": [p2.id], "gap_ids": []}
+    legacy.status = "on_hold"
+    db_session.flush()
+    assert _links(db_session, org, copy) == {"plateau_ids": [p2.id], "gap_ids": []}
+
+
 # -- N3-03: an old screen's move or clear replaces the link -------------------
 
 
@@ -366,6 +391,32 @@ def test_link_step_uses_flushing_session(db_session, make_org, monkeypatch):
         other.close()
     assert db.session.registry() is application_session, "the application's session is back in place"
     assert not application_session.in_transaction(), "db.session never joined that transaction"
+
+
+def test_using_session_restores_registry_on_every_path(db_session):
+    from sqlalchemy.orm import Session
+
+    from app import db
+    from app.services import work_package_bridge as bridge
+
+    application_session = db.session.registry()
+    other = Session(bind=db_session.get_bind())
+    try:
+        try:
+            with bridge._using_session(other):
+                assert db.session.registry() is other
+                raise RuntimeError("escapes the savepoint")
+        except RuntimeError:
+            pass
+        assert db.session.registry() is application_session
+        # No session in the registry beforehand: it is left empty, not holding the other one.
+        db.session.registry.clear()
+        with bridge._using_session(other):
+            assert db.session.registry() is other
+        assert not db.session.registry.has()
+    finally:
+        other.close()
+        db.session.registry.set(application_session)
 
 
 # -- N3-06: a dependency removed on a new screen stays removed -------------------

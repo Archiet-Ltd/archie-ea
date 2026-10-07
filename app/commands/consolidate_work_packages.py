@@ -1062,19 +1062,22 @@ def apply_link_changes(changes, *, replace=True, stats=None):
     stats = stats if stats is not None else _Stats()
     done = []
     for uid, values in sorted(changes.items()):
-        row = db.session.execute(text(
-            "SELECT organization_id FROM unified_work_packages WHERE id = :i"),  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
-            {"i": uid}).first()
-        if row is None:
-            continue
-        org_id = row[0]
-        if org_id is None:
-            logger.warning("plateau/gap link not applied: work package %s has no organisation "
-                           "(values %s)", uid, values)
-            stats.add("unified_work_packages: link skipped (no organisation)", len(values))
-            continue
+        org_id = None
+        # The read of the row sits inside the savepoint too, so a failure anywhere in a
+        # work package's link step leaves the outer transaction usable.
         try:
             with db.session.begin_nested():
+                row = db.session.execute(text(
+                    "SELECT organization_id FROM unified_work_packages WHERE id = :i"),  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+                    {"i": uid}).first()
+                org_id = row[0] if row is not None else None
+                if row is None:
+                    continue
+                if org_id is None:
+                    logger.warning("plateau/gap link not applied: work package %s has no organisation "
+                                   "(values %s)", uid, values)
+                    stats.add("unified_work_packages: link skipped (no organisation)", len(values))
+                    continue
                 wp = db.session.execute(  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
                     db.select(UnifiedWorkPackage).where(UnifiedWorkPackage.id == uid)).scalar_one()
                 for key, value in values.items():

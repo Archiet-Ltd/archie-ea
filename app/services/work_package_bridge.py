@@ -283,11 +283,12 @@ def _run_pending_links(session):
         return
     from app.commands.consolidate_work_packages import apply_link_changes
 
-    try:
-        with _using_session(session):
-            apply_link_changes(wanted)
-    except Exception as exc:  # noqa: BLE001 - never break the caller's flush for a link
-        logger.warning("plateau/gap link step failed for work packages %s: %s", sorted(wanted), exc)
+    # Every failure that can be contained is contained in apply_link_changes, inside a
+    # savepoint per work package (the row read included). Nothing is swallowed here: an
+    # error that escapes a savepoint means the connection itself is gone, and the
+    # caller must see it rather than carry on with an aborted transaction.
+    with _using_session(session):
+        apply_link_changes(wanted)
 
 
 def _flush_then_link(original):
