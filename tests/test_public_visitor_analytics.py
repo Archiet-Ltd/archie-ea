@@ -264,6 +264,30 @@ class TestOfferEnquiryLogging:
         )
 
 
+class TestIndexNowKeyNeedsNoSetup:
+    """The IndexNow key is not a secret -- the protocol requires it to be
+    served in plaintext, unauthenticated, at /<key>.txt, specifically so
+    search engines can verify it without any credential. There is nothing
+    to protect by keeping it out of the repository, so it ships with a
+    real committed default and works with no environment variable set."""
+
+    def test_key_is_set_out_of_the_box(self, app):
+        key = app.config.get("INDEXNOW_API_KEY", "")
+        assert key, "INDEXNOW_API_KEY must have a real, non-empty default"
+        assert 32 <= len(key) <= 128
+        assert all(c in "0123456789abcdef" for c in key)
+
+    def test_key_file_route_serves_the_configured_key(self, client, app):
+        key = app.config["INDEXNOW_API_KEY"]
+        resp = client.get(f"/{key}.txt")
+        assert resp.status_code == 200
+        assert resp.data.decode() == key
+
+    def test_wrong_key_file_is_a_404(self, client):
+        resp = client.get("/not-the-real-key.txt")
+        assert resp.status_code == 404
+
+
 class TestNoCookieNoLocalStorage:
     """The app already sets its own (pre-existing, unrelated) session
     cookie carrying the CSRF token on every page -- nothing to do with this

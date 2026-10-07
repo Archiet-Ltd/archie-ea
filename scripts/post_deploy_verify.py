@@ -42,6 +42,7 @@ failed deploy, and until now it was a successful one.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import re
@@ -143,10 +144,51 @@ def sitemap_urls(base: str) -> list:
     return [loc.text.strip() for loc in root.findall(f".//{ns}loc") if loc.text]
 
 
+def _indexnow_key() -> str:
+    """The IndexNow key, read from the one place it is defined.
+
+    INDEXNOW_API_KEY is not a secret (config.py) and this runner no longer
+    has it wired into its environment -- a real env var still wins, for
+    anyone who wants to rotate the key without a code change, but otherwise
+    this reads config.py's own source as text and pulls out its committed
+    default. Deliberately not `import config`: this runner has none of the
+    app's dependencies installed (see the module docstring above), the same
+    reason check_pages() / sitemap_urls() above talk to the live site over
+    HTTP instead of importing the app.
+    """
+    env_key = os.environ.get("INDEXNOW_API_KEY", "").strip()
+    if env_key:
+        return env_key
+
+    config_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.py"
+    )
+    try:
+        with open(config_path, "r", encoding="utf-8") as fh:
+            tree = ast.parse(fh.read(), filename=config_path)
+    except (OSError, SyntaxError):
+        return ""
+
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "INDEXNOW_API_KEY"
+                for target in node.targets
+            )
+            and isinstance(node.value, ast.Call)
+            and len(node.value.args) == 2
+            and isinstance(node.value.args[1], ast.Constant)
+            and isinstance(node.value.args[1].value, str)
+        ):
+            return node.value.args[1].value
+    return ""
+
+
 def ping_indexnow(base: str, urls: list) -> dict | None:
     """Tell IndexNow (api.indexnow.org, shared by Bing/Yandex) that every URL
     in *urls* may have changed, so these engines can re-crawl now rather than
-    waiting. No-op when INDEXNOW_API_KEY is unset -- the key is free and
+    waiting. No-op when no key can be found -- the key is free and
     self-generated (https://www.indexnow.org/documentation), never a paid
     account, but until one is generated and the matching /<key>.txt is
     deployed this stays a no-op by design, the same pattern as the other
@@ -157,7 +199,7 @@ def ping_indexnow(base: str, urls: list) -> dict | None:
     is reported in the JSON output and never added to the caller's
     `problems` list (post_deploy_verify's exit code / rollback signal).
     """
-    key = os.environ.get("INDEXNOW_API_KEY", "").strip()
+    key = _indexnow_key()
     if not key or not urls:
         return None
 
@@ -227,7 +269,7 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
         "--no-indexnow", action="store_true",
-        help="skip the IndexNow ping even when INDEXNOW_API_KEY is set",
+        help="skip the IndexNow ping even when a key is found",
     )
     args = parser.parse_args()
 
@@ -262,7 +304,7 @@ def main() -> int:
             print("production OK: %d public surfaces served, none reporting an error"
                   % len(PUBLIC_PATHS))
             if indexnow_result is None:
-                print("IndexNow: skipped (INDEXNOW_API_KEY not set, or --no-indexnow)")
+                print("IndexNow: skipped (no key found, or --no-indexnow)")
             else:
                 print("IndexNow: submitted %d URL(s), status %s"
                       % (indexnow_result["url_count"], indexnow_result["status"]))
