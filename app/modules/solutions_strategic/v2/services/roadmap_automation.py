@@ -593,7 +593,7 @@ class RoadmapAutomationEngine:
         timeline_constraint = constraints.get("timeline_constraint")
 
         for wp in work_packages:
-            wp_data = wp.to_dict()
+            wp_data = work_package_service.to_dict(wp)
 
             # Apply budget constraint
             if budget_constraint and wp.estimated_cost:

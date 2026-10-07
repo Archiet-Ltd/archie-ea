@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from flask import Blueprint, abort, jsonify, request
 from flask_login import current_user, login_required
-from sqlalchemy import text
+from sqlalchemy import func, text
 
 from app import db
 from app.decorators import audit_log
@@ -48,6 +48,16 @@ def _require(work_package_id):
     if work_package is None:
         abort(404)
     return work_package
+
+
+def _by_priority(rows):
+    """Work packages per priority ("unset" when none), for these rows."""
+    counts = {}
+    for priority, count in rows.with_entities(
+        ImplementationWorkPackage.priority, func.count()
+    ).group_by(ImplementationWorkPackage.priority).all():
+        counts[priority or "unset"] = counts.get(priority or "unset", 0) + count
+    return counts
 
 
 def _deliverable_or_404(deliverable_id):
@@ -1549,13 +1559,7 @@ def get_statistics():
                     .group_by(ImplementationWorkPackage.status)
                     .all()
                 ),
-                "by_priority": dict(
-                    _wp_rows.with_entities(
-                        _func.coalesce(ImplementationWorkPackage.priority, "unset"), _func.count()
-                    )
-                    .group_by(_func.coalesce(ImplementationWorkPackage.priority, "unset"))
-                    .all()
-                ),
+                "by_priority": _by_priority(_wp_rows),
                 "total_cost": _wp_rows.with_entities(
                     _func.coalesce(_func.sum(ImplementationWorkPackage.estimated_cost), 0)
                 ).scalar()

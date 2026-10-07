@@ -281,7 +281,7 @@ def test_roadmap_builder_screen_uses_unified_ids(screens, client, login_as):
     # a cycle is refused
     cyc = _json(client, "post", "/api/roadmap-builder/work-packages/%s/dependencies" % first_id,
                 {"depends_on_id": second_id})
-    assert cyc.get_json()["data"]["success"] is False
+    assert cyc.status_code == 400 and cyc.get_json()["success"] is False
 
     assert _json(client, "put", "/api/roadmap-builder/work-packages/%s" % first_id,
                  {"name": "Builder renamed"}).status_code == 200
