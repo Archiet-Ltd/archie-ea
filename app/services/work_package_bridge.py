@@ -9,9 +9,12 @@ this module the repointed lists would miss every row such a screen creates until
 the next deploy, and an edit to an already copied row would never arrive.
 
 How it works: a session listener sees every flush.
-  * new or changed rows of a retired store are handed, in the same transaction,
-    to ``sync_source_rows`` in app/commands/consolidate_work_packages.py -- the
-    one per-row copy path the deploy merge also uses;
+  * new rows of a retired store are handed, in the same transaction, to
+    ``sync_source_rows`` in app/commands/consolidate_work_packages.py -- the one
+    per-row copy path the deploy merge also uses; a row edited later passes only
+    the columns that changed (read from the session's attribute history), and a
+    changed dependency list as the ids added and removed, so what was edited on
+    the one store's own screens is never written over;
   * a deleted row of a retired store removes its copy through
     ``work_package_service.delete_work_package`` (dependency clean-up included);
   * a retired row whose copy was deleted carries ``retired_at`` and is never
@@ -27,7 +30,7 @@ from __future__ import annotations
 import contextlib
 import logging
 
-from sqlalchemy import event, text
+from sqlalchemy import event, inspect, text
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -73,14 +76,55 @@ def _load_tables():
 
 
 def _caller_org():
+    """The organisation a row written with no attribution of its own belongs to:
+    the request's, or the tenant a scheduled job runs for (tenant_scope in
+    app/jobs/tenant_safe_job.py sets both g values)."""
     try:
         from flask import g, has_app_context
 
         if has_app_context():
-            return getattr(g, "current_org_id", None)
+            return getattr(g, "current_org_id", None) or getattr(
+                g, "_tenant_scope_organization_id", None)
     except Exception:  # pragma: no cover - no Flask context at all
         pass
     return None
+
+
+def _history_list(history, which):
+    """The list value an attribute history holds (None when it holds none)."""
+    values = getattr(history, which)
+    for value in values or ():
+        if isinstance(value, (list, tuple)):
+            return list(value)
+    return None
+
+
+def _changes_of(obj, table):
+    """({source column, ...}, (old dependency ids, new ids) or None) for a row of a
+    retired store that was edited: its changed mapped columns, named as the
+    source store names them, read from the attribute history."""
+    from app.commands.consolidate_work_packages import _DEP_SOURCE_COLUMN, _LINK_RELATIONSHIPS
+
+    state = inspect(obj)
+    columns = set()
+    dependency_change = None
+    dep_column = _DEP_SOURCE_COLUMN.get(table)
+    for attr in state.mapper.column_attrs:
+        history = state.attrs[attr.key].history
+        if not history.has_changes():
+            continue
+        name = attr.columns[0].name
+        if name == dep_column:
+            new = _history_list(history, "added")
+            if new is None:
+                new = list(getattr(obj, attr.key) or [])
+            dependency_change = (_history_list(history, "deleted"), new)
+        else:
+            columns.add(name)
+    for key in _LINK_RELATIONSHIPS:
+        if key in state.mapper.relationships and state.attrs[key].history.has_changes():
+            columns.add(key)
+    return columns, dependency_change
 
 
 def _table_of(tables, obj):
@@ -125,10 +169,19 @@ def _after_flush(session, flush_context):
         return
     tables = _tables()
     pending = {}
+    changed = {}
+    dependency_changes = {}
+    new_objects = set(session.new)
     for obj in list(session.new) + [o for o in session.dirty if session.is_modified(o)]:
         table = _table_of(tables, obj)
         if table is not None and getattr(obj, "id", None) is not None:
             pending.setdefault(table, {})[obj.id] = obj
+            if obj not in new_objects:
+                columns, dependency_change = _changes_of(obj, table)
+                if columns:
+                    changed.setdefault(table, {})[obj.id] = columns
+                if dependency_change is not None:
+                    dependency_changes.setdefault(table, {})[obj.id] = dependency_change
     if not pending:
         return
 
@@ -138,7 +191,8 @@ def _after_flush(session, flush_context):
     caller = _caller_org()
     for table, objs in pending.items():
         sync_source_rows(
-            conn, table, list(objs), update_existing=True, fallback_org_id=caller
+            conn, table, list(objs), update_existing=True, fallback_org_id=caller,
+            changed=changed.get(table), dependency_changes=dependency_changes.get(table),
         )
         marks = {
             row[0]: row[1:] for row in conn.execute(

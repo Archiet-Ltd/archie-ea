@@ -263,6 +263,13 @@ class RoadmapDeliverable(TenantMixin, db.Model):
     created_by = Column(Integer, nullable=True)
     updated_by = Column(Integer, nullable=True)
 
+    # This store is retired into ``deliverables`` (never dropped): the row copied
+    # there is ``retired_into_id``; ``retired_at`` survives that copy's deletion.
+    retired_into_id = Column(
+        Integer, ForeignKey("deliverables.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    retired_at = Column(DateTime, nullable=True)
+
     # Relationships
     work_package = relationship("RoadmapWorkPackage", back_populates="deliverables")
     source_application = relationship(
