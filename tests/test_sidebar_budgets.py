@@ -470,8 +470,11 @@ def test_platform_admin_zone_link_total_is_pinned():
     My work — the one registry recording each agent's owner, charter version
     and delegated limits, closest existing persona to the brief's
     "Organisation Administrator".
+
+    30 -> 31 (R1-B26 PR 1, 7 Oct 2026): "Leavers" added to platform_admin's
+    Admin zone — the list of departed users and the ownerships to hand over.
     """
-    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 30
+    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 31
 
 
 def test_platform_admin_collapsed_sidebar_icons_are_unambiguous():
