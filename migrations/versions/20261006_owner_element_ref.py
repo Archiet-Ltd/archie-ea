@@ -12,14 +12,14 @@ unique index, so this does not collide with, or get collided with by, the
 existing application-only rows.
 
 Revision ID: 20261006_owner_element_ref
-Revises: 20261004_acr_escalated_at
+Revises: 20261005_bf_capability_fk
 Create Date: 2026-10-06
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261006_owner_element_ref"
-down_revision = "20261004_acr_escalated_at"
+down_revision = "20261005_bf_capability_fk"
 branch_labels = None
 depends_on = None
 
