@@ -115,6 +115,32 @@ def _csrf_guard():
     """
     if is_bearer_only_mcp_request():
         return None
+    # A standard MCP client (including Claude Code's own) is expected to
+    # trigger OAuth (re-)authentication specifically on an HTTP 401 from this
+    # endpoint -- both on first connection (no token yet) and when a token
+    # has expired. Without this, a POST /mcp carrying no valid bearer token
+    # and no session cookie never sets g.auth_mode == "bearer" (so the
+    # is_bearer_only_mcp_request() check above returns False) and falls
+    # through to the ordinary CSRF check below, which fails with a generic
+    # 400 before the view body -- which would have returned a proper 401
+    # JSON-RPC error -- ever runs. Restricted to POST so the public,
+    # unauthenticated GET /mcp metadata-discovery endpoint (mcp_get) is
+    # unaffected. Restricted to "no session cookie at all" so a browser call
+    # authenticated via a valid session cookie (no bearer token at all) is
+    # completely unaffected and still goes through the ordinary CSRF path
+    # exactly as today. This also correctly applies to the "initialize"
+    # JSON-RPC method, which skips the current_user.is_authenticated check
+    # entirely in the view body -- a client's very first POST /mcp call
+    # before it has ever obtained a token should get 401 with
+    # WWW-Authenticate, which is what tells a spec-compliant MCP client to go
+    # start the OAuth flow.
+    if (request.path == "/mcp" and request.method == "POST"
+            and not _request_carries_session_cookie()
+            and getattr(g, "auth_mode", None) != "bearer"):
+        response = jsonify({"error": "invalid_token"})
+        response.status_code = 401
+        response.headers["WWW-Authenticate"] = 'Bearer realm="entelim", error="invalid_token"'
+        return response
     if not current_app.config.get("WTF_CSRF_ENABLED", True):
         return None
     if not current_app.config.get("WTF_CSRF_CHECK_DEFAULT", True):
@@ -191,6 +217,21 @@ def mcp_endpoint():
                                           "Authentication required")), 401
 
         handler = TOOL_REGISTRY[tool_name]
+
+        # Scope check -- only meaningful for a bearer-authenticated call: the
+        # token's granted scope (set at issue time by
+        # oauth_provider.routes._filter_granted_scopes) is the only place a
+        # scope exists at all. A session-cookie-authenticated browser call
+        # carries no OAuth token and no scope to check -- the existing
+        # permission system already governs that path, unchanged.
+        if getattr(g, "auth_mode", None) == "bearer":
+            bearer_token = getattr(g, "bearer_token", None)
+            granted_scopes = set((bearer_token.scope or "").split()) if bearer_token else set()
+            if handler.required_scope not in granted_scopes:
+                return jsonify(_jsonrpc_error(
+                    req_id, JSONRPC_INTERNAL_ERROR,
+                    f"insufficient_scope: this token does not have {handler.required_scope}",
+                )), 403
 
         # Meter the call
         try:

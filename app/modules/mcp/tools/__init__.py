@@ -16,20 +16,30 @@ class ToolHandler:
     """A registered MCP tool — name, schema, and execution callback."""
 
     def __init__(self, name: str, description: str, input_schema: dict,
-                 annotations: dict, execute: Callable[[dict], Any]):
+                 annotations: dict, execute: Callable[[dict], Any],
+                 required_scope: str = "mcp:read"):
         self.name = name
         self.description = description
         self.input_schema = input_schema
         self.annotations = annotations
         self._execute = execute
+        self.required_scope = required_scope
 
     def execute(self, arguments: dict) -> Any:
         return self._execute(arguments)
 
 
 def register_tool(name: str, description: str, input_schema: dict,
-                  annotations: dict | None = None):
-    """Decorator to register a tool handler."""
+                  annotations: dict | None = None,
+                  required_scope: str = "mcp:read"):
+    """Decorator to register a tool handler.
+
+    ``required_scope`` defaults to "mcp:read" — every tool registered today
+    is read-only. A future write tool (an "mcp:propose" grant) passes
+    ``required_scope="mcp:propose"`` explicitly; the blueprint's tools/call
+    handling checks this against the calling bearer token's granted scope
+    before the handler ever runs.
+    """
     if annotations is None:
         annotations = {"readOnlyHint": True}
 
@@ -40,6 +50,7 @@ def register_tool(name: str, description: str, input_schema: dict,
             input_schema=input_schema,
             annotations=annotations,
             execute=fn,
+            required_scope=required_scope,
         )
         return fn
 

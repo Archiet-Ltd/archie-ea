@@ -189,6 +189,81 @@ class TestBearerOnlyCallSucceedsWithCsrfEnabled:
         assert len(data["result"]["tools"]) == 10
 
 
+class TestNoAuthGetsRealUnauthorizedNotCsrf:
+    """A standard MCP client (including Claude Code's own) is expected to
+    trigger OAuth (re-)authentication specifically on an HTTP 401 from /mcp
+    -- both on first connection (no token yet) and when a token has
+    expired. Before this fix, a POST /mcp with no valid bearer token and no
+    session cookie never set g.auth_mode == "bearer", so it fell through to
+    the ordinary CSRF check and got a generic 400 instead -- before the view
+    body (which would have returned a proper 401) ever ran. These tests run
+    with CSRF genuinely enabled, the one configuration that matters: without
+    this fix, CSRF would reject the request first.
+    """
+
+    def test_post_mcp_with_no_auth_at_all_gets_401_with_www_authenticate(
+        self, csrf_enabled, client
+    ):
+        payload = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
+        resp = client.post("/mcp", data=json.dumps(payload), content_type="application/json")
+        assert resp.status_code == 401, resp.get_data(as_text=True)
+        body = resp.get_json()
+        assert body.get("error_type") != "csrf", body
+        assert "WWW-Authenticate" in resp.headers
+        assert resp.headers["WWW-Authenticate"].startswith("Bearer ")
+
+    def test_post_mcp_with_garbage_bearer_token_gets_401_with_www_authenticate(
+        self, csrf_enabled, client
+    ):
+        payload = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        resp = client.post(
+            "/mcp",
+            data=json.dumps(payload),
+            content_type="application/json",
+            headers={"Authorization": "Bearer not-a-real-token-at-all"},
+        )
+        assert resp.status_code == 401, resp.get_data(as_text=True)
+        body = resp.get_json()
+        assert body.get("error_type") != "csrf", body
+        assert "WWW-Authenticate" in resp.headers
+
+    def test_get_mcp_metadata_is_unaffected(self, csrf_enabled, client):
+        """The public, unauthenticated GET /mcp metadata-discovery endpoint
+        must not be caught by the new POST-only check."""
+        resp = client.get("/mcp")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["protocolVersion"] == "2025-11-25"
+
+    def test_session_cookie_call_with_no_bearer_token_still_goes_through_ordinary_csrf(
+        self, csrf_enabled, client, db_session, make_org, login_as
+    ):
+        """An existing session-cookie-authenticated browser call to /mcp
+        with no CSRF token still gets the ordinary CSRF 400 -- unaffected by
+        this fix, which only intercepts the no-session-cookie-and-no-bearer
+        case."""
+        from app.models.user import Role, User
+
+        role = Role.query.filter_by(name="Administrator").first()
+        if role is None:
+            Role.insert_roles()
+            role = Role.query.filter_by(name="Administrator").first()
+        org = make_org("csrf-session-still-blocked")
+        user = User(
+            email="csrf-session-still-blocked@example.com", first_name="Test", last_name="User",
+            organization_id=org.id, role=role, is_org_admin=True, confirmed=True,
+        )
+        user.password = "test"
+        db_session.add(user)
+        db_session.flush()
+        login_as(client, user)
+
+        payload = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+        resp = client.post("/mcp", data=json.dumps(payload), content_type="application/json")
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        assert resp.get_json()["error_type"] == "csrf"
+
+
 class TestSessionCookieNeverGetsBearerExemption:
     """A request to /mcp carrying a valid session cookie must still be
     rejected by CSRF -- the bearer-only exemption never applies to it, even

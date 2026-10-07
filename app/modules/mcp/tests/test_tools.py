@@ -195,11 +195,33 @@ def _mcp_tools_list(client, token: str) -> list:
 class TestMCPInitialize:
     """MCP lifecycle: initialize and tools/list."""
 
-    def test_initialize(self, client):
-        """POST /mcp with initialize returns protocol version and capabilities."""
+    def test_initialize(self, client, db_session, make_org, login_as):
+        """POST /mcp with initialize, authenticated via a bearer token,
+        returns protocol version and capabilities.
+
+        An initialize call with no credentials at all now gets 401 with
+        WWW-Authenticate instead of 200 -- see
+        app/modules/mcp/tests/test_csrf.py's
+        TestNoAuthGetsRealUnauthorizedNotCsrf for that regression test. A
+        standard MCP client is expected to trigger OAuth on exactly that
+        401 (both on first connection and on an expired token), so the
+        handshake this test exercises is the one a real client completes
+        after that: retrying initialize with the token it just obtained.
+        """
+        org = make_org("mcp")
+        user = _make_user(db_session, org, "mcp-initialize@example.com")
+        token = _mint_oauth_token(client, db_session, org, user, login_as)
+
+        _clear_cached_identity()
+        bearer_client = client.application.test_client()
         payload = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
-        resp = client.post("/mcp", data=json.dumps(payload), content_type="application/json")
-        assert resp.status_code == 200
+        resp = bearer_client.post(
+            "/mcp",
+            data=json.dumps(payload),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
         data = resp.get_json()
         assert data["result"]["protocolVersion"] == "2025-11-25"
         assert "tools" in data["result"]["capabilities"]
