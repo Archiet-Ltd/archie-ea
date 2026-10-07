@@ -1,0 +1,75 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block title %}Export activity{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    {{ page_header(
+        title='Export activity',
+        description='Who has been downloading files, compared with their own usual pattern.',
+        breadcrumbs=[
+            {'label': 'Admin', 'href': url_for('admin.index')},
+            {'label': 'Team', 'href': url_for('team.team')},
+            {'label': 'Export activity'}
+        ]
+    ) }}
+    {% include 'admin/access/_flash.html' %}
+
+    {% if can_act %}
+    <form method="POST" action="{{ url_for('access_review.exports_scan') }}" class="mb-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit"
+            class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-9 px-4">Check now</button>
+        <span class="ml-3 text-sm text-muted-foreground">This also runs every hour.</span>
+    </form>
+    {% endif %}
+
+    <div class="bg-background shadow rounded-lg mb-8 overflow-hidden" data-export-flags>
+        <div class="px-6 py-4 border-b border-border"><h2 class="text-lg font-semibold text-foreground">Needs a look</h2></div>
+        {% if flags %}
+        <ul class="divide-y divide-border">
+            {% for row in flags %}
+            <li class="px-6 py-4 flex flex-wrap items-center justify-between gap-3" data-flag-id="{{ row.flag.id }}">
+                <p class="text-sm text-foreground">{{ row.flag.summary }}</p>
+                <a class="text-sm text-primary hover:underline" href="{{ url_for('access_review.export_flag', flag_id=row.flag.id) }}">Look at it</a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="px-6 py-4 text-sm text-muted-foreground">Nothing unusual right now.</p>
+        {% endif %}
+    </div>
+
+    <div class="bg-background shadow rounded-lg overflow-x-auto" data-export-activity>
+        <table class="min-w-full divide-y divide-border">
+            <thead class="bg-muted/30">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Person</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Last 24 hours</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Last 7 days</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Usually a day</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Flag above</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                {% for row in activity %}
+                <tr>
+                    <td class="px-6 py-4 text-sm text-foreground">{{ row.user.full_name() }}<span class="block text-muted-foreground">{{ row.user.email }}</span></td>
+                    <td class="px-6 py-4 text-sm text-foreground">{{ row.count_24h }}</td>
+                    <td class="px-6 py-4 text-sm text-foreground">{{ row.count_7d }}</td>
+                    {% if row.enough_history %}
+                    <td class="px-6 py-4 text-sm text-muted-foreground">{{ '%.1f' | format(row.baseline_mean) }}</td>
+                    <td class="px-6 py-4 text-sm text-muted-foreground">{{ '%.0f' | format(row.threshold) }}</td>
+                    {% else %}
+                    <td class="px-6 py-4 text-sm text-muted-foreground" colspan="2">Not enough history yet</td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="px-6 py-4 text-center text-sm text-muted-foreground">No downloads in the last 7 days.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

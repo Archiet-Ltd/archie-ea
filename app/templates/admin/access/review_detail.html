@@ -1,0 +1,99 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block title %}Access review{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    {{ page_header(
+        title='Access review',
+        description='Started ' ~ cycle.opened_at.strftime('%d %b %Y') ~ ', finish by ' ~ cycle.due_at.strftime('%d %b %Y') ~ '.',
+        breadcrumbs=[
+            {'label': 'Admin', 'href': url_for('admin.index')},
+            {'label': 'Team', 'href': url_for('team.team')},
+            {'label': 'Access review', 'href': url_for('access_review.reviews')},
+            {'label': 'Review'}
+        ]
+    ) }}
+    {% include 'admin/access/_flash.html' %}
+
+    <div class="mb-6 flex flex-wrap items-center gap-3" data-review-status="{{ cycle.status }}">
+        {% if cycle.is_open %}
+            <p class="text-sm text-foreground" data-review-state>Open. {{ pending }} still to decide.</p>
+            {% if can_act %}
+            <form method="POST" action="{{ url_for('access_review.review_close', cycle_id=cycle.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" {% if pending %}disabled{% endif %}
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                    Close review
+                </button>
+            </form>
+            {% endif %}
+        {% else %}
+            <p class="text-sm text-foreground" data-review-state>Closed {{ cycle.closed_at.strftime('%d %b %Y') }}.
+                {% if cycle.summary_json %}{{ cycle.summary_json.kept }} kept, {{ cycle.summary_json.removed }} removed, {{ cycle.summary_json.unused }} unused for {{ cycle.unused_days }} days.{% endif %}</p>
+            <a href="{{ url_for('access_review.review_evidence', cycle_id=cycle.id) }}"
+               class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-9 px-4">Download evidence</a>
+        {% endif %}
+    </div>
+    {% if platform_admins %}
+    <p class="mb-4 text-sm text-muted-foreground">{{ platform_admins }} platform administrator(s) are not listed here; their access is not managed in this review.</p>
+    {% endif %}
+
+    <div class="bg-background shadow rounded-lg overflow-x-auto" data-review-items>
+        <table class="min-w-full divide-y divide-border">
+            <thead class="bg-muted/30">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Person</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Last activity</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Decision</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                {% for item in items %}
+                <tr data-item-id="{{ item.id }}" data-item-email="{{ item.user.email if item.user else '' }}" data-item-decision="{{ item.decision }}" data-item-unused="{{ 'yes' if item.unused else 'no' }}">
+                    <td class="px-6 py-4 text-sm">
+                        <span class="font-medium text-foreground">{{ item.user.full_name() if item.user else 'Removed account' }}</span>
+                        <span class="block text-muted-foreground">{{ item.user.email if item.user else '' }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-muted-foreground">{{ item.org_role }}{% if item.persona %} <span aria-hidden="true">·</span> {{ item.persona | replace('_', ' ') }}{% endif %}</td>
+                    <td class="px-6 py-4 text-sm">
+                        {% if item.last_activity_at %}
+                            <span class="text-foreground">{{ item.last_activity_at.strftime('%d %b %Y') }}</span>
+                        {% else %}
+                            <span class="text-foreground">Never</span>
+                        {% endif %}
+                        {% if item.unused %}<span class="ml-2 rounded bg-warning/10 px-2 py-0.5 text-xs text-foreground" data-unused-flag>Not used in {{ cycle.unused_days }} days</span>{% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        {% if item.decision == 'pending' %}
+                            {% if cycle.is_open and can_act %}
+                            <form method="POST" action="{{ url_for('access_review.review_decide', cycle_id=cycle.id, item_id=item.id) }}" class="flex flex-wrap items-center gap-2">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <label class="sr-only" for="note-{{ item.id }}">Note</label>
+                                <input id="note-{{ item.id }}" name="note" type="text" maxlength="1000" placeholder="Note (optional)"
+                                    class="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground">
+                                <button type="submit" name="decision" value="kept"
+                                    class="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium text-foreground hover:bg-accent">Keep</button>
+                                {% if item.user_id != current_user.id %}
+                                <button type="submit" name="decision" value="removed" aria-label="Remove access for {{ item.user.email if item.user else '' }}"
+                                    class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10">Remove</button>
+                                {% endif %}
+                            </form>
+                            {% else %}<span class="text-muted-foreground">To decide</span>{% endif %}
+                        {% else %}
+                            <span class="text-foreground" data-decision-label>{{ 'Kept' if item.decision == 'kept' else 'Access reduced to view only and signed out' }}</span>
+                            {% if item.decided_at %}<span class="block text-xs text-muted-foreground">{{ item.decided_at.strftime('%d %b %Y') }}{% if item.decided_by %} by {{ item.decided_by.email }}{% endif %}</span>{% endif %}
+                            {% if item.note %}<span class="block text-xs text-muted-foreground">{{ item.note }}</span>{% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="px-6 py-4 text-center text-sm text-muted-foreground">Nobody to review.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

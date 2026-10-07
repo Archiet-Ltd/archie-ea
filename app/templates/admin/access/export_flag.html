@@ -1,0 +1,67 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block title %}Export flag{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    {{ page_header(
+        title='Unusual downloads',
+        description=flag.summary,
+        breadcrumbs=[
+            {'label': 'Admin', 'href': url_for('admin.index')},
+            {'label': 'Team', 'href': url_for('team.team')},
+            {'label': 'Export activity', 'href': url_for('access_review.exports')},
+            {'label': 'Flag'}
+        ]
+    ) }}
+    {% include 'admin/access/_flash.html' %}
+
+    <div class="bg-background shadow rounded-lg mb-8 p-6" data-flag-state="{{ flag.status.value }}">
+        <p class="text-sm text-foreground">
+            {{ payload.count_24h }} downloads in the last 24 hours. Their usual is about {{ payload.baseline_mean }} a day, and this is flagged above {{ payload.threshold }}.
+        </p>
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+            {% if evidence_url %}
+            <a href="{{ evidence_url }}" class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background text-foreground hover:bg-accent h-9 px-4">Download evidence</a>
+            {% endif %}
+            {% if is_open and can_act and not is_self %}
+            <form method="POST" action="{{ url_for('access_review.export_flag_decide', flag_id=flag.id) }}" class="flex gap-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" name="decision" value="restrict"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4">Restrict access</button>
+                <button type="submit" name="decision" value="dismiss"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background text-foreground hover:bg-accent h-9 px-4">Dismiss</button>
+            </form>
+            {% elif is_open and is_self %}
+            <p class="text-sm text-muted-foreground">This flag is about you; another administrator needs to decide it.</p>
+            {% elif not is_open %}
+            <p class="text-sm text-foreground" data-flag-decided>{{ 'Access was reduced to view only and signed out.' if flag.status.value == 'approved' else 'Dismissed as expected.' }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-background shadow rounded-lg overflow-x-auto" data-flag-exports>
+        <table class="min-w-full divide-y divide-border">
+            <thead class="bg-muted/30">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">When (UTC)</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">File</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">From</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                {% for e in exports %}
+                <tr>
+                    <td class="px-6 py-3 text-sm text-muted-foreground">{{ e.at | replace('T', ' ') }}</td>
+                    <td class="px-6 py-3 text-sm text-foreground">{{ e.filename or 'Unnamed file' }}</td>
+                    <td class="px-6 py-3 text-sm text-muted-foreground">{{ e.endpoint or '' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3" class="px-6 py-4 text-center text-sm text-muted-foreground">No downloads recorded.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
