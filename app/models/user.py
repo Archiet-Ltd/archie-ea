@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask import current_app
 from flask_login import AnonymousUserMixin, UserMixin
 from itsdangerous import BadSignature, SignatureExpired
@@ -190,6 +192,12 @@ class User(UserMixin, db.Model):
     deactivated_at = db.Column(db.DateTime, nullable=True)
     deactivation_reason = db.Column(db.String(32), nullable=True)
     provisioned_via = db.Column(db.String(16), nullable=True)  # 'scim' or NULL
+    # Nullable on purpose: users that existed before these columns have no
+    # truthful creation time, so none is invented (SCIM meta omits a NULL).
+    created_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     @hybrid_property
     def is_active(self):

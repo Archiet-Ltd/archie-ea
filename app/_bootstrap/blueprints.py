@@ -356,9 +356,11 @@ def _register_scim(app, csrf):
         app.register_blueprint(scim_bp)
         csrf.exempt(scim_bp)
         # An identity provider syncs from one address: the global per-IP
-        # default (120/min, 30/min for writes) would cut a bulk sync short.
-        # The blueprint carries its own throttles instead: 600/min per token
-        # and 20 failed authentications/min per address.
+        # default (120/min, 30/min for writes) would cap it below the 600/min
+        # per token the design sets, so the blueprint is exempt from it. It
+        # carries its own throttles instead (600/min per token and 20 failed
+        # authentications/min per address), counted in the same shared
+        # storage the global limiter uses, so every worker sees one count.
         from app._bootstrap import rate_limiting
 
         if rate_limiting.limiter is not None:

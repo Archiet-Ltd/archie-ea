@@ -9,6 +9,12 @@ adapters over these functions; nothing else writes ``users.deactivated_at``,
 ``users.deactivation_reason``, ``users.provisioned_via``, ``scim_tokens`` or
 ``scim_group_memberships``.
 
+Three callers sign users in from an identity provider, and all three come
+through ``create_or_update_user``: the per-organisation SSO sign-in
+(``SSOService.provision_user``) and the two global SSO callbacks of the
+account blueprints (``link_only=True``). No other code constructs a ``User``
+from an identity provider.
+
 Tenancy: ``User`` is not a ``TenantMixin`` model, so every ``User`` query here
 carries an explicit ``User.organization_id == org_id`` predicate, and an id
 from another organisation is answered exactly as a missing one.
@@ -119,7 +125,7 @@ def _admin_email():
 # ---------------------------------------------------------------------------
 
 
-def create_or_update_user(org_id, attrs, *, source, user=None, actor=None):
+def create_or_update_user(org_id, attrs, *, source, user=None, actor=None, link_only=False):
     """Create or update a user of ``org_id`` from identity-provider attributes.
 
     ``attrs`` keys (any may be absent, meaning "not provided"): ``email``,
@@ -133,7 +139,13 @@ def create_or_update_user(org_id, attrs, *, source, user=None, actor=None):
     Raises :class:`EmailInOtherOrganisation` when the email belongs to another
     organisation's account (the rule the SSO sign-in has always applied, now
     shared), and, for SCIM only, :class:`ProtectedUserError` for platform
-    administrators and a 409 for the configured ``ADMIN_EMAIL``.
+    administrators and a 409 for the configured ``ADMIN_EMAIL``; SCIM also
+    refuses to change the ``userName`` of an organisation administrator.
+
+    ``link_only`` is for the global SSO callbacks: without a ``user`` the
+    account is looked up by the (``external_id``, ``sso_provider``) pair first
+    (inside ``org_id`` when one is given), then by email, and ``external_id``
+    and ``sso_provider`` are only ever filled when empty, never replaced.
     """
     scim = source == SOURCE_SCIM
     actor = actor or (f"scim:{source}" if scim else "sso")
@@ -151,11 +163,21 @@ def create_or_update_user(org_id, attrs, *, source, user=None, actor=None):
     created = False
 
     if user is None:
-        if email is None:
+        existing = None
+        if link_only and attrs.get("external_id") and attrs.get("sso_provider"):
+            pair = User.query.filter(  # tenant-scoping-ok: pre-auth SSO callback, no org context yet; the pair is unique per IdP.
+                User.external_id == attrs["external_id"],
+                User.sso_provider == attrs["sso_provider"],
+            )
+            if org_id is not None:
+                pair = pair.filter(User.organization_id == org_id)
+            existing = pair.first()
+        if email is None and existing is None:
             raise ProvisioningError("userName is required.", scim_type="invalidValue")
-        # tenant-scoping-ok: an email is the globally unique sign-in identity and the
-        # whole purpose of this lookup is to find out whether another organisation holds it.
-        existing = User.find_by_email(email)
+        if existing is None and email is not None:
+            # tenant-scoping-ok: an email is the globally unique sign-in identity and the
+            # whole purpose of this lookup is to find out whether another organisation holds it.
+            existing = User.find_by_email(email)
         if existing is not None and org_id is not None and existing.organization_id != org_id:
             raise EmailInOtherOrganisation(
                 "This email address belongs to a different organisation's "
@@ -180,7 +202,7 @@ def create_or_update_user(org_id, attrs, *, source, user=None, actor=None):
         raise ProtectedUserError("Platform administrators cannot be provisioned through SCIM.")
 
     if not created:
-        changed.extend(_apply_attrs(org_id, user, email, attrs, scim))
+        changed.extend(_apply_attrs(org_id, user, email, attrs, scim, link_only))
     elif scim:
         user.provisioned_via = SOURCE_SCIM
 
@@ -255,9 +277,14 @@ def _construct_user(org_id, email, attrs, scim):
     return user
 
 
-def _apply_attrs(org_id, user, email, attrs, scim):
+def _apply_attrs(org_id, user, email, attrs, scim, link_only=False):
     changed = []
     if email is not None and email != User.normalize_email(user.email):
+        if scim and org_id is not None and _is_org_admin(user, org_id):
+            # A changed email plus a password reset is an account takeover.
+            raise ProtectedUserError(
+                "The userName of an organisation administrator cannot be changed through SCIM."
+            )
         # tenant-scoping-ok: globally unique identity; checking for a collision anywhere.
         other = User.find_by_email(email)
         if other is not None and other.id != user.id:
@@ -279,17 +306,26 @@ def _apply_attrs(org_id, user, email, attrs, scim):
     external_id = attrs.get("external_id")
     if external_id is not None:
         # An SSO sign-in never overwrites the id the identity provider's own
-        # SCIM feed set (decision 8).
-        if scim or user.provisioned_via != SOURCE_SCIM:
-            if user.external_id != external_id:
-                user.external_id = external_id
-                changed.append("externalId")
+        # SCIM feed set (decision 8); a link-only sign-in never replaces any set id.
+        if link_only:
+            allowed = not user.external_id
+        else:
+            allowed = scim or user.provisioned_via != SOURCE_SCIM
+        if allowed and user.external_id != external_id:
+            user.external_id = external_id
+            changed.append("externalId")
     if not scim:
-        if attrs.get("sso_provider"):
+        if attrs.get("sso_provider") and not (link_only and user.sso_provider):
             user.sso_provider = attrs["sso_provider"]
         if org_id is not None and not user.organization_id:
             user.organization_id = org_id
     return changed
+
+
+def _is_org_admin(user, org_id):
+    from app.services.rbac_service import rbac_service
+
+    return rbac_service.is_org_admin(user, org_id)
 
 
 def _apply_active(user, attrs, actor, changed):
@@ -447,6 +483,7 @@ def add_group_members(org_id, group, user_ids, actor):
             db.session.add(ScimGroupMembership(
                 organization_id=org_id, group_mapping_id=group.id, user_id=user.id,
             ))
+    group.updated_at = _now()
     db.session.commit()
     recompute_roles(org_id, [u.id for u in users])
     auth_audit.record_scim_group_changed(
@@ -466,9 +503,37 @@ def remove_group_members(org_id, group, user_ids, actor):
             ScimGroupMembership.group_mapping_id == group.id,
             ScimGroupMembership.user_id.in_(ids),
         ).delete(synchronize_session=False)
+        group.updated_at = _now()
         db.session.commit()
         recompute_roles(org_id, ids)
     auth_audit.record_scim_group_changed(org_id, group.id, actor, ["members"], {"removed": ids})
+
+
+def replace_group_member(org_id, group, old_user_id, new_user_ids, actor):
+    """Swap one member (``old_user_id``) for ``new_user_ids`` in a single
+    commit; every other member is left alone."""
+    users = _resolve_members(org_id, new_user_ids)
+    old = get_user(org_id, old_user_id)
+    new_ids = {u.id for u in users}
+    held = set(group_member_ids(org_id, group.id))
+    gone = [old.id] if old is not None and old.id in held and old.id not in new_ids else []
+    if gone:
+        ScimGroupMembership.query.filter(
+            ScimGroupMembership.organization_id == org_id,
+            ScimGroupMembership.group_mapping_id == group.id,
+            ScimGroupMembership.user_id.in_(gone),
+        ).delete(synchronize_session=False)
+    for user in users:
+        if user.id not in held:
+            db.session.add(ScimGroupMembership(
+                organization_id=org_id, group_mapping_id=group.id, user_id=user.id,
+            ))
+    group.updated_at = _now()
+    db.session.commit()
+    recompute_roles(org_id, sorted(new_ids | set(gone)))
+    auth_audit.record_scim_group_changed(
+        org_id, group.id, actor, ["members"], {"removed": gone, "added": sorted(new_ids - held)}
+    )
 
 
 def set_group_members(org_id, group, user_ids, actor):
@@ -488,6 +553,7 @@ def set_group_members(org_id, group, user_ids, actor):
             db.session.add(ScimGroupMembership(
                 organization_id=org_id, group_mapping_id=group.id, user_id=user.id,
             ))
+    group.updated_at = _now()
     db.session.commit()
     recompute_roles(org_id, sorted(wanted | set(gone)))
     auth_audit.record_scim_group_changed(
@@ -502,6 +568,7 @@ def delete_group(org_id, group, actor):
         ScimGroupMembership.organization_id == org_id,
         ScimGroupMembership.group_mapping_id == group.id,
     ).delete(synchronize_session=False)
+    group.updated_at = _now()
     db.session.commit()
     recompute_roles(org_id, ids)
     auth_audit.record_scim_group_changed(org_id, group.id, actor, ["members"], {"event": "memberships_removed"})
@@ -547,6 +614,15 @@ def recompute_roles(org_id, user_ids):
 def issue_scim_token(org_id, created_by, *, actor_id=None):
     """Create a token and return ``(row, raw)``. The raw value is returned
     once and never stored or logged."""
+    from sqlalchemy import select
+
+    from app.models.organization import Organization
+
+    # Serialise concurrent issues for one organisation (same lock check_capacity
+    # takes) so the count below cannot be passed by two requests at once.
+    db.session.execute(
+        select(Organization.id).where(Organization.id == org_id).with_for_update()
+    )
     active = ScimToken.query.filter(
         ScimToken.organization_id == org_id, ScimToken.revoked_at.is_(None)
     ).count()

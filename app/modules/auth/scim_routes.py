@@ -105,7 +105,7 @@ def _bearer_value():
     return None
 
 
-@rate_limit(20, "1m", key_func=lambda: f"scim-auth-fail:{request.remote_addr}")
+@rate_limit(20, "1m", key_func=lambda: f"scim-auth-fail:{request.remote_addr}", shared=True)
 def _failed_auth_gate():
     """Counts one failed authentication against the caller's address; raises
     RateLimitExceeded once 20 have landed in a minute."""
@@ -147,7 +147,7 @@ def _route(rule, methods):
     """Register a route behind token authentication and the per-token throttle."""
 
     def decorator(view):
-        guarded = _scim_auth(rate_limit(600, "1m", key_func=_rate_key)(view))
+        guarded = _scim_auth(rate_limit(600, "1m", key_func=_rate_key, shared=True)(view))
         return scim_bp.route(rule, methods=methods)(guarded)
 
     return decorator
@@ -181,12 +181,18 @@ def _parse_bool(value):
     raise ProvisioningError("active must be true or false.", scim_type="invalidValue")
 
 
+_MAX_INT = 2147483647
+
+
 def _paging():
     try:
         start = int(request.args.get("startIndex", 1))
         count = int(request.args.get("count", DEFAULT_COUNT))
     except ValueError:
         raise ProvisioningError("startIndex and count must be integers.", scim_type="invalidValue")
+    if start > _MAX_INT or count > _MAX_INT:
+        raise ProvisioningError("startIndex and count are too large.", scim_type="invalidValue")
+    # RFC 7644 3.4.2.4: a startIndex below 1 is treated as 1.
     return max(start, 1), max(0, min(count, MAX_COUNT))
 
 
@@ -315,6 +321,19 @@ def _attrs_from_patch(body):
 # ---------------------------------------------------------------------------
 
 
+def _iso(value):
+    return value.strftime("%Y-%m-%dT%H:%M:%SZ") if value is not None else None
+
+
+def _with_times(meta, created, modified):
+    """Add ``created`` / ``lastModified`` to ``meta``; a NULL column omits its key."""
+    if created is not None:
+        meta["created"] = _iso(created)
+    if modified is not None:
+        meta["lastModified"] = _iso(modified)
+    return meta
+
+
 def _user_resource(user):
     full = user.full_name() if (user.first_name or user.last_name) else None
     resource = {
@@ -332,6 +351,7 @@ def _user_resource(user):
             "location": url_for("scim.scim_get_user", user_id=str(user.id), _external=True),
         },
     }
+    _with_times(resource["meta"], user.created_at, user.updated_at)
     if full:
         resource["name"]["formatted"] = full
         resource["displayName"] = full
@@ -352,15 +372,17 @@ def _group_resource(group):
             "display": user.email,
             "$ref": url_for("scim.scim_get_user", user_id=str(user.id), _external=True),
         })
+    meta = {
+        "resourceType": "Group",
+        "location": url_for("scim.scim_get_group", group_id=str(group.id), _external=True),
+    }
+    _with_times(meta, group.created_at, group.updated_at)
     return {
         "schemas": [GROUP_SCHEMA],
         "id": str(group.id),
         "displayName": group.sso_group_name,
         "members": members,
-        "meta": {
-            "resourceType": "Group",
-            "location": url_for("scim.scim_get_group", group_id=str(group.id), _external=True),
-        },
+        "meta": meta,
     }
 
 
@@ -412,7 +434,10 @@ def scim_list_users():
         else:
             query = query.filter(func.lower(User.email) == value.strip().lower())
     total = query.count()
-    rows = query.order_by(User.id).offset(start - 1).limit(count).all() if count else []
+    if not count or start > total:
+        rows = []
+    else:
+        rows = query.order_by(User.id).offset(start - 1).limit(count).all()
     return _list_response([_user_resource(u) for u in rows], total, start)
 
 
@@ -491,7 +516,7 @@ def scim_list_groups():
         name = match.group("value")
     groups = provisioning_service.list_groups(_org_id(), name)
     total = len(groups)
-    page = groups[start - 1:start - 1 + count] if count else []
+    page = groups[start - 1:start - 1 + count] if count and start <= total else []
     return _list_response([_group_resource(g_) for g_ in page], total, start)
 
 
@@ -560,7 +585,7 @@ def scim_patch_group(group_id):
             continue
         match = _MEMBER_PATH.match(path)
         if match:
-            _members_op(org_id, group, "remove" if op == "remove" else op, [match.group("id")])
+            _filtered_member_op(org_id, group, op, match.group("id"), value)
         elif path.lower() == "members":
             if op == "remove" and value is None:
                 provisioning_service.set_group_members(org_id, group, [], _actor())
@@ -570,6 +595,20 @@ def scim_patch_group(group_id):
             _check_display_name(group, {"displayName": value})
         # other attributes are ignored
     return scim_response(_group_resource(group))
+
+
+def _filtered_member_op(org_id, group, op, member_id, value):
+    """``members[value eq "<id>"]`` touches only that member, never the whole list."""
+    if op == "remove":
+        provisioning_service.remove_group_members(org_id, group, [member_id], _actor())
+    elif op == "add":
+        provisioning_service.add_group_members(org_id, group, [member_id], _actor())
+    else:
+        if value is None:
+            raise ProvisioningError("replace needs a value.", scim_type="noTarget")
+        provisioning_service.replace_group_member(
+            org_id, group, member_id, _member_ids(value), _actor()
+        )
 
 
 def _members_op(org_id, group, op, ids):

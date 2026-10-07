@@ -23,6 +23,8 @@ def upgrade():
     bind.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMP"))
     bind.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS deactivation_reason VARCHAR(32)"))
     bind.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS provisioned_via VARCHAR(16)"))
+    bind.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP"))
+    bind.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP"))
 
     bind.execute(text(
         "CREATE TABLE IF NOT EXISTS scim_tokens ("
@@ -74,6 +76,8 @@ def downgrade():
     bind = op.get_bind()
     bind.execute(text("DROP TABLE IF EXISTS scim_group_memberships"))
     bind.execute(text("DROP TABLE IF EXISTS scim_tokens"))
+    bind.execute(text("ALTER TABLE users DROP COLUMN IF EXISTS updated_at"))
+    bind.execute(text("ALTER TABLE users DROP COLUMN IF EXISTS created_at"))
     bind.execute(text("ALTER TABLE users DROP COLUMN IF EXISTS provisioned_via"))
     bind.execute(text("ALTER TABLE users DROP COLUMN IF EXISTS deactivation_reason"))
     bind.execute(text("ALTER TABLE users DROP COLUMN IF EXISTS deactivated_at"))
