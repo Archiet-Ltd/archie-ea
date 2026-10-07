@@ -6697,11 +6697,7 @@ Instructions:
             if not explicit_record and not implicit_decision:
                 return
 
-            from app.models.adr import ArchitectureDecisionRecord
-            from sqlalchemy import func
-
-            # Get next ADR number
-            max_num = db.session.query(func.max(ArchitectureDecisionRecord.adr_number)).scalar() or 0
+            from app.models.architecture_decision import ArchitectureDecision
 
             # Extract decision title from message
             title = message[:150].strip()
@@ -6721,20 +6717,25 @@ Instructions:
             for cap_info in resolved.get("capabilities", [])[:5]:
                 affected.append({"type": "capability", "id": cap_info["id"], "name": cap_info["name"]})
 
-            adr = ArchitectureDecisionRecord(
-                adr_number=max_num + 1,
+            from flask import g as _g
+            org_id = getattr(_g, "current_org_id", None)
+
+            adr = ArchitectureDecision(
+                decision_id=ArchitectureDecision.next_decision_id(),
                 title=title[:200],
                 status="accepted" if explicit_record else "proposed",
                 context=f"Decision recorded via AI chat by user {self.user_id}",
                 decision=message[:1000] if explicit_record else response_text[:1000],
                 rationale="Recorded from AI chat conversation",
                 consequences="To be assessed",
-                affected_systems=json.dumps(affected) if affected else None,
-                decision_date=datetime.utcnow().date(),
+                affected_systems=affected or None,
+                decided_at=datetime.utcnow() if explicit_record else None,
+                organization_id=org_id,
             )
             db.session.add(adr)
+            db.session.flush()
             db.session.commit()
-            logger.info(f"AIC-307: ADR #{adr.adr_number} recorded: {title[:60]}")
+            logger.info(f"AIC-307: decision {adr.decision_id} recorded: {title[:60]}")
         except Exception as e:
             logger.debug(f"AIC-307: Decision recording failed: {e}")
             db.session.rollback()
@@ -6853,7 +6854,7 @@ Instructions:
                 """ + _org_clause), {"vid": vid, **_org_params}).scalar() or 0
 
                 # Capability coverage
-                # tenant-filtered: scoped via parent FK (vendor_product_capabilities)
+                # tenancy-ok: scoped via vendor_organization_id in the WHERE clause
                 cap_count = db.session.execute(text(  # tenant-filtered: scoped via parent FK (vendor_product_capabilities)
                     """
                     SELECT COUNT(DISTINCT vpc.business_capability_id)

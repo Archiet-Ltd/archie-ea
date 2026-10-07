@@ -10,6 +10,7 @@ Ensures no data modifications happen without explicit user confirmation.
 import json
 import logging
 from datetime import datetime, timedelta
+from html import escape
 from typing import Any, Dict, List, Optional
 
 
@@ -64,6 +65,70 @@ class SelfApprovalError(AIChatApprovalError):
 
 class MissingApproverError(AIChatApprovalError):
     """No resolvable approver identity, or the approver lacks write permission."""
+
+
+def create_approval_record(
+    *,
+    organization_id: int,
+    operation_type: str,
+    entity_type: str,
+    summary: str,
+    operation_payload: Dict[str, Any],
+    entity_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    original_command: Optional[str] = None,
+    chat_session_id: Optional[str] = None,
+    agent_turn_id: Optional[str] = None,
+    source_table: Optional[str] = None,
+    source_id: Optional[int] = None,
+    expiry_minutes: int = 15,
+    persona: Optional[str] = None,
+) -> AIChatCRUDApproval:
+    """The one writer of ai_chat_crud_approvals (consolidation).
+
+    Lower-level than AIChatApprovalService.create_pending_approval, which
+    wraps this for the live-chat path (auth check, duplicate detection, a
+    chat-formatted response). This is what a non-chat writer uses instead:
+    the backfill command, and the repointed constructor sites of
+    ReviewQueueItem, RelationshipSuggestion and SolutionBlueprintProposal,
+    none of which have a live chat_session_id, original_command or
+    necessarily a human user_id.
+
+    Adds and flushes; does not commit — the caller controls the transaction
+    boundary (a single commit per request for the chat path, one per
+    organisation for the backfill command, one per record for a repointed
+    constructor site that commits its own work as before).
+    """
+    approval = AIChatCRUDApproval(
+        user_id=user_id,
+        organization_id=organization_id,
+        operation_type=operation_type,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        original_command=original_command or f"system: {operation_type} {entity_type}",
+        operation_payload=json.dumps(operation_payload),
+        summary=summary,
+        status=ApprovalStatus.PENDING,
+        expires_at=datetime.utcnow() + timedelta(minutes=expiry_minutes),
+        chat_session_id=chat_session_id,
+        agent_turn_id=agent_turn_id,
+        source_table=source_table,
+        source_id=source_id,
+        persona=persona,
+    )
+    db.session.add(approval)
+    db.session.flush()
+    db.session.add(
+        AIChatApprovalAuditLog(
+            approval_id=approval.id,
+            from_status=None,
+            to_status=ApprovalStatus.PENDING.value,
+            event="created",
+            actor_user_id=user_id,
+            actor_type="user" if user_id is not None else "system",
+        )
+    )
+    return approval
 
 
 class AIChatApprovalService:
@@ -156,12 +221,14 @@ class AIChatApprovalService:
         *,
         session=None,
     ) -> bool:
-        """Durably claim one unexpired approval before any mutable dispatch.
+        """Durably claim one pending approval before any mutable dispatch.
 
         The conditional update is the at-most-once boundary.  An executor may
         commit its own work, or the process may crash after the claim; both
         cases leave the approval APPROVED and therefore fail closed on retry
         rather than allowing a second caller to dispatch the write.
+        Overdue-not-expired: a PENDING approval stays claimable past
+        expires_at (overdue, not expired) — no expires_at check here.
         """
         session = session or db.session
         now = datetime.utcnow()
@@ -171,7 +238,6 @@ class AIChatApprovalService:
                 AIChatCRUDApproval.id == approval_id,
                 AIChatCRUDApproval.organization_id == organization_id,
                 AIChatCRUDApproval.status == ApprovalStatus.PENDING,
-                AIChatCRUDApproval.expires_at > now,
             )
             .update(
                 {
@@ -192,7 +258,10 @@ class AIChatApprovalService:
         reason: Optional[str],
         session=None,
     ) -> bool:
-        """Atomically reject an unexpired pending approval without clobbering a claim."""
+        """Atomically reject a pending approval without clobbering a claim.
+
+        Overdue-not-expired: rejectable past expires_at too (overdue, not expired).
+        """
         session = session or db.session
         updated = (
             session.query(AIChatCRUDApproval)
@@ -200,7 +269,6 @@ class AIChatApprovalService:
                 AIChatCRUDApproval.id == approval_id,
                 AIChatCRUDApproval.organization_id == organization_id,
                 AIChatCRUDApproval.status == ApprovalStatus.PENDING,
-                AIChatCRUDApproval.expires_at > datetime.utcnow(),
             )
             .update(
                 {AIChatCRUDApproval.rejected_reason: reason,
@@ -330,7 +398,6 @@ class AIChatApprovalService:
                 entity_type=entity_type,
                 status=ApprovalStatus.PENDING,
             )
-            .filter(AIChatCRUDApproval.expires_at > datetime.utcnow())
             .all()
         )
         for existing in pending:
@@ -415,32 +482,18 @@ class AIChatApprovalService:
                 }
 
             # Create approval record
-            approval = AIChatCRUDApproval(
-                user_id=self.user_id,
+            approval = create_approval_record(
                 organization_id=requester.organization_id,
                 operation_type=operation_type,
                 entity_type=entity_type,
                 entity_id=entity_id,
                 original_command=original_command,
-                operation_payload=json.dumps(operation_payload),
+                operation_payload=operation_payload,
                 summary=summary,
-                status=ApprovalStatus.PENDING,
-                expires_at=datetime.utcnow() + timedelta(minutes=self.DEFAULT_EXPIRY_MINUTES),
+                user_id=self.user_id,
                 chat_session_id=chat_session_id,
                 agent_turn_id=agent_turn_id,
-            )
-
-            db.session.add(approval)
-            db.session.flush()
-            db.session.add(
-                AIChatApprovalAuditLog(
-                    approval_id=approval.id,
-                    from_status=None,
-                    to_status=ApprovalStatus.PENDING.value,
-                    event="created",
-                    actor_user_id=self.user_id,
-                    actor_type="user",
-                )
+                expiry_minutes=self.DEFAULT_EXPIRY_MINUTES,
             )
             db.session.commit()
 
@@ -484,7 +537,7 @@ class AIChatApprovalService:
             "error": result.get("error", "Operation failed"),
             "approval_id": approval_id,
         }
-        for key in ("reason_codes", "missing_evidence", "recovery"):
+        for key in ("reason_codes", "missing_evidence", "recovery", "charter_refused", "code"):
             if key in result:
                 response[key] = result[key]
         return response
@@ -549,26 +602,11 @@ class AIChatApprovalService:
                     "error": f"Approval is already {approval.status.value}",
                 }
 
-            # Check expiration. An expiry transition is SYSTEM-initiated and must
-            # never also execute the operation (ARCH-022) — it only ever moves
-            # PENDING -> EXPIRED and returns, it never falls through to the
-            # execution dispatch below.
-            if approval.is_expired():
-                approval.status = ApprovalStatus.EXPIRED
-                self._audit(
-                    approval,
-                    event="expired",
-                    to_status=ApprovalStatus.EXPIRED.value,
-                    actor_user_id=None,
-                    from_status=ApprovalStatus.PENDING.value,
-                    reason="expires_at passed at approval attempt",
-                )
-                db.session.commit()
-                return {
-                    "success": False,
-                    "code": "CONFLICT",
-                    "error": "Approval has expired. Please submit a new request.",
-                }
+            # Overdue-not-expired: an item past expires_at is overdue, not expired —
+            # it stays actionable indefinitely (escalate_overdue_approvals, run
+            # periodically, notifies the organisation's administrators the first
+            # time it goes overdue; see AIChatCRUDApproval.is_overdue()). Nothing
+            # here refuses the approval or forces a status transition on it.
 
             # Persist the claim before dispatch.  This is deliberately before
             # parsing or calling any executor because some executors commit
@@ -664,6 +702,35 @@ class AIChatApprovalService:
                 else:
                     return {"success": False, "error": f"Unknown entity type: {approval.entity_type}"}
 
+            elif approval.operation_type == "agent_charter_change":
+                # R1-B56: the proposed charter version was never created at
+                # request time -- only approving it creates the real
+                # AgentCharter row, so AgentCharter.current_for never sees
+                # an unreviewed change as current.
+                from app.modules.ai_chat.services.agent_registry_service import (
+                    execute_charter_change,
+                )
+                from app.models.agent_registration import AgentRegistration
+
+                registration = AgentRegistration.query.filter_by(
+                    id=approval.entity_id, organization_id=approval.organization_id,
+                ).first()
+                if registration is None:
+                    return {"success": False, "error": "Agent registration not found"}
+                charter = execute_charter_change(registration, payload)
+                result = {"success": True, "charter_id": charter.id, "version": charter.version}
+
+            elif approval.operation_type == "end_of_support_alert":
+                # R1-B85: approving the alert is the acknowledgement that a
+                # refresh owner has been assigned (via the existing
+                # ApplicationOwner flow on the affected application's own
+                # page -- this is not a second owner-assignment mechanism).
+                # There is nothing further to execute against the vendor
+                # product itself, so this is a deliberate no-op dispatch
+                # rather than falling through to "Unsupported operation
+                # type", which would leave the claim permanently stuck.
+                result = {"success": True, "acknowledged": True}
+
             elif approval.operation_type == "tool_use":
                 # AgentRunner._queue_approval (agent_runner.py) writes exactly this
                 # operation_type for every queued agent tool call — both the
@@ -681,7 +748,7 @@ class AIChatApprovalService:
                 # "Unsupported operation type: tool_use".
                 from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
 
-                executor = ToolExecutor(self.user_id)
+                executor = ToolExecutor(self.user_id, persona=approval.persona)
                 tc = ToolCall(id=str(approval_id), name=approval.entity_type, arguments=payload)
                 result = executor.execute(tc)
 
@@ -861,13 +928,19 @@ class AIChatApprovalService:
                 organization_id=actor.organization_id,
                 status=ApprovalStatus.PENDING,
             )
-            .filter(AIChatCRUDApproval.expires_at > datetime.utcnow())
             .all()
         )
         return [approval.to_dict() for approval in approvals]
 
     def get_approver_queue(self) -> Dict[str, Any]:
-        """Pending, unexpired same-org approvals a different user may review."""
+        """Pending same-org approvals a different user may review.
+
+        Overdue-not-expired: includes overdue rows (no expires_at filter — being
+        overdue must never make an item disappear from the queue). A row with
+        no requester (user_id NULL, backfilled or system-originated) is every
+        eligible approver's to review, so the "not the requester" exclusion
+        only applies when there is a requester to exclude.
+        """
         actor, actor_error = self._acting_user(require_general=True)
         if actor_error:
             return actor_error
@@ -877,8 +950,10 @@ class AIChatApprovalService:
                 status=ApprovalStatus.PENDING,
             )
             .filter(
-                AIChatCRUDApproval.expires_at > datetime.utcnow(),
-                AIChatCRUDApproval.user_id != actor.id,
+                db.or_(
+                    AIChatCRUDApproval.user_id.is_(None),
+                    AIChatCRUDApproval.user_id != actor.id,
+                )
             )
             .order_by(AIChatCRUDApproval.created_at.desc())
             .all()
@@ -904,6 +979,17 @@ class AIChatApprovalService:
                     "arguments": json.loads(approval.operation_payload),
                     "created_at": approval.created_at.isoformat() if approval.created_at else None,
                     "expires_at": approval.expires_at.isoformat() if approval.expires_at else None,
+                    # The queue query filters to PENDING only, so every item
+                    # here is "pending". The inbox template's isOverdue()
+                    # checks this field to decide whether to show the Overdue
+                    # indicator — without it the indicator never renders even
+                    # for genuinely overdue items.
+                    "status": approval.status.value if approval.status else "pending",
+                    # Source table/id for backfilled items (e.g. confidence
+                    # reviews). The inbox template renders a source badge when
+                    # these are present; without them the badge is always dead.
+                    "source_table": getattr(approval, "source_table", None),
+                    "source_id": getattr(approval, "source_id", None),
                     "requester": {
                         "id": approval.user_id,
                         "display_name": " ".join(
@@ -935,7 +1021,6 @@ class AIChatApprovalService:
                 chat_session_id=chat_session_id,
                 status=ApprovalStatus.PENDING,
             )
-            .filter(AIChatCRUDApproval.expires_at > datetime.utcnow())
             .order_by(AIChatCRUDApproval.created_at.desc())
             .all()
         )
@@ -1068,7 +1153,6 @@ class AIChatApprovalService:
                 chat_session_id=chat_session_id,
                 status=ApprovalStatus.PENDING,
             )
-            .filter(AIChatCRUDApproval.expires_at > datetime.utcnow())
             .order_by(AIChatCRUDApproval.created_at.desc())
             .all()
         )
@@ -1094,3 +1178,98 @@ class AIChatApprovalService:
         if confirmation["action"] == "confirm":
             return self.approve_and_execute(target.id)
         return self.reject_approval(target.id)
+
+
+def escalate_overdue_approvals(app=None) -> Dict[str, int]:
+    """Overdue-not-expired: notify each organisation's administrators about its
+    overdue (past expires_at, still PENDING, not yet escalated) approvals.
+
+    One email per organisation, listing every overdue item currently pending
+    for it. Idempotent: a row's escalated_at is set once escalation is
+    attempted, so a later sweep never re-notifies for the same row (matching
+    the "no duplicate work" shape of the digest-email jobs this reuses). Runs
+    outside any request/tenant context — same shape as
+    app/_bootstrap/_digest_emails.py's scheduled digests — so it resolves
+    recipients and organisation membership explicitly per row rather than
+    relying on request-scoped tenant filtering.
+
+    Returns a summary: organisations notified and rows escalated.
+    """
+    from collections import defaultdict
+
+    from flask import current_app
+
+    from app._bootstrap._digest_emails import _get_recipients_by_roles, _safe_send_email
+
+    app = app or current_app._get_current_object()
+    overdue = AIChatCRUDApproval.get_overdue_unescalated()
+    by_org: Dict[int, List[AIChatCRUDApproval]] = defaultdict(list)
+    for row in overdue:
+        if row.organization_id is not None:
+            by_org[row.organization_id].append(row)
+
+    organisations_notified = 0
+    rows_escalated = 0
+    now = datetime.utcnow()
+    for organization_id, rows in by_org.items():
+        # The brief asks for the organisation's own administrators, not only
+        # the enterprise-wide platform_admin role: an organisation can have
+        # a real is_org_admin without anyone holding platform_admin, and a
+        # platform_admin-only lookup silently escalates to nobody for it
+        # (reviews/pr302-final-check-v1.md). Union both -- an org admin for
+        # this tenant, plus any platform_admin who also wants every escalation.
+        # is_org_admin is a derived property (app/models/user.py, PR 291), not
+        # a queryable column -- filter organisation + confirmed in SQL, then
+        # the canonical admin rule in Python, same as every other caller of it.
+        org_admins = [
+            u for u in User.query.filter(
+                User.organization_id == organization_id,
+                User.confirmed.is_(True),
+            ).all()
+            if u.is_org_admin
+        ]
+        # _get_recipients_by_roles always filters by organization_id (it has
+        # no global mode, by design -- see its own docstring), so this reaches
+        # platform admins who belong to this organisation, not every platform
+        # admin on the instance. That is deliberate: an overdue approval is
+        # this tenant's data, and only this tenant's admins should be told
+        # about it by email.
+        recipients = sorted({u.email for u in org_admins if u.email} |
+                             set(_get_recipients_by_roles(["platform_admin"], organization_id)))
+        # summary/entity_type/operation_type all trace back to user- or
+        # AI-generated content (a capability name, a blueprint proposal
+        # name); escape before interpolating into hand-built HTML.
+        items_html = "".join(
+            f"<li>#{row.id}: {escape(str(row.operation_type))} {escape(str(row.entity_type))} — "
+            f"{escape(str(row.summary))} "
+            f"(raised {escape(row.created_at.isoformat() if row.created_at else 'unknown')})</li>"
+            for row in rows
+        )
+        sent = _safe_send_email(
+            app,
+            subject=f"{len(rows)} approval request(s) overdue for review",
+            recipients=recipients,
+            html_body=(
+                f"<p>{len(rows)} pending change{'s' if len(rows) != 1 else ''} "
+                "in your organisation's approval queue passed their review-by "
+                f"time and still need a decision:</p><ul>{items_html}</ul>"  # raw-html-ok: items_html is built above from escape()d fields only
+            ),
+        )
+        for row in rows:
+            row.escalated_at = now
+            db.session.add(
+                AIChatApprovalAuditLog(
+                    approval_id=row.id,
+                    from_status=row.status.value,
+                    to_status=row.status.value,
+                    event="escalated",
+                    actor_user_id=None,
+                    actor_type="system",
+                    reason=f"overdue, {len(recipients)} administrator(s) notified" if sent
+                    else "overdue, no SMTP configured — logged instead",
+                )
+            )
+            rows_escalated += 1
+        organisations_notified += 1
+    db.session.commit()
+    return {"organisations_notified": organisations_notified, "rows_escalated": rows_escalated}

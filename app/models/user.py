@@ -50,6 +50,19 @@ ROLE_DATA_ARCHITECT = "data_architect"
 # and interfaces modelled; served until now only through solution_architect.
 ROLE_TECHNOLOGY_ARCHITECT = "technology_architect"
 ROLE_APPLICATION_ARCHITECT = "application_architect"
+# R1-B36 (TB-0146): promoted from unassignable to assignable, 2026-10-04.
+# finance: licence/contract cost exposure had no owner who could act on it.
+# compliance: RegulatoryFramework/ComplianceControl is a security_architect-owned
+# surface today; this role is the one who actually works the control backlog.
+# risk: SolutionRisk/the risk register had readers with no accountable owner.
+# operations: service incidents and connector health had no persona of record.
+# non_technical_owner: a business-side application/capability owner who is not
+# an architect -- read-focused, named directly in the brief's objective line.
+ROLE_FINANCE = "finance"
+ROLE_COMPLIANCE = "compliance"
+ROLE_RISK = "risk"
+ROLE_OPERATIONS = "operations"
+ROLE_NON_TECHNICAL_OWNER = "non_technical_owner"
 
 VALID_ROLES = [
     ROLE_SOLUTION_ARCHITECT,
@@ -65,6 +78,11 @@ VALID_ROLES = [
     ROLE_DATA_ARCHITECT,
     ROLE_TECHNOLOGY_ARCHITECT,
     ROLE_APPLICATION_ARCHITECT,
+    ROLE_FINANCE,
+    ROLE_COMPLIANCE,
+    ROLE_RISK,
+    ROLE_OPERATIONS,
+    ROLE_NON_TECHNICAL_OWNER,
 ]
 
 # Role display names for UI
@@ -82,6 +100,11 @@ ROLE_DISPLAY_NAMES = {
     ROLE_DATA_ARCHITECT: "Data Architect",
     ROLE_TECHNOLOGY_ARCHITECT: "Technology Architect",
     ROLE_APPLICATION_ARCHITECT: "Application Architect",
+    ROLE_FINANCE: "Finance",
+    ROLE_COMPLIANCE: "Compliance",
+    ROLE_RISK: "Risk",
+    ROLE_OPERATIONS: "Operations",
+    ROLE_NON_TECHNICAL_OWNER: "Non-Technical Owner",
 }
 
 
@@ -174,6 +197,18 @@ class User(UserMixin, db.Model):
     # SSO / Enterprise Identity (S0-01)
     external_id = db.Column(db.String(255), index=True)
     sso_provider = db.Column(db.String(50))
+
+    # Multi-factor authentication (R1-B12 PR 2, TB-0144/PB-0100). Required
+    # for administrators (app.services.mfa_service.required_for) regardless
+    # of sign-in path (password, OIDC or SAML); an administrator who has not
+    # enrolled yet is sent to enrol, not let through. Not Fernet-encrypted
+    # like SSOConfig.client_secret: pyotp secrets are base32, high-entropy,
+    # and rotated by re-enrolling -- a mirror of the existing
+    # password_hash column's own protection level, not a lesser one.
+    mfa_secret = db.Column(db.String(64))
+    mfa_enabled = db.Column(
+        db.Boolean, default=False, nullable=False, server_default=db.text("false")
+    )
 
     # Onboarding fields
     role_archetype = db.Column(
