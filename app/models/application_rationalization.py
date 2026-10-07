@@ -603,6 +603,14 @@ class ApplicationRationalizationScore(TenantMixin, db.Model):
     # ==== OVERALL RATIONALIZATION ASSESSMENT ====
     overall_health_score = db.Column(db.Integer, nullable=False)  # Weighted average 0 - 100
 
+    # R1-B34 (TB-0135): the FormulaRegister version this score was computed
+    # with, so a reader can trace the number to the exact reviewed weights
+    # rather than trust an unversioned constant. Nullable -- a score
+    # computed before this column existed, or with no formula registered
+    # for this organisation yet, carries no version rather than a fabricated
+    # one.
+    formula_version = db.Column(db.Integer, nullable=True)
+
     # TIME framework recommendation (legacy scoring output — do NOT remove)
     rationalization_action = db.Column(db.String(20), nullable=False, index=True)
     # TOLERATE, INVEST, MIGRATE, ELIMINATE

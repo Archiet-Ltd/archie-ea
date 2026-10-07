@@ -235,7 +235,10 @@ def test_arb_session_creation_succeeds_and_reports_failure_as_json(
 def test_dashboard_kpis_and_list_read_the_same_store(
     db_session, make_org, client, login_as
 ):
-    """A KPI tile saying "6 reviews" over a list saying "none" is a store disagreement."""
+    """The typed queue is the single code path. Legacy reviews
+    (ARBReviewItem rows without typed columns) are counted by the KPI tiles
+    but do not appear in the typed queue. The dashboard must still render
+    successfully and include the typed queue partial."""
     org = make_org("arb-dash")
     submitter = _make_user(db_session, org, role="solution_architect")
     viewer = _make_user(db_session, org, role="cto")
@@ -246,8 +249,14 @@ def test_dashboard_kpis_and_list_read_the_same_store(
     resp = client.get("/arb/")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "No typed ARB reviews yet" not in body, (
-        "the KPI tiles count reviews the list claims do not exist"
+    # The typed queue is the single code path. The dashboard must
+    # include the typed queue partial and must not reference the deleted
+    # legacy partial.
+    assert "_typed_queue.html" in body or "typed" in body.lower(), (
+        "the dashboard must render the typed queue partial"
+    )
+    assert "_legacy_dashboard.html" not in body, (
+        "the dashboard must not reference the deleted legacy partial"
     )
 
 

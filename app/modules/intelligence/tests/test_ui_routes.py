@@ -164,6 +164,11 @@ def test_the_read_only_pages_are_the_only_routes_this_blueprint_serves(app):
         "/intelligence/twin-map": ["GET"],
         "/intelligence/value-streams-at-risk": ["GET"],
         "/intelligence/traceability": ["GET"],
+        "/intelligence/history/as-of": ["GET"],
+        "/intelligence/history/changes": ["GET"],
+        "/intelligence/api/history/as-of": ["GET"],
+        "/intelligence/api/history/changes": ["GET"],
+        "/intelligence/api/history/element/<int:element_id>": ["GET"],
     }
     assert not [r for r in rules if r.startswith("/api/")]
 
@@ -425,7 +430,9 @@ def test_names_come_only_from_the_impact_answers_element_map():
     # fix -- the L3/L5/L6 briefs each added a fetch URL to core.js (risk,
     # portfolio, programme) without updating it. Found while adding the L2
     # brief's own strategy URL; corrected to the real, current set rather
-    # than bumped by one on top of a stale base.
+    # than bumped by one on top of a stale base. L7 (Data lens) adds its
+    # own endpoint which now returns an elements map for name lookups.
+    # Compliance (under L6) adds its own endpoint the same way.
     urls = set(re.findall(r"'(/[a-z0-9_/.-]*)'", _scripts()["core.js"]))
     assert urls == {
         "/archimate/api/elements/search",
@@ -437,6 +444,8 @@ def test_names_come_only_from_the_impact_answers_element_map():
         "/api/v1/intelligence/strategy/",
         "/api/v1/intelligence/accountability/",
         "/api/v1/intelligence/derived/",
+        "/api/v1/intelligence/data/",
+        "/api/v1/intelligence/compliance/",
     }
 
 

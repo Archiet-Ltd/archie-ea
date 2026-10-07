@@ -2,11 +2,15 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/card.html' import card, card_header, card_title, card_content %}
+
+{# Consolidated governance queue - typed queue is the single code path.
+   Make queue available to all blocks (content, extra_head_js, etc.) #}
+{% set queue = typed_queue %}
 
 {% block title %}ARB Dashboard{% endblock %}
 
-{% block guided_mode_steps %}{% set _typed = typed_queue | default(none) %}
-{% if not _typed %}
+{% block guided_mode_steps %}
 <script id="guided-mode-steps-data" type="application/json">
 [
   {"title": "Step 1 — Pending Reviews", "text": "The queue shows submissions awaiting ARB decision. Click a submission to open the full blueprint."},
@@ -14,46 +18,35 @@
   {"title": "Step 3 — Sessions", "text": "ARB Sessions group decisions by meeting date. Navigate to /arb/sessions to see the session calendar."}
 ]
 </script>
-{% endif %}
 {% endblock %}
 
 {% from 'components/inline_hint.html' import inline_hint %}
-{% block page_hint %}{% set _typed = typed_queue | default(none) %}
-{% if not _typed %}
+{% block page_hint %}
 {{ inline_hint(
     hint_id='arb_dashboard',
     text='This is the ARB governance hub. Reviewers action submissions; solution architects track their submissions here.',
     action_text='View pending reviews',
     action_href='/arb/reviews'
 ) }}
-{% endif %}
 {% endblock %}
 
-{% block content %}{% set _typed = typed_queue | default(none) %}
+{% block content %}
 {#
-  ARB queue — the typed/legacy DISPATCHER (blueprint sections 3 and 5).
+  ARB queue — the consolidated governance queue.
 
-  Exactly one branch renders, so the page always has exactly one outer wrapper,
-  one breadcrumb <nav> and one <h1>.
-
-  `typed_queue` is the mapping returned by
+  The typed/legacy dispatch has been removed. The typed queue is now the
+  single code path for the ARB dashboard. The queue is the mapping returned by
   app.modules.transformation_room.arb_read_models.typed_arb_queue_view().
-  Its three states are available, empty and failed. On `failed` the read model
+  Its states are available, empty and failed. On `failed` the read model
   returns page/page_size/total_items/total_pages as None and the partial renders
   a destructive alert with NO counts — a zero here would be indistinguishable
   from a measured zero, and the route returns 503.
-
-  The typed queue keeps measured governance KPIs, but deliberately drops the
-  legacy chart, AI triage and generic "New Review" modal: a typed review begins
-  from a real subject and cannot be drafted as an unattached review item.
 #}
-{% if _typed %}
-{% set queue = _typed %}
 {% set queue_action_url = url_for('arb.dashboard') %}
 <div class="p-6 space-y-6">
     {{ page_header(
         title='Architecture Review Board',
-        description='Typed governance queue. Every review is pinned to one immutable evidence snapshot.',
+        description='Consolidated governance queue. Every review is pinned to one immutable evidence snapshot.',
         breadcrumbs=[
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Governance'},
@@ -71,6 +64,69 @@
             <i data-lucide="calendar" class="mr-2 h-4 w-4" aria-hidden="true"></i>Sessions
         </a>
     </div>
+
+    {# AI Queue Triage (board-secretary assist). arbQueueTriagePanel() below
+       advises on the pending queue only; it writes nothing back and never
+       reorders or changes a review — the queue below still reflects the
+       real, stored data. #}
+    <section aria-label="AI queue triage" x-data="arbQueueTriagePanel()">
+    {% call card() %}
+        {% call card_header() %}
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="sparkles" class="h-4 w-4 text-primary" aria-hidden="true"></i>
+                    {% call card_title(class='text-lg') %}AI queue triage{% endcall %}
+                    <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">AI-suggested draft</span>
+                </div>
+                <button type="button" @click="generate()" :disabled="loading"
+                        class="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                        aria-label="Generate AI queue triage">
+                    <i data-lucide="loader" x-show="loading" x-cloak class="h-3.5 w-3.5 animate-spin" aria-hidden="true"></i>
+                    <span x-text="loading ? 'Triaging…' : (triage ? 'Regenerate' : 'Triage pending queue')"></span>
+                </button>
+            </div>
+        {% endcall %}
+        {% call card_content(class='space-y-3') %}
+        <p class="text-xs text-muted-foreground">
+            AI-assessed complexity and suggested review order for the pending queue. Advisory only &#8212; it does
+            not reorder or change any review; the queue below still reflects the real, stored data.
+        </p>
+
+        <div x-show="error" x-cloak role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" x-text="error"></div>
+        <div x-show="message" x-cloak class="text-sm text-muted-foreground" x-text="message"></div>
+
+        <div x-show="triage" x-cloak class="space-y-3">
+            <p class="text-sm text-foreground" x-text="triage && triage.summary"></p>
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse text-sm">
+                    <thead>
+                        <tr>
+                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Review #</th>
+                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Title</th>
+                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Complexity</th>
+                            <th class="border-b border-border px-3 py-2 text-left text-xs font-medium text-muted-foreground">Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        <template x-for="(item, idx) in (triage ? triage.items : [])" :key="idx">
+                            <tr>
+                                <td class="px-3 py-2 text-foreground" x-text="item.review_number"></td>
+                                <td class="px-3 py-2 text-foreground" x-text="item.title"></td>
+                                <td class="px-3 py-2 text-foreground" x-text="item.complexity"></td>
+                                <td class="px-3 py-2 text-muted-foreground" x-text="item.reason"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div x-show="triage && triage.suggested_order && triage.suggested_order.length" x-cloak>
+                <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Suggested order</h3>
+                <p class="mt-1 text-sm text-foreground" x-text="triage && triage.suggested_order.join(' → ')"></p>
+            </div>
+        </div>
+        {% endcall %}
+    {% endcall %}
+    </section>
 
     {% if queue.state != 'failed' %}
     {% set completed_reviews = dashboard_data.metrics.approved_items + dashboard_data.metrics.rejected_items %}
@@ -147,47 +203,17 @@
 
     {% include 'arb/partials/_typed_queue.html' %}
 </div>
-{% else %}
-{% include 'arb/partials/_legacy_dashboard.html' %}
-{% endif %}
 {% endblock %}
 
-{% block extra_head_js %}{% set _typed = typed_queue | default(none) %}
+{% block extra_head_js %}
 <script src="/static/vendor/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='js/shared/css_color_tokens.js') }}"></script>
-{% if not _typed or _typed.state != 'failed' %}
+{% if queue.state != 'failed' %}
 <script>
 (function () {
-  // This block renders in extra_head_js, which sits inside <head> --
-  // #arbStatusChart lives in the body and does not exist yet when this
-  // script runs synchronously. Without the DOMContentLoaded wrap,
-  // getElementById returns null every time (not just the documented
-  // zero-reviews case below), `if (!ctx) return;` fires silently with no
-  // console error, and the "Review status" card renders as dead whitespace
-  // with only the legend numbers floating in it. Found 11 Sep 2026 in a
-  // visual-design pass on production.
-  //
-  // ONE initialiser serving BOTH the typed-queue and legacy branches
-  // (dashboard.html / _legacy_dashboard.html each render their own
-  // #arbStatusChart canvas, mutually exclusive). Previously duplicated with a
-  // divergent, unparseable `hsl(var(--warning))` JS-string colour array on the
-  // typed branch -- `var(...)` only resolves inside real CSS, so Chart.js's
-  // @kurkle/color silently failed to parse it and every segment fell back to
-  // default black. Colours are now resolved via the shared cssHSL() helper
-  // (app/static/js/shared/css_color_tokens.js), which reads the custom
-  // property with getComputedStyle() first. Found 17 Sep 2026.
   document.addEventListener('DOMContentLoaded', function () {
     const ctx = document.getElementById('arbStatusChart');
     if (!ctx) return;
-    // Round-2 hardening (17 Sep 2026): under heavy system load the stylesheet
-    // defining the --warning/--success/etc custom properties can still be
-    // mid-application when this DOMContentLoaded handler runs, so
-    // getComputedStyle briefly returns an empty string for the property.
-    // cssHSL() already returns null in that case (see css_color_tokens.js),
-    // but defend here too against ANY resolution that isn't a real colour --
-    // in particular never hand an unresolved `var(...)` string to Chart.js,
-    // which is exactly the silent @kurkle/color parse failure this fix
-    // exists to prevent.
     const _cssHSLRaw = (window.ArchieColorTokens && window.ArchieColorTokens.cssHSL) || function (v) { return null; };
     const cssHSL = function (v) {
       const resolved = _cssHSLRaw(v);
@@ -228,7 +254,6 @@
 })();
 </script>
 {% endif %}
-{% if not _typed %}
 <script>
   window.__ARB_CONFIG__ = window.__ARB_CONFIG__ || {};
   window.__ARB_CONFIG__.createReviewUrl = '{{ url_for("arb.create_review") }}';
@@ -278,9 +303,6 @@ function arbQueueTriagePanel() {
             this.error = null;
             this.message = null;
             try {
-                // silent: this panel paints its own inline error state below, so the
-                // wrapper's toast would be a duplicate. CSRF is injected for us, and a
-                // non-2xx raises rather than returning a body that could read as a result.
                 const d = await Platform.fetch.post('/arb/api/queue/ai-triage', undefined, { silent: true });
                 this.triage = d.triage;
                 if (!d.triage) this.message = d.message || 'No pending reviews';
@@ -295,5 +317,4 @@ function arbQueueTriagePanel() {
     };
 }
 </script>
-{% endif %}
 {% endblock %}

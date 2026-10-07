@@ -73,6 +73,7 @@ def _work_package(
     kwargs = dict(
         name=name,
         archimate_element_id=element.id,
+        organization_id=element.organization_id,
         business_capability="Test Capability",
         status=status,
         progress_percentage=progress_percentage,
@@ -690,7 +691,8 @@ def test_route_redacts_gap_estimated_cost_without_budget_authority(app, db_sessi
     a = _element(db_session, org.id, "A")
     g1 = _gap(db_session, org.id, name="Costed gap", estimated_cost=5000.0)
     db_session.add(UnifiedWorkPackage(
-        name="Migrate", archimate_element_id=a.id, business_capability="Test", gap_id=g1.id,
+        name="Migrate", archimate_element_id=a.id, organization_id=org.id,
+        business_capability="Test", gap_id=g1.id,
     ))
     db_session.commit()
 
@@ -713,7 +715,8 @@ def test_route_does_not_redact_gap_estimated_cost_for_cto(app, db_session, make_
     a = _element(db_session, org.id, "A")
     g1 = _gap(db_session, org.id, name="Costed gap", estimated_cost=5000.0)
     db_session.add(UnifiedWorkPackage(
-        name="Migrate", archimate_element_id=a.id, business_capability="Test", gap_id=g1.id,
+        name="Migrate", archimate_element_id=a.id, organization_id=org.id,
+        business_capability="Test", gap_id=g1.id,
     ))
     db_session.commit()
 
