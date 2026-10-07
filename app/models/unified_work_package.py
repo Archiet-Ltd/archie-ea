@@ -179,6 +179,16 @@ class UnifiedWorkPackage(TenantMixin, db.Model):
     created_by = Column(Integer, ForeignKey("users.id"), index=True)
     updated_by = Column(Integer, ForeignKey("users.id"))
 
+    # Set once work_dependencies hold unified ids (merge remap, or created by the
+    # writer). Lets the merge's dependency remap run exactly once per row.
+    dependencies_remapped_at = Column(DateTime, nullable=True)
+
+    # Hierarchy (a child work package under a parent), carried from the
+    # work_packages store; filled by the merge and the bridge.
+    parent_id = Column(
+        BigInteger, ForeignKey("unified_work_packages.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     # === Sync and Automation Status ===
     last_sync_at = Column(DateTime)
     sync_status = Column(String(20), default="synced")  # synced, pending, error

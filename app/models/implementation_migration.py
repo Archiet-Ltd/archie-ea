@@ -67,6 +67,10 @@ class TechnologyRoadmapInitiative(db.Model):
         nullable=True,
         index=True,
     )
+    # Set when the row is copied across (merge or bridge). A unified copy that
+    # is later deleted nulls retired_into_id (ON DELETE SET NULL) but leaves
+    # this set, so the row stays deleted instead of being merged again.
+    retired_at = db.Column(db.DateTime, nullable=True)
 
     def to_dict(self):
         return {
@@ -188,6 +192,10 @@ class WorkPackage(TenantMixin, db.Model):
         nullable=True,
         index=True,
     )
+    # Set when the row is copied across (merge or bridge). A unified copy that
+    # is later deleted nulls retired_into_id (ON DELETE SET NULL) but leaves
+    # this set, so the row stays deleted instead of being merged again.
+    retired_at = db.Column(db.DateTime, nullable=True)
 
     architecture = db.relationship("ArchitectureModel", backref="migration_work_packages")
     archimate_element = db.relationship(
@@ -360,10 +368,19 @@ class Deliverable(db.Model):
     name = db.Column(db.String(255), nullable=False, index=True)
     description = db.Column(db.Text)
 
+    # Legacy key: only set when a work_packages row exists for this work
+    # package. Nullable so a deliverable can be added to any work package;
+    # unified_work_package_id below is the key every reader uses.
     work_package_id = db.Column(
         db.Integer,
         db.ForeignKey("work_packages.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    unified_work_package_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("unified_work_packages.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     architecture_id = db.Column(

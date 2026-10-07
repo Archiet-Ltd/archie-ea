@@ -35,16 +35,26 @@ flask --app manage backfill-review-queue-approvals || echo 'WARN approval-queue 
 
 # ADR 0008 / unified_work_packages tenancy and consolidation. The unified
 # work packages table predates TenantMixin; reconcile-schema above adds
-# organization_id as NULL. The first backfill attributes every existing row
-# to its owning organisation (linked programme or element, else creator,
-# else quarantine). The merge copies rows from the four legacy stores
-# (work_packages, roadmap_work_packages, technology_roadmap_initiatives,
-# implementation_work_packages) into unified_work_packages with provenance.
-# The second backfill picks up rows that the merge resolved through a FK
-# its own attribution chain did not try. Each command is idempotent.
-flask --app manage backfill-work-package-org || echo 'WARN work package tenancy backfill skipped - unified_work_packages rows without an organisation are invisible to every org until this runs'
-flask --app manage merge-work-package-stores || echo 'WARN work package store merge skipped - legacy work package stores will not appear in the unified view until this runs'
-flask --app manage backfill-work-package-org || echo 'WARN work package tenancy second pass skipped - merged rows that resolved through a new FK remain unattributed until this runs'
+# organization_id (and the retired_at / link columns) as NULL. In run order:
+#   1. backfill-work-package-org attributes every existing row to its owning
+#      organisation (linked programme or element, else creator, else quarantine);
+#   2. merge-work-package-stores copies rows from the four retired stores
+#      (work_packages, roadmap_work_packages, technology_roadmap_initiatives,
+#      implementation_work_packages) into unified_work_packages with provenance,
+#      remaps dependencies to unified ids, fills the fields earlier merges did
+#      not copy, and never copies a row whose copy was deleted (retired_at);
+#   3. the second backfill picks up rows the merge resolved through a FK its own
+#      attribution chain did not try;
+#   4. merge-work-package-stores --verify exits non-zero, with per-store counts,
+#      if any retired store still holds a row that is not copied.
+# These four lines are NOT suppressed: the work package screens read only
+# unified_work_packages, so a failed merge must stop the deploy before the new
+# code starts, as the schema-upgrade comment at the top of this script requires.
+# Each command is idempotent.
+flask --app manage backfill-work-package-org
+flask --app manage merge-work-package-stores
+flask --app manage backfill-work-package-org
+flask --app manage merge-work-package-stores --verify
 # The generic history trigger reconcile-schema cannot create, then
 # one seeded version per pre-existing element/relationship. Trigger first so
 # the backfill's "no entity_history row at all" check is not racing a

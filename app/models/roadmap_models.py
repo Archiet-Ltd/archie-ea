@@ -118,6 +118,9 @@ class RoadmapWorkPackage(db.Model):
         nullable=True,
         index=True,
     )
+    # Set when the row is copied across (merge or bridge); survives the unified
+    # copy's deletion so the row is never merged again.
+    retired_at = Column(DateTime, nullable=True)
 
     # Relationships
     deliverables = relationship(
