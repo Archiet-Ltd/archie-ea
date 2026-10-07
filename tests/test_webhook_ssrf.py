@@ -141,7 +141,13 @@ def _legacy_http_subscription(org_id, url):
     from app import db
 
     row = WebhookSubscription(
-        id=str(uuid.uuid4()), user_id="1", url=url, events=["*"], organization_id=org_id, last_ordinal=0
+        id=str(uuid.uuid4()),
+        user_id="1",
+        url=url,
+        events=["*"],
+        organization_id=org_id,
+        last_ordinal=0,
+        secret="legacy-plaintext-secret",
     )
     db.session.add(row)
     db.session.commit()
