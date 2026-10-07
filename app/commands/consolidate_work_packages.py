@@ -906,14 +906,15 @@ def _merge_roadmap_deliverables(conn, stats, dry_run=False):
         "SELECT rd.id, rd.name, rd.description, rd.status, rd.deliverable_type, "
         "rd.due_date, rd.delivered_date, rd.review_date, rd.approval_criteria, "
         "rd.quality_score, rd.approval_status, rd.related_task_ids, rd.created_at, "
-        "rd.updated_at, COALESCE(u.id, r.retired_into_id) "
+        "rd.updated_at, COALESCE(u.id, r.retired_into_id), ac.id "
         'FROM roadmap_deliverables rd '
         "LEFT JOIN unified_work_packages u ON u.id = rd.unified_work_package_id "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
         "LEFT JOIN roadmap_work_packages r ON r.id = rd.work_package_id "
+        "LEFT JOIN application_components ac ON ac.id = rd.source_application_id "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
         "WHERE rd.retired_into_id IS NULL AND rd.retired_at IS NULL ORDER BY rd.id"
     )).fetchall()
     for (source_id, name, description, status, dtype, due, delivered, review, criteria,
-         quality, approval, tasks, created, updated, unified_id) in rows:
+         quality, approval, tasks, created, updated, unified_id, application_id) in rows:
         if unified_id is None:
             stats.add("roadmap_deliverables: retired without a work package", 1)
             if not dry_run:
@@ -927,16 +928,17 @@ def _merge_roadmap_deliverables(conn, stats, dry_run=False):
         new_id = conn.execute(text(
             "INSERT INTO deliverables (name, description, unified_work_package_id, delivery_status, "
             "deliverable_type, target_date, delivered_date, review_date, approval_criteria, "
-            "quality_score, approval_status, related_task_ids, created_at, updated_at) "
+            "quality_score, approval_status, related_task_ids, application_component_id, "
+            "created_at, updated_at) "
             "VALUES (:name, :description, :uid, :status, :dtype, CAST(:due AS date), "
-            "CAST(:delivered AS date), :review, :criteria, :quality, :approval, :tasks, "
+            "CAST(:delivered AS date), :review, :criteria, :quality, :approval, :tasks, :application, "
             "COALESCE(:created, CURRENT_TIMESTAMP), COALESCE(:updated, CURRENT_TIMESTAMP)) "
             "RETURNING id"
         ), {
             "name": name, "description": description, "uid": unified_id, "status": status,
             "dtype": dtype, "due": due, "delivered": delivered, "review": review,
             "criteria": criteria, "quality": quality, "approval": approval, "tasks": tasks,
-            "created": created, "updated": updated,
+            "application": application_id, "created": created, "updated": updated,
         }).scalar()
         conn.execute(text(  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
             "UPDATE roadmap_deliverables SET retired_into_id = :n, retired_at = CURRENT_TIMESTAMP "

@@ -346,9 +346,12 @@ def test_one_deliverable_store(app, db_session, make_org, client, login_as, brid
     with_unified = RoadmapDeliverable(
         name="Old, keyed on the unified id", organization_id=org.id,
         unified_work_package_id=wp.id, status="delivered", approval_status="approved")
+    from tests.test_work_package_consolidation import _app_component
+
+    component = _app_component(db_session, org)
     by_roadmap = RoadmapDeliverable(
         name="Old, keyed on the roadmap row", organization_id=org.id,
-        work_package_id=roadmap.id, status="planned")
+        work_package_id=roadmap.id, status="planned", source_application_id=component.id)
     db_session.add_all([with_unified, by_roadmap])
     db_session.flush()
     db_session.commit()
@@ -360,6 +363,7 @@ def test_one_deliverable_store(app, db_session, make_org, client, login_as, brid
     roadmap_copy = _copy("roadmap_work_packages", roadmap.id, org)
     second = Deliverable.query.filter_by(name="Old, keyed on the roadmap row").one()
     assert second.unified_work_package_id == roadmap_copy.id
+    assert second.application_component_id == component.id
     db_session.expire_all()
     source = db_session.get(RoadmapDeliverable, with_unified.id)
     assert source.retired_into_id == copies[0].id and source.retired_at is not None
@@ -591,10 +595,18 @@ def test_reconcile_added_columns_get_foreign_keys():
         assert added.returncode == 0, added.stdout[-1500:]
         for table, column in columns:
             assert "%s.%s" % (table, column) in added.stdout, (table, column)
+        def foreign_keys(conn):
+            return {
+                (row[0], row[1]): (row[2], row[3]) for row in conn.execute(sa.text(
+                    "SELECT c.conrelid::regclass::text, a.attname, c.confrelid::regclass::text, "
+                    "c.confdeltype::text FROM pg_constraint c JOIN pg_attribute a "
+                    "ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey) WHERE c.contype = 'f'"))
+            }
+
         with engine.connect() as conn:
-            assert conn.execute(sa.text(
-                "SELECT count(*) FROM pg_constraint WHERE contype = 'f' AND conname LIKE 'fk\\_%'"
-            )).scalar() == 0, "a reconcile-added column has no foreign key"
+            present = foreign_keys(conn)
+            assert not [pair for pair in columns if pair in present], (
+                "a reconcile-added column has no foreign key")
             # Production data: a child pointing at a parent that no longer exists.
         with engine.begin() as conn:
             conn.execute(sa.text(
@@ -605,24 +617,19 @@ def test_reconcile_added_columns_get_foreign_keys():
         assert merged.returncode == 0, merged.stdout[-2000:] + merged.stderr[-1500:]
         assert "unified_work_packages.parent_id: orphan values set to NULL: 1" in merged.stdout
 
-        rules = {"n": "n", "c": "c"}
         expected = {
-            ("unified_work_packages", "unified_work_packages"): "n",
-            ("deliverables", "unified_work_packages"): "c",
-            ("kanban_cards", "unified_work_packages"): "n",
-            ("work_packages", "unified_work_packages"): "n",
-            ("roadmap_work_packages", "unified_work_packages"): "n",
-            ("implementation_work_packages", "unified_work_packages"): "n",
-            ("technology_roadmap_initiatives", "unified_work_packages"): "n",
-            ("roadmap_deliverables", "deliverables"): "n",
+            ("unified_work_packages", "parent_id"): ("unified_work_packages", "n"),
+            ("deliverables", "unified_work_package_id"): ("unified_work_packages", "c"),
+            ("kanban_cards", "unified_work_package_id"): ("unified_work_packages", "n"),
+            ("work_packages", "retired_into_id"): ("unified_work_packages", "n"),
+            ("roadmap_work_packages", "retired_into_id"): ("unified_work_packages", "n"),
+            ("implementation_work_packages", "retired_into_id"): ("unified_work_packages", "n"),
+            ("technology_roadmap_initiatives", "retired_into_id"): ("unified_work_packages", "n"),
+            ("roadmap_deliverables", "retired_into_id"): ("deliverables", "n"),
         }
         with engine.connect() as conn:
-            found = {
-                (row[0], row[1]): row[2] for row in conn.execute(sa.text(
-                    "SELECT conrelid::regclass::text, confrelid::regclass::text, confdeltype::text "
-                    "FROM pg_constraint WHERE contype = 'f' AND conname LIKE 'fk\\_%'"))
-            }
-            assert found == {k: rules[v] for k, v in expected.items()}, found
+            found = foreign_keys(conn)
+            assert {pair: found.get(pair) for pair in expected} == expected, found
             assert conn.execute(sa.text(
                 "SELECT parent_id FROM unified_work_packages WHERE id = 9101")).scalar() is None
 
