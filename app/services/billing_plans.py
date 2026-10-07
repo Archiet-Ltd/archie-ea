@@ -305,6 +305,9 @@ def _count_members(connection, org_id: int, counts: str) -> int:
             )
         )
         .where(or_(users.c.organization_id == org_id, roles.c.organization_id == org_id))
+        # A deactivated person (a leaver) holds no seat; reactivation is
+        # re-checked in _flush_changes.
+        .where(users.c.deactivated_at.is_(None))
     ).subquery()
 
     stmt = select(func.count()).select_from(membership)
@@ -425,6 +428,7 @@ def check_capacity(connection, org_id: int, change: "_Change") -> None:
 def _flush_changes(session) -> Dict[int, _Change]:
     """{organisation id: _Change} for the people and roles this flush writes."""
     from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy import select
 
     from app.models.org_role import OrgRole
     from app.models.user import User
@@ -455,6 +459,26 @@ def _flush_changes(session) -> Dict[int, _Change]:
             if history.added and history.added[0] is not None:
                 if not history.deleted or history.added[0] != history.deleted[0]:
                     at(history.added[0]).joining += 1
+            reactivated = sa_inspect(obj).attrs.deactivated_at.history
+            if (
+                reactivated.deleted
+                and reactivated.deleted[0] is not None
+                and (not reactivated.added or reactivated.added[0] is None)
+                and obj.organization_id is not None
+            ):
+                # A leaver coming back takes a seat again.
+                change = at(obj.organization_id)
+                change.joining += 1
+                held = OrgRole.__table__
+                is_reader = session.connection().execute(
+                    select(held.c.id).where(
+                        held.c.user_id == obj.id,
+                        held.c.organization_id == obj.organization_id,
+                        held.c.role == "viewer",
+                    )
+                ).first()
+                if is_reader is not None:
+                    change.demoted += 1
         elif isinstance(obj, OrgRole) and obj.organization_id is not None:
             history = sa_inspect(obj).attrs.role.history
             if not (history.added and history.deleted):
