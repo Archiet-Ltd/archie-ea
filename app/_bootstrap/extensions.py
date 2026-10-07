@@ -733,6 +733,36 @@ def init_scheduler(app):
                 exc,
             )
 
+        # R1-B88: hourly export-volume scan. Flags a member whose last 24 hours of
+        # downloads is out of line with their own history into the approval queue.
+        export_anomaly_registered = False
+        try:
+            def run_export_anomaly_scan():
+                with app.app_context():
+                    from app.jobs.tenant_safe_job import run_for_each_tenant
+                    from app.services.export_anomaly_service import scan_organisation
+
+                    run = run_for_each_tenant(
+                        app, "export_anomaly_scan", lambda organization_id: scan_organisation(organization_id)
+                    )
+                    if run.failed:
+                        app.logger.error(
+                            "APScheduler export anomaly scan partial failure: %s",
+                            run.as_dict(),
+                        )
+
+            scheduler.add_job(
+                func=run_export_anomaly_scan,
+                trigger=IntervalTrigger(hours=1),
+                id="export_anomaly_scan",
+                name="Export Anomaly Scan",
+                replace_existing=True,
+                max_instances=1,
+            )
+            export_anomaly_registered = True
+        except Exception as exc:
+            app.logger.error("Export anomaly scan job was not registered: %s", exc)
+
         # Per-organisation model-health / drift scan. Runs the
         # deterministic drift detector for every active organisation and
         # stores the report so the page reads a single row rather than
@@ -825,6 +855,8 @@ def init_scheduler(app):
             scheduled_jobs += ", model-health drift scan (interval)"
         if event_log_partition_registered:
             scheduled_jobs += ", event log partition maintenance (daily)"
+        if export_anomaly_registered:
+            scheduled_jobs += ", export anomaly scan (hourly)"
         app.logger.info("APScheduler started: %s", scheduled_jobs)
     except ImportError:
         app.logger.warning("APScheduler not available — EA workflow schedules disabled")
