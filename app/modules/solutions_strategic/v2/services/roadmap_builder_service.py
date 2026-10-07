@@ -337,7 +337,7 @@ class RoadmapBuilderService:
 
         return {
             "success": True,
-            "work_packages": [work_package_service.to_dict(wp) for wp in work_packages],
+            "work_packages": work_package_service.to_dicts(work_packages),
             "total": total,
             "limit": limit,
             "offset": offset,

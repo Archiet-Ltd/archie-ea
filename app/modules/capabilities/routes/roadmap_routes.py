@@ -1197,47 +1197,48 @@ def api_roadmap_create_work_package(gap_id):
             # Create single work package
             wp = gap_archimate_service.create_work_package_for_gap(gap, data)
 
+        from app.services import work_package_service
+        from app.utils.tenant import current_organization_id
+
+        org_id = current_organization_id()
+        copy = None
         try:
             db.session.commit()
         except Exception as commit_err:
             # Production DB may be missing new columns (migration freeze).
-            # Rollback and retry with only the proven-safe core columns.
+            # Rollback and make the work package through the one writer (its core
+            # columns only), linked to the gap as the writer links it.
             db.session.rollback()
             current_app.logger.warning(
-                f"WorkPackage commit failed ({commit_err}), retrying with core columns"
+                f"WorkPackage commit failed ({commit_err}), retrying through the writer"
             )
-            from app.models.implementation_migration import WorkPackage as WP
             from datetime import date as date_type
-            wp2 = WP(
-                name=data.get("name", f"Resolve: {gap.name}"),
-                summary=data.get("summary", ""),
+
+            def _day(value):
+                return date_type.fromisoformat(value) if value else None
+
+            copy = work_package_service.create_work_package(
+                organization_id=org_id,
+                user_id=current_user.id if current_user.is_authenticated else None,
+                name=data.get("name") or f"Resolve: {gap.name}",
                 description=data.get("description", gap.description),
-                start_date=data.get("start_date") and date_type.fromisoformat(data["start_date"]) or None,
-                target_date=data.get("target_date") and date_type.fromisoformat(data["target_date"]) or None,
+                start_date=_day(data.get("start_date")),
+                end_date=_day(data.get("target_date")),
                 priority=data.get("priority", "medium"),
                 status="planned",
+                gap_id=gap.id,
             )
-            db.session.add(wp2)
-            try:
-                gap.work_packages.append(wp2)
-            except Exception as exc:
-                logger.debug("suppressed error in api_roadmap_create_work_package (app/modules/capabilities/routes/roadmap_routes.py): %s", exc)
             db.session.commit()
-            wp = wp2
 
-        try:
-            # The screen's ids are the one store's ids: answer with the copy
-            # the bridge made of this row, not the older list's row.
-            from app.services import work_package_service
-            from app.utils.tenant import current_organization_id
-
-            org_id = current_organization_id()
+        # The screen's ids are the one store's ids: answer with the row of the one
+        # store (the copy the bridge made of the older row, or the row the writer
+        # just made), never the older list's id.
+        if copy is None:
             copy = work_package_service.get_by_source("work_packages", wp.id, org_id)
-            if copy is None:
-                raise LookupError("no copy")
-            wp_dict = work_package_service.to_roadmap_dict(copy, org_id, include_children=True)
-        except Exception:
-            wp_dict = {"id": wp.id, "name": wp.name, "status": getattr(wp, "status", "planned")}
+        if copy is None:
+            current_app.logger.error("create-from-gap: no row in the one store for work package %s", wp.id)
+            return jsonify({"success": False, "error": "An internal error occurred"}), 500
+        wp_dict = work_package_service.to_roadmap_dict(copy, org_id, include_children=True)
 
         return jsonify(
             {
@@ -1284,14 +1285,14 @@ def api_roadmap_work_packages():
             if root_only:
                 query = query.filter(UWP.parent_id.is_(None))
             if gap_id:
-                # Rows made here carry gap_id; rows carried over from the older
-                # work package list are linked through gap_work_packages by
-                # that list's id.
+                # Rows made here are linked to the gap by an ArchiMate relationship;
+                # rows carried over from the older work package list are linked
+                # through gap_work_packages by that list's id.
                 linked = select(gap_work_packages.c.work_package_id).where(
                     gap_work_packages.c.gap_id == gap_id
                 )
                 query = query.filter(or_(
-                    UWP.gap_id == gap_id,
+                    UWP.id.in_(work_package_service.work_package_ids_for_gap(gap_id, org_id)),
                     (UWP.source_table == "work_packages") & UWP.source_id.in_(linked),
                 ))
             work_packages = query.order_by(UWP.start_date, UWP.id).all()

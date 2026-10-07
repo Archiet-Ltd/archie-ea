@@ -6162,7 +6162,7 @@ def api_solution_gantt_data(solution_id: int):
     Transforms RoadmapWorkPackage records into groups/tasks/milestones.
     """
     try:
-        from app.models.roadmap_models import RoadmapDeliverable, RoadmapWorkPackage
+        from app.models.roadmap_models import RoadmapWorkPackage
 
         solution = Solution.query.get_or_404(solution_id)
 
@@ -6213,24 +6213,29 @@ def api_solution_gantt_data(solution_id: int):
                 },
             })
 
-        # Milestones from deliverables with due dates
+        # Milestones from deliverables with due dates (the one deliverable store,
+        # reached through each roadmap row's copy in the one work package store)
         milestones = []
-        deliverable_ids = [wp.id for wp in work_packages]
-        if deliverable_ids:
-            deliverables = RoadmapDeliverable.query.filter(
-                RoadmapDeliverable.work_package_id.in_(deliverable_ids),
-                RoadmapDeliverable.due_date.isnot(None),
+        by_unified = {wp.retired_into_id: wp for wp in work_packages if wp.retired_into_id}
+        if by_unified:
+            from app.models.implementation_migration import Deliverable
+            from app.services import work_package_service
+
+            deliverables = work_package_service.deliverables_query(
+                solution.organization_id
+            ).filter(
+                Deliverable.unified_work_package_id.in_(list(by_unified)),
+                Deliverable.target_date.isnot(None),
             ).all()
             for d in deliverables:
-                # Find which group this deliverable's WP belongs to
-                ms_group = None
-                for wp in work_packages:
-                    if wp.id == d.work_package_id:
-                        ms_group = (wp.business_capability or "Ungrouped").strip().lower().replace(" ", "-")
-                        break
+                owner = by_unified.get(d.unified_work_package_id)
+                ms_group = (
+                    (owner.business_capability or "Ungrouped").strip().lower().replace(" ", "-")
+                    if owner is not None else None
+                )
                 milestones.append({
                     "id": f"ms-{d.id}",
-                    "date": d.due_date.isoformat() if d.due_date else None,
+                    "date": d.target_date.isoformat() if d.target_date else None,
                     "label": d.name,
                     "group": ms_group,
                 })

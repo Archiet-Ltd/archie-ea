@@ -210,6 +210,12 @@ def archimate_roadmap():
                     for gap in open_gaps[:20]
                 ],
             }
+            _plateaus = Plateau.query.order_by(Plateau.sequence_order.asc()).all()
+            # The count is of this organisation's work packages that realise the
+            # plateau, from the one store (relationships), not the older list.
+            _plateau_wps = work_package_service.plateau_work_package_ids(
+                [p.id for p in _plateaus], current_organization_id()
+            )
             plateaus_list = [
                 {
                     "id": p.id,
@@ -217,9 +223,9 @@ def archimate_roadmap():
                     "description": p.description or "",
                     "sequence_order": p.sequence_order or 0,
                     "target_date": p.target_date.isoformat() if p.target_date else None,
-                    "work_package_count": len(p.work_packages) if p.work_packages else 0,
+                    "work_package_count": len(_plateau_wps.get(p.id, ())),
                 }
-                for p in Plateau.query.order_by(Plateau.sequence_order.asc()).all()
+                for p in _plateaus
             ]
         except Exception as e:
             logger.debug("Gap/Plateau tables may not exist yet: %s", e)

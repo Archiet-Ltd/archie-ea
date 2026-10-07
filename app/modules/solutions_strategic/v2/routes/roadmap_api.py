@@ -1540,6 +1540,7 @@ def get_statistics():
         # The work package totals and the breakdowns read the same population:
         # this organisation's rows of the one store.
         _wp_rows = work_package_service.query_for(current_organization_id())
+        _deliverable_rows = work_package_service.deliverables_query(current_organization_id())
         from flask import g as _g
         _org = getattr(_g, "current_org_id", None)
         _org_where = " WHERE organization_id = :org" if _org is not None else ""
@@ -1566,18 +1567,14 @@ def get_statistics():
                 or 0,
             },
             "deliverables": {
-                "total": Deliverable.query.count(),
-                "by_status": dict(
-                    db.session.execute(  # tenant-exempt: system table (aggregate stats)
-                        text(
-                            """
-                    SELECT COALESCE(delivery_status, 'unknown'), COUNT(*)
-                    FROM deliverables
-                    GROUP BY delivery_status
-                """
-                        )
-                    ).fetchall()
-                ),
+                # This organisation's deliverables only: those of its work packages.
+                "total": _deliverable_rows.count(),
+                "by_status": {
+                    (status or "unknown"): n
+                    for status, n in _deliverable_rows.with_entities(
+                        Deliverable.delivery_status, _func.count()
+                    ).group_by(Deliverable.delivery_status).all()
+                },
             },
             "gaps": {
                 "total": ImplementationGap.query.filter(ImplementationGap.gap_kind != "plateau_transition").count(),

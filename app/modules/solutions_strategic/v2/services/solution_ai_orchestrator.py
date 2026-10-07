@@ -3103,7 +3103,11 @@ CRITICAL -- TRACEABILITY:
                 db.session.add(gap)
                 db.session.flush()
                 gaps_by_name[gap.name.lower().strip()] = gap
-                self._sync_archimate_element(solution.id, gap.name, 'Gap', 'Implementation', gap.description or '')
+                gap_element = self._sync_archimate_element(solution.id, gap.name, 'Gap', 'Implementation', gap.description or '')
+                if gap_element is not None and gap.archimate_element_id is None:
+                    # The gap's own element: a work package linked to this gap
+                    # relates to it, so no second element is made for the gap.
+                    gap.archimate_element_id = gap_element.id
                 created['gaps'] += 1
         except Exception as exc:
             logger.warning(f"Error creating gaps: {exc}")
@@ -3141,7 +3145,8 @@ CRITICAL -- TRACEABILITY:
                     user_id=user_id,
                     name=wp_data.get('name', ''),
                     description=wp_data.get('description', ''),
-                    plateau_id=plateau.id if plateau else None,
+                    # plateau is a SolutionPlateau (its own table), not a Plateau row, so
+                    # its id is not a plateau link; the gap is a real Gap row.
                     gap_id=gap.id if gap else None,
                     # capability_id FK references unified_capabilities (empty) -- use business_capability text field instead
                     business_capability=cap.name if cap else 'General',
@@ -3157,7 +3162,12 @@ CRITICAL -- TRACEABILITY:
                     layer=wp_data.get('arch_layer', 'application'),
                 )
                 wp_by_name[wp.name.lower().strip()] = wp
-                self._sync_archimate_element(solution.id, wp.name, 'WorkPackage', 'Implementation', wp.description or '')
+                # The writer has already put the work package in the ArchiMate model;
+                # only the solution's junction row is added, to that same element.
+                from app.models.archimate_core import ArchiMateElement
+                self._sync_archimate_element(
+                    solution.id, wp.name, 'WorkPackage', 'Implementation', wp.description or '',
+                    element=db.session.get(ArchiMateElement, wp.archimate_element_id))
                 created['work_packages'] += 1
 
                 # 2. Create KanbanCard linked to work package, gap, plateau
@@ -3852,7 +3862,7 @@ CRITICAL -- TRACEABILITY:
         logger.warning("Failed to parse LLM response as JSON (len=%d)", len(text))
         return None
 
-    def _sync_archimate_element(self, solution_id: int, name: str, element_type: str, layer: str, description: str = "", role: str = "ai_derived"):
+    def _sync_archimate_element(self, solution_id: int, name: str, element_type: str, layer: str, description: str = "", role: str = "ai_derived", element=None):
         """Create or find an ArchiMateElement and link it to the solution via the correct junction table.
 
         This is the DATA PIPELINE fix: every entity created by generate_draft_architecture()
@@ -3864,8 +3874,9 @@ CRITICAL -- TRACEABILITY:
         if not name or not name.strip():
             return None
 
-        # Try to find existing element with same name+type+layer
-        existing = ArchiMateElement.query.filter(
+        # An element the caller already made (the work package writer's) is used as is.
+        # Otherwise try to find existing element with same name+type+layer
+        existing = element or ArchiMateElement.query.filter(
             db.func.lower(ArchiMateElement.name) == name.strip().lower(),
             ArchiMateElement.type == element_type,
             db.func.lower(ArchiMateElement.layer) == layer.lower(),

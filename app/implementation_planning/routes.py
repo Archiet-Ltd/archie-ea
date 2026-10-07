@@ -566,7 +566,7 @@ def api_work_packages():
         if limit:
             query = query.limit(limit)
         work_packages = query.all()
-        return jsonify({"work_packages": [work_package_service.to_dict(wp) for wp in work_packages]})
+        return jsonify({"work_packages": work_package_service.to_dicts(work_packages)})
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
 
@@ -1183,7 +1183,7 @@ def generate_report():
                 "work_packages_by_priority": {},
                 "gaps_by_priority": {},
             },
-            "work_packages": [work_package_service.to_dict(wp) for wp in work_packages],
+            "work_packages": work_package_service.to_dicts(work_packages),
             "gaps": [g.to_dict() for g in gaps],
             "deliverables": [d.to_dict() for d in deliverables],
         }

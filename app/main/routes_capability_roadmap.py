@@ -12,7 +12,7 @@ from sqlalchemy import func
 from app import db
 from app.main.views import main
 from app.models.roadmap import RoadmapTask
-from app.models.roadmap_models import RoadmapDeliverable
+from app.models.implementation_migration import Deliverable
 from app.models.unified_capability import BusinessDomain, UnifiedCapability
 from app.models.unified_work_package import UnifiedWorkPackage
 from app.services import work_package_service
@@ -508,11 +508,11 @@ def get_capability_work_packages():
             # Get deliverable counts in a single query
             deliverable_count_query = (
                 db.session.query(
-                    RoadmapDeliverable.unified_work_package_id,
-                    func.count(RoadmapDeliverable.id).label("count"),
+                    Deliverable.unified_work_package_id,
+                    func.count(Deliverable.id).label("count"),
                 )
-                .filter(RoadmapDeliverable.unified_work_package_id.in_(wp_ids))
-                .group_by(RoadmapDeliverable.unified_work_package_id)
+                .filter(Deliverable.unified_work_package_id.in_(wp_ids))
+                .group_by(Deliverable.unified_work_package_id)
                 .all()
             )
 
@@ -960,10 +960,10 @@ def get_work_package_deliverables(wp_id):
         # Verify work package exists
         work_package = _require_wp(wp_id)
 
-        # Get deliverables for this work package
+        # Get deliverables for this work package (the one deliverable store)
         deliverables = (
-            RoadmapDeliverable.query.filter_by(unified_work_package_id=wp_id)
-            .order_by(RoadmapDeliverable.due_date.asc())
+            work_package_service.deliverables_query(current_organization_id(), wp_id)
+            .order_by(Deliverable.target_date.asc())
             .all()
         )
 
@@ -972,7 +972,7 @@ def get_work_package_deliverables(wp_id):
                 "success": True,
                 "work_package_id": wp_id,
                 "work_package_name": work_package.name,
-                "deliverables": [d.to_dict() for d in deliverables],
+                "deliverables": [work_package_service.deliverable_to_roadmap_dict(d) for d in deliverables],
                 "total_deliverables": len(deliverables),
             }
         )
@@ -1000,23 +1000,24 @@ def create_work_package_deliverable(wp_id):
             return jsonify({"error": "Missing required field: name"}), 400
 
         # Create new deliverable
-        new_deliverable = RoadmapDeliverable(
-            name=data["name"],
-            description=data.get("description", ""),
-            unified_work_package_id=wp_id,
-            status=data.get("status", "planned"),
-            due_date=datetime.fromisoformat(data["due_date"]) if data.get("due_date") else None,
-            approval_criteria=data.get("approval_criteria"),
-            deliverable_type=data.get("deliverable_type"),
-            related_task_ids=data.get("related_task_ids"),
-            archimate_element_type="Deliverable",
-            created_by=current_user.id,
-        )
-
-        db.session.add(new_deliverable)
+        fields = work_package_service.roadmap_deliverable_fields(data)
+        fields.setdefault("description", "")
+        fields.setdefault("delivery_status", "planned")
+        try:
+            new_deliverable = work_package_service.create_deliverable(
+                wp_id, organization_id=current_organization_id(), **fields
+            )
+        except work_package_service.WorkPackageNotFound:
+            abort(404)
+        except work_package_service.WorkPackageError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
         db.session.commit()
 
-        return jsonify({"success": True, "deliverable": new_deliverable.to_dict()}), 201
+        return jsonify({
+            "success": True,
+            "deliverable": work_package_service.deliverable_to_roadmap_dict(new_deliverable),
+        }), 201
 
     except HTTPException:
 
@@ -1036,42 +1037,23 @@ def update_work_package_deliverable(wp_id, deliverable_id):
     try:
         # Verify work package and deliverable exist
         _require_wp(wp_id)
-        deliverable = RoadmapDeliverable.query.filter_by(
-            id=deliverable_id, unified_work_package_id=wp_id
-        ).first_or_404()
-
         data = request.get_json()
-
-        # Update fields
-        if "name" in data:
-            deliverable.name = data["name"]
-        if "description" in data:
-            deliverable.description = data["description"]
-        if "status" in data:
-            deliverable.status = data["status"]
-        if "due_date" in data:
-            deliverable.due_date = (
-                datetime.fromisoformat(data["due_date"]) if data["due_date"] else None
+        try:
+            deliverable = work_package_service.update_deliverable(
+                wp_id, deliverable_id, organization_id=current_organization_id(),
+                **work_package_service.roadmap_deliverable_fields(data),
             )
-        if "delivered_date" in data:
-            deliverable.delivered_date = (
-                datetime.fromisoformat(data["delivered_date"]) if data["delivered_date"] else None
-            )
-        if "approval_criteria" in data:
-            deliverable.approval_criteria = data["approval_criteria"]
-        if "approval_status" in data:
-            deliverable.approval_status = data["approval_status"]
-        if "quality_score" in data:
-            deliverable.quality_score = data["quality_score"]
-        if "deliverable_type" in data:
-            deliverable.deliverable_type = data["deliverable_type"]
-        if "related_task_ids" in data:
-            deliverable.related_task_ids = data["related_task_ids"]
-
-        deliverable.updated_by = current_user.id
+        except work_package_service.WorkPackageNotFound:
+            abort(404)
+        except work_package_service.WorkPackageError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
         db.session.commit()
 
-        return jsonify({"success": True, "deliverable": deliverable.to_dict()})
+        return jsonify({
+            "success": True,
+            "deliverable": work_package_service.deliverable_to_roadmap_dict(deliverable),
+        })
 
     except HTTPException:
 
@@ -1092,11 +1074,12 @@ def delete_work_package_deliverable(wp_id, deliverable_id):
     try:
         # Verify work package and deliverable exist
         _require_wp(wp_id)
-        deliverable = RoadmapDeliverable.query.filter_by(
-            id=deliverable_id, unified_work_package_id=wp_id
-        ).first_or_404()
-
-        db.session.delete(deliverable)
+        try:
+            work_package_service.delete_deliverable(
+                wp_id, deliverable_id, organization_id=current_organization_id()
+            )
+        except work_package_service.WorkPackageNotFound:
+            abort(404)
         db.session.commit()
 
         return jsonify({"success": True, "message": f"Deliverable {deliverable_id} deleted"})
@@ -1137,8 +1120,8 @@ def get_work_package_details(wp_id):
 
         # Get deliverables
         deliverables = (
-            RoadmapDeliverable.query.filter_by(unified_work_package_id=wp_id)
-            .order_by(RoadmapDeliverable.due_date.asc())
+            work_package_service.deliverables_query(current_organization_id(), wp_id)
+            .order_by(Deliverable.target_date.asc())
             .all()
         )
 
@@ -1151,7 +1134,7 @@ def get_work_package_details(wp_id):
 
         # Calculate deliverable statistics
         total_deliverables = len(deliverables)
-        delivered_count = len([d for d in deliverables if d.status == "delivered"])
+        delivered_count = len([d for d in deliverables if d.delivery_status == "delivered"])
         approved_count = len([d for d in deliverables if d.approval_status == "approved"])
 
         return jsonify(
@@ -1194,7 +1177,7 @@ def get_work_package_details(wp_id):
                     else None,
                 },
                 "tasks": [task.to_dict() for task in tasks],
-                "deliverables": [d.to_dict() for d in deliverables],
+                "deliverables": [work_package_service.deliverable_to_roadmap_dict(d) for d in deliverables],
                 "statistics": {
                     "total_tasks": total_tasks,
                     "completed_tasks": completed_tasks,

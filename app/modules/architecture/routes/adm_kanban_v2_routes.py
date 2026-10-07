@@ -594,26 +594,34 @@ def push_to_gantt(card_ref):
             fields["start_date"] = target_start
         if target_end:
             fields["end_date"] = target_end
-        work_package_service.update_work_package(
-            existing.id, organization_id=org_id, user_id=current_user.id, **fields
-        )
+        try:
+            work_package_service.update_work_package(
+                existing.id, organization_id=org_id, user_id=current_user.id, **fields
+            )
+        except work_package_service.WorkPackageError as exc:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(exc)}), 400
         card.unified_work_package_id = existing.id
         db.session.commit()
         return jsonify({"success": True, "work_package_id": existing.id, "updated": True,
                         "gantt_url": "/roadmap-builder"})
 
-    wp = work_package_service.create_work_package(
-        organization_id=org_id,
-        user_id=current_user.id,
-        name=card.title,
-        description=card.description or "",
-        business_capability=f"ADM Phase {phase_code} — {card.arch_domain or 'Business'}",
-        start_date=target_start,
-        end_date=target_end,
-        priority=wp_priority,
-        source_type="adm_kanban",
-        source_id=card.id,
-    )
+    try:
+        wp = work_package_service.create_work_package(
+            organization_id=org_id,
+            user_id=current_user.id,
+            name=card.title,
+            description=card.description or "",
+            business_capability=f"ADM Phase {phase_code} — {card.arch_domain or 'Business'}",
+            start_date=target_start,
+            end_date=target_end,
+            priority=wp_priority,
+            source_type="adm_kanban",
+            source_id=card.id,
+        )
+    except work_package_service.WorkPackageError as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(exc)}), 400
     card.unified_work_package_id = wp.id
     db.session.commit()
 
