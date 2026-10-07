@@ -112,8 +112,12 @@ def test_sidebar_link_budget_is_31():
     Agent Registry (R1-B56, 6 Oct 2026): raised 32 -> 33. One new
     platform_admin-only link (owner, charter and delegated limits per
     registered agent); no fold is available for the same reason as above.
+
+    Leavers (R1-B26 PR 1, 7 Oct 2026): raised 33 -> 34. One new
+    administrator-only link (departed users and the ownerships to hand over);
+    no fold is available for the same reason as above.
     """
-    assert SIDEBAR_LINK_BUDGET == 33
+    assert SIDEBAR_LINK_BUDGET == 34
 
 
 def test_every_role_is_defined():

@@ -453,7 +453,13 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # agent) is a new, genuinely needed platform_admin-only screen, not a
 # duplicate of anything already in the Admin zone. No fold is available for
 # the same reason as above; taking the budget 32 -> 33.
-SIDEBAR_LINK_BUDGET = 33
+#
+# R1-B26 PR 1 (7 Oct 2026): raised 33 -> 34. One new administrator-only link,
+# "Leavers" (the list of departed users and what each still owns, from which
+# an administrator hands every ownership to someone who is still here). No
+# fold is available for the same reason as above; the directory page picks it
+# up from this zone, so it needs no entry of its own.
+SIDEBAR_LINK_BUDGET = 34
 
 _ZONE_TITLES = {
     "home": "Home",
@@ -578,6 +584,8 @@ _ADMIN_LINKS = [
     # Management stays one click away as a tile on Command Center
     # (app/templates/admin/index.html).
     _link("Audit Log", "admin.audit_log_viewer", "scroll-text", requires="admin"),
+    # R1-B26: departed users and the ownerships to hand over.
+    _link("Leavers", "admin.leavers", "user-minus", requires="admin"),
     _link("Settings", "main.settings", "settings"),
     # Added in the Task 3 fix round (review finding: orphaned real routes —
     # both existed, worked, and had no sidebar link of any kind).
