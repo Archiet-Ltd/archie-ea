@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 
 from flask import (
     Blueprint,
+    abort,
     flash,
     g,
     jsonify,
@@ -66,7 +67,12 @@ from ...forms.admin_forms import (
 )
 from app.modules.account.forms.account_forms import CreatePasswordForm
 from app.decorators import admin_required, audit_log, governance_gate_reader_required
-from app.middleware.tenant_decorators import org_admin_required, platform_admin_required
+from app.middleware.tenant_decorators import (
+    is_platform_admin,
+    org_admin_required,
+    platform_admin_required,
+)
+from app.services.rbac_service import rbac_service
 from app.services.rate_limiter import rate_limit
 from app.models import APISettings, EditableHTML, Permission, Role, User
 from app.models.organization import Organization
@@ -2247,6 +2253,8 @@ from app.models.user import VALID_ROLES as _VALID_ROLES  # noqa: E402
 @audit_log("update_sso_settings")
 def sso_settings():
     """Manage SSO group-to-role mappings stored in the database."""
+    if not (is_platform_admin(current_user) or rbac_service.is_org_admin(current_user, g.current_org_id)):
+        abort(403)
     from app.models.miscellaneous import SSOGroupRoleMapping
 
     if request.method == "POST":
@@ -2387,6 +2395,8 @@ def _render_sso_settings(new_scim_token=None):
 @rate_limit(10, "1m", methods=("POST",))
 def create_scim_token():
     """Issue a SCIM bearer token for the caller's organisation (shown once)."""
+    if not (is_platform_admin(current_user) or rbac_service.is_org_admin(current_user, g.current_org_id)):
+        abort(403)
     from flask import current_app
 
     from app.services import provisioning_service
@@ -2407,6 +2417,8 @@ def create_scim_token():
 @rate_limit(10, "1m", methods=("POST",))
 def revoke_scim_token(token_id):
     """Revoke one of the caller's organisation's SCIM tokens."""
+    if not (is_platform_admin(current_user) or rbac_service.is_org_admin(current_user, g.current_org_id)):
+        abort(403)
     from app.services import provisioning_service
 
     row = provisioning_service.revoke_scim_token(

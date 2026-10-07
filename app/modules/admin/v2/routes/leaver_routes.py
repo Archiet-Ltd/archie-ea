@@ -14,6 +14,8 @@ from flask import abort, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.decorators import admin_required
+from app.middleware.tenant_decorators import is_platform_admin
+from app.services.rbac_service import rbac_service
 from app.services import provisioning_service
 from app.services.rate_limiter import rate_limit
 
@@ -25,6 +27,8 @@ from .admin_routes import admin_bp_v2
 @admin_required
 def leavers():
     """Departed users of this organisation and what each still owns."""
+    if not (is_platform_admin(current_user) or rbac_service.is_org_admin(current_user, g.current_org_id)):
+        abort(403)
     org_id = g.current_org_id
     return render_template(
         "admin/leavers.html",
@@ -39,6 +43,8 @@ def leavers():
 @rate_limit(10, "1m", methods=("POST",))
 def leaver_transfer(owner_id):
     """Hand one ownership row of a departed user to an active user."""
+    if not (is_platform_admin(current_user) or rbac_service.is_org_admin(current_user, g.current_org_id)):
+        abort(403)
     org_id = g.current_org_id
     try:
         _row, removed = provisioning_service.transfer_ownership(
