@@ -275,23 +275,40 @@ class OAuthToken(db.Model):
         db.session.commit()
         return raw_access, raw_refresh, token
 
-    def revoke(self) -> None:
-        self.revoked_at = datetime.now(timezone.utc)
-        # Commit, not flush -- see the matching note on OAuthToken.issue
-        # above: /oauth/revoke calls this standalone, with no other pending
-        # work in the request, and the refresh-rotation path
-        # (_token_refresh) that also calls it is itself followed by
-        # OAuthToken.issue's own commit -- but this revocation must survive
-        # even if that second call never happens (e.g. a future caller that
-        # only revokes). Without an explicit commit here, Flask's
-        # teardown_appcontext hook (shutdown_session) only rolls back on
-        # exception and otherwise just removes the session without
-        # committing, so this write would be silently discarded at the end
-        # of the request that called /oauth/revoke, and the access and
-        # refresh tokens on this row -- gated together off this single
-        # revoked_at column -- would both still read as active on the very
-        # next request.
+    def revoke(self) -> bool:
+        """Atomically revoke this token. Returns True if this call is the one
+        that actually flipped revoked_at from NULL -- False if it was already
+        revoked (lost a concurrent race, or a redundant call). The conditional
+        UPDATE...WHERE revoked_at IS NULL is what makes this safe under
+        concurrent requests on the same token: only one call's UPDATE can
+        match the still-NULL row, so only one can return True, regardless of
+        how many requests read is_refresh_active as True before any of them
+        committed.
+
+        Still a real commit, not a flush -- see the matching note that used
+        to live here and on OAuthToken.issue above: /oauth/revoke calls this
+        standalone, with no other pending work in the request, and the
+        refresh-rotation path (_token_refresh) that also calls it is itself
+        followed by OAuthToken.issue's own commit -- but this revocation must
+        survive even if that second call never happens (e.g. a future caller
+        that only revokes). Without an explicit commit here, Flask's
+        teardown_appcontext hook (shutdown_session) only rolls back on
+        exception and otherwise just removes the session without committing,
+        so this write would be silently discarded at the end of the request
+        that called /oauth/revoke, and the access and refresh tokens on this
+        row -- gated together off this single revoked_at column -- would both
+        still read as active on the very next request.
+        """
+        now = datetime.now(timezone.utc)
+        updated_rows = (
+            db.session.query(OAuthToken)
+            .filter(OAuthToken.id == self.id, OAuthToken.revoked_at.is_(None))
+            .update({"revoked_at": now})
+        )
         db.session.commit()
+        if updated_rows:
+            self.revoked_at = now
+        return bool(updated_rows)
 
     @property
     def is_revoked(self) -> bool:

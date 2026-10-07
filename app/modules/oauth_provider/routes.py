@@ -284,7 +284,19 @@ def _token_refresh(expected_resource: str):
     # Rotation: the presented refresh token is revoked in the same request
     # that mints its replacement, so it can never be used a second time —
     # including by whoever it leaked to, once the legitimate client rotates.
-    old_token.revoke()
+    #
+    # old_token.revoke() is an atomic UPDATE...WHERE revoked_at IS NULL, so
+    # under several concurrent refresh-grant requests presenting the SAME
+    # refresh token, only one of them can be the call whose UPDATE matches
+    # the still-NULL row -- every other one reads is_refresh_active as True
+    # above (that check-then-act window is unavoidable and harmless on its
+    # own) but then loses the race here and must not mint a second token
+    # pair for a token that is, at that point, already spoken for.
+    if not old_token.revoke():
+        # Another concurrent request already won the race to rotate this
+        # refresh token -- that is not this request's token to redeem a
+        # second time.
+        return jsonify({"error": "invalid_grant", "error_description": "refresh token not found, expired or revoked"}), 400
 
     raw_access, raw_refresh_new, new_token = OAuthToken.issue(
         client_id=old_token.client_id,
