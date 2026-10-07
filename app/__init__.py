@@ -88,6 +88,14 @@ def create_app(config=None):
     from app.middleware.analytics_middleware import install_analytics
     install_analytics(app)
 
+    # 1d-2. First-party, cookieless pageview counting for public marketing
+    # pages -- separate from the PostHog hook above, which only fires for a
+    # signed-in user.
+    from app.middleware.public_analytics_middleware import (
+        install_public_pageview_tracking,
+    )
+    install_public_pageview_tracking(app)
+
     # 1d. SOC 2 audit logging: SQLAlchemy mapper events for controlled models
     from app.middleware.audit_middleware import install_audit_logging
     install_audit_logging(app)
