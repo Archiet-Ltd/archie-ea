@@ -445,6 +445,43 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
         out["ids"]["org"] = org.id
 
         # Enable the implementation_planning feature flag so /implementation/ routes work
+        from tests.conftest import seed_implementation_planning_flag
+
+        seed_implementation_planning_flag()
+
+        if ai_protocol_stub is not None:
+            from app.models.models import APISettings
+
+            # Clean up any stale protocol-stub records from interrupted runs.
+            # The live_server subprocess may have created a record, then the
+            # seeder's own app_context reads the same database.  Without this
+            # cleanup a previous run whose finalizer did not execute leaves an
+            # enabled provider behind, and every smoke test errors at setup.
+            for stale in APISettings.query.filter_by(key_label="ci-protocol-stub").all():
+                db.session.delete(stale)
+            db.session.commit()
+
+            # This app context is intentionally unscoped: reject ANY existing
+            # enabled provider (other than our own, which was just removed)
+            # before exercising AI in a candidate database.
+            if APISettings.query.filter_by(enabled=True).count():
+                pytest.fail("AI protocol qualification requires a candidate database without enabled provider records")
+        Role.insert_roles()
+        architect_role = Role.query.filter_by(name="Architect").one()
+        administrator_role = Role.query.filter_by(name="Administrator").one()
+
+        org = Organization(name="Smoke Org %s" % suffix, slug="smoke-%s" % suffix)
+        db.session.add(org)
+        db.session.flush()
+        # One person per archetype is more than Community admits; the plan is
+        # recorded where every limit is read from, the subscriptions row.
+        from app.services.billing_plans import set_contract_plan
+
+        set_contract_plan(org, "enterprise", None)
+        db.session.commit()
+        out["ids"]["org"] = org.id
+
+        # Enable the implementation_planning feature flag so /implementation/ routes work
         from app.models.feature_flags import FeatureFlag, FeatureState
         impl_flag = FeatureFlag.query.filter_by(key="architecture_implementation_planning").first()
         if not impl_flag:

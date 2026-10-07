@@ -50,23 +50,6 @@ def _json(client, method, path, data=None):
     )
 
 
-def _enable_implementation_module(db_session):
-    from app.models.feature_flags import FeatureFlag, FeatureState
-
-    flag = FeatureFlag.query.filter_by(key="architecture_implementation_planning").first()
-    if flag is None:
-        db_session.add(FeatureFlag(
-            key="architecture_implementation_planning",
-            name="Architecture Implementation Planning",
-            description="Implementation planning module", enabled=True,
-            state=FeatureState.STABLE))
-        db_session.flush()
-    elif not flag.is_active:
-        flag.enabled = True
-        flag.state = FeatureState.STABLE
-        db_session.flush()
-
-
 def _legacy(db_session, org, name, **extra):
     from app.models.implementation_migration import WorkPackage
 
@@ -300,7 +283,6 @@ def test_implementation_deliverable_uses_unified_id_and_org(db_session, make_org
     from app.models.implementation_migration import Deliverable
     from app.services import work_package_service as svc
 
-    _enable_implementation_module(db_session)
     org_a, user_a = _org_with_user(db_session, make_org, "d07a")
     org_b, user_b = _org_with_user(db_session, make_org, "d07b")
     mine = svc.create_work_package(organization_id=org_a.id, name="A package")
@@ -510,7 +492,6 @@ def test_capability_roadmap_other_org_404(db_session, make_org, client, login_as
 def test_add_dependency_refuses_cycle(db_session, make_org, client, login_as):
     from app.services import work_package_service as svc
 
-    _enable_implementation_module(db_session)
     org, user = _org_with_user(db_session, make_org, "d12a")
     one, two, three = (svc.create_work_package(organization_id=org.id, name="Cycle %s" % i)
                        for i in range(3))
@@ -531,7 +512,6 @@ def test_add_dependency_refuses_cycle(db_session, make_org, client, login_as):
 def test_dependency_picker_filters_by_name(db_session, make_org, client, login_as):
     from app.services import work_package_service as svc
 
-    _enable_implementation_module(db_session)
     org, user = _org_with_user(db_session, make_org, "d12b")
     main = svc.create_work_package(organization_id=org.id, name="Edited package")
     for i in range(60):
@@ -569,7 +549,6 @@ def test_roadmap_breakdown_matches_totals(db_session, make_org, client, login_as
     assert stats["by_status"] == {"planned": 1, "in_progress": 2}
     assert stats["total_cost"] == 150
 
-    _enable_implementation_module(db_session)
     login_as(client, user_a)
     data = client.get("/implementation/api/roadmap-data").get_json()
     domains = {i["name"]: i["domain_name"] for i in data["items"] if i["type"] == "work_package"}

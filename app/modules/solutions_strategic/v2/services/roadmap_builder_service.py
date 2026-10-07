@@ -14,7 +14,7 @@ Key Features:
 - Integration with existing capability roadmap
 
 Reuses:
-- ImplementationWorkPackage model
+- UnifiedWorkPackage (through work_package_service)
 - ImplementationPlateau model
 - technology_roadmap_service.py patterns
 - capability_roadmap_dashboard_service.py patterns
@@ -31,7 +31,6 @@ from sqlalchemy import or_  # dead-code-ok
 from app import db
 from app.models.implementation_migration import (  # dead-code-ok
     Gap as ImplementationGap,
-    WorkPackage as ImplementationWorkPackage,
 )
 from app.models.implementation_planning import (
     ImplementationPlateau,
@@ -40,6 +39,11 @@ from app.services import work_package_service
 from app.utils.tenant import current_organization_id
 
 logger = logging.getLogger(__name__)
+
+
+def _as_date(value):
+    """A stored date-time as a plain date, so dates and date-times never mix."""
+    return value.date() if isinstance(value, datetime) else value
 
 
 # =============================================================================
@@ -429,11 +433,14 @@ class RoadmapBuilderService:
         edges = []
 
         # Get work packages
-        query = ImplementationWorkPackage.query
-        if status_filter:
-            query = query.filter(ImplementationWorkPackage.status.in_(status_filter))
+        from app.models.unified_work_package import UnifiedWorkPackage as UWP
 
-        work_packages = query.order_by(ImplementationWorkPackage.start_date.asc()).all()
+        org_id = current_organization_id()
+        query = work_package_service.query_for(org_id)
+        if status_filter:
+            query = query.filter(UWP.status.in_(status_filter))
+
+        work_packages = query.order_by(UWP.start_date.asc().nullsfirst(), UWP.id.asc()).all()
 
         # Calculate layout positions using topological sort levels
         levels = self._calculate_topological_levels(work_packages)
@@ -448,7 +455,7 @@ class RoadmapBuilderService:
             # its fields (percent_complete, target_date, owner) to roadmap
             # names; reuse it here instead of reading attribute names the
             # model does not have.
-            row = wp.to_roadmap_dict()
+            row = work_package_service.to_roadmap_dict(wp, org_id)
             node_data = {
                 "label": wp.name,
                 "status": wp.status,
@@ -474,8 +481,9 @@ class RoadmapBuilderService:
             level_counts[level] += 1
 
             # Create edges for dependencies
-            if wp.dependencies:
-                for dep_id in wp.dependencies:
+            wp_deps = work_package_service.dependency_ids(wp)
+            if wp_deps:
+                for dep_id in wp_deps:
                     edges.append(
                         {
                             "id": f"e-{dep_id}-{wp.id}",
@@ -513,7 +521,7 @@ class RoadmapBuilderService:
         }
 
     def _calculate_topological_levels(
-        self, work_packages: List[ImplementationWorkPackage]
+        self, work_packages: List[Any]
     ) -> Dict[int, int]:
         """Calculate topological levels for layout."""
         levels = {}
@@ -529,7 +537,7 @@ class RoadmapBuilderService:
 
             visited.add(wp_id)
             wp = wp_map[wp_id]
-            deps = wp.dependencies or []
+            deps = work_package_service.dependency_ids(wp)
 
             if not deps:
                 level = 0
@@ -759,9 +767,13 @@ class RoadmapBuilderService:
         Returns:
             Dict with critical path analysis
         """
-        work_packages = ImplementationWorkPackage.query.filter(
-            ImplementationWorkPackage.status.notin_(["completed", "cancelled"])
-        ).all()
+        from app.models.unified_work_package import UnifiedWorkPackage as UWP
+
+        work_packages = (
+            work_package_service.query_for(current_organization_id())
+            .filter(UWP.status.notin_(["completed", "cancelled"]))
+            .all()
+        )
 
         if not work_packages:
             return {"success": True, "critical_path": [], "total_duration": 0}
@@ -783,15 +795,15 @@ class RoadmapBuilderService:
                 today = date.today()
                 return today, today
 
-            deps = wp.dependencies or []
+            deps = work_package_service.dependency_ids(wp)
             if not deps:
-                es = wp.start_date or date.today()
+                es = _as_date(wp.start_date) or date.today()
             else:
                 dep_finishes = []
                 for dep_id in deps:
                     _, ef = calc_earliest(dep_id)
                     dep_finishes.append(ef)
-                es = max(dep_finishes) if dep_finishes else (wp.start_date or date.today())
+                es = max(dep_finishes) if dep_finishes else (_as_date(wp.start_date) or date.today())
 
             duration = wp.duration_days or 30
             ef = es + timedelta(days=duration)
@@ -806,8 +818,7 @@ class RoadmapBuilderService:
         # Find end nodes (no dependents)
         all_deps = set()
         for wp in work_packages:
-            if wp.dependencies:
-                all_deps.update(wp.dependencies)
+            all_deps.update(work_package_service.dependency_ids(wp))
 
         end_nodes = [wp for wp in work_packages if wp.id not in all_deps]
 
@@ -828,7 +839,9 @@ class RoadmapBuilderService:
 
             # Find dependents
             dependents = [
-                w for w in work_packages if w.dependencies and wp_id in w.dependencies
+                w
+                for w in work_packages
+                if wp_id in work_package_service.dependency_ids(w)
             ]
 
             if not dependents:
@@ -913,24 +926,23 @@ class RoadmapBuilderService:
         Returns:
             Dict with timeline data
         """
-        query = ImplementationWorkPackage.query
+        from app.models.unified_work_package import UnifiedWorkPackage as UWP
+
+        org_id = current_organization_id()
+        query = work_package_service.query_for(org_id)
 
         if start_date:
             query = query.filter(
-                or_(
-                    ImplementationWorkPackage.start_date >= start_date,
-                    ImplementationWorkPackage.target_date >= start_date,
-                )
+                or_(UWP.start_date >= start_date, UWP.end_date >= start_date)
             )
         if end_date:
+            # A day-only end date includes that whole day.
+            end_bound = end_date + timedelta(days=1) if type(end_date) is date else end_date
             query = query.filter(
-                or_(
-                    ImplementationWorkPackage.start_date <= end_date,
-                    ImplementationWorkPackage.target_date <= end_date,
-                )
+                or_(UWP.start_date < end_bound, UWP.end_date < end_bound)
             )
 
-        work_packages = query.order_by(ImplementationWorkPackage.start_date.asc()).all()
+        work_packages = query.order_by(UWP.start_date.asc().nullsfirst(), UWP.id.asc()).all()
 
         # A fixed set rather than getattr on a query-string attribute name:
         # an unrecognised value (or a bound method like "to_dict") falls back
@@ -945,7 +957,7 @@ class RoadmapBuilderService:
             # its fields (percent_complete, target_date, owner, dependencies)
             # to roadmap names; reuse it here instead of reading attribute
             # names the model does not have.
-            row = wp.to_roadmap_dict()
+            row = work_package_service.to_roadmap_dict(wp, org_id)
             if effective_group_by == "assigned_to":
                 group_key = row["owner_name"] or "unassigned"
             elif effective_group_by == "priority":
@@ -993,10 +1005,10 @@ class RoadmapBuilderService:
             "plateau_markers": plateau_markers,
             "date_range": {
                 "start": min(
-                    (wp.start_date for wp in work_packages if wp.start_date), default=None
+                    (_as_date(wp.start_date) for wp in work_packages if wp.start_date), default=None
                 ),
                 "end": max(
-                    (wp.target_date for wp in work_packages if wp.target_date), default=None
+                    (_as_date(wp.end_date) for wp in work_packages if wp.end_date), default=None
                 ),
             },
         }
@@ -1012,7 +1024,7 @@ class RoadmapBuilderService:
         Returns:
             Dict with summary statistics
         """
-        work_packages = ImplementationWorkPackage.query.all()
+        work_packages = work_package_service.query_for(current_organization_id()).all()
 
         status_counts = defaultdict(int)
         priority_counts = defaultdict(int)

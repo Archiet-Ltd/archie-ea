@@ -212,6 +212,14 @@ def create_work_package(
     _apply(wp, fields, organization_id)
     db.session.add(wp)
     db.session.flush()
+    # Every work package joins the ArchiMate model. Idempotent: a row that came
+    # from another store already carries its element and is left alone.
+    from app.services.archimate_backbone import sync_archimate_element
+
+    try:
+        sync_archimate_element(wp)
+    except ValueError as exc:
+        raise WorkPackageError("Could not add the work package to the ArchiMate model: %s" % exc) from exc
     return wp
 
 
