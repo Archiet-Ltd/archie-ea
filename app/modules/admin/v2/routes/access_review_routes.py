@@ -59,7 +59,7 @@ def _can_act(org_id):
     return is_platform_admin(current_user) or rbac_service.is_org_admin(current_user, org_id)
 
 
-def _cycle_or_404(org_id, cycle_id):
+def _cycle_or_404(cycle_id, org_id):
     cycle = AccessReviewCycle.query.filter_by(id=cycle_id, organization_id=org_id).first()
     if cycle is None:
         abort(404)
@@ -245,7 +245,7 @@ def review_open():
 @governance_gate_reader_required
 def review_detail(cycle_id):
     org_id = _require_org_id()
-    return _render_cycle(org_id, _cycle_or_404(org_id, cycle_id))
+    return _render_cycle(org_id, _cycle_or_404(cycle_id, org_id))
 
 
 @access_review_bp.route("/reviews/<int:cycle_id>/items/<int:item_id>", methods=["POST"])
@@ -254,7 +254,7 @@ def review_detail(cycle_id):
 def review_decide(cycle_id, item_id):
     org_id = _require_org_id()
     _require_org_or_platform_admin(org_id)
-    cycle = _cycle_or_404(org_id, cycle_id)
+    cycle = _cycle_or_404(cycle_id, org_id)
     item = AccessReviewItem.query.filter_by(
         id=item_id, cycle_id=cycle.id, organization_id=org_id
     ).first()
@@ -315,7 +315,7 @@ def review_decide(cycle_id, item_id):
 def review_close(cycle_id):
     org_id = _require_org_id()
     _require_org_or_platform_admin(org_id)
-    cycle = _cycle_or_404(org_id, cycle_id)
+    cycle = _cycle_or_404(cycle_id, org_id)
     if not cycle.is_open:
         return _render_cycle(org_id, cycle, "This review is already closed.", 409)
     pending = sum(1 for i in cycle.items if i.decision == DECISION_PENDING)
@@ -350,7 +350,7 @@ def review_close(cycle_id):
 @governance_gate_reader_required
 def review_evidence(cycle_id):
     org_id = _require_org_id()
-    cycle = _cycle_or_404(org_id, cycle_id)
+    cycle = _cycle_or_404(cycle_id, org_id)
     if cycle.is_open:
         abort(409)
     return csv_attachment(
@@ -361,7 +361,7 @@ def review_evidence(cycle_id):
 # ---------------------------------------------------------------- export investigation
 
 
-def _flag_or_404(org_id, flag_id):
+def _flag_or_404(flag_id, org_id):
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval
 
     flag = AIChatCRUDApproval.query.filter(
@@ -429,7 +429,7 @@ def _evidence_link(member, payload):
 @governance_gate_reader_required
 def export_flag(flag_id):
     org_id = _require_org_id()
-    flag = _flag_or_404(org_id, flag_id)
+    flag = _flag_or_404(flag_id, org_id)
     member = _flagged_member(org_id, flag)
     try:
         payload = json.loads(flag.operation_payload or "{}")
@@ -456,7 +456,7 @@ def export_flag_decide(flag_id):
 
     org_id = _require_org_id()
     _require_org_or_platform_admin(org_id)
-    flag = _flag_or_404(org_id, flag_id)
+    flag = _flag_or_404(flag_id, org_id)
     decision = (request.form.get("decision") or "").strip()
     if decision not in ("restrict", "dismiss"):
         abort(400)

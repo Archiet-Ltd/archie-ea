@@ -131,7 +131,7 @@ def assess_member(org_id, user_id, *, now=None):
 
 def _recent_exports(org_id, user_id, window_start, now):
     rows = (
-        AuditLog.query.filter(
+        AuditLog.query.filter(  # tenant-scoping-ok: AuditLog.org_predicate(org_id) below
             AuditLog.org_predicate(org_id),
             AuditLog.user_id == user_id,
             export_clause(),
