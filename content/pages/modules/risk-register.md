@@ -46,8 +46,8 @@ risk shows up everywhere its impact would actually reach.
 
 ## Where you'll meet it
 
-- [Which risks sit on our revenue-critical path?](/scale-up/risk-blast-radius)
-- [Which risks touch this part of the architecture?](/enterprise-architecture/risk-and-controls)
+- [Which risks sit on our revenue-critical path?](/use-cases/risk-blast-radius)
+- [Which risks touch this part of the architecture?](/use-cases/risk-and-control-gaps)
 
 ## Related modules
 

@@ -23,7 +23,7 @@ the cost and impact figures each one actually carries.
 
 ## Where you'll meet it
 
-- [Build the business case for the CIO from the model's own figures](/enterprise-architecture/business-case)
+- [Build the business case for the CIO from the model's own figures](/use-cases/business-case-for-the-cio)
 
 ## Related modules
 

@@ -108,8 +108,12 @@ def test_sidebar_link_budget_is_31():
     change proposal. platform_admin (the role with zero headroom) renders it
     like every other role; no fold is available. Raising the budget by one is
     the honest cost of a genuinely new, intentional link.
+
+    Agent Registry (R1-B56, 6 Oct 2026): raised 32 -> 33. One new
+    platform_admin-only link (owner, charter and delegated limits per
+    registered agent); no fold is available for the same reason as above.
     """
-    assert SIDEBAR_LINK_BUDGET == 32
+    assert SIDEBAR_LINK_BUDGET == 33
 
 
 def test_every_role_is_defined():
@@ -289,6 +293,8 @@ def test_cto_my_work_membership():
         "Tech Radar",
         # Ownership coverage by business unit — CTO accountability.
         "Ownership Coverage",
+        # R1-B03 PR 2: the one ownership record now also covers capabilities.
+        "Capabilities With No Owner",
         # R1-B85: supported-estate share, open exceptions, the store-
         # agreement disagreement finder.
         "CTO Scorecard",
@@ -344,6 +350,8 @@ def test_portfolio_manager_my_work_membership():
         # shared by every persona with GENERAL permission.
         "Approval Inbox",
         "Rationalization",
+        # R1-B34 (TB-0135): the reviewer of a composite score's weights.
+        "Formula Register",
         "Vendors",
         "Applications",
         "Consolidation List",
@@ -352,6 +360,8 @@ def test_portfolio_manager_my_work_membership():
         "Duplicate Detection",
         # Ownership coverage by business unit — portfolio manager.
         "Ownership Coverage",
+        # R1-B03 PR 2: the one ownership record now also covers capabilities.
+        "Capabilities With No Owner",
     ]
 
 
@@ -451,8 +461,13 @@ def test_platform_admin_zone_link_total_is_pinned():
     28 -> 29: "Approval Inbox" added to every persona's My work, platform_admin
     included. It is a genuinely new, intentional link — the one queue for every
     pending change proposal, shared by every persona with GENERAL permission.
+
+    29 -> 30 (R1-B56, 6 Oct 2026): "Agent Registry" added to platform_admin's
+    My work — the one registry recording each agent's owner, charter version
+    and delegated limits, closest existing persona to the brief's
+    "Organisation Administrator".
     """
-    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 29
+    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 30
 
 
 def test_platform_admin_collapsed_sidebar_icons_are_unambiguous():

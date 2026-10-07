@@ -52,6 +52,50 @@ def _csv_safe(value):
     return text
 
 
+# The home page's "see it for your segment" section: three use-case pages
+# curated per segment to match that segment's existing persona blurb above
+# it on the page (see main/index.html, "Who it is for"), not every page in
+# the family -- the full, generated list lives at /use-cases. Each page's
+# own title (loaded live, not copied here) is the link text, so this never
+# drifts from the page it points to.
+_HOME_USE_CASE_HIGHLIGHTS = {
+    "Startup founders": [
+        "business-model-canvas-on-one-page",
+        "website-full-profile",
+        "show-investors-what-we-run",
+    ],
+    "Scale-up CTOs": [
+        "what-breaks-and-who-gets-called",
+        "risk-blast-radius",
+        "duplicate-software-spend",
+    ],
+    "Enterprise architects": [
+        "import-archimate-model",
+        "value-streams-at-risk",
+        "derivation-yield",
+    ],
+    "Operations leads": [
+        "what-happens-if-a-supplier-fails",
+        "key-person-risk",
+        "contract-renewals",
+    ],
+}
+
+
+def _home_use_case_highlights():
+    """Three curated use-case pages per home-page persona, loaded live so
+    the link text always matches each page's real, current title."""
+    from app.services.public_pages import load_page
+
+    groups = []
+    for label, slugs in _HOME_USE_CASE_HIGHLIGHTS.items():
+        pages = [load_page("function-per-segment", slug=slug) for slug in slugs]
+        pages = [p for p in pages if p is not None]
+        if pages:
+            groups.append({"label": label, "pages": pages})
+    return groups
+
+
 @main.route("/", methods=["GET", "POST"])
 @rate_limit(10, "1m", methods=("POST",))
 def index():
@@ -60,6 +104,7 @@ def index():
 
     thanks = False
     error = None
+    use_case_highlights = _home_use_case_highlights()
 
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
@@ -75,7 +120,12 @@ def index():
                 email = valid.normalized
             except EmailNotValidError:
                 error = "Please enter a valid email address."
-                return render_template("main/index.html", thanks=False, error=error)
+                return render_template(
+                    "main/index.html",
+                    thanks=False,
+                    error=error,
+                    use_case_highlights=use_case_highlights,
+                )
 
             from app.models.waitlist_signup import WaitlistSignup
 
@@ -90,7 +140,12 @@ def index():
                 db.session.commit()
             thanks = True
 
-    return render_template("main/index.html", thanks=thanks, error=error)
+    return render_template(
+        "main/index.html",
+        thanks=thanks,
+        error=error,
+        use_case_highlights=use_case_highlights,
+    )
 
 
 @main.route("/admin/waitlist.csv")
@@ -346,10 +401,14 @@ def sitemap_xml():
     urls.append(
         f"  <url><loc>{base_url}/</loc><priority>1.0</priority></url>"
     )
-    # The /vs comparison hub is a view, not a content page from load_all_pages(),
-    # so it needs its own entry here, same as the homepage above.
+    # The /vs comparison hub and the /use-cases index are views, not content
+    # pages from load_all_pages(), so each needs its own entry here, same as
+    # the homepage above.
     urls.append(
         f"  <url><loc>{base_url}/vs</loc></url>"
+    )
+    urls.append(
+        f"  <url><loc>{base_url}/use-cases</loc></url>"
     )
     for p in pages:
         urls.append(
@@ -537,25 +596,76 @@ def public_vision():
 @main.route("/modules/<slug>")
 def public_module(slug):
     """A module content page."""
-    from app.services.public_pages import build_jsonld, load_page
+    from app.services.public_pages import build_jsonld, get_page_screenshot, load_page
 
     page = load_page("module", slug=slug)
     if page is None:
         from flask import abort
         abort(404)
-    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        screenshot=get_page_screenshot(page),
+    )
+
+
+_USE_CASE_SEGMENT_LABELS = {
+    "S1": "Startups",
+    "S2": "Scale-ups",
+    "S3": "Enterprise architecture teams",
+    "S4": "Services and operations",
+}
+
+
+@main.route("/use-cases")
+def public_use_cases_index():
+    """The /use-cases index: every live use-case page, grouped by segment."""
+    from app.services.public_pages import load_all_pages
+
+    pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+
+    groups: dict[str, list] = {}
+    for page in pages:
+        segment_id = page.front_matter.get("segment_id", "")
+        groups.setdefault(segment_id, []).append(page)
+
+    ordered_groups = []
+    for segment_id in sorted(groups):
+        label = _USE_CASE_SEGMENT_LABELS.get(segment_id, segment_id or "More")
+        entries = sorted(groups[segment_id], key=lambda p: p.title.lower())
+        ordered_groups.append({"label": label, "pages": entries})
+
+    return render_template("public/use_cases_index.html", groups=ordered_groups)
 
 
 @main.route("/use-cases/<slug>")
 def public_use_case(slug):
-    """A function-per-segment content page."""
-    from app.services.public_pages import build_jsonld, load_page
+    """A function-per-segment content page.
+
+    A slug that no longer resolves is checked against the family's old,
+    internal uc-sN-NN-* filename slugs before 404ing: some of those URLs are
+    already indexed, so a page that moved gets a real redirect, not a dead
+    link.
+    """
+    from app.services.public_pages import (
+        build_jsonld,
+        get_page_recording,
+        get_page_screenshot,
+        load_page,
+        use_case_redirect_target,
+    )
 
     page = load_page("function-per-segment", slug=slug)
     if page is None:
+        redirect_target = use_case_redirect_target(slug)
+        if redirect_target:
+            return redirect(redirect_target, code=301)
         from flask import abort
         abort(404)
-    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        screenshot=get_page_screenshot(page),
+        recording=get_page_recording(page),
+    )
 
 
 @main.route("/vs")
@@ -575,6 +685,12 @@ def public_comparison_hub():
         {
             "competitor": p.front_matter.get("competitor", p.title),
             "real_url": p.canonical_url or f"{site_url}{p.url}",
+            # The entelim.org page itself, so a visitor who stays on this
+            # site (and a crawler following only entelim.org links) can
+            # still reach it even when real_url points at archiet.ai --
+            # only shown when it differs from real_url, to avoid a second,
+            # identical link.
+            "same_origin_url": p.url if p.canonical_url else None,
         }
         for p in pages
     ]
@@ -592,6 +708,22 @@ def public_comparison(slug):
         from flask import abort
         abort(404)
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+
+
+@main.route("/vs/avolution")
+def vs_avolution_redirect():
+    """/vs/avolution and /vs/avolution-abacus covered the same comparison,
+    added separately by two uncoordinated changes. The merged page lives at
+    avolution-abacus; this old URL 301s there rather than 404ing."""
+    return redirect("/vs/avolution-abacus", code=301)
+
+
+@main.route("/vs/orbus")
+def vs_orbus_redirect():
+    """/vs/orbus and /vs/orbus-iserver covered the same comparison, added
+    separately by two uncoordinated changes. The merged page lives at
+    orbus-iserver; this old URL 301s there rather than 404ing."""
+    return redirect("/vs/orbus-iserver", code=301)
 
 
 @main.route("/how-archiet-runs-on-entelim")

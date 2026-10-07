@@ -2,6 +2,7 @@ User-agent: *
 Allow: /$
 Allow: /vision
 Allow: /modules/
+Allow: /use-cases$
 Allow: /use-cases/
 Allow: /vs$
 Allow: /vs/

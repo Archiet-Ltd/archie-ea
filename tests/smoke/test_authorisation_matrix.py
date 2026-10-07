@@ -41,8 +41,24 @@ DENIED = "denied"
 # covers it, which matters because the chat sees the whole portfolio.
 POLICY = {
     "/procurement/contracts":  {"procurement", "portfolio_manager"},
-    "/procurement/licenses":   {"procurement", "portfolio_manager"},
+    # R1-B36 (TB-0146): finance added via requires_procurement_or_finance --
+    # licences/spend are a finance persona's own numbers. Deliberately NOT
+    # extended to contracts/renewals/compliance below, which stay
+    # requires_procurement-only.
+    "/procurement/licenses":   {"procurement", "portfolio_manager", "finance"},
+    "/procurement/spend":      {"procurement", "portfolio_manager", "finance"},
     "/procurement/compliance": {"procurement", "portfolio_manager"},
+    # R1-B34 (TB-0135): viewing the register is @login_required only (every
+    # archetype can see a formula's active version); activating a new one
+    # is gated to portfolio_manager by @requires_role in
+    # app/modules/formula_register/routes.py. This row is the view page.
+    "/admin/formula-register/": set(ARCHETYPES),
+    # application_mgmt.compliance_frameworks_dashboard is @login_required only
+    # (RegulatoryFramework/ComplianceControl, a different store from the
+    # procurement compliance page above) -- every persona can reach it.
+    "/dashboard/compliance":   set(ARCHETYPES),
+    # risk.risk_register is @login_required only.
+    "/risks/":                 set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
@@ -84,6 +100,11 @@ POLICY = {
     # is refused -- inviting people into an organisation is not a persona's
     # job, it is its administrator's.
     "/admin/team":             set(),
+    # R1-B56: Agent Registry (owner/charter/delegated-limits per agent) is
+    # gated to platform_admin via @requires_role / _guard in
+    # agent_registry_routes.py -- registering and activating an agent is
+    # not a persona's job.
+    "/admin/agent-registry/":  set(),
     # Agent oversight: pause/resume all agent writes, view refused-call log,
     # and check classification status — all gated by org_admin, which no
     # seeded archetype except platform_admin holds.

@@ -24,4 +24,4 @@ Available now on a paid plan. [See plans](/pricing).
 
 ## Related
 
-- [Let our AI assistant query the model instead of guessing](/enterprise-architecture/ai-assistant)
+- [Let our AI assistant query the model instead of guessing](/use-cases/ai-assistant-for-your-architecture)

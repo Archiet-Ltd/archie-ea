@@ -2790,6 +2790,23 @@ def api_export_saved_viewpoint(vp_id):
     Returns:
         application/xml with ArchiMate Open Exchange Format content.
     """
+    # Hardening pass alongside the snapshot-route fix (same file, same class
+    # of gap): every exporter below reaches the diagram through
+    # load_viewpoint_dict's bare db.session.get(SavedDiagram, vp_id) rather
+    # than the tenant-scoped helper. SavedDiagram IS a TenantMixin, so a
+    # genuinely fresh request (nothing already loaded for this id) still gets
+    # the tenant predicate applied on that SELECT — this is not a currently
+    # reproducible cross-org read, unlike the snapshot routes above. But it is
+    # the same unscoped-lookup-as-authorization pattern, and relies on no
+    # earlier code in the request having already touched this exact
+    # SavedDiagram row (Session.get() answers from the identity map without
+    # re-applying the tenant filter once a row is cached). Verifying ownership
+    # explicitly here removes that dependency rather than leaving it to hold
+    # by accident.
+    vp = _get_saved_diagram_scoped(vp_id)
+    if not vp:
+        return jsonify({"error": "Diagram not found"}), 404
+
     fmt = request.args.get("format", "archimate_exchange")
     _supported = {"archimate_exchange", "mermaid", "lucid", "archi"}
     if fmt not in _supported:
@@ -3010,8 +3027,20 @@ def api_get_snapshot(vp_id, sid):
 
     from app.models.archimate_viewpoint import ArchimateViewpointSnapshot
 
-    snapshot = db.session.get(ArchimateViewpointSnapshot, sid)
-    if not snapshot or snapshot.viewpoint_id != vp_id:
+    # CMP-025/CVE-style fix: verify the viewpoint's ownership FIRST (scoped
+    # query, applies the tenant predicate), THEN load the snapshot scoped to
+    # that already-verified viewpoint in one filtered query. The previous
+    # code loaded the snapshot with a bare db.session.get() (ArchimateViewpointSnapshot
+    # carries no organization_id of its own) and only checked that the
+    # snapshot's own stored viewpoint_id equalled vp_id — an internal
+    # consistency check, not an ownership check, so any organisation's user
+    # supplying another organisation's own (vp_id, sid) pair could read it.
+    vp = _get_saved_diagram_scoped(vp_id)
+    if not vp:
+        return jsonify({"error": "Diagram not found"}), 404
+
+    snapshot = ArchimateViewpointSnapshot.query.filter_by(id=sid, viewpoint_id=vp_id).first()
+    if not snapshot:
         return jsonify({"error": "Snapshot not found"}), 404
 
     return jsonify({
@@ -3039,13 +3068,19 @@ def api_restore_snapshot(vp_id, sid):
     )
     from app.models.archimate_viewpoint import ArchimateViewpointSnapshot
 
-    snapshot = db.session.get(ArchimateViewpointSnapshot, sid)
-    if not snapshot or snapshot.viewpoint_id != vp_id:
-        return jsonify({"error": "Snapshot not found"}), 404
-
+    # CMP-025/CVE-style fix: verify the viewpoint's ownership FIRST (scoped
+    # query, applies the tenant predicate), THEN load the snapshot scoped to
+    # that already-verified viewpoint in one filtered query — see
+    # api_get_snapshot above for the full rationale. Loading the snapshot
+    # first with a bare db.session.get() and only comparing viewpoint_id
+    # afterwards was an internal consistency check, not an ownership check.
     vp = _get_saved_diagram_scoped(vp_id)
     if not vp:
         return jsonify({"error": "Diagram not found"}), 404
+
+    snapshot = ArchimateViewpointSnapshot.query.filter_by(id=sid, viewpoint_id=vp_id).first()
+    if not snapshot:
+        return jsonify({"error": "Snapshot not found"}), 404
 
     snap_data = _json.loads(snapshot.snapshot_json)
 

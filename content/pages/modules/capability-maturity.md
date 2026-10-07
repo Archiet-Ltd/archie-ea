@@ -25,4 +25,4 @@ Available now on a paid plan. [See plans](/pricing).
 
 ## Related
 
-- [Which value streams are at risk?](/enterprise-architecture/value-streams-at-risk)
+- [Which value streams are at risk?](/use-cases/value-streams-at-risk)
