@@ -3,7 +3,6 @@ Webhook service for Enterprise Architecture Platform
 Provides event-driven notifications and integrations
 """
 
-import hashlib
 import hmac
 import json
 import secrets
@@ -65,7 +64,11 @@ def verify_webhook_signature(payload, signature, secret):
     if not secret or not signature:
         return False
 
-    expected_signature = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+    # Imported here so this helper stays self-contained (the signature tests
+    # load its source on its own); the one HMAC primitive lives in the service.
+    from app.services.webhook_service import hmac_sha256_hex
+
+    expected_signature = hmac_sha256_hex(secret, payload)
 
     return hmac.compare_digest(signature, expected_signature)
 
@@ -333,7 +336,7 @@ def test_subscription(subscription_id):
 
 @webhook_bp.route("/subscriptions/<subscription_id>/deliveries", methods=["GET"])
 @require_auth
-@audit_log("webhook_deliveries_list")
+@audit_log("webhook_dlv_list")
 def list_deliveries(subscription_id):
     """Deliveries of one subscription, newest first (paged)."""
     try:
