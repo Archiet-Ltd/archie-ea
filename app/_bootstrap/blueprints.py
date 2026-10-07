@@ -213,6 +213,9 @@ def _init_blueprints(app):
     # --- SSO federation (COM-005) ---
     _register_sso(app)
 
+    # --- SCIM 2.0 provisioning (R1-B26) ---
+    _register_scim(app, csrf)
+
     # --- Standalone feature blueprints the v2 module paths omit ---
     _register_optional_standalone(app)
 
@@ -339,6 +342,30 @@ def _register_sso(app):
         app.logger.info("[SSO] SSO federation blueprint registered (COM-005)")
     except Exception as exc:
         app.logger.warning("[SSO] Could not register SSO blueprint (non-fatal): %s", exc)
+
+
+def _register_scim(app, csrf):
+    """Register the SCIM 2.0 provisioning blueprint (R1-B26 PR 1).
+
+    csrf.exempt: bearer-token only. The blueprint never reads the session
+    cookie, so there is no ambient credential for a forged request to ride.
+    """
+    try:
+        from app.modules.auth.scim_routes import scim_bp
+
+        app.register_blueprint(scim_bp)
+        csrf.exempt(scim_bp)
+        # An identity provider syncs from one address: the global per-IP
+        # default (120/min, 30/min for writes) would cut a bulk sync short.
+        # The blueprint carries its own throttles instead: 600/min per token
+        # and 20 failed authentications/min per address.
+        from app._bootstrap import rate_limiting
+
+        if rate_limiting.limiter is not None:
+            rate_limiting.limiter.exempt(scim_bp)
+        app.logger.info("[SCIM] SCIM 2.0 provisioning blueprint registered at /scim/v2 (R1-B26)")
+    except Exception as exc:
+        app.logger.warning("[SCIM] Could not register SCIM blueprint (non-fatal): %s", exc)
 
 
 def _warn_non_canonical_blueprints(app):

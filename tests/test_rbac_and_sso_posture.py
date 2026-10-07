@@ -18,18 +18,11 @@ cross-tenant IDOR — 0 vulnerable. This file covers what that audit did not:
      accepting requests. The application registers no SAML sign-in route and
      the service has no SAML assertion method; both are asserted from the URL
      map and the class, not from a response code.
-  3. SCIM posture — grepped for across the entire app/ tree (case-insensitive,
-     "scim" appears nowhere except as a substring of unrelated vendor JS
-     filenames). There is no SCIM provisioning endpoint, no SCIM schema
-     model, and no SCIM route registered anywhere in this codebase.
-
-     FINDING, stated plainly per the assignment: SCIM is NOT IMPLEMENTED.
-     There is nothing to test because there is no code path to exercise —
-     asserting "SCIM works" here would be exactly the "note that pretends to
-     be coverage" CLAUDE.md's docs/known-issues/ section warns against. The
-     honest artifact is this test, which pins "SCIM is absent" as a fact a
-     future PR must update if it ever adds SCIM, rather than a paragraph
-     that silently drifts from reality.
+  3. SCIM posture — SCIM 2.0 provisioning exists at /scim/v2 (R1-B26 PR 1).
+     This file pins that every route there refuses a missing, malformed or
+     revoked token and another organisation's id; the behaviour itself is
+     covered by tests/test_scim_users.py, tests/test_scim_groups.py and
+     tests/test_scim_tenant_isolation.py.
 """
 
 from __future__ import annotations
@@ -377,40 +370,62 @@ def test_sso_service_has_no_saml_assertion_method():
 
 
 # ---------------------------------------------------------------------------
-# SCIM posture — the honest "not implemented" finding.
+# SCIM posture — every route is token-gated and tenant-bound (R1-B26 PR 1).
 # ---------------------------------------------------------------------------
 
 
-def test_scim_is_not_implemented_anywhere_in_the_app_tree():
-    """FINDING: SCIM provisioning does not exist in this codebase.
+def test_every_scim_route_refuses_no_token_a_revoked_token_and_another_organisations_token(
+    db_session, make_org, client
+):
+    """SCIM provisioning landed with R1-B26 (this test used to pin "SCIM is
+    absent", and said to update it, not delete it, when that changed).
 
-    Walks app/ for anything naming SCIM (case-insensitive) in a .py file, as
-    a route path, blueprint name, model, or service. The only pre-existing
-    hits anywhere in the repo are `zxcvbn.js` substring false positives
-    (a password-strength library filename, unrelated), which is a search
-    outside this scope (.py only) and so does not appear here.
-
-    If this test ever starts failing because someone genuinely lands SCIM
-    support, that is the correct outcome — update this test to assert the
-    new endpoints are tenant-scoped and auth-gated, rather than deleting it.
+    Every route the application registers under ``/scim/v2``, in every method:
+    with no token, a malformed header, or a revoked token it answers 401 with
+    the SCIM error schema; and a valid token of organisation A used against an
+    id that belongs to organisation B answers exactly as a missing id (404).
     """
-    import re
-    from pathlib import Path
+    from flask import current_app
 
-    app_dir = Path(__file__).resolve().parent.parent / "app"
-    scim_pattern = re.compile(r"\bscim\b", re.IGNORECASE)
+    from tests._scim_test_helpers import issue_token, make_user
+    from app.models.miscellaneous import SSOGroupRoleMapping
+    from app.services import provisioning_service
 
-    hits = []
-    for path in app_dir.rglob("*.py"):
-        if "__pycache__" in path.parts:
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if scim_pattern.search(text):
-            hits.append(str(path.relative_to(app_dir.parent)))
-
-    assert not hits, (
-        f"SCIM references found where none were expected: {hits}. This test "
-        "encodes 'SCIM is not implemented' as of ARCH-091's audit — if SCIM "
-        "now exists, replace this test with real coverage of it rather than "
-        "deleting the assertion."
+    org_a = make_org("posture-a")
+    org_b = make_org("posture-b")
+    user_b = make_user(db_session, org_b, "victim")
+    group_b = SSOGroupRoleMapping(
+        organization_id=org_b.id, sso_group_name="B-Only", role_name="non_technical_owner", is_active=True
     )
+    db_session.add(group_b)
+    db_session.flush()
+    row_a, raw_a = issue_token(db_session, org_a)
+    revoked_row, revoked_raw = issue_token(db_session, org_a)
+    provisioning_service.revoke_scim_token(org_a.id, revoked_row.id, "test")
+
+    rules = [
+        r for r in current_app.url_map.iter_rules() if r.rule.startswith("/scim/v2")
+    ]
+    assert len(rules) >= 15, "the SCIM routes are not registered"
+    error_schema = "urn:ietf:params:scim:api:messages:2.0:Error"
+
+    for rule in rules:
+        for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
+            path = rule.rule
+            path = path.replace("<user_id>", str(user_b.id)).replace("<group_id>", str(group_b.id))
+            body = {} if method in ("POST", "PUT", "PATCH") else None
+            for headers in (
+                {},
+                {"Authorization": "Bearer"},
+                {"Authorization": "Basic abc"},
+                {"Authorization": f"Bearer {revoked_raw}"},
+                {"Authorization": "Bearer scim_not-a-real-token"},
+            ):
+                resp = client.open(path, method=method, json=body, headers=headers)
+                assert resp.status_code == 401, (method, path, headers, resp.status_code)
+                assert resp.get_json(force=True)["schemas"] == [error_schema], (method, path)
+            if "<" in rule.rule:
+                resp = client.open(
+                    path, method=method, json=body, headers={"Authorization": f"Bearer {raw_a}"}
+                )
+                assert resp.status_code == 404, (method, path, resp.status_code, resp.get_data(as_text=True))

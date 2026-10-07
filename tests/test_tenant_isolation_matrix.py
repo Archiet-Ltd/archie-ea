@@ -45,6 +45,11 @@ INTENTIONALLY_GLOBAL = {
         "organization_id in their own predicates"
     ),
     "SSOConfig": "read during authentication, before a tenant is known",
+    "ScimToken": (
+        "a SCIM bearer token is resolved to its organisation by the hash of the "
+        "presented value, before any tenant context exists; every other query "
+        "carries an explicit organization_id predicate"
+    ),
     "Subscription": "billing is administered platform-side",
     "UsageEvent": "metering is aggregated platform-side",
     "OrgRole": "role definitions are resolved during authorisation setup",
@@ -359,6 +364,7 @@ EXCLUDED_PARAMS = {
 # Exclusions by endpoint prefix: the whole blueprint serves no tenant record.
 EXCLUDED_ENDPOINT_PREFIXES = {
     "static": "static files",
+    "scim.": "bearer-token only; isolation proven in tests/test_scim_tenant_isolation.py",
 }
 
 # Exclusions by exact endpoint.
