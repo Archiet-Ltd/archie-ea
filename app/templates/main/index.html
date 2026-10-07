@@ -1,11 +1,15 @@
 {% extends 'layouts/public_base.html' %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
 {% block full_title %}Entelim — your whole company, one model you can ask{% endblock %}
 {% block meta_description %}
-<meta name="description" content="Entelim is the open-source Enterprise Intelligence Model: enter your website address and see your company's architecture, applications, risks and gaps as one model you can ask. Self-host free under AGPL-3.0.">
+<link rel="canonical" href="https://entelim.org/">
+<meta name="description" content="Entelim is the open-source Enterprise Intelligence Model: your company's architecture, applications, risks and gaps as one model you can ask. Self-host free under AGPL-3.0.">
 <meta property="og:title" content="Entelim — your whole company, one model you can ask">
-<meta property="og:description" content="Enter your website address and see your company as one model you can ask. Open source, self-host free, forever.">
+<meta property="og:description" content="Your whole company as one model you can ask. Open source, self-host free, forever.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Entelim — your whole company, one model you can ask">
+<meta name="twitter:description" content="Your whole company as one model you can ask. Open source, self-host free, forever.">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "The open-source Enterprise Intelligence Model."}</script>
 {% if config.GOOGLE_SITE_VERIFICATION %}
 <meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">

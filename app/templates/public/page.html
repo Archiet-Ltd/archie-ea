@@ -11,6 +11,13 @@
 {% extends 'layouts/public_base.html' %}
 {% block title %}{{ page.title }}{% endblock %}
 
+{% block meta_description %}
+{% from 'partials/_seo_meta.html' import seo_meta %}
+{{ seo_meta(page.self_canonical_url, page.description, page.is_held) }}
+<meta property="og:title" content="{{ page.title }}">
+<meta name="twitter:title" content="{{ page.title }}">
+{% endblock %}
+
 {% block header %}
 {% include 'components/public_navbar.html' %}
 {% endblock %}
@@ -40,10 +47,6 @@
 
 {% block content %}
 <div class="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16">
-  {% if page.canonical_url %}
-  <link rel="canonical" href="{{ page.canonical_url }}">
-  {% endif %}
-
   {% if jsonld %}
   <script type="application/ld+json">{{ jsonld }}</script>
   {% endif %}
@@ -119,13 +122,37 @@
   {% endif %}
 
   {% if page.cta == 'waiting_list' %}
-  <div class="mt-12 p-6 border border-border rounded-lg bg-card">
-    <p class="text-lg font-semibold mb-2">Join the waiting list</p>
-    <p class="text-muted-foreground mb-4">Be the first to know when this capability ships.</p>
-    <a href="/#waitlist" class="inline-flex items-center justify-center px-6 py-3 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all duration-200">
-      Join the waiting list
-    </a>
-  </div>
+  {# "Tell us you need this": reuses the same /offers/inquire mechanism as a
+     paid offer page's inquiry form (see app/main/views.py:product_inquiry_submit
+     and PublicPage.feature_interest_offer) instead of a dead link to the home
+     page's waiting-list section. #}
+  <section aria-labelledby="feature-interest-heading" class="mt-12 p-6 border border-border rounded-lg bg-card" data-testid="feature-interest">
+    <h2 id="feature-interest-heading" class="text-lg font-semibold mb-2">Tell us you need this</h2>
+    {% if thanks %}
+    <p class="text-muted-foreground" data-testid="feature-interest-thanks">Thank you. We will tell you when this becomes available.</p>
+    {% else %}
+    <p class="text-muted-foreground mb-4">This isn't built yet. Leave your email and we'll tell you the day it ships.</p>
+    {% if error %}
+    <p class="text-sm text-destructive mb-4" role="alert">{{ error }}</p>
+    {% endif %}
+    <form method="POST" action="{{ url_for('main.product_inquiry_submit') }}" class="space-y-4" data-testid="feature-interest-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="offer" value="{{ page.feature_interest_offer }}">
+      <input type="hidden" name="family" value="{{ page.family }}">
+      <input type="hidden" name="slug" value="{{ page.slug }}">
+      <div>
+        <label for="feature-interest-email" class="block text-sm font-medium text-foreground mb-1">Email</label>
+        <input type="email" id="feature-interest-email" name="email" required
+               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+      </div>
+      <div class="flex items-start gap-2">
+        <input type="checkbox" id="feature-interest-consent" name="consent" value="1" required class="mt-1">
+        <label for="feature-interest-consent" class="text-sm text-muted-foreground">Used to tell you when this becomes available, and for nothing else.</label>
+      </div>
+      <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" data-testid="feature-interest-submit">Tell us you need this</button>
+    </form>
+    {% endif %}
+  </section>
   {% endif %}
 
   {% if page.cta == 'inquiry' %}
