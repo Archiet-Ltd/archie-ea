@@ -11,10 +11,9 @@ inquiry_consent_text: "Used to follow up about pricing and scheduling for the ar
 # Architecture health check
 
 A fixed-price, one-time engagement. We import your application landscape
-(spreadsheets, Archi or Open Exchange files, exports from your current tools,
-or a start from your website address) and run Entelim's analysis over your
-real data, not a demonstration. What comes back is a written report your team
-can act on.
+(spreadsheets, Archi or Open Exchange files, or exports from your current
+tools) and run Entelim's analysis over your real data, not a demonstration.
+What comes back is a written report your team can act on.
 
 ## What it costs
 
