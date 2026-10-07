@@ -3955,7 +3955,7 @@ def webhook_settings_create():
 @timed_route
 @login_required
 @admin_required
-@audit_log("webhook_secret_rotate")
+@audit_log("webhook_sec_rotate")
 def webhook_settings_rotate(subscription_id: str):
     """Replace the signing secret; the new one is shown once and the old one stops signing."""
     from app.services.webhook_service import WebhookError, WebhookService
@@ -3995,8 +3995,6 @@ def webhook_settings_delete(subscription_id: str):
 @audit_log("webhook_replay")
 def webhook_settings_replay(subscription_id: str):
     """Queue logged events again, from a sequence number or from a time."""
-    from datetime import timezone
-
     from app.services.webhook_service import WebhookError, WebhookService
 
     back = url_for("admin.webhook_settings", sub=subscription_id)
@@ -4011,8 +4009,6 @@ def webhook_settings_replay(subscription_id: str):
                 raise ValueError("sequence")
         elif since_text:
             since = datetime.fromisoformat(since_text.replace("Z", "+00:00"))
-            if since.tzinfo is not None:
-                since = since.astimezone(timezone.utc).replace(tzinfo=None)
     except ValueError:
         flash("Enter a whole sequence number from 1, or a valid date and time.", "error")
         return redirect(back)

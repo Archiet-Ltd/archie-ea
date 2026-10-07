@@ -8,7 +8,7 @@ import hmac
 import json
 import secrets
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime
 
 from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user
@@ -275,7 +275,7 @@ def delete_subscription(subscription_id):
 
 @webhook_bp.route("/subscriptions/<subscription_id>/rotate-secret", methods=["POST"])
 @require_auth
-@audit_log("webhook_secret_rotate")
+@audit_log("webhook_sec_rotate")
 def rotate_secret(subscription_id):
     """Replace the signing secret; the new one is returned once and the old one stops signing."""
     try:
@@ -373,8 +373,6 @@ def replay_subscription(subscription_id):
                     raise ValueError("from_ordinal")
             if since_raw is not None:
                 since = datetime.fromisoformat(str(since_raw).replace("Z", "+00:00"))
-                if since.tzinfo is not None:
-                    since = since.astimezone(timezone.utc).replace(tzinfo=None)
         except (TypeError, ValueError):
             return _json_error(
                 "from_ordinal must be a whole number from 1, and since an ISO 8601 time", 400

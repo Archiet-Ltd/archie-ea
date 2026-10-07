@@ -19,7 +19,7 @@ import json
 import random
 import secrets as _secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 import requests
@@ -631,6 +631,10 @@ class WebhookService:
         org_id = subscription.organization_id
         if (from_ordinal is None) == (since is None):
             raise WebhookValidationError("Give either a sequence number or a time to replay from.")
+
+        if since is not None and since.tzinfo is None:
+            # The log's timestamps are timezone-aware; a bare time means UTC.
+            since = since.replace(tzinfo=timezone.utc)
 
         events: List[Dict] = []
         if from_ordinal is not None:
