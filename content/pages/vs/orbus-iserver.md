@@ -19,6 +19,9 @@ sources:
   - url: https://www.businesswire.com/news/home/20241211108881/en/Global-cloud-native-enterprise-architecture-leader-Orbus-Software-acquires-architecture-solutions-provider-Capsifi
     read_date: 2026-10-04
     fact: "Press release, 11 Dec 2024: Orbus Software acquired Capsifi, a Sydney, Australia business-architecture provider, to enhance OrbusInfinity"
+  - url: https://www.orbussoftware.com/capability/frameworks-and-standards
+    read_date: 2026-10-03
+    fact: "OrbusInfinity ships 'Full ArchiMate 3.2 notation with layered viewpoints', preconfigured TOGAF ADM phases, content metamodel and governance artifacts, BPMN 2.0 templates, and ITIL process mapping; BIZBOK is not mentioned"
 verification_note: "The GetApp starting-price figure (12,000, 'Per Feature') is third-party-reported and not shown on Orbus's own product page; re-verify before treating it as authoritative."
 compliance_note: >
   Comparative claims only where sourced and linked. The one price figure included is flagged as
@@ -38,8 +41,11 @@ figure of roughly 12,000, described on that listing as a "Per Feature" charge �
 not appear on Orbus's own product page, so treat it as third-party-reported rather than confirmed.
 In December 2024, Orbus also acquired fellow enterprise-architecture vendor Capsifi and folded it
 into OrbusInfinity, which is why Capsifi does not get a separate comparison page here — it is no
-longer an independent product. Entelim is open source under AGPL, self-hostable, and built on full
-ArchiMate 3.2 modelling, with its own [plans and pricing](/pricing) published directly.
+longer an independent product. On framework support, Orbus's own site states OrbusInfinity ships
+full ArchiMate 3.2 notation with layered viewpoints, preconfigured TOGAF ADM phases, a content
+metamodel and governance artifacts, BPMN 2.0 templates and ITIL process mapping. Entelim is open
+source under AGPL, self-hostable, and built on full ArchiMate 3.2 modelling, with its own
+[plans and pricing](/pricing) published directly.
 
 ## What each product actually is
 
@@ -51,6 +57,7 @@ ArchiMate 3.2 modelling, with its own [plans and pricing](/pricing) published di
 | Pricing | Not published on Orbus's own site; a third-party aggregator reports a starting figure around 12,000, "Per Feature," unconfirmed on Orbus's own page | Published at /pricing; free to self-host under AGPL |
 | Recent acquisitions | Acquired Capsifi, December 2024, now folded into OrbusInfinity | None |
 | Branding | Actively rebranding iServer / iServer365 to OrbusInfinity | One name throughout |
+| Framework support | Full ArchiMate 3.2 notation with layered viewpoints; preconfigured TOGAF ADM phases, content metamodel and governance artifacts; BPMN 2.0 templates; ITIL process mapping | ArchiMate 3.2, specifically; framework content mapped, not ADM-certified |
 
 ## What Entelim already does
 
@@ -76,3 +83,7 @@ and folded it into OrbusInfinity, which is why Capsifi has no comparison page of
 Not on Orbus's own product page. A third-party pricing aggregator reports a starting figure of
 roughly 12,000 described as "Per Feature," but that figure is not confirmed on the vendor's own
 site, so treat it as third-party-reported rather than official.
+
+**Does OrbusInfinity support ArchiMate?**
+Yes — Orbus's own capability page states full ArchiMate 3.2 notation with layered viewpoints,
+plus preconfigured TOGAF ADM phases, BPMN 2.0 templates and ITIL process mapping.
