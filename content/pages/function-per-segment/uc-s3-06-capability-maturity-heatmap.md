@@ -6,7 +6,7 @@ state: in_review
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: plans
 capture_status: live
-url_slug: /capability-maturity/heatmap
+url_slug: /use-cases/capability-maturity-heatmap
 ---
 
 # Show capability maturity as a heat map that never invents a value
@@ -28,4 +28,4 @@ It's live today, on a paid plan. [See plans](/pricing).
 
 ## Related
 
-- [Which value streams are at risk?](/enterprise-architecture/value-streams-at-risk)
+- [Which value streams are at risk?](/use-cases/value-streams-at-risk)

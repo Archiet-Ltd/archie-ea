@@ -22,7 +22,7 @@ because it reads what your team already maintains, not because someone re-enters
 
 ## Where you'll meet it
 
-- [Pull our systems and initiatives from Jira and GitHub instead of typing them in](/scale-up/connect-your-tools)
+- [Pull our systems and initiatives from Jira and GitHub instead of typing them in](/use-cases/import-from-jira-and-github)
 
 ## Related modules
 

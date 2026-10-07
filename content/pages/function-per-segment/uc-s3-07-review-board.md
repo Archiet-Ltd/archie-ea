@@ -5,7 +5,7 @@ segment_id: S3
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /enterprise-architecture/review-board
+url_slug: /use-cases/architecture-review-board
 ---
 
 # Take a change through the review board with the impact evidence attached
@@ -27,4 +27,4 @@ governance doesn't live in a separate record nobody trusts.
 
 ## Related
 
-- [Which risks touch this part of the architecture?](/enterprise-architecture/risk-and-controls)
+- [Which risks touch this part of the architecture?](/use-cases/risk-and-control-gaps)

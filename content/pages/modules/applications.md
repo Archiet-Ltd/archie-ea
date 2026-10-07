@@ -75,11 +75,11 @@ this application fails.
 
 ## Where you'll meet it
 
-- [Show an investor what we run, in an afternoon](/startups/show-what-we-run)
-- [What are we paying for twice?](/scale-up/duplicate-spend)
-- [Give the acquirer a current architecture picture we didn't draw by hand](/scale-up/twin-map)
-- [Import our existing Archi or Open Exchange model](/enterprise-architecture/import)
-- [Which contracts renew soon, and what depends on them?](/services-ops/contract-renewals)
+- [Show an investor what we run, in an afternoon](/use-cases/show-investors-what-we-run)
+- [What are we paying for twice?](/use-cases/duplicate-software-spend)
+- [Give the acquirer a current architecture picture we didn't draw by hand](/use-cases/architecture-map-for-due-diligence)
+- [Import our existing Archi or Open Exchange model](/use-cases/import-archimate-model)
+- [Which contracts renew soon, and what depends on them?](/use-cases/contract-renewals)
 
 ## Related modules
 
