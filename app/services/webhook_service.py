@@ -115,7 +115,7 @@ def next_backoff(attempt_number: int, *, jitter: bool = True) -> float:
     """
     n = max(int(attempt_number), 1)
     base = _BACKOFF_SECONDS[n - 1] if n <= len(_BACKOFF_SECONDS) else _BACKOFF_CAP_SECONDS
-    return base * (1 + random.uniform(0, 0.10)) if jitter else float(base)
+    return base * (1 + random.uniform(0, 0.10)) if jitter else float(base)  # fabricated-ok: retry back-off jitter, never displayed as data
 
 
 def display_status(status: Optional[str]) -> str:
@@ -136,6 +136,19 @@ def _clean_headers(headers) -> Dict[str, str]:
         if not isinstance(value, (str, int, float)):
             raise WebhookValidationError(f"header {name!r} must have a text value")
         cleaned[str(name)] = str(value)
+    return cleaned
+
+
+def _clean_events(events) -> List[str]:
+    if not isinstance(events, list) or not events:
+        return ["*"]
+    cleaned = []
+    for pattern in events:
+        if not isinstance(pattern, str) or not pattern.strip() or len(pattern) > 100:
+            raise WebhookValidationError(
+                "events must be a list of event types, prefixes ending .* or *"
+            )
+        cleaned.append(pattern.strip())
     return cleaned
 
 
@@ -192,8 +205,7 @@ class WebhookService:
         """
         url = _check_url(url)
         headers = _clean_headers(headers)
-        if not isinstance(events, list) or not events:
-            events = ["*"]
+        events = _clean_events(events)
         _ensure_secret_storage()
 
         org_id = organization_id if organization_id is not None else _current_org_id()
@@ -288,6 +300,8 @@ class WebhookService:
                 value = _check_url(value)
             elif field == "headers":
                 value = _clean_headers(value)
+            elif field == "events":
+                value = _clean_events(value)
             elif field == "webhook_type" and value not in ("generic", "teams", "slack"):
                 value = "generic"
             clean[field] = value
@@ -516,10 +530,23 @@ class WebhookService:
 
         body = (delivery.request_body or "").encode("utf-8")
         secret = subscription.get_secret()
+        if not secret:
+            # Every delivery is signed. A row with no usable secret (an old row
+            # created without one, or a stored secret that no longer decrypts)
+            # is not sent unsigned; rotating the secret on the screen fixes it.
+            return self._record_failure(
+                delivery, moment, "no usable signing secret: rotate the secret"
+            )
+        custom = {
+            name: value
+            for name, value in (subscription.headers or {}).items()
+            if str(name).lower() not in _FORBIDDEN_HEADERS
+            and not str(name).lower().startswith("entelim-")
+        }
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "Entelim-Webhook/1.0",
-            **(subscription.headers or {}),
+            **custom,
             "Entelim-Webhook-Id": delivery.id,
             "Entelim-Event-Id": delivery.log_event_id or "",
             "Entelim-Event-Type": delivery.event_type,
@@ -528,9 +555,8 @@ class WebhookService:
         delivery.signature_timestamp = timestamp
         delivery.signature = None
         headers["Entelim-Timestamp"] = str(timestamp)
-        if secret:
-            delivery.signature = sign_body(secret, timestamp, body)
-            headers["Entelim-Signature"] = f"t={timestamp},v1={delivery.signature}"
+        delivery.signature = sign_body(secret, timestamp, body)
+        headers["Entelim-Signature"] = f"t={timestamp},v1={delivery.signature}"
 
         try:
             validate_outbound_url(subscription.url, require_https=not subscription.is_plain_http)

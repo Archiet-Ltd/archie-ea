@@ -198,3 +198,49 @@ def test_the_signing_secret_is_never_logged(monkeypatch, tenant_ctx, make_org, d
     caplog.set_level(logging.DEBUG)
     _deliver_one(monkeypatch, tenant_ctx, make_org)
     assert SECRET not in caplog.text
+
+
+def test_a_subscription_with_no_usable_secret_is_never_sent_unsigned(monkeypatch, tenant_ctx, make_org, db_session):
+    from app.models.webhook import WebhookDelivery
+
+    org = make_org("nosecret")
+    transport = install_transport(monkeypatch)
+    service = WebhookService()
+    with tenant_ctx(org.id):
+        subscription = make_subscription(service, org.id, secret=SECRET)
+        subscription.secret_encrypted = None
+        subscription.secret = None
+        db_session.commit()
+        emit_events(org.id, 1)
+        service.fan_out(org.id)
+        service.dispatch_due(org.id, now=NOW)
+        delivery = WebhookDelivery.query.filter_by(subscription_id=subscription.id).one()
+    assert transport.calls == []
+    assert delivery.status == "retrying"
+    assert "signing secret" in delivery.error_message
+
+
+def test_reserved_headers_on_a_stored_row_are_dropped_at_send_time(monkeypatch, tenant_ctx, make_org, db_session):
+    org = make_org("badheaders")
+    transport = install_transport(monkeypatch)
+    service = WebhookService()
+    with tenant_ctx(org.id):
+        subscription = make_subscription(service, org.id, secret=SECRET)
+        subscription.headers = {"Host": "evil.example", "Entelim-Signature": "forged", "X-Team": "platform"}
+        db_session.commit()
+        emit_events(org.id, 1)
+        service.fan_out(org.id)
+        service.dispatch_due(org.id, now=NOW)
+    headers = transport.calls[0]["headers"]
+    assert "Host" not in headers
+    assert headers["X-Team"] == "platform"
+    assert headers["Entelim-Signature"].startswith("t=") and headers["Entelim-Signature"] != "forged"
+
+
+@pytest.mark.parametrize("events", [[1], [""], [None], ["x" * 101]])
+def test_malformed_event_lists_are_refused(monkeypatch, tenant_ctx, make_org, db_session, events):
+    org = make_org("badevents")
+    install_transport(monkeypatch)
+    with tenant_ctx(org.id):
+        with pytest.raises(WebhookValidationError):
+            make_subscription(WebhookService(), org.id, events=events)
