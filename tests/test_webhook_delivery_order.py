@@ -61,18 +61,41 @@ def test_a_subscriber_down_for_an_hour_receives_every_event_in_order_afterwards(
         emit_events(org.id, 10)
         second_batch_sent = False
         step = timedelta(seconds=10)
+        second_batch_at = T0 + timedelta(minutes=30)
         now = T0
         deadline = T0 + timedelta(hours=3)
         while now < deadline:
             clock["now"] = now
-            if not second_batch_sent and now >= T0 + timedelta(minutes=30):
+            if not second_batch_sent and now >= second_batch_at:
                 emit_events(org.id, 10, start=11)  # logged while the subscriber is still down
                 second_batch_sent = True
             service.fan_out(org.id)
             service.dispatch_due(org.id, now=now)
             if second_batch_sent and sum(1 for _s, status, _w in outcomes if status == 200) >= 20:
                 break
-            now += step
+            # Advance the simulated clock to the next instant at which anything can
+            # happen, never past it: the head of the line's next attempt, the moment
+            # the subscriber recovers, or the moment the second batch is logged. Once
+            # the subscriber is back and everything is logged, step by ten seconds as
+            # the real job does.
+            candidates = []
+            head = next(
+                (
+                    row
+                    for row in _deliveries(subscription.id)
+                    if row.status in ("pending", "retrying")
+                ),
+                None,
+            )
+            if head is not None and head.next_attempt_at is not None:
+                candidates.append(head.next_attempt_at)
+            else:
+                candidates.append(now + step)
+            if now < recovery:
+                candidates.append(recovery)
+            if not second_batch_sent:
+                candidates.append(second_batch_at)
+            now = max(min(candidates), now + timedelta(seconds=1))
         rows = _deliveries(subscription.id)
 
     failures = [(s, w) for s, status, w in outcomes if status == 503]
