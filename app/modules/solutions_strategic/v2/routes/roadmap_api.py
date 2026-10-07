@@ -12,7 +12,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, abort, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import text
 
@@ -24,7 +24,9 @@ from app.models.implementation_migration import (
     Gap as ImplementationGap,
     Plateau as ImplementationPlateau,
 )
-from app.models.roadmap_models import RoadmapWorkPackage as ImplementationWorkPackage
+from app.models.unified_work_package import UnifiedWorkPackage as ImplementationWorkPackage
+from app.services import work_package_service
+from app.utils.tenant import current_organization_id
 from app.modules.solutions_strategic.v2.services.roadmap_automation import (
     RoadmapAutomationEngine,
 )
@@ -35,6 +37,25 @@ from app.modules.solutions_strategic.v2.services.roadmap_validator import (
 from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
+
+
+def _require(work_package_id):
+    """This organisation's work package, else a 404 (another organisation's id
+    is indistinguishable from a missing one)."""
+    work_package = work_package_service.get_work_package(
+        work_package_id, current_organization_id()
+    )
+    if work_package is None:
+        abort(404)
+    return work_package
+
+
+def _legacy_id(work_package):
+    """Deliverables still key on the retired work_packages table; a row merged
+    from it carries that id in source_id."""
+    if work_package.source_table == "work_packages":
+        return work_package.source_id
+    return None
 
 # Create blueprint
 roadmap_bp = Blueprint("roadmap_api", __name__, url_prefix="/api/roadmap")
@@ -125,7 +146,7 @@ def get_work_packages():
         search = request.args.get("search", "").strip()
 
         # Build base query
-        query = ImplementationWorkPackage.query
+        query = work_package_service.query_for(current_organization_id())
 
         # Apply filters
         if status:
@@ -288,31 +309,24 @@ def create_work_package():
                 201,
             )
 
-        # Create manual work package
-        work_package = ImplementationWorkPackage(
+        # Create manual work package (the one writer)
+        work_package = work_package_service.create_work_package(
+            organization_id=current_organization_id(),
+            user_id=current_user.id,
             name=data["name"],
             description=data.get("description", ""),
             business_capability=data["business_capability"],
             assigned_to=data.get("assigned_to"),
             status=data.get("status", "planned"),
-            start_date=datetime.fromisoformat(data["start_date"])
-            if data.get("start_date")
-            else None,
-            end_date=datetime.fromisoformat(data["end_date"]) if data.get("end_date") else None,
+            start_date=data.get("start_date"),
+            end_date=data.get("end_date"),
             progress_percentage=data.get("progress_percentage", 0),
             estimated_cost=data.get("estimated_cost"),
             priority=data.get("priority", "medium"),
-            created_by=current_user.id,
-            auto_generated=False,
             source_data=data.get("source_data"),
             confidence_score=data.get("confidence_score", 1.0),
         )
-
-        db.session.add(work_package)
         db.session.commit()
-
-        # Sync with related systems
-        sync_service.sync_work_package_created(work_package)
 
         return (
             jsonify(
@@ -333,6 +347,10 @@ def create_work_package():
     except HTTPException:
 
         raise
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return api_error(str(e), "VALIDATION_ERROR")
 
     except Exception as e:
         db.session.rollback()
@@ -366,23 +384,24 @@ def get_work_package(work_package_id: int):
         description: Not found
     """
     try:
-        work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
+        work_package = _require(work_package_id)
 
         # Get related deliverables
-        deliverables = Deliverable.query.filter_by(work_package_id=work_package_id).all()
+        legacy_id = _legacy_id(work_package)
+        deliverables = (
+            Deliverable.query.filter_by(work_package_id=legacy_id).all() if legacy_id else []
+        )
 
-        # Get dependencies
-        dependencies = db.session.execute(  # tenant-filtered: scoped via parent FK (work_package_id)
-            text(
-                """
-            SELECT wp.id, wp.name, wp.status
-            FROM implementation_work_packages wp
-            JOIN work_package_dependencies wpd ON wp.id = wpd.dependency_id
-            WHERE wpd.work_package_id = :wp_id
-        """
-            ),
-            {"wp_id": work_package_id},
-        ).fetchall()
+        # Get dependencies (ids held on the work package itself)
+        dep_ids = work_package_service.dependency_ids(work_package)
+        dependencies = []
+        if dep_ids:
+            dependencies = [
+                (d.id, d.name, d.status)
+                for d in work_package_service.query_for(current_organization_id())
+                .filter(ImplementationWorkPackage.id.in_(dep_ids))
+                .all()
+            ]
 
         return jsonify(
             {
@@ -481,7 +500,7 @@ def update_work_package(work_package_id: int):
         description: Not found
     """
     try:
-        work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
+        work_package = _require(work_package_id)
 
         # Validate JSON data
         if not request.is_json:
@@ -514,20 +533,13 @@ def update_work_package(work_package_id: int):
             "priority",
         ]
 
-        for field in updatable_fields:
-            if field in data:
-                if field in ["start_date", "end_date"] and data[field]:
-                    setattr(work_package, field, datetime.fromisoformat(data[field]))
-                else:
-                    setattr(work_package, field, data[field])
-
-        work_package.updated_by = current_user.id
-        work_package.updated_at = datetime.utcnow()
-
+        work_package = work_package_service.update_work_package(
+            work_package_id,
+            organization_id=current_organization_id(),
+            user_id=current_user.id,
+            **{f: data[f] for f in updatable_fields if f in data},
+        )
         db.session.commit()
-
-        # Sync changes
-        sync_service.sync_work_package_updated(work_package)
 
         return jsonify(
             {
@@ -544,6 +556,10 @@ def update_work_package(work_package_id: int):
     except HTTPException:
 
         raise
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return api_error(str(e), "VALIDATION_ERROR")
 
     except Exception as e:
         db.session.rollback()
@@ -580,33 +596,29 @@ def delete_work_package(work_package_id: int):
         description: Not found
     """
     try:
-        work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
+        work_package = _require(work_package_id)
 
         # Check for dependencies
-        dependents = db.session.execute(  # tenant-filtered: scoped via parent FK (work_package_id)
-            text(
-                """
-            SELECT COUNT(*) as count
-            FROM work_package_dependencies
-            WHERE dependency_id = :wp_id
-        """
-            ),
-            {"wp_id": work_package_id},
-        ).fetchone()
+        dependent_count = len(
+            work_package_service.dependents_of(work_package_id, current_organization_id())
+        )
 
-        if dependents and dependents.count > 0:
+        if dependent_count > 0:
             return (
                 jsonify(
                     {
                         "error": "Cannot delete work package with dependencies",
-                        "dependent_count": dependents.count,
+                        "dependent_count": dependent_count,
                     }
                 ),
                 400,
             )
 
         # Check for deliverables
-        deliverable_count = Deliverable.query.filter_by(work_package_id=work_package_id).count()
+        legacy_id = _legacy_id(work_package)
+        deliverable_count = (
+            Deliverable.query.filter_by(work_package_id=legacy_id).count() if legacy_id else 0
+        )
         if deliverable_count > 0:
             return (
                 jsonify(
@@ -619,17 +631,20 @@ def delete_work_package(work_package_id: int):
             )
 
         # Delete the work package
-        db.session.delete(work_package)
+        work_package_service.delete_work_package(
+            work_package_id, organization_id=current_organization_id()
+        )
         db.session.commit()
-
-        # Sync deletion
-        sync_service.sync_work_package_deleted(work_package_id)
 
         return jsonify({"message": "Work package deleted successfully"})
 
     except HTTPException:
 
         raise
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return api_error(str(e), "VALIDATION_ERROR")
 
     except Exception as e:
         db.session.rollback()
@@ -759,14 +774,19 @@ def create_deliverable():
         data = request.get_json()
 
         # Validate work package exists
-        ImplementationWorkPackage.query.get_or_404(data["work_package_id"])
+        legacy_id = _legacy_id(_require(data["work_package_id"]))
+        if not legacy_id:
+            return api_error(
+                "Deliverables can only be added to work packages carried over from the earlier work package list.",
+                "VALIDATION_ERROR",
+            )
 
         # Deliverable columns are delivery_status/target_date/assigned_user_id — the
         # old code used status/due_date/approval_criteria/created_by (none exist).
         deliverable = Deliverable(
             name=data["name"],
             description=data.get("description", ""),
-            work_package_id=data["work_package_id"],
+            work_package_id=legacy_id,
             delivery_status=data.get("status", "planned"),
             target_date=datetime.fromisoformat(data["due_date"]) if data.get("due_date") else None,
         )

@@ -533,12 +533,13 @@ def delete_task(card_ref):
 @audit_log("kanban_push_to_gantt")
 def push_to_gantt(card_ref):
     """
-    Create or update a RoadmapWorkPackage linked to this KanbanCard.
+    Create or update the work package (the one store) for this KanbanCard.
     Body (JSON): { target_start_date: "YYYY-MM-DD", target_end_date: "YYYY-MM-DD" }
     Returns: { success: True, work_package_id: int, gantt_url: str }
     """
     from app.models.adm_kanban import KanbanCard
-    from app.models.roadmap_models import RoadmapWorkPackage
+    from app.services import work_package_service
+    from app.utils.tenant import current_organization_id
     from datetime import datetime
 
     if not card_ref.startswith("task:"):
@@ -575,23 +576,30 @@ def push_to_gantt(card_ref):
     priority_map = {"critical": "critical", "high": "high", "medium": "medium", "low": "low"}
     wp_priority = priority_map.get(card.priority or "medium", "medium")
 
-    if card.work_package_id:
-        # Update existing
-        wp = db.session.get(RoadmapWorkPackage, card.work_package_id)
-        if wp:
-            wp.name = card.title
-            wp.description = card.description or ""
-            if target_start:
-                wp.start_date = target_start
-            if target_end:
-                wp.end_date = target_end
-            wp.priority = wp_priority
-            db.session.commit()
-            return jsonify({"success": True, "work_package_id": wp.id, "updated": True,
-                            "gantt_url": "/roadmap-builder"})
+    # The work package lives in the one store (UnifiedWorkPackage) and is found
+    # again by the card it came from, not through the card's old roadmap key.
+    org_id = current_organization_id()
+    existing = (
+        work_package_service.query_for(org_id)
+        .filter_by(source_type="adm_kanban", source_id=card.id)
+        .first()
+    )
+    if existing is not None:
+        fields = {"name": card.title, "description": card.description or "", "priority": wp_priority}
+        if target_start:
+            fields["start_date"] = target_start
+        if target_end:
+            fields["end_date"] = target_end
+        work_package_service.update_work_package(
+            existing.id, organization_id=org_id, user_id=current_user.id, **fields
+        )
+        db.session.commit()
+        return jsonify({"success": True, "work_package_id": existing.id, "updated": True,
+                        "gantt_url": "/roadmap-builder"})
 
-    # Create new
-    wp = RoadmapWorkPackage(
+    wp = work_package_service.create_work_package(
+        organization_id=org_id,
+        user_id=current_user.id,
         name=card.title,
         description=card.description or "",
         business_capability=f"ADM Phase {phase_code} — {card.arch_domain or 'Business'}",
@@ -600,12 +608,7 @@ def push_to_gantt(card_ref):
         priority=wp_priority,
         source_type="adm_kanban",
         source_id=card.id,
-        created_by=current_user.id,
     )
-    db.session.add(wp)
-    db.session.flush()
-
-    card.work_package_id = wp.id
     db.session.commit()
 
     return jsonify({"success": True, "work_package_id": wp.id, "updated": False,

@@ -280,8 +280,15 @@ CONCEPTS = {
     # organisation column are attributed by the linked element, else by the
     # creating user.
     "work packages": [
+        # The three older stores are retired into UnifiedWorkPackage (R1-B04
+        # PR 1: source_table/source_id/retired_into_id) and keep their rows;
+        # they no longer receive writes from the repointed screens. Declared as a
+        # narrower scope: each is a subset of UnifiedWorkPackage. The screens still reading them (the
+        # enterprise list, the capability-map roadmap list and the roadmap
+        # builder) stay registered below so their disagreement stays visible.
         Surface("orm:WorkPackage", "orm",
-                "app.models.implementation_migration.WorkPackage"),
+                "app.models.implementation_migration.WorkPackage",
+                scope="retired store"),
         Surface("orm:UnifiedWorkPackage", "orm",
                 "app.models.unified_work_package.UnifiedWorkPackage",
                 tenant_via=[("archimate_element_id", "archimate_elements"),
@@ -290,11 +297,13 @@ CONCEPTS = {
                             ("created_by", "users")]),
         Surface("orm:RoadmapWorkPackage", "orm",
                 "app.models.roadmap_models.RoadmapWorkPackage",
-                tenant_via=[("created_by", "users")]),
+                tenant_via=[("created_by", "users")],
+                scope="retired store"),
         Surface("orm:ImplementationWorkPackage", "orm",
                 "app.models.implementation_planning.ImplementationWorkPackage",
                 tenant_via=[("application_component_id", "application_components"),
-                            ("architecture_id", "architecture_models")]),
+                            ("architecture_id", "architecture_models")],
+                scope="retired store"),
         Surface("GET /enterprise/api/work-packages", "http",
                 "/enterprise/api/work-packages?per_page=1", extract="total"),
         Surface("GET /api/roadmap/work-packages", "http",
