@@ -53,7 +53,7 @@ def _gap_count(db):
 def test_a_derived_gap_can_be_turned_into_planned_work(app, client):
     """The value chain: identified gap in, work package out, traceability kept."""
     from app import db
-    from app.models.implementation_migration import WorkPackage
+    from app.models.unified_work_package import UnifiedWorkPackage
 
     with app.app_context():
         org_id = make_org(db, "GapChain")
@@ -80,9 +80,11 @@ def test_a_derived_gap_can_be_turned_into_planned_work(app, client):
     with app.app_context():
         db.session.expunge_all()
         work_package = db.session.execute(
-            db.select(WorkPackage).filter_by(name=name)
+            db.select(UnifiedWorkPackage).filter_by(name=name)
         ).scalar_one_or_none()
         assert work_package is not None, "the work package did not persist"
+        assert work_package.organization_id == org_id
+        assert work_package.gap_id is not None, "the work package is not linked to its gap"
         assert _gap_count(db) == gaps_before + 1, (
             "no Gap row was materialised, so the work package has nothing to "
             "trace back to"

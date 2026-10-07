@@ -48,8 +48,18 @@ def suspended():
         _suspended -= 1
 
 
+_TABLES = None
+
+
 def _tables():
     """{mapped class: table name} of the four retired stores."""
+    global _TABLES
+    if _TABLES is None:
+        _TABLES = _load_tables()
+    return _TABLES
+
+
+def _load_tables():
     from app.models.implementation_migration import TechnologyRoadmapInitiative, WorkPackage
     from app.models.implementation_planning import ImplementationWorkPackage
     from app.models.roadmap_models import RoadmapWorkPackage

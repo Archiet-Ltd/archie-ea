@@ -406,9 +406,9 @@ SHARED_MODELS = {
 _PR258 = "PR 258 (scoring/consolidation): consolidation entries are fenced through their application"
 _PR274 = "PR 274 and PR 218 edit solution_design_routes.py; the fix waits for them to land"
 KNOWN_LEAKS = {
-    "DELETE /api/roadmap/deliverables/<int:deliverable_id>": (
-        "PR 265 (work package stores): a deliverable is scoped through its work package"),
-    "PUT /api/roadmap/deliverables/<int:deliverable_id>": "PR 265 (work package stores), as above",
+    # PR 421 (one work package store) scoped the deliverable update and delete
+    # through the organisation's own work packages; test_known_leak_is_still_open
+    # went XPASS(strict) on both, so their entries come out.
     "DELETE /api/v1/mappings/application-to-vendor/<int:mapping_id>": "PR 269 (vendor/contract)",
     "DELETE /api/v1/mappings/unified-to-application/<int:mapping_id>": "capability store brief",
     "DELETE /api/v1/mappings/unified-to-vendor-org/<int:mapping_id>": "capability store brief",

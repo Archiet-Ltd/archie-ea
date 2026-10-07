@@ -294,3 +294,19 @@ def test_roadmap_builder_screen_uses_unified_ids(screens, client, login_as):
     assert client.delete("/api/roadmap-builder/work-packages/%s" % first_id).status_code == 200
     assert UnifiedWorkPackage.query.get(first_id) is None
     assert svc.dependency_ids(UnifiedWorkPackage.query.get(second_id)) == []
+
+
+def test_unattributable_bridged_row_belongs_to_the_caller(db_session, make_org, tenant_ctx):
+    """An older-list row with no programme, element or creator would be quarantined;
+    written from a request it belongs to the organisation that made the request."""
+    from app.models.implementation_planning import ImplementationWorkPackage
+    from app.services import work_package_service as svc
+
+    org_a, org_b = make_org("bridge-caller-a"), make_org("bridge-caller-b")
+    with tenant_ctx(org_a.id):
+        row = ImplementationWorkPackage(name="No links at all")
+        db_session.add(row)
+        db_session.flush()
+        copy = _copy("implementation_work_packages", row.id, org_a)
+    assert copy is not None and copy.organization_id == org_a.id
+    assert svc.get_work_package(copy.id, org_b.id) is None

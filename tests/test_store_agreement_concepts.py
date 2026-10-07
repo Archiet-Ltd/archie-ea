@@ -237,7 +237,6 @@ def _probe(concept, count, overrides=None):
         if surface.expect_zero:
             # A retired store must hold nothing that is not copied across.
             row["count"] = 0
-            row["expect_zero"] = True
         rows.append(row)
     for name, value in (overrides or {}).items():
         for row in rows:
@@ -290,7 +289,7 @@ def test_probe_all_zero_is_no_evidence(tmp_path, concept):
 def test_probe_narrower_scope_exceeding_the_whole_is_reported(tmp_path, concept):
     probe = _probe(concept, 3)
     narrower = [row for row in probe[concept]
-                if row["scope"] != "all" and not row.get("expect_zero")]
+                if row["scope"] not in ("all", gate.RETIRED_SCOPE)]
     narrower[0]["count"] = 9
     count, out = _run_probe(tmp_path, probe)
     assert count >= 1, out
@@ -299,7 +298,7 @@ def test_probe_narrower_scope_exceeding_the_whole_is_reported(tmp_path, concept)
 
 def test_probe_unmerged_retired_row_is_its_own_finding(tmp_path):
     probe = _probe("work packages", 7)
-    retired = [row for row in probe["work packages"] if row.get("expect_zero")]
+    retired = [row for row in probe["work packages"] if row["scope"] == gate.RETIRED_SCOPE]
     assert len(retired) == 4, retired
     retired[0]["count"] = 2
     count, out = _run_probe(tmp_path, probe)
@@ -640,7 +639,7 @@ def test_work_packages_concept_agrees_after_merge(
         assert whole.get(screen) == 14, (screen, whole, notes)
     assert set(whole.values()) == {14}, whole
     unmerged = {row[0]: row[1] for row in observations["work packages"]
-                if row[2] == "unmerged retired rows"}
+                if row[2] == gate.RETIRED_SCOPE}
     assert unmerged and set(unmerged.values()) == {0}, unmerged
 
 

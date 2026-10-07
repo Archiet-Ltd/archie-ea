@@ -121,6 +121,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALLOW_MARKER = "store-agreement-ok:"
 
 
+# The scope of a retired store's surface: it is not compared with anything, it
+# must hold nothing that is not copied across (`retired-store-unmerged`).
+RETIRED_SCOPE = "unmerged retired rows"
+
+
 class Surface:
     """One way the product answers "how many X are there?".
 
@@ -145,7 +150,7 @@ class Surface:
         self.kind = kind
         self.target = target
         self.extract = extract
-        self.scope = scope
+        self.scope = RETIRED_SCOPE if expect_zero else scope
         self.waived = waived
         # orm-only: a real WHERE, not just "how many rows" -- lets a concept
         # express a genuine filtered-count question (e.g. "how many of these
@@ -296,7 +301,7 @@ CONCEPTS = {
     "work packages": [
         Surface("orm:WorkPackage(unmerged)", "orm",
                 "app.models.implementation_migration.WorkPackage",
-                scope="unmerged retired rows", expect_zero=True,
+                expect_zero=True,
                 filter_null=("retired_into_id", "retired_at")),
         Surface("orm:UnifiedWorkPackage", "orm",
                 "app.models.unified_work_package.UnifiedWorkPackage",
@@ -307,19 +312,19 @@ CONCEPTS = {
         Surface("orm:RoadmapWorkPackage(unmerged)", "orm",
                 "app.models.roadmap_models.RoadmapWorkPackage",
                 tenant_via=[("created_by", "users")],
-                scope="unmerged retired rows", expect_zero=True,
+                expect_zero=True,
                 filter_null=("retired_into_id", "retired_at")),
         Surface("orm:ImplementationWorkPackage(unmerged)", "orm",
                 "app.models.implementation_planning.ImplementationWorkPackage",
                 tenant_via=[("application_component_id", "application_components"),
                             ("architecture_id", "architecture_models")],
-                scope="unmerged retired rows", expect_zero=True,
+                expect_zero=True,
                 filter_null=("retired_into_id", "retired_at")),
         Surface("orm:TechnologyRoadmapInitiative(unmerged)", "orm",
                 "app.models.implementation_migration.TechnologyRoadmapInitiative",
                 tenant_via=[("solution_id", "solutions"),
                             ("architecture_id", "architecture_models")],
-                scope="unmerged retired rows", expect_zero=True,
+                expect_zero=True,
                 filter_null=("retired_into_id", "retired_at")),
         Surface("GET /enterprise/api/work-packages", "http",
                 "/enterprise/api/work-packages?per_page=1", extract="total"),
@@ -552,7 +557,7 @@ def compare(observations):
         for row in observations[concept]:
             if row[1] is None:
                 continue
-            if len(row) > 4 and row[4]:
+            if row[2] == RETIRED_SCOPE:
                 if row[1]:
                     findings.append(
                         "  %s [retired-store-unmerged] %s still holds %d row(s) "
@@ -817,8 +822,7 @@ def _observe_concepts(concepts, db, client, org_id, http, notes):
                 notes.append("  %s [unanswered] %s: %s"
                              % (concept, surface.name, why))
                 continue
-            rows.append((surface.name, count, surface.scope, unscoped,
-                         bool(surface.expect_zero)))
+            rows.append((surface.name, count, surface.scope, unscoped))
         observations[concept] = rows
     return observations
 
@@ -985,8 +989,7 @@ def observe_synthetic(root):
             if ALLOW_MARKER in str(row.get("waived", "")):
                 continue
             kept.append((row["surface"], row.get("count"),
-                         row.get("scope", "all"), bool(row.get("unscoped")),
-                         bool(row.get("expect_zero"))))
+                         row.get("scope", "all"), bool(row.get("unscoped"))))
         observations[concept] = kept
     return observations, []
 

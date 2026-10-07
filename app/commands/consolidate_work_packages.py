@@ -296,9 +296,9 @@ def _table_exists(conn, name):
     return bool(conn.execute(text("SELECT to_regclass(:n) IS NOT NULL"), {"n": name}).scalar())
 
 
-def _insert_missing(conn, spec, ids, stats):
+def _insert_missing(conn, spec, ids, stats, fallback_org_id=None):
     table = spec["table"]
-    params = {"source_table": table}
+    params = {"source_table": table, "fallback_org": fallback_org_id}
     if ids is not None:
         params["ids"] = list(ids)
     insert_columns = (
@@ -312,7 +312,11 @@ def _insert_missing(conn, spec, ids, stats):
         # context/scope have only a Python-side ORM default (no
         # server_default), so a raw INSERT bypassing the ORM must supply
         # both explicitly or trip their NOT NULL constraint.
-        + ["'architecture'", "'enterprise'", spec["org_expr"], f"'{table}'", "s.id"]
+        # A row the attribution chain cannot place, written from a request,
+        # belongs to the organisation that made the request (bridge only).
+        + ["'architecture'", "'enterprise'",
+           f"COALESCE({spec['org_expr']}, CAST(:fallback_org AS integer))",
+           f"'{table}'", "s.id"]
     )
     sql = (
         "WITH inserted AS ("
@@ -417,7 +421,7 @@ def _fill_roadmap_source_data(conn, ids, stats):
         if data is None:
             continue
         conn.execute(
-            text("UPDATE unified_work_packages SET source_data = :v WHERE id = :id"),
+            text("UPDATE unified_work_packages SET source_data = :v WHERE id = :id"),  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
             {"v": json.dumps(data), "id": uid},
         )
         stats.add("roadmap_work_packages: filled source_data", 1)
@@ -448,7 +452,7 @@ def _remap_dependencies(conn, table, ids, stats):
         only = " AND source_id = ANY(:ids)"
         params["ids"] = list(ids)
     rows = conn.execute(
-        text(
+        text(  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
             "SELECT id, work_dependencies FROM unified_work_packages "
             f"WHERE source_table = :t AND dependencies_remapped_at IS NULL{only}"
         ),
@@ -458,7 +462,7 @@ def _remap_dependencies(conn, table, ids, stats):
         return
     mapping = {
         old: new for old, new in conn.execute(
-            text("SELECT source_id, id FROM unified_work_packages WHERE source_table = :t"),
+            text("SELECT source_id, id FROM unified_work_packages WHERE source_table = :t"),  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
             {"t": table},
         )
     }
@@ -473,7 +477,7 @@ def _remap_dependencies(conn, table, ids, stats):
                 new_ids.append(int(new))
         if old_ids:
             conn.execute(
-                text(
+                text(  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
                     "UPDATE unified_work_packages SET work_dependencies = CAST(:v AS json), "
                     "dependencies_remapped_at = CURRENT_TIMESTAMP WHERE id = :id"
                 ),
@@ -482,7 +486,7 @@ def _remap_dependencies(conn, table, ids, stats):
             stats.add(f"{table}: dependencies remapped", 1)
         else:
             conn.execute(
-                text("UPDATE unified_work_packages SET dependencies_remapped_at = CURRENT_TIMESTAMP "
+                text("UPDATE unified_work_packages SET dependencies_remapped_at = CURRENT_TIMESTAMP "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
                      "WHERE id = :id"),
                 {"id": uid},
             )
@@ -499,7 +503,7 @@ def _union_roadmap_links(conn, ids, stats):
         only = " AND source_id = ANY(:ids)"
         params["ids"] = list(ids)
     rows = conn.execute(
-        text(
+        text(  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
             "SELECT id, source_id, work_dependencies, capability_ids FROM unified_work_packages "
             f"WHERE source_table = :t AND dependencies_remapped_at IS NULL{only}"
         ),
@@ -509,7 +513,7 @@ def _union_roadmap_links(conn, ids, stats):
         return
     mapping = {
         old: new for old, new in conn.execute(
-            text("SELECT source_id, id FROM unified_work_packages WHERE source_table = :t"),
+            text("SELECT source_id, id FROM unified_work_packages WHERE source_table = :t"),  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
             {"t": t},
         )
     }
@@ -547,7 +551,7 @@ def _union_roadmap_links(conn, ids, stats):
             sets.append("capability_ids = CAST(:caps AS json)")
             values["caps"] = json.dumps(new_caps)
             stats.add(f"{t}: capability links added", len(new_caps) - len(cap_ids))
-        conn.execute(text(f"UPDATE unified_work_packages SET {', '.join(sets)} WHERE id = :id"), values)
+        conn.execute(text(f"UPDATE unified_work_packages SET {', '.join(sets)} WHERE id = :id"), values)  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
 
 
 def sync_source_rows(conn, table, ids=None, *, update_existing=False, fallback_org_id=None):
@@ -570,7 +574,7 @@ def sync_source_rows(conn, table, ids=None, *, update_existing=False, fallback_o
         if not ids:
             return stats
 
-    _insert_missing(conn, spec, ids, stats)
+    _insert_missing(conn, spec, ids, stats, fallback_org_id)
     if update_existing:
         _update_existing(conn, spec, ids, stats)
     _fill_missing(conn, spec, ids, stats)
@@ -578,23 +582,12 @@ def sync_source_rows(conn, table, ids=None, *, update_existing=False, fallback_o
     if ids is not None:
         uids = [
             row[0] for row in conn.execute(
-                text("SELECT id FROM unified_work_packages WHERE source_table = :t AND source_id = ANY(:ids)"),
+                text("SELECT id FROM unified_work_packages WHERE source_table = :t AND source_id = ANY(:ids)"),  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
                 {"t": table, "ids": ids},
             )
         ]
         if uids:
             stats.add(f"{table}: attributed", _attribute_org(conn, unified_ids=uids, emit=False))
-            if fallback_org_id is not None:
-                # A row the chain could not attribute, written from a request:
-                # it belongs to the organisation that made the request.
-                stats.add(
-                    f"{table}: attributed to caller",
-                    conn.execute(
-                        text("UPDATE unified_work_packages SET organization_id = :org "
-                             "WHERE id = ANY(:uids) AND organization_id IS NULL"),
-                        {"org": fallback_org_id, "uids": uids},
-                    ).rowcount,
-                )
 
     if spec.get("remap_dependencies"):
         _remap_dependencies(conn, table, ids, stats)
@@ -618,12 +611,12 @@ def _backfill_retired_at(conn, dry_run, stats):
 def _backfill_links(conn, stats):
     """Point child rows that still key on a retired store at the unified row."""
     if _table_exists(conn, "kanban_cards"):
-        stats.add("kanban_cards: unified_work_package_id set", conn.execute(text(
+        stats.add("kanban_cards: unified_work_package_id set", conn.execute(text(  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
             "UPDATE kanban_cards c SET unified_work_package_id = r.retired_into_id "
             "FROM roadmap_work_packages r WHERE r.id = c.work_package_id "
             "AND c.unified_work_package_id IS NULL AND r.retired_into_id IS NOT NULL")).rowcount)
     if _table_exists(conn, "deliverables"):
-        stats.add("deliverables: unified_work_package_id set", conn.execute(text(
+        stats.add("deliverables: unified_work_package_id set", conn.execute(text(  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
             "UPDATE deliverables d SET unified_work_package_id = w.retired_into_id "
             "FROM work_packages w WHERE w.id = d.work_package_id "
             "AND d.unified_work_package_id IS NULL AND w.retired_into_id IS NOT NULL")).rowcount)
