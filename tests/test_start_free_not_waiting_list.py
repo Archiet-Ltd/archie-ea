@@ -177,10 +177,10 @@ def test_llms_summary_line_does_not_claim_website_address_intake(app):
 @pytest.mark.parametrize(
     "slug",
     [
-        "uc-s1-08-website-first-look",
-        "uc-s1-09-website-full-profile",
-        "uc-s3-15-see-your-own-twin",
-        "uc-s4-02-set-up-in-an-afternoon",
+        "website-first-look",
+        "website-full-profile",
+        "see-your-own-twin",
+        "set-up-in-an-afternoon",
     ],
 )
 def test_hold_pages_keep_their_waiting_list_framing(app, slug):
