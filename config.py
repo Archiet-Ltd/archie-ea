@@ -232,7 +232,7 @@ class Config:
     # app/main/views.py:indexnow_key_file). Committed here like APP_NAME
     # above; still overridable by an env var if the key is ever rotated.
     INDEXNOW_API_KEY = os.environ.get(
-        "INDEXNOW_API_KEY", "d51b9c0554cf9ff9c975e8f5a67c7892328f56e1e4afe0f73fb8c34507bb292f"
+        "INDEXNOW_API_KEY", "d51b9c0554cf9ff9c975e8f5a67c7892328f56e1e4afe0f73fb8c34507bb292f"  # gitleaks:allow
     )
 
     # Admin account
