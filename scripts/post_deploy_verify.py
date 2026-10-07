@@ -43,12 +43,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import ssl
 import subprocess
 import sys
 import urllib.error
 import urllib.request
+from xml.etree import ElementTree
 
 DEFAULT_BASE = "https://entelim.org"
 DEFAULT_DROPLET = "root@134.122.105.56"
@@ -126,6 +128,62 @@ def check_pages(base: str) -> list:
     return problems
 
 
+def sitemap_urls(base: str) -> list:
+    """Every <loc> in the live sitemap.xml, read the same way check_pages()
+    reads any other public page -- no new dependency, just the stdlib XML
+    parser already available everywhere Python is."""
+    status, body = _fetch(base.rstrip("/") + "/sitemap.xml")
+    if status != 200 or not body:
+        return []
+    try:
+        root = ElementTree.fromstring(body)
+    except ElementTree.ParseError:
+        return []
+    ns = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+    return [loc.text.strip() for loc in root.findall(f".//{ns}loc") if loc.text]
+
+
+def ping_indexnow(base: str, urls: list) -> dict | None:
+    """Tell IndexNow (api.indexnow.org, shared by Bing/Yandex) that every URL
+    in *urls* may have changed, so these engines can re-crawl now rather than
+    waiting. No-op when INDEXNOW_API_KEY is unset -- the key is free and
+    self-generated (https://www.indexnow.org/documentation), never a paid
+    account, but until one is generated and the matching /<key>.txt is
+    deployed this stays a no-op by design, the same pattern as the other
+    *_API_KEY settings in config.py.
+
+    Never allowed to fail the deploy: this is a courtesy ping to search
+    engines, not a correctness check of the site itself, so any problem here
+    is reported in the JSON output and never added to the caller's
+    `problems` list (post_deploy_verify's exit code / rollback signal).
+    """
+    key = os.environ.get("INDEXNOW_API_KEY", "").strip()
+    if not key or not urls:
+        return None
+
+    from urllib.parse import urlparse
+
+    payload = json.dumps({
+        "host": urlparse(base).netloc,
+        "key": key,
+        "keyLocation": base.rstrip("/") + "/" + key + ".txt",
+        "urlList": urls,
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        "https://api.indexnow.org/indexnow",
+        data=payload,
+        headers={"Content-Type": "application/json; charset=utf-8"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return {"status": response.status, "url_count": len(urls)}
+    except urllib.error.HTTPError as exc:
+        return {"status": exc.code, "url_count": len(urls), "error": exc.read().decode("utf-8", "replace")[:300]}
+    except Exception as exc:  # network-level failure
+        return {"status": 0, "url_count": len(urls), "error": str(exc)}
+
+
 def check_logs(droplet: str, app_dir: str, minutes: int = 30) -> list:
     """Count real errors in the running container since the deploy.
 
@@ -167,6 +225,10 @@ def main() -> int:
                         help="also scan the container logs over ssh")
     parser.add_argument("--minutes", type=int, default=30)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--no-indexnow", action="store_true",
+        help="skip the IndexNow ping even when INDEXNOW_API_KEY is set",
+    )
     args = parser.parse_args()
 
     problems = check_pages(args.base)
@@ -176,9 +238,18 @@ def main() -> int:
         except Exception as exc:
             problems.append("could not read container logs: %s" % exc)
 
+    # IndexNow: only after confirming the deploy is actually healthy -- no
+    # point telling search engines to recrawl pages that are currently
+    # serving errors. A ping problem is reported but never added to
+    # `problems`: see ping_indexnow()'s docstring for why.
+    indexnow_result = None
+    if not problems and not args.no_indexnow:
+        indexnow_result = ping_indexnow(args.base, sitemap_urls(args.base))
+
     if args.json:
         print(json.dumps({"base": args.base, "problems": problems,
-                          "ok": not problems}, indent=2))
+                          "ok": not problems, "indexnow": indexnow_result},
+                          indent=2))
     else:
         if problems:
             print("PRODUCTION IS NOT HEALTHY:")
@@ -190,6 +261,11 @@ def main() -> int:
         else:
             print("production OK: %d public surfaces served, none reporting an error"
                   % len(PUBLIC_PATHS))
+            if indexnow_result is None:
+                print("IndexNow: skipped (INDEXNOW_API_KEY not set, or --no-indexnow)")
+            else:
+                print("IndexNow: submitted %d URL(s), status %s"
+                      % (indexnow_result["url_count"], indexnow_result["status"]))
     return 1 if problems else 0
 
 

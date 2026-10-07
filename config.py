@@ -219,6 +219,16 @@ class Config:
     CLARITY_PROJECT_ID = os.environ.get("CLARITY_PROJECT_ID", "")
     GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "")
     BING_SITE_VERIFICATION = os.environ.get("BING_SITE_VERIFICATION", "")
+    # First-party, cookieless page/event analytics -- no consent banner, no
+    # third party. Pepper for the daily-rotating visitor correlation hash
+    # (app/services/visitor_hash.py); falls back to SECRET_KEY when unset, so
+    # this always works, but a dedicated secret keeps the two uses apart.
+    VISITOR_HASH_SECRET = os.environ.get("VISITOR_HASH_SECRET", "")
+    # IndexNow: pings search engines when a public URL changes instead of
+    # waiting for re-crawl. A self-generated key, not issued by anyone -- see
+    # app/services/indexnow_service.py. Empty means the feature does nothing,
+    # the same no-op-when-unset pattern as GA4_MEASUREMENT_ID above.
+    INDEXNOW_API_KEY = os.environ.get("INDEXNOW_API_KEY", "")
 
     # Admin account
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")

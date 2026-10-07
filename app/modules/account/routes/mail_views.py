@@ -42,6 +42,12 @@ def _after_confirmation_url(user):
 
 def register_view():
     form = RegistrationForm()
+    if request.method == "GET":
+        # A visitor reaching the sign-up form, not a retry after a failed
+        # POST -- see app/services/public_analytics_service.py.
+        from app.services.public_analytics_service import log_signup_started
+
+        log_signup_started()
     if form.validate_on_submit():
         _user, confirmation = AccountService.sign_up(
             first_name=form.first_name.data,
@@ -49,6 +55,9 @@ def register_view():
             email=form.email.data,
             password=form.password.data,
         )
+        from app.services.public_analytics_service import log_signup_completed
+
+        log_signup_completed()
         if confirmation == "sent":
             return redirect(url_for("account.unconfirmed"))
         if confirmation == "failed":

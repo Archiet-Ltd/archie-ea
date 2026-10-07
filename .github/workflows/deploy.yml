@@ -239,6 +239,12 @@ jobs:
       - name: Check the public pages
         id: post
         if: steps.gate.outputs.mode == 'deploy'
+        # INDEXNOW_API_KEY is not a secret -- it is a self-generated string
+        # this same step publishes at /<key>.txt for anyone to read, so it is
+        # a repository variable, not a GitHub secret. Empty/unset is a no-op
+        # (see post_deploy_verify.py::ping_indexnow).
+        env:
+          INDEXNOW_API_KEY: ${{ vars.INDEXNOW_API_KEY }}
         run: python3 scripts/post_deploy_verify.py --json
 
       - name: Job summary
