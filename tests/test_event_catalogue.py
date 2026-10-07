@@ -144,34 +144,35 @@ def test_matches(pattern, event_type, expected):
 # --------------------------------------------------------------------------- #
 
 
-def _outbox_count():
+def _outbox_count(org):
+    """Outbox rows of one organisation (the filter is explicit: other tests commit rows of their own)."""
     from app.models.transformation_execution import OperationOutboxEvent
 
-    return OperationOutboxEvent.query.count()
+    return OperationOutboxEvent.query.filter_by(organization_id=org.id).count()
 
 
 def test_emit_event_refuses_an_unknown_type_and_writes_no_row(db_session, make_org):
     from app.services.outbox import emit_event
 
     org = make_org("cat")
-    before = _outbox_count()
+    before = _outbox_count(org)
     with pytest.raises(event_catalogue.UnknownEventType):
         emit_event(organization_id=org.id, event_type="not.catalogued", payload={})
     db_session.flush()
-    assert _outbox_count() == before
+    assert _outbox_count(org) == before
 
 
 def test_emit_event_refuses_a_bad_payload_and_writes_no_row(db_session, make_org):
     from app.services.outbox import emit_event
 
     org = make_org("cat")
-    before = _outbox_count()
+    before = _outbox_count(org)
     with pytest.raises(event_catalogue.EventSchemaError) as caught:
         emit_event(organization_id=org.id, event_type="archimate_element.created", payload={"id": 1})
     assert caught.value.event_type == "archimate_element.created"
     assert "action" in caught.value.detail
     db_session.flush()
-    assert _outbox_count() == before
+    assert _outbox_count(org) == before
 
 
 def test_saving_an_element_still_succeeds_when_validation_would_fail(db_session, make_org, monkeypatch, caplog):
@@ -182,7 +183,7 @@ def test_saving_an_element_still_succeeds_when_validation_would_fail(db_session,
 
     monkeypatch.setattr(event_catalogue, "validate", refuse)
     org = make_org("cat")
-    before = _outbox_count()
+    before = _outbox_count(org)
     element = ArchiMateElement(
         name="Saved anyway", type="ApplicationComponent", layer="Application", organization_id=org.id
     )
@@ -190,7 +191,7 @@ def test_saving_an_element_still_succeeds_when_validation_would_fail(db_session,
     db_session.commit()
     assert element.id is not None
     assert ArchiMateElement.query.filter_by(id=element.id).count() == 1
-    assert _outbox_count() == before
+    assert _outbox_count(org) == before
 
 
 def test_saving_an_element_still_emits_its_event(db_session, make_org):
@@ -248,8 +249,9 @@ def _publish(client, login_as, user, body):
 def test_publish_with_a_bad_payload_answers_400_and_creates_nothing(app, db_session, make_org, client, login_as):
     from app.models.webhook import WebhookEvent
 
-    user = make_org_user(db_session, make_org("cat"))
-    before = _outbox_count()
+    org = make_org("cat")
+    user = make_org_user(db_session, org)
+    before = _outbox_count(org)
     response = _publish(client, login_as, user, {"event_type": "archimate_element.created", "payload": {"id": 1}})
     assert response.status_code == 400
     body = response.get_json()
@@ -257,17 +259,18 @@ def test_publish_with_a_bad_payload_answers_400_and_creates_nothing(app, db_sess
     assert body["error"] == "event_schema_invalid"
     assert body["event_type"] == "archimate_element.created"
     assert "action" in body["detail"]
-    assert _outbox_count() == before
+    assert _outbox_count(org) == before
     assert WebhookEvent.query.count() == 0
 
 
 def test_publish_with_an_unknown_type_answers_400(app, db_session, make_org, client, login_as):
-    user = make_org_user(db_session, make_org("cat"))
-    before = _outbox_count()
+    org = make_org("cat")
+    user = make_org_user(db_session, org)
+    before = _outbox_count(org)
     response = _publish(client, login_as, user, {"event_type": "made.up.type", "payload": {}})
     assert response.status_code == 400
     assert response.get_json()["error"] == "event_type_unknown"
-    assert _outbox_count() == before
+    assert _outbox_count(org) == before
 
 
 def test_publish_with_a_good_payload_creates_one_outbox_row_for_the_callers_organisation(

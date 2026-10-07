@@ -669,8 +669,13 @@ def publish_event():
         if org_id is None:
             return jsonify({"success": False, "error": "No organisation selected"}), 400
 
+        # The outbox requires an entity type on every entity-less event too; this
+        # names the producer so a subscriber can tell published events apart.
         event = emit_event(
-            organization_id=org_id, event_type=event_type, payload=data["payload"]
+            organization_id=org_id,
+            event_type=event_type,
+            payload=data["payload"],
+            entity_type="published_event",
         )
         db.session.commit()
 

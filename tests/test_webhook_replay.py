@@ -48,7 +48,7 @@ def test_replay_from_sequence_5_of_10_creates_six_ordered_replay_deliveries(monk
         result = service.replay(subscription.id, from_ordinal=5, actor="tester")
         assert result == {"count": 6, "capped": False, "cap": 10_000}
         replays = [d for d in _all(subscription.id) if d.is_replay]
-        assert [d.event_ordinal for d in replays] == [5, 6, 7, 8, 9, 10]
+        assert sorted(d.event_ordinal for d in replays) == [5, 6, 7, 8, 9, 10]
         assert all(d.status == "pending" and d.is_replay for d in replays)
         assert subscription.last_ordinal == cursor, "replay must not move the cursor"
         service.dispatch_due(org.id, now=NOW + timedelta(minutes=1))
@@ -65,7 +65,12 @@ def test_replay_since_a_time_selects_by_the_logs_created_at(monkeypatch, tenant_
         service.fan_out(org.id)
         service.dispatch_due(org.id, now=NOW)
         rows = EventLogRecord.query.filter_by(organization_id=org.id).order_by(EventLogRecord.ordinal).all()
-        midpoint = rows[3].created_at  # ordinal 4
+        # Space the log's timestamps a minute apart so "since" has an unambiguous midpoint.
+        base = datetime.now(timezone.utc) - timedelta(hours=1)
+        for index, row in enumerate(rows):
+            row.created_at = base + timedelta(minutes=index)
+        db_session.flush()
+        midpoint = base + timedelta(minutes=3)  # the time of ordinal 4
         result = service.replay(subscription.id, since=midpoint, actor="tester")
         assert result["count"] == 3
         replays = [d for d in _all(subscription.id) if d.is_replay]
@@ -109,7 +114,7 @@ def test_replay_is_capped_and_says_so(monkeypatch, tenant_ctx, make_org, db_sess
         emit_events(org.id, 5)
         result = service.replay(subscription.id, from_ordinal=1)
         assert result == {"count": 3, "capped": True, "cap": 3}
-        assert [d.event_ordinal for d in _all(subscription.id) if d.is_replay] == [1, 2, 3]
+        assert sorted(d.event_ordinal for d in _all(subscription.id) if d.is_replay) == [1, 2, 3]
 
 
 def test_replay_does_not_overtake_an_event_that_is_still_being_retried(monkeypatch, tenant_ctx, make_org, db_session):

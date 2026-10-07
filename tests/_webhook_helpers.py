@@ -83,31 +83,43 @@ def install_guards(app) -> None:
 
 def emit_events(org_id: int, count: int, *, start: int = 1, event_type: str = "archimate_element.created") -> None:
     """Emit *count* catalogued events for *org_id* and relay them into the event log."""
+    from flask import g
+
     from app import db
     from app.services.event_log_service import relay_outbox_batch
     from app.services.outbox import emit_event
 
-    for number in range(start, start + count):
-        emit_event(
-            organization_id=org_id,
-            event_type=event_type,
-            payload={"action": "created", "id": number},
-            entity_type="archimate_element",
-            entity_id=number,
-        )
-    db.session.commit()
-    relay_outbox_batch()
-    db.session.commit()
+    # tenant_ctx() leaves g.current_org_id set after it exits (the test's app context
+    # outlives it), and the relay is filtered by it. Relay with no tenant set, as the
+    # production relay does for the organisation it is visiting, then put it back.
+    previous = g.pop("current_org_id", None)
+    try:
+        for number in range(start, start + count):
+            emit_event(
+                organization_id=org_id,
+                event_type=event_type,
+                payload={"action": "created", "id": number},
+                entity_type="archimate_element",
+                entity_id=number,
+            )
+        db.session.commit()
+        relay_outbox_batch()
+        db.session.commit()
+    finally:
+        if previous is not None:
+            g.current_org_id = previous
 
 
 def make_org_user(db_session, org, *, is_org_admin=True, is_platform_admin=False):
     """A confirmed administrator of *org*."""
     from app.models.user import Role, User
 
-    role = Role.query.filter_by(name="Administrator").first()
+    # Administrator is what makes a user an organisation administrator; an ordinary member is an Architect.
+    role_name = "Administrator" if (is_org_admin or is_platform_admin) else "Architect"
+    role = Role.query.filter_by(name=role_name).first()
     if role is None:
         Role.insert_roles()
-        role = Role.query.filter_by(name="Administrator").first()
+        role = Role.query.filter_by(name=role_name).first()
     user = User(
         email=f"wh-{uuid.uuid4().hex[:10]}@example.com",
         first_name="Web",
