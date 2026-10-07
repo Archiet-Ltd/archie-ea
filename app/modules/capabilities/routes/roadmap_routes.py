@@ -31,7 +31,7 @@ from app.services.archimate_backbone import sync_archimate_element
 from datetime import datetime
 
 from flask import current_app, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.services.rate_limiter import rate_limit
@@ -1226,7 +1226,16 @@ def api_roadmap_create_work_package(gap_id):
             wp = wp2
 
         try:
-            wp_dict = wp.to_roadmap_dict(include_children=True)
+            # The screen's ids are the one store's ids: answer with the copy
+            # the bridge made of this row, not the older list's row.
+            from app.services import work_package_service
+            from app.utils.tenant import current_organization_id
+
+            org_id = current_organization_id()
+            copy = work_package_service.get_by_source("work_packages", wp.id, org_id)
+            if copy is None:
+                raise LookupError("no copy")
+            wp_dict = work_package_service.to_roadmap_dict(copy, org_id, include_children=True)
         except Exception:
             wp_dict = {"id": wp.id, "name": wp.name, "status": getattr(wp, "status", "planned")}
 
@@ -1249,7 +1258,8 @@ def api_roadmap_create_work_package(gap_id):
 @rate_limit(60, "1m")
 def api_roadmap_work_packages():
     """
-    Get work packages for roadmap display.
+    Get work packages for roadmap display, from the one work package store
+    (this organisation's rows only).
 
     Query params:
         gap_id: Filter by associated gap
@@ -1257,16 +1267,34 @@ def api_roadmap_work_packages():
         include_children: If true, include nested children
     """
     try:
-        from app.services.gap_archimate_service import gap_archimate_service
+        from sqlalchemy import or_, select
 
+        from app.models.relationship_tables import gap_work_packages
+        from app.models.unified_work_package import UnifiedWorkPackage as UWP
+        from app.services import work_package_service
+        from app.utils.tenant import current_organization_id
+
+        org_id = current_organization_id()
         gap_id = request.args.get("gap_id", type=int)
         root_only = request.args.get("root_only", "true").lower() == "true"
         include_children = request.args.get("include_children", "true").lower() == "true"
 
         try:
-            work_packages = gap_archimate_service.get_hierarchical_work_packages(
-                root_only=root_only, gap_id=gap_id
-            )
+            query = work_package_service.query_for(org_id)
+            if root_only:
+                query = query.filter(UWP.parent_id.is_(None))
+            if gap_id:
+                # Rows made here carry gap_id; rows carried over from the older
+                # work package list are linked through gap_work_packages by
+                # that list's id.
+                linked = select(gap_work_packages.c.work_package_id).where(
+                    gap_work_packages.c.gap_id == gap_id
+                )
+                query = query.filter(or_(
+                    UWP.gap_id == gap_id,
+                    (UWP.source_table == "work_packages") & UWP.source_id.in_(linked),
+                ))
+            work_packages = query.order_by(UWP.start_date, UWP.id).all()
         except Exception as qe:
             current_app.logger.warning(f"Work packages query failed: {qe}", exc_info=True)
             work_packages = []
@@ -1274,7 +1302,11 @@ def api_roadmap_work_packages():
         serialized = []
         for wp in work_packages:
             try:
-                serialized.append(wp.to_roadmap_dict(include_children=include_children))
+                serialized.append(
+                    work_package_service.to_roadmap_dict(
+                        wp, org_id, include_children=include_children
+                    )
+                )
             except Exception as se:
                 current_app.logger.warning(f"WorkPackage {wp.id} serialization failed: {se}")
                 serialized.append({"id": wp.id, "name": wp.name, "status": wp.status})
@@ -1416,7 +1448,9 @@ def api_roadmap_create_standalone_work_package():
     Returns 201 with work_package dict on success.
     """
     try:
-        from app.models.implementation_migration import Plateau, WorkPackage
+        from app.models.implementation_migration import Plateau
+        from app.services import work_package_service
+        from app.utils.tenant import current_organization_id
 
         data = request.get_json() or {}
         if not data.get("name"):
@@ -1475,22 +1509,24 @@ def api_roadmap_create_standalone_work_package():
                 "error": "target_date must be on or after start_date.",
             }), 400
 
-        wp = WorkPackage(
-            name=data["name"],
-            description=data.get("description", ""),
-            status=status,
-            priority=priority,
-            start_date=start_date,
-            target_date=target_date,
-        )
-        db.session.add(wp)
-        sync_archimate_element(wp)
-        db.session.flush()
-
-        if gap:
-            gap.work_packages.append(wp)
-        if plateau:
-            plateau.work_packages.append(wp)
+        try:
+            wp = work_package_service.create_work_package(
+                organization_id=current_organization_id(),
+                user_id=current_user.id if current_user.is_authenticated else None,
+                name=data["name"],
+                description=data.get("description", ""),
+                status=status,
+                priority=priority,
+                start_date=start_date,
+                end_date=target_date,
+                gap_id=gap.id if gap else None,
+                plateau_id=plateau.id if plateau else None,
+            )
+        except work_package_service.WorkPackageError as exc:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(exc)}), (
+                404 if isinstance(exc, work_package_service.WorkPackageNotFound) else 400
+            )
 
         db.session.commit()
 
@@ -1502,8 +1538,8 @@ def api_roadmap_create_standalone_work_package():
                 "description": wp.description,
                 "status": wp.status,
                 "priority": wp.priority,
-                "start_date": wp.start_date.isoformat() if wp.start_date else None,
-                "target_date": wp.target_date.isoformat() if wp.target_date else None,
+                "start_date": wp.start_date.date().isoformat() if wp.start_date else None,
+                "target_date": wp.end_date.date().isoformat() if wp.end_date else None,
             },
         }), 201
 
@@ -1519,13 +1555,18 @@ def api_roadmap_create_standalone_work_package():
 def api_roadmap_get_work_package(wp_id):
     """Get a single work package with children."""
     try:
-        from app.models.implementation_migration import WorkPackage
+        from app.services import work_package_service
+        from app.utils.tenant import current_organization_id
 
-        wp = WorkPackage.query.get(wp_id)
+        org_id = current_organization_id()
+        wp = work_package_service.get_work_package(wp_id, org_id)
         if not wp:
             return jsonify({"success": False, "error": "Work package not found"}), 404
 
-        return jsonify({"success": True, "work_package": wp.to_roadmap_dict(include_children=True)})
+        return jsonify({
+            "success": True,
+            "work_package": work_package_service.to_roadmap_dict(wp, org_id, include_children=True),
+        })
 
     except Exception as e:
         current_app.logger.error(f"Error getting work package: {e}", exc_info=True)
@@ -1545,9 +1586,10 @@ def api_roadmap_update_work_package(wp_id):
     try:
         from datetime import date as date_type
 
-        from app.services.gap_archimate_service import gap_archimate_service
+        from app.services import work_package_service
+        from app.utils.tenant import current_organization_id
 
-        data = request.get_json()
+        data = request.get_json() or {}
 
         # Validate date fields before passing to service
         for date_field in ("start_date", "target_date"):
@@ -1575,17 +1617,27 @@ def api_roadmap_update_work_package(wp_id):
                 "error": "target_date must be on or after start_date.",
             }), 400
 
-        wp = gap_archimate_service.update_work_package(wp_id, data)
-
-        if not wp:
+        org_id = current_organization_id()
+        try:
+            wp = work_package_service.update_work_package(
+                wp_id,
+                organization_id=org_id,
+                user_id=current_user.id if current_user.is_authenticated else None,
+                **work_package_service.from_form(data),
+            )
+        except work_package_service.WorkPackageNotFound:
+            db.session.rollback()
             return jsonify({"success": False, "error": "Work package not found"}), 404
+        except work_package_service.WorkPackageError as exc:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(exc)}), 400
 
         db.session.commit()
 
         return jsonify(
             {
                 "success": True,
-                "work_package": wp.to_roadmap_dict(),
+                "work_package": work_package_service.to_roadmap_dict(wp, org_id),
                 "message": "Work package updated successfully",
             }
         )
@@ -1603,15 +1655,20 @@ def api_roadmap_update_work_package(wp_id):
 def api_roadmap_delete_work_package(wp_id):
     """Delete a WorkPackage (and optionally its children)."""
     try:
-        from app.services.gap_archimate_service import gap_archimate_service
+        from app.services import work_package_service
+        from app.utils.tenant import current_organization_id
 
         cascade = request.args.get("cascade", "true").lower() == "true"
 
-        if gap_archimate_service.delete_work_package(wp_id, cascade=cascade):
-            db.session.commit()
-            return jsonify({"success": True, "message": "Work package deleted successfully"})
-        else:
+        try:
+            work_package_service.delete_work_package(
+                wp_id, organization_id=current_organization_id(), cascade=cascade
+            )
+        except work_package_service.WorkPackageNotFound:
+            db.session.rollback()
             return jsonify({"success": False, "error": "Work package not found"}), 404
+        db.session.commit()
+        return jsonify({"success": True, "message": "Work package deleted successfully"})
 
     except Exception as e:
         db.session.rollback()
@@ -1636,10 +1693,11 @@ def api_roadmap_create_child_work_package(wp_id):
     }
     """
     try:
-        from app.models.implementation_migration import WorkPackage
-        from app.services.gap_archimate_service import gap_archimate_service
+        from app.services import work_package_service
+        from app.utils.tenant import current_organization_id
 
-        parent = WorkPackage.query.get(wp_id)
+        org_id = current_organization_id()
+        parent = work_package_service.get_work_package(wp_id, org_id)
         if not parent:
             return jsonify({"success": False, "error": "Parent work package not found"}), 404
 
@@ -1667,14 +1725,21 @@ def api_roadmap_create_child_work_package(wp_id):
                     "error": "target_date must be on or after start_date.",
                 }), 400
 
-        child = gap_archimate_service.create_child_work_package(parent, data)
+        child_fields = work_package_service.from_form(data)
+        child_fields["parent_id"] = parent.id
+        child_fields.setdefault("gap_id", parent.gap_id)
+        child = work_package_service.create_work_package(
+            organization_id=org_id,
+            user_id=current_user.id if current_user.is_authenticated else None,
+            **child_fields,
+        )
 
         db.session.commit()
 
         return jsonify(
             {
                 "success": True,
-                "work_package": child.to_roadmap_dict(),
+                "work_package": work_package_service.to_roadmap_dict(child, org_id),
                 "message": "Child work package created successfully",
             }
         )

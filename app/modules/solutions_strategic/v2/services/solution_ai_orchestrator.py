@@ -3052,9 +3052,8 @@ CRITICAL -- TRACEABILITY:
     def _create_implementation_entities(self, solution, parsed, capabilities, user_id):
         """Create Implementation Layer entities with Kanban + Gantt linkage."""
         from app.models.solution_lifecycle_models import SolutionPlateau
-        from app.models.unified_work_package import UnifiedWorkPackage
+        from app.services import work_package_service
         from app.models.adm_kanban import KanbanBoard, KanbanCard, ADMPhase
-        from app.models.roadmap_models import RoadmapWorkPackage
         from datetime import datetime, timedelta
 
         created = {'plateaus': 0, 'gaps': 0, 'work_packages': 0, 'kanban_cards': 0, 'gantt_items': 0, 'deliverables': 0, 'implementation_events': 0}
@@ -3137,7 +3136,9 @@ CRITICAL -- TRACEABILITY:
                 duration = wp_data.get('estimated_duration_days', 60)
 
                 # 1. Create UnifiedWorkPackage
-                wp = UnifiedWorkPackage(
+                wp = work_package_service.create_work_package(
+                    organization_id=solution.organization_id,
+                    user_id=user_id,
                     name=wp_data.get('name', ''),
                     description=wp_data.get('description', ''),
                     plateau_id=plateau.id if plateau else None,
@@ -3146,7 +3147,6 @@ CRITICAL -- TRACEABILITY:
                     business_capability=cap.name if cap else 'General',
                     priority=wp_data.get('priority', 'medium'),
                     estimated_cost=wp_data.get('estimated_cost', 0),
-                    duration_days=duration,
                     start_date=base_date,
                     end_date=base_date + timedelta(days=duration),
                     status='planned',
@@ -3155,10 +3155,7 @@ CRITICAL -- TRACEABILITY:
                     source_id=cap.id if cap else None,
                     togaf_phase='F',
                     layer=wp_data.get('arch_layer', 'application'),
-                    created_by=user_id,
                 )
-                db.session.add(wp)
-                db.session.flush()
                 wp_by_name[wp.name.lower().strip()] = wp
                 self._sync_archimate_element(solution.id, wp.name, 'WorkPackage', 'Implementation', wp.description or '')
                 created['work_packages'] += 1
@@ -3173,7 +3170,8 @@ CRITICAL -- TRACEABILITY:
                         adm_phase_id=phase_f.id,
                         status='backlog',
                         priority=wp_data.get('priority', 'medium'),
-                        work_package_id=None,  # FK points to roadmap_work_packages not unified_work_packages
+                        work_package_id=None,  # FK points to roadmap_work_packages, the retired store
+                        unified_work_package_id=wp.id,
                         closes_gap_id=None,
                         target_plateau_id=None,  # Self-referential -- would need a card for the plateau
                         arch_element_type='WorkPackage',
@@ -3187,23 +3185,9 @@ CRITICAL -- TRACEABILITY:
                     db.session.add(card)
                     created['kanban_cards'] += 1
 
-                # 3. Create RoadmapWorkPackage for Gantt chart
-                rwp = RoadmapWorkPackage(
-                    name=wp.name,
-                    description=wp.description or '',
-                    business_capability=cap.name if cap else '',
-                    start_date=wp.start_date,
-                    end_date=wp.end_date,
-                    status='planned',
-                    priority=wp_data.get('priority', 'medium'),
-                    estimated_cost=wp_data.get('estimated_cost', 0),
-                    auto_generated=True,
-                    source_type='solution',
-                    source_id=solution.id,
-                    confidence_score=wp_data.get('confidence', 0.8),
-                    generation_method='AI',
-                )
-                db.session.add(rwp)
+                # 3. The Gantt chart reads the one work package store, so the
+                # work package created above is its item; a second row in the
+                # retired roadmap store would only be copied back as a duplicate.
                 created['gantt_items'] += 1
 
             db.session.flush()
@@ -3226,7 +3210,7 @@ CRITICAL -- TRACEABILITY:
                         name=del_data.get('name', ''),
                         description=del_data.get('description', ''),
                         deliverable_type=del_data.get('deliverable_type', 'document'),
-                        work_package_id=wp_ref.id,
+                        unified_work_package_id=wp_ref.id,
                         delivery_status='planned',
                     )
                     db.session.add(deliv)

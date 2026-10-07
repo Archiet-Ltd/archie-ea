@@ -576,14 +576,18 @@ def push_to_gantt(card_ref):
     priority_map = {"critical": "critical", "high": "high", "medium": "medium", "low": "low"}
     wp_priority = priority_map.get(card.priority or "medium", "medium")
 
-    # The work package lives in the one store (UnifiedWorkPackage) and is found
-    # again by the card it came from, not through the card's old roadmap key.
+    # The work package lives in the one store (UnifiedWorkPackage). A card finds
+    # it through its own unified_work_package_id; a card pushed before that
+    # column existed still holds the retired roadmap store's id, which the merge
+    # carried across (source_table / source_id).
     org_id = current_organization_id()
-    existing = (
-        work_package_service.query_for(org_id)
-        .filter_by(source_type="adm_kanban", source_id=card.id)
-        .first()
-    )
+    existing = None
+    if card.unified_work_package_id:
+        existing = work_package_service.get_work_package(card.unified_work_package_id, org_id)
+    if existing is None and card.work_package_id:
+        existing = work_package_service.get_by_source(
+            "roadmap_work_packages", card.work_package_id, org_id
+        )
     if existing is not None:
         fields = {"name": card.title, "description": card.description or "", "priority": wp_priority}
         if target_start:
@@ -593,6 +597,7 @@ def push_to_gantt(card_ref):
         work_package_service.update_work_package(
             existing.id, organization_id=org_id, user_id=current_user.id, **fields
         )
+        card.unified_work_package_id = existing.id
         db.session.commit()
         return jsonify({"success": True, "work_package_id": existing.id, "updated": True,
                         "gantt_url": "/roadmap-builder"})
@@ -609,6 +614,7 @@ def push_to_gantt(card_ref):
         source_type="adm_kanban",
         source_id=card.id,
     )
+    card.unified_work_package_id = wp.id
     db.session.commit()
 
     return jsonify({"success": True, "work_package_id": wp.id, "updated": False,
@@ -732,7 +738,7 @@ def roadmap_timeline_all():
                 "arch_domain": domain,
                 "adm_phase": phase_code,
                 "board_id": card.board_id,
-                "work_package_id": card.work_package_id,
+                "work_package_id": card.unified_work_package_id,
             },
         })
 
@@ -823,7 +829,7 @@ def roadmap_timeline(board_id):
             "metadata": {
                 "arch_domain": domain,
                 "adm_phase": phase_code,
-                "work_package_id": card.work_package_id,
+                "work_package_id": card.unified_work_package_id,
                 "ref": card.card_ref if hasattr(card, "card_ref") else str(card.id),
             },
         })

@@ -50,12 +50,12 @@ def _require(work_package_id):
     return work_package
 
 
-def _legacy_id(work_package):
-    """Deliverables still key on the retired work_packages table; a row merged
-    from it carries that id in source_id."""
-    if work_package.source_table == "work_packages":
-        return work_package.source_id
-    return None
+def _deliverable_or_404(deliverable_id):
+    """A deliverable of one of this organisation's work packages, else a 404."""
+    deliverable = work_package_service.get_deliverable(deliverable_id, current_organization_id())
+    if deliverable is None:
+        abort(404)
+    return deliverable
 
 # Create blueprint
 roadmap_bp = Blueprint("roadmap_api", __name__, url_prefix="/api/roadmap")
@@ -387,10 +387,9 @@ def get_work_package(work_package_id: int):
         work_package = _require(work_package_id)
 
         # Get related deliverables
-        legacy_id = _legacy_id(work_package)
-        deliverables = (
-            Deliverable.query.filter_by(work_package_id=legacy_id).all() if legacy_id else []
-        )
+        deliverables = Deliverable.query.filter_by(
+            unified_work_package_id=work_package.id
+        ).all()
 
         # Get dependencies (ids held on the work package itself)
         dep_ids = work_package_service.dependency_ids(work_package)
@@ -615,10 +614,9 @@ def delete_work_package(work_package_id: int):
             )
 
         # Check for deliverables
-        legacy_id = _legacy_id(work_package)
-        deliverable_count = (
-            Deliverable.query.filter_by(work_package_id=legacy_id).count() if legacy_id else 0
-        )
+        deliverable_count = Deliverable.query.filter_by(
+            unified_work_package_id=work_package.id
+        ).count()
         if deliverable_count > 0:
             return (
                 jsonify(
@@ -687,9 +685,11 @@ def get_deliverables():
         work_package_id = request.args.get("work_package_id", type=int)
         status = request.args.get("status")
 
-        query = Deliverable.query
         if work_package_id:
-            query = query.filter(Deliverable.work_package_id == work_package_id)
+            _require(work_package_id)
+        query = work_package_service.deliverables_query(
+            current_organization_id(), work_package_id or None
+        )
         if status:
             query = query.filter(Deliverable.delivery_status == status)
 
@@ -702,7 +702,7 @@ def get_deliverables():
                         "id": d.id,
                         "name": d.name,
                         "description": d.description,
-                        "work_package_id": d.work_package_id,
+                        "work_package_id": d.unified_work_package_id,
                         "status": d.delivery_status,
                         "due_date": d.target_date.isoformat() if d.target_date else None,
                         "delivered_date": d.delivered_date.isoformat()
@@ -773,25 +773,21 @@ def create_deliverable():
 
         data = request.get_json()
 
-        # Validate work package exists
-        legacy_id = _legacy_id(_require(data["work_package_id"]))
-        if not legacy_id:
-            return api_error(
-                "Deliverables can only be added to work packages carried over from the earlier work package list.",
-                "VALIDATION_ERROR",
-            )
+        # The work package must be this organisation's own (404 otherwise).
+        # Any work package takes a deliverable.
+        _require(data["work_package_id"])
 
         # Deliverable columns are delivery_status/target_date/assigned_user_id — the
         # old code used status/due_date/approval_criteria/created_by (none exist).
-        deliverable = Deliverable(
+        deliverable = work_package_service.create_deliverable(
+            data["work_package_id"],
+            organization_id=current_organization_id(),
             name=data["name"],
             description=data.get("description", ""),
-            work_package_id=legacy_id,
             delivery_status=data.get("status", "planned"),
             target_date=datetime.fromisoformat(data["due_date"]) if data.get("due_date") else None,
         )
 
-        db.session.add(deliverable)
         db.session.commit()
 
         return (
@@ -801,7 +797,7 @@ def create_deliverable():
                     "deliverable": {
                         "id": deliverable.id,
                         "name": deliverable.name,
-                        "work_package_id": deliverable.work_package_id,
+                        "work_package_id": deliverable.unified_work_package_id,
                         "status": deliverable.delivery_status,
                     },
                 }
@@ -859,7 +855,7 @@ def update_deliverable(deliverable_id: int):
         description: Not found
     """
     try:
-        deliverable = Deliverable.query.get_or_404(deliverable_id)
+        deliverable = _deliverable_or_404(deliverable_id)
 
         if not request.is_json:
             return {"error": "Request must be JSON"}, 400
@@ -935,7 +931,7 @@ def delete_deliverable(deliverable_id: int):
         description: Not found
     """
     try:
-        deliverable = Deliverable.query.get_or_404(deliverable_id)
+        deliverable = _deliverable_or_404(deliverable_id)
 
         db.session.delete(deliverable)
         db.session.commit()
@@ -1369,6 +1365,8 @@ def optimize_timeline():
         optimized_timeline = automation_engine.optimize_timeline(
             work_package_ids=data["work_package_ids"], constraints=data.get("constraints", {})
         )
+        if optimized_timeline.get("error"):
+            return jsonify({"error": optimized_timeline["error"]}), 404
 
         return jsonify(
             {"message": "Timeline optimized successfully", "optimized_timeline": optimized_timeline}
@@ -1527,6 +1525,11 @@ def get_statistics():
         # the "tenant-exempt: aggregate stats" note they carried was wrong, and
         # work_packages / gaps are both tenant tables. Raw SQL bypasses the ORM
         # listener, so the predicate has to be written out.
+        from sqlalchemy import func as _func
+
+        # The work package totals and the breakdowns read the same population:
+        # this organisation's rows of the one store.
+        _wp_rows = work_package_service.query_for(current_organization_id())
         from flask import g as _g
         _org = getattr(_g, "current_org_id", None)
         _org_where = " WHERE organization_id = :org" if _org is not None else ""
@@ -1540,38 +1543,22 @@ def get_statistics():
 
         stats = {
             "work_packages": {
-                "total": ImplementationWorkPackage.query.count(),
+                "total": _wp_rows.count(),
                 "by_status": dict(
-                    db.session.execute(
-                        text(
-                            f"""
-                    SELECT status, COUNT(*)
-                    FROM work_packages{_org_where}
-                    GROUP BY status
-                """
-                        ), _org_params
-                    ).fetchall()
+                    _wp_rows.with_entities(ImplementationWorkPackage.status, _func.count())
+                    .group_by(ImplementationWorkPackage.status)
+                    .all()
                 ),
                 "by_priority": dict(
-                    db.session.execute(
-                        text(
-                            f"""
-                    SELECT COALESCE(priority, 'unset'), COUNT(*)
-                    FROM work_packages{_org_where}
-                    GROUP BY priority
-                """
-                        ), _org_params
-                    ).fetchall()
+                    _wp_rows.with_entities(
+                        _func.coalesce(ImplementationWorkPackage.priority, "unset"), _func.count()
+                    )
+                    .group_by(_func.coalesce(ImplementationWorkPackage.priority, "unset"))
+                    .all()
                 ),
-                "total_cost": db.session.execute(
-                    text(
-                        f"""
-                    SELECT COALESCE(SUM(estimated_cost), 0)
-                    FROM work_packages
-                    WHERE estimated_cost IS NOT NULL{_org_and}
-                """
-                    ), _org_params
-                ).fetchone()[0]
+                "total_cost": _wp_rows.with_entities(
+                    _func.coalesce(_func.sum(ImplementationWorkPackage.estimated_cost), 0)
+                ).scalar()
                 or 0,
             },
             "deliverables": {
@@ -1617,7 +1604,7 @@ def get_statistics():
             "plateaus": {"total": ImplementationPlateau.query.count()},
             "automation_metrics": {
                 "auto_generated_count": 0,
-                "manual_count": ImplementationWorkPackage.query.count(),
+                "manual_count": _wp_rows.count(),
                 "average_confidence": 0,
             },
         }

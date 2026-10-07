@@ -84,7 +84,7 @@ def implementation_dashboard():
         # Get statistics
         stats = {
             "work_packages": ImplementationWorkPackage.query.count(),
-            "deliverables": Deliverable.query.count(),
+            "deliverables": work_package_service.deliverables_query(_org_id()).count(),
             "gaps": ImplementationGap.query.count(),
             "plateaus": ImplementationPlateau.query.count(),
             "in_progress": ImplementationWorkPackage.query.filter_by(
@@ -252,16 +252,12 @@ def work_package_detail(work_package_id):
         if work_package is None:
             abort(404)
 
-        # Deliverables and events still key on the retired work_packages
-        # table; a row merged from it carries that id in source_id.
-        legacy_id = (
-            work_package.source_id
-            if work_package.source_table == "work_packages"
-            else None
-        )
-        deliverables = (
-            Deliverable.query.filter_by(work_package_id=legacy_id).all() if legacy_id else []
-        )
+        # Events still key on the retired work_packages table; a row merged
+        # from it carries that id in source_id. Deliverables key on the one store.
+        legacy_id = work_package_service.legacy_id(work_package, "work_packages")
+        deliverables = Deliverable.query.filter_by(
+            unified_work_package_id=work_package.id
+        ).all()
         events = (
             ImplementationEvent.query.filter_by(work_package_id=legacy_id).all()
             if legacy_id
@@ -282,17 +278,33 @@ def work_package_detail(work_package_id):
         return redirect(url_for("implementation_planning.work_packages_list"))
 
 
+# The dependency picker offers the first matches of a name filter, not a
+# silent cap on everything: type to narrow the list.
+_PICKER_LIMIT = 50
+
+
+def _picker_options(work_package, org_id, q):
+    query = work_package_service.query_for(org_id).order_by(ImplementationWorkPackage.name)
+    if work_package is not None:
+        query = query.filter(ImplementationWorkPackage.id != work_package.id)
+    q = (q or "").strip()
+    if q:
+        query = query.filter(ImplementationWorkPackage.name.ilike("%" + q + "%"))
+    return query.limit(_PICKER_LIMIT).all()
+
+
 def _form_context(work_package, action):
     org_id = _org_id()
-    others = [
-        w
-        for w in work_package_service.query_for(org_id)
-        .order_by(ImplementationWorkPackage.name)
-        .limit(500)
-        .all()
-        if work_package is None or w.id != work_package.id
-    ]
+    others = _picker_options(work_package, org_id, request.args.get("q"))
     names = {w.id: w.name for w in others}
+    # A dependency already chosen is always shown, even beyond the filtered list.
+    chosen = work_package_service.dependency_ids(work_package) if work_package else []
+    missing = [d for d in chosen if d not in names]
+    if missing:
+        for row in work_package_service.query_for(org_id).filter(
+            ImplementationWorkPackage.id.in_(missing)
+        ):
+            names[row.id] = row.name
     return dict(
         work_package=work_package,
         action=action,
@@ -512,7 +524,7 @@ def api_dashboard_stats():
     try:
         stats = {
             "work_packages": ImplementationWorkPackage.query.count(),
-            "deliverables": Deliverable.query.count(),
+            "deliverables": work_package_service.deliverables_query(_org_id()).count(),
             "gaps": ImplementationGap.query.count(),
             "plateaus": ImplementationPlateau.query.count(),
             "in_progress": ImplementationWorkPackage.query.filter_by(
@@ -889,8 +901,10 @@ def deliverables_list():
         status = request.args.get("status", "")
         work_package_id = request.args.get("work_package_id", type=int)
 
-        # Build query
-        query = Deliverable.query
+        # Build query (this organisation's work packages' deliverables)
+        if work_package_id:
+            work_package_service.require_work_package(work_package_id, _org_id())
+        query = work_package_service.deliverables_query(_org_id(), work_package_id)
 
         if search:
             query = query.filter(
@@ -901,10 +915,7 @@ def deliverables_list():
             )
 
         if status:
-            query = query.filter(Deliverable.status == status)
-
-        if work_package_id:
-            query = query.filter(Deliverable.work_package_id == work_package_id)
+            query = query.filter(Deliverable.delivery_status == status)
 
         # Paginate
         deliverables = query.order_by(Deliverable.created_at.desc()).paginate(
@@ -919,6 +930,8 @@ def deliverables_list():
             work_package_id=work_package_id,
         )
 
+    except work_package_service.WorkPackageNotFound:
+        abort(404)
     except Exception:
         flash("Error loading deliverables. Please try again.", "error")
         return redirect(url_for("implementation_planning.implementation_dashboard"))
@@ -932,7 +945,7 @@ def api_deliverables():
     API endpoint to get all deliverables.
     """
     try:
-        deliverables = Deliverable.query.all()
+        deliverables = work_package_service.deliverables_query(_org_id()).all()
         return jsonify(
             {"deliverables": [deliverable.to_dict() for deliverable in deliverables]}
         )
@@ -953,22 +966,30 @@ def api_create_deliverable():
         if not data.get("name"):
             return jsonify({"error": "Name is required"}), 400
 
-        # Create deliverable
-        deliverable = Deliverable(
-            name=data["name"],
-            description=data.get("description", ""),
-            deliverable_type=data.get("deliverable_type", ""),
-            format=data.get("format", ""),
-            status=data.get("status", "planned"),
-            due_date=datetime.strptime(data["due_date"], "%Y-%m-%d")
-            if data.get("due_date")
-            else None,
-            work_package_id=data.get("work_package_id"),
-            properties=data.get("properties", {}),
-            created_by=current_user.username,
-        )
+        if not data.get("work_package_id"):
+            return jsonify({"error": "work_package_id is required"}), 400
 
-        db.session.add(deliverable)
+        # Create deliverable on a work package of this organisation (the same
+        # path the roadmap API uses); another organisation's id is a 404.
+        try:
+            deliverable = work_package_service.create_deliverable(
+                data["work_package_id"],
+                organization_id=_org_id(),
+                name=data["name"],
+                description=data.get("description", ""),
+                deliverable_type=data.get("deliverable_type") or None,
+                delivery_status=data.get("status", "planned"),
+                target_date=datetime.strptime(data["due_date"], "%Y-%m-%d").date()
+                if data.get("due_date")
+                else None,
+            )
+        except work_package_service.WorkPackageNotFound:
+            db.session.rollback()
+            return jsonify({"error": "Work package not found"}), 404
+        except (work_package_service.WorkPackageError, ValueError) as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+
         db.session.commit()
 
         return jsonify(
@@ -1061,7 +1082,11 @@ def api_roadmap_data():
                 "priority": wp.priority or "medium",
                 "progress": wp_progress or 0,
                 "assigned_to": wp_owner or "Unassigned",
-                "domain_name": "Architecture",
+                "domain_name": (
+                    getattr(wp, "business_capability", None)
+                    or (getattr(wp, "layer", None) or "").capitalize()
+                    or "Unassigned"
+                ),
                 "level": 1,
                 "parent_id": getattr(wp, "parent_id", None)
                 or getattr(wp, "parent_work_package_id", None),
@@ -1142,7 +1167,7 @@ def generate_report():
         gaps = ImplementationGap.query.all()
 
         # Get deliverables
-        deliverables = Deliverable.query.all()
+        deliverables = work_package_service.deliverables_query(_org_id()).all()
 
         # Generate report data
         report_data = {

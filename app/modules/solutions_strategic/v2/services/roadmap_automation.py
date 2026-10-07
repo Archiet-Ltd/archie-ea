@@ -15,12 +15,13 @@ from app import db
 from app.models.roadmap_models import (  # dead-code-ok
     ImplementationGap,
     PlanningDeliverable,
-    RoadmapWorkPackage,
 )
+from app.models.unified_work_package import UnifiedWorkPackage
+from app.services import work_package_service
 
 # Aliases for backwards compatibility
 Deliverable = PlanningDeliverable
-ImplementationWorkPackage = RoadmapWorkPackage
+ImplementationWorkPackage = UnifiedWorkPackage
 from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_capability import UnifiedCapability
 
@@ -352,6 +353,23 @@ class RoadmapAutomationEngine:
 
         return work_packages
 
+    @staticmethod
+    def _load_work_packages(work_package_ids: List[int]) -> List[UnifiedWorkPackage]:
+        """The caller's own work packages among these ids; another
+        organisation's id is simply not found."""
+        from app.utils.tenant import current_organization_id
+
+        org_id = current_organization_id()
+        found = []
+        for raw in work_package_ids or []:
+            try:
+                wp = work_package_service.get_work_package(int(raw), org_id)
+            except (TypeError, ValueError):
+                continue
+            if wp is not None:
+                found.append(wp)
+        return found
+
     def optimize_timeline(
         self, work_package_ids: List[int], constraints: Optional[Dict] = None
     ) -> Dict[str, Any]:
@@ -366,10 +384,8 @@ class RoadmapAutomationEngine:
             Optimized timeline with suggested dates and conflicts
         """
         try:
-            # Get work packages
-            work_packages = ImplementationWorkPackage.query.filter(
-                ImplementationWorkPackage.id.in_(work_package_ids)
-            ).all()
+            # Get work packages (this organisation's own rows of the one store)
+            work_packages = self._load_work_packages(work_package_ids)
 
             if not work_packages:
                 return {"error": "No work packages found"}
@@ -413,10 +429,8 @@ class RoadmapAutomationEngine:
         try:
             conflicts = []
 
-            # Get work packages
-            work_packages = ImplementationWorkPackage.query.filter(
-                ImplementationWorkPackage.id.in_(work_package_ids)
-            ).all()
+            # Get work packages (this organisation's own rows of the one store)
+            work_packages = self._load_work_packages(work_package_ids)
 
             # Detect timeline conflicts
             timeline_conflicts = self._detect_timeline_conflicts(work_packages)

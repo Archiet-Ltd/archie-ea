@@ -58,8 +58,11 @@ from ..models.business_capabilities import (  # dead-code-ok
 from ..models.archimate_core import ArchiMateElement
 from ..models.implementation_migration import Gap
 from ..models.implementation_migration import Plateau
-from ..models.implementation_migration import WorkPackage
+from ..models.unified_work_package import UnifiedWorkPackage
+from ..models.implementation_migration import WorkPackage  # dead-code-ok
+from app.services import work_package_service
 from app.utils.pagination import safe_int_arg
+from app.utils.tenant import current_organization_id
 
 logger = logging.getLogger(__name__)
 
@@ -412,7 +415,7 @@ def strategic_planning_dashboard():
 
         workpackage_count = 0
         try:
-            workpackage_count = WorkPackage.query.count()
+            workpackage_count = work_package_service.query_for(current_organization_id()).count()
         except Exception as exc:
             logger.debug(f"WorkPackage query fallback: {exc}")
         if workpackage_count == 0:
@@ -555,17 +558,18 @@ def api_list_work_packages():
     if sort_by not in ALLOWED_SORT:
         sort_by = "created_at"
 
-    q = WorkPackage.query
+    UWP = UnifiedWorkPackage
+    q = work_package_service.query_for(current_organization_id())
     if search:
         q = q.filter(or_(
-            WorkPackage.name.ilike(f"%{search}%"),
-            WorkPackage.summary.ilike(f"%{search}%"),
+            UWP.name.ilike(f"%{search}%"),
+            UWP.description.ilike(f"%{search}%"),
         ))
     if status_filter:
-        q = q.filter(WorkPackage.status == status_filter)
+        q = q.filter(UWP.status == status_filter)
 
-    sort_col = getattr(WorkPackage, sort_by, WorkPackage.created_at)
-    q = q.order_by(sort_col.asc() if sort_dir == "asc" else sort_col.desc())
+    sort_col = getattr(UWP, _WP_SORT_COLUMNS.get(sort_by, "created_at"), UWP.created_at)
+    q = q.order_by(sort_col.asc() if sort_dir == "asc" else sort_col.desc(), UWP.id.asc())
 
     paginated = q.paginate(page=page, per_page=per_page, error_out=False)
     offset = (page - 1) * per_page
@@ -576,11 +580,11 @@ def api_list_work_packages():
             "id": wp.id,
             "row_number": offset + idx + 1,
             "name": wp.name or "",
-            "summary": wp.summary or wp.description or "",
+            "summary": wp.description or "",
             "status": wp.status or "Planned",
             "priority": wp.priority or "Normal",
-            "percent_complete": wp.percent_complete or 0,
-            "target_date": str(wp.target_date) if wp.target_date else None,
+            "percent_complete": wp.progress_percentage or 0,
+            "target_date": str(wp.end_date.date()) if wp.end_date else None,
             "togaf_phase": wp.togaf_phase or "",
             "created_at": str(wp.created_at) if wp.created_at else None,
         })
@@ -594,16 +598,27 @@ def api_list_work_packages():
     })
 
 
+# The table's sort keys, as columns of the one work package store.
+_WP_SORT_COLUMNS = {
+    "id": "id", "name": "name", "status": "status", "priority": "priority",
+    "target_date": "end_date", "created_at": "created_at",
+    "percent_complete": "progress_percentage",
+}
+
+
 def _milestones_for(wp):
     """Delivery milestones for a work package, via the projects that deliver it.
 
-    Returns [] rather than raising if the project models are unavailable — the
-    Gantt degrades to bars without markers, which is honest; it must never
-    invent a milestone.
+    Projects still key on the retired work_packages table, so the unified row
+    is resolved to that id first. Returns [] rather than raising if the project
+    models are unavailable -- the Gantt degrades to bars without markers, which
+    is honest; it must never invent a milestone.
     """
     try:
+        legacy = work_package_service.legacy_id(wp, "work_packages")
+        legacy_wp = WorkPackage.query.filter_by(id=legacy).first() if legacy else None
         out = []
-        for project in getattr(wp, "projects", None) or []:
+        for project in getattr(legacy_wp, "projects", None) or []:
             for ms in project.milestones:
                 target = ms.actual_date or ms.target_date
                 if not target:
@@ -629,58 +644,35 @@ def api_work_packages_gantt():
     Separate from api_list_work_packages because that endpoint is a paginated
     table feed (row_number, summary, percent_complete) while the Gantt needs a
     full unpaginated timeline (start/end dates, progress, cost, owner).
-
-    The Gantt previously called `/implementation/api/work-packages`. That route
-    does resolve — despite a stale comment in _bootstrap/blueprints.py claiming
-    the blueprint was deregistered — but it serves WorkPackage.to_dict(), whose
-    field names do not match what the component reads: it emits `target_date` and
-    `percent_complete` where the Gantt expects `end_date` and
-    `progress_percentage`, and omits assigned_to / business_capability / layer /
-    milestones entirely. The chart therefore drew bars with undefined dates and
-    progress. This endpoint serves the component's actual contract.
-
-    Tenant scoping is implicit — WorkPackage carries TenantMixin.
+    Reads the one work package store, this organisation's rows only.
     """
     try:
-        q = WorkPackage.query
+        UWP = UnifiedWorkPackage
+        q = work_package_service.query_for(current_organization_id())
         status_filter = request.args.get("status", "")
         if status_filter:
-            q = q.filter(WorkPackage.status == status_filter)
+            q = q.filter(UWP.status == status_filter)
 
         # Undated packages cannot be placed on a timeline; excluding them keeps the
         # chart honest rather than inventing a start date. They remain visible in
         # the table feed above.
-        q = q.filter(WorkPackage.start_date.isnot(None))
-        work_packages = q.order_by(
-            WorkPackage.start_date.asc(), WorkPackage.sequence_order.asc()
-        ).all()
+        q = q.filter(UWP.start_date.isnot(None))
+        work_packages = q.order_by(UWP.start_date.asc(), UWP.id.asc()).all()
 
         items = []
         for wp in work_packages:
             items.append({
                 "id": wp.id,
                 "name": wp.name or "",
-                "description": wp.description or wp.summary or "",
-                "assigned_to": (wp.owner.email if wp.owner else None),
-                "business_capability": (wp.capability.name if wp.capability else None),
+                "description": wp.description or "",
+                "assigned_to": wp.assigned_to,
+                "business_capability": wp.business_capability,
                 "status": wp.status or "planned",
                 "start_date": wp.start_date.isoformat() if wp.start_date else None,
-                # The Gantt's x-axis field is end_date; the model calls it target_date.
-                "end_date": (
-                    wp.completed_date.isoformat() if wp.completed_date
-                    else (wp.target_date.isoformat() if wp.target_date else None)
-                ),
-                "progress_percentage": (
-                    wp.percent_complete
-                    if wp.percent_complete is not None
-                    else (100 if wp.completed_date else 0)
-                ),
+                "end_date": wp.end_date.isoformat() if wp.end_date else None,
+                "progress_percentage": wp.progress_percentage or 0,
                 "estimated_cost": wp.estimated_cost,
-                "layer": wp.element_type or "implementation",
-                # Milestone hangs off Project. Project now carries a real
-                # work_package_id FK, so the delivery milestones of a work package
-                # are reachable: work_package -> projects -> milestones. Before that
-                # FK existed there was no path and this was necessarily [].
+                "layer": wp.layer or wp.element_type or "implementation",
                 "milestones": _milestones_for(wp),
             })
 
@@ -738,10 +730,35 @@ def _normalise_wp_payload(data):
     return data
 
 
+def _wp_error(exc):
+    if isinstance(exc, work_package_service.WorkPackageNotFound):
+        return api_error(str(exc), "NOT_FOUND", 404)
+    return api_error(str(exc), "INVALID_FIELD")
+
+
+def _audit_wp(action, wp_id, name, status=None, severity=AuditEventSeverity.MEDIUM):
+    try:
+        details = {"name": name,
+                   "user_id": current_user.id if current_user.is_authenticated else None}
+        if status is not None:
+            details["status"] = status
+        audit_logger.log_event(
+            AuditEventType.DATA_MODIFICATION,
+            severity,
+            action,
+            resource_type="work_package",
+            resource_id=str(wp_id),
+            details=details,
+            compliance_flags=["SOC2"],
+        )
+    except Exception as _exc:
+        logger.warning("audit log failed for %s work package %s: %s", action, wp_id, _exc)
+
+
 @enterprise_bp.route("/api/work-packages", methods=["POST"])
 @login_required
 def api_create_work_package():
-    """Create a new work package. PROD-008"""
+    """Create a new work package in the one store. PROD-008"""
     data = request.get_json(force=True) or {}
 
     if not data.get("name", "").strip():
@@ -749,43 +766,17 @@ def api_create_work_package():
 
     try:
         _normalise_wp_payload(data)
-    except ValueError as ve:
-        return api_error(str(ve), "INVALID_FIELD")
-
-    wp = WorkPackage(
-        name=data["name"].strip(),
-        summary=data.get("summary", ""),
-        description=data.get("description", ""),
-        status=data.get("status", "planned"),
-        priority=data.get("priority", "medium"),
-        togaf_phase=data.get("togaf_phase"),
-        start_date=data.get("start_date"),
-        target_date=data.get("target_date"),
-        estimated_effort_hours=data.get("estimated_effort_hours"),
-        estimated_cost=data.get("estimated_cost"),
-        percent_complete=data.get("percent_complete", 0),
-        plateau_id=data.get("plateau_id"),
-        architecture_id=data.get("architecture_id"),
-        owner_id=data.get("owner_id"),
-        level=data.get("level", 1),
-        color=data.get("color"),
-    )
-    db.session.add(wp)
-    sync_archimate_element(wp)
-    db.session.commit()
-    try:
-        audit_logger.log_event(
-            AuditEventType.DATA_MODIFICATION,
-            AuditEventSeverity.MEDIUM,
-            "create",
-            resource_type="work_package",
-            resource_id=str(wp.id),
-            details={"name": wp.name, "status": wp.status,
-                     "user_id": current_user.id if current_user.is_authenticated else None},
-            compliance_flags=["SOC2"],
+        wp = work_package_service.create_work_package(
+            organization_id=current_organization_id(),
+            user_id=current_user.id if current_user.is_authenticated else None,
+            **work_package_service.from_form(data),
         )
-    except Exception as _exc:
-        logger.warning("audit log failed for api_create_work_package: %s", _exc)
+    except (ValueError, work_package_service.WorkPackageError) as exc:
+        db.session.rollback()
+        return _wp_error(exc) if isinstance(exc, work_package_service.WorkPackageError) \
+            else api_error(str(exc), "INVALID_FIELD")
+    db.session.commit()
+    _audit_wp("create", wp.id, wp.name, wp.status)
     return jsonify({"status": "created", "id": wp.id}), 201
 
 
@@ -794,71 +785,46 @@ def api_create_work_package():
 @login_required
 def api_update_work_package(wp_id):
     """Update a work package. PROD-008"""
-    wp = WorkPackage.query.get_or_404(wp_id)
     data = request.get_json(force=True) or {}
 
     try:
         _normalise_wp_payload(data)
-    except ValueError as ve:
-        return api_error(str(ve), "INVALID_FIELD")
-
-    allowed = {
-        "name", "summary", "description", "status", "priority", "togaf_phase",
-        "start_date", "target_date", "estimated_effort_hours", "actual_effort_hours",
-        "estimated_cost", "actual_cost", "percent_complete", "plateau_id",
-        "architecture_id", "owner_id", "level", "color", "sequence_order",
-        "capability_id", "parent_id", "dependencies",
-    }
-    for field in allowed:
-        if field in data:
-            setattr(wp, field, data[field])
-
-    db.session.commit()
-    try:
-        audit_logger.log_event(
-            AuditEventType.DATA_MODIFICATION,
-            AuditEventSeverity.MEDIUM,
-            "update",
-            resource_type="work_package",
-            resource_id=str(wp_id),
-            details={"name": wp.name, "status": wp.status,
-                     "user_id": current_user.id if current_user.is_authenticated else None},
-            compliance_flags=["SOC2"],
+        wp = work_package_service.update_work_package(
+            wp_id,
+            organization_id=current_organization_id(),
+            user_id=current_user.id if current_user.is_authenticated else None,
+            **work_package_service.from_form(data),
         )
-    except Exception as _exc:
-        logger.warning("audit log failed for api_update_work_package: %s", _exc)
+    except (ValueError, work_package_service.WorkPackageError) as exc:
+        db.session.rollback()
+        return _wp_error(exc) if isinstance(exc, work_package_service.WorkPackageError) \
+            else api_error(str(exc), "INVALID_FIELD")
+    db.session.commit()
+    _audit_wp("update", wp_id, wp.name, wp.status)
     return jsonify({"status": "ok", "id": wp.id})
 
 
 @enterprise_bp.route("/api/work-packages/bulk", methods=["DELETE"])
 @login_required
 def api_bulk_delete_work_packages():
-    """Bulk delete work packages."""
+    """Bulk delete work packages (this organisation's own only)."""
     data = request.get_json() or {}
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
         return api_error("ids list required", "MISSING_IDS")
-    wps = WorkPackage.query.filter(WorkPackage.id.in_(ids)).all()
+    org_id = current_organization_id()
     deleted = 0
-    for wp in wps:
-        wp_id = wp.id
-        wp_name = wp.name
-        db.session.delete(wp)
-        db.session.flush()
-        deleted += 1
+    for raw_id in ids:
         try:
-            audit_logger.log_event(
-                AuditEventType.DATA_MODIFICATION,
-                AuditEventSeverity.HIGH,
-                "delete",
-                resource_type="work_package",
-                resource_id=str(wp_id),
-                details={"name": wp_name,
-                         "user_id": current_user.id if current_user.is_authenticated else None},
-                compliance_flags=["SOC2"],
-            )
-        except Exception as _exc:
-            logger.warning("audit log failed for bulk_delete wp %s: %s", wp_id, _exc)
+            wp = work_package_service.get_work_package(int(raw_id), org_id)
+        except (TypeError, ValueError):
+            continue
+        if wp is None:
+            continue
+        wp_id, wp_name = wp.id, wp.name
+        work_package_service.delete_work_package(wp_id, organization_id=org_id)
+        deleted += 1
+        _audit_wp("delete", wp_id, wp_name, severity=AuditEventSeverity.HIGH)
     db.session.commit()
     return jsonify({"deleted": deleted})
 
@@ -867,28 +833,16 @@ def api_bulk_delete_work_packages():
 @login_required
 def api_delete_work_package(wp_id):
     """Delete one work package. The 2 Sep 2026 audit (F-06) found rows had no
-    delete at all — only the bulk path existed. Mirrors the bulk handler: the
-    WorkPackage query is tenant-scoped by TenantMixin, and the deletion is
-    audit-logged with the same SOC2 flag."""
-    wp = WorkPackage.query.filter_by(id=wp_id).first()
+    delete at all -- only the bulk path existed. Mirrors the bulk handler:
+    another organisation's id is answered as a missing one, and the deletion
+    is audit-logged with the same SOC2 flag."""
+    org_id = current_organization_id()
+    wp = work_package_service.get_work_package(wp_id, org_id)
     if wp is None:
         return api_error("Work package not found", "NOT_FOUND", 404)
     wp_name = wp.name
-    db.session.delete(wp)
-    db.session.flush()
-    try:
-        audit_logger.log_event(
-            AuditEventType.DATA_MODIFICATION,
-            AuditEventSeverity.HIGH,
-            "delete",
-            resource_type="work_package",
-            resource_id=str(wp_id),
-            details={"name": wp_name,
-                     "user_id": current_user.id if current_user.is_authenticated else None},
-            compliance_flags=["SOC2"],
-        )
-    except Exception as _exc:
-        logger.warning("audit log failed for delete wp %s: %s", wp_id, _exc)
+    work_package_service.delete_work_package(wp_id, organization_id=org_id)
+    _audit_wp("delete", wp_id, wp_name, severity=AuditEventSeverity.HIGH)
     db.session.commit()
     return jsonify({"deleted": 1, "id": wp_id})
 

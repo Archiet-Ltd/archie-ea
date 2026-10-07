@@ -5,7 +5,7 @@ import logging
 import re
 from datetime import datetime
 
-from flask import current_app, g, jsonify, redirect, render_template, request, url_for
+from flask import abort, current_app, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
@@ -18,6 +18,15 @@ from app.models.unified_work_package import UnifiedWorkPackage
 from app.services import work_package_service
 from app.utils.tenant import current_organization_id
 from app.utils.tenant_users import escape_like_literal
+
+
+def _require_wp(wp_id):
+    """This organisation's work package, else a 404 (another organisation's id
+    is indistinguishable from a missing one)."""
+    work_package = work_package_service.get_work_package(wp_id, current_organization_id())
+    if work_package is None:
+        abort(404)
+    return work_package
 
 logger = logging.getLogger(__name__)
 
@@ -786,7 +795,7 @@ def get_work_package_tasks(wp_id):
     """Get all tasks for a work package"""
     try:
         # Verify work package exists
-        work_package = UnifiedWorkPackage.query.get_or_404(wp_id)
+        work_package = _require_wp(wp_id)
 
         # Get tasks for this work package
         tasks = (
@@ -819,7 +828,7 @@ def create_work_package_task(wp_id):
     """Create a new task for a work package"""
     try:
         # Verify work package exists
-        UnifiedWorkPackage.query.get_or_404(wp_id)
+        _require_wp(wp_id)
 
         data = request.get_json()
 
@@ -868,7 +877,7 @@ def update_work_package_task(wp_id, task_id):
     """Update a task"""
     try:
         # Verify work package and task exist
-        UnifiedWorkPackage.query.get_or_404(wp_id)
+        _require_wp(wp_id)
         task = RoadmapTask.query.filter_by(id=task_id, unified_work_package_id=wp_id).first_or_404()
 
         data = request.get_json()
@@ -921,7 +930,7 @@ def delete_work_package_task(wp_id, task_id):
     """Delete a task"""
     try:
         # Verify work package and task exist
-        UnifiedWorkPackage.query.get_or_404(wp_id)
+        _require_wp(wp_id)
         task = RoadmapTask.query.filter_by(id=task_id, unified_work_package_id=wp_id).first_or_404()
 
         db.session.delete(task)
@@ -949,7 +958,7 @@ def get_work_package_deliverables(wp_id):
     """Get all deliverables for a work package"""
     try:
         # Verify work package exists
-        work_package = UnifiedWorkPackage.query.get_or_404(wp_id)
+        work_package = _require_wp(wp_id)
 
         # Get deliverables for this work package
         deliverables = (
@@ -982,7 +991,7 @@ def create_work_package_deliverable(wp_id):
     """Create a new deliverable for a work package"""
     try:
         # Verify work package exists
-        UnifiedWorkPackage.query.get_or_404(wp_id)
+        _require_wp(wp_id)
 
         data = request.get_json()
 
@@ -1026,7 +1035,7 @@ def update_work_package_deliverable(wp_id, deliverable_id):
     """Update a deliverable"""
     try:
         # Verify work package and deliverable exist
-        UnifiedWorkPackage.query.get_or_404(wp_id)
+        _require_wp(wp_id)
         deliverable = RoadmapDeliverable.query.filter_by(
             id=deliverable_id, unified_work_package_id=wp_id
         ).first_or_404()
@@ -1082,7 +1091,7 @@ def delete_work_package_deliverable(wp_id, deliverable_id):
     """Delete a deliverable"""
     try:
         # Verify work package and deliverable exist
-        UnifiedWorkPackage.query.get_or_404(wp_id)
+        _require_wp(wp_id)
         deliverable = RoadmapDeliverable.query.filter_by(
             id=deliverable_id, unified_work_package_id=wp_id
         ).first_or_404()
@@ -1112,7 +1121,7 @@ def get_work_package_details(wp_id):
     """Get complete work package details including tasks and deliverables"""
     try:
         # Get work package
-        work_package = UnifiedWorkPackage.query.get_or_404(wp_id)
+        work_package = _require_wp(wp_id)
 
         # Get associated capability
         capability = UnifiedCapability.query.filter_by(
