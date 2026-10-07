@@ -519,37 +519,6 @@ class RationalizationScoringService:
         # Both unknown — default to operational with flag
         return {"lifecycle": "operational", "data_quality_flag": True}
 
-    REQUIRED_FORMULA_DIMENSIONS = frozenset(
-        {"technical_health", "business_value", "cost_efficiency", "vendor_risk"}
-    )
-
-    @staticmethod
-    def _resolve_overall_weights(app, scoring_config, active_policy):
-        """The ONE weight-resolution path for the rationalization overall
-        score, shared by calculate_app_score (which writes the score) and
-        get_evidence_trail (which re-derives it for display) -- so both
-        surfaces answer with the same weights (ADR 0008: one answer per
-        question). Returns (weights, active_formula_or_None); the second
-        value is non-None only when a registered FormulaRegister version's
-        weights are the ones actually returned, so callers can record that
-        version only when it is true.
-
-        A registered formula is used only when it names every required
-        dimension; an incomplete one (R1-B34 review finding C) is treated
-        exactly as if nothing were registered, rather than partially
-        overriding ScoringConfiguration with some dimensions missing.
-        """
-        from app.models.formula_register import FormulaRegister
-
-        active_formula = FormulaRegister.active_for(app.organization_id, "rationalization_overall")
-        required = RationalizationScoringService.REQUIRED_FORMULA_DIMENSIONS
-        if active_formula is not None and required.issubset(active_formula.inputs or {}):
-            return active_formula.inputs, active_formula
-
-        if active_policy is not None:
-            return active_policy.get_effective_weights(scoring_config), None
-        return scoring_config.get_weights_dict(), None
-
     @staticmethod
     @transactional
     def calculate_app_score(
@@ -610,12 +579,11 @@ class RationalizationScoringService:
             # Capability coverage dimension (CAP-020: now contributes to overall score)
             capability_result = RationalizationScoringService._compute_capability_score(application_id)
 
-            # R1-B34 (TB-0135): one shared resolver, also used by
-            # get_evidence_trail below, so both surfaces answer with the
-            # same weights. See _resolve_overall_weights's own docstring.
-            weights, active_formula = RationalizationScoringService._resolve_overall_weights(
-                app, scoring_config, active_policy,
-            )
+            # Resolve effective weights — policy overrides base config if present.
+            if active_policy is not None:
+                weights = active_policy.get_effective_weights(scoring_config)
+            else:
+                weights = scoring_config.get_weights_dict()
 
             # Calculate weighted overall score using resolved weights.
             overall_score = (
@@ -840,13 +808,6 @@ class RationalizationScoringService:
             # A row registered before versioning (NULL) is its first version.
             score.formula_version = scoring_config.formula_version or 1
 
-            # R1-B34 (TB-0135): `active_formula` here is the same object
-            # resolved above when the overall score was computed -- it is
-            # None whenever the FormulaRegister's weights were NOT the ones
-            # actually used (missing or incomplete), so this column never
-            # names a formula that did not produce this number.
-            score.formula_version = active_formula.version if active_formula else None
-
             # Record which policy was applied (nullable — None when no policy exists).
             score.policy_id = active_policy.id if active_policy else None
             score.policy_name = active_policy.name if active_policy else None
@@ -994,12 +955,10 @@ class RationalizationScoringService:
             vendor_score = vendor_result["score"]
             vendor_evidence = vendor_result.get("evidence", [])
 
-            # R1-B34 (TB-0135): the same resolver calculate_app_score uses,
-            # so this re-derived trail never disagrees with the saved score
-            # (review finding A).
-            weights, _active_formula = RationalizationScoringService._resolve_overall_weights(
-                app, scoring_config, active_policy,
-            )
+            if active_policy is not None:
+                weights = active_policy.get_effective_weights(scoring_config)
+            else:
+                weights = scoring_config.get_weights_dict()
 
             overall_score = (
                 technical_score * weights["technical_health"]

@@ -350,8 +350,6 @@ def test_portfolio_manager_my_work_membership():
         # shared by every persona with GENERAL permission.
         "Approval Inbox",
         "Rationalization",
-        # R1-B34 (TB-0135): the reviewer of a composite score's weights.
-        "Formula Register",
         "Vendors",
         "Applications",
         "Consolidation List",

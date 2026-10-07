@@ -106,7 +106,6 @@ else:
     )  # ARB-002, ARB-004
     from .application_portfolio import *  # noqa - ApplicationComponent, ApplicationTechnologyInstance, VendorContract
     from .application_rationalization import *  # noqa - ApplicationReplacement, ApplicationDependency, ApplicationRationalizationScore, VendorConcentrationAnalysis
-    from .formula_register import FormulaRegister  # noqa - R1-B34, versioned composite-score formulas
     from .archimate_motivation import *  # noqa - MotivationStakeholder, MotivationAssessment, MotivationOutcome, MotivationConstraint, MotivationValue, MotivationMeaning (ArchiMate 3.2 Motivation Layer)
     from .business_capabilities import (  # noqa
         ApplicationCapabilityCoverage,
