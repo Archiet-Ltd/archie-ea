@@ -2057,7 +2057,17 @@ def api_health_scorecard():
         legacy_rels = _scope(
             db.session.query(func.count(ArchiMateRelationship.id)), ArchiMateRelationship
         ).scalar() or 0
-        inference_rels = db.session.query(func.count(InfRel.id)).scalar() or 0
+        # InfRel carries no organization_id (see architecture_inference_relationship.py);
+        # scope it by joining to the source element, which does. source_id/target_id are
+        # expected to agree on organisation for any row where both elements still exist and
+        # belong to one org -- this join does not verify that agreement, it is a read-side
+        # count fix only.
+        inference_rels = _scope(
+            db.session.query(func.count(InfRel.id)).join(
+                ArchiMateElement, ArchiMateElement.id == InfRel.source_id
+            ),
+            ArchiMateElement,
+        ).scalar() or 0
         total_rels = legacy_rels + inference_rels
 
         # Elements per layer
