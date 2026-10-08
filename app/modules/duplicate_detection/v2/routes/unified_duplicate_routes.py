@@ -21,6 +21,7 @@ from flask import (  # dead-code-ok
     url_for,
 )
 from flask_login import current_user, login_required
+from app.middleware.tenant_decorators import platform_admin_required
 
 from app import db
 from app.core.compat import mark_blueprint_guardrailed
@@ -61,6 +62,7 @@ def enterprise_dashboard():
 @unified_duplicate_bp_v2.route("/enterprise/run-detection", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_enterprise_detection():
     """Run enterprise-grade duplicate detection"""
     try:
@@ -138,6 +140,7 @@ def simple_dashboard():
 @unified_duplicate_bp_v2.route("/simple/run-detection", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_simple_detection():
     """Run simple duplicate detection with strategy support."""
     try:
@@ -163,6 +166,7 @@ def run_simple_detection():
 @unified_duplicate_bp_v2.route("/simple/run-hybrid", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_hybrid_detection():
     """Run hybrid duplicate detection"""
     try:
@@ -194,6 +198,7 @@ def get_simple_groups():
 @unified_duplicate_bp_v2.route("/simple/runs")
 @timed_route
 @login_required
+@platform_admin_required
 def get_simple_runs():
     """Get simple detection runs with full details for dashboard display."""
     try:
@@ -217,6 +222,7 @@ def get_simple_runs():
 @unified_duplicate_bp_v2.route("/simple/cleanup", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def cleanup_stale_data():
     """Clean up stale duplicate detection data (POST only)"""
     try:
@@ -407,6 +413,7 @@ def get_element_duplicate_groups_api():
 @unified_duplicate_bp_v2.route("/simple/api/run-detection", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_simple_detection_api():
     """Run application consolidation detection API endpoint"""
     try:
@@ -656,6 +663,7 @@ def unified_dashboard():
 @unified_duplicate_bp_v2.route("/unified/run-detection", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_unified_detection():
     """Run unified duplicate detection with specified mode"""
     try:
@@ -1087,6 +1095,7 @@ def api_detection_runs():
 @unified_duplicate_bp_v2.route("/run-detection", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_detection():
     """Run duplicate detection from the enterprise dashboard."""
     try:

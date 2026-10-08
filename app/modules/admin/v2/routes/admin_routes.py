@@ -490,6 +490,7 @@ def manage_users_redirect():
 @admin_required
 def registered_users():
     """View all registered users."""
+    require_org_or_platform_admin(g.current_org_id)
     users = _svc.get_all_users()
     roles = _svc.get_all_roles()
     # A-02: get_all_users() is (correctly) org-scoped — see the
@@ -517,6 +518,7 @@ def registered_users():
 @admin_required
 def user_info(user_id):
     """View a user's profile."""
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -3252,6 +3254,7 @@ def _auto_discover_features(app):
 @admin_required
 def api_list_users():
     """Paginated user list API for canonical data table."""
+    require_org_or_platform_admin(g.current_org_id)
     from sqlalchemy.orm import joinedload
 
     page = safe_int_arg('page', 1, minimum=1)
@@ -5344,6 +5347,7 @@ def governance_gates_list():
 @audit_log("admin_governance_gate_create")
 def governance_gates_create():
     """Create a new governance gate."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     data = request.get_json()
