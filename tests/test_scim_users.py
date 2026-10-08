@@ -129,7 +129,7 @@ class TestCreateGetListReplacePatchDelete:
         ))
         assert resp.status_code == 200, resp.get_data(as_text=True)
         row = _db_user(uid)
-        assert (row.first_name, row.last_name, row.external_id) == ("Ada", "Lovelace", "ext-9")
+        assert (row.first_name, row.last_name, row.scim_external_id) == ("Ada", "Lovelace", "ext-9")
 
         # Entra sends the boolean as the string "False".
         resp = call(client, "PATCH", f"/Users/{uid}", token, patch_body(
@@ -204,7 +204,8 @@ class TestEmailAndRoleSafety:
         assert resp.get_json(force=True)["id"] == str(existing.id)
         db_session.refresh(existing)
         assert existing.provisioned_via == "scim"
-        assert existing.external_id == "idp-link"
+        assert existing.scim_external_id == "idp-link"
+        assert existing.external_id is None and existing.sso_provider is None
         assert User.query.filter(User.email == existing.email).count() == 1
 
     def test_admin_email_cannot_be_created_or_set(self, client, token, app):
@@ -240,13 +241,14 @@ class TestEmailAndRoleSafety:
 
 
 class TestSso:
-    def test_sso_provisioning_does_not_overwrite_a_scim_external_id(self, client, token, org):
+    def test_sso_provisioning_does_not_touch_a_scim_external_id(self, client, token, org):
         from app.services.sso_service import SSOService
 
         data = call(client, "POST", "/Users", token, user_body(external_id="scim-id")).get_json(force=True)
         row = _db_user(data["id"])
         SSOService().provision_user(org, {"email": row.email, "sub": "oidc-sub", "name": "Pat Person"})
-        assert _db_user(data["id"]).external_id == "scim-id"
+        assert _db_user(data["id"]).scim_external_id == "scim-id"
+        assert _db_user(data["id"]).external_id == "oidc-sub"
         assert _db_user(data["id"]).sso_provider == "oidc"
 
 

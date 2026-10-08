@@ -38,7 +38,7 @@ def two_orgs(db_session, make_org):
 
 
 def _snapshot(user):
-    return (user.deactivated_at, user.first_name, user.last_name, user.email, user.external_id, user.organization_id)
+    return (user.deactivated_at, user.first_name, user.last_name, user.email, user.external_id, user.scim_external_id, user.organization_id)
 
 
 def _fresh(db_session, user):

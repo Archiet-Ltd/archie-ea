@@ -52,7 +52,7 @@ def _two_orgs(db_session, make_org, label):
 
 def test_n01_scim_cannot_set_or_change_the_external_id_of_an_administrator(client, db_session, make_org):
     _org_a, org_b = _two_orgs(db_session, make_org, "n01s")
-    admin = make_user(db_session, org_b, "bossb", administrator=True, external_id="orig-id")
+    admin = make_user(db_session, org_b, "bossb", administrator=True, scim_external_id="orig-id")
     unlinked_admin = make_user(db_session, org_b, "bossb2", administrator=True)
     _row, raw = issue_token(db_session, org_b)
 
@@ -71,41 +71,16 @@ def test_n01_scim_cannot_set_or_change_the_external_id_of_an_administrator(clien
 
     db_session.refresh(admin)
     db_session.refresh(unlinked_admin)
-    assert admin.external_id == "orig-id"
-    assert unlinked_admin.external_id is None
+    assert admin.scim_external_id == "orig-id"
+    assert unlinked_admin.scim_external_id is None
 
     # A brand-new user may still arrive with an externalId.
     resp = call(client, "POST", "/Users", raw, user_body(external_id="fresh-id"))
     assert resp.status_code == 201
 
 
-@pytest.mark.parametrize("label", _LABELS)
-@pytest.mark.parametrize("victim_is_admin", [True, False])
-def test_n01_a_forced_external_id_does_not_resolve_to_the_scim_provisioned_victim(
-    app, db_session, make_org, monkeypatch, label, victim_is_admin
-):
-    from app.models.user import User
-
-    _org_a, org_b = _two_orgs(db_session, make_org, f"n01{label}")
-    victim = make_user(db_session, org_b, "victim", administrator=victim_is_admin)
-    sub = f"attacker-sub-{uuid.uuid4().hex[:6]}"
-    # The id as it would have been set before this fix.
-    victim.external_id, victim.sso_provider, victim.provisioned_via = sub, "azure", "scim"
-    db_session.flush()
-    victim_email, victim_org = victim.email, victim.organization_id
-    attacker_email = f"attacker-{uuid.uuid4().hex[:6]}@evil.example"
-
-    _resp, snap = _run_callback(
-        app, monkeypatch, _module(label), {"email": attacker_email, "sub": sub}, provider="azure"
-    )
-
-    db_session.refresh(victim)
-    assert victim.email == victim_email
-    assert victim.external_id == sub and victim.organization_id == victim_org
-    assert snap.get("_user_id") != str(victim.id)
-    assert snap.get("_mfa_pending_user_id") != victim.id
-    found = User.find_by_email(attacker_email)
-    assert found is None or found.id != victim.id
+# (the forced-externalId sign-in test of this section is superseded by V3-02 in
+# tests/test_scim_review_fixes_v3.py: SCIM no longer writes the sign-in pair.)
 
 
 # ---------------------------------------------------------------------------
@@ -182,14 +157,14 @@ def test_n02_an_administrators_username_is_refused_and_a_members_is_not(client, 
 
 def test_n02_administration_is_judged_across_every_organisation_of_the_person(db_session, make_org):
     from app.models.org_role import OrgRole
-    from app.services import provisioning_service
+    from app.services.rbac_service import rbac_service
 
     org_c, org_b = _two_orgs(db_session, make_org, "n02a")
     person = make_user(db_session, org_b, "elsewhere")
-    assert provisioning_service.is_admin_anywhere(person) is False
+    assert rbac_service.is_org_admin_anywhere(person) is False
     db_session.add(OrgRole(organization_id=org_c.id, user_id=person.id, role="org_admin"))
     db_session.flush()
-    assert provisioning_service.is_admin_anywhere(person) is True
+    assert rbac_service.is_org_admin_anywhere(person) is True
 
 
 # ---------------------------------------------------------------------------
