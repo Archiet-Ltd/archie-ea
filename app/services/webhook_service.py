@@ -157,9 +157,22 @@ class WebhookService:
 
         # Deliver to subscriptions asynchronously
         if subscriptions:
-            threading.Thread(
-                target=self._deliver_to_subscriptions, args=(event, subscriptions), daemon=True
-            ).start()
+            # A bare thread has no application context, so every db.session /
+            # current_app call in the delivery path raised and the thread died
+            # silently. Capture the real app (same idiom as flask_email) and
+            # hand the thread plain ids, not request-session ORM instances.
+            org_id = event.organization_id
+            subscription_ids = [
+                s.id
+                for s in subscriptions
+                if org_id is None or s.organization_id == org_id
+            ]
+            self._delivery_thread = threading.Thread(
+                target=self._run_delivery_in_app_context,
+                args=(current_app._get_current_object(), event.id, org_id, subscription_ids),
+                daemon=True,
+            )
+            self._delivery_thread.start()
 
         current_app.logger.info(
             f"Published event {event_type} with {len(subscriptions)} subscriptions"
@@ -205,6 +218,41 @@ class WebhookService:
 
         return True
 
+    def _run_delivery_in_app_context(self, app, event_id, org_id, subscription_ids):
+        """Thread body: deliver one event inside its own application context.
+
+        Re-loads the event and subscriptions by id under the event's tenant
+        scope, so nothing from the publishing request's session is shared with
+        this thread. Never raises: failures are logged through the captured app.
+        """
+        from contextlib import nullcontext
+
+        from app.jobs.tenant_safe_job import tenant_scope
+
+        with app.app_context():
+            try:
+                scope = tenant_scope(org_id) if org_id is not None else nullcontext()
+                with scope:
+                    event = db.session.get(WebhookEvent, event_id)
+                    subscriptions = [
+                        s
+                        for s in (db.session.get(WebhookSubscription, sid) for sid in subscription_ids)
+                        if s is not None
+                    ]
+                    if event is not None and subscriptions:
+                        self._deliver_to_subscriptions(event, subscriptions)
+            except Exception as e:  # never let the thread die silently
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                app.logger.error(f"Webhook delivery thread failed for event {event_id}: {e}")
+            finally:
+                try:
+                    db.session.remove()
+                except Exception:
+                    pass
+
     def _deliver_to_subscriptions(
         self, event: WebhookEvent, subscriptions: List[WebhookSubscription]
     ):
@@ -222,6 +270,10 @@ class WebhookService:
                     },
                 )
             except Exception as e:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
                 current_app.logger.error(
                     f"Failed to deliver event {event.id} to subscription {subscription.id}: {str(e)}"
                 )
@@ -348,7 +400,7 @@ class WebhookService:
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "Enterprise-Architecture-Webhook/1.0",
-            **subscription.headers,
+            **(subscription.headers or {}),
         }
 
         # Format payload according to webhook_type (teams/slack/generic)
