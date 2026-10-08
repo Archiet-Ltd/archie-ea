@@ -111,10 +111,10 @@ function arbReviewCreateModal() {
         return;
       }
       // F-06 (2 Sep 2026): without a linked ADR/Architecture Model the review
-      // can never reach the board — require the explicit acknowledgement shown
+      // carries no evidence snapshot — require the explicit acknowledgement shown
       // in the warning banner rather than letting it through silently.
       if (!this.formData.adr_id && !this.formData.architecture_model_id && !this.formData.acknowledge_no_subject) {
-        this.errorMsg = 'Link an ADR or Architecture Model, or confirm you understand this will be a record-only item the board cannot act on.';
+        this.errorMsg = 'Link an ADR or Architecture Model, or confirm you understand this will be a record-only item: the board can decide it, but the decision is stored on this review alone.';
         return;
       }
       this.submitting = true;

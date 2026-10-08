@@ -1,0 +1,105 @@
+{% extends 'layouts/admin_base.html' %}
+{% from "components/page_header.html" import page_header %}
+{% from "components/empty_state.html" import empty_state %}
+
+{% block title %}Ownership Coverage{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+
+  {{ page_header(
+      title='Ownership coverage',
+      description='Applications that have a named owner, by business unit.',
+      breadcrumbs=[
+        {'label': 'Applications', 'href': url_for('unified_applications.application_list')},
+        {'label': 'Ownership coverage'}
+      ]
+  ) }}
+
+  {% if forbidden %}
+  <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6">
+    <p class="text-center text-muted-foreground py-8">You do not have access to this page.</p>
+  </div>
+  {% else %}
+
+  {# Overview summary #}
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6">
+      <p class="text-sm text-muted-foreground">Total applications</p>
+      <p class="text-3xl font-bold text-foreground mt-1">{{ total_apps }}</p>
+    </div>
+    <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6">
+      <p class="text-sm text-muted-foreground">With named owner</p>
+      <p class="text-3xl font-bold text-foreground mt-1">{{ total_owned }}</p>
+    </div>
+    <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6">
+      <p class="text-sm text-muted-foreground">Coverage</p>
+      <p class="text-3xl font-bold mt-1
+        {%- if overall_pct is none %} text-muted-foreground
+        {%- elif overall_pct >= 80 %} text-success
+        {%- elif overall_pct >= 50 %} text-warning
+        {%- else %} text-destructive{% endif %}">
+        {% if overall_pct is none %}&mdash;{% else %}{{ overall_pct }}%{% endif %}</p>
+    </div>
+  </div>
+
+  {# Table #}
+  <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-border bg-muted/50">
+            <th class="text-left px-6 py-3 font-medium text-muted-foreground">Business unit</th>
+            <th class="text-right px-6 py-3 font-medium text-muted-foreground">Applications</th>
+            <th class="text-right px-6 py-3 font-medium text-muted-foreground">With owner</th>
+            <th class="text-right px-6 py-3 font-medium text-muted-foreground">Coverage</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+          {% for row in rows %}
+          <tr class="hover:bg-muted/30">
+            <td class="px-6 py-3 font-medium text-foreground">{{ row.unit_name }}</td>
+            <td class="px-6 py-3 text-right text-foreground">
+              {% if row.total_apps > 0 %}{{ row.total_apps }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+            </td>
+            <td class="px-6 py-3 text-right text-foreground">
+              {% if row.total_apps > 0 %}{{ row.owned }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
+            </td>
+            <td class="px-6 py-3 text-right">
+              {% if row.coverage_pct is not none %}
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium
+                  {%- if row.coverage_pct >= 80 %} bg-success/10 text-success-emphasis
+                  {%- elif row.coverage_pct >= 50 %} bg-warning/10 text-warning-emphasis
+                  {%- else %} bg-destructive/10 text-destructive-emphasis{% endif %}">
+                  {{ row.coverage_pct }}%
+                </span>
+              {% else %}
+                <span class="text-muted-foreground">&mdash;</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" class="px-6 py-12">
+              {{ empty_state(
+                  icon='building',
+                  title='No organisation units found',
+                  description='Set up organisation units and assign applications to business domains to track ownership coverage.',
+                  padding='py-4'
+              ) }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="text-xs text-muted-foreground mt-4">
+    An application counts as having a named owner when a business owner is recorded
+    on the application record, or an application manager is assigned through the
+    owner picker.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}

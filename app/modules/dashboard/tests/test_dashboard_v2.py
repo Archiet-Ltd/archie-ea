@@ -374,6 +374,7 @@ class TestDashboardV2ServiceInlining:
     SHARED_SYSTEMS_OF_RECORD = {
         "app.services.archimate_viewpoint_service",
         "app.services.feature_flag_service",
+        "app.services.application_cost_accessor",
     }
 
     def test_no_direct_app_services_imports(self):

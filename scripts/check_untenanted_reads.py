@@ -76,7 +76,7 @@ REPO = Path(__file__).resolve().parent.parent
 APP = REPO / "app"
 TABLE_LIST = REPO / "scripts" / "unfenced_tables.txt"
 
-FENCE_BASES = ("TenantMixin", "HybridCapabilityTenantMixin")
+FENCE_BASES = ("TenantMixin", "HybridCapabilityTenantMixin", "HybridTenantMixin")
 MODEL_BASES = ("db.Model", "Model", "Base")
 MARKER = "tenant-scoping-ok"
 # The hatch needs a reason: `tenant-scoping-ok: <why>`. A bare marker does not exempt a read.

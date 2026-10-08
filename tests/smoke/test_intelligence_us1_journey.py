@@ -1436,23 +1436,28 @@ def test_twin_map_still_draws_a_stale_connection_marked_and_the_table_agrees(
     # Recalculating from the map brings the current connection back and clears the notice.
     page.locator("#twin-show-derived").check()
     page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
+    before = page.locator("[data-map-row][data-kind=derived]").get_attribute("data-edge-row")
     with page.expect_request(
         lambda r: r.method == "POST" and r.url.endswith("/api/v1/intelligence/derivation/recompute")
     ):
         page.locator("[data-stale-notice]").get_by_role("button", name="Work them out now").click()
     expect(page.locator("[data-stale-notice]")).to_be_hidden()
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
-    # Recalculating gives the worked-out connection a new id while the row count
-    # stays at 4, and the table re-renders a moment before the map redraws; wait
-    # for the two to settle on the same answer before comparing them.
+    # The notice hides as soon as the map starts asking again, before the new answer
+    # arrives, and the row count is 4 both before and after. Recalculating gives the
+    # worked-out connection a new id, so wait for that recomputed answer to be the one
+    # both the table and the map show, read in one pass so no update can land between
+    # the two reads, before comparing them.
     page.wait_for_function(
-        "() => { const drawn = [...document.querySelectorAll('svg g.intel-edge')]"
+        "(before) => { const drawn = [...document.querySelectorAll('svg g.intel-edge')]"
         ".map(e => e.getAttribute('data-edge')).sort().join();"
         " const listed = [...document.querySelectorAll('[data-map-row]')]"
         ".map(e => e.getAttribute('data-edge-row')).sort().join();"
-        " return drawn === listed; }"
+        " const derived = document.querySelector('[data-map-row][data-kind=derived]');"
+        " return !!derived && derived.getAttribute('data-edge-row') !== before && drawn === listed; }",
+        arg=before,
     )
     assert _drawn_edges(page) == _listed_edges(page)
+    assert before not in _listed_edges(page)
     expect(page.locator("[data-map-row][data-kind=derived] [aria-label='Last worked out']")).to_be_hidden()
     expect(page.locator("svg g.intel-badge text")).to_have_text("Worked out")
     page.wait_for_function("() => document.activeElement.id === 'twin-map-heading'")

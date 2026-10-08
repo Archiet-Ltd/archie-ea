@@ -9,6 +9,12 @@ name: CI
 # which fails when a measurement gets worse than the recorded baseline. See
 # docs/adr/0001-verification-strategy.md for why ratchets rather than a big-bang
 # clean-up.
+#
+# Labeled trigger: the `labeled` pull_request event type fires for every label
+# added to a PR. Each such event creates a workflow run in the GitHub Actions
+# UI, even though all jobs are skipped for non-`ci-fast` labels by the job-level
+# `if:` guards. The concurrency group's `cancel-in-progress` excludes labeled
+# events so that adding an unrelated label never cancels an in-progress CI run.
 on:
   push:
     # main/master AND the branch production actually deploys from. That branch
@@ -26,6 +32,7 @@ on:
   # first real signal arrived at the merge to main - the most expensive possible
   # moment to learn a ratchet has regressed.
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   # Run the full suite against a work-in-progress branch without opening a PR.
   workflow_dispatch:
 
@@ -39,7 +46,7 @@ on:
 # rather than losing to whichever push landed after it.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action != 'labeled' }}
 
 permissions:
   contents: read
@@ -63,6 +70,7 @@ jobs:
   secret-scan:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -86,6 +94,7 @@ jobs:
   static-gates:
     name: Static gates (compile + ratchets)
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     # The static tag includes route/navigation and CSRF coverage, which import
     # the real app, plus the reproducible CSS build. Install the application
     # dependencies and the exact standalone Tailwind binary those gates need;
@@ -117,6 +126,7 @@ jobs:
   boot-health:
     name: Boot health (no database)
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     # Catches the class of failure nothing else here can see: a blueprint that
     # silently fails to register, or a url_for() endpoint that no longer resolves
     # (a BuildError 500 on every page rendering the sidebar).
@@ -176,20 +186,24 @@ jobs:
   # database sessions; it does not protect against state shared ACROSS files.
   tests-shard:
     name: Tests (pytest + coverage) — shard ${{ matrix.shard }}
-    # Self-hosted ibm-vsi runners only serve push/dispatch on this repository and PRs
-    # whose head repository is this one — a PR from a fork never runs job code on
-    # our runners. Everything else (forked PRs) falls back to GitHub-hosted
-    # ubuntu-latest. Several jobs run at once on the same ibm-vsi machine, so the
-    # postgres service below must not bind a fixed host port either way.
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    # Same-repository runs (push/dispatch and same-repo PRs) select a runner
+    # via repository variables: vars.CI_FAST_RUNNER takes precedence when the
+    # PR carries the ci-fast label, vars.CI_SHARD_RUNNER routes to a managed
+    # pool when set, otherwise the job falls back to the self-hosted ibm-vsi
+    # runners. A PR from a fork never runs job code on our own or a managed
+    # runner — it always uses ubuntu-latest. Several jobs run at once on the
+    # same ibm-vsi machine, so the postgres service below must not bind a
+    # fixed host port either way.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
     strategy:
       # A failing shard should not hide failures in the others.
       fail-fast: false
-      # Only three ibm-vsi runners exist. On them, run at most three shards at
-      # once so one CI run's eight shards cannot take every dedicated runner
-      # for its whole duration; GitHub-hosted runners (forked PRs) have no
-      # such limit, so all eight shards start together there.
-      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 3 || 8 }}
+      # vars.CI_SHARD_MAX_PARALLEL controls how many shards run at once on
+      # same-repository runs (default 6 when the variable is unset).
+      # GitHub-hosted runners (forked PRs) have no such limit, so all eight
+      # shards start together there.
+      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && 8 || vars.CI_SHARD_MAX_PARALLEL || 6) || 8 }}
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     services:
@@ -202,6 +216,7 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 10s
           --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
       # create_app() selects config from FLASK_CONFIG. FLASK_ENV (set here before)
       # has no effect on config selection.
@@ -286,6 +301,7 @@ jobs:
         run: |
           python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
           flask --app manage init-db
+          flask --app manage schema-upgrade
           flask --app manage reconcile-schema
       # The schema deploy applies this migration after reconcile-schema in every
       # environment. Without the unique provenance index the write-time projection
@@ -326,12 +342,13 @@ jobs:
   tests:
     name: Tests (pytest + coverage)
     needs: tests-shard
-    if: always()
-    # Same runner selection as tests-shard above: the dedicated ibm-vsi runners
-    # for push/dispatch and this repository's own PR branches, GitHub-hosted
-    # ubuntu-latest for forked PRs. It runs after every shard has finished, so
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) }}
+    # Same runner selection as tests-shard above: vars.CI_FAST_RUNNER takes
+    # precedence when the PR carries the ci-fast label, vars.CI_SHARD_RUNNER
+    # routes to a managed pool when set, otherwise the job falls back to the
+    # self-hosted ibm-vsi runners. It runs after every shard has finished, so
     # it never competes with them for a runner.
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
     # No PostgreSQL service here: this job only imports the app to build its
     # route/nav sets (for nav-verified) and combines files (coverage, junit).
     # Confirmed by running route_verification_audit.py against an unreachable
@@ -442,6 +459,7 @@ jobs:
   db-gates:
     name: Database gates (schema drift)
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     services:
       postgres:
         image: postgres:16
@@ -452,6 +470,7 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 10s
           --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/archie_test
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/archie_test
@@ -470,6 +489,7 @@ jobs:
       - name: Create schema
         run: |
           flask --app manage init-db
+          flask --app manage schema-upgrade
           flask --app manage reconcile-schema
       - name: Generate SBOM (CycloneDX)
         # From the INSTALLED environment, not requirements.txt: the latter pins
@@ -509,6 +529,7 @@ jobs:
   security-sast:
     name: SAST (bandit)
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -537,6 +558,7 @@ jobs:
   smoke:
     name: Browser journeys (one per archetype)
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     # Renders real pages in a real browser against a real database. Every cheaper
     # layer has passed defects this catches: a front end blocked by integrity
     # hashes, handlers that 500 on their first row, and pages returning 200 while
@@ -551,6 +573,7 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 10s
           --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
       TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_smoke
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_smoke
@@ -578,6 +601,7 @@ jobs:
         id: smoke-schema
         run: |
           python -m flask --app manage init-db
+          python -m flask --app manage schema-upgrade
           python -m flask --app manage reconcile-schema
       - name: Run archetype journeys
         run: pytest tests/smoke -q -p no:randomly --timeout=900 -W ignore::DeprecationWarning -m "not adversarial and not census and not ai_protocol and not guide_history" --junitxml=tests/smoke/_artifacts/chromium-main.xml
@@ -624,6 +648,7 @@ jobs:
   browser-compatibility:
     name: Browser compatibility (${{ matrix.browser }})
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     strategy:
       fail-fast: false
       matrix:
@@ -638,6 +663,7 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 10s
           --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
       TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_browser_compat
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_browser_compat
@@ -665,6 +691,7 @@ jobs:
         id: compatibility-schema
         run: |
           python -m flask --app manage init-db
+          python -m flask --app manage schema-upgrade
           python -m flask --app manage reconcile-schema
       - name: Run cross-browser critical journeys
         run: >-
@@ -716,6 +743,7 @@ jobs:
   walkthrough:
     name: Level 10 archetype walkthrough
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     # docs/TESTING_STANDARD.md level 10: not "does it break?" but "can this
     # archetype do their job, and could they have FOUND the page?". It runs as a
     # non-admin per persona, measures geometry at a fixed viewport rather than
@@ -735,6 +763,7 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 10s
           --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
       TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_walkthrough
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_walkthrough
@@ -757,6 +786,7 @@ jobs:
       - name: Create schema and seed the tenant
         run: |
           python -m flask --app manage init-db
+          python -m flask --app manage schema-upgrade
           python -m flask --app manage reconcile-schema
           python scripts/seed_walkthrough_users.py
       - name: Start the app
@@ -782,6 +812,7 @@ jobs:
   dependency-audit:
     name: Dependency CVEs (pip-audit)
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     # A ratchet against scripts/ci/dependency_baseline.json: the count may fall,
     # never rise. The baseline is accepted risk, not proof of safety - every entry
     # is a real advisory a security review will ask about.

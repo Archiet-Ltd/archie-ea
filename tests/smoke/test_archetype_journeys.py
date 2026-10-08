@@ -41,6 +41,12 @@ JOURNEY = {
                              "/trust-centre/security-findings/"],
     "data_architect":       ["/architecture/data-architecture",
                              "/architecture/data-lineage"],
+    # R1-B36 (TB-0146/TB-0170): promoted from unassignable to assignable.
+    "finance":              ["/procurement/spend", "/procurement/licenses"],
+    "compliance":           ["/dashboard/compliance"],
+    "risk":                 ["/risks/"],
+    "operations":           ["/status"],
+    "non_technical_owner":  ["/applications/"],
 }
 
 PAGE_STATE = """() => {
@@ -966,3 +972,95 @@ def test_reachable_pages_boot_without_javascript_errors(path, page, live_server,
               if "favicon" not in e.lower()]
     assert not errors, "%s -> %d JavaScript error(s):\n  - %s" % (
         path, len(errors), "\n  - ".join(errors[:5]))
+
+
+def test_data_architect_declares_system_of_record_and_checks_a_model(page, live_server, seeded):
+    """Data governance, as the data architect: declare a system of record from the
+    picker and see it persisted with the other holder flagged as a copy; run the
+    standards check on a model with a naming breach; set a master data domain's
+    golden source. Every write is followed by a reload."""
+    import uuid
+
+    from app import create_app, db as _db
+    from app.models.all_missing_models import ConceptualDataModel, LogicalDataModel
+    from app.models.application_layer import DataObject
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.process_data import DataDomain, DataEntity
+
+    ref = uuid.uuid4().hex[:6]
+    org_id = seeded["ids"]["org"]
+    crm_name, erp_name = "Smoke CRM %s" % ref, "Smoke ERP %s" % ref
+    entity_name = "Smoke Customer %s" % ref
+    model_name = "smoke_orders_%s" % ref
+    master_name = "Smoke master domain %s" % ref
+
+    app = create_app("testing")
+    with app.app_context():
+        crm = ApplicationComponent(name=crm_name, description="Customer master record", organization_id=org_id)
+        erp = ApplicationComponent(name=erp_name, description="Customer master consumer", organization_id=org_id)
+        _db.session.add_all([crm, erp])
+        _db.session.flush()
+        _db.session.add_all([
+            DataObject(name="Customer Master", application_component_id=crm.id, organization_id=org_id),
+            DataObject(name="Customer Master", application_component_id=erp.id, organization_id=org_id),
+        ])
+        entity = DataEntity(name=entity_name, domain_id=seeded["ids"]["data_domain"],
+                            organization_id=org_id, description="Customer master record")
+        conceptual = ConceptualDataModel(name="Smoke concept %s" % ref, organization_id=org_id)
+        conceptual.data_entities.append(DataEntity(
+            name="tbl_%s" % ref, domain_id=seeded["ids"]["data_domain"], organization_id=org_id))
+        _db.session.add_all([entity, conceptual])
+        _db.session.flush()
+        model = LogicalDataModel(name=model_name, conceptual_model_id=conceptual.id,
+                                 organization_id=org_id)
+        master = DataDomain(name=master_name, domain_type="master", organization_id=org_id)
+        _db.session.add_all([model, master])
+        _db.session.commit()
+        entity_id, model_id, master_id = entity.id, model.id, master.id
+
+    _login(page, live_server, seeded["emails"]["data_architect"])
+
+    # Declare the system of record through the live-search picker.
+    _visit(page, live_server, "/data-governance/entities/%d" % entity_id)
+    page.fill("#sor-application", crm_name)
+    page.get_by_role("button", name=crm_name, exact=True).click(timeout=PAGE_TIMEOUT)
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+        page.get_by_role("button", name="Save", exact=True).click()
+    page.reload(wait_until="domcontentloaded")
+    body = page.inner_text("body")
+    assert "Declared: %s" % crm_name in body, "system of record did not persist after reload"
+    assert "Copy of %s" % crm_name in body, "the other holding application was not flagged as a copy"
+
+    # Standards check on a model with a naming breach.
+    _visit(page, live_server, "/data-governance/models/%d/standards" % model_id)
+    page.reload(wait_until="domcontentloaded")
+    table = page.locator("[data-testid=breach-table]")
+    assert table.count() == 1, "the standards check rendered no breach table"
+    assert "NAMING-1" in table.inner_text()
+    assert "Business names use words" in table.inner_text(), "the standard was not cited"
+
+    # Master data domain register and golden source.
+    _visit(page, live_server, "/data-governance/domains")
+    section = page.locator("[data-testid=domain-%d]" % master_id)
+    section.locator("input[type=text]").fill(erp_name)
+    section.get_by_role("button", name=erp_name, exact=True).click(timeout=PAGE_TIMEOUT)
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+        section.get_by_role("button", name="Save", exact=True).click()
+    page.reload(wait_until="domcontentloaded")
+    assert erp_name in page.locator("[data-testid=golden-source-%d]" % master_id).inner_text()
+
+
+def test_operations_subscribes_to_service_status_and_it_persists(page, live_server, seeded):
+    """R1-B36 (TB-0170): the operations persona reaches its own real control
+    (the subscribe toggle this page already had) and the change survives a
+    reload -- the acceptance criterion's "clicks a real control" test."""
+    _login(page, live_server, seeded["emails"]["operations"])
+
+    _visit(page, live_server, "/status")
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+        page.locator("[data-testid=service-status-subscribe]").click()
+
+    page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert page.locator("[data-testid=service-status-subscribed]").count() == 1, (
+        "the subscription did not persist after reload"
+    )

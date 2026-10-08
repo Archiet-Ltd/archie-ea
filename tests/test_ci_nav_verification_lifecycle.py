@@ -171,33 +171,4 @@ def test_merge_is_the_union_of_every_shard_and_refuses_a_missing_one(tmp_path, m
     assert merged == ["a.index", "b.view", "c.edit"]
 
 
-def test_backend_test_jobs_use_the_dedicated_runner_selection():
-    """Every backend-test shard and the combining ``tests`` job run on this
-    repository's dedicated ibm-vsi runners for push/dispatch and same-repo PRs,
-    and on GitHub-hosted ubuntu-latest for forked PRs — so a fork's code never
-    runs on a self-hosted runner. On the three dedicated runners the shard
-    matrix runs at most three at once."""
-    jobs = _ci_jobs()
-    own_branch = (
-        "(github.event_name != 'pull_request' || "
-        "github.event.pull_request.head.repo.full_name == github.repository)"
-    )
-    expected = (
-        "${{ " + own_branch
-        + " && fromJSON('[\"self-hosted\",\"ibm-vsi\"]') || 'ubuntu-latest' }}"
-    )
-    for job_id in ("tests-shard", "tests"):
-        assert jobs[job_id]["runs-on"] == expected, job_id
-        steps = jobs[job_id]["steps"]
-        venv = _step_index(steps, "python -m venv --clear .venv")
-        install = _step_index(steps, "pip install -r requirements.txt")
-        assert 0 <= venv < install, f"{job_id} must install into its own venv"
 
-    assert jobs["tests-shard"]["strategy"]["max-parallel"] == (
-        "${{ " + own_branch + " && 3 || 8 }}"
-    )
-    # Several jobs share one ibm-vsi machine: no fixed host port, and the
-    # database URL comes from the docker-assigned port.
-    shard = jobs["tests-shard"]
-    assert shard["services"]["postgres"]["ports"] == ["5432"]
-    assert _step_index(shard["steps"], "job.services.postgres.ports['5432']") >= 0

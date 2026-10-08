@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S3-09, segment: S3}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Projects
@@ -23,7 +24,7 @@ on-budget.
 
 ## Where you'll meet it
 
-- [Is the programme on time and on budget?](/enterprise-architecture/programme-tracking)
+- [Is the programme on time and on budget?](/use-cases/programme-tracking)
 
 ## Related modules
 

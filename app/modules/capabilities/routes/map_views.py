@@ -35,14 +35,11 @@ def _compute_capability_mapping_counts():
     fabricated red one, and the legend only appears when this returned a
     real dict.
 
-    ``ApplicationCapabilityMapping`` is not ``TenantMixin`` (see the model),
-    so the org predicate here is deliberate, not defence-in-depth. It is
-    applied via the FK parent ``BusinessCapability`` (which *is*
-    ``TenantMixin``), not ``ApplicationCapabilityMapping.organization_id`` --
-    that column is NULL on every row in production (added nullable by
-    reconcile-schema, never backfilled), so a predicate directly on it would
-    report every capability as having 0 mapped apps for every org. See
-    e622d36 / rationalization_scoring_service.py for the precedent.
+    Uses ``UnifiedApplicationCapabilityMapping`` joined with
+    ``UnifiedCapability`` (the canonical store PR 1 built). Only the
+    tenant's own capabilities (``organization_id == org_id``) are counted;
+    shared reference capabilities (``organization_id IS NULL``) are
+    excluded from per-organisation mapping counts.
     """
     org_id = getattr(g, "current_org_id", None)
     if org_id is None:
@@ -51,21 +48,21 @@ def _compute_capability_mapping_counts():
     from sqlalchemy import func
 
     from app import db
-    from app.models.application_capability import ApplicationCapabilityMapping
-    from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+    from app.models.unified_capability import UnifiedCapability
 
     try:
         rows = (
             db.session.query(
-                ApplicationCapabilityMapping.business_capability_id,
-                func.count(ApplicationCapabilityMapping.id),
+                UnifiedApplicationCapabilityMapping.unified_capability_id,
+                func.count(UnifiedApplicationCapabilityMapping.id),
             )
             .join(
-                BusinessCapability,
-                ApplicationCapabilityMapping.business_capability_id == BusinessCapability.id,
+                UnifiedCapability,
+                UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
             )
-            .filter(BusinessCapability.organization_id == org_id)
-            .group_by(ApplicationCapabilityMapping.business_capability_id)
+            .filter(UnifiedCapability.organization_id == org_id)
+            .group_by(UnifiedApplicationCapabilityMapping.unified_capability_id)
             .all()
         )
     except Exception:
@@ -81,11 +78,11 @@ def _compute_capability_mapping_counts():
 def index():
     """Main capability mapping page"""
     from app.modules.capabilities.services.capability_count_service import (
-        count_business_capabilities,
+        count_capabilities,
     )
 
     try:
-        total_capabilities = count_business_capabilities()
+        total_capabilities = count_capabilities()
     except Exception:
         current_app.logger.exception("Could not count business capabilities")
         total_capabilities = None
@@ -137,20 +134,20 @@ def _hierarchy_context():
     the header in the same response, cache hit or not.
     """
     from app.modules.capabilities.services.capability_count_service import (
-        count_business_capabilities,
+        count_capabilities,
     )
 
     try:
-        total_capabilities = count_business_capabilities()
+        total_capabilities = count_capabilities()
     except Exception:
-        current_app.logger.exception("Could not count business capabilities")
+        current_app.logger.exception("Could not count capabilities")
         total_capabilities = None
 
     try:
-        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.order_by(
-            BusinessCapability.level, BusinessCapability.name
+        capabilities = UnifiedCapability.query.order_by(
+            UnifiedCapability.level, UnifiedCapability.name
         ).all()
 
         # Build parent lookup
@@ -174,7 +171,7 @@ def _hierarchy_context():
                 "level": cap.level,
                 # Falsy values hide the badge in the template; "Unknown" and a
                 # hardcoded "core" pill were fabricated labels on every row.
-                "domain": cap.business_domain or "",
+                "domain": cap.domain.name if cap.domain else "",
                 "category": cap.category or "",
                 "capability_type": getattr(cap, "capability_type", None) or "",
                 "functions": [],
@@ -211,7 +208,7 @@ def _hierarchy_context():
 @capability_map.route("/hierarchy")
 @login_required
 def hierarchy():
-    """Capability hierarchy visualization — uses real BusinessCapability data."""
+    """Capability hierarchy visualization — uses real UnifiedCapability data."""
     context = _hierarchy_context()
     if context["load_error"]:
         flash("Error loading the capability hierarchy. Please try again.", "error")
@@ -245,10 +242,10 @@ def _simple_view_context():
     (freshly generated) nonce, and the browser blocks the mismatch.
     """
     try:
-        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.order_by(
-            BusinessCapability.level, BusinessCapability.name
+        capabilities = UnifiedCapability.query.order_by(
+            UnifiedCapability.level, UnifiedCapability.name
         ).all()
 
         children_by_parent = {}
@@ -261,7 +258,7 @@ def _simple_view_context():
                 "name": cap.name,
                 "description": cap.description or "",
                 "level": cap.level,
-                "domain": cap.business_domain or "",
+                "domain": cap.domain.name if cap.domain else "",
             }
 
         roots = [c for c in capabilities if c.level == 1]
@@ -270,7 +267,7 @@ def _simple_view_context():
                 "name": root.name,
                 "description": root.description or "",
                 "level": root.level,
-                "domain": root.business_domain or "",
+                "domain": root.domain.name if root.domain else "",
                 "children": [
                     child_to_dict(child) for child in children_by_parent.get(root.id, [])
                 ],
@@ -279,7 +276,7 @@ def _simple_view_context():
         ]
 
         levels = [c.level for c in capabilities if c.level is not None]
-        domains = {c.business_domain for c in capabilities if c.business_domain}
+        domains = {c.domain.name for c in capabilities if c.domain}
 
         stats = {
             "total": len(capabilities),
@@ -308,7 +305,7 @@ def _simple_view_context():
 @capability_map.route("/simple")
 @login_required
 def simple_view():
-    """Simple flat view of capabilities — real BusinessCapability data.
+    """Simple flat view of capabilities — real UnifiedCapability data.
 
     Was previously a 612-line static template with no context at all: a
     hardcoded "38 capabilities / 124 functions / 11 domains" and a fictional

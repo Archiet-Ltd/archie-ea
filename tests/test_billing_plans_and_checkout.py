@@ -12,6 +12,7 @@ import time
 import uuid
 
 import pytest
+from flask import render_template_string, session
 
 WEBHOOK_SECRET = "unit-test-signing-value"
 PRICES = {
@@ -430,9 +431,35 @@ def test_without_keys_the_billing_page_says_payment_is_not_set_up(app, db_sessio
     html = page.get_data(as_text=True)
     assert page.status_code == 200
     assert "Online payment is not set up on this installation" in html
-    assert "STRIPE_SECRET_KEY" in html  # the operator can see which setting is missing
+    # An organisation administrator is a customer, not the platform operator:
+    # the banner tells them payment is not available, but not which settings
+    # are missing.
+    assert "STRIPE_SECRET_KEY" not in html
+    assert "Settings the operator has not provided" not in html
     assert "Continue to payment" not in html
     assert "Online payment is not set up on this installation. No payment was taken." in resp.get_data(as_text=True)
+
+
+def test_without_keys_a_platform_admin_sees_which_settings_are_missing(app, db_session, client, login_as, no_billing):
+    platform = _platform_admin(db_session)
+    with app.app_context():
+        login_as(client, platform)
+        page = client.get("/admin/billing/")
+    html = page.get_data(as_text=True)
+    assert page.status_code == 200
+    assert "Online payment is not set up on this installation" in html
+    assert "STRIPE_SECRET_KEY" in html  # the operator can see which setting is missing
+
+
+def test_with_keys_the_billing_page_shows_no_configuration_warning(app, db_session, client, login_as, billing):
+    org, admin = _admin_org(db_session, "haskeys")
+    with app.app_context():
+        login_as(client, admin)
+        page = client.get("/admin/billing/")
+    html = page.get_data(as_text=True)
+    assert page.status_code == 200
+    assert "Online payment is not set up on this installation" not in html
+    assert 'data-testid="billing-not-configured"' not in html
 
 
 def test_buy_starts_checkout_for_the_chosen_plan(app, db_session, client, login_as, billing, monkeypatch):
@@ -597,6 +624,64 @@ def test_billing_details_and_invoices(app, db_session, client, login_as, billing
     assert "USD 0.00" not in html
 
 
+def test_billing_page_uses_the_switched_organisation(app, db_session, client, login_as, no_billing):
+    from app.models.org_role import OrgRole
+    from app.models.subscription import SubscriptionPlan
+
+    home_org, admin = _admin_org(db_session, "home")
+    switched_org = _org(db_session, "second")
+    OrgRole.set_role(switched_org.id, admin.id, "architect", granted_by_id=admin.id)
+    _subscription(db_session, switched_org, plan=SubscriptionPlan.team, seats_purchased=20)
+    db_session.commit()
+
+    with app.app_context():
+        login_as(client, admin)
+        switched = client.post(
+            "/account/switch-organization",
+            data={"organization_id": str(switched_org.id)},
+            follow_redirects=True,
+        )
+        login_as(client, admin)
+        page = client.get("/admin/billing/")
+
+    switched_html = switched.get_data(as_text=True)
+    html = page.get_data(as_text=True)
+
+    assert switched.status_code == 200
+    assert page.status_code == 200
+    assert f"Active: {switched_org.name}" in switched_html
+    assert switched_org.name in html
+    assert home_org.name not in html
+    assert 'data-testid="billing-current-plan">Team<' in html
+
+
+def test_currency_context_and_filter_follow_the_switched_organisation(app, db_session, make_org):
+    from app.models.org_role import OrgRole
+    from tests._session_test_helpers import mint_test_sid
+
+    home_org = make_org("currency-home")
+    switched_org = make_org("currency-second")
+    home_org.settings = {"currency_code": "USD"}
+    switched_org.settings = {"currency_code": "EUR"}
+    user = _user(db_session, home_org, admin=True)
+    OrgRole.set_role(switched_org.id, user.id, "architect", granted_by_id=user.id)
+    db_session.commit()
+
+    sid = mint_test_sid(user.id, organization_id=home_org.id, app=app)
+    with app.test_request_context("/"):
+        session["_user_id"] = str(user.id)
+        session["_fresh"] = True
+        session["_sid"] = sid
+        session["current_org_id"] = switched_org.id
+
+        app.preprocess_request()
+        rendered = render_template_string(
+            "{{ active_organization_name }}|{{ currency_config.code }}|{{ 12.5|format_currency(show_code=True) }}"
+        )
+
+    assert rendered == f"{switched_org.name}|EUR|EUR 12.50€"
+
+
 def test_admin_at_the_limit_is_shown_the_upgrade_instead_of_adding(app, db_session, client, login_as, no_billing):
     from app.models.user import Role, User
 
@@ -642,10 +727,26 @@ def test_pricing_page_has_a_buy_button_per_plan(app, client):
         resp = client.get("/pricing")
     html = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    assert "/admin/billing/?plan=startup&amp;interval=year#checkout" in html
-    assert "/admin/billing/?plan=team&amp;interval=year#checkout" in html
-    assert "/admin/billing/?plan=team&amp;interval=month#checkout" in html
+    # Buy buttons route through the click-tracking redirect
+    # (app/main/views.py::track_plan_click) before landing on registration, so
+    # the plan-preserving registration URL now travels as the redirect's
+    # "next" parameter.
+    assert "/t/plan-click?plan=startup&amp;next=/account/register?plan%3Dstartup%26interval%3Dyear" in html
+    assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dyear" in html
+    assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dmonth" in html
     assert 'data-testid="buy-enterprise"' in html
+
+
+def test_pricing_contact_sales_button_points_at_the_contact_page(app, client):
+    """'Contact sales' leads to /contact (via the click-tracking redirect,
+    app/main/views.py::track_plan_click), which now carries the sales enquiry
+    form rather than the old pre-launch waiting list."""
+    import re
+
+    resp = client.get("/pricing")
+    html = resp.get_data(as_text=True)
+    assert re.search(
+        r'<a href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
 
 
 def test_signing_in_returns_the_visitor_to_the_plan_they_chose(app, db_session, client, login_as, no_billing):

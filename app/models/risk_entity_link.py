@@ -9,6 +9,12 @@ Solution, StrategicInitiative/"Programme"), which a single polymorphic table
 handles without three near-duplicate columns.
 
 New table, ADD-only via init-db's create_all -- no existing-database impact.
+
+"constraint" (SolutionConstraint) was added for the one-risk-register
+consolidation: a risk solution_ai_orchestrator.py derives from a named
+constraint keeps that relationship as a risk link here, the same mechanism
+every other entity type already uses, rather than a column the canonical
+Risk model has no room for.
 """
 from datetime import datetime
 
@@ -18,7 +24,7 @@ from app.models.mixins import TenantMixin
 # "Programme" in the product vocabulary is StrategicInitiative in the schema
 # (see app/models/transformation_programme.py: ProgrammeWorkstream.programme_id
 # -> strategic_initiatives.id).
-ENTITY_TYPES = ("application", "solution", "programme")
+ENTITY_TYPES = ("application", "solution", "programme", "constraint")
 
 
 class RiskEntityLink(TenantMixin, db.Model):

@@ -63,8 +63,8 @@ def test_new_owner_persists_org_role_and_cannot_administer_foreign_org(
         assignment = OrgRole.query.filter_by(organization_id=org_id, user_id=user_id).one()
         assert assignment.role == 'org_admin'
         assert assignment.granted_by == user_id
-        assert rbac_service.is_org_admin(org_id, user_id)
-        assert not rbac_service.is_org_admin(foreign_id, user_id)
+        assert rbac_service.is_org_admin(saved, org_id)
+        assert not rbac_service.is_org_admin(saved, foreign_id)
         assert OrgRole.get_role(foreign_id, colleague_id) == 'viewer'
 
 
@@ -125,4 +125,15 @@ def test_rerunning_initial_admin_preserves_existing_assignment(
     provision(app, monkeypatch, 'initial_admin', email)
     db_session.expunge_all()
     assert OrgRole.get_role(org_id, user_id) == existing_role
-    assert User.query.filter_by(id=user_id, organization_id=org_id).one().is_org_admin is False
+    # is_org_admin follows the preserved per-organisation OrgRole assignment
+    # too (rbac_service.is_org_admin checks OrgRole for the user's own
+    # organisation, not only Permission.ADMINISTER), so it is True exactly
+    # when the preserved assignment is 'org_admin'.
+    expect_org_admin = existing_role == 'org_admin'
+    reloaded = User.query.filter_by(id=user_id, organization_id=org_id).one()
+    assert reloaded.is_org_admin is expect_org_admin
+    assert reloaded.is_admin() is False, (
+        "re-running initial-admin provisioning for an existing email must "
+        "never grant Permission.ADMINISTER; a pre-existing org_admin OrgRole "
+        "row answers is_org_admin True without touching the global Role"
+    )

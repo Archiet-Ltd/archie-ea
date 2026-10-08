@@ -68,25 +68,151 @@ def _validate_entity(data, required_fields):
 # Solution Lifecycle CRUD — Risks, Metrics, TCO, Plateaus
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# PR 316 fix round, one-risk-register consolidation: solution_risks is the
+# superseded store -- the canonical register is `risks` (app/models/risk.py) plus its
+# link table `risk_entity_links`, written only through
+# app/services/risk_service.py (see that model's own docstring). The create,
+# update, delete and CSV-import handlers below call risk_service instead of
+# instantiating SolutionRisk directly, so no new row reaches the old table.
+# GET above still reads solution_risks -- repointing that read, like the risk
+# register and programme screens, is PR 2 scope (CLAUDE.md section 7).
+_RISK_INT_TO_LEVEL = {1: "very_low", 2: "low", 3: "medium", 4: "high", 5: "critical"}
+
+
+def _solution_risk_level_to_int(value, default=3):
+    """The exact probability/impact scale app/commands/backfill_solution_risk_merge.py
+    already reuses from solution_routes._level_to_int, imported lazily to
+    avoid a module-load-time circular import between the two route modules --
+    not a second, possibly-inconsistent mapping."""
+    from app.modules.solutions_strategic.v2.routes.solution_routes import _level_to_int
+    return _level_to_int(value, default)
+
+
+def _solution_risk_level_from_int(value, default="medium"):
+    """The inverse of the mapping above, for echoing an unchanged impact/
+    probability string back in a PUT response when the caller does not send
+    one. Approximate (4 and 5 both mapped from "high"/"very_high"/"critical"
+    on the way in) -- adequate for a value the caller is not changing, and
+    this route never claims more than that."""
+    return _RISK_INT_TO_LEVEL.get(value, default)
+
+
+def _resolve_canonical_solution_risk(solution_id, risk_id):
+    """Resolve a /solutions/<id>/risks/<risk_id> id to its canonical Risk row.
+
+    GET above still reads solution_risks (PR 2 repoints that reader), so a
+    risk created before this fix is still listed under its old solution_risks
+    id. That id resolves here via the pointer
+    app/commands/backfill_solution_risk_merge.py already sets on every row it
+    merges (retired_into_risk_id) -- reusing that pointer rather than adding a
+    second lookup helper. A risk created after this fix has no solution_risks
+    row at all (the create handler below no longer makes one), so its id
+    already names a canonical Risk directly.
+    """
+    from app.models.risk import Risk
+    from app.models.solution_lifecycle_models import SolutionRisk
+
+    legacy = SolutionRisk.query.filter_by(id=risk_id, solution_id=solution_id).first()
+    if legacy is not None and legacy.retired_into_risk_id is not None:
+        risk = Risk.query.filter_by(
+            id=legacy.retired_into_risk_id, solution_id=solution_id
+        ).first()
+        if risk is not None:
+            return risk
+    risk = Risk.query.filter_by(id=risk_id, solution_id=solution_id).first()
+    if risk is None:
+        abort(404)
+    return risk
+
+
+def _solution_risk_dict(risk, *, risk_name, risk_description, impact, probability, mitigation, owner):
+    """SolutionRisk.to_dict()'s exact key set, built from the canonical Risk
+    instead -- the response shape the existing solution risk tab
+    (app/templates/solutions/partials/_edit_risks.html) already reads.
+    retired_into_risk_id only ever applies to a superseded row, never to the
+    canonical risk itself, so it is always None here."""
+    return {
+        "id": risk.id,
+        "risk_name": risk_name,
+        "risk_description": risk_description,
+        "impact": impact,
+        "probability": probability,
+        "mitigation": mitigation,
+        "status": risk.status.value,
+        "owner": owner,
+        "retired_into_risk_id": None,
+    }
+
 
 @solution_design_bp.route("/<int:solution_id>/risks", methods=["GET"])
 @login_required
 def get_solution_risks(solution_id):
-    """List all risks for a solution."""
+    """List all risks for a solution.
+
+    Reads both halves of the one-risk-register consolidation, so a risk
+    created through the POST/CSV-import handlers below does not vanish from
+    this same list: the canonical risks linked to this solution
+    (risk_entity_links, entity_type="solution", via risk_service.risks_linked_to
+    -- the same query the parent-side "Linked risks" reader already uses)
+    plus any solution_risks row the backfill
+    (app/commands/backfill_solution_risk_merge.py) has not yet merged
+    (retired_into_risk_id IS NULL). A merged legacy row is excluded here --
+    its replacement already exists on the canonical side, so it is never
+    shown twice.
+    """
     Solution.query.get_or_404(solution_id)
+    from datetime import datetime as _datetime
+
     from app.models.solution_lifecycle_models import SolutionRisk
-    risks = SolutionRisk.query.filter_by(solution_id=solution_id).order_by(
-        SolutionRisk.created_at.desc()
-    ).all()
-    return jsonify({"success": True, "data": [r.to_dict() for r in risks]})
+    from app.services import risk_service
+
+    canonical_rows = [
+        (risk.created_at or _datetime.min, _solution_risk_dict(
+            risk,
+            risk_name=risk.title,
+            risk_description=risk.description,
+            impact=_solution_risk_level_from_int(risk.impact),
+            probability=_solution_risk_level_from_int(risk.likelihood),
+            mitigation=risk.mitigation_plan,
+            owner=risk.owner,
+        ))
+        for risk in risk_service.risks_linked_to("solution", solution_id)
+    ]
+    legacy_rows = [
+        (risk.created_at or _datetime.min, risk.to_dict())
+        for risk in SolutionRisk.query.filter_by(solution_id=solution_id)
+        .filter(SolutionRisk.retired_into_risk_id.is_(None))
+        .all()
+    ]
+    rows = sorted(canonical_rows + legacy_rows, key=lambda pair: pair[0], reverse=True)
+    return jsonify({"success": True, "data": [row[1] for row in rows]})
 
 
 @solution_design_bp.route("/<int:solution_id>/risks", methods=["POST"])
 @login_required
 def create_solution_risk(solution_id):
-    """Add a risk to a solution."""
-    Solution.query.get_or_404(solution_id)
-    from app.models.solution_lifecycle_models import SolutionRisk
+    """Add a risk to a solution.
+
+    Writes through the canonical risk register (app/services/risk_service.py)
+    -- the one writer per the one-risk-register consolidation -- rather than
+    creating a SolutionRisk row directly. _solution_risk_dict keeps the response the same
+    shape SolutionRisk.to_dict() already produced, so the existing screen
+    (app/templates/solutions/partials/_edit_risks.html) is unaffected.
+
+    Uses require_entity rather than Solution.query.get_or_404: the latter is
+    Query.get() under the hood, which is tenant-scoped only on an identity-map
+    MISS -- on a HIT (the solution already loaded elsewhere in this request's
+    session, e.g. by an earlier call in the same test or request) it returns
+    the cached row with no SQL and no tenant predicate, letting another
+    organisation's id through to risk_service below instead of a clean 404.
+    require_entity (app/utils/route_guards.py, already used by
+    delete_solution_stakeholder in this file) always issues a real, tenant-
+    filtered SELECT.
+    """
+    from app.utils.route_guards import require_entity
+    require_entity(Solution, solution_id, description="Solution not found")
+    from app.models.risk import RiskStatus
+    from app.services import risk_service
     data = request.get_json()
     # Validate required fields — SD-004
     risk_name = (data.get("risk_name") or data.get("name") or "").strip()
@@ -95,52 +221,92 @@ def create_solution_risk(solution_id):
         return jsonify({"success": False, "error": "risk_name is required"}), 400
     if not risk_desc:
         return jsonify({"success": False, "error": "risk_description is required"}), 400
-    risk = SolutionRisk(
+    impact = data.get("impact", "medium")
+    probability = data.get("probability", "medium")
+    mitigation = data.get("mitigation", "")
+    owner = data.get("owner", "")
+    status = data.get("status", "open")
+
+    risk = risk_service.create_risk(
         solution_id=solution_id,
-        risk_name=risk_name,
-        risk_description=risk_desc,
-        impact=data.get("impact", "medium"),
-        probability=data.get("probability", "medium"),
-        mitigation=data.get("mitigation", ""),
-        status=data.get("status", "open"),
-        owner=data.get("owner", ""),
-        created_by_id=current_user.id,
+        title=risk_name,
+        description=risk_desc,
+        likelihood=_solution_risk_level_to_int(probability),
+        impact=_solution_risk_level_to_int(impact),
+        owner=owner,
+        mitigation_plan=mitigation,
     )
-    db.session.add(risk)
-    db.session.flush()
+    if status and status != RiskStatus.OPEN.value:
+        try:
+            risk = risk_service.update_risk_status(risk.id, status)
+        except ValueError:
+            return jsonify({"success": False, "error": f"Invalid status: {status!r}"}), 400
+    risk_service.add_risk_link(risk.id, "solution", solution_id)
+
     if data.get("archimate_element_id"):
         ae, err = _link_existing_archimate_element(solution_id, data["archimate_element_id"], "Assessment", "Motivation")
         if err:
-            db.session.rollback()
             return err
     else:
-        _sync_archimate_element(solution_id, ae_type="Assessment", ae_layer="Motivation", name=risk.risk_description[:100], description=risk.risk_description)
+        _sync_archimate_element(solution_id, ae_type="Assessment", ae_layer="Motivation", name=risk_desc[:100], description=risk_desc)
     db.session.commit()
-    return jsonify({"success": True, "data": risk.to_dict()}), 201
+    return jsonify({"success": True, "data": _solution_risk_dict(
+        risk, risk_name=risk_name, risk_description=risk_desc,
+        impact=impact, probability=probability, mitigation=mitigation, owner=owner,
+    )}), 201
 
 
 @solution_design_bp.route("/<int:solution_id>/risks/<int:risk_id>", methods=["PUT"])
 @login_required
 def update_solution_risk(solution_id, risk_id):
-    """Update a risk."""
-    from app.models.solution_lifecycle_models import SolutionRisk
-    risk = SolutionRisk.query.filter_by(id=risk_id, solution_id=solution_id).first_or_404()
+    """Update a risk. Writes through risk_service -- see create_solution_risk."""
+    from app.utils.route_guards import require_entity
+    require_entity(Solution, solution_id, description="Solution not found")
+    from app.services import risk_service
+    risk = _resolve_canonical_solution_risk(solution_id, risk_id)
     data = request.get_json()
-    for field in ["risk_name", "risk_description", "impact", "probability", "mitigation", "status", "owner"]:
-        if field in data:
-            setattr(risk, field, data[field])
-    db.session.commit()
-    return jsonify({"success": True, "data": risk.to_dict()})
+
+    edits = {}
+    if "risk_name" in data:
+        edits["title"] = data["risk_name"]
+    if "risk_description" in data:
+        edits["description"] = data["risk_description"]
+    if "mitigation" in data:
+        edits["mitigation_plan"] = data["mitigation"]
+    if "owner" in data:
+        edits["owner"] = data["owner"]
+    if "probability" in data:
+        edits["likelihood"] = _solution_risk_level_to_int(data["probability"])
+    if "impact" in data:
+        edits["impact"] = _solution_risk_level_to_int(data["impact"])
+    if edits:
+        risk = risk_service.update_risk(risk.id, **edits)
+    if "status" in data and data["status"]:
+        try:
+            risk = risk_service.update_risk_status(risk.id, data["status"])
+        except ValueError:
+            return jsonify({"success": False, "error": f"Invalid status: {data['status']!r}"}), 400
+
+    return jsonify({"success": True, "data": _solution_risk_dict(
+        risk,
+        risk_name=data.get("risk_name", risk.title),
+        risk_description=data.get("risk_description", risk.description),
+        impact=data.get("impact", _solution_risk_level_from_int(risk.impact)),
+        probability=data.get("probability", _solution_risk_level_from_int(risk.likelihood)),
+        mitigation=data.get("mitigation", risk.mitigation_plan),
+        owner=data.get("owner", risk.owner),
+    )})
 
 
 @solution_design_bp.route("/<int:solution_id>/risks/<int:risk_id>", methods=["DELETE"])
 @login_required
 def delete_solution_risk(solution_id, risk_id):
-    """Delete a risk."""
-    from app.models.solution_lifecycle_models import SolutionRisk
-    risk = SolutionRisk.query.filter_by(id=risk_id, solution_id=solution_id).first_or_404()
-    db.session.delete(risk)
-    db.session.commit()
+    """Delete a risk. Writes through risk_service -- see create_solution_risk."""
+    from app.utils.route_guards import require_entity
+    require_entity(Solution, solution_id, description="Solution not found")
+    from app.services import risk_service
+    risk = _resolve_canonical_solution_risk(solution_id, risk_id)
+    risk_service.delete_risk(risk.id)
     return jsonify({"success": True})
 
 
@@ -166,8 +332,9 @@ def import_solution_risks(solution_id):
     Returns: {created, skipped, errors: [{row, reason}]}
     Limits: 2 MB file, 500 rows.
     """
-    Solution.query.get_or_404(solution_id)
-    from app.models.solution_lifecycle_models import SolutionRisk
+    from app.utils.route_guards import require_entity
+    require_entity(Solution, solution_id, description="Solution not found")
+    from app.services import risk_service
 
     file_storage = request.files.get("file")
     if not file_storage or not file_storage.filename:
@@ -219,28 +386,24 @@ def import_solution_risks(solution_id):
         if status not in _VALID_STATUSES:
             status = "open"
 
+        title = (row.get("name") or "").strip() or desc[:255]
         try:
-            risk = SolutionRisk(
+            risk = risk_service.create_risk(
                 solution_id=solution_id,
-                risk_name=(row.get("name") or "").strip() or None,
-                risk_description=desc,
-                impact=impact,
-                probability=probability,
-                mitigation=(row.get("mitigation") or "").strip() or None,
-                status=status,
+                title=title,
+                description=desc,
+                likelihood=_solution_risk_level_to_int(probability),
+                impact=_solution_risk_level_to_int(impact),
                 owner=(row.get("owner") or "").strip() or None,
-                created_by_id=current_user.id,
+                mitigation_plan=(row.get("mitigation") or "").strip() or None,
             )
-            db.session.add(risk)
-            sync_archimate_element(risk)
-            db.session.flush()
+            if status != "open":
+                risk = risk_service.update_risk_status(risk.id, status)
+            risk_service.add_risk_link(risk.id, "solution", solution_id)
             created += 1
         except Exception as e:
             db.session.rollback()
             errors.append({"row": idx, "reason": str(e)})
-
-    if created:
-        db.session.commit()
 
     return jsonify({
         "success": True,
