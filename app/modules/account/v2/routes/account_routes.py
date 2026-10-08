@@ -644,16 +644,23 @@ def sso_callback(provider):
     # authenticator app. Checked before login_and_register() below mints a
     # real session, so an IdP response alone never mints a real session for
     # an administrator account. There is no "remember me" checkbox in an SSO
-    # flow, matching this route's own unconditional remember=True pending
-    # value; _mfa_pending_next has no equivalent "next" here either, matching
-    # _complete_login_after_mfa()'s own empty-string fallback. Mirrors v1
-    # account_routes.py's sso_callback() exactly -- USE_ACCOUNT_GUARDRAILS
-    # chooses which of the two is registered, so both must agree.
+    # flow in either case, so this pending value matches this route's own
+    # non-MFA path below (session_registry.login_and_register(user), no
+    # remember= argument, defaults to False) rather than carrying a
+    # "remembered" cookie an MFA-enrolled admin never asked for;
+    # _mfa_pending_next has no equivalent "next" here either, matching
+    # _complete_login_after_mfa()'s own empty-string fallback. v1
+    # account_routes.py's sso_callback() carries the same MFA gate but
+    # keeps its own pending value at True, matching that route's own
+    # non-MFA path, which calls login_and_register(user, remember=True)
+    # explicitly -- USE_ACCOUNT_GUARDRAILS chooses which of the two is
+    # registered, so whichever is live stays internally consistent between
+    # its own MFA and non-MFA paths.
     from app.services import mfa_service
 
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
-        session["_mfa_pending_remember"] = True
+        session["_mfa_pending_remember"] = False
         session["_mfa_pending_next"] = ""
         return redirect(url_for("account.mfa_challenge"))
 
