@@ -54,11 +54,11 @@ publishes its own [plans and pricing](/pricing) directly.
   browser across every layer.
 - **Answer questions about your model directly, through Entelim's own AI Chat** — no separate AI
   tool or connector required to ask it something.
-- **Find what you're paying for twice.** Pick the application in question and get duplicate-spend
-  detection and a consolidation plan, deep-linked straight into the answer.
+- **Find what you're paying for twice.** Pick an application and see its duplicate-spend detection
+  and a consolidation plan directly — its own view, not something Ask or AI Chat answers.
 - **A business case built from your own figures**, never invented to fill a gap.
 
-## Where Entelim is headed next
+## Bringing your model across
 
 ArchiMate Open Exchange and CSV are the working path to bring a model across.
 

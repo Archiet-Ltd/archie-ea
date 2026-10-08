@@ -53,11 +53,11 @@ licence instead of AGPL.
   browser across every layer — the same Open Group exchange format Archi itself produces.
 - **Derivation with provenance.** Entelim shows its reasoning for every connection it works out, in a
   proof drawer you can open, not a number you have to trust.
-- **Find what you're paying for twice.** Duplicate detection across your application list, answered
-  directly from a plain-language question.
+- **Find what you're paying for twice.** Duplicate detection across your application list: pick an
+  application and see it directly, not a question Ask answers.
 - **A business case built from your own figures**, never invented to fill a gap.
 
-## Where Entelim is headed next
+## Bringing your model across
 
 ArchiMate Open Exchange is the working path across; since Archi's own format is ArchiMate-based
 already, that tends to be a more direct path than for tools built on a proprietary notation.

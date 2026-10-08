@@ -65,12 +65,8 @@ source under AGPL, self-hostable, and built on full ArchiMate 3.2 modelling, wit
   browser across every layer.
 - **CSV and Excel import** for anything not already in ArchiMate form.
 - **Find what you're paying for twice.** Duplicate-spend detection and a consolidation plan,
-  deep-linked directly from a plain-language question.
+  reached by picking an application directly, not from a question Ask answers.
 - **A business case built from your own figures**, never invented to fill a gap.
-
-## Where Entelim is headed next
-
-ArchiMate Open Exchange and CSV are the working path to bring a model across.
 
 ## Frequently asked
 

@@ -75,8 +75,9 @@ from every other.
 
 ## AI and integrations
 
-- [AI Chat](/modules/ai-chat) — Entelim's own built-in chat, backed directly by your model data
-  so every answer reasons from what's actually there, instead of guessing.
+- [AI Chat](/modules/ai-chat) — Entelim's own built-in chat, backed directly by your model data: it
+  reads your model's own records and shows which ones it cites, so you can check an answer rather
+  than take it on faith.
 - [Integrations](/modules/integrations) — every connector in one place, with a health page showing
   exactly what's actually feeding your model.
 

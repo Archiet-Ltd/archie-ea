@@ -46,11 +46,11 @@ published directly.
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
   browser across every layer.
 - **Find what you're paying for twice.** Duplicate detection across your application list and a
-  consolidation plan, answered directly from a plain-language question.
+  consolidation plan: pick an application and see them directly, not a question Ask answers.
 - **A business case built from your own figures**, never invented to fill a gap.
 - **Full ArchiMate 3.2 modelling**, named explicitly rather than left undocumented.
 
-## Where Entelim is headed next
+## Bringing your model across
 
 ArchiMate Open Exchange and CSV are the working path to bring a model across.
 

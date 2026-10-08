@@ -123,6 +123,34 @@ BANNED_CLAIMS = [
         "app/modules/intelligence/services/derived_facts.py's provenance field) carries a "
         "proof trail; a plain suggestion does not",
     ),
+    (
+        "deep-linked directly from a plain-language question",
+        "duplicate-spend detection (NAV-DUPLICATE-DETECTION, partial) is reached by picking an "
+        "application and opening its rationalization_planning deep link -- it is not answered as "
+        "a question the way Ask's other lenses are",
+    ),
+    (
+        "deep-linked from a plain-language question",
+        "duplicate-spend detection (NAV-DUPLICATE-DETECTION, partial) is reached by picking an "
+        "application and opening its rationalization_planning deep link -- it is not answered as "
+        "a question the way Ask's other lenses are",
+    ),
+    (
+        "answered directly from a plain-language question",
+        "duplicate-spend detection (NAV-DUPLICATE-DETECTION, partial) is reached by picking an "
+        "application and opening its rationalization_planning deep link -- it is not answered as "
+        "a question the way Ask's other lenses are",
+    ),
+    (
+        "deep-linked straight into the answer",
+        "duplicate-spend detection sits in its own view, reached by picking an application -- it "
+        "is not part of what Ask or AI Chat answers",
+    ),
+    (
+        "ask the question directly and get duplicate detection",
+        "duplicate-spend detection (NAV-DUPLICATE-DETECTION, partial) is reached by picking an "
+        "application, not by asking Ask a question",
+    ),
 ]
 
 # Front-matter keys that are metadata-only and must never appear as visible

@@ -19,7 +19,7 @@ people. Every question, the Business Model Canvas, the twin map, file import, an
 ## Startup — $49/month ($490/year)
 
 Ten people. For founders and small services firms, 5 to 50 people. Everything in Community, plus
-webhook delivery for events you post, audit export, and email support.
+audit export and email support.
 
 ## Team — $29/editor/month ($290/editor/year)
 
@@ -34,7 +34,7 @@ key by default, supported self-hosting, and a named contact.
 
 ## On the way
 
-Exporting and sharing answers is not live yet.
+Export any answer as a spreadsheet or PDF, and share it with a link.
 
 ## Self-hosting is always free
 

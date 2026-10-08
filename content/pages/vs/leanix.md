@@ -55,8 +55,9 @@ can ask without learning the notation first.
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
   browser across every layer and an import history of what was brought in and when.
 - **CSV and Excel import** for anything not already in ArchiMate form.
-- **Find what you're paying for twice.** Ask the question directly and get duplicate detection
-  across your application list, a consolidation plan, and spend broken down by category.
+- **Find what you're paying for twice.** Pick an application and see duplicate detection across
+  your application list, a consolidation plan, and spend broken down by category — directly, not
+  as a question Ask answers.
 - **A business case built from your own figures.** Capex, opex, three-year TCO, ROI and payback,
   computed only from data that actually exists in your model.
 

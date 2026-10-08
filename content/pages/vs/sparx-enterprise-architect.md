@@ -56,13 +56,9 @@ and its own [plans and pricing](/pricing) published directly.
   browser across every layer.
 - **CSV and Excel import** for anything not already in ArchiMate form.
 - **Find what you're paying for twice.** Duplicate-spend detection and a consolidation plan,
-  deep-linked directly from a plain-language question.
+  reached from the application itself, not a question Ask answers.
 - **A business case built from your own figures**, computed only from data that actually exists in
   your model.
-
-## Where Entelim is headed next
-
-ArchiMate Open Exchange and CSV are the working path to bring a model across.
 
 ## Frequently asked
 

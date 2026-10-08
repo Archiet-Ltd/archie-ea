@@ -58,13 +58,10 @@ full ArchiMate 3.2 modelling — one version ahead of ABACUS's certified 3.0 —
   browser across every layer and an import history of what was brought in and when.
 - **CSV and Excel import** for anything not already in ArchiMate form.
 - **Find what you're paying for twice.** Duplicate detection across your application list, a
-  consolidation plan, and spend broken down by category, deep-linked from a plain-language question.
+  consolidation plan, and spend broken down by category — pick an application and see them
+  directly, not from a question Ask answers.
 - **A business case built from your own figures.** Capex, opex, three-year TCO, ROI and payback,
   computed only from data that actually exists in your model.
-
-## Where Entelim is headed next
-
-ArchiMate Open Exchange and CSV are the working path to bring a model across.
 
 ## Frequently asked
 
