@@ -9,12 +9,15 @@ platform-wide admin status (``app.middleware.tenant_decorators.is_platform_admin
 — ``current_user.is_platform_admin`` combined with ``Permission.ADMINISTER``,
 the same pair ``platform_admin_required`` checks). A platform admin with no
 OrgRole row for their org defaults to "viewer" there and was refused every
-route below. ``_require_org_or_platform_admin`` admits either, reusing both
-existing checks rather than adding a third: the platform-admin half calls
-``tenant_decorators.is_platform_admin`` directly (the predicate
-``platform_admin_required`` itself now calls, so there is exactly one
-implementation of it), and the org half calls ``rbac_service.is_org_admin``
-unchanged.
+route below. ``tenant_decorators.require_org_or_platform_admin`` admits
+either, reusing both existing checks rather than adding a third: the
+platform-admin half calls ``tenant_decorators.is_platform_admin`` directly
+(the predicate ``platform_admin_required`` itself now calls, so there is
+exactly one implementation of it), and the org half calls
+``rbac_service.is_org_admin`` unchanged. This file used to carry its own
+private copy of that guard (``_require_org_or_platform_admin``); it now
+imports the shared, public version instead, which every other admin route
+needing the same two-vocabulary check also calls.
 
 ``app/utils/rbac.py``'s ``require_role("org_admin")`` was considered and not
 used here: its role comes from ``User.is_org_admin`` / ``User.is_platform_admin``
@@ -35,9 +38,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.flask_email import mail_available
-from app.middleware.tenant_decorators import (
-    require_org_or_platform_admin as _require_org_or_platform_admin,
-)
+from app.middleware.tenant_decorators import require_org_or_platform_admin
 from app.models.user import ROLE_DISPLAY_NAMES, User
 from app.models.org_role import OrgRole, VALID_ORG_ROLES
 from app.services.rate_limiter import rate_limit
@@ -90,7 +91,7 @@ def _render_team(org_id, error=None, status=200):
 def team():
     """List org members with their roles, and the invitations still open."""
     org_id = _require_org_id()
-    _require_org_or_platform_admin(org_id)
+    require_org_or_platform_admin(org_id)
     return _render_team(org_id)
 
 
@@ -107,7 +108,7 @@ def team_invite():
     and duplicate open invitations are refused.
     """
     org_id = _require_org_id()
-    _require_org_or_platform_admin(org_id)
+    require_org_or_platform_admin(org_id)
     email = (request.form.get("email") or "").strip().lower()
     role = request.form.get("role", "viewer")
 
@@ -173,7 +174,7 @@ def team_invite():
 def team_invitation_resend(invitation_id):
     """Send a fresh link for an open invitation; the previous link stops working."""
     org_id = _require_org_id()
-    _require_org_or_platform_admin(org_id)
+    require_org_or_platform_admin(org_id)
     from app.modules.account.services import invitation_service
 
     try:
@@ -199,7 +200,7 @@ def team_invitation_revoke(invitation_id):
     with it, so the address is free to register or be invited elsewhere.
     """
     org_id = _require_org_id()
-    _require_org_or_platform_admin(org_id)
+    require_org_or_platform_admin(org_id)
     from app.modules.account.services import invitation_service
 
     try:
@@ -216,7 +217,7 @@ def team_invitation_revoke(invitation_id):
 def team_change_role():
     """Change a member's role within the org."""
     org_id = _require_org_id()
-    _require_org_or_platform_admin(org_id)
+    require_org_or_platform_admin(org_id)
     user_id = request.form.get("user_id", type=int)
     role = request.form.get("role", "")
 
@@ -248,7 +249,7 @@ def team_change_role():
 def team_remove_member(user_id):
     """Remove a user's org role (does not delete the user account)."""
     org_id = _require_org_id()
-    _require_org_or_platform_admin(org_id)
+    require_org_or_platform_admin(org_id)
 
     # Prevent org_admin from removing themselves
     if user_id == current_user.id:

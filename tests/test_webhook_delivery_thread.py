@@ -1475,7 +1475,7 @@ def test_r45_one_admin_predicate_shared_by_webhook_and_team_routes():
 
     assert not hasattr(webhook_routes, "_is_webhook_admin")
     assert webhook_routes.require_org_or_platform_admin is require_org_or_platform_admin
-    assert team_routes._require_org_or_platform_admin is require_org_or_platform_admin
+    assert team_routes.require_org_or_platform_admin is require_org_or_platform_admin
 
 
 # ---- R3-4: the connected peer is judged by the ssrf_guard rule --------------
