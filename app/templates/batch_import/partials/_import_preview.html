@@ -140,6 +140,101 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Cost Mapping -->
+            <div x-show="previewData?.cost_mapping?.detected_columns?.length > 0" x-cloak class="mb-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="dollar-sign" class="h-5 w-5 text-primary"></i>
+                    <h4 class="font-semibold">Cost Mapping</h4>
+                    <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium"
+                          x-text="previewData?.cost_mapping?.detected_columns?.length + ' columns'"></span>
+                </div>
+
+                <!-- Column mapping summary -->
+                <div class="rounded-md border overflow-hidden mb-3">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b bg-muted/50">
+                                <th class="px-4 py-2 text-left font-medium">Field</th>
+                                <th class="px-4 py-2 text-left font-medium">Column</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="[field, column] in Object.entries(previewData?.cost_mapping?.column_mapping || {})" :key="field">
+                                <tr class="border-b">
+                                    <td class="px-4 py-2 font-mono text-xs" x-text="field"></td>
+                                    <td class="px-4 py-2" x-text="column"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Per-row cost preview -->
+                <div class="rounded-md border overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b bg-muted/50">
+                                <th class="px-4 py-2 text-left font-medium">Row</th>
+                                <th class="px-4 py-2 text-left font-medium">Application</th>
+                                <th class="px-4 py-2 text-left font-medium">Values</th>
+                                <th class="px-4 py-2 text-left font-medium">Issues</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(row, idx) in (previewData?.cost_mapping?.row_previews || [])" :key="'cost-row-' + idx">
+                                <tr class="border-b" :class="{ 'bg-destructive/5': Object.keys(row.cost_errors || {}).length > 0 }">
+                                    <td class="px-4 py-2 text-muted-foreground" x-text="row.import_row"></td>
+                                    <td class="px-4 py-2" x-text="row.application_name"></td>
+                                    <td class="px-4 py-2">
+                                        <template x-for="[field, val] in Object.entries(row.cost_fields || {})" :key="field">
+                                            <span class="inline-flex items-center rounded-md border px-2 py-0.5 text-xs mr-1 mb-1">
+                                                <span class="font-medium" x-text="{
+                                                    'total_cost_of_ownership': 'Total cost',
+                                                    'license_cost_annual': 'Licence',
+                                                    'maintenance_cost': 'Maintenance',
+                                                    'infrastructure_cost': 'Infrastructure',
+                                                    'support_cost': 'Support',
+                                                    'implementation_cost': 'Implementation',
+                                                    'development_cost_annual': 'Development',
+                                                }[field] || field.split('_').pop()"></span>:
+                                                <span class="ml-1 text-muted-foreground" x-text="val !== null ? (window.currencyManager?.format ? window.currencyManager.format(val) : val.toLocaleString()) : '—'"></span>
+                                            </span>
+                                        </template>
+                                        <span x-show="Object.keys(row.cost_fields || {}).length === 0" class="text-xs text-muted-foreground">No costs</span>
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <template x-for="[field, err] in Object.entries(row.cost_errors || {})" :key="field">
+                                            <div class="text-xs text-destructive">
+                                                <span class="font-medium" x-text="{
+                                                    'total_cost_of_ownership': 'Total cost',
+                                                    'license_cost_annual': 'Licence',
+                                                    'maintenance_cost': 'Maintenance',
+                                                    'infrastructure_cost': 'Infrastructure',
+                                                    'support_cost': 'Support',
+                                                    'implementation_cost': 'Implementation',
+                                                    'development_cost_annual': 'Development',
+                                                }[field] || field"></span>: <span x-text="err"></span>
+                                            </div>
+                                        </template>
+                                        <div x-show="Object.keys(row.cost_errors || {}).length === 0" class="text-xs text-muted-foreground">
+                                            <span x-show="Object.keys(row.cost_fields || {}).length > 0">OK</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Cost summary -->
+                <div class="mt-2 flex flex-wrap gap-2">
+                    <span class="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success-emphasis"
+                          x-text="'Rows with cost: ' + (previewData?.cost_mapping?.summary?.rows_with_cost || 0)"></span>
+                    <span class="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive-emphasis"
+                          x-text="'Rows with errors: ' + (previewData?.cost_mapping?.summary?.rows_with_errors || 0)"></span>
+                </div>
+            </div>
         </div>
     </div>
 </div>

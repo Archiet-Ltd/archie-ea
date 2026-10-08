@@ -143,6 +143,7 @@ _PUBLIC_ACCOUNT_ROUTES = (
     "/account/unconfirmed",
     "/account/sso",
     "/account/join-from-invite",
+    "/account/join",
 )
 
 

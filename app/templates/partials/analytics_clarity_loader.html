@@ -1,0 +1,22 @@
+{# Microsoft Clarity loader — loads only after consent cookie is 'accepted'.
+   Script carries the CSP nonce. #}
+{% if config.CLARITY_PROJECT_ID %}
+<script nonce="{{ csp_nonce }}">
+  (function() {
+    // Deferred Clarity loader — only creates the script tag on consent
+    window.addEventListener('analytics:consent', function(e) {
+      if (e.detail && e.detail.consent === 'accepted' && !window._clarityLoaded) {
+        window._clarityLoaded = true;
+        var script = document.createElement('script');
+        script.async = true;
+        script.src = 'https://www.clarity.ms/tag/' + '{{ config.CLARITY_PROJECT_ID }}';
+        script.nonce = '{{ csp_nonce }}';
+        document.head.appendChild(script);
+        window.clarity = window.clarity || function() {
+          (window.clarity.q = window.clarity.q || []).push(arguments);
+        };
+      }
+    });
+  })();
+</script>
+{% endif %}

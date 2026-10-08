@@ -134,6 +134,13 @@ def test_application_history_filters_csv_and_confirmed_rollback_persist(
     def _content_free_pageerror(error):
         name = getattr(error, 'name', None)
         message = getattr(error, 'message', None)
+        # Alpine rejects a superseded transition with {isFromCancelledTransition:
+        # true}. The platform and the archetype journeys already treat it as the
+        # benign signal it is; Firefox still reports it here, as
+        # "Object { isFromCancelledTransition }", even though the page's
+        # unhandledrejection handler prevents it.
+        if 'isFromCancelledTransition' in str(error):
+            return True
         return name in (None, '', 'uncaught exception', 'PageError') and (not message or message == 'Object')
 
     page.on('pageerror', lambda error: errors.append(str(error))

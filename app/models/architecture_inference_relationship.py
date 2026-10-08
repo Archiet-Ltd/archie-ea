@@ -3,13 +3,32 @@ Augments ArchiMateRelationship with cross-model-type support and audit fields.
 """
 # migration-exempt — table created via db.create_all() per migration-freeze policy
 from app import db
+from app.models.mixins.core import TenantMixin
 
 
-class ArchitectureInferenceRelationship(db.Model):
+class ArchitectureInferenceRelationship(TenantMixin, db.Model):
+    """Inferred/wizard-written ArchiMate relationship edges.
+
+    Each row belongs to one organisation and is only visible to that
+    organisation's users; the tenant filter applies through ``TenantMixin``.
+    """
+
     __tablename__ = "architecture_inference_relationship"
 
     id = db.Column(db.Integer, primary_key=True)
     architecture_id = db.Column(db.Integer, index=True, nullable=False)
+
+    # Nullable so reconcile-schema can add the column to an existing table (it
+    # only adds nullable columns). The mixin still applies the tenant filter, and a
+    # row with no organisation matches no organisation, so it is listed for
+    # nobody. New rows take the organisation of the writing request/service; there
+    # is no default owner.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     source_type = db.Column(db.String(64), nullable=False)
     source_id = db.Column(db.Integer, nullable=False)

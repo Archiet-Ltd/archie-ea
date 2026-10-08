@@ -50,6 +50,13 @@ class HybridCapabilityTenantMixin:
     This is intentionally separate from ``TenantMixin`` because the ordinary
     equality filter would hide shared reference rows.  The model-specific event
     handlers below provide its read and write mechanism.
+
+    This exact pattern has since been generalised into ``HybridTenantMixin``
+    (``app/models/mixins/core.py``) for its own shared-catalogue tables. This
+    class becomes a plain alias of that one once the capability-store
+    consolidation merges and this model's own event handlers below are
+    retired in favour of the generic ones; kept distinct for now so this
+    change does not touch that other file beyond this comment.
     """
 
     @declared_attr
@@ -352,6 +359,26 @@ class UnifiedCapability(HybridCapabilityTenantMixin, db.Model, OptimisticLockMix
         return f"<UnifiedCapability {self.name} (L{self.level})>"
 
     @classmethod
+    def visibility_predicate(cls, organization_id: int | None):
+        """The shared-reference visibility rule, in one place.
+
+        Visible: the caller's own rows, plus rows that are explicitly
+        ``scope == "reference"`` with a null organisation. An organisation-null
+        row that is *not* an explicit reference row is not shared and is
+        excluded either way — that is the "unclassified NULL-organisation row
+        is not automatically shared" rule. Callers that need to state their own
+        tenant scope explicitly (rather than depend on the ambient
+        ``do_orm_execute`` listener below) filter on this directly.
+        """
+
+        reference_scope = and_(
+            cls.scope == "reference", cls.organization_id.is_(None)
+        )
+        if organization_id is not None:
+            return or_(reference_scope, cls.organization_id == organization_id)
+        return reference_scope
+
+    @classmethod
     def visible_to_organization(cls, capability_id: int, organization_id: int | None):
         """Load a supplied identifier through an explicit hybrid-owner predicate.
 
@@ -360,13 +387,9 @@ class UnifiedCapability(HybridCapabilityTenantMixin, db.Model, OptimisticLockMix
         PostgreSQL and treats only explicit reference scope as shared.
         """
 
-        reference_scope = and_(
-            cls.scope == "reference", cls.organization_id.is_(None)
-        )
-        visibility = reference_scope
-        if organization_id is not None:
-            visibility = or_(reference_scope, cls.organization_id == organization_id)
-        return cls.query.filter(cls.id == capability_id, visibility).one_or_none()
+        return cls.query.filter(
+            cls.id == capability_id, cls.visibility_predicate(organization_id)
+        ).one_or_none()
 
     # ------------------------------------------------------------------ #
     # T-002: the single maturity accessor (ADR 0008 rule 3 — one accessor
@@ -821,6 +844,16 @@ class ValueStreamStage(TenantMixin, db.Model):
     target_duration = Column(db.Integer)  # Target in hours/days
     current_duration = Column(db.Integer)  # Current in hours/days
     quality_gate = Column(db.Boolean, default=False)
+
+    # What must be true for work to enter / leave this stage, who takes part in
+    # it and what value it hands on (BIZBOK stage definition). Free text, one
+    # item per line for stakeholders and value items. Nullable so
+    # `flask reconcile-schema` can add them to existing databases; NULL means
+    # "not recorded" and renders as an em dash, never as an empty list.
+    entry_criteria = Column(db.Text, nullable=True)
+    exit_criteria = Column(db.Text, nullable=True)
+    stakeholders = Column(db.Text, nullable=True)
+    value_items = Column(db.Text, nullable=True)
 
     # Timestamps
     created_at = Column(db.DateTime, default=datetime.utcnow)

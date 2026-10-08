@@ -1586,6 +1586,8 @@ def update_element(solution_id, element_id):
         data = request.get_json() or {}
         orch = JourneyOrchestrator(solution_id)
         result = orch.update_element(element_id, data)
+        if isinstance(result, dict) and result.get("property_errors"):
+            return api_error(result["error"], 400)
         return api_success(data=result)
     except Exception as e:
         logger.error("Element update failed: %s", e, exc_info=True)
@@ -2138,6 +2140,8 @@ def update_proposal_properties(solution_id, proposal_id):
         data = request.get_json() or {}
         orch = JourneyOrchestrator(solution_id)
         result = orch.update_proposal_properties(proposal_id, data.get("properties", {}))
+        if isinstance(result, dict) and result.get("property_errors"):
+            return api_error(result["error"], 400)
         return api_success(data=result)
     except Exception as e:
         logger.error("Property update failed: %s", e, exc_info=True)
@@ -4760,9 +4764,17 @@ def _sync_capability_realization_links(solution_id):
     wizard stores all elements with element_table='archimate_elements' and uses
     the type column to distinguish Goals/Capabilities/Drivers.
     """
-    from app.models.solution_models import SolutionArchiMateElement
+    from app.models.solution_models import Solution, SolutionArchiMateElement
     from app.models.architecture_inference_relationship import ArchitectureInferenceRelationship
     from app.models.archimate_core import ArchiMateElement
+
+    # ArchitectureInferenceRelationship.organization_id has no request-context
+    # default (see the model's own nullable override) -- every writer, this one
+    # included, must set it explicitly or the row is NULL and invisible to every
+    # tenant. The caller (_require_solution_owner) already tenant-scoped this
+    # solution_id, so re-resolving it here is safe and gives the real owner.
+    _solution = Solution.query.get(solution_id)
+    _org_id = _solution.organization_id if _solution else None
 
     # Capability elements: strategy layer, type='Capability'
     cap_elements = (
@@ -4811,6 +4823,7 @@ def _sync_capability_realization_links(solution_id):
             try:
                 rel = ArchitectureInferenceRelationship(
                     architecture_id=solution_id,
+                    organization_id=_org_id,
                     source_type="Goal",
                     source_id=goal.element_id,
                     target_type="Capability",
@@ -4833,6 +4846,7 @@ def _sync_capability_realization_links(solution_id):
             try:
                 rel = ArchitectureInferenceRelationship(
                     architecture_id=solution_id,
+                    organization_id=_org_id,
                     source_type="Driver",
                     source_id=driver.element_id,
                     target_type="Capability",

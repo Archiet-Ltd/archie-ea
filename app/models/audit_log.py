@@ -8,11 +8,29 @@ captured here.
 
 ``created_at`` uses ``server_default='NOW()'`` so that the timestamp is set
 by the database engine and cannot be falsified by application-clock tampering.
+
+Integrity chain
+---------------
+Every row inserted through any path (``AuditLog.log``, ``AuditLogService``,
+a bare ``AuditLog(...)`` on the session, or a Core insert through
+``chain_insert``) is sealed into a per-organisation hash chain: ``prev_hash``
+is the ``row_hash`` of the organisation's previous entry and ``row_hash`` is
+the SHA-256 of ``prev_hash`` plus the canonical form of the row's columns.
+Altering, deleting or inserting a row in SQL breaks the chain at that row,
+which ``verify_chain`` reports. Rows written before the chain existed keep
+NULL hashes and are reported as not covered, never as verified.
+
+Other audit stores (ArchiMate composer, ARB, application rationalisation)
+are copied into this table as they are written, carrying ``source_table`` /
+``source_id``; the source row's ``retired_into_id`` points at its copy.
 """
 
-from datetime import datetime
+import hashlib
+import json
+from datetime import datetime, timezone
 
-from sqlalchemy import Index
+from sqlalchemy import Index, event, select
+from sqlalchemy.engine import Engine
 
 from app.extensions import db
 import logging
@@ -33,6 +51,8 @@ class AuditLog(db.Model):
         Index("ix_soc2_audit_org_created", "organization_id", "created_at"),
         Index("ix_soc2_audit_user_created", "user_id", "created_at"),
         Index("ix_soc2_audit_record", "table_name", "record_id"),
+        # Chain tail lookup and ordered export/verify per organisation.
+        Index("ix_soc2_audit_org_id", "organization_id", "id"),
         {"extend_existing": True},
     )
 
@@ -65,6 +85,16 @@ class AuditLog(db.Model):
     )
     extra_json = db.Column(db.JSON, nullable=True)
 
+    # Provenance for rows copied from another audit store (ADR 0008). NULL for
+    # rows written here first.
+    source_table = db.Column(db.String(100), nullable=True)
+    source_id = db.Column(db.Integer, nullable=True)
+
+    # Integrity chain, per organisation. NULL on rows recorded before the
+    # chain existed; set on every row inserted since.
+    prev_hash = db.Column(db.String(64), nullable=True)
+    row_hash = db.Column(db.String(64), nullable=True)
+
     def __repr__(self):
         return (
             f"<AuditLog id={self.id} action={self.action!r} "
@@ -84,6 +114,9 @@ class AuditLog(db.Model):
             "ip_address": self.ip_address,
             "user_agent": self.user_agent,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "source_table": self.source_table,
+            "source_id": self.source_id,
+            "row_hash": self.row_hash,
         }
 
     # ------------------------------------------------------------------ #
@@ -122,7 +155,7 @@ class AuditLog(db.Model):
         try:
             from app.models.user import User
 
-            u = User.query.get(self.user_id)
+            u = User.query.filter_by(id=self.user_id).first()
             return u.email if u and getattr(u, "email", None) else str(self.user_id)
         except Exception:
             return str(self.user_id)
@@ -135,11 +168,19 @@ class AuditLog(db.Model):
     def description(self):
         if not self.action:
             return ""
+        if self.action == "tool_refused" and isinstance(self.new_value, dict):
+            # A refused AI tool call: which tool, and the rule that refused it.
+            return "AI tool '%s' refused. %s" % (
+                self.new_value.get("tool") or "unknown",
+                self.new_value.get("rule_description") or "",
+            )
         _rec = f"#{self.record_id}" if self.record_id else ""
         return f"{self.action} {self.table_name or ''}{_rec}".strip()
 
     @property
     def status(self):
+        if self.action == "tool_refused":
+            return "refused"
         return ""  # not tracked
 
     @property
@@ -273,3 +314,451 @@ class AuditLog(db.Model):
             record_id=entity_id,
             new_value={"ai_originated": True},
         )
+
+    # ------------------------------------------------------------------ #
+    #  Integrity chain: verification and the recorded verification result #
+    # ------------------------------------------------------------------ #
+
+    VERIFY_ACTION = "verify"
+
+    @classmethod
+    def org_predicate(cls, org_id):
+        """The one tenant predicate every read of this table goes through."""
+        if org_id is None:
+            return cls.organization_id.is_(None)
+        return cls.organization_id == org_id
+
+    @classmethod
+    def verify_chain(cls, org_id, batch_size=2000):
+        """Walk ``org_id``'s chain in id order and report the first break.
+
+        Returns a dict with ``status`` one of ``intact`` / ``broken`` /
+        ``empty`` (no sealed entry to check), ``checked`` (sealed entries
+        verified), ``unsealed`` (entries recorded before the chain existed,
+        which this cannot vouch for), and on a break ``first_broken_id`` and
+        ``reason``, plus ``last_id`` / ``last_row_hash`` of the newest entry
+        verified. A chain cannot show that its newest entries were removed;
+        the recorded ``last_row_hash``, kept by the auditor with the result,
+        is what shows that.
+        """
+        table = cls.__table__
+
+        result = {
+            "status": "empty",
+            "checked": 0,
+            "unsealed": 0,
+            "first_broken_id": None,
+            "reason": None,
+            "last_id": None,
+            "last_row_hash": None,
+        }
+        prev = None
+        sealed_seen = False
+        last_seen_id = 0
+        while True:
+            rows = db.session.execute(
+                select(table)
+                .where(cls.org_predicate(org_id), table.c.id > last_seen_id)
+                .order_by(table.c.id)
+                .limit(batch_size)
+            ).mappings().all()
+            if not rows:
+                break
+            for row in rows:
+                last_seen_id = row["id"]
+                if row["row_hash"] is None:
+                    if not sealed_seen:
+                        result["unsealed"] += 1
+                        continue
+                    return cls._broken(result, row["id"], "This entry carries no seal.")
+                sealed_seen = True
+                if row["prev_hash"] != prev:
+                    return cls._broken(
+                        result, row["id"],
+                        "This entry does not follow the one before it: an entry "
+                        "was removed, inserted or re-sealed.",
+                    )
+                if row["row_hash"] not in (
+                    chain_digest(row["prev_hash"], row),
+                    chain_digest(row["prev_hash"], row, LEGACY_CHAINED_COLUMNS),
+                ):
+                    return cls._broken(result, row["id"], "This entry was altered after it was recorded.")
+                prev = row["row_hash"]
+                result["checked"] += 1
+                result["last_id"] = row["id"]
+                result["last_row_hash"] = prev
+        result["status"] = "intact" if sealed_seen else "empty"
+        return result
+
+    @staticmethod
+    def _broken(result, row_id, reason):
+        result["status"] = "broken"
+        result["first_broken_id"] = row_id
+        result["reason"] = reason
+        return result
+
+    @classmethod
+    def verify_and_record(cls, org_id, user_id=None):
+        """Verify ``org_id``'s chain and record the result as an entry of its own."""
+        result = cls.verify_chain(org_id)
+        cls.log(
+            action=cls.VERIFY_ACTION,
+            table_name=cls.__tablename__,
+            organization_id=org_id,
+            user_id=user_id,
+            new_value=result,
+        )
+        return result
+
+    @classmethod
+    def latest_verification(cls, org_id):
+        return (
+            cls.query.filter(
+                cls.org_predicate(org_id),
+                cls.action == cls.VERIFY_ACTION,
+                cls.table_name == cls.__tablename__,
+            )
+            .order_by(cls.id.desc())
+            .first()
+        )
+
+    # ------------------------------------------------------------------ #
+    #  Export: every matching row, in id order, in bounded batches.       #
+    # ------------------------------------------------------------------ #
+
+    @classmethod
+    def iter_rows(cls, criteria, upto_id, batch_size=1000):
+        """Yield row mappings matching ``criteria`` with ``id <= upto_id``.
+
+        Keyset-paginated so an export of any size holds one batch in memory
+        and never stops at an arbitrary cap. ``criteria`` must include the
+        organisation predicate.
+        """
+        table = cls.__table__
+        last_id = 0
+        while True:
+            rows = db.session.execute(
+                select(table)
+                .where(*criteria, table.c.id > last_id, table.c.id <= upto_id)
+                .order_by(table.c.id)
+                .limit(batch_size)
+            ).mappings().all()
+            if not rows:
+                return
+            yield from rows
+            last_id = rows[-1]["id"]
+
+
+# ---------------------------------------------------------------------- #
+#  Sealing. One implementation for ORM inserts and Core inserts.         #
+# ---------------------------------------------------------------------- #
+
+#: Columns covered by ``row_hash``. ``prev_hash`` is covered by prefixing it.
+#: ``id`` is assigned by the database and is not hashed: the chain's order is
+#: id order (appends per organisation are serialised by the advisory lock),
+#: and ``prev_hash`` links make any removal, insertion or reordering visible.
+CHAINED_COLUMNS = (
+    "organization_id", "user_id", "action", "table_name", "record_id",
+    "old_value", "new_value", "ip_address", "user_agent", "created_at",
+    "extra_json", "source_table", "source_id",
+)
+#: What entries sealed before the id left the seal covered: the same columns
+#: plus ``id``. Those seals stay valid, so verification accepts either form.
+LEGACY_CHAINED_COLUMNS = ("id", *CHAINED_COLUMNS)
+_JSON_COLUMNS = ("old_value", "new_value", "extra_json")
+_INT_COLUMNS = ("organization_id", "user_id", "record_id", "source_id")
+_STR_COLUMNS = ("action", "table_name", "ip_address", "user_agent", "source_table")
+
+# Namespace for pg_advisory_xact_lock(namespace, organisation): serialises
+# chain appends per organisation so two transactions cannot fork the chain.
+_CHAIN_LOCK_NAMESPACE = 50_210_001
+_CHAIN_INFO_KEY = "_audit_chain"
+
+
+def _canonical_json(value):
+    if value is None:
+        return None
+    # Round-trip first so tuples, int keys and the like take the shape the
+    # database hands back, then serialise deterministically.
+    return json.dumps(
+        json.loads(json.dumps(value, default=str)),
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    )
+
+
+def _normalise_timestamp(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    if value.tzinfo is not None:
+        value = value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
+def _normalise(values):
+    """Coerce values to the types the database stores, in place."""
+    for key in _INT_COLUMNS:
+        if values.get(key) is not None:
+            values[key] = int(values[key])
+    for key in _STR_COLUMNS:
+        if values.get(key) is not None:
+            values[key] = str(values[key])
+    values["created_at"] = _normalise_timestamp(values.get("created_at")) or datetime.utcnow()
+    return values
+
+
+def chain_digest(prev_hash, values, columns=CHAINED_COLUMNS):
+    """SHA-256 over ``prev_hash`` and the canonical form of the chained columns."""
+    body = {}
+    for key in columns:
+        value = values.get(key)
+        if key in _JSON_COLUMNS:
+            value = _canonical_json(value)
+        elif key == "created_at" and value is not None:
+            value = _normalise_timestamp(value).isoformat(timespec="microseconds")
+        body[key] = value
+    payload = (prev_hash or "") + "\n" + json.dumps(
+        body, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _chain_state(connection):
+    """Per-transaction chain tails, keyed by the server transaction id.
+
+    Rows sealed earlier in the same flush are not in the table yet, so the
+    tail of each organisation's chain is carried here for the life of the
+    transaction. Keying on the server's transaction id means a state left
+    behind by a transaction that ended without a visible commit or rollback
+    is never reused.
+    """
+    txid = connection.exec_driver_sql("SELECT txid_current()").scalar()
+    state = connection.info.get(_CHAIN_INFO_KEY)
+    if not state or state["txid"] != txid:
+        state = {"txid": txid, "tails": {}}
+        connection.info[_CHAIN_INFO_KEY] = state
+    return state
+
+
+def seal(connection, values):
+    """Assign ``prev_hash`` and ``row_hash`` to an audit row about to be inserted."""
+    _normalise(values)
+    state = _chain_state(connection)
+    org_id = values.get("organization_id")
+    key = org_id if org_id is not None else 0
+    if key not in state["tails"]:
+        connection.execute(
+            db.text("SELECT pg_advisory_xact_lock(:ns, :key)"),
+            {"ns": _CHAIN_LOCK_NAMESPACE, "key": key},
+        )
+        table = AuditLog.__table__
+        tail = connection.execute(
+            select(table.c.row_hash)
+            .where(AuditLog.org_predicate(org_id), table.c.row_hash.isnot(None))
+            .order_by(table.c.id.desc())
+            .limit(1)
+        ).scalar()
+        state["tails"][key] = tail
+    values["prev_hash"] = state["tails"][key]
+    values["row_hash"] = chain_digest(values["prev_hash"], values)
+    state["tails"][key] = values["row_hash"]
+    return values
+
+
+def chain_insert(connection, **values):
+    """Insert one sealed audit row through ``connection``; returns its id.
+
+    For writers that run mid-flush (mapper events) and so cannot use the
+    session. ORM inserts are sealed by the ``before_insert`` hook below.
+    """
+    seal(connection, values)
+    table = AuditLog.__table__
+    return connection.execute(table.insert().values(**values).returning(table.c.id)).scalar()
+
+
+@event.listens_for(AuditLog, "before_insert")
+def _seal_orm_insert(mapper, connection, target):
+    values = {key: getattr(target, key, None) for key in CHAINED_COLUMNS}
+    seal(connection, values)
+    for key in ("prev_hash", "row_hash", "created_at", *_INT_COLUMNS, *_STR_COLUMNS):
+        setattr(target, key, values.get(key))
+
+
+def _forget_chain_state(conn, *args):
+    conn.info.pop(_CHAIN_INFO_KEY, None)
+
+
+# A rolled-back savepoint removes rows the cached tail may point at.
+for _evt in ("commit", "rollback", "rollback_savepoint"):
+    event.listen(Engine, _evt, _forget_chain_state)
+
+
+# ---------------------------------------------------------------------- #
+#  Copies from the other audit stores (ADR 0008: one audit store).       #
+# ---------------------------------------------------------------------- #
+
+# One literal statement per table: table names are never interpolated into SQL.
+_ORG_OF_SQL = {
+    "saved_diagrams": "SELECT organization_id FROM saved_diagrams WHERE id = :id",  # tenancy-ok: attributing one row by its own key
+    "users": "SELECT organization_id FROM users WHERE id = :id",  # tenancy-ok: attributing one row by its own key
+    "application_components": "SELECT organization_id FROM application_components WHERE id = :id",  # tenancy-ok: attributing one row by its own key
+}
+
+#: Points one source row at its copy (``:audit_id``, ``:id``), per source table.
+RETIRE_SQL = {
+    "archimate_audit_logs": "UPDATE archimate_audit_logs SET retired_into_id = :audit_id WHERE id = :id",  # tenancy-ok: one row by its own key
+    "arb_audit_logs": "UPDATE arb_audit_logs SET retired_into_id = :audit_id WHERE id = :id",  # tenancy-ok: one row by its own key
+    "rationalization_audit_entries": "UPDATE rationalization_audit_entries SET retired_into_id = :audit_id WHERE id = :id",  # tenancy-ok: one row by its own key
+}
+
+
+def _org_of(connection, table, row_id):
+    if row_id is None:
+        return None
+    return connection.execute(db.text(_ORG_OF_SQL[table]), {"id": row_id}).scalar()
+
+
+def _existing_user(connection, user_id):
+    """``user_id`` if that user exists, else None (source stores hold loose ids)."""
+    try:
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        return None
+    found = connection.execute(
+        db.text("SELECT id FROM users WHERE id = :id"), {"id": user_id}  # tenancy-ok: existence check of one id
+    ).scalar()
+    return found
+
+
+def _clip(value, length):
+    return str(value)[:length] if value is not None else None
+
+
+def _from_arb(connection, row):
+    return {
+        "organization_id": row["organization_id"],
+        "user_id": _existing_user(connection, row["user_id"]),
+        "action": _clip(row["action"], 20),
+        "table_name": _clip(f"arb:{row['entity_type']}", 100),
+        "record_id": row["entity_id"],
+        "old_value": row["old_value"],
+        "new_value": {
+            "entity_reference": row["entity_reference"],
+            "description": row["action_description"],
+            "new_value": row["new_value"],
+            "changed_fields": row["changed_fields"],
+        },
+        "ip_address": _clip(row["ip_address"], 45),
+        "user_agent": _clip(row["user_agent"], 500),
+        "created_at": row["timestamp"],
+        "extra_json": {"source_action": row["action"], "request_id": row["request_id"]},
+    }
+
+
+def _from_archimate(connection, row):
+    # No organisation column: the diagram's organisation, else its author's.
+    org_id = _org_of(connection, "saved_diagrams", row["viewpoint_id"])
+    if org_id is None:
+        org_id = _org_of(connection, "users", row["user_id"])
+    return {
+        "organization_id": org_id,
+        "user_id": _existing_user(connection, row["user_id"]),
+        "action": _clip(row["action"], 20),
+        "table_name": _clip(f"archimate:{row['entity_type'] or 'diagram'}", 100),
+        "record_id": row["entity_id"],
+        "old_value": row["old_value"],
+        "new_value": {
+            "entity_name": row["entity_name"],
+            "viewpoint_id": row["viewpoint_id"],
+            "value": row["new_value"],
+        },
+        "created_at": row["created_at"],
+        "extra_json": {"source_action": row["action"]},
+    }
+
+
+def _from_rationalization(connection, row):
+    org_id = _org_of(connection, "application_components", row["application_id"])
+    user_id = _existing_user(connection, row["actor"])
+    return {
+        "organization_id": org_id,
+        "user_id": user_id,
+        "action": _clip(row["action"], 20),
+        "table_name": "rationalization:application",
+        "record_id": row["application_id"],
+        "old_value": row["before_state"],
+        "new_value": {
+            "after_state": row["after_state"],
+            "details": row["details"],
+            "score_id": row["score_id"],
+        },
+        "created_at": row["created_at"],
+        "extra_json": {
+            "source_action": row["action"],
+            "actor": row["actor"],
+            "actor_type": row["actor_type"],
+        },
+    }
+
+
+#: source table -> builder of the AuditLog copy's values.
+MIRRORED_SOURCES = {
+    "archimate_audit_logs": _from_archimate,
+    "arb_audit_logs": _from_arb,
+    "rationalization_audit_entries": _from_rationalization,
+}
+
+
+def mirror_values(connection, source_table, row):
+    """AuditLog values for one source row, or None when it has no organisation.
+
+    A row whose organisation cannot be determined is never copied into
+    shared scope; the backfill lists it for the platform administrator.
+    """
+    values = MIRRORED_SOURCES[source_table](connection, row)
+    if values.get("organization_id") is None:
+        return None
+    values["source_table"] = source_table
+    values["source_id"] = row["id"]
+    return values
+
+
+def mirror_source_row(connection, source_table, row):
+    """Copy one source row into this table and point it at its copy.
+
+    Runs inside a savepoint: a failure here is logged and never fails the
+    action the source row records. Returns the copy's id, or None.
+    """
+    try:
+        with connection.begin_nested():
+            values = mirror_values(connection, source_table, row)
+            if values is None:
+                return None
+            audit_id = chain_insert(connection, **values)
+            connection.execute(
+                db.text(RETIRE_SQL[source_table]),
+                {"audit_id": audit_id, "id": row["id"]},
+            )
+        return audit_id
+    except Exception:
+        logger.warning(
+            "Copy of %s #%s into the audit log failed (non-blocking)",
+            source_table, row.get("id"), exc_info=True,
+        )
+        return None
+
+
+def _mirror_after_insert(mapper, connection, target):
+    source_table = getattr(target, "__tablename__", None)
+    if source_table not in MIRRORED_SOURCES:
+        return
+    from sqlalchemy.orm.attributes import set_committed_value
+
+    row = {attr.key: getattr(target, attr.key, None) for attr in mapper.column_attrs}
+    audit_id = mirror_source_row(connection, source_table, row)
+    if audit_id is not None and hasattr(target, "retired_into_id"):
+        set_committed_value(target, "retired_into_id", audit_id)
+
+
+event.listen(db.Model, "after_insert", _mirror_after_insert, propagate=True)

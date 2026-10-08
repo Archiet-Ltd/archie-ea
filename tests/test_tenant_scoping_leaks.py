@@ -278,6 +278,9 @@ def test_dashboard_user_count_is_org_scoped(db_session, make_org, tenant_ctx, ap
     every organization saw the platform-wide user count instead of its own.
     """
     org_a, org_b = make_org("dash-a"), make_org("dash-b")
+    from app.services.billing_plans import set_contract_plan
+
+    set_contract_plan(org_b, "enterprise", None)  # five people: more than Community admits
     _make_user(db_session, org_a.id, "dash-a-1")
     _make_user(db_session, org_a.id, "dash-a-2")
     for i in range(5):

@@ -12,11 +12,15 @@ Directory layout maps to URL families:
   content/pages/site/            → /<slug> (about, security, privacy, terms,
                                     contact, features, pricing, docs — one
                                     fixed top-level page per file)
+  content/pages/legal/           → /<slug> (legal pages held back until
+                                    LEGAL_PAGES_ENABLED is on — see
+                                    app/services/legal_pages.py)
 """
 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -24,8 +28,176 @@ from typing import Any
 import bleach
 import markdown
 import yaml
+from markupsafe import Markup
+
+from app.services.billing_plans import CONTACT_SALES_URL, PLANS
 
 CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content" / "pages"
+STATIC_ROOT = Path(__file__).resolve().parent.parent / "static"
+IMG_MODULES_DIR = STATIC_ROOT / "img" / "modules"
+IMG_USE_CASES_DIR = STATIC_ROOT / "img" / "use-cases"
+VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
+
+# ── seeded demo personas (Lantern Quay Systems -- app/commands/seed_demo_company.py) ──
+# scripts/capture_screenshots.py --modules logs in as these to capture the
+# registries below; kept here (not duplicated in the capture script) so the
+# fictional persona list has one source.
+DEMO_PERSONA = "demo@lantern-quay.example.com"
+ITOPS_ADMIN_PERSONA = "sage.itops@lantern-quay.example.com"
+APP_MANAGER_PERSONA = "casey.inventory@lantern-quay.example.com"
+PROCUREMENT_PERSONA = "taylor.procurement@lantern-quay.example.com"
+
+# ── module & use-case screenshot/recording registry ─────────────────────────
+# Single source of truth for which live pages get a captured screen: the path
+# scripts/capture_screenshots.py --modules visits, which seeded persona can
+# reach it, and the caption/alt text get_page_screenshot()/get_page_recording()
+# below attach to the image. The capture script imports this same list rather
+# than keeping its own copy, so the capture tool and the renderer can never
+# drift out of agreement about what a slug's image is of.
+#
+# Each entry: (slug, path, persona_email, caption, alt_text)
+MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
+    ("ai-chat", "/ai-chat", DEMO_PERSONA,
+     "The AI assistant answering a question from the organisation's own architecture model.",
+     "Screenshot of the AI Chat module answering a question about Lantern Quay Systems' architecture."),
+    ("applications", "/applications/", DEMO_PERSONA,
+     "The application portfolio list, with an owner, cost and lifecycle stage recorded for every entry.",
+     "Screenshot of the Applications module listing Lantern Quay Systems' application portfolio."),
+    ("arb", "/arb/", DEMO_PERSONA,
+     "The Architecture Review Board dashboard, tracking review sessions and decisions in progress.",
+     "Screenshot of the Architecture Review Board module's dashboard."),
+    ("architecture-model", "/architecture/", DEMO_PERSONA,
+     "The ArchiMate element browser, spanning the business, application, technology and motivation layers.",
+     "Screenshot of the Architecture Model module's ArchiMate element browser."),
+    ("business-case", "/business-case/", DEMO_PERSONA,
+     "Business cases with their status, three-year TCO and return on investment.",
+     "Screenshot of the Business Case module's list of business cases."),
+    ("business-model-canvas", "/business-model/", DEMO_PERSONA,
+     "The business model canvas library, with each canvas's operating-model archetype.",
+     "Screenshot of the Business Model Canvas module's canvas library."),
+    ("compliance-frameworks", "/dashboard/compliance", DEMO_PERSONA,
+     "The compliance frameworks dashboard, tracking framework coverage across the estate.",
+     "Screenshot of the Compliance Frameworks module's dashboard."),
+    ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,
+     "The duplicate detection dashboard, flagging applications that may overlap in function.",
+     "Screenshot of the Duplicate Detection module's dashboard."),
+    ("my-applications", "/my-applications/", APP_MANAGER_PERSONA,
+     "An application owner's personal dashboard of the applications they're responsible for.",
+     "Screenshot of the My Applications module's owner dashboard."),
+    ("portfolio", "/portfolio/", DEMO_PERSONA,
+     "The portfolio dashboard, summarising active initiatives and programmes.",
+     "Screenshot of the Portfolio module's dashboard."),
+    ("procurement", "/procurement/renewals", PROCUREMENT_PERSONA,
+     "The contract renewals dashboard, showing upcoming vendor renewal dates.",
+     "Screenshot of the Procurement module's contract renewals dashboard."),
+    ("projects", "/enterprise/implementation/work-packages", DEMO_PERSONA,
+     "The work packages list, tracking delivery programmes in progress.",
+     "Screenshot of the Projects module's work packages list."),
+    ("risk-register", "/risks/", DEMO_PERSONA,
+     "The risk register, with likelihood, impact and a mitigation plan recorded for each risk.",
+     "Screenshot of the Risk Register module."),
+    ("solutions", "/solutions/", DEMO_PERSONA,
+     "The solutions list, tracking each solution's design progress and next action.",
+     "Screenshot of the Solutions module's solution list."),
+    ("vendors", "/applications/vendors", DEMO_PERSONA,
+     "The vendor catalogue, with each vendor's type, products and contract status.",
+     "Screenshot of the Vendors module's vendor catalogue."),
+]
+
+# ── capture-pending: named explicitly, by design (lead review 2026-10-06) ──
+# Every slug below is genuinely capture_status: live in its own content file
+# -- the FEATURE is real and shipped, cta: plans stays untouched, and
+# nothing here ever flips that front-matter. What's pending is only the
+# capture: each one's first screenshot/recording was reviewed and rejected
+# (empty data, the wrong screen, or a recording that never performs the use
+# case it claims), the file was removed, and round 2 reseeds what each
+# screen actually needs and recaptures it properly.
+#
+# This dict (not just an absence from MODULE_CAPTURES) is what keeps the
+# registry-completeness tests strict: test_module_screenshots.py asserts
+# every live module/use-case is in MODULE_CAPTURES **or** named here, so a
+# module that quietly loses its capture without being added to this list
+# still fails the test, exactly as it would have before any pending list
+# existed. Round 2 deletes a name from here the same moment it adds the
+# slug back to the matching *_CAPTURES list above -- the two are meant to
+# be mutually exclusive, never both.
+MODULE_CAPTURE_PENDING: dict[str, str] = {
+    "integrations": (
+        "connector health dashboard throws \"An internal error occurred\" on any "
+        "data: app/routes/connector_routes.py api_list_connectors() calls .value "
+        "on connector_type/status/sync_mode as though they were Enum columns, but "
+        "app/models/connector_config.py declares all three as plain strings -- "
+        "pre-existing bug, unrelated file, out of scope to fix here"
+    ),
+    "capability-maturity": (
+        "heat map showed \"No capabilities yet\" for an organisation that has 24 "
+        "capabilities elsewhere (investment-analysis) -- this screen reads a "
+        "different capability store than the one seeded; a reuse-register-shaped "
+        "bug, separate brief owed"
+    ),
+    "batch-import": (
+        "completed jobs rendered at 0% progress and 0 elements generated -- "
+        "reads broken, not done; needs a real completed run with actual elements"
+    ),
+    "org-chart": (
+        "captured screen was the module's hub page (three link cards), not the "
+        "organisation chart itself -- needs actors/hierarchy seeded and the "
+        "/organization/chart route captured instead"
+    ),
+    "diagrams": (
+        "captured screen was a list of diagram names, not a rendered diagram -- "
+        "needs a diagram actually open in the Composer"
+    ),
+    "industry-apqc": "0 processes shown on every seeded framework",
+    "investment-analysis": "domain Unknown and 0 apps coverage on every capability row",
+    "gap-analysis": "type None on every row",
+    "rationalization": (
+        "captured screen was the \"Get started\" onboarding panel, not the "
+        "rationalization view itself -- needs scores past onboarding"
+    ),
+    "roadmaps": "0 gaps detected; plateaus with no description and 0 gaps",
+    "value-streams": "0 stages and 0 capabilities on every value stream",
+}
+
+# The one live use-case page: same screen as the capability-maturity module
+# (its own url_slug front-matter field points at the identical route). Empty
+# for the same reason as capability-maturity above -- see
+# USE_CASE_SCREENSHOT_PENDING.
+USE_CASE_SCREENSHOT_CAPTURES: list[tuple[str, str, str, str, str]] = []
+
+USE_CASE_SCREENSHOT_PENDING: dict[str, str] = {
+    "capability-maturity-heatmap": (
+        "same capability-maturity heat map issue as the module above -- "
+        "\"No capabilities yet\""
+    ),
+}
+
+# Four multi-step use cases keyed by the readable /use-cases/<slug> form --
+# the pending URL rewrite from /use-cases/uc-* to this readable form has
+# since landed, so these are keyed the same way USE_CASE_SCREENSHOT_PENDING
+# above is: a rename, not a recapture. Each entry: (slug, steps,
+# persona_email, caption, alt_text) -- steps themselves only matter to the
+# capture script. Empty for round 1 -- see USE_CASE_VIDEO_PENDING below;
+# round 2 restores these once each recording actually performs the use case
+# it claims rather than touring past it.
+USE_CASE_VIDEO_CAPTURES: list[tuple[str, list, str, str, str]] = []
+
+USE_CASE_VIDEO_PENDING: dict[str, str] = {
+    "import-archimate-model": "recording never selects or uploads a file",
+    "what-breaks-and-who-gets-called": (
+        "recording ends on the Twin map's empty \"pick a system\" prompt"
+    ),
+    "architecture-review-board": "recording never submits or decides a change",
+    "business-case-for-the-cio": "recording never opens an actual business case",
+}
+
+# uc-s4-02-set-up-in-an-afternoon.md ("set it up from our spreadsheet in an
+# afternoon") is deliberately in neither USE_CASE_VIDEO_CAPTURES nor
+# USE_CASE_VIDEO_PENDING: its own content says plainly "What Entelim is
+# building ... Coming soon. Join the waiting list" (capture_status:
+# not_applicable_not_yet_built, state: briefed, not on_main). There is no
+# built screen behind that page to record, which is a different thing from
+# a capture being merely pending.
 
 FAMILY_DIR_MAP = {
     "vision": "vision",
@@ -34,6 +206,7 @@ FAMILY_DIR_MAP = {
     "comparison": "vs",
     "dogfood": "dogfood",
     "site": "site",
+    "legal": "legal",
 }
 
 FAMILY_URL_PREFIX = {
@@ -45,6 +218,8 @@ FAMILY_URL_PREFIX = {
     # No prefix: each file under content/pages/site/ is its own fixed
     # top-level page (content/pages/site/about.md -> /about).
     "site": "",
+    # Same shape as "site", but only published while LEGAL_PAGES_ENABLED is on.
+    "legal": "",
 }
 
 _md = markdown.Markdown(extensions=["extra"])
@@ -65,14 +240,20 @@ _ALLOWED_ATTRS = {
 }
 
 
-def _sanitize_html(html: str) -> str:
-    """Strip unsafe HTML tags and attributes from rendered Markdown."""
-    return bleach.clean(
+def _sanitize_html(html: str) -> Markup:
+    """Strip unsafe HTML tags and attributes from rendered Markdown.
+
+    Returns ``Markup`` (a ``str`` subclass), not a plain string: this is the
+    one place sanitization actually happens, so it is also the one place
+    that gets to mark the result trusted -- the template then renders it
+    with no bare ``|safe`` for test_template_escaping.py to flag.
+    """
+    return Markup(bleach.clean(
         html,
         tags=_ALLOWED_TAGS,
         attributes=_ALLOWED_ATTRS,
         strip=True,
-    )
+    ))
 
 
 @dataclass
@@ -87,6 +268,7 @@ class PublicPage:
     front_matter: dict[str, Any] = field(default_factory=dict)
     source_path: Path | None = None
     canonical_url: str | None = None
+    description: str = ""
 
     @property
     def cta(self) -> str | None:
@@ -95,6 +277,16 @@ class PublicPage:
     @property
     def page_family(self) -> str:
         return self.front_matter.get("page_family", self.family)
+
+    @property
+    def effective_canonical_url(self) -> str:
+        """The canonical link every page must carry.
+
+        ``canonical_url`` (set only for a legacy archiet.ai url_slug, see
+        _build_canonical()) wins when present; every other page is
+        self-referencing -- its own current URL on this domain.
+        """
+        return self.canonical_url or (CANONICAL_BASE_URL + self.url)
 
 
 def _parse_front_matter(raw: str) -> tuple[dict[str, Any], str]:
@@ -134,12 +326,173 @@ def _build_canonical(front_matter: dict[str, Any]) -> str | None:
     return None
 
 
+# The one canonical host for every self-referencing canonical link and meta
+# description below -- same literal already used by sitemap_xml()/llms_txt()
+# in app/main/views.py, kept here too rather than introducing a second source
+# of truth for it.
+CANONICAL_BASE_URL = "https://entelim.org"
+
+
+def _derive_description(front_matter: dict[str, Any], title: str) -> str:
+    """A one-line meta description, always non-empty.
+
+    An explicit front-matter ``description:`` wins once a page sets one --
+    the content-writer standard's place to put a real, considered summary.
+    Until a page has one, this falls back to the page's own title rather
+    than excerpting body copy: body text was written to be read as an
+    article, not audited for standing alone, out of context, inside an HTML
+    attribute (one page's own reassurance that sales is "not on a waiting
+    list" is exactly the kind of sentence that reads fine as a paragraph and
+    badly as a six-word snippet). The title is always short, always exists,
+    and never says anything the page itself does not already say in <title>.
+    """
+    explicit = front_matter.get("description")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    return title
+
+
+def _use_case_slug_and_url(front_matter: dict[str, Any], filename_slug: str) -> tuple[str, str]:
+    """A use-case (function-per-segment) page's real, crawlable address is its
+    own ``url_slug`` front-matter -- ``/use-cases/<slug>`` for every page in
+    this family -- not its internal ``uc-sN-NN-*`` filename, which was never
+    meant to be public. A page with no ``url_slug`` yet (should not happen
+    once every file carries one, but kept as a safety fallback so a brand new
+    file is still reachable immediately) falls back to its filename slug.
+    """
+    prefix = FAMILY_URL_PREFIX["function-per-segment"] + "/"
+    url_slug = front_matter.get("url_slug")
+    if isinstance(url_slug, str) and url_slug.startswith(prefix):
+        return url_slug[len(prefix):], url_slug
+    return filename_slug, f"{FAMILY_URL_PREFIX['function-per-segment']}/{filename_slug}"
+
+
+_OLD_USE_CASE_FILENAME_RE = re.compile(r"uc-s\d-\d{2}-[a-z0-9-]+")
+
+
+def use_case_redirect_target(old_filename_slug: str) -> str | None:
+    """The new ``/use-cases/<slug>`` URL for a use-case page previously
+    served at its internal ``uc-sN-NN-*`` filename slug, or ``None`` if
+    ``old_filename_slug`` doesn't even look like one of those filenames, is
+    not a known filename in this family, or is one whose public slug was
+    never different (nothing to redirect).
+
+    Lets the ``/use-cases/<slug>`` route 301 an already-indexed old URL to
+    its new one instead of just 404ing it. The filename-shape check runs
+    first and fails closed: without it, any slug-shaped string reaching this
+    function would open whatever file matches it verbatim under
+    content/pages/function-per-segment/ and 301 to that file's own url_slug,
+    which is not a claim this function should make about arbitrary input.
+    """
+    if not _OLD_USE_CASE_FILENAME_RE.fullmatch(old_filename_slug):
+        return None
+    family_dir = CONTENT_ROOT / FAMILY_DIR_MAP["function-per-segment"]
+    if not family_dir.is_dir():
+        return None
+    file_path = family_dir / f"{old_filename_slug}.md"
+    if not file_path.is_file():
+        return None
+    front_matter, _ = _parse_front_matter(file_path.read_text(encoding="utf-8"))
+    public_slug, public_url = _use_case_slug_and_url(front_matter, old_filename_slug)
+    if public_slug == old_filename_slug:
+        return None
+    return public_url
+
+
+def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
+    """Screenshot metadata for a module or use-case page, if one exists.
+
+    Gated on capture_status: live -- a page flipped back to awaiting_capture
+    stops rendering its image with no code change, since this check runs
+    every request -- and on the file actually existing on disk, which is what
+    lets MODULE_CAPTURES/USE_CASE_SCREENSHOT_CAPTURES list a page before its
+    image has been captured without a broken <img> shipping in the meantime.
+    """
+    if page.front_matter.get("capture_status") != "live":
+        return None
+
+    if page.page_family == "module":
+        registry = MODULE_CAPTURES
+        static_dir = IMG_MODULES_DIR
+        url_prefix = "/static/img/modules"
+    elif page.page_family == "function-per-segment":
+        registry = USE_CASE_SCREENSHOT_CAPTURES
+        static_dir = IMG_USE_CASES_DIR
+        url_prefix = "/static/img/use-cases"
+    else:
+        return None
+
+    entry = next((e for e in registry if e[0] == page.slug), None)
+    if entry is None:
+        return None
+    _, _, _, caption, alt = entry
+
+    image_path = static_dir / f"{page.slug}.webp"
+    if not image_path.is_file():
+        return None
+
+    from PIL import Image
+
+    with Image.open(image_path) as im:
+        width, height = im.size
+
+    return {
+        "url": f"{url_prefix}/{page.slug}.webp",
+        "width": width,
+        "height": height,
+        "alt": alt,
+        "caption": caption,
+    }
+
+
+def get_page_recording(page: "PublicPage") -> dict[str, Any] | None:
+    """Recording metadata for a use-case page with a captured video, if any.
+
+    Independent of capture_status: these use cases get a recording precisely
+    because their answer is a sequence a single screenshot cannot show, and
+    most are (rightly) still marked awaiting_capture for the screenshot that
+    field was designed around. The three files existing together -- video,
+    poster, and the sidecar with the measured duration -- is this function's
+    own, separate signal; it does not read capture_status at all.
+    """
+    if page.page_family != "function-per-segment":
+        return None
+
+    entry = next((e for e in USE_CASE_VIDEO_CAPTURES if e[0] == page.slug), None)
+    if entry is None:
+        return None
+    _, _, _, caption, alt = entry
+
+    video_path = VIDEO_USE_CASES_DIR / f"{page.slug}.webm"
+    poster_path = VIDEO_USE_CASES_DIR / f"{page.slug}-poster.webp"
+    meta_path = VIDEO_USE_CASES_DIR / f"{page.slug}.json"
+    if not (video_path.is_file() and poster_path.is_file() and meta_path.is_file()):
+        return None
+
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+
+    return {
+        "video_url": f"/static/video/use-cases/{page.slug}.webm",
+        "poster_url": f"/static/video/use-cases/{page.slug}-poster.webp",
+        "width": meta["width"],
+        "height": meta["height"],
+        "duration_seconds": meta["duration_seconds"],
+        "captured_date": meta["captured_date"],
+        "caption": caption,
+        "alt": alt,
+        "name": f"{page.title} — recorded walkthrough",
+    }
+
+
 def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     raw = file_path.read_text(encoding="utf-8")
     front_matter, body_md = _parse_front_matter(raw)
+    if family == "function-per-segment":
+        slug, url = _use_case_slug_and_url(front_matter, slug)
     body_html = _sanitize_html(_md.reset().convert(body_md))
     title = _extract_title(body_html, front_matter)
     canonical = _build_canonical(front_matter)
+    description = _derive_description(front_matter, title)
     return PublicPage(
         family=family,
         slug=slug,
@@ -149,6 +502,7 @@ def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
         front_matter=front_matter,
         source_path=file_path,
         canonical_url=canonical,
+        description=description,
     )
 
 
@@ -162,7 +516,11 @@ def load_all_pages() -> list[PublicPage]:
     if not CONTENT_ROOT.is_dir():
         return pages
 
+    from app.services.legal_pages import legal_pages_enabled
+
     for family, dir_name in FAMILY_DIR_MAP.items():
+        if family == "legal" and not legal_pages_enabled():
+            continue
         family_dir = CONTENT_ROOT / dir_name
         if not family_dir.is_dir():
             continue
@@ -204,6 +562,18 @@ def load_page(family: str, slug: str | None = None) -> PublicPage | None:
     if slug is None:
         return None
 
+    if family == "function-per-segment":
+        # The public slug is this family's own url_slug front-matter, not
+        # the internal uc-sN-NN-* filename -- find the file whose public
+        # slug (see _use_case_slug_and_url) matches the one requested.
+        for md_file in sorted(family_dir.glob("*.md")):
+            filename_slug = _slug_from_filename(md_file.name)
+            front_matter, _ = _parse_front_matter(md_file.read_text(encoding="utf-8"))
+            public_slug, public_url = _use_case_slug_and_url(front_matter, filename_slug)
+            if public_slug == slug:
+                return _load_page(md_file, family, filename_slug, public_url)
+        return None
+
     file_path = family_dir / f"{slug}.md"
     if not file_path.is_file():
         return None
@@ -213,7 +583,14 @@ def load_page(family: str, slug: str | None = None) -> PublicPage | None:
 
 
 def build_jsonld(page: PublicPage) -> str:
-    """Build JSON-LD structured data for a page based on its family."""
+    """Build JSON-LD structured data for a page based on its family.
+
+    Returns ``Markup`` (a ``str`` subclass -- every existing caller treating
+    it as plain text, including ``json.loads()``, is unaffected): the value
+    is already escaped for a <script> block by the time it leaves this
+    function, so the template renders it with no bare ``|safe`` for
+    test_template_escaping.py to flag.
+    """
     family = page.page_family
     site_url = "https://entelim.org"
 
@@ -230,7 +607,7 @@ def build_jsonld(page: PublicPage) -> str:
     else:
         ld = _jsonld_webpage(page, site_url)
 
-    return _escape_for_script_block(json.dumps(ld, indent=2, ensure_ascii=False))
+    return Markup(_escape_for_script_block(json.dumps(ld, indent=2, ensure_ascii=False)))
 
 
 def _escape_for_script_block(serialised: str) -> str:
@@ -239,14 +616,122 @@ def _escape_for_script_block(serialised: str) -> str:
     ``json.dumps`` does not escape ``<``, ``>`` or ``&``, so a title or answer
     containing ``</script>`` would end the block early and let the rest run as
     markup. The escaped forms are still valid JSON and decode to the same text.
+    Returned as a plain ``str``: the caller (``build_jsonld``) is the one that
+    marks the final value ``Markup``-trusted, since this helper's own output
+    still needs JSON-encoding (by ``json.dumps`` above) before that's true.
     """
     return (
         serialised.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     )
 
 
-def _jsonld_webpage(page: PublicPage, site_url: str) -> dict[str, Any]:
+def _self_hosted_offer() -> dict[str, Any]:
+    """The self-hosted AGPL edition: unlimited editors, $0, forever.
+
+    Kept distinct from the hosted "Community" tier below, which is also $0
+    but is a different thing -- hosted by Entelim, capped at three people --
+    so a reader (human or crawler) cannot read one price as describing both.
+    """
     return {
+        "@type": "Offer",
+        "name": "Self-Hosted Edition",
+        "price": "0",
+        "priceCurrency": "USD",
+        "description": (
+            "Free to self-host under AGPL-3.0, at any size, for as long as "
+            "you want -- unlimited editors, no hosted-tier cap."
+        ),
+    }
+
+
+def _flat_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
+    """An Offer for a flat (non per-unit) hosted plan price at one interval."""
+    suffix = "month" if interval == "month" else "year"
+    price_text = "Free" if amount == 0 else f"${amount}/{suffix}"
+    return {
+        "@type": "Offer",
+        "name": f"{plan.name} (hosted)",
+        "price": str(amount),
+        "priceCurrency": plan.display_currency,
+        "description": f"{plan.summary} {price_text}, hosted by Entelim.",
+    }
+
+
+def _per_unit_plan_offer(plan, interval: str, amount: int) -> dict[str, Any]:
+    """An Offer for a per-seat hosted plan price at one interval.
+
+    Carries a UnitPriceSpecification with a referenceQuantity rather than a
+    flat Offer.price, since the real charge is quantity (seats) x this
+    per-unit amount, not this amount alone.
+    """
+    unit = plan.display_price_unit or "unit"
+    billing_duration = "P1M" if interval == "month" else "P1Y"
+    suffix = "month" if interval == "month" else "year"
+    return {
+        "@type": "Offer",
+        "name": f"{plan.name} (hosted, per {unit})",
+        "price": str(amount),
+        "priceCurrency": plan.display_currency,
+        "description": (
+            f"{plan.summary} ${amount}/{unit}/{suffix}, hosted by Entelim."
+        ),
+        "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "price": str(amount),
+            "priceCurrency": plan.display_currency,
+            "unitText": unit,
+            "billingDuration": billing_duration,
+            "referenceQuantity": {
+                "@type": "QuantitativeValue",
+                "value": 1,
+                "unitText": unit,
+            },
+        },
+    }
+
+
+def _enterprise_offer(plan, site_url: str) -> dict[str, Any]:
+    """Enterprise's contract floor: a minimum, not a fixed, purchasable price.
+
+    Typed AggregateOffer (schema.org's type for a price that starts at a
+    floor rather than naming one fixed amount), carrying lowPrice rather
+    than price, and pointing at contact sales rather than a checkout flow,
+    since Enterprise is sold by contract and is not purchasable online.
+    """
+    floor = plan.display_price_floor_annual
+    return {
+        "@type": "AggregateOffer",
+        "name": plan.name,
+        "lowPrice": str(floor),
+        "priceCurrency": plan.display_currency,
+        "url": f"{site_url}{CONTACT_SALES_URL}",
+        "description": (
+            f"{plan.summary} Sold by contract, from ${floor:,}/year -- contact sales."
+        ),
+    }
+
+
+def _hosted_plan_offers(site_url: str) -> list[dict[str, Any]]:
+    """The real hosted tiers (Community, Startup, Team, Enterprise), read
+    from billing_plans.PLANS's display-price fields -- the one place those
+    dollar figures live, so this list can never silently drift from the
+    pricing page or the home page again.
+    """
+    offers: list[dict[str, Any]] = []
+    for plan in PLANS:
+        if plan.display_price_floor_annual is not None:
+            offers.append(_enterprise_offer(plan, site_url))
+            continue
+        offer_fn = _per_unit_plan_offer if plan.display_price_per_unit else _flat_plan_offer
+        if plan.display_price_monthly is not None:
+            offers.append(offer_fn(plan, "month", plan.display_price_monthly))
+        if plan.display_price_annual is not None:
+            offers.append(offer_fn(plan, "year", plan.display_price_annual))
+    return offers
+
+
+def _jsonld_webpage(page: PublicPage, site_url: str) -> dict[str, Any]:
+    ld: dict[str, Any] = {
         "@context": "https://schema.org",
         "@type": "WebPage",
         "name": page.title,
@@ -256,13 +741,31 @@ def _jsonld_webpage(page: PublicPage, site_url: str) -> dict[str, Any]:
             "name": "Entelim",
             "applicationCategory": "Enterprise Architecture",
             "operatingSystem": "Web",
-            "offers": {
-                "@type": "Offer",
-                "price": "0",
-                "priceCurrency": "USD",
-                "description": "Free to self-host under AGPL",
-            },
+            "offers": [_self_hosted_offer(), *_hosted_plan_offers(site_url)],
         },
+    }
+    recording = get_page_recording(page)
+    if recording is not None:
+        ld["video"] = _jsonld_video_object(recording, site_url)
+    return ld
+
+
+def _jsonld_video_object(recording: dict[str, Any], site_url: str) -> dict[str, Any]:
+    """VideoObject for a use-case page's recording, so search engines and AI
+    answers can cite the clip directly rather than just the page around it.
+
+    Required fields per the brief: name, description, thumbnailUrl,
+    uploadDate, duration, contentUrl.
+    """
+    duration_seconds = int(round(recording["duration_seconds"]))
+    return {
+        "@type": "VideoObject",
+        "name": recording["name"],
+        "description": recording["caption"],
+        "thumbnailUrl": f"{site_url}{recording['poster_url']}",
+        "uploadDate": f"{recording['captured_date']}T00:00:00Z",
+        "duration": f"PT{duration_seconds}S",
+        "contentUrl": f"{site_url}{recording['video_url']}",
     }
 
 
@@ -275,22 +778,7 @@ def _jsonld_software_app(page: PublicPage, site_url: str) -> dict[str, Any]:
         "applicationCategory": "Enterprise Architecture",
         "operatingSystem": "Web",
         "description": page.title,
-        "offers": [
-            {
-                "@type": "Offer",
-                "name": "Self-Hosted",
-                "price": "0",
-                "priceCurrency": "USD",
-                "description": "Free to self-host under AGPL",
-            },
-            {
-                "@type": "Offer",
-                "name": "Commercial Licence",
-                "price": "0",
-                "priceCurrency": "USD",
-                "description": "Available for organisations that need different terms",
-            },
-        ],
+        "offers": [_self_hosted_offer(), *_hosted_plan_offers(site_url)],
     }
 
 

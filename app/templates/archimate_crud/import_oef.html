@@ -20,6 +20,10 @@
            class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
             <i data-lucide="arrow-left" class="h-4 w-4" aria-hidden="true"></i> Back to Dashboard
         </a>
+<a href="{{ url_for('architect_ui.import_restore_points') }}" data-testid="link-restore-points"
+           class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
+            <i data-lucide="history" class="h-4 w-4" aria-hidden="true"></i> Restore before an import
+        </a>
     {% endmacro %}
     {{ page_shell(title='Import ArchiMate Model (OEF)', subtitle='Upload an ArchiMate Open Exchange Format XML file', actions_caller=_ps_actions) }}
 
@@ -34,44 +38,65 @@
 
     {% if result %}
     <!-- Import Result -->
-    <div class="rounded-lg border bg-card p-6 space-y-4">
+    <div class="rounded-lg border bg-card p-6 space-y-4" data-testid="import-result">
         <h2 class="text-lg font-semibold">Import Result</h2>
+        <p class="text-sm text-muted-foreground">
+            {% if result.model_name %}Model <span class="font-medium text-foreground">{{ result.model_name }}</span>,
+            {% endif %}strategy <span class="font-medium text-foreground">{{ {'skip_duplicates': 'Skip duplicates', 'update_existing': 'Update existing', 'create_all': 'Create all'}.get(result.strategy, result.strategy) }}</span>.
+        </p>
+
+        <h3 class="text-sm font-semibold text-foreground">Elements</h3>
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div class="rounded-md bg-muted p-3 text-center">
-                <div class="text-2xl font-bold text-primary">{{ result.elements_created }}</div>
-                <div class="text-xs text-muted-foreground mt-1">Elements Created</div>
+                <div class="text-2xl font-bold text-primary" data-testid="result-elements-created">{{ result.created }}</div>
+                <div class="text-xs text-muted-foreground mt-1">Created</div>
             </div>
             <div class="rounded-md bg-muted p-3 text-center">
-                <div class="text-2xl font-bold text-muted-foreground">{{ result.elements_skipped }}</div>
-                <div class="text-xs text-muted-foreground mt-1">Elements Skipped (dedup)</div>
+                <div class="text-2xl font-bold text-primary" data-testid="result-elements-updated">{{ result.updated }}</div>
+                <div class="text-xs text-muted-foreground mt-1">Updated</div>
             </div>
             <div class="rounded-md bg-muted p-3 text-center">
-                <div class="text-2xl font-bold text-primary">{{ result.relationships_created }}</div>
-                <div class="text-xs text-muted-foreground mt-1">Relationships Created</div>
+                <div class="text-2xl font-bold text-muted-foreground" data-testid="result-elements-skipped">{{ result.skipped }}</div>
+                <div class="text-xs text-muted-foreground mt-1">Skipped (already stored)</div>
             </div>
             <div class="rounded-md bg-muted p-3 text-center">
-                <div class="text-2xl font-bold {{ 'text-destructive' if result.errors else 'text-success' }}">
-                    {{ result.errors | length }}
-                </div>
-                <div class="text-xs text-muted-foreground mt-1">Errors</div>
+                <div class="text-2xl font-bold {{ 'text-destructive-emphasis' if result.failed else 'text-success' }}" data-testid="result-elements-refused">{{ result.failed }}</div>
+                <div class="text-xs text-muted-foreground mt-1">Refused</div>
             </div>
         </div>
 
-        {% if result.warnings %}
-        <div class="rounded-md border border-warning bg-warning/5 p-4 space-y-1">
-            <p class="text-sm font-medium text-warning-emphasis">Warnings:</p>
-            <ul class="list-disc list-inside text-sm text-warning-emphasis/80 space-y-0.5">
-                {% for w in result.warnings %}
-                <li>{{ w }}</li>
-                {% endfor %}
-            </ul>
+        <div class="space-y-3" data-testid="relationship-import-result">
+            <h3 class="text-sm font-semibold text-foreground">Relationships</h3>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="rounded-md bg-muted p-3 text-center">
+                    <div class="text-2xl font-bold text-primary" data-testid="result-relationships-created">{{ result.relationships_created }}</div>
+                    <div class="text-xs text-muted-foreground mt-1">Created</div>
+                </div>
+                <div class="rounded-md bg-muted p-3 text-center">
+                    <div class="text-2xl font-bold text-muted-foreground" data-testid="result-relationships-skipped">{{ result.relationships_skipped }}</div>
+                    <div class="text-xs text-muted-foreground mt-1">Already stored</div>
+                </div>
+                <div class="rounded-md bg-muted p-3 text-center">
+                    <div class="text-2xl font-bold {{ 'text-destructive-emphasis' if result.relationships_failed else 'text-success' }}" data-testid="result-relationships-refused">{{ result.relationships_failed | length }}</div>
+                    <div class="text-xs text-muted-foreground mt-1">Refused</div>
+                </div>
+            </div>
+            {% if result.relationships_failed %}
+            <div class="rounded-md border border-destructive bg-destructive/5 p-4 space-y-1">
+                <p class="text-sm font-medium text-destructive-emphasis">Relationships not imported:</p>
+                <ul class="list-disc list-inside text-sm text-destructive-emphasis/80 space-y-0.5">
+                    {% for failure in result.relationships_failed %}
+                    <li>{{ failure.type }}: {{ failure.source }} &rarr; {{ failure.target }} &mdash; {{ failure.reason }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
 
         {% if result.errors %}
-        <div class="rounded-md border border-destructive bg-destructive/5 p-4 space-y-1">
-            <p class="text-sm font-medium text-destructive-emphasis">Errors encountered during import:</p>
-            <ul class="list-disc list-inside text-sm text-destructive-emphasis/80 space-y-0.5">
+        <div class="rounded-md border border-warning bg-warning/5 p-4 space-y-1">
+            <p class="text-sm font-medium text-warning-emphasis">Messages from the import:</p>
+            <ul class="list-disc list-inside text-sm text-warning-emphasis/80 space-y-0.5">
                 {% for err in result.errors %}
                 <li>{{ err }}</li>
                 {% endfor %}
@@ -79,47 +104,217 @@
         </div>
         {% endif %}
 
-        <p class="text-sm text-muted-foreground">
-            Created {{ result.elements_created }} elements ({{ result.elements_skipped }} skipped as duplicates),
-            {{ result.relationships_created }} relationships.
-            {% if result.errors | length > 0 %}
-                {{ result.errors | length }} error(s).
-            {% else %}
-                No errors.
-            {% endif %}
-        </p>
-
-        <a href="{{ url_for('archimate_crud.dashboard') }}"
+        <a href="/architecture/elements"
            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
             <i data-lucide="layout-grid" class="h-4 w-4" aria-hidden="true"></i>
-            View Architecture Dashboard
+            Open the element catalog
         </a>
     </div>
     {% endif %}
 
     <!-- Upload Form -->
-    <div class="rounded-lg border bg-card p-6 space-y-4">
+    <div class="rounded-lg border bg-card p-6 space-y-4" x-data="oefImport()">
         <h2 class="text-lg font-semibold">Upload OEF XML File</h2>
-        <form method="POST" action="{{ url_for('architect_ui.import_oef') }}" enctype="multipart/form-data" class="space-y-4">
+        <form method="POST" action="{{ url_for('architect_ui.import_oef') }}" enctype="multipart/form-data" class="space-y-4"
+              x-ref="importForm" @change="syncStrategy($event)">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div
                 class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                x-data="{ fileName: '' }"
                 @click="$refs.oefFile.click()">
                 <i data-lucide="upload-cloud" class="h-10 w-10 text-muted-foreground mb-3" aria-hidden="true"></i>
                 <p class="text-sm font-medium">Click to select or drag &amp; drop</p>
-                <p class="text-xs text-muted-foreground mt-1">ArchiMate OEF XML files (.xml)</p>
+                <p class="text-xs text-muted-foreground mt-1">ArchiMate OEF XML files (.xml), up to 10 MB</p>
                 <p class="text-xs text-primary mt-2" x-text="fileName"></p>
-                <input x-ref="oefFile" id="oef_file" name="oef_file" type="file" accept=".xml" class="sr-only"
-                    @change="fileName = $event.target.files[0]?.name || ''" aria-label="Oef file">
+                <input x-ref="oefFile" id="oef_file" name="oef_file" type="file" accept=".xml,application/xml,text/xml" class="sr-only"
+                    @change="fileChosen($event)" aria-label="OEF XML file">
             </div>
 
-            <button type="submit"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 w-full justify-center">
-                <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>
-                Import Model
-            </button>
+            {% from 'components/radio_group.html' import radio_group %}
+            {{ radio_group(
+                name='strategy', label='When an element is already stored (same name and type)',
+                value=strategy or 'skip_duplicates',
+                options=[
+                    {'value': 'skip_duplicates', 'label': 'Skip duplicates', 'description': 'Leave the stored element as it is; only new elements are created.'},
+                    {'value': 'update_existing', 'label': 'Update existing', 'description': 'Overwrite the stored description and merge the imported properties.'},
+                    {'value': 'create_all', 'label': 'Create all', 'description': 'Create every element again, even when one with the same name and type exists.'},
+                ]) }}
+
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <button type="button" data-testid="btn-preview-import"
+                    @click="runPreview()" :disabled="!fileName || previewing"
+                    class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 sm:flex-1 disabled:opacity-50 disabled:pointer-events-none">
+                    <span x-show="previewing" x-cloak class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
+                    <i x-show="!previewing" x-cloak data-lucide="eye" class="h-4 w-4" aria-hidden="true"></i>
+                    Preview import
+                </button>
+                <button type="submit" data-testid="btn-import-model"
+                    class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 sm:flex-1 disabled:opacity-50 disabled:pointer-events-none">
+                    <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>
+                    Import Model
+                </button>
+            </div>
         </form>
+
+        <div x-show="previewError" x-cloak role="alert"
+             class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive-emphasis"
+             x-text="previewError"></div>
+
+        <!-- Preview: what Import Model will do with this file, nothing written yet -->
+        <div x-show="preview" x-cloak class="space-y-4 border-t border-border pt-4" data-testid="import-preview">
+            <h3 class="text-sm font-semibold text-foreground">
+                Preview<span x-show="preview && preview.model_name" x-cloak>: <span x-text="preview ? preview.model_name : ''"></span></span>
+            </h3>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <div class="rounded-md bg-muted p-3 text-center">
+                    <div class="text-xl font-bold text-foreground" data-testid="preview-total" x-text="count('total')"></div>
+                    <div class="text-xs text-muted-foreground mt-1">Elements</div>
+                </div>
+                <div class="rounded-md bg-muted p-3 text-center">
+                    <div class="text-xl font-bold text-success" data-testid="preview-new" x-text="count('new')"></div>
+                    <div class="text-xs text-muted-foreground mt-1">New</div>
+                </div>
+                <div class="rounded-md bg-muted p-3 text-center">
+                    <div class="text-xl font-bold text-primary" data-testid="preview-exists" x-text="count('exists')"></div>
+                    <div class="text-xs text-muted-foreground mt-1">Already stored</div>
+                </div>
+                <div class="rounded-md bg-muted p-3 text-center">
+                    <div class="text-xl font-bold text-warning-emphasis" data-testid="preview-conflict" x-text="count('conflict')"></div>
+                    <div class="text-xs text-muted-foreground mt-1">Stored, different</div>
+                </div>
+                <div class="rounded-md bg-muted p-3 text-center">
+                    <div class="text-xl font-bold text-destructive-emphasis" data-testid="preview-invalid" x-text="count('invalid')"></div>
+                    <div class="text-xs text-muted-foreground mt-1">Will be refused</div>
+                </div>
+            </div>
+            <p class="text-sm text-muted-foreground" data-testid="preview-outcome" x-text="outcomeSentence()"></p>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-md bg-muted p-3 text-center">
+                    <div class="text-xl font-bold text-success" data-testid="preview-relationships-valid" x-text="count('relationships_valid')"></div>
+                    <div class="text-xs text-muted-foreground mt-1">Valid relationships</div>
+                </div>
+                <div class="rounded-md bg-muted p-3 text-center">
+                    <div class="text-xl font-bold text-destructive-emphasis" data-testid="preview-relationships-invalid" x-text="count('relationships_invalid')"></div>
+                    <div class="text-xs text-muted-foreground mt-1">Will be refused</div>
+                </div>
+            </div>
+
+            <div x-show="invalidRelationships().length" x-cloak class="rounded-md border border-destructive bg-destructive/5 p-4 space-y-1">
+                <p class="text-sm font-medium text-destructive-emphasis">Relationships that will not be imported:</p>
+                <ul class="list-disc list-inside text-sm text-destructive-emphasis/80 space-y-0.5">
+                    <template x-for="rel in invalidRelationships()" :key="rel.identifier">
+                        <li x-text="rel.type + ': ' + rel.source + ' → ' + rel.target + ' — ' + rel.reason"></li>
+                    </template>
+                </ul>
+            </div>
+
+            <div class="overflow-x-auto rounded-md border border-border">
+                <table class="w-full text-sm">
+                    <thead class="bg-muted/50">
+                        <tr>
+                            <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Name</th>
+                            <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Type</th>
+                            <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        <template x-for="(elem, idx) in (preview ? preview.elements : [])" :key="elem.identifier + '-' + idx">
+                            <tr>
+                                <td class="px-3 py-2 font-medium text-foreground break-words" x-text="elem.name"></td>
+                                <td class="px-3 py-2 text-muted-foreground" x-text="elem.type"></td>
+                                <td class="px-3 py-2">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"
+                                          :class="statusClass(elem.status)" x-text="statusLabel(elem.status)"></span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('alpine:init', function () {
+    Alpine.data('oefImport', function () {
+        return {
+            fileName: '',
+            strategy: {{ (strategy or 'skip_duplicates') | tojson }},
+            previewing: false,
+            previewError: '',
+            preview: null,
+
+            fileChosen(event) {
+                const file = event.target.files[0];
+                this.fileName = file ? file.name : '';
+                this.preview = null;
+                this.previewError = '';
+            },
+
+            syncStrategy(event) {
+                if (event.target && event.target.name === 'strategy') {
+                    this.strategy = event.target.value;
+                }
+            },
+
+            runPreview() {
+                const self = this;
+                self.previewing = true;
+                self.previewError = '';
+                self.preview = null;
+                return Platform.fetch({{ url_for('architect_ui.import_oef_preview') | tojson }}, {
+                    method: 'POST',
+                    body: new FormData(self.$refs.importForm),
+                    silent: true,  // this panel paints its own error state
+                }).then(function (data) {
+                    self.preview = data;
+                }).catch(function (err) {
+                    const errors = err && err.data && err.data.errors;
+                    self.previewError = (errors && errors.length ? errors[0] : (err && err.message)) || 'Preview failed.';
+                }).finally(function () {
+                    self.previewing = false;
+                });
+            },
+
+            count(key) {
+                if (!this.preview || !this.preview.summary) return '—';
+                const value = this.preview.summary[key];
+                return value === undefined || value === null ? '—' : value;
+            },
+
+            invalidRelationships() {
+                if (!this.preview || !this.preview.relationships) return [];
+                return this.preview.relationships.filter(function (rel) { return rel.status === 'invalid'; });
+            },
+
+            outcomeSentence() {
+                if (!this.preview || !this.preview.summary) return '';
+                const s = this.preview.summary;
+                const stored = (s.exists || 0) + (s.conflict || 0);
+                if (this.strategy === 'create_all') {
+                    return 'Create all: ' + ((s.new || 0) + stored) + ' elements will be created, ' + (s.invalid || 0) + ' refused.';
+                }
+                if (this.strategy === 'update_existing') {
+                    return 'Update existing: ' + (s.new || 0) + ' will be created, ' + stored + ' updated, ' + (s.invalid || 0) + ' refused.';
+                }
+                return 'Skip duplicates: ' + (s.new || 0) + ' will be created, ' + stored + ' left as stored, ' + (s.invalid || 0) + ' refused.';
+            },
+
+            statusLabel(status) {
+                return { new: 'New', exists: 'Already stored', conflict: 'Stored, different', invalid: 'Will be refused' }[status] || status;
+            },
+
+            statusClass(status) {
+                return {
+                    new: 'bg-success/10 text-success-emphasis border-success/30',
+                    exists: 'bg-primary/10 text-primary border-primary/30',
+                    conflict: 'bg-warning/10 text-warning-emphasis border-warning/30',
+                    invalid: 'bg-destructive/10 text-destructive-emphasis border-destructive/30',
+                }[status] || 'bg-muted text-muted-foreground border-border';
+            },
+        };
+    });
+});
+</script>
 {% endblock %}

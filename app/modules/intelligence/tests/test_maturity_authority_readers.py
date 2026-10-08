@@ -316,6 +316,100 @@ class TestCapabilityGapDetailToDictRendersReasonCode:
             assert rendered["maturity_reason_code"] is None
 
 
+class TestEngineMaturityReadsGoThroughTheHelper:
+    """ADR-005 (extended): ``CapabilityHeatmapService.maturity_for_elements``
+    and ``CapabilityHeatmapService.maturity_for_capability_ids`` are the only
+    two engine-facing maturity reads this codebase allows (ADR-MAT-1). An
+    engine holding element or capability ids reaches a capability's current
+    maturity, its target, whether it was assessed, whether it is under
+    target and by how much, only through one of those two methods -- never
+    by reading the authority's own current/target maturity columns off
+    ``UnifiedCapability`` directly, never through either of the two
+    source-provenance accessors, and never by calling the strict,
+    capability-id-keyed accessor itself from outside the one file that hosts
+    the two helpers (and, until a later task repoints it, the one existing
+    caller named below).
+    """
+
+    ENGINE_FILES = [
+        "app/modules/intelligence/services/query_service.py",
+        "app/modules/ai_chat/services/ai_gap_detection_service.py",
+        "app/services/gap_discovery_service.py",
+        "app/modules/business_model_canvas/service.py",
+        "app/modules/business_case/service.py",
+    ]
+
+    # The only files allowed to call the strict, capability-id-keyed
+    # accessor directly. This list can only shrink: query_service.py's
+    # value_streams_at_risk was repointed onto the batched helper, so only
+    # capability_heatmap_service.py remains.
+    ACCESSOR_CALLERS = {
+        "app/modules/capabilities/services/capability_heatmap_service.py",
+    }
+
+    def test_no_engine_reads_the_authority_columns_or_the_source_accessors_directly(self):
+        pattern = re.compile(
+            r"\.current_maturity_level\b|\.target_maturity_level\b"
+            r"|maturity_for_source\(|maturity_for_sources\("
+        )
+        hits = []
+        for rel in self.ENGINE_FILES:
+            path = REPO_ROOT / rel
+            text = path.read_text(encoding="utf-8")
+            for lineno, line in enumerate(text.splitlines(), start=1):
+                if line.strip().startswith("#"):
+                    continue
+                if pattern.search(line):
+                    hits.append(f"{rel}:{lineno}: {line.strip()}")
+        assert hits == [], (
+            "an engine read the maturity authority's columns, or a source-"
+            "provenance accessor, directly instead of going through "
+            f"CapabilityHeatmapService's batched helper: {hits}"
+        )
+
+    def test_accessor_is_called_only_from_its_allowed_callers(self):
+        pattern = re.compile(r"UnifiedCapability\.maturity_for_capability_ids\(")
+        hits = []
+        for path in APP_DIR.rglob("*.py"):
+            if "/tests/" in path.as_posix() or path.name.startswith("test_"):
+                continue
+            rel = path.relative_to(REPO_ROOT).as_posix()
+            if rel in self.ACCESSOR_CALLERS:
+                continue
+            text = path.read_text(encoding="utf-8")
+            for lineno, line in enumerate(text.splitlines(), start=1):
+                if line.strip().startswith("#"):
+                    continue
+                if pattern.search(line):
+                    hits.append(f"{rel}:{lineno}: {line.strip()}")
+        assert hits == [], (
+            "UnifiedCapability.maturity_for_capability_ids was called outside "
+            "its allowed callers -- route an engine through "
+            f"CapabilityHeatmapService.maturity_for_elements / "
+            f".maturity_for_capability_ids instead: {hits}"
+        )
+
+    def test_accessor_callers_list_names_no_stale_entry(self):
+        """ACCESSOR_CALLERS is an allow-list, not a record of history -- an
+        entry that no longer calls the strict accessor (because a later
+        change repointed it onto the batched helper, as query_service.py's
+        value_streams_at_risk was) silently widens what the test above
+        actually enforces without anyone noticing. Pins that every listed
+        caller still earns its place."""
+        pattern = re.compile(r"UnifiedCapability\.maturity_for_capability_ids\(")
+        for rel in self.ACCESSOR_CALLERS:
+            path = REPO_ROOT / rel
+            text = path.read_text(encoding="utf-8")
+            calls = [
+                line for line in text.splitlines()
+                if not line.strip().startswith("#") and pattern.search(line)
+            ]
+            assert calls, (
+                f"{rel} is listed in ACCESSOR_CALLERS but no longer calls "
+                "the strict accessor -- drop it from the list"
+            )
+
+
 class TestCapabilityMaturityAssessmentHistorySurvives:
     """D-2 / brief AC-9, task 03 AC-2/3/4/6: the per-event audit trail must not
     have been touched by this task. Plant two assessments in different

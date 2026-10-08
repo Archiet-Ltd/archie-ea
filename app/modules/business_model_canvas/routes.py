@@ -206,8 +206,8 @@ def api_list():
     return success_response([
         {
             "id": c.id,
-            "name": c.name or "",
-            "description": c.description or "",
+            "name": c.name,
+            "description": c.description,
             "operating_model_type": c.operating_model_type,
             "updated_at": c.updated_at.isoformat() if c.updated_at else None,
         }

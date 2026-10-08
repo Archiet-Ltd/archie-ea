@@ -1094,9 +1094,13 @@ def seed_demo_company() -> dict:
     # ── 1. organisation ─────────────────────────────────────────────────
     org = Organization.query.filter_by(slug=_ORG_SLUG).first()
     if org is None:
-        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG, plan="enterprise")
+        from app.services.billing_plans import set_contract_plan
+
+        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG)
         db.session.add(org)
         db.session.flush()
+        # Enterprise has no people limit, so the demo cast below fits.
+        set_contract_plan(org, "enterprise", None)
         stats["organization_created"] = 1
     else:
         stats["organization_created"] = 0
@@ -1391,6 +1395,7 @@ def seed_demo_company() -> dict:
                 business_capability=cap.name if cap else "",
                 assigned_to="Ivo Reed",
                 scope="enterprise",
+                organization_id=org_id,
             )
             db.session.add(wp)
             wps_created += 1

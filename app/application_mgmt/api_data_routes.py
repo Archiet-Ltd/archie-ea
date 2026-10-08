@@ -58,6 +58,7 @@ def upload_document_file(application_id):
         # Create document record in database (without file_path first to get ID)
         document = ApplicationDocument(
             application_component_id=app.id,
+            organization_id=app.organization_id,
             title=document_title,
             description=document_description,
             file_name=file.filename,
@@ -65,6 +66,7 @@ def upload_document_file(application_id):
             file_path=None,
             file_size=None,
             uploaded_by=uploaded_by,
+            uploaded_by_id=current_user.id if current_user.is_authenticated else None,
         )
 
         db.session.add(document)

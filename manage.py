@@ -82,13 +82,8 @@ def register_cli_commands(app):
         # create_all() then emits a duplicate "CREATE INDEX" and fails on an empty
         # database. (Production never hit this because its schema was built
         # incrementally.) Drop duplicate same-named indexes per table before creating.
-        for _table in db.metadata.tables.values():
-            _seen = {}
-            for _idx in list(_table.indexes):
-                if _idx.name in _seen:
-                    _table.indexes.discard(_idx)
-                else:
-                    _seen[_idx.name] = _idx
+        from app.commands.schema_migrations import dedupe_metadata_indexes
+        dedupe_metadata_indexes(db.metadata)
         db.create_all()
         # LEGACY WORKAROUNDS: These ALTER TABLE statements add columns that predate
         # alembic tracking. They are idempotent (IF NOT EXISTS) and remain here to
@@ -123,13 +118,10 @@ def register_cli_commands(app):
                 "ALTER TABLE unified_application_capability_mapping "
                 "ADD COLUMN IF NOT EXISTS notes TEXT"
             ))
-        # VA-005: Add enforcement_status and adm_phase columns to principles
-        db.session.execute(text(
-            "ALTER TABLE principles ADD COLUMN IF NOT EXISTS enforcement_status VARCHAR(20) NOT NULL DEFAULT 'advisory'"
-        ))
-        db.session.execute(text(
-            "ALTER TABLE principles ADD COLUMN IF NOT EXISTS adm_phase VARCHAR(5)"
-        ))
+        # VA-005 principles columns and the RAT-114 created_at index. No model
+        # declares them, so the schema baseline creates them from the same list.
+        from app.commands.schema_migrations import ensure_undeclared_schema
+        ensure_undeclared_schema(db.session.connection())
 
         # SA-003: Add Phase C lifecycle planning columns to application_components
         for col_ddl in [
@@ -332,10 +324,6 @@ def register_cli_commands(app):
             db.session.execute(db.text(
                 "CREATE INDEX IF NOT EXISTS idx_rat_audit_app_action "
                 "ON rationalization_audit_entries(application_id, action)"
-            ))
-            db.session.execute(db.text(
-                "CREATE INDEX IF NOT EXISTS idx_rat_audit_created "
-                "ON rationalization_audit_entries(created_at)"
             ))
             db.session.commit()
             print("  \u2713 RAT-114: Created rationalization_audit_entries table")
@@ -559,14 +547,18 @@ def register_cli_commands(app):
     @app.cli.command()
     def format():
         """Runs the yapf and isort formatters over the project."""
-        isort = "isort -rc *.py app/"
-        yapf = "yapf -r -i *.py app/"
+        import glob
 
-        print("Running {}".format(isort))
-        subprocess.call(isort, shell=True)
+        # The shell used to expand *.py; glob does it without one.
+        top_level = sorted(glob.glob("*.py"))
+        isort = ["isort", "-rc", *top_level, "app/"]
+        yapf = ["yapf", "-r", "-i", *top_level, "app/"]
 
-        print("Running {}".format(yapf))
-        subprocess.call(yapf, shell=True)
+        print("Running {}".format(" ".join(isort)))
+        subprocess.call(isort)
+
+        print("Running {}".format(" ".join(yapf)))
+        subprocess.call(yapf)
 
     # ===== FEATURE FLAGS COMMANDS =====
 
@@ -911,6 +903,15 @@ def register_cli_commands(app):
         """Seed enterprise-standard ArchiMate Driver, Stakeholder, and Constraint vocabulary records. Safe to run multiple times."""
         from app.commands.seed_motivation_elements import seed_motivation_elements
         seed_motivation_elements()
+
+    # ===== REGULATORY FRAMEWORK CATALOGUE SEEDING =====
+
+    @app.cli.command()
+    def seed_framework_catalogue():
+        """Seed the shared regulatory framework catalogue with ISO 27001, SOC 2 and DORA. Safe to run multiple times."""
+        from app.services.compliance.regulatory_framework_service import RegulatoryFrameworkService
+        seeded = RegulatoryFrameworkService.seed_manufacturing_frameworks()
+        print(f"Framework catalogue: {seeded} frameworks seeded")
 
     # ===== BUSINESS CAPABILITY SEEDING =====
 
@@ -1518,9 +1519,8 @@ def register_cli_commands(app):
             # documented command reported "60 capabilities seeded" on a fresh
             # install and left the flagship screen showing zero. That is the
             # five-capability-stores problem costing an evaluator their first hour.
-            from flask import g as _g
-
             from app.commands.seed_capabilities import seed_business_caps
+            from app.jobs.tenant_safe_job import tenant_scope
             from app.models.organization import Organization
 
             # An explicit tenant, because TenantMixin fills organization_id
@@ -1536,13 +1536,10 @@ def register_cli_commands(app):
                 )
                 _business = {"created": 0}
             else:
-                _previous = getattr(_g, "current_org_id", None)
-                _g.current_org_id = _org.id
-                try:
+                _org_id, _org_name = _org.id, _org.name
+                with tenant_scope(_org_id):
                     _business = seed_business_caps()
-                finally:
-                    _g.current_org_id = _previous
-                print(f"    seeded into organisation {_org.id} ({_org.name})")
+                print(f"    seeded into organisation {_org_id} ({_org_name})")
 
             print(
                 "\n[OK] Seeding complete! Unified capabilities: "
@@ -1902,17 +1899,16 @@ if __name__ == "__main__":
         if platform.system() == "Windows":
             import subprocess as _sp
             try:
-                out = _sp.check_output(
-                    f"netstat -ano | findstr :{_port}",
-                    shell=True, text=True, stderr=_sp.DEVNULL
-                )
+                # Filtered here rather than piped through findstr, so no shell
+                # is involved; findstr's match was this same substring test.
+                out = _sp.check_output(["netstat", "-ano"], text=True, stderr=_sp.DEVNULL)
                 for line in out.splitlines():
                     parts = line.split()
-                    if parts and "LISTENING" in line:
+                    if parts and "LISTENING" in line and f":{_port}" in line:
                         pid = int(parts[-1])
                         if pid and pid != os.getpid():
                             try:
-                                _sp.call(f"taskkill /F /PID {pid}", shell=True,
+                                _sp.call(["taskkill", "/F", "/PID", str(pid)],
                                          stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
                                 killed.append(pid)
                             except Exception:

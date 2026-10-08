@@ -351,6 +351,10 @@ class ArchitectureGraphFacade:
             confidence=metadata.get("confidence", 1.0),
             inference_pass=metadata.get("inference_pass", 1),
             rule_name=metadata.get("rule_name"),
+            # Resolved at facade construction from architecture_id -> Solution,
+            # not from request context, so this is correct whether or not the
+            # call runs inside a request (see __init__ above).
+            organization_id=self.organization_id,
         )
         db.session.add(rel)
         db.session.flush()

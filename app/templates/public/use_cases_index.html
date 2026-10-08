@@ -1,0 +1,53 @@
+{# smoke-coverage-ok: covered by tests/test_public_content_pages.py (use-cases index lists every live use-case page).
+   Template: public/use_cases_index.html — Renders the /use-cases index: every
+   function-per-segment page, grouped by segment, generated from the content
+   files (app/services/public_pages.py load_all_pages()) -- a new .md file
+   under content/pages/function-per-segment/ appears here with no template
+   edit. Extends layouts/public_base.html, reuses components/public_navbar.html
+   and components/public_footer.html, same page data every other public page
+   uses; no second loader or renderer.
+#}
+{% extends 'layouts/public_base.html' %}
+{% block title %}Use cases{% endblock %}
+{% block meta_description %}
+<meta name="description" content="What Entelim answers for startup founders, scale-up CTOs, enterprise architecture teams and operations leads.">
+<link rel="canonical" href="https://entelim.org/use-cases">
+{% endblock %}
+
+{% block header %}
+{% include 'components/public_navbar.html' %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .public-page-content h1 { font-size: 2.25rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.2; }
+  .public-page-content h2 { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.75rem; }
+  .public-page-content p { margin-bottom: 1rem; line-height: 1.75; }
+  .public-page-content ul { margin-bottom: 1.5rem; padding-left: 1.5rem; }
+  .public-page-content li { margin-bottom: 0.5rem; line-height: 1.75; }
+  .public-page-content a { color: var(--color-primary, #3b82f6); text-decoration: underline; }
+  .public-page-content a:hover { color: var(--color-primary-hover, #2563eb); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16">
+  <article class="public-page-content prose max-w-none">
+    <h1>Use cases</h1>
+    <p>
+      What Entelim answers, grouped by where you sit: startup founders, scale-up CTOs,
+      enterprise architecture teams, and operations leads.
+    </p>
+
+    {% for group in groups %}
+    <h2>{{ group.label }}</h2>
+    <ul>
+      {% for page in group.pages %}
+      <li><a href="{{ page.url }}">{{ page.title }}</a></li>
+      {% endfor %}
+    </ul>
+    {% endfor %}
+  </article>
+</div>
+{% include 'components/public_footer.html' %}
+{% endblock %}

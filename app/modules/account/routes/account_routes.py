@@ -31,17 +31,15 @@ from flask_login import current_user, login_required
 from app.security.audit import audit_logger
 
 _log = logging.getLogger(__name__)
+from app.services import buy_intent
 from app.services.rate_limiter import rate_limit
 
+from . import mail_views
 from ..services.account_service import AccountService
 from ..forms.account_forms import (
     ChangeEmailForm,
     ChangePasswordForm,
-    CreatePasswordForm,
     LoginForm,
-    RegistrationForm,
-    RequestResetPasswordForm,
-    ResetPasswordForm,
 )
 
 account_bp = Blueprint("account", __name__)
@@ -69,7 +67,7 @@ def login():
         from app.utils.safe_redirect import safe_next_url
 
         return redirect(
-            safe_next_url(request.args.get("next"), url_for("dashboard.overview"))
+            safe_next_url(buy_intent.next_candidate(consume=True), url_for("dashboard.overview"))
         )
     form = LoginForm()
     if form.validate_on_submit():
@@ -89,7 +87,23 @@ def login():
 
         user = _svc.authenticate(form.email.data, form.password.data)
         if user is not None:
+            # R1-B12 PR 2 (TB-0144/PB-0100): an administrator must complete
+            # multi-factor before the login finishes, whether they are
+            # enrolling for the first time or entering a code from an
+            # already-enrolled authenticator app. Checked before the
+            # session-fixation reset below so a password alone never mints
+            # a real session for an administrator account.
+            from app.services import mfa_service
+
+            if mfa_service.required_for(user):
+                session["_mfa_pending_user_id"] = user.id
+                session["_mfa_pending_remember"] = bool(form.remember_me.data)
+                session["_mfa_pending_next"] = buy_intent.next_candidate(consume=True) or ""
+                return redirect(url_for("account.mfa_challenge"))
+
             # Fix Session Fixation: Regenerate session ID after successful authentication
+            # Read before the session is cleared: the chosen plan lives in it.
+            _landing = buy_intent.next_candidate(consume=True)
             session.clear()
             session.modified = True
             _svc.login(user, form.remember_me.data)
@@ -113,7 +127,7 @@ def login():
             from app.utils.safe_redirect import safe_next_url
 
             return redirect(
-                safe_next_url(request.args.get("next"), url_for("dashboard.overview"))
+                safe_next_url(_landing, url_for("dashboard.overview"))
             )
         else:
             try:
@@ -142,21 +156,111 @@ def login():
     )
 
 
+def _mfa_pending_user():
+    """Return the User this request is mid-MFA for, or None.
+
+    The user is NOT yet logged in (flask-login's current_user is anonymous
+    throughout this flow) -- the pending identity lives only in the signed
+    session cookie, set by login()/the SSO callbacks right after password
+    or IdP authentication succeeds and before any real session is minted.
+    """
+    from app.models.user import User
+
+    user_id = session.get("_mfa_pending_user_id")
+    if not user_id:
+        return None
+    # tenant-scoping-ok: pre-login MFA step, no org context yet -- this is
+    # the one user the signed session cookie names as mid-login, the same
+    # posture as the pre-auth SSO callback lookup below.
+    return User.query.get(user_id)
+
+
+def _complete_login_after_mfa(user):
+    """Finish the login that _mfa_pending_user_id was holding open, mirroring
+    login()'s own session-fixation reset and audit trail."""
+    from app.services import auth_audit
+
+    remember = bool(session.pop("_mfa_pending_remember", False))
+    next_url = session.pop("_mfa_pending_next", "") or ""
+    session.pop("_mfa_pending_user_id", None)
+
+    session.clear()
+    session.modified = True
+    _svc.login(user, remember)
+    session.permanent = True
+    try:
+        audit_logger.log_authentication(success=True)
+    except Exception as _exc:
+        _log.warning("Audit log failed on login success: %s", _exc)
+    _login_entry = auth_audit.record_login_success(user)
+    if _login_entry is not None:
+        session["_login_audit_id"] = _login_entry.id
+    flash("You are now logged in. Welcome back!", "success")
+
+    from app.utils.safe_redirect import safe_next_url
+
+    return redirect(safe_next_url(next_url, url_for("dashboard.overview")))
+
+
+@account_bp.route("/mfa-challenge", methods=["GET", "POST"])
+@rate_limit(10, "1m", methods=("POST",))  # SECURITY: brute-force protection on code submits
+def mfa_challenge():
+    """Multi-factor step for an administrator mid-login (R1-B12 PR 2,
+    TB-0144/PB-0100).
+
+    Reached only via the pending-user session key login()/the SSO callbacks
+    set right after primary authentication succeeds -- there is no direct
+    path to this route that skips the password or IdP check. An
+    already-enrolled administrator enters a code from their authenticator
+    app; one not yet enrolled is shown a fresh secret to scan and must prove
+    they captured it correctly before MFA (and the login) is considered
+    satisfied.
+    """
+    user = _mfa_pending_user()
+    if user is None:
+        flash("Your sign-in attempt expired. Please sign in again.", "error")
+        return redirect(url_for("account.login"))
+
+    from app.services import mfa_service
+
+    if not user.mfa_enabled:
+        secret = session.get("_mfa_enroll_secret")
+        if not secret:
+            secret = mfa_service.generate_secret()
+            session["_mfa_enroll_secret"] = secret
+        if request.method == "POST":
+            code = request.form.get("code", "")
+            try:
+                mfa_service.enroll(user, secret, code)
+            except mfa_service.MFAError as exc:
+                flash(str(exc), "form-error")
+                return render_template(
+                    "account/mfa_enroll.html",
+                    secret=secret,
+                    provisioning_uri=mfa_service.provisioning_uri(user, secret),
+                )
+            session.pop("_mfa_enroll_secret", None)
+            return _complete_login_after_mfa(user)
+        return render_template(
+            "account/mfa_enroll.html",
+            secret=secret,
+            provisioning_uri=mfa_service.provisioning_uri(user, secret),
+        )
+
+    if request.method == "POST":
+        code = request.form.get("code", "")
+        if mfa_service.verify_login_code(user, code):
+            return _complete_login_after_mfa(user)
+        flash("That code was not accepted. Try again.", "form-error")
+
+    return render_template("account/mfa_challenge.html")
+
+
 @account_bp.route("/register", methods=["GET", "POST"])
 @rate_limit(5, "1m", methods=("POST",))  # SECURITY: Anti-abuse on registration submits only
 def register():
     """Register a new user, and send them a confirmation email."""
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        (_svc.register_user(
-            first_name=form.first_name.data,
-            last_name=form.last_name.data,
-            email=form.email.data,
-            password=form.password.data,
-        ))
-        flash(f"Account created successfully. Welcome to {current_app.config['APP_NAME']}!", "success")
-        return redirect(url_for("main.index"))
-    return render_template("account/register.html", form=form)
+    return mail_views.register_view()
 
 
 @account_bp.route("/logout")
@@ -198,6 +302,17 @@ def manage():
         last_login_entry=last_login_entry,
         recent_auth_events=auth_audit.recent_auth_events(current_user.id),
     )
+
+
+@account_bp.route("/switch-organization", methods=["POST"])
+@login_required
+def switch_organization():
+    """Switch the signed-in user's active organisation."""
+    success, message = _svc.switch_active_organization(
+        current_user, request.form.get("organization_id", type=int)
+    )
+    flash(message, "success" if success else "error")
+    return redirect(url_for("account.manage"))
 
 
 @account_bp.route("/session/keepalive", methods=["GET"])
@@ -288,32 +403,17 @@ def save_preferences():
 
 
 @account_bp.route("/reset-password", methods=["GET", "POST"])
+@rate_limit(5, "1m", methods=("POST",))  # SECURITY: each POST can send mail
 def reset_password_request():
     """Respond to existing user's request to reset their password."""
-    if not current_user.is_anonymous:
-        return redirect(url_for("main.index"))
-    form = RequestResetPasswordForm()
-    if form.validate_on_submit():
-        _svc.request_password_reset(form.email.data)
-        flash("A password reset link has been sent to {}.".format(form.email.data), "warning")
-        return redirect(url_for("account.login"))
-    return render_template("account/reset_password.html", form=form)
+    return mail_views.reset_request_view()
 
 
 @account_bp.route("/reset-password/<token>", methods=["GET", "POST"])
+@rate_limit(10, "1m", methods=("POST",))
 def reset_password(token):
     """Reset an existing user's password."""
-    if not current_user.is_anonymous:
-        return redirect(url_for("main.index"))
-    form = ResetPasswordForm()
-    if form.validate_on_submit():
-        success, message = _svc.reset_password(token, form.email.data, form.new_password.data)
-        flash_cat = "form-success" if success else "form-error"
-        flash(message, flash_cat)
-        if success:
-            return redirect(url_for("account.login"))
-        return redirect(url_for("main.index"))
-    return render_template("account/reset_password.html", form=form)
+    return mail_views.reset_view(token)
 
 
 @account_bp.route("/manage/change-password", methods=["GET", "POST"])
@@ -376,58 +476,37 @@ def change_email(token):
     return redirect(url_for("main.index"))
 
 
-@account_bp.route("/confirm-account")
+@account_bp.route("/confirm-account", methods=["GET", "POST"])
 @login_required
+@rate_limit(3, "1m", methods=("POST",))  # SECURITY: each POST sends mail
 def confirm_request():
     """Respond to new user's request to confirm their account."""
-    _svc.send_confirmation_email(current_user)
-    flash("A new confirmation link has been sent to {}.".format(current_user.email), "warning")
-    return redirect(url_for("main.index"))
+    return mail_views.confirm_request_view()
 
 
 @account_bp.route("/confirm-account/<token>")
-@login_required
 def confirm(token):
     """Confirm new user's account with provided token."""
-    if current_user.confirmed:
-        return redirect(url_for("main.index"))
-    success, message = _svc.confirm_account(current_user, token)
-    flash_cat = "success" if success else "error"
-    flash(message, flash_cat)
-    return redirect(url_for("main.index"))
+    return mail_views.confirm_view(token)
+
+
+@account_bp.route("/join/<token>", methods=["GET", "POST"])
+@rate_limit(10, "1m", methods=("POST",))
+def join(token):
+    """Accept an e-mailed invitation into an organisation by setting a password."""
+    return mail_views.join_view(token)
 
 
 @account_bp.route("/join-from-invite/<int:user_id>/<token>", methods=["GET", "POST"])
+@rate_limit(10, "1m")
 def join_from_invite(user_id, token):
-    """Confirm new user's account with provided token and prompt them to set a password."""
-    if current_user is not None and current_user.is_authenticated:
-        flash("You are already logged in.", "error")
-        return redirect(url_for("main.index"))
+    """Retired invitation link: it is served by the one invitation flow.
 
-    new_user, token_valid, message = _svc.join_from_invite(user_id, token)
-
-    if new_user is None:
-        return redirect(404)
-
-    if not token_valid and new_user.password_hash is not None:
-        flash(message, "error")
-        return redirect(url_for("main.index"))
-
-    if token_valid:
-        form = CreatePasswordForm()
-        if form.validate_on_submit():
-            _svc.set_password(new_user, form.password.data)
-            flash(
-                "Your password has been set. After you log in, you can "
-                'go to the "Your Account" page to review your account '
-                "information and settings.",
-                "success",
-            )
-            return redirect(url_for("account.login"))
-        return render_template("account/join_invite.html", form=form)
-    else:
-        flash(message, "error")
-    return redirect(url_for("main.index"))
+    Links of this shape carried a reusable signed token that was never
+    stored. They set no password and send no mail any more; the token is
+    handed to ``/join/<token>``, which refuses anything it did not issue.
+    """
+    return redirect(url_for("account.join", token=token))
 
 
 @account_bp.route("/invitation/<int:invitation_id>/accept", methods=["POST"])
@@ -463,9 +542,7 @@ def before_request():
 @account_bp.route("/unconfirmed")
 def unconfirmed():
     """Catch users with unconfirmed emails."""
-    if current_user.is_anonymous or current_user.confirmed:
-        return redirect(url_for("main.index"))
-    return render_template("account/unconfirmed.html")
+    return mail_views.unconfirmed_view()
 
 
 # =========================================================================

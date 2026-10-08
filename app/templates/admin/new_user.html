@@ -18,6 +18,16 @@
         ]
     ) }}
 
+    {% if plan_limit and plan_limit.limit_reached %}
+    <div role="alert" data-testid="plan-limit-reached" class="rounded-md border p-4 text-sm bg-warning/5 border-warning/20 text-warning-emphasis">
+        <p class="font-medium">Your organisation has reached its plan limit.</p>
+        <p class="mt-1">The {{ plan_limit.plan_name }} plan admits {{ plan_limit.limit }} {{ 'editors' if plan_limit.counts == 'editors' else 'people' }} and {{ plan_limit.used }} are in use, so no one new can be added. Upgrade the plan to add someone.</p>
+        {% if 'billing.billing_index' in flask.current_app.view_functions %}
+        <a href="{{ url_for('billing.billing_index') }}#plans" class="mt-3 inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 transition-colors">Upgrade plan</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
         {% set flashes = {
             'error':   get_flashed_messages(category_filter=['form-error']),

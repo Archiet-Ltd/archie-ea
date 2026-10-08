@@ -231,7 +231,7 @@ def api_list():
     return success_response([
         {
             "id": bc.id,
-            "title": bc.title or "",
+            "title": bc.title,
             "status": bc.status,
             "updated_at": bc.updated_at.isoformat() if bc.updated_at else None,
         }

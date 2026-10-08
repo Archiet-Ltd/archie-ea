@@ -29,6 +29,15 @@
 
     <div class="flex items-center gap-2">
 
+        {% if current_user.is_authenticated and active_organization_name %}
+        <div class="hidden md:flex items-center gap-2 rounded-lg border border-input bg-muted/40 px-3 py-2 text-sm"
+             data-testid="active-organization-chip"
+             aria-label="Active organization {{ active_organization_name }}">
+            <i data-lucide="building-2" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
+            <span class="font-medium text-foreground">{{ active_organization_name }}</span>
+        </div>
+        {% endif %}
+
         <!-- Search (desktop) -->
         <div class="relative hidden md:block">
             <button type="button" id="search-modal-trigger"
@@ -185,6 +194,14 @@
                         <i data-lucide="settings" class="h-4 w-4"></i>
                         Settings
                     </a>
+                    {% if (current_user.is_org_admin or current_user.is_platform_admin) and 'team.team' in flask.current_app.view_functions %}
+                    <a href="{{ url_for('team.team') }}"
+                       role="menuitem"
+                       class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors">
+                        <i data-lucide="user-plus" class="h-4 w-4"></i>
+                        Invite your team
+                    </a>
+                    {% endif %}
 
                     <div class="h-px bg-border my-1" role="separator"></div>
                     <button type="button"
@@ -275,14 +292,19 @@
         const avatar = document.getElementById('user-avatar');
         if (!avatar) return;
         const text = avatar.textContent.trim();
+        // The 700 shade of each hue: every one keeps the light initial above
+        // 4.5:1. The 600 shades left amber, green and cyan near 3.5:1.
         const COLOURS = [
-            '#2563eb','#7c3aed','#db2777','#dc2626',
-            '#d97706','#059669','#0891b2','#9333ea',
+            '#1d4ed8','#6d28d9','#be185d','#b91c1c',
+            '#b45309','#047857','#0e7490','#7e22ce',
         ];
         let hash = 0;
         const name = avatar.dataset.name || text;
         for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
         avatar.style.backgroundColor = COLOURS[Math.abs(hash) % COLOURS.length];
+        // Pinned rather than text-primary-foreground: that token turns navy in
+        // the dark theme, while this background does not change with it.
+        avatar.style.color = '#f8fafc';
     })();
 
     /* ── Role badge colour ───────────────────────────────────────────────── */

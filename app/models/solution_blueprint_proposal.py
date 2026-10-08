@@ -35,3 +35,11 @@ class SolutionBlueprintProposal(TenantMixin, db.Model):
     default_rel_target_id = db.Column(db.Integer, nullable=True)
     acm_properties = db.Column(db.JSON, default=dict)
     decision_rationale = db.Column(db.Text, nullable=True)
+
+    # Consolidation: set by `flask backfill-review-queue-approvals` on
+    # the row's canonical ai_chat_crud_approvals copy. NULL until backfilled;
+    # this table stays readable (never dropped), it just stops gaining new
+    # rows once its constructor sites are repointed.
+    retired_into_id = db.Column(
+        db.Integer, db.ForeignKey("ai_chat_crud_approvals.id"), nullable=True
+    )

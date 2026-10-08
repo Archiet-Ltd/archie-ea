@@ -173,6 +173,16 @@ def evidence_scope(app, _schema):
                         },
                     )
                 connection.execute(
+                    text(
+                        "DELETE FROM subscriptions "
+                        "WHERE organization_id IN (:organization_id, :foreign_id)"
+                    ),
+                    {
+                        "organization_id": scope.organization_id,
+                        "foreign_id": scope.foreign_organization_id,
+                    },
+                )
+                connection.execute(
                     text("DELETE FROM organizations WHERE id IN (:organization_id, :foreign_id)"),
                     {
                         "organization_id": scope.organization_id,

@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Literal, Optional
 
+from app.modules.ai_chat.services.llm_service_impl import LLMService
+
 # Model provider clients
 try:
     import openai
@@ -245,6 +247,7 @@ class MultiModelChatService:
     ) -> ChatMessage:
         """Chat using OpenAI API (GPT - 4)."""
         config = self.models[model]
+        LLMService._guard_provider_call("openai", model, prompt="multi-model chat")
 
         # Convert ChatMessage objects to OpenAI format
         openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
@@ -273,6 +276,7 @@ class MultiModelChatService:
     ) -> ChatMessage:
         """Chat using Anthropic API (Claude - 3)."""
         config = self.models[model]
+        LLMService._guard_provider_call("anthropic", model, prompt="multi-model chat")
 
         # Extract system message if present
         system_msg = None

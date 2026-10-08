@@ -235,6 +235,44 @@ def latest_derivation_run(organization_id: int):
     return db.session.execute(stmt).scalars().first()
 
 
+def derivation_status(organization_id: int, *, recent: int = 5) -> Dict[str, Any]:
+    """What the Ask page shows about worked-out connections, for one tenant.
+
+    The latest completed runs (newest first, at most ``recent``), the
+    current and out-of-date counts from the derived-fact store, and how many
+    out-of-date rows each stale reason accounts for. Reads the same two
+    stores the recompute and yield endpoints answer from; nothing is
+    computed here. ``runs`` is empty when derivation has never completed --
+    the page renders that as "—", never as zero.
+    """
+    from app.modules.intelligence.models.derivation_run import DerivationRun
+    from app.modules.intelligence.models.derived_relationship import DerivedRelationship
+
+    runs = db.session.execute(
+        db.select(DerivationRun)
+        .where(DerivationRun.organization_id == organization_id)
+        .order_by(DerivationRun.finished_at.desc(), DerivationRun.id.desc())
+        .limit(recent)
+    ).scalars().all()
+    reasons = db.session.execute(
+        db.select(DerivedRelationship.stale_reason, db.func.count(DerivedRelationship.id))
+        .where(
+            DerivedRelationship.organization_id == organization_id,
+            DerivedRelationship.stale.is_(True),
+        )
+        .group_by(DerivedRelationship.stale_reason)
+        .order_by(DerivedRelationship.stale_reason)
+    ).all()
+    aggregates = derived_fact_aggregates(organization_id)
+    return {
+        "runs": list(runs),
+        "last_run": runs[0] if runs else None,
+        "current_count": aggregates["derived_count"],
+        "stale_count": aggregates["stale_count"],
+        "stale_reasons": [(reason, int(count)) for reason, count in reasons],
+    }
+
+
 def get_derived_fact(
     organization_id: int, derived_id: int, *, include_stale: bool = True
 ) -> Optional[Dict[str, Any]]:

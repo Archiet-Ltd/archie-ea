@@ -367,7 +367,9 @@ def assign_issue(solution_id, issue_id):
     try:
         issue = issue_service.assign_issue(
             issue_id=issue_id,
-            assigned_to_id=data.get('assigned_to_id')
+            assigned_to_id=data.get('assigned_to_id'),
+            organization_id=_current_org_id(),
+            solution_id=solution_id
         )
         return jsonify(issue.to_dict()), 200
     except Exception as e:
@@ -380,12 +382,14 @@ def assign_issue(solution_id, issue_id):
 def escalate_issue(solution_id, issue_id):
     """Escalate issue."""
     data = request.get_json()
-    
+
     try:
         issue = issue_service.escalate_issue(
             issue_id=issue_id,
             escalated_to_id=data.get('escalated_to_id'),
-            escalation_reason=data.get('escalation_reason')
+            escalation_reason=data.get('escalation_reason'),
+            organization_id=_current_org_id(),
+            solution_id=solution_id
         )
         return jsonify(issue.to_dict()), 200
     except Exception as e:
@@ -398,12 +402,13 @@ def escalate_issue(solution_id, issue_id):
 def resolve_issue(solution_id, issue_id):
     """Mark issue as resolved."""
     data = request.get_json()
-    
+
     try:
         issue = issue_service.resolve_issue(
             issue_id=issue_id,
-            resolved_by_id=data.get('resolved_by_id'),
-            resolution_notes=data.get('resolution_notes')
+            resolved_by_id=current_user.id,
+            resolution_notes=data.get('resolution_notes'),
+            solution_id=solution_id
         )
         return jsonify(issue.to_dict()), 200
     except Exception as e:
