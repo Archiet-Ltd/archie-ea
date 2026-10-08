@@ -95,8 +95,16 @@ BANNED_CLAIMS = [
     ),
     (
         "webhook feed",
-        "the real, shipped feature is Slack/Teams notifications and generic webhook subscriptions "
-        "to twelve events (admin.webhook_settings), not a branded 'webhook feed'",
+        "the real, shipped feature is a generic webhook subscription (admin.webhook_settings), "
+        "not a branded 'webhook feed'",
+    ),
+    (
+        "twelve platform events",
+        "WebhookService.publish_event() is called from exactly one place in the app "
+        "(POST /public/events) -- nothing internal to Entelim ever publishes any of the twelve "
+        "named events on the webhook-settings picklist, so the platform does not notify a "
+        "subscriber when one of those twelve things happens; only a customer's own API call or "
+        "the manual 'test' button ever publishes an event",
     ),
     (
         "canvas drafted from your own site",
@@ -338,6 +346,30 @@ def test_withdrawn_pages_200_but_excluded_from_every_feed(app):
                 assert f'href="{page.url}"' not in use_cases_html, (
                     f"/use-cases should not link to withdrawn page {page.url}"
                 )
+
+
+def test_withdrawn_page_is_noindex_but_live_page_is_not(app):
+    """A page withdrawn from discovery (state: not_planned) still renders,
+    but must tell search engines not to index it; a normal live page must
+    not carry that tag at all."""
+    withdrawn = [p for p in load_all_pages() if p.is_withdrawn]
+    assert withdrawn, (
+        "expected at least one withdrawn page (state: not_planned) to exist "
+        "on this branch to exercise the noindex tag"
+    )
+    live = next(p for p in load_all_pages() if not p.is_withdrawn)
+
+    with app.test_client() as client:
+        for page in withdrawn:
+            html = client.get(page.url).data.decode()
+            assert '<meta name="robots" content="noindex">' in html, (
+                f"withdrawn page {page.url} is missing <meta name=\"robots\" content=\"noindex\">"
+            )
+
+        live_html = client.get(live.url).data.decode()
+        assert 'name="robots"' not in live_html, (
+            f"live page {live.url} should not carry a robots noindex tag"
+        )
 
 
 def _strings_in(value):
@@ -1500,6 +1532,62 @@ def test_no_page_repeats_a_disproven_claim():
     assert not violations, (
         "Disproven claim(s) reappeared on a content page:\n"
         + "\n".join(violations)
+    )
+
+
+def test_billing_plans_summaries_repeat_no_disproven_claim():
+    """billing_plans.PLANS's own ``summary`` strings are never rendered
+    through load_all_pages() (they are not content pages), but they feed
+    every page's JSON-LD Offer/AggregateOffer description directly (see
+    app/services/public_pages.py::_flat_plan_offer / _per_unit_plan_offer /
+    _enterprise_offer, all of which interpolate ``plan.summary`` verbatim).
+    A disproven claim fixed on the rendered pages but left in
+    billing_plans.py would resurface there the next time those templates
+    changed what they pull from the catalogue."""
+    from app.services.billing_plans import PLANS
+
+    violations = []
+    for plan in PLANS:
+        summary_lower = plan.summary.lower()
+        for phrase, reason in BANNED_CLAIMS:
+            if phrase.lower() in summary_lower:
+                violations.append(
+                    f"billing_plans.PLANS[{plan.key!r}].summary: contains banned phrase "
+                    f"'{phrase}' ({reason})"
+                )
+    assert not violations, (
+        "Disproven claim(s) reappeared in billing_plans.py's own PLANS summaries:\n"
+        + "\n".join(violations)
+    )
+
+
+def test_rendered_home_pricing_and_onboarding_pages_repeat_no_disproven_claim(app):
+    """The actually-rendered HTML of /, /pricing and /team-annual-onboarding
+    must never contain a disproven claim either.
+
+    test_no_page_repeats_a_disproven_claim already checks every content
+    page's ``body_html`` -- the Markdown-derived content only. The home
+    page is not a content page at all (rendered directly from
+    app/templates/main/index.html, never through load_all_pages()), and a
+    content page's full HTTP response can contain more than its own
+    body_html (template chrome, the plan_buy_section() CTA, JSON-LD). This
+    checks the three pages a pricing claim is most likely to land on, as
+    they are actually served.
+    """
+    pages_to_check = ["/", "/pricing", "/team-annual-onboarding"]
+    with app.test_client() as client:
+        violations = []
+        for url in pages_to_check:
+            rv = client.get(url)
+            assert rv.status_code == 200, f"{url} returned {rv.status_code}"
+            body_lower = rv.data.decode().lower()
+            for phrase, reason in BANNED_CLAIMS:
+                if phrase.lower() in body_lower:
+                    violations.append(
+                        f"{url}: contains banned phrase '{phrase}' ({reason})"
+                    )
+    assert not violations, (
+        "Disproven claim(s) reappeared on a rendered page:\n" + "\n".join(violations)
     )
 
 

@@ -723,11 +723,16 @@ def public_comparison_hub():
     a comparison page's own front-matter `routing` decides its real address — most
     carry an archiet.ai canonical URL, so the hub links there rather than assuming
     every comparison page lives on entelim.org.
+
+    load_feed_pages(), not load_all_pages(): a comparison page withdrawn from
+    discovery (state: not_planned) still renders at its own URL but must drop
+    out of this hub automatically, the same as the sitemap, llms.txt and the
+    /use-cases index.
     """
-    from app.services.public_pages import load_all_pages
+    from app.services.public_pages import load_feed_pages
 
     site_url = "https://entelim.org"
-    pages = [p for p in load_all_pages() if p.family == "comparison"]
+    pages = [p for p in load_feed_pages() if p.family == "comparison"]
     entries = [
         {
             "competitor": p.front_matter.get("competitor", p.title),

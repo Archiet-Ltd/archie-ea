@@ -26,8 +26,8 @@ get you from blank page to something real faster than typing every box from scra
 
 ## Before you ask "we already have this in Miro or Notion"
 
-Keep it there. What's different here is a canvas that's linked to what you actually run, so it can
-say which of your assumptions have nothing real behind them yet.
+Keep it there. What's different here is that every block gets an AI-drafted suggestion pulled from
+your own model data, so you start from something real instead of a blank box.
 
 ## Related
 

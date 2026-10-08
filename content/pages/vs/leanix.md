@@ -60,11 +60,6 @@ can ask without learning the notation first.
 - **A business case built from your own figures.** Capex, opex, three-year TCO, ROI and payback,
   computed only from data that actually exists in your model.
 
-## Where Entelim is headed next
-
-ArchiMate Open Exchange and CSV are the working path to bring a model across. A capability maturity
-heat map is close behind, in active development now.
-
 ## Frequently asked
 
 **Do we have to publish our code if we use Entelim?**

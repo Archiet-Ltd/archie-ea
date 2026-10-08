@@ -15,6 +15,9 @@
 {% block meta_description %}
 <meta name="description" content="{{ page.description }}">
 <link rel="canonical" href="{{ page.effective_canonical_url }}">
+{% if page.is_withdrawn %}
+<meta name="robots" content="noindex">
+{% endif %}
 {% endblock %}
 
 {% block header %}

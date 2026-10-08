@@ -90,3 +90,52 @@ def test_every_non_override_page_canonical_is_self_referencing(app):
         assert page.effective_canonical_url == CANONICAL_BASE_URL + page.url, (
             f"{page.url}: canonical is not self-referencing"
         )
+
+
+# ── IndexNow: the same feed-set exclusion as the sitemap ──────────────────
+
+
+def test_ping_indexnow_excludes_a_withdrawn_page(app, monkeypatch):
+    """The `ping-indexnow` CLI command (app/commands/indexnow_commands.py)
+    builds its URL list from load_feed_pages(), the same feed set the
+    sitemap and llms.txt are built from -- a page withdrawn from discovery
+    (state: not_planned) must not be submitted to IndexNow either.
+
+    Exercises the real command (not a re-implementation of its URL-building
+    logic) with the network call swapped out, so a regression in the
+    command's own loader choice is caught here.
+    """
+    withdrawn = [p for p in load_all_pages() if p.is_withdrawn]
+    assert withdrawn, (
+        "expected at least one withdrawn page (state: not_planned) to exist "
+        "on this branch to exercise the exclusion"
+    )
+
+    captured = {}
+
+    def _fake_ping_indexnow(app, urls, base_url=None):
+        captured["urls"] = list(urls)
+        return {"status_code": 200, "body": "ok"}
+
+    monkeypatch.setattr(
+        "app.services.indexnow_service.ping_indexnow", _fake_ping_indexnow
+    )
+
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["ping-indexnow"])
+    assert result.exit_code == 0, result.output
+
+    submitted = captured.get("urls")
+    assert submitted is not None, "ping-indexnow did not call ping_indexnow (is INDEXNOW_API_KEY unset?)"
+
+    for page in withdrawn:
+        assert not any(url.endswith(page.url) for url in submitted), (
+            f"ping-indexnow submitted withdrawn page {page.url}: {submitted}"
+        )
+
+    feed_pages = load_feed_pages()
+    assert len(submitted) == len(feed_pages) + 1  # +1 for the site root "/"
+    for page in feed_pages:
+        assert any(url.endswith(page.url) for url in submitted), (
+            f"ping-indexnow did not submit live page {page.url}"
+        )

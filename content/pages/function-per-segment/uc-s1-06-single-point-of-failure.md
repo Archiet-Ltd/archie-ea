@@ -39,8 +39,9 @@ whose head has been the system of record until now.
 
 Start from what you already use — a Lean Canvas or Business Model Canvas, if you have one. The
 underlying model notation is never shown unless you choose to open it. If your canvas already lives
-in Miro or Notion, keep it there: what Entelim adds is a version that's linked to what you actually
-run, so it can say which of your assumptions have nothing real behind them yet.
+in Miro or Notion, keep it there: what Entelim adds is a version where every block gets an
+AI-drafted suggestion pulled from your own model data, so you start from something real instead of
+a blank box.
 
 ## Related
 

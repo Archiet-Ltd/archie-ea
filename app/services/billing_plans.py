@@ -73,7 +73,7 @@ PLANS: Tuple[Plan, ...] = (
     Plan(
         key="free",
         name="Community",
-        summary="One organisation, three people. Every question, every canvas, the twin map.",
+        summary="One organisation, three people. Every question, the Business Model Canvas, the twin map.",
         purchasable=False,
         user_limit=3,
         display_price_monthly=0,
@@ -82,8 +82,8 @@ PLANS: Tuple[Plan, ...] = (
         key="startup",
         name="Startup",
         summary=(
-            "Ten people. Adds Slack and Teams notifications, webhook subscriptions to "
-            "twelve platform events, audit export, and email support."
+            "Ten people. Adds webhook delivery for events you post, audit export, "
+            "and email support."
         ),
         purchasable=True,
         user_limit=10,

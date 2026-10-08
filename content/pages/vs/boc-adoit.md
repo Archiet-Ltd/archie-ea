@@ -34,8 +34,8 @@ ADOIT through MCP. A free Community Edition exists alongside paid, multi-user En
 tiers — confirmed on BOC's own community site — though no price is shown for the paid tiers there;
 Gartner Peer Insights adds that pricing varies by the number of users and the modules selected, with
 annual billing options and enterprise-level customisation available depending on requirements.
-Entelim answers plain-language questions about your model directly, without routing through a
-separate AI tool, is open source under AGPL, self-hostable, on full ArchiMate 3.2 modelling, and
+Entelim's own AI Chat answers questions about your model directly, with no external AI tool or MCP
+connector required, is open source under AGPL, self-hostable, on full ArchiMate 3.2 modelling, and
 publishes its own [plans and pricing](/pricing) directly.
 
 ## What each product actually is
@@ -44,7 +44,7 @@ publishes its own [plans and pricing](/pricing) directly.
 |---|---|---|
 | Vendor | BOC Group | Archiet Ltd |
 | Licence | Free Community Edition; proprietary paid Enterprise Edition | Open source, AGPL, plus a commercial licence |
-| AI / natural-language questions | Via external AI tools (ChatGPT, Copilot) connected through MCP, per BOC's own marketing | Built in directly, no external AI tool required |
+| AI / natural-language questions | Via external AI tools (ChatGPT, Copilot) connected through MCP, per BOC's own marketing | Entelim's own built-in AI Chat, no external AI tool or MCP connector required |
 | Self-hostable | Not stated for the paid Enterprise Edition on the pages reviewed | Yes |
 | Pricing | Community Edition free; Enterprise Edition price varies by users and modules, annual billing, per Gartner Peer Insights — no fixed figure published | Published at /pricing; free to self-host under AGPL |
 
@@ -52,10 +52,10 @@ publishes its own [plans and pricing](/pricing) directly.
 
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
   browser across every layer.
-- **Answer plain-language questions about your model directly** — no separate AI tool or connector
-  required to ask it something.
-- **Find what you're paying for twice.** Duplicate-spend detection and a consolidation plan,
-  deep-linked from the same question.
+- **Answer questions about your model directly, through Entelim's own AI Chat** — no separate AI
+  tool or connector required to ask it something.
+- **Find what you're paying for twice.** Pick the application in question and get duplicate-spend
+  detection and a consolidation plan, deep-linked straight into the answer.
 - **A business case built from your own figures**, never invented to fill a gap.
 
 ## Where Entelim is headed next

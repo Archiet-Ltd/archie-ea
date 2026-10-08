@@ -75,8 +75,8 @@ from every other.
 
 ## AI and integrations
 
-- [AI Chat](/modules/ai-chat) — one chat interface for your AI assistant to query the model
-  directly, instead of guessing at an answer.
+- [AI Chat](/modules/ai-chat) — Entelim's own built-in chat, backed directly by your model data
+  so every answer reasons from what's actually there, instead of guessing.
 - [Integrations](/modules/integrations) — every connector in one place, with a health page showing
   exactly what's actually feeding your model.
 
