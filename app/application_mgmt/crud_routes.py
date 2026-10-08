@@ -5,6 +5,8 @@ Handles create, read (legacy redirect), update, and delete operations for Applic
 """
 
 from datetime import datetime
+from decimal import Decimal
+
 from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
@@ -12,6 +14,7 @@ from .. import db
 from ..models.application_portfolio import ApplicationComponent
 from ..models.models import ArchiMateElement, ArchiMateRelationship
 from ..models.requirements import Requirement
+from ..services.application_cost_accessor import set_annual_cost
 from ..utils.html_sanitizer import sanitize_html
 from ..utils.validators import (
     validate_application_name,
@@ -274,7 +277,6 @@ def application_create():
             infrastructure_cost_monthly=form.infrastructure_cost_monthly.data,
             development_cost_annual=form.development_cost_annual.data,
             maintenance_cost_annual=form.maintenance_cost_annual.data,
-            total_cost_of_ownership=form.total_cost_of_ownership.data,
             cost_center=form.cost_center.data,
             go_live_date=form.go_live_date.data,
             last_major_release_date=form.last_major_release_date.data,
@@ -309,6 +311,9 @@ def application_create():
             tags=form.tags.data,
             notes=form.notes.data,
         )
+
+        if form.total_cost_of_ownership.data is not None:
+            set_annual_cost(app, Decimal(str(form.total_cost_of_ownership.data)))
 
         db.session.add(app)
         db.session.flush()
@@ -469,7 +474,10 @@ def application_edit(id):
         app.infrastructure_cost_monthly = form.infrastructure_cost_monthly.data
         app.development_cost_annual = form.development_cost_annual.data
         app.maintenance_cost_annual = form.maintenance_cost_annual.data
-        app.total_cost_of_ownership = form.total_cost_of_ownership.data
+        if form.total_cost_of_ownership.data is not None:
+            set_annual_cost(app, Decimal(str(form.total_cost_of_ownership.data)))
+        else:
+            set_annual_cost(app, None)
         app.cost_center = form.cost_center.data
         app.go_live_date = form.go_live_date.data
         app.last_major_release_date = form.last_major_release_date.data

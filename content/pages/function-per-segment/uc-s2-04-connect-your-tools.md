@@ -5,7 +5,7 @@ segment_id: S2
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /scale-up/connect-your-tools
+url_slug: /use-cases/import-from-jira-and-github
 ---
 
 # Pull our systems and initiatives from Jira and GitHub instead of typing them in
@@ -25,5 +25,5 @@ one to look after — with a connector health page so you can see exactly what's
 
 ## Related
 
-- [What breaks if this service fails, and who gets called?](/scale-up/what-breaks-and-who-gets-called)
+- [What breaks if this service fails, and who gets called?](/use-cases/what-breaks-and-who-gets-called)
 - [Entelim vs LeanIX](/vs/leanix)

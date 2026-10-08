@@ -1,6 +1,7 @@
 import os
 
 from .. import db
+from .mixins import TenantMixin
 
 _FAST_INIT = os.getenv("APP_FAST_INIT", "0") == "1"
 
@@ -10,7 +11,7 @@ if not _FAST_INIT:
     from .models import Requirement  # noqa: F401
 else:
 
-    class Requirement(db.Model):
+    class Requirement(TenantMixin, db.Model):
         __tablename__ = "requirements"
 
         id = db.Column(db.Integer, primary_key=True)

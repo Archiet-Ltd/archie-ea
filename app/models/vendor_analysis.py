@@ -18,9 +18,10 @@ import json
 from datetime import datetime
 
 from .. import db
+from app.models.mixins import TenantMixin
 
 
-class OptionsAnalysis(db.Model):
+class OptionsAnalysis(TenantMixin, db.Model):
     """
     Main analysis session for comparing vendor options.
 
@@ -617,7 +618,7 @@ class VendorProofPoint(db.Model):
         return f"<VendorProofPoint {self.id}: {self.capability_claim} ({self.proof_type})>"
 
 
-class StakeholderInput(db.Model):
+class StakeholderInput(TenantMixin, db.Model):
     """
     Multi-stakeholder input for collaborative vendor selection.
 

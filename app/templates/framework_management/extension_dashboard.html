@@ -12,9 +12,18 @@
         actions=[
             {'text': 'Activate Extension', 'icon': 'power', 'onclick': 'activateExtension()', 'variant': 'default'},
             {'text': 'Configure', 'icon': 'settings', 'onclick': 'configureExtension()', 'variant': 'secondary'}
-        ]
+        ] if extension else []
     ) }}
 
+    {% if not extension %}
+    <div class="bg-card rounded-lg p-6 border border-border">
+        <div class="flex flex-col items-center justify-center py-8 text-center">
+            <i data-lucide="package-x" class="h-10 w-10 text-muted-foreground mb-3" aria-hidden="true"></i>
+            <p class="text-sm font-medium text-foreground">No extension named &ldquo;{{ extension_name|title }}&rdquo; is registered</p>
+            <p class="text-sm text-muted-foreground">Nothing is installed or available under this name yet.</p>
+        </div>
+    </div>
+    {% else %}
     <!-- Extension Info -->
     <div class="bg-card rounded-lg p-6 border border-border mb-6">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -23,68 +32,78 @@
                 <div class="space-y-2">
                     <div class="flex justify-between">
                         <span class="text-muted-foreground">Type:</span>
-                        <span class="text-foreground" id="extensionType">Loading...</span>
+                        <span class="text-foreground">{{ extension.extension_type or '—' }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-muted-foreground">Version:</span>
-                        <span class="text-foreground" id="extensionVersion">Loading...</span>
+                        <span class="text-foreground">{{ extension.extension_version or '—' }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-muted-foreground">Provider:</span>
-                        <span class="text-foreground" id="extensionProvider">Loading...</span>
+                        <span class="text-foreground">{{ extension.provider or '—' }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-muted-foreground">Status:</span>
-                        <span class="px-2 py-1 text-xs rounded-full bg-warning/10 text-warning-emphasis" id="extensionStatus">Inactive</span>
+                        {% if extension.status == 'active' %}
+                        <span class="px-2 py-1 text-xs rounded-full bg-success/10 text-success" id="extensionStatus">Active</span>
+                        {% elif extension.status == 'deprecated' %}
+                        <span class="px-2 py-1 text-xs rounded-full bg-warning/10 text-warning-emphasis" id="extensionStatus">Deprecated</span>
+                        {% elif extension.status == 'archived' %}
+                        <span class="px-2 py-1 text-xs rounded-full bg-muted text-muted-foreground" id="extensionStatus">Archived</span>
+                        {% else %}
+                        <span class="px-2 py-1 text-xs rounded-full bg-muted text-muted-foreground" id="extensionStatus">&mdash;</span>
+                        {% endif %}
                     </div>
                 </div>
             </div>
-            
+
             <div>
                 <h3 class="text-lg font-semibold text-foreground mb-2">Usage Statistics</h3>
                 <div class="space-y-2">
                     <div class="flex justify-between">
                         <span class="text-muted-foreground">Downloads:</span>
-                        <span class="text-foreground" id="downloadCount">Loading...</span>
+                        <span class="text-foreground">{{ extension.download_count if extension.download_count is not none else '—' }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-muted-foreground">Active Installations:</span>
-                        <span class="text-foreground" id="activeInstallations">Loading...</span>
+                        <span class="text-foreground">{{ extension.active_installations if extension.active_installations is not none else '—' }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-muted-foreground">User Rating:</span>
                         <div class="flex items-center">
-                            <div id="userRating" class="flex text-warning-emphasis/80">
-                                <!-- Stars will be populated by JavaScript -->
-                            </div>
-                            <span class="text-foreground ml-1" id="ratingValue">Loading...</span>
+                            {% if extension.user_rating is not none %}
+                            <div class="flex text-warning-emphasis/80" id="userRating" data-rating="{{ extension.user_rating }}"></div>
+                            <span class="text-foreground ml-1">{{ extension.user_rating }}</span>
+                            {% else %}
+                            <span class="text-foreground">&mdash;</span>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-muted-foreground">Last Updated:</span>
-                        <span class="text-foreground" id="lastUpdated">Loading...</span>
+                        <span class="text-foreground">{{ extension.last_updated.strftime('%Y-%m-%d') if extension.last_updated else '—' }}</span>
                     </div>
                 </div>
             </div>
-            
+
             <div>
                 <h3 class="text-lg font-semibold text-foreground mb-2">Compatibility</h3>
                 <div class="space-y-2">
                     <div class="flex justify-between">
                         <span class="text-muted-foreground">Target Framework:</span>
-                        <span class="text-foreground" id="targetFramework">Loading...</span>
+                        <span class="text-foreground">{{ extension.target_framework or '—' }}</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-muted-foreground">Min Version:</span>
-                        <span class="text-foreground" id="minVersion">Loading...</span>
+                        <span class="text-muted-foreground">Compatible Versions:</span>
+                        <span class="text-foreground">{{ compatible_versions or '—' }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-muted-foreground">Dependencies:</span>
-                        <span class="text-foreground" id="dependencies">Loading...</span>
+                        <span class="text-foreground">{{ dependencies_display or '—' }}</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-muted-foreground">Size:</span>
-                        <span class="text-foreground" id="extensionSize">Loading...</span>
+                        <span class="text-muted-foreground">License:</span>
+                        <span class="text-foreground">{{ extension.license_type or '—' }}</span>
                     </div>
                 </div>
             </div>
@@ -94,9 +113,26 @@
     <!-- Extension Features -->
     <div class="bg-card rounded-lg p-6 border border-border mb-6">
         <h3 class="text-lg font-semibold text-foreground mb-4">Extension Features</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="extensionFeatures">
-            <!-- Features will be populated by JavaScript -->
+        {% if features %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for feature in features %}
+            <div class="bg-muted rounded-lg p-4">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-primary/10 p-2 rounded-full">
+                        <i data-lucide="puzzle" class="h-4 w-4 text-primary" aria-hidden="true"></i>
+                    </div>
+                    <h4 class="font-medium text-foreground">{{ feature }}</h4>
+                </div>
+            </div>
+            {% endfor %}
         </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center py-8 text-center">
+            <i data-lucide="inbox" class="h-10 w-10 text-muted-foreground mb-3" aria-hidden="true"></i>
+            <p class="text-sm font-medium text-foreground">No features documented</p>
+            <p class="text-sm text-muted-foreground">This extension has no registered capabilities yet.</p>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Configuration Panel -->
@@ -111,7 +147,7 @@
                     <option value="custom">Custom Mode</option>
                 </select>
             </div>
-            
+
             <div>
                 <label class="block text-sm font-medium text-muted-foreground mb-1">Auto-Update</label>
                 <div class="flex items-center space-x-2">
@@ -119,7 +155,7 @@
                     <label for="autoUpdate" class="text-sm text-foreground">Enable automatic updates</label>
                 </div>
             </div>
-            
+
             <div>
                 <label for="loggingLevel" class="block text-sm font-medium text-muted-foreground mb-1">Logging Level</label>
                 <select id="loggingLevel" class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground">
@@ -129,7 +165,7 @@
                     <option value="debug">Debug</option>
                 </select>
             </div>
-            
+
             <div class="flex space-x-2">
                 <button type="button" @click="saveConfiguration()" class="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors" aria-label="Save">
                     <i data-lucide="save" class="inline h-4 w-4 mr-2" aria-hidden="true"></i>Save Configuration
@@ -148,120 +184,29 @@
             <!-- Activity log entries will be populated by JavaScript -->
         </div>
     </div>
+    {% endif %}
 </div>
 
 <script>
-function escapeHtml(str) {
-    if (str == null) return '';
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
 // Extension Dashboard JavaScript
 const extensionName = "{{ extension_name }}";
+const extensionExists = {{ 'true' if extension else 'false' }};
 
 document.addEventListener('DOMContentLoaded', function() {
-    loadExtensionData();
-    loadActivityLog();
+    if (extensionExists) {
+        renderRatingStars();
+        loadActivityLog();
+    }
 });
 
-function loadExtensionData() {
-    // Simulate loading extension data
-    const extensionData = getExtensionData(extensionName);
-    
-    document.getElementById('extensionType').textContent = extensionData.type;
-    document.getElementById('extensionVersion').textContent = extensionData.version;
-    document.getElementById('extensionProvider').textContent = extensionData.provider;
-    document.getElementById('downloadCount').textContent = extensionData.downloadCount;
-    document.getElementById('activeInstallations').textContent = extensionData.activeInstallations;
-    document.getElementById('ratingValue').textContent = extensionData.rating;
-    document.getElementById('targetFramework').textContent = extensionData.targetFramework;
-    document.getElementById('minVersion').textContent = extensionData.minVersion;
-    document.getElementById('dependencies').textContent = extensionData.dependencies;
-    document.getElementById('extensionSize').textContent = extensionData.size;
-    document.getElementById('lastUpdated').textContent = extensionData.lastUpdated;
-    
-    // Render rating stars
-    renderRatingStars(extensionData.rating);
-    
-    // Render features
-    renderFeatures(extensionData.features);
-}
-
-function getExtensionData(name) {
-    const extensions = {
-        'manufacturing-basic': {
-            type: 'Industry',
-            version: '2.1.0',
-            provider: 'System',
-            downloadCount: 1250,
-            activeInstallations: 89,
-            rating: 4.2,
-            targetFramework: 'Unified_Manufacturing_Excellence',
-            minVersion: '1.5.0',
-            dependencies: 'Core Framework v1.5+',
-            size: '15.2 MB',
-            lastUpdated: '2024-01-10',
-            features: [
-                { name: 'Basic Process Templates', description: 'Pre-built manufacturing process templates', icon: 'fa-file-alt' },
-                { name: 'Quality Control', description: 'Basic quality management tools', icon: 'fa-check-circle' },
-                { name: 'Inventory Tracking', description: 'Simple inventory management', icon: 'fa-boxes' },
-                { name: 'Production Scheduling', description: 'Basic production planning', icon: 'fa-calendar-alt' },
-                { name: 'Reporting Dashboard', description: 'Essential manufacturing reports', icon: 'fa-chart-bar' },
-                { name: 'User Management', description: 'Basic user role management', icon: 'fa-users' }
-            ]
-        },
-        'manufacturing-advanced': {
-            type: 'Industry',
-            version: '3.4.1',
-            provider: 'System',
-            downloadCount: 856,
-            activeInstallations: 42,
-            rating: 4.7,
-            targetFramework: 'Unified_Manufacturing_Excellence',
-            minVersion: '2.0.0',
-            dependencies: 'Core Framework v2.0+, Manufacturing Basic',
-            size: '28.7 MB',
-            lastUpdated: '2024-01-08',
-            features: [
-                { name: 'Advanced Analytics', description: 'Predictive analytics and insights', icon: 'fa-chart-line' },
-                { name: 'AI Integration', description: 'Machine learning capabilities', icon: 'fa-brain' },
-                { name: 'IoT Connectivity', description: 'Industrial IoT integration', icon: 'fa-network-wired' },
-                { name: 'Digital Twin', description: 'Virtual factory modeling', icon: 'fa-cube' },
-                { name: 'Automated Quality', description: 'AI-powered quality control', icon: 'fa-robot' },
-                { name: 'Supply Chain Optimization', description: 'Advanced supply chain management', icon: 'fa-truck' }
-            ]
-        },
-        'digital-transformation': {
-            type: 'Technology',
-            version: '1.8.2',
-            provider: 'System',
-            downloadCount: 623,
-            activeInstallations: 31,
-            rating: 4.5,
-            targetFramework: 'Unified_Manufacturing_Excellence',
-            minVersion: '1.8.0',
-            dependencies: 'Core Framework v1.8+',
-            size: '22.1 MB',
-            lastUpdated: '2024-01-12',
-            features: [
-                { name: 'Cloud Integration', description: 'Cloud services connectivity', icon: 'fa-cloud' },
-                { name: 'Mobile Access', description: 'Mobile device support', icon: 'fa-mobile-alt' },
-                { name: 'API Gateway', description: 'RESTful API management', icon: 'fa-plug' },
-                { name: 'Data Analytics', description: 'Big data processing', icon: 'fa-database' },
-                { name: 'Security Suite', description: 'Advanced security features', icon: 'fa-shield-alt' },
-                { name: 'Collaboration Tools', description: 'Team collaboration platform', icon: 'fa-comments' }
-            ]
-        }
-    };
-    
-    return extensions[name.replace('-', '-')] || extensions['manufacturing-basic'];
-}
-
-function renderRatingStars(rating) {
+function renderRatingStars() {
     const ratingContainer = document.getElementById('userRating');
+    if (!ratingContainer) return;
+    const rating = parseFloat(ratingContainer.dataset.rating);
+    if (Number.isNaN(rating)) return;
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 !== 0;
-    
+
     const starSvg = '<svg class="inline h-4 w-4 text-warning/80 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
     const halfSvg = '<svg class="inline h-4 w-4 text-warning/80 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77V2z"/></svg>';
     const emptySvg = '<svg class="inline h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
@@ -269,37 +214,13 @@ function renderRatingStars(rating) {
     let starsHTML = starSvg.repeat(fullStars);
     if (hasHalfStar) starsHTML += halfSvg;
     starsHTML += emptySvg.repeat(emptyStars);
-    
+
     ratingContainer.innerHTML = starsHTML;
 }
 
-function renderFeatures(features) {
-    const featuresContainer = document.getElementById('extensionFeatures');
-    featuresContainer.innerHTML = '';
-    
-    features.forEach(feature => {
-        const featureDiv = document.createElement('div');
-        featureDiv.className = 'bg-muted rounded-lg p-4';
-        featureDiv.innerHTML = `
-            <div class="flex items-center space-x-3">
-                <div class="bg-primary/10 p-2 rounded-full">
-                    <i class="fas ${escapeHtml(feature.icon)} text-primary"></i>
-                </div>
-                <div>
-                    <h4 class="font-medium text-foreground">${escapeHtml(feature.name)}</h4>
-                    <p class="text-sm text-muted-foreground">${escapeHtml(feature.description)}</p>
-                </div>
-            </div>
-        `;
-        featuresContainer.appendChild(featureDiv);
-    });
-}
-
 function loadActivityLog() {
-    // This rendered four hardcoded rows - 'Extension downloaded' / 'Admin' /
-    // '2024-01-13 10:30' - which read as a genuine audit trail. Nothing records
-    // extension activity: main.framework_management.extension_dashboard only
-    // renders this template, and no activity endpoint exists. In a governance
+    // Nothing records extension activity: main.framework_management.extension_dashboard
+    // only renders this template, and no activity endpoint exists. In a governance
     // product a fabricated audit log is the worst kind of placeholder, because a
     // reader cannot distinguish it from a record and may cite it in a review.
     // Show the absence instead, until something real is captured.
@@ -318,16 +239,17 @@ function loadActivityLog() {
 }
 
 async function activateExtension() {
-    // Activating extension
-    // API call to activate extension
     try {
         const data = await Platform.fetch.post('/framework-management/api/activate-extension', {
             extension_name: extensionName
         }, { silent: true });
-        
+
         if (!data.success) throw new Error(data.error || 'Could not activate the extension');
-        document.getElementById('extensionStatus').textContent = 'Active';
-        document.getElementById('extensionStatus').className = 'px-2 py-1 text-xs rounded-full bg-success/10 text-success';
+        const statusEl = document.getElementById('extensionStatus');
+        if (statusEl) {
+            statusEl.textContent = 'Active';
+            statusEl.className = 'px-2 py-1 text-xs rounded-full bg-success/10 text-success';
+        }
         loadActivityLog();
     } catch (err) {
         // The badge is left as it was — claiming "Active" for a call that never

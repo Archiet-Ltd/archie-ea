@@ -20,7 +20,6 @@ class AdminCompatStats(CompatStats):
 LEGACY_ROUTE_MAP = {
     # admin blueprint (38+ routes, url_prefix=/admin)
     "admin.index":                        {"url": "/admin/",                                    "v2": "admin.index",                        "method": "GET"},
-    "admin.dashboard_test":               {"url": "/admin/dashboard-test",                      "v2": "admin.dashboard_test",               "method": "GET"},
     "admin.dashboard":                    {"url": "/admin/dashboard",                           "v2": "admin.dashboard",                    "method": "GET"},
     "admin.new_user":                     {"url": "/admin/new-user",                            "v2": "admin.new_user",                     "method": "GET,POST"},
     "admin.invite_user":                  {"url": "/admin/invite-user",                         "v2": "admin.invite_user",                  "method": "GET,POST"},

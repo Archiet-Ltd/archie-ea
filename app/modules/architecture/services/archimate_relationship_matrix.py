@@ -25,6 +25,8 @@ Pure Python module: no DB, no LLM, no I/O.
 
 import logging
 
+from app.models.constants import ArchiMateRelationshipType
+
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -366,19 +368,8 @@ def validate_relationship(source_type, target_type, relationship_type):
 # INTERNAL HELPERS
 # ═══════════════════════════════════════════════════════════════════════════
 
-_REL_TYPE_NORM = {
-    "realizes": "Realization", "realization": "Realization",
-    "serves": "Serving", "serving": "Serving",
-    "composition": "Composition", "aggregation": "Aggregation",
-    "assignment": "Assignment", "access": "Access",
-    "influence": "Influence", "triggering": "Triggering",
-    "flow": "Flow", "specialization": "Specialization",
-    "association": "Association",
-}
-
-
 def _normalize_rel_type(rel_type):
     """Normalize relationship type to canonical form."""
     if not rel_type:
         return "Association"
-    return _REL_TYPE_NORM.get(rel_type.lower().strip(), rel_type)
+    return ArchiMateRelationshipType.normalize(rel_type, pascal_case=True) or rel_type

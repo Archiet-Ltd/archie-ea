@@ -220,7 +220,9 @@ def ci_job_names() -> set:
         if "${{ matrix." in template:
             key = re.search(r"\$\{\{\s*matrix\.(\w+)\s*\}\}", template).group(1)
             for value in matrix[key]:
-                names.add(re.sub(r"\$\{\{[^}]*\}\}", value, template))
+                # YAML types matrix values: `shard: [0, 1]` yields ints, and a
+                # check run's name carries each value as text.
+                names.add(re.sub(r"\$\{\{[^}]*\}\}", str(value), template))
         else:
             names.add(template)
     return names
@@ -241,7 +243,9 @@ def test_the_only_exclusion_is_the_image_build_and_it_says_why():
     for name in ("Tests (pytest + coverage)", "SAST (bandit)", "Browser journeys (one per archetype)",
                  "Browser compatibility (webkit)", "Browser compatibility (firefox)"):
         assert name in dw.REQUIRED_CHECKS
-    assert len(dw.REQUIRED_CHECKS) == 11
+    for shard in range(8):
+        assert f"Tests (pytest + coverage) \u2014 shard {shard}" in dw.REQUIRED_CHECKS
+    assert len(dw.REQUIRED_CHECKS) == 19
 
 
 @pytest.mark.parametrize("dry_run", ["true", "false"])

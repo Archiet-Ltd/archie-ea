@@ -54,12 +54,24 @@ class ComplianceControl(db.Model):
     # Reference
     official_reference = db.Column(db.String(500))
 
+    # Cross-framework harmonisation
+    harmonized_control_id = db.Column(
+        db.Integer, db.ForeignKey("compliance_controls.id"), nullable=True, index=True
+    )
+    harmonization_status = db.Column(
+        db.String(20), nullable=True
+    )  # proposed, confirmed, rejected
+    harmonization_notes = db.Column(db.Text)
+
     # Metadata
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
     framework = db.relationship("RegulatoryFramework", back_populates="controls")
+    harmonized_control = db.relationship(
+        "ComplianceControl", remote_side="ComplianceControl.id", backref="harmonized_controls"
+    )
 
     __table_args__ = (
         db.UniqueConstraint("framework_id", "control_code", name="uq_framework_control"),
@@ -495,6 +507,13 @@ class ComplianceGap(db.Model):
     # Metadata
     identified_at = db.Column(db.DateTime, default=datetime.utcnow)
     identified_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+
+    # Set once this row has been merged into the one gap register (app.models.
+    # implementation_migration.Gap) by app/commands/consolidate_gaps.py. NULL
+    # means not yet merged; the row itself is never dropped (CLAUDE.md).
+    retired_into_id = db.Column(
+        db.Integer, db.ForeignKey("gaps.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # Relationships
     compliance_requirement = db.relationship("ComplianceRequirement", backref="gaps")

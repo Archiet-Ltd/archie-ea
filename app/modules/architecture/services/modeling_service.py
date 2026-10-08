@@ -12,8 +12,6 @@ Consolidates model generation, patterns, viewpoints, and relationships:
 - app.services.archimate_relationship_generator (ArchiMateRelationshipGenerator — 15KB)
 - app.services.archimate_relationship_service (ArchiMateRelationshipService — 8KB)
 - app.services.archimate.relationship_service (RelationshipService — 33KB)
-- app.services.archimate.relationship_derivation_service (RelationshipDerivationService — 43KB)
-- app.services.archimate.unified_derivation_service (UnifiedDerivationService — 59KB)
 - app.services.archimate.relationship_validator (RelationshipValidator — 20KB)
 - app.services.archimate.relationship_pattern_service (RelationshipPatternService — 9KB)
 - app.services.archimate.relationship_completion_service (RelationshipCompletionService — 4KB)
@@ -62,14 +60,6 @@ from app.modules.architecture.services.archimate_relationship_service import (  
 
 from app.modules.architecture.services.relationship_service import (  # noqa: F401
     RelationshipService,
-)
-
-from app.modules.architecture.services.relationship_derivation_service import (  # noqa: F401
-    RelationshipDerivationService,
-)
-
-from app.modules.architecture.services.unified_derivation_service import (  # noqa: F401
-    UnifiedDerivationService,
 )
 
 from app.modules.architecture.services.relationship_validator import (  # noqa: F401

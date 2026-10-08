@@ -132,6 +132,11 @@ class GeminiFileSearchService:
             "Content-Type": "application/json",
         }
 
+    def _guard_provider_call(self, model: str | None = None, prompt: str | None = None) -> None:
+        from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+        LLMService._guard_provider_call("gemini", model, prompt=prompt)
+
     @staticmethod
     def _build_store_display_name(file_path: str) -> str:
         base_name = os.path.basename(file_path) or "document"
@@ -142,6 +147,7 @@ class GeminiFileSearchService:
         return f"archimate-{slug}-{unique_suffix}"[:60]
 
     def _create_store(self, display_name: str) -> str:
+        self._guard_provider_call(model=self.DEFAULT_MODEL, prompt=f"create store {display_name}")
         resp = requests.post(
             f"{self.GENERATIVE_BASE_URL}/fileSearchStores",
             headers=self._headers(),
@@ -155,6 +161,7 @@ class GeminiFileSearchService:
         return data["name"]
 
     def _upload_file_to_store(self, store_name: str, file_path: str) -> str:
+        self._guard_provider_call(model=self.DEFAULT_MODEL, prompt=f"upload file {file_path}")
         file_size = os.path.getsize(file_path)
         mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
 
@@ -201,6 +208,7 @@ class GeminiFileSearchService:
         return operation_name
 
     def _wait_for_operation(self, operation_name: str, timeout_seconds: int = 300) -> None:
+        self._guard_provider_call(model=self.DEFAULT_MODEL, prompt=f"wait for operation {operation_name}")
         deadline = time.time() + timeout_seconds
         poll_url = f"{self.GENERATIVE_BASE_URL}/{operation_name}"
 
@@ -280,6 +288,7 @@ class GeminiFileSearchService:
         user_prompt: str,
         model: str,
     ) -> Dict[str, Any]:
+        self._guard_provider_call(model=model, prompt=user_prompt)
         payload = {
             "systemInstruction": {
                 "role": "system",
@@ -333,6 +342,7 @@ class GeminiFileSearchService:
 
     def _cleanup_store(self, store_name: str) -> None:
         try:
+            self._guard_provider_call(model=self.DEFAULT_MODEL, prompt=f"cleanup store {store_name}")
             requests.delete(
                 f"{self.GENERATIVE_BASE_URL}/{store_name}",
                 headers={"x-goog-api-key": self.api_key},

@@ -7,7 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 roadmap_citation: "roadmap-v2.md 'Next: December 2026 to February 2027' — 'ServiceNow as the first native connector, with incidents and changes read into the model and each configuration item resolved to exactly one element'"
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /enterprise-architecture/servicenow-crosswalk
+url_slug: /use-cases/servicenow-cmdb-mapping
 ---
 
 # Resolve a ServiceNow CI to exactly one model element by shared identifier
@@ -28,4 +28,4 @@ Coming December 2026 to February 2027. Join the waiting list and we'll tell you 
 
 ## Related
 
-- [Import our existing Archi or Open Exchange model](/enterprise-architecture/import)
+- [Import our existing Archi or Open Exchange model](/use-cases/import-archimate-model)

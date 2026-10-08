@@ -43,6 +43,16 @@ LAST_ACTIVITY_KEY = "_last_activity_at"
 
 _DEFAULT_IDLE = timedelta(minutes=30)
 
+# R1-B12 PR 2 (TB-0144/PB-0100): administrators get tighter limits than the
+# platform default -- a shorter idle window, and an absolute cap on session
+# age regardless of activity (the platform default only has PERMANENT_
+# SESSION_LIFETIME, an 8-hour cookie-level cap that is the same for every
+# role; this adds a second, stricter, role-aware cap read from the session
+# registry's created_at rather than the cookie, so it cannot be extended by
+# a refreshed cookie the way the cookie-level cap can).
+_DEFAULT_IDLE_ADMIN = timedelta(minutes=15)
+_DEFAULT_ABSOLUTE_ADMIN = timedelta(hours=4)
+
 #: Requests that must NOT count as activity. A background /health poll from an
 #: abandoned tab would otherwise refresh the stamp forever - which is exactly
 #: the defect the old client-side "extend" button had, since it pinged /health.
@@ -64,6 +74,32 @@ def _idle_seconds(app):
         return int(raw)
     except (TypeError, ValueError):
         return int(_DEFAULT_IDLE.total_seconds())
+
+
+def _timedelta_seconds(raw, default):
+    if isinstance(raw, timedelta):
+        return int(raw.total_seconds())
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return int(default.total_seconds())
+
+
+def _idle_seconds_admin(app):
+    return _timedelta_seconds(
+        app.config.get("SESSION_IDLE_TIMEOUT_ADMIN", _DEFAULT_IDLE_ADMIN), _DEFAULT_IDLE_ADMIN
+    )
+
+
+def _absolute_seconds_admin(app):
+    return _timedelta_seconds(
+        app.config.get("SESSION_ABSOLUTE_TIMEOUT_ADMIN", _DEFAULT_ABSOLUTE_ADMIN),
+        _DEFAULT_ABSOLUTE_ADMIN,
+    )
+
+
+def _is_admin(user):
+    return bool(getattr(user, "is_org_admin", False) or getattr(user, "is_platform_admin", False))
 
 
 def _now():
@@ -189,13 +225,45 @@ def init_session_policy(app):
             return resp
         session_registry.touch(sid)
 
-        if idle_seconds <= 0:
+        # R1-B12 PR 2: an administrator's session is bound by two extra,
+        # stricter checks before the platform-default idle check below even
+        # runs -- an absolute cap from the registry's created_at (which a
+        # refreshed cookie cannot push out, unlike PERMANENT_SESSION_LIFETIME),
+        # and its own shorter idle window.
+        is_admin = _is_admin(current_user)
+        if is_admin:
+            age = session_registry.age_seconds(sid)
+            if age is not None:
+                absolute_seconds = _absolute_seconds_admin(app)
+                if absolute_seconds > 0 and age > absolute_seconds:
+                    user_label = getattr(current_user, "email", None) or current_user.get_id()
+                    _rejected_user = current_user._get_current_object()
+                    session_registry.revoke(sid, "admin_absolute_timeout")
+                    session.clear()
+                    logout_user()
+                    logger.info(
+                        "Admin session absolute timeout: signed out %s after %ss (limit %ss)",
+                        user_label, int(age), absolute_seconds,
+                    )
+                    from app.services import auth_audit
+
+                    auth_audit.record_session_rejected(_rejected_user, "admin_absolute_timeout")
+                    resp = _reject_response(
+                        request, "admin_absolute",
+                        "Administrator sessions expire after a fixed time. Please log in again.",
+                    )
+                    _force_clear_remember_cookie(resp)
+                    return resp
+
+        effective_idle_seconds = _idle_seconds_admin(app) if is_admin else idle_seconds
+
+        if effective_idle_seconds <= 0:
             return None
 
         now = _now()
         last = session.get(LAST_ACTIVITY_KEY)
 
-        if isinstance(last, int) and now - last > idle_seconds:
+        if isinstance(last, int) and now - last > effective_idle_seconds:
             user_label = getattr(current_user, "email", None) or current_user.get_id()
             _rejected_user = current_user._get_current_object() if current_user.is_authenticated else None
             session_registry.revoke(sid, "idle_timeout")
@@ -206,7 +274,7 @@ def init_session_policy(app):
                 "Session idle timeout: signed out %s after %ss idle (limit %ss)",
                 user_label,
                 now - last,
-                idle_seconds,
+                effective_idle_seconds,
             )
             if _rejected_user is not None:
                 from app.services import auth_audit

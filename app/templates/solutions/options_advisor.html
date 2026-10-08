@@ -74,7 +74,7 @@
     <div class="border border-border rounded-xl bg-card overflow-hidden">
         <div class="px-5 py-3 border-b border-border flex items-center justify-between bg-muted/20">
             <div class="flex items-center gap-2">
-                <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground">ADR-{{ '%03d' % adr.adr_number }}</span>
+                <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground">{{ adr.decision_id or ('ADR-%03d' % adr.id) }}</span>
                 <h2 class="text-sm font-semibold text-foreground">{{ adr.title }}</h2>
             </div>
             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold uppercase"

@@ -43,7 +43,7 @@ def health_db():
 
 @health_bp.route("/health/slo", methods=["GET"])
 def health_slo():
-    """Internal platform SLO attainment (TB-0165, REQ-NFR-005).
+    """Internal platform SLO attainment.
 
     Unauthenticated like /health and /health/db — production watch alerts on
     this. Returns only aggregate objective numbers: no organisation names,
