@@ -830,13 +830,6 @@ def test_nav_counts_cache_expires_empty_result_on_other_worker(
 
     from app._bootstrap.context_processors import compute_nav_counts, _nav_counts_cache
 
-    # compute_nav_counts memoises on the request environ when a request context
-    # is active, and only uses the process cache outside one. This test is about
-    # the process cache, so take that path even if an earlier test in the same
-    # process left a request context pushed -- otherwise the second call returns
-    # the first call's memo and the assertion below reads 0.
-    monkeypatch.setattr("flask.has_request_context", lambda: False)
-
     org = make_org()
 
     # Prime cache with empty result — stored with 5-second TTL.
