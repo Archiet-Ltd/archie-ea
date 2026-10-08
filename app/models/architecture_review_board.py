@@ -2744,7 +2744,7 @@ if not _FAST_INIT:
         TOGAF ADM Phase H: Architecture Change Management.
 
         PR 297 defect 2/3: organization_id added via migration
-        20261008_change_request_organization_id, backfilled from
+        20261008_cr_organization_id, backfilled from
         arb_review_item_id's own tenant. A row with no review item has
         no derivable tenant and keeps a NULL organization_id -- same as
         every other TenantMixin model, the ORM listener then excludes it

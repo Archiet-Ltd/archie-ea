@@ -18,7 +18,7 @@ returned to the wrong tenant.
 Idempotent: guards the column add, the backfill and the NOT NULL step
 so a second run is a no-op.
 
-Revision ID: 20261008_change_request_organization_id
+Revision ID: 20261008_cr_organization_id
 Revises: 20261007_public_visitor_events
 Create Date: 2026-10-08
 """
@@ -26,7 +26,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import text
 
-revision = "20261008_change_request_organization_id"
+revision = "20261008_cr_organization_id"
 down_revision = "20261007_public_visitor_events"
 branch_labels = None
 depends_on = None
