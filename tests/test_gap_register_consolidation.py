@@ -182,33 +182,28 @@ def test_merge_implementation_gap_attributed_by_architecture(db_session, two_org
     assert merged.severity == "high"
 
 
-def test_merge_implementation_gap_unattributable_quarantined(db_session, two_orgs, tenant_ctx):
-    """No architecture link: stays quarantined (organization_id NULL),
-    invisible to both organisations -- never a guess."""
+def test_merge_implementation_gap_unattributable_left_unmerged(db_session, two_orgs):
+    """No architecture link: gaps.organization_id is NOT NULL (TenantMixin),
+    so an unattributable row cannot be quarantined inside the one register --
+    it is left unmerged instead (retired_into_id stays NULL, the row stays
+    exactly where it was), never guessed at and never dropped."""
     from app.models.implementation_planning import ImplementationGap
     from app.models.implementation_migration import Gap
 
-    org_a, org_b = two_orgs
     source = ImplementationGap(name="Orphan Gap", gap_type="technology")
     db_session.add(source)
     db_session.commit()
+    source_id = source.id
 
     result = _run("merge-gap-stores")
     assert result.exit_code == 0, f"merge failed: {result.output}"
 
     db_session.refresh(source)
-    assert source.retired_into_id is not None
-    merged_id = source.retired_into_id
-
-    merged = Gap.query.filter_by(id=merged_id).one()
-    assert merged.organization_id is None
-
-    with tenant_ctx(org_a.id):
-        visible_to_a = Gap.query.filter_by(id=merged_id).first()
-    with tenant_ctx(org_b.id):
-        visible_to_b = Gap.query.filter_by(id=merged_id).first()
-    assert visible_to_a is None
-    assert visible_to_b is None
+    assert source.retired_into_id is None, "an unattributable row must not be merged"
+    assert ImplementationGap.query.filter_by(id=source_id).first() is not None, (
+        "the source row must still exist -- never dropped"
+    )
+    assert Gap.query.filter_by(source_table="implementation_gaps", source_id=source_id).first() is None
 
 
 # ── merge-gap-stores: compliance_gaps ───────────────────────────────────────
@@ -385,17 +380,21 @@ def test_create_gap_same_name_different_organisation_is_not_a_duplicate(db_sessi
 
 
 def test_create_gap_duplicate_check_scoped_by_architecture_when_given(db_session, two_orgs):
+    """Two different architectures, same organisation and name: distinct
+    findings, not a duplicate of each other."""
     from app.services import gap_register_service
 
     org_a, _org_b = two_orgs
-    arch = _architecture_model(db_session, org_a)
+    arch_1 = _architecture_model(db_session, org_a, "arch-1")
+    arch_2 = _architecture_model(db_session, org_a, "arch-2")
 
     gap_1, created_1 = gap_register_service.create_gap(
-        org_a.id, "Scoped Finding", architecture_id=arch.id
+        org_a.id, "Scoped Finding", architecture_id=arch_1.id
     )
     db_session.commit()
-    # Same name, no architecture given: a different scope, not a duplicate.
-    gap_2, created_2 = gap_register_service.create_gap(org_a.id, "Scoped Finding")
+    gap_2, created_2 = gap_register_service.create_gap(
+        org_a.id, "Scoped Finding", architecture_id=arch_2.id
+    )
     db_session.commit()
 
     assert created_1 is True

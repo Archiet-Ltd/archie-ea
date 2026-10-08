@@ -16,9 +16,7 @@ capability_heatmap_service.py under the capability-gap concept; they are
 deliberately not merged here (r1-build-briefs-v1.md, R1-B05, MIG-R-0068/0069
 excluded from wave 1).
 
-Attribution rule per source, in this order, else quarantine (organization_id
-left NULL -- the tenant filter's `=` comparison then matches no organisation,
-visible to no tenant, never a guess):
+Attribution rule per source, in this order:
 
     roadmap_gaps           source_application_id -> application_components,
                             else source_capability_id -> unified_capabilities
@@ -28,6 +26,14 @@ visible to no tenant, never a guess):
     implementation_gaps    architecture_id -> architecture_models
     compliance_gaps        assigned_to_id -> users,
                             else identified_by_id -> users
+
+A row this cannot attribute an organisation to is left unmerged (its
+retired_into_id stays NULL, exactly where it was) rather than guessed or
+quarantined with a NULL organisation: gaps.organization_id is NOT NULL
+(TenantMixin), unlike a target table purpose-built nullable for a backfill,
+so there is nowhere to put an unattributable row inside the one register
+without either guessing or relaxing a constraint every other Gap reader
+relies on. Re-run after the row gains a resolvable link.
 
 Run:
 
@@ -136,12 +142,31 @@ _TARGET_COLUMNS = (
 
 def _merge_one(conn, spec, dry_run):
     table = spec["table"]
-    eligible = _count(conn, f'SELECT count(*) FROM "{table}" WHERE retired_into_id IS NULL')
-    if not eligible:
+    unmerged = _count(conn, f'SELECT count(*) FROM "{table}" WHERE retired_into_id IS NULL')
+    if not unmerged:
         click.echo(f"  {table}: nothing to merge")
         return
+
+    # gaps.organization_id is NOT NULL (TenantMixin) -- unlike a target table
+    # purpose-built nullable for a backfill, gaps cannot record a quarantined
+    # row with no organisation. A row this cannot attribute an organisation
+    # to is left unmerged (retired_into_id stays NULL, the row stays exactly
+    # where it was -- CLAUDE.md's "never drop" holds either way) rather than
+    # guessing or relaxing a constraint every other Gap reader relies on.
+    attributable = _count(
+        conn,
+        f'SELECT count(*) FROM "{table}" s {spec["org_joins"]} '
+        f'WHERE s.retired_into_id IS NULL AND {spec["org_expr"]} IS NOT NULL',
+    )
+    unattributable = unmerged - attributable
     if dry_run:
-        click.echo(f"  - {table}: would merge {eligible} row(s) into gaps")
+        click.echo(
+            f"  - {table}: would merge {attributable} row(s) into gaps"
+            + (f", {unattributable} left unattributed" if unattributable else "")
+        )
+        return
+    if not attributable:
+        click.echo(f"  {table}: {unattributable} row(s) left unattributed, none merged")
         return
 
     select_columns = (
@@ -155,6 +180,7 @@ def _merge_one(conn, spec, dry_run):
         f"SELECT {select_columns} "
         f'FROM "{table}" s {spec["org_joins"]} '
         "WHERE s.retired_into_id IS NULL "
+        f"AND {spec['org_expr']} IS NOT NULL "
         "AND NOT EXISTS ("
         "SELECT 1 FROM gaps g WHERE g.source_table = :source_table AND g.source_id = s.id"
         ") "
@@ -164,7 +190,10 @@ def _merge_one(conn, spec, dry_run):
         f'FROM inserted WHERE "{table}".id = inserted.old_id'
     )
     conn.execute(text(sql), {"source_table": table})
-    click.echo(f"  + {table}: merged {eligible} row(s), marked retired_into_id")
+    click.echo(
+        f"  + {table}: merged {attributable} row(s), marked retired_into_id"
+        + (f"; {unattributable} left unattributed (no resolvable organisation)" if unattributable else "")
+    )
 
 
 @click.command("merge-gap-stores")
@@ -188,12 +217,8 @@ def merge_gap_stores(dry_run):
         return
 
     after = _count(conn, "SELECT count(*) FROM gaps")
-    quarantined = _count(conn, "SELECT count(*) FROM gaps WHERE organization_id IS NULL")
     db.session.commit()
-    click.echo(
-        f"merge-gap-stores: done. gaps: {before} -> {after} row(s), "
-        f"{quarantined} quarantined (unattributable)."
-    )
+    click.echo(f"merge-gap-stores: done. gaps: {before} -> {after} row(s).")
 
 
 def init_app(app):
