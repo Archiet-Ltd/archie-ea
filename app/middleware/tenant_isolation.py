@@ -7,17 +7,33 @@ Layer 1: SQLAlchemy do_orm_execute event adds WHERE organization_id = X
 Layer 3: before_flush event auto-sets organization_id on new TenantMixin
           records when the caller didn't set it explicitly.
 
-Both layers are NO-OPs when g.current_org_id is None (CLI, migrations,
-background tasks, unauthenticated requests).
+Layer 4: before_flush event refuses an authenticated, non-platform-admin
+          write (insert/update/delete) to any model that is NOT a
+          TenantMixin subclass, unless that model's table is on the
+          explicit allow-list (app/middleware/platform_write_allowlist.py).
+          Structural, defense-in-depth guard (lead review of PR 430, Part 1):
+          a route that forgets its own platform_admin_required decorator —
+          or a new route nobody remembers to decorate — is still stopped
+          here, one layer below every route, instead of relying on every
+          call site remembering the same check forever.
+
+Layers 1 and 3 are NO-OPs when g.current_org_id is None (CLI, migrations,
+background tasks, unauthenticated requests). Layer 4 is a NO-op outside a
+request context, or when there is no authenticated user, or when that user
+is a platform admin — see _refuse_unscoped_platform_write below.
 """
 
 import logging
 
-from flask import g
+from flask import g, has_request_context
+from flask_login import current_user
 from sqlalchemy import text
 from sqlalchemy.orm import with_loader_criteria
 
+from app.exceptions import AuthorizationError
 from app.extensions import db
+from app.middleware.platform_write_allowlist import reason_for
+from app.middleware.tenant_decorators import is_platform_admin
 from app.models.mixins.core import TenantMixin
 
 logger = logging.getLogger(__name__)
@@ -131,4 +147,84 @@ def install_tenant_filter(app):
             if isinstance(obj, TenantMixin) and getattr(obj, "organization_id", None) is None:
                 obj.organization_id = g.current_org_id
 
-    app.logger.info("Tenant isolation filters installed (do_orm_execute + before_flush)")
+    @db.event.listens_for(db.session, "before_flush")
+    def _refuse_unscoped_platform_write(session, flush_context, instances):
+        """Refuse a non-platform-admin's write to a non-tenant-scoped table.
+
+        The "no invitation needed" vulnerability class the PR 428/430 reviews
+        kept finding in new places: an ordinary org admin of their own
+        brand-new, self-registered organisation (or in some cases any
+        signed-in user) writing to a table that isn't scoped to any
+        organisation at all, because the route guarding it checked
+        ``require_roles``/``admin_required`` (satisfied by that org's own
+        admin) instead of ``platform_admin_required``. This stops the write
+        here regardless of which decorator the route remembered, for every
+        ``session.new`` / ``session.dirty`` / ``session.deleted`` object in
+        the flush, not just the ones a reviewer happened to look at.
+
+        NO-OP, same pattern as ``_set_tenant_on_new`` above, in every context
+        this must not touch:
+        * outside a Flask request context at all (CLI commands, migrations,
+          the tenant-safe job harness in app/jobs/tenant_safe_job.py, which
+          runs inside ``app.app_context()`` but deliberately never a request
+          context — see that module's own docstring);
+        * inside a request with no authenticated user (``current_user`` is
+          ``None``/anonymous outside a request context too, which is exactly
+          why the request-context check above runs first — flask_login's
+          ``current_user`` resolves to ``None`` with no request context, and
+          ``None.is_authenticated`` would raise, not just read False);
+        * for a genuine platform admin (``is_platform_admin``), who is the
+          intended writer of these tables.
+
+        TenantMixin objects are never inspected here: Layer 1's
+        ``do_orm_execute`` filter already prevents loading another
+        organisation's row of one in the first place, and Layer 3 above
+        already stamps a new one's ``organization_id`` — this layer is only
+        for the tables neither of those mechanisms ever scoped at all.
+
+        Known gap (by design, matches the brief this guard was written
+        against): this only sees ORM unit-of-work objects. A bulk
+        ``Query.update()``/``Query.delete()`` (``synchronize_session=False``)
+        or a raw ``db.session.execute(text(...))`` bypasses the ORM session
+        entirely and never reaches ``before_flush`` — those call sites still
+        depend entirely on their own route decorator (Part 2/3 of the PR 430
+        follow-up fix exactly this for the specific routes found so far).
+        """
+        if not has_request_context():
+            return
+        if not getattr(current_user, "is_authenticated", False):
+            return
+        if is_platform_admin(current_user):
+            return
+
+        candidates = list(session.new) + list(session.dirty) + list(session.deleted)
+        for obj in candidates:
+            if isinstance(obj, TenantMixin):
+                continue
+            table = getattr(type(obj), "__table__", None)
+            table_name = table.name if table is not None else None
+            if table_name is not None and reason_for(table_name) is not None:
+                continue
+
+            operation = (
+                "insert" if obj in session.new
+                else "delete" if obj in session.deleted
+                else "update"
+            )
+            logger.warning(
+                "platform-write-guard: refused %s on %s (table=%s) for "
+                "user_id=%s — not a platform admin and not on the allow-list",
+                operation, type(obj).__name__, table_name,
+                getattr(current_user, "id", None),
+            )
+            raise AuthorizationError(
+                message=(
+                    "non-platform-admin %s refused on unscoped table %s"
+                    % (operation, table_name or type(obj).__name__)
+                ),
+            )
+
+    app.logger.info(
+        "Tenant isolation filters installed (do_orm_execute + before_flush + "
+        "platform-write guard)"
+    )
