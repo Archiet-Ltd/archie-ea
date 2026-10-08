@@ -1011,3 +1011,412 @@ class TestViewerRole:
 
         assert viewer_user.can(Permission.ADMINISTER) is False
         assert viewer_user.is_admin() is False
+
+
+class TestDeleteUserSessionSwitchIDOR:
+    """Same session-switch IDOR class as ``TestChangeEmailSessionSwitchIDOR``
+    above, for ``delete_user`` (``POST /admin/user/<user_id>/_delete``).
+    Reproduced by the refuter on PR425: ``admin_required`` only checks the
+    caller's own, organisation-independent ``Permission.ADMINISTER`` bit, so
+    once the attacker's active session is switched into the victim
+    organisation, the only remaining gate is this route's own authorization
+    check -- it could delete that organisation's own administrator outright."""
+
+    def test_admin_with_viewer_role_in_other_org_cannot_delete_its_admin(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.org_role import OrgRole
+        from app.models.user import User
+
+        org_a = _make_org(db_session, "del-sw-a")
+        org_b = _make_org(db_session, "del-sw-b")
+        attacker = _make_user(db_session, org_a, is_org_admin=True, is_platform_admin=False)
+        victim = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        victim_id = victim.id
+        OrgRole.set_role(org_b.id, attacker.id, "viewer", granted_by_id=attacker.id)
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, attacker)
+            switched = client.post(
+                "/account/switch-organization",
+                data={"organization_id": str(org_b.id)},
+                follow_redirects=False,
+            )
+            assert switched.status_code == 302
+
+            resp = client.post(f"/admin/user/{victim_id}/_delete")
+
+        assert resp.status_code == 403
+
+        with app.app_context():
+            # Provably unchanged: the victim still exists at all, not just
+            # "the response said 403".
+            assert User.query.get(victim_id) is not None
+
+    def test_genuine_org_admin_can_still_delete_within_own_org(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.user import User
+
+        org_b = _make_org(db_session, "del-sw-legit-b")
+        admin_b = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        target = _make_user(
+            db_session, org_b, email=f"del-sw-target-{uuid.uuid4().hex[:8]}@example.com"
+        )
+        target_id = target.id
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin_b)
+            resp = client.post(f"/admin/user/{target_id}/_delete")
+
+        assert resp.status_code == 302
+        assert resp.headers["Location"].endswith("/admin/users")
+
+        with app.app_context():
+            assert User.query.get(target_id) is None
+
+
+class TestChangeAccountTypeSessionSwitchIDOR:
+    """Same session-switch IDOR class, for ``change_account_type``
+    (``POST /admin/user/<user_id>/change-account-type``). Reproduced by the
+    refuter on PR425: once switched, the attacker can demote another org's
+    administrator or promote any of that org's users to Administrator --
+    same gap as change_user_email (commit 7ae1b168)."""
+
+    def test_admin_with_viewer_role_in_other_org_cannot_change_its_admin_type(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.org_role import OrgRole
+        from app.models.user import Role, User
+
+        org_a = _make_org(db_session, "type-sw-a")
+        org_b = _make_org(db_session, "type-sw-b")
+        attacker = _make_user(db_session, org_a, is_org_admin=True, is_platform_admin=False)
+        victim = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        victim_id = victim.id
+        victim_role_id_before = victim.role_id
+        user_role = Role.query.filter_by(name="User").first()
+        OrgRole.set_role(org_b.id, attacker.id, "viewer", granted_by_id=attacker.id)
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, attacker)
+            switched = client.post(
+                "/account/switch-organization",
+                data={"organization_id": str(org_b.id)},
+                follow_redirects=False,
+            )
+            assert switched.status_code == 302
+
+            resp = client.post(
+                f"/admin/user/{victim_id}/change-account-type",
+                data={"role": str(user_role.id)},
+            )
+
+        assert resp.status_code == 403
+
+        with app.app_context():
+            reloaded = User.query.get(victim_id)
+            # Byte-for-byte: a route that still wrote the new role before
+            # hitting a later check would be a real residual bug this
+            # assertion exists to catch, not just "got a 403".
+            assert reloaded.role_id == victim_role_id_before
+
+    def test_genuine_org_admin_can_still_change_account_type_within_own_org(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.user import Role, User
+
+        org_b = _make_org(db_session, "type-sw-legit-b")
+        admin_b = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        target = _make_user(
+            db_session, org_b, email=f"type-sw-target-{uuid.uuid4().hex[:8]}@example.com"
+        )
+        target_id = target.id
+        admin_role = Role.query.filter_by(name="Administrator").first()
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin_b)
+            resp = client.post(
+                f"/admin/user/{target_id}/change-account-type",
+                data={"role": str(admin_role.id)},
+            )
+
+        assert resp.status_code == 200
+
+        with app.app_context():
+            reloaded = User.query.get(target_id)
+            assert reloaded.role_id == admin_role.id
+
+
+class TestAssignEnterpriseRoleApiSessionSwitchIDOR:
+    """Same session-switch IDOR class, for the JSON API twin of
+    change_account_type: ``POST /admin/api/enterprise-roles/assign``.
+    Reproduced by the refuter on PR425: once switched, the attacker can
+    assign any enterprise role to another organisation's users via the API
+    path, the same gap as D5 (change_account_type)."""
+
+    def test_admin_with_viewer_role_in_other_org_cannot_assign_its_user_a_role(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.org_role import OrgRole
+        from app.models.user import VALID_ROLES, User
+
+        org_a = _make_org(db_session, "erole-sw-a")
+        org_b = _make_org(db_session, "erole-sw-b")
+        attacker = _make_user(db_session, org_a, is_org_admin=True, is_platform_admin=False)
+        victim = _make_user(
+            db_session, org_b, email=f"erole-victim-{uuid.uuid4().hex[:8]}@example.com"
+        )
+        victim_id = victim.id
+        victim_role_before = victim.enterprise_role
+        OrgRole.set_role(org_b.id, attacker.id, "viewer", granted_by_id=attacker.id)
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, attacker)
+            switched = client.post(
+                "/account/switch-organization",
+                data={"organization_id": str(org_b.id)},
+                follow_redirects=False,
+            )
+            assert switched.status_code == 302
+
+            resp = client.post(
+                "/admin/api/enterprise-roles/assign",
+                json={"user_id": victim_id, "role": VALID_ROLES[0]},
+            )
+
+        assert resp.status_code == 403
+
+        with app.app_context():
+            reloaded = User.query.get(victim_id)
+            assert reloaded.enterprise_role == victim_role_before
+
+    def test_genuine_org_admin_can_still_assign_a_role_within_own_org(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.user import VALID_ROLES, User
+
+        org_b = _make_org(db_session, "erole-sw-legit-b")
+        admin_b = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        target = _make_user(
+            db_session, org_b, email=f"erole-target-{uuid.uuid4().hex[:8]}@example.com"
+        )
+        target_id = target.id
+        chosen_role = VALID_ROLES[0]
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin_b)
+            resp = client.post(
+                "/admin/api/enterprise-roles/assign",
+                json={"user_id": target_id, "role": chosen_role},
+            )
+
+        assert resp.status_code == 200
+        assert resp.get_json()["success"] is True
+
+        with app.app_context():
+            reloaded = User.query.get(target_id)
+            assert reloaded.enterprise_role == chosen_role
+
+
+class TestRolesApiPlatformAdminOnly:
+    """Sibling finding on PR425: ``Role`` is a GLOBAL table (no
+    organization_id on app/models/user.py's Role) -- reachable by ANY org
+    admin of their own, brand-new organisation, no invitation into anyone
+    else's org needed at all. ``admin_required`` alone (the caller's own,
+    organisation-independent Permission.ADMINISTER bit) let any such org
+    admin read, create, rename, re-permission or delete rows in this
+    platform-wide table. Each of the five /admin/api/roles* routes now also
+    requires ``platform_admin_required``; this duplicates the fix already
+    written for PR #428 (fix/admin-rbac-active-org) intentionally, since
+    PR425 deploys first and must not leave this gap open in the interim."""
+
+    def test_ordinary_org_admin_cannot_list_roles(self, app, db_session, login_as, client):
+        org = _make_org(db_session, "roles-api-list")
+        admin = _make_user(db_session, org, is_org_admin=True, is_platform_admin=False)
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin)
+            resp = client.get("/admin/api/roles")
+
+        assert resp.status_code == 403
+
+    def test_platform_admin_can_still_list_roles(self, app, db_session, login_as, client):
+        org = _make_org(db_session, "roles-api-list-pa")
+        admin = _make_user(db_session, org, is_org_admin=True, is_platform_admin=True)
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin)
+            resp = client.get("/admin/api/roles")
+
+        assert resp.status_code == 200
+        assert resp.get_json()["success"] is True
+
+    def test_ordinary_org_admin_cannot_get_a_role(self, app, db_session, login_as, client):
+        from app.models.user import Role
+
+        org = _make_org(db_session, "roles-api-get")
+        admin = _make_user(db_session, org, is_org_admin=True, is_platform_admin=False)
+        admin_role = Role.query.filter_by(name="Administrator").first()
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin)
+            resp = client.get(f"/admin/api/roles/{admin_role.id}")
+
+        assert resp.status_code == 403
+
+    def test_platform_admin_can_still_get_a_role(self, app, db_session, login_as, client):
+        from app.models.user import Role
+
+        org = _make_org(db_session, "roles-api-get-pa")
+        admin = _make_user(db_session, org, is_org_admin=True, is_platform_admin=True)
+        admin_role = Role.query.filter_by(name="Administrator").first()
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin)
+            resp = client.get(f"/admin/api/roles/{admin_role.id}")
+
+        assert resp.status_code == 200
+        assert resp.get_json()["success"] is True
+
+    def test_ordinary_org_admin_cannot_create_a_role(self, app, db_session, login_as, client):
+        from app.models.user import Role
+
+        org = _make_org(db_session, "roles-api-create")
+        admin = _make_user(db_session, org, is_org_admin=True, is_platform_admin=False)
+        role_name = f"NoPlatformAdmin-{uuid.uuid4().hex[:8]}"
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin)
+            resp = client.post("/admin/api/roles", json={"name": role_name})
+
+        assert resp.status_code == 403
+
+        with app.app_context():
+            assert Role.query.filter_by(name=role_name).first() is None
+
+    def test_platform_admin_can_still_create_a_role(self, app, db_session, login_as, client):
+        from app.models.user import Role
+
+        org = _make_org(db_session, "roles-api-create-pa")
+        admin = _make_user(db_session, org, is_org_admin=True, is_platform_admin=True)
+        role_name = f"PlatformAdminOK-{uuid.uuid4().hex[:8]}"
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin)
+            resp = client.post("/admin/api/roles", json={"name": role_name})
+
+        assert resp.status_code == 201
+
+        with app.app_context():
+            assert Role.query.filter_by(name=role_name).first() is not None
+
+    def test_ordinary_org_admin_cannot_update_a_role(self, app, db_session, login_as, client):
+        from app.models.user import Role
+
+        org = _make_org(db_session, "roles-api-update")
+        admin = _make_user(db_session, org, is_org_admin=True, is_platform_admin=False)
+        custom_role = Role(
+            name=f"UpdateTarget-{uuid.uuid4().hex[:8]}", permissions=0, index="main", default=False
+        )
+        db_session.add(custom_role)
+        db_session.flush()
+        custom_role_id = custom_role.id
+        original_name = custom_role.name
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin)
+            resp = client.put(
+                f"/admin/api/roles/{custom_role_id}",
+                json={"name": f"Pwned-{uuid.uuid4().hex[:8]}"},
+            )
+
+        assert resp.status_code == 403
+
+        with app.app_context():
+            reloaded = Role.query.get(custom_role_id)
+            assert reloaded.name == original_name
+
+    def test_platform_admin_can_still_update_a_role(self, app, db_session, login_as, client):
+        from app.models.user import Role
+
+        org = _make_org(db_session, "roles-api-update-pa")
+        admin = _make_user(db_session, org, is_org_admin=True, is_platform_admin=True)
+        custom_role = Role(
+            name=f"UpdateTargetPA-{uuid.uuid4().hex[:8]}", permissions=0, index="main", default=False
+        )
+        db_session.add(custom_role)
+        db_session.flush()
+        custom_role_id = custom_role.id
+        new_name = f"UpdatedPA-{uuid.uuid4().hex[:8]}"
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin)
+            resp = client.put(
+                f"/admin/api/roles/{custom_role_id}",
+                json={"name": new_name},
+            )
+
+        assert resp.status_code == 200
+
+        with app.app_context():
+            reloaded = Role.query.get(custom_role_id)
+            assert reloaded.name == new_name
+
+    def test_ordinary_org_admin_cannot_delete_a_role(self, app, db_session, login_as, client):
+        from app.models.user import Role
+
+        org = _make_org(db_session, "roles-api-delete")
+        admin = _make_user(db_session, org, is_org_admin=True, is_platform_admin=False)
+        custom_role = Role(
+            name=f"DeleteTarget-{uuid.uuid4().hex[:8]}", permissions=0, index="main", default=False
+        )
+        db_session.add(custom_role)
+        db_session.flush()
+        custom_role_id = custom_role.id
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin)
+            resp = client.delete(f"/admin/api/roles/{custom_role_id}")
+
+        assert resp.status_code == 403
+
+        with app.app_context():
+            assert Role.query.get(custom_role_id) is not None
+
+    def test_platform_admin_can_still_delete_a_role(self, app, db_session, login_as, client):
+        from app.models.user import Role
+
+        org = _make_org(db_session, "roles-api-delete-pa")
+        admin = _make_user(db_session, org, is_org_admin=True, is_platform_admin=True)
+        custom_role = Role(
+            name=f"DeleteTargetPA-{uuid.uuid4().hex[:8]}", permissions=0, index="main", default=False
+        )
+        db_session.add(custom_role)
+        db_session.flush()
+        custom_role_id = custom_role.id
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin)
+            resp = client.delete(f"/admin/api/roles/{custom_role_id}")
+
+        assert resp.status_code == 200
+
+        with app.app_context():
+            assert Role.query.get(custom_role_id) is None
