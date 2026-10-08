@@ -7,7 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 roadmap_citation: "roadmap-v2.md 'Next: December 2026 to February 2027' — Enterprise architecture teams: 'reference packs for the platforms you run, offered during onboarding'"
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /enterprise-architecture/adopt-reference-pack
+url_slug: /use-cases/adopt-reference-pack
 ---
 
 # Adopt the standard shape of what we run on day one and map our own systems onto it
@@ -29,4 +29,4 @@ Coming December 2026 to February 2027. Join the waiting list and we'll tell you 
 
 ## Related
 
-- [Import our existing Archi or Open Exchange model](/enterprise-architecture/import)
+- [Import our existing Archi or Open Exchange model](/use-cases/import-archimate-model)

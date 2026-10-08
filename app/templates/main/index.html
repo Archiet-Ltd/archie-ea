@@ -1,5 +1,20 @@
 {% extends 'layouts/public_base.html' %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
-{% block full_title %}Entelim{% endblock %}
+{% block full_title %}Entelim — your whole company, one model you can ask{% endblock %}
+{% block meta_description %}
+<meta name="description" content="Entelim is the open-source Enterprise Intelligence Model: enter your website address and see your company's architecture, applications, risks and gaps as one model you can ask. Self-host free under AGPL-3.0.">
+<link rel="canonical" href="https://entelim.org/">
+<meta property="og:title" content="Entelim — your whole company, one model you can ask">
+<meta property="og:description" content="Enter your website address and see your company as one model you can ask. Open source, self-host free, forever.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://entelim.org/">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "The open-source Enterprise Intelligence Model."}</script>
+{% if config.GOOGLE_SITE_VERIFICATION %}
+<meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">
+{% endif %}
+{% if config.BING_SITE_VERIFICATION %}
+<meta name="msvalidate.01" content="{{ config.BING_SITE_VERIFICATION }}">
+{% endif %}
+{% endblock %}
 
 {% block header %}
 {% with brand_name = "Entelim" %}
@@ -111,6 +126,38 @@
   </div>
 </section>
 
+<!-- See it for your segment: curated use cases, plus the comparison hub -->
+<section class="relative py-20 sm:py-32 bg-muted/30">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6">
+    <div class="text-center mb-16 space-y-4">
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+        See it answered for where you are.
+      </h2>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+      {% for group in use_case_highlights %}
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-3">{{ group.label }}</h3>
+        <ul class="space-y-2 text-sm">
+          {% for page in group.pages %}
+          <li><a href="{{ page.url }}" class="text-primary underline hover:no-underline">{{ page.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="text-center mt-10 space-y-3">
+      <p class="text-muted-foreground">
+        <a href="/use-cases" class="text-primary underline hover:no-underline">See every use case</a>
+        or
+        <a href="/vs" class="text-primary underline hover:no-underline">compare Entelim to other enterprise architecture tools</a>.
+      </p>
+    </div>
+  </div>
+</section>
+
 <!-- Open source and self-hosting -->
 <section class="relative py-20 sm:py-32 bg-muted/30">
   <div class="mx-auto max-w-4xl px-4 sm:px-6 text-center space-y-6">
@@ -153,7 +200,7 @@
       <div class="rounded-lg border border-border bg-card p-6 ring-2 ring-primary">
         <h3 class="text-lg font-semibold text-foreground mb-1">Team</h3>
         <p class="text-2xl font-bold text-foreground mb-1">$29<span class="text-sm font-normal text-muted-foreground">/editor/month</span></p>
-        <p class="text-sm text-muted-foreground mb-3">Or $290/month for fifteen editors. Askers free.</p>
+        <p class="text-sm text-muted-foreground mb-3">$290/editor/year. Askers free.</p>
         <p class="text-sm text-muted-foreground">For scale-ups and services companies, 50 to 500 people. SSO, review-board workflow, own model key, usage history.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">

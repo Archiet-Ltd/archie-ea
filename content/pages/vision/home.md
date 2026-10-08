@@ -52,7 +52,7 @@ at risk and why. Who's accountable, and where that trail runs cold. Every answer
 reasoning — open it, check it, never just trust a number because a page said so.
 
 [Explore what Entelim answers for your team](/modules/applications) — or see it built for exactly
-where you are: [startup founders](/startups/single-point-of-failure),
-[scale-up engineering leaders](/scale-up/what-breaks-and-who-gets-called),
-[enterprise architecture teams](/enterprise-architecture/import), and
-[services-business operators](/services-ops/what-happens-if).
+where you are: [startup founders](/use-cases/single-point-of-failure),
+[scale-up engineering leaders](/use-cases/what-breaks-and-who-gets-called),
+[enterprise architecture teams](/use-cases/import-archimate-model), and
+[services-business operators](/use-cases/what-happens-if-a-supplier-fails).

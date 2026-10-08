@@ -11,6 +11,7 @@ Covers:
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 from pathlib import Path
 
@@ -31,6 +32,40 @@ FORBIDDEN_STRINGS = [
     "briefed",
     "in_review",
     "UC-S",
+]
+
+# Factual claims that were found false on one or more content pages and
+# corrected. Each entry is (banned phrase, why it is false) so a future
+# diff that reintroduces any of these phrases fails loudly instead of
+# shipping a disproven claim again.
+BANNED_CLAIMS = [
+    (
+        "straight through to your change-request system",
+        "ARBDecisionEvent's subject_type is DB-constrained to decision_brief/solution/"
+        "architecture_model/adr only -- no model links an ARB decision to a change request",
+    ),
+    (
+        "control-gap view",
+        "RiskEntityLink only links risks to application/solution/programme, never to a "
+        "compliance control; the real compliance mechanism maps applications to controls, "
+        "not risks",
+    ),
+    (
+        "current automatically",
+        "no content page module keeps any derived map, dependency graph, or model current "
+        "without an explicit action recorded by someone",
+    ),
+    (
+        "vendor and procurement detail",
+        "an application's own record shows the vendor name as plain text only -- no page "
+        "links from an application to vendor or procurement detail",
+    ),
+    (
+        "not published; free to self-host",
+        "Entelim's prices are published at /pricing (Startup $49/month, Team $29/editor/month) -- "
+        "self-hosting under AGPL is a separate, true fact, but it does not mean pricing is "
+        "unpublished",
+    ),
 ]
 
 # Front-matter keys that are metadata-only and must never appear as visible
@@ -190,8 +225,10 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     homepage = [(loc, rest) for loc, rest in entries if urlparse(loc).path == "/"]
     assert len(homepage) == 1
     assert "<priority>1.0</priority>" in homepage[0][1]
-    # Listing it does not displace any content page.
-    assert len(entries) == len(load_all_pages()) + 1
+    # Listing it does not displace any content page. +3 non-content URLs:
+    # the homepage, the /vs comparison hub and the /use-cases index (views,
+    # not load_all_pages() pages).
+    assert len(entries) == len(load_all_pages()) + 3
 
 
 def _strings_in(value):
@@ -240,6 +277,196 @@ def test_sitemap_xml_has_correct_content_type(app):
     with app.test_client() as client:
         rv = client.get("/sitemap.xml")
         assert "xml" in rv.content_type
+
+
+# ── AC3 extended: llms.txt Capabilities section and llms-full.txt ─────────────
+
+
+def test_llms_txt_has_capabilities_section(app):
+    """/llms.txt includes a ## Capabilities section with all module pages."""
+    from app.services.public_pages import load_all_pages
+
+    module_pages = [p for p in load_all_pages() if p.family == "module"]
+    assert len(module_pages) > 0, "No module pages found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+        # Check Capabilities section exists
+        assert "## Capabilities" in text, "llms.txt missing ## Capabilities section"
+
+        # Every module page should appear in the Capabilities section with its URL
+        for page in module_pages:
+            assert page.url in text, f"llms.txt Capabilities section missing URL {page.url}"
+            # Title should appear
+            assert page.title in text, f"llms.txt Capabilities section missing title '{page.title}'"
+            # Should have a descriptive sentence (the — separator)
+            assert f"[{page.title}](https://entelim.org{page.url}) —" in text, (
+                f"llms.txt Capabilities section missing description for {page.url}"
+            )
+
+
+def test_llms_full_txt_returns_200(app):
+    """/llms-full.txt returns 200 with text/plain content type."""
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        assert "text/plain" in rv.content_type
+
+
+def test_llms_full_txt_contains_all_module_titles(app):
+    """/llms-full.txt contains the title of every module page."""
+    from app.services.public_pages import load_all_pages
+
+    module_pages = [p for p in load_all_pages() if p.family == "module"]
+    assert len(module_pages) > 0, "No module pages found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+        for page in module_pages:
+            assert page.title in text, f"llms-full.txt missing module title '{page.title}'"
+
+
+def test_llms_full_txt_contains_all_use_case_titles(app):
+    """/llms-full.txt contains the title of every use-case page."""
+    from app.services.public_pages import load_all_pages
+
+    use_case_pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+    assert len(use_case_pages) > 0, "No use-case pages found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+        for page in use_case_pages:
+            assert page.title in text, f"llms-full.txt missing use-case title '{page.title}'"
+
+
+def test_llms_full_txt_contains_all_comparison_titles(app):
+    """/llms-full.txt contains the title of every comparison page."""
+    from app.services.public_pages import load_all_pages
+
+    comparison_pages = [p for p in load_all_pages() if p.family == "comparison"]
+    assert len(comparison_pages) > 0, "No comparison pages found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+        for page in comparison_pages:
+            assert page.title in text, f"llms-full.txt missing comparison title '{page.title}'"
+
+
+def test_llms_full_txt_includes_urls(app):
+    """/llms-full.txt includes the URL for each page."""
+    from app.services.public_pages import load_all_pages
+
+    target_pages = [
+        p for p in load_all_pages()
+        if p.family in {"module", "function-per-segment", "comparison"}
+    ]
+    assert len(target_pages) > 0, "No target pages found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+        for page in target_pages:
+            assert page.url in text, f"llms-full.txt missing URL {page.url}"
+
+
+def test_llms_full_txt_under_size_limit(app):
+    """/llms-full.txt is under 2 MB."""
+    with app.test_client() as client:
+        rv = client.get("/llms-full.txt")
+        assert rv.status_code == 200
+        assert len(rv.data) < 2 * 1024 * 1024, "llms-full.txt exceeds 2 MB limit"
+
+
+# ── Review findings: llms.txt defects ───────────────────────────────────────
+
+
+def test_llms_txt_no_duplicate_urls(app):
+    """/llms.txt must not contain any URL more than once."""
+    from app.services.public_pages import load_all_pages
+
+    with app.test_client() as client:
+        rv = client.get("/llms.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+    # Extract all URLs from markdown links [title](url)
+    import re
+
+    urls = re.findall(r"\]\((https://entelim\.org[^)]+)\)", text)
+    # Count occurrences
+    from collections import Counter
+
+    counts = Counter(urls)
+    duplicates = [url for url, count in counts.items() if count > 1]
+    assert not duplicates, f"llms.txt contains duplicate URLs: {duplicates}"
+
+
+def test_llms_txt_first_sentence_not_glued_to_title(app):
+    """For ai-chat, the extracted sentence in llms.txt does not start with the page title."""
+    from app.services.public_pages import load_page
+
+    page = load_page("module", slug="ai-chat")
+    assert page is not None, "ai-chat page not found"
+
+    with app.test_client() as client:
+        rv = client.get("/llms.txt")
+        assert rv.status_code == 200
+        text = rv.data.decode()
+
+    # Find the line for ai-chat in the Capabilities section
+    import re
+
+    # Pattern: - [AI Chat](https://entelim.org/modules/ai-chat) — <sentence>
+    pattern = rf"\[{re.escape(page.title)}\]\(https://entelim\.org{re.escape(page.url)}\) — ([^\n]+)"
+    match = re.search(pattern, text)
+    assert match is not None, "ai-chat entry not found in llms.txt Capabilities section"
+
+    sentence = match.group(1).strip()
+    # The sentence must not start with the page title (glued)
+    assert not sentence.startswith(page.title), (
+        f"Extracted sentence starts with page title (glued): '{sentence}'"
+    )
+    # The sentence should be a proper sentence starting with a capital letter
+    assert sentence[0].isupper(), f"Sentence should start with capital letter: '{sentence}'"
+
+
+def test_html_to_plain_text_removes_script_and_style_content():
+    """_html_to_plain_text removes <script> and <style> elements with their content."""
+    from app.main.views import _html_to_plain_text
+
+    html = """
+    <h1>Title</h1>
+    <script>alert('xss'); var x = 1;</script>
+    <p>Paragraph 1.</p>
+    <style>.hidden { display: none; }</style>
+    <p>Paragraph 2.</p>
+    """
+    result = _html_to_plain_text(html)
+
+    # Script content must not appear
+    assert "alert('xss')" not in result, "Script content leaked into plain text"
+    assert "var x = 1" not in result, "Script content leaked into plain text"
+    # Style content must not appear
+    assert ".hidden" not in result, "Style content leaked into plain text"
+    assert "display: none" not in result, "Style content leaked into plain text"
+    # But regular content must remain
+    assert "Title" in result
+    assert "Paragraph 1" in result
+    assert "Paragraph 2" in result
 
 
 # ── AC4: JSON-LD per page family ──────────────────────────────────────────
@@ -556,7 +783,7 @@ def test_load_page_dogfood():
 
 def test_build_jsonld_webpage():
     """build_jsonld returns valid JSON for a function-per-segment page."""
-    page = load_page("function-per-segment", slug="uc-s1-02-canvas-on-one-page")
+    page = load_page("function-per-segment", slug="canvas-dependencies")
     assert page is not None
     ld_str = build_jsonld(page)
     ld = json.loads(ld_str)
@@ -599,9 +826,13 @@ def test_non_comparison_no_canonical():
 
 def test_waiting_list_cta_renders_link(app):
     """Pages with cta=waiting_list show the waiting list link."""
-    # ai-chat has cta: waiting_list
+    # ai-chat moved to cta: plans (feature shipped) and /contact moved to
+    # cta: inquiry (a sales enquiry form), so use a not-yet-built use-case
+    # page instead, which still carries cta: waiting_list. Its current,
+    # readable URL -- the old uc-s1-01-canvas-dependencies filename form
+    # now 301-redirects here instead of rendering directly.
     with app.test_client() as client:
-        rv = client.get("/modules/ai-chat")
+        rv = client.get("/use-cases/canvas-dependencies")
         html = rv.data.decode()
         assert "/#waitlist" in html
         assert "Join the waiting list" in html
@@ -671,7 +902,7 @@ def test_title_html_entities_decoded_org_chart():
 
 def test_comparison_faq_jsonld_has_entries():
     """Comparison pages with <strong>-format FAQ produce non-empty mainEntity."""
-    for slug in ["leanix", "ardoq", "bizzdesign-hopex"]:
+    for slug in ["leanix", "ardoq", "bizzdesign-hopex", "avolution-abacus", "orbus-iserver"]:
         page = load_page("comparison", slug=slug)
         assert page is not None, f"Comparison page {slug} not found"
         ld_str = build_jsonld(page)
@@ -693,6 +924,8 @@ def test_comparison_faq_jsonld_question_count():
         "leanix": 3,
         "ardoq": 3,
         "bizzdesign-hopex": 2,
+        "avolution-abacus": 4,
+        "orbus-iserver": 3,
     }
     for slug, expected in expected_counts.items():
         page = load_page("comparison", slug=slug)
@@ -958,3 +1191,599 @@ def test_xss_sanitization_cross_org(app):
                 assert f"{handler}=" not in html.lower(), (
                     f"{page.url}: contains {handler} handler"
                 )
+
+
+# ── robots.txt crawl-access guard ──────────────────────────────────────────
+#
+# app/static/robots.txt is an explicit allow-list: every ``Allow:`` line
+# names one path a crawler may fetch, and the file ends in a catch-all
+# ``Disallow: /`` that blocks anything not explicitly named. That shape makes
+# it easy to add a new public page or a new crawler-facing file (llms.txt,
+# llms-full.txt, sitemap.xml) without ever adding the matching ``Allow:``
+# line — the page renders fine for a signed-out visitor, and is simply
+# invisible to every crawler.
+#
+# This guard treats /sitemap.xml, /llms.txt and /llms-full.txt as the three
+# places a real crawler discovers the rest of the site, fetches each one for
+# real, collects every entelim.org URL any of them names (plus their own
+# three paths), and checks each one against the actual rules in robots.txt
+# using the same longest-match-wins algorithm real crawlers use. A URL that
+# is reachable from one of those three files but not allowed by robots.txt
+# fails this test by name.
+
+_ROBOTS_TXT_PATH = Path(__file__).resolve().parent.parent / "app" / "static" / "robots.txt"
+
+# The three files a crawler uses to discover the rest of the site. Each
+# one's own path must be allowed, and so must every entelim.org URL it names.
+_CRAWLER_FACING_ENDPOINTS = ["/sitemap.xml", "/llms.txt", "/llms-full.txt"]
+
+
+def _parse_robots_rules(text: str) -> list[tuple[str, str]]:
+    """Return the ordered ``(directive, pattern)`` rules for ``User-agent: *``.
+
+    Only the rule lines that apply to the wildcard user-agent group are
+    kept, in file order, which is all this robots.txt has.
+    """
+    rules: list[tuple[str, str]] = []
+    group_applies = False
+    for raw_line in text.splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line or ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip().lower()
+        value = value.strip()
+        if key == "user-agent":
+            group_applies = value == "*"
+            continue
+        if not group_applies:
+            continue
+        if key in ("allow", "disallow") and value:
+            rules.append((key, value))
+    return rules
+
+
+def _robots_pattern_matches(pattern: str, path: str) -> bool:
+    """A robots.txt pattern matches a path by prefix, except a trailing
+    ``$`` which anchors the match to the exact path (used here only by
+    ``/$``, the home page)."""
+    if pattern.endswith("$"):
+        return path == pattern[:-1]
+    return path.startswith(pattern)
+
+
+def _robots_allows(rules: list[tuple[str, str]], path: str) -> bool:
+    """Whether ``path`` is allowed under ``rules``.
+
+    The longest matching pattern wins, the de facto standard algorithm most
+    crawlers use, including Google's documented behaviour; a tie between an
+    Allow and a Disallow of the same length favours Allow; a path matched by
+    no rule at all is allowed by default (this file has no such paths, since
+    its own last rule is the catch-all ``Disallow: /``).
+    """
+    best_length = -1
+    best_directive = "allow"
+    for directive, pattern in rules:
+        if _robots_pattern_matches(pattern, path):
+            length = len(pattern)
+            if length > best_length or (length == best_length and directive == "allow"):
+                best_length = length
+                best_directive = directive
+    return best_directive == "allow"
+
+
+def _entelim_paths_in(text: str) -> set[str]:
+    """Every ``https://entelim.org/...`` URL referenced in a rendered
+    response, reduced to its path."""
+    paths = set()
+    for match in re.finditer(r"https://entelim\.org([^\s)\"'<>]*)", text):
+        paths.add(match.group(1) or "/")
+    return paths
+
+
+def _collect_must_allow_paths(client) -> set[str]:
+    """Every path a real crawler meets by fetching sitemap.xml, llms.txt and
+    llms-full.txt — plus the three paths themselves.
+
+    Each endpoint is fetched for real. If an endpoint isn't live yet, its
+    own path is still checked (robots.txt governs the URL whether or not the
+    route behind it has shipped), but there is no rendered body to pull
+    further URLs from.
+    """
+    paths: set[str] = set(_CRAWLER_FACING_ENDPOINTS)
+    for endpoint in _CRAWLER_FACING_ENDPOINTS:
+        response = client.get(endpoint)
+        if response.status_code == 200:
+            paths |= _entelim_paths_in(response.data.decode())
+    return paths
+
+
+def test_every_crawler_discoverable_url_is_allowed_by_robots_txt(app):
+    """No URL reachable from sitemap.xml, llms.txt or llms-full.txt, and none
+    of those three files' own paths, is blocked by robots.txt's catch-all
+    ``Disallow: /``."""
+    rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
+    with app.test_client() as client:
+        must_allow = _collect_must_allow_paths(client)
+
+    blocked = sorted(path for path in must_allow if not _robots_allows(rules, path))
+    assert not blocked, (
+        "robots.txt blocks these URLs that a crawler reaches from sitemap.xml, "
+        "llms.txt or llms-full.txt: " + ", ".join(blocked)
+    )
+
+
+def test_robots_root_dollar_matches_only_exact_root():
+    rules = [("allow", "/$"), ("disallow", "/")]
+    assert _robots_allows(rules, "/") is True
+    assert _robots_allows(rules, "/about") is False
+
+
+def test_robots_longest_match_wins_over_shorter_disallow():
+    rules = [("disallow", "/"), ("allow", "/modules/")]
+    assert _robots_allows(rules, "/modules/applications") is True
+    assert _robots_allows(rules, "/other") is False
+
+
+def test_robots_path_with_no_matching_rule_is_allowed_by_default():
+    rules = [("allow", "/vision")]
+    assert _robots_allows(rules, "/unrelated") is True
+
+
+def test_robots_parse_rules_ignores_other_user_agent_groups():
+    text = (
+        "User-agent: Googlebot-Image\n"
+        "Disallow: /private\n"
+        "\n"
+        "User-agent: *\n"
+        "Allow: /vision\n"
+        "Disallow: /\n"
+    )
+    rules = _parse_robots_rules(text)
+    assert ("disallow", "/private") not in rules
+    assert ("allow", "/vision") in rules
+
+
+# ── Regression guard: disproven factual claims must never reappear ────────
+
+
+def test_no_page_repeats_a_disproven_claim():
+    """No content page body contains a factual claim already found false
+    and corrected elsewhere.
+
+    Each phrase in BANNED_CLAIMS was once live on a content page and was
+    disproven against the data model (see the reason recorded next to each
+    phrase). This test collects every page/phrase match across the whole
+    corpus before failing, so a single run shows every offending page at
+    once rather than stopping at the first one.
+    """
+    pages = load_all_pages()
+    violations = []
+    for page in pages:
+        body_lower = page.body_html.lower()
+        for phrase, reason in BANNED_CLAIMS:
+            if phrase.lower() in body_lower:
+                violations.append(
+                    f"{page.url}: contains banned phrase '{phrase}' ({reason})"
+                )
+    assert not violations, (
+        "Disproven claim(s) reappeared on a content page:\n"
+        + "\n".join(violations)
+    )
+
+
+# ── cta: plans must match a feature that is actually live (PR #373 review) ─
+#
+# PR #373 flipped 7 pages from cta: waiting_list to cta: plans on the claim
+# that the feature each one describes was shipped and reachable. An
+# independent review found 4 of the 7 were not: capture_status had been set
+# to "live" right alongside cta, so a check that only compares those two
+# front-matter fields against each other would have passed all 7 pages,
+# including the 4 that were wrong. The actual tell, in every one of the 4
+# bad pages, was that nothing in the running app answers the page's own
+# url_slug -- the only front-matter field that names a concrete, checkable
+# destination. That is what this test verifies, for every module and
+# function-per-segment page, via the app's real url_map rather than by
+# re-reading the content files a second time.
+#
+# state: missing is also rejected outright, since a page admitting its own
+# feature does not exist yet is never consistent with cta: plans -- see
+# uc-s3-15, the one page of the 4 that had this set and still should not
+# have needed a route check to catch.
+
+
+def test_cta_plans_requires_capture_status_live(app):
+    """Any module / function-per-segment page claiming cta: plans must also
+    declare capture_status: live and must not declare state: missing."""
+    pages = [
+        p for p in load_all_pages() if p.family in ("module", "function-per-segment")
+    ]
+    assert pages, "no module / function-per-segment pages loaded"
+
+    for page in pages:
+        fm = page.front_matter
+        if fm.get("cta") != "plans":
+            continue
+        assert fm.get("capture_status") == "live", (
+            f"{page.source_path}: cta: plans but capture_status is "
+            f"{fm.get('capture_status')!r}, not 'live'"
+        )
+        assert fm.get("state") != "missing", (
+            f"{page.source_path}: cta: plans but state is 'missing' -- "
+            "the page itself says the feature does not exist yet"
+        )
+
+
+def test_cta_plans_url_slug_matches_a_real_route(app):
+    """Any module / function-per-segment page claiming cta: plans, with a
+    same-origin url_slug, must name a route the app actually serves.
+
+    A page can legitimately have no url_slug (nothing to check) or a
+    url_slug pointing at an external canonical (archiet.ai/...), which this
+    skips -- only a same-origin path (starting with "/") makes a checkable
+    claim about this app's own routing.
+    """
+    from werkzeug.exceptions import MethodNotAllowed, NotFound
+
+    adapter = app.url_map.bind("entelim.org")
+    pages = [
+        p for p in load_all_pages() if p.family in ("module", "function-per-segment")
+    ]
+    checked_at_least_one = False
+
+    for page in pages:
+        fm = page.front_matter
+        if fm.get("cta") != "plans":
+            continue
+        url_slug = fm.get("url_slug")
+        if not isinstance(url_slug, str) or not url_slug.startswith("/"):
+            continue
+
+        checked_at_least_one = True
+        try:
+            adapter.match(url_slug, method="GET")
+        except MethodNotAllowed:
+            pass  # route exists; GET just isn't one of its declared methods
+        except NotFound:
+            pytest.fail(
+                f"{page.source_path}: cta: plans and url_slug={url_slug!r}, "
+                "but no route in the app answers that path -- the feature "
+                "it describes is not actually reachable"
+            )
+
+    assert checked_at_least_one, (
+        "no cta: plans page with a same-origin url_slug was found to check -- "
+        "this test would pass vacuously; update it alongside whatever changed"
+    )
+
+
+# ── Use-case pages: readable slugs, old-URL redirects, /use-cases index ───
+#
+# Every function-per-segment (use-case) page used to be served at
+# /use-cases/<internal uc-sN-NN-* filename slug>. Some of those URLs are
+# already indexed, so the old route now 301-redirects to the new, readable
+# slug (each page's own url_slug front-matter, rewritten to /use-cases/<slug>)
+# instead of just 404ing.
+
+
+def _redirect_path(rv) -> str:
+    """The path a Werkzeug test-client redirect response points at, whether
+    its Location header came back relative or absolute."""
+    from urllib.parse import urlparse
+
+    return urlparse(rv.location).path
+
+
+def test_use_case_slugs_are_unique():
+    """Every function-per-segment page's public slug is unique -- two pages
+    must never resolve to the same /use-cases/<slug> URL."""
+    pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+    assert len(pages) > 0, "no function-per-segment pages loaded"
+
+    slugs = [p.slug for p in pages]
+    from collections import Counter
+
+    counts = Counter(slugs)
+    duplicates = {slug: count for slug, count in counts.items() if count > 1}
+    assert not duplicates, f"duplicate use-case slugs: {duplicates}"
+
+    urls = [p.url for p in pages]
+    assert len(urls) == len(set(urls)), "duplicate use-case page URLs"
+
+
+def test_every_use_case_page_redirects_from_its_old_filename_url(app):
+    """Every use-case page whose public slug differs from its uc-sN-NN-*
+    filename 301-redirects from that old filename-based URL to its current
+    url_slug -- not a hand-picked sample, every file under
+    content/pages/function-per-segment/, with the expected target read from
+    that file's own front matter at test time (not a hardcoded mapping), so
+    this cannot drift out of sync with a future slug change.
+
+    Also asserts the redirect was actually exercised for every file in the
+    family (none silently skipped), so this test cannot quietly shrink to a
+    no-op as pages are added, renamed or removed.
+    """
+    seg_dir = CONTENT_ROOT / "function-per-segment"
+    md_files = sorted(seg_dir.glob("*.md"))
+    assert len(md_files) > 0, "no function-per-segment files found"
+
+    checked = 0
+    with app.test_client() as client:
+        for md_file in md_files:
+            filename_slug = md_file.stem
+            raw = md_file.read_text(encoding="utf-8")
+            front_matter, _ = _parse_front_matter(raw)
+            url_slug = front_matter.get("url_slug", "")
+            assert isinstance(url_slug, str) and url_slug.startswith("/use-cases/"), (
+                f"{md_file.name}: url_slug is {url_slug!r}, expected a "
+                "/use-cases/<slug> path -- every use-case file must carry one"
+            )
+            public_slug = url_slug[len("/use-cases/"):]
+            if public_slug == filename_slug:
+                continue  # this file's filename already is its public slug
+
+            checked += 1
+            rv = client.get(f"/use-cases/{filename_slug}", follow_redirects=False)
+            assert rv.status_code == 301, (
+                f"/use-cases/{filename_slug}: expected a 301 redirect to "
+                f"{url_slug}, got {rv.status_code}"
+            )
+            assert _redirect_path(rv) == url_slug, (
+                f"/use-cases/{filename_slug}: redirected to {rv.location!r}, "
+                f"expected {url_slug!r}"
+            )
+
+    # Every file in the family migrated its slug, so every file must have
+    # been checked above -- if this ever reads 0, the loop above stopped
+    # actually testing anything and the test would otherwise pass vacuously.
+    assert checked == len(md_files), (
+        f"expected to check all {len(md_files)} use-case files' redirects, "
+        f"only checked {checked} -- some file's filename already equals its "
+        "public slug, which should not happen for this family yet"
+    )
+
+
+def test_use_case_old_filename_url_redirects_to_new_slug_sample(app):
+    """Spot-check: a handful of already-indexed old uc-* URLs 301 to their
+    new, readable slug -- including the one page that had no url_slug at all
+    before this migration (uc-s1-07)."""
+    samples = {
+        "uc-s2-01-what-breaks": "/use-cases/what-breaks-and-who-gets-called",
+        "uc-s3-06-capability-maturity-heatmap": "/use-cases/capability-maturity-heatmap",
+        "uc-s1-07-reference-packs": "/use-cases/reference-packs",
+        "uc-s4-06-what-we-can-and-cannot-tell": "/use-cases/what-we-can-and-cannot-tell",
+    }
+    with app.test_client() as client:
+        for old_slug, new_url in samples.items():
+            rv = client.get(f"/use-cases/{old_slug}", follow_redirects=False)
+            assert rv.status_code == 301, f"{old_slug}: expected 301, got {rv.status_code}"
+            assert _redirect_path(rv) == new_url, f"{old_slug}: redirected to {rv.location!r}"
+            # And the new URL actually renders.
+            rv2 = client.get(new_url)
+            assert rv2.status_code == 200, f"{new_url}: expected 200, got {rv2.status_code}"
+
+
+def test_use_case_unknown_slug_still_404s(app):
+    """A slug that was never a real page (old filename or new) still 404s --
+    the redirect lookup must not turn every unknown path into a catch-all."""
+    with app.test_client() as client:
+        rv = client.get("/use-cases/this-page-does-not-exist-xyz")
+        assert rv.status_code == 404
+
+
+# Directories scanned for stale old-filename-form use-case references (see
+# the needle string built below). Binary/vendor assets are skipped: they
+# cannot contain a hand-written link to a content page and some are not
+# valid UTF-8. tests/ is included deliberately (not just app/content/static):
+# a stale reference in a fixture, doc or test is exactly the same bug as one
+# in product code, just caught later.
+_STALE_REFERENCE_ROOTS = ["app", "content", "tests"]
+_STALE_REFERENCE_SKIP_DIR_NAMES = {
+    "vendor", "node_modules", "__pycache__", ".git", "dist", "build",
+}
+_STALE_REFERENCE_SKIP_SUFFIXES = {
+    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".ttf",
+    ".eot", ".pdf", ".svg", ".zip", ".pyc", ".map",
+}
+
+# Test functions that deliberately reference the old uc-sN-NN-* URL form, to
+# exercise the redirect itself (this file's own check logic, just below,
+# also carries the needle string literally and is exempted the same way).
+# A new file is never added to this allowlist to silence a hit -- only a
+# function whose whole job is testing the old-URL-to-new-URL redirect.
+_STALE_REFERENCE_ALLOWED_FUNCTIONS = {
+    ("tests/test_public_content_pages.py", "test_every_use_case_page_redirects_from_its_old_filename_url"),
+    ("tests/test_public_content_pages.py", "test_use_case_old_filename_url_redirects_to_new_slug_sample"),
+    ("tests/test_public_content_pages.py", "test_no_stale_internal_use_case_uc_slug_references"),
+}
+
+
+def _text_with_allowed_functions_blanked(repo_root, rel_path: str, text: str) -> str:
+    """``text`` with the source of any function in
+    ``_STALE_REFERENCE_ALLOWED_FUNCTIONS`` for this file replaced by blank
+    lines (preserving line numbers, in case a future failure message wants
+    them) -- a needle inside one of those functions is expected and not a
+    finding; a needle anywhere else in the same file still is.
+    """
+    import ast
+
+    names = {name for path, name in _STALE_REFERENCE_ALLOWED_FUNCTIONS if path == rel_path}
+    if not names:
+        return text
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return text
+    lines = text.splitlines(keepends=True)
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names:
+            start, end = node.lineno - 1, getattr(node, "end_lineno", node.lineno)
+            for i in range(start, end):
+                lines[i] = "\n"
+    return "".join(lines)
+
+
+def test_no_stale_internal_use_case_uc_slug_references():
+    """No file under app/, content/ (which covers app/static/) or tests/
+    contains the string "/use-cases/uc-s" -- the old, internal-filename-based
+    URL form -- outside the specific test functions whose job is to exercise
+    the redirect from that old form. A hit here would be a leftover internal
+    link, fixture or doc still pointing at the pre-migration URL instead of
+    the current readable slug.
+    """
+    repo_root = Path(__file__).resolve().parent.parent
+    needle = "/use-cases/uc-s"
+    offenders: list[str] = []
+
+    for root_name in _STALE_REFERENCE_ROOTS:
+        root = repo_root / root_name
+        if not root.is_dir():
+            continue
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            if path.suffix.lower() in _STALE_REFERENCE_SKIP_SUFFIXES:
+                continue
+            if _STALE_REFERENCE_SKIP_DIR_NAMES & set(path.relative_to(root).parts[:-1]):
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            rel_path = str(path.relative_to(repo_root)).replace("\\", "/")
+            if rel_path.endswith(".py"):
+                text = _text_with_allowed_functions_blanked(repo_root, rel_path, text)
+            if needle in text:
+                offenders.append(rel_path)
+
+    assert not offenders, (
+        "stale '/use-cases/uc-s' reference(s) found (old filename-based URL "
+        "form) outside the functions that deliberately test the redirect -- "
+        "update to the current readable slug:\n" + "\n".join(offenders)
+    )
+
+
+def test_use_cases_index_returns_200_and_lists_every_page(app):
+    """/use-cases returns 200 and links every live use-case page by its
+    current (post-migration) URL and title."""
+    pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+    assert len(pages) > 0
+
+    with app.test_client() as client:
+        rv = client.get("/use-cases")
+        assert rv.status_code == 200
+        html = rv.data.decode()
+        # Unescape first: a title with an apostrophe renders as &#39; in the
+        # template's auto-escaped output (same handling as
+        # test_all_pages_have_title_in_html_title above).
+        import html as _html_mod
+
+        unescaped = _html_mod.unescape(html)
+        for page in pages:
+            assert f'href="{page.url}"' in html, f"/use-cases missing link to {page.url}"
+            assert page.title in unescaped, f"/use-cases missing title for {page.url}"
+
+
+def test_use_cases_index_groups_by_segment(app):
+    """/use-cases groups pages under a segment heading, not one flat list."""
+    with app.test_client() as client:
+        rv = client.get("/use-cases")
+        html = rv.data.decode()
+    for label in ["Startups", "Scale-ups", "Enterprise architecture teams", "Services and operations"]:
+        assert label in html, f"/use-cases missing segment heading '{label}'"
+
+
+def test_use_cases_index_in_robots_and_sitemap(app):
+    """/use-cases (the index) is allowed by robots.txt and listed in the
+    sitemap, same as every other public index."""
+    rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
+    assert _robots_allows(rules, "/use-cases"), "robots.txt blocks /use-cases"
+
+    with app.test_client() as client:
+        xml = client.get("/sitemap.xml").data.decode()
+    assert "<loc>https://entelim.org/use-cases</loc>" in xml
+
+
+# ── Home page: curated use-case highlights per segment, plus the /vs hub ──
+
+
+def test_home_page_links_curated_use_cases_and_vs_hub(app):
+    """The home page links at least one use case per persona segment, plus
+    the /vs comparison hub, with real working URLs."""
+    with app.test_client() as client:
+        rv = client.get("/")
+        html = rv.data.decode()
+
+    assert 'href="/use-cases"' in html
+    assert 'href="/vs"' in html
+
+    # Every curated slug on the home page resolves to a real page.
+    from app.main.views import _HOME_USE_CASE_HIGHLIGHTS
+
+    for slugs in _HOME_USE_CASE_HIGHLIGHTS.values():
+        for slug in slugs:
+            page = load_page("function-per-segment", slug=slug)
+            assert page is not None, f"curated home-page slug {slug!r} does not resolve"
+            assert f'href="{page.url}"' in html, (
+                f"home page missing link to curated use case {page.url}"
+            )
+
+
+# ── Header/footer: every public page links Features, Use cases, Compare, ──
+# Pricing, and the two offers -- the two-click reachability test below is
+# the real acceptance check; this test documents which links carry it.
+
+
+def test_public_footer_links_use_cases_compare_pricing_and_offers(app):
+    """The shared public footer (every public page) links Use cases, Compare,
+    Pricing and both offers."""
+    with app.test_client() as client:
+        html = client.get("/").data.decode()
+
+    for href in ["/use-cases", "/vs", "/pricing", "/architecture-health-check", "/team-annual-onboarding"]:
+        assert f'href="{href}"' in html, f"public footer missing link to {href}"
+
+
+def test_two_click_reachability_from_home_page(app):
+    """Every URL in the sitemap is reachable within two ordinary links from
+    the home page: either linked directly from '/', or linked from a page
+    that '/' links to.
+
+    This is the brief's actual acceptance test -- it does not special-case
+    any one page family, it walks real anchor hrefs the way a visitor or a
+    crawler would.
+    """
+    import re
+    from urllib.parse import urlparse
+
+    def same_site_links(html: str) -> set[str]:
+        hrefs = re.findall(r'href="([^"]+)"', html)
+        paths = set()
+        for href in hrefs:
+            if href.startswith("https://entelim.org"):
+                href = href[len("https://entelim.org"):] or "/"
+            if href.startswith("/") and not href.startswith("//"):
+                paths.add(urlparse(href).path)
+        return paths
+
+    with app.test_client() as client:
+        sitemap_xml = client.get("/sitemap.xml").data.decode()
+        must_reach = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml))
+        must_reach.discard("/")  # the home page itself, not a link target
+
+        home_html = client.get("/").data.decode()
+        one_click = same_site_links(home_html)
+
+        two_click = set(one_click)
+        for path in one_click:
+            if path in ("/", "") or path.startswith("/api/") or path.startswith("/static/"):
+                continue
+            rv = client.get(path)
+            if rv.status_code != 200:
+                continue
+            two_click |= same_site_links(rv.data.decode())
+
+        unreachable = sorted(p for p in must_reach if p not in two_click and p not in one_click)
+        assert not unreachable, (
+            "not reachable within two clicks of the home page: " + ", ".join(unreachable)
+        )

@@ -7,7 +7,8 @@ state: on_main
 answers_use_cases:
   - {id: UC-S3-01, segment: S3}
   - {id: UC-S4-02, segment: S4}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Batch Import
@@ -23,8 +24,8 @@ in and when.
 
 ## Where you'll meet it
 
-- [Import our existing model](/enterprise-architecture/import)
-- [Set it up from our spreadsheet in an afternoon](/services-ops/set-up-in-an-afternoon)
+- [Import our existing model](/use-cases/import-archimate-model)
+- [Set it up from our spreadsheet in an afternoon](/use-cases/set-up-in-an-afternoon)
 
 ## Related modules
 

@@ -17,9 +17,10 @@ import json
 from datetime import datetime
 
 from .. import db
+from .mixins import HybridTenantMixin, TenantMixin
 
 
-class ReferenceModel(db.Model):
+class ReferenceModel(HybridTenantMixin, db.Model):
     """
     Reference Model Definition (ISA - 95, APQC, Industry 4.0)
 
@@ -65,7 +66,7 @@ class ReferenceModel(db.Model):
         }
 
 
-class ReferenceModelCapability(db.Model):
+class ReferenceModelCapability(HybridTenantMixin, db.Model):
     """
     Reference Model Capability Template
 
@@ -148,12 +149,16 @@ class ReferenceModelCapability(db.Model):
         return " > ".join(path)
 
 
-class ReferenceModelImport(db.Model):
+class ReferenceModelImport(TenantMixin, db.Model):
     """
     Reference Model Import History
 
     Tracks when reference model capabilities were imported into BusinessCapability.
     Enables compliance tracking and auditability.
+
+    Unlike its shared catalogue siblings, an import event is one organisation's
+    own action against its own BusinessCapability rows, so it is fenced
+    (TenantMixin) rather than left shared (HybridTenantMixin).
     """
 
     __tablename__ = "reference_model_import"

@@ -1,0 +1,58 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% from 'data_governance/_app_picker.html' import app_picker, app_picker_script with context %}
+
+{% block title %}{{ entity.name }} — System of record — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6">
+  {{ page_shell(
+      title=entity.name,
+      subtitle='System of record and the applications that hold this entity.',
+      breadcrumb=[('Home', url_for('main.index')), ('Data governance', url_for('data_governance.entities')), (entity.name, None)],
+      tabs=tabs
+  ) }}
+
+  <div class="rounded-lg border border-border bg-card p-4 mb-6">
+    <h2 class="text-sm font-semibold text-foreground mb-1">System of record</h2>
+    <p class="text-sm mb-3" data-testid="sor-current">
+      {% if declared %}Declared: <span class="font-medium">{{ declared.name }}</span>
+        {% if entity.system_of_record_declared_at %}
+        <span class="text-muted-foreground">on {{ entity.system_of_record_declared_at.strftime('%d %b %Y') }}</span>
+        {% endif %}
+      {% else %}<span class="text-muted-foreground">Not declared yet. Pick the application that is authoritative for this entity.</span>{% endif %}
+    </p>
+    <form method="post" action="{{ url_for('data_governance.declare_system_of_record', entity_id=entity.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {{ app_picker('sor-application', declared.name if declared else None, declared.id if declared else None) }}
+    </form>
+  </div>
+
+  <div class="rounded-lg border border-border bg-card p-4">
+    <h2 class="text-sm font-semibold text-foreground mb-3">Applications holding this entity</h2>
+    {% if holders %}
+    <ul class="divide-y divide-border" data-testid="holders-list">
+      {% for h in holders %}
+      <li class="py-2.5 flex items-center justify-between gap-4" data-testid="holder-{{ h.application_id }}">
+        <div class="min-w-0">
+          <p class="text-sm font-medium truncate">{{ h.application_name }}</p>
+          <p class="text-xs text-muted-foreground truncate">Data object: {{ h.data_object_name }}</p>
+        </div>
+        {% if h.role == 'system_of_record' %}
+        <span class="inline-flex rounded-md bg-success/10 text-success-emphasis px-2 py-0.5 text-xs font-medium">System of record</span>
+        {% elif h.role == 'copy' %}
+        <span class="inline-flex rounded-md bg-warning/10 text-warning-emphasis px-2 py-0.5 text-xs font-medium">Copy of {{ declared.name }}</span>
+        {% else %}
+        <span class="inline-flex rounded-md bg-muted text-muted-foreground px-2 py-0.5 text-xs font-medium">Source not declared</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-muted-foreground">No application data object matches this entity — no copies to flag.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}{{ app_picker_script() }}{% endblock %}
