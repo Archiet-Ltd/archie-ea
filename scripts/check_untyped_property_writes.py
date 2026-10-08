@@ -64,14 +64,14 @@ def _iter_py_files(root: str):
 
 
 def _allowed(path: str, root: str) -> bool:
-    rel = os.path.relpath(path, root)
-    return any(rel.endswith(suffix) for suffix in ALLOWED_SUFFIXES)
+    rel = os.path.relpath(path, root).replace(os.sep, "/")
+    return any(rel.endswith(suffix.replace(os.sep, "/")) for suffix in ALLOWED_SUFFIXES)
 
 
 def scan(root: str) -> list[str]:
     problems = []
     for path in _iter_py_files(root):
-        rel = os.path.relpath(path, root)
+        rel = os.path.relpath(path, root).replace(os.sep, "/")
         if _allowed(path, root):
             continue
         try:
