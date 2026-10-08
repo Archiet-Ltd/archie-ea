@@ -382,7 +382,10 @@ class Seeder:
             return self.org_id
         if ttable == "users":
             return self.user_id
-        if ttable in self.pks:
+        # A column under a unique index (one work package per element) gets a parent of its own:
+        # reusing the shared one would put two rows of the same table on it.
+        unique = any(ix.unique and list(ix.columns) == [col] for ix in col.table.indexes)
+        if ttable in self.pks and not unique:
             return self.pks[ttable]
         target = table_models().get(ttable)
         if target is None or depth >= 3:
@@ -391,13 +394,17 @@ class Seeder:
             raise Unseedable("required %s -> %s" % (col.name, ttable))
         if col.nullable and not tenant_owned(target, self.shared_models):
             return None
+        shared = self.pks.get(ttable)
         try:
-            self.seed(target, context, depth + 1)
+            self.seed(target, {} if unique else context, depth + 1)
         except Unseedable:
             if col.nullable:
                 return None
             raise
-        return self.pks[target.__table__.name]
+        own = self.pks[target.__table__.name]
+        if unique and shared is not None:
+            self.pks[ttable] = shared
+        return own
 
     def _value(self, col, marker, context, depth):
         import sqlalchemy as sa
