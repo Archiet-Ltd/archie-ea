@@ -45,6 +45,7 @@ def register(app) -> None:
 
     try:
         from app.modules.intelligence.routes.ui import intelligence_ui
+        from app.modules.intelligence.routes import history_routes  # noqa: F401
 
         app.register_blueprint(intelligence_ui)
     except Exception:

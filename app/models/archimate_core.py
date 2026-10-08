@@ -92,6 +92,14 @@ if _FAST_INIT:
         overlay_code = db.Column(db.String(32), nullable=True)
         acm_properties = db.Column(db.JSON, default=dict)
 
+        # Model history -- same columns as the normal-runtime twin
+        # in app/models/models.py; see that docstring for the full rationale.
+        valid_from = db.Column(db.DateTime, nullable=True)
+        valid_to = db.Column(db.DateTime, nullable=True)
+        recorded_at = db.Column(db.DateTime, nullable=True)
+        superseded_at = db.Column(db.DateTime, nullable=True)
+        last_confirmed = db.Column(db.DateTime, nullable=True)
+
         # Relationships
         # Note: app_component relationship is handled in the main ArchiMateElement model
         # to avoid conflicts with the duplicate class definition
@@ -167,6 +175,14 @@ if _FAST_INIT:
         # so every pre-existing relationship renders (in creation order) instead
         # of being dropped for lacking a value reconcile-schema cannot backfill.
         sequence_order = db.Column(db.Integer, nullable=True)
+
+        # Model history -- same columns as the normal-runtime twin
+        # in app/models/models.py.
+        valid_from = db.Column(db.DateTime, nullable=True)
+        valid_to = db.Column(db.DateTime, nullable=True)
+        recorded_at = db.Column(db.DateTime, nullable=True)
+        superseded_at = db.Column(db.DateTime, nullable=True)
+        last_confirmed = db.Column(db.DateTime, nullable=True)
 
         def __repr__(self):
             return f"<ArchiMateRelationship {self.source_id} -> {self.target_id}>"

@@ -2,128 +2,31 @@
 {% from "components/page_header.html" import page_header %}
 
 {#
-  ARB review detail — the typed/legacy DISPATCHER (blueprint sections 3 and 6).
+  ARB review detail — the consolidated governance workspace.
 
-  Exactly one branch renders, so the page always has exactly one outer wrapper,
-  one breadcrumb <nav> and one <h1>:
-
-    typed_review present  -> the typed governance workspace. This template owns
-                             the wrapper and the single page_header call; every
-                             typed partial is header-less by construction.
-    typed_review absent   -> arb/partials/_legacy_review_detail.html, the
-                             pre-typed body extracted verbatim, which brings its
-                             own wrapper and its own single page_header.
-
-  `typed_review` is the mapping returned by
-  app.modules.transformation_room.arb_read_models.typed_arb_review_view().
-  Its four states — available, historical_unverified, legacy_generic, failed —
-  each have a dedicated partial. The template never re-derives authority: only
-  typed_review.allowed_actions decides what is offered.
+  The typed/legacy dispatch has been removed. The typed workspace is now the
+  single code path for the ARB review detail. The workspace is the mapping
+  returned by app.modules.transformation_room.arb_read_models.typed_arb_review_view().
+  Its states are available, historical_unverified, legacy_generic, failed.
+  Each state has a dedicated partial. The template never re-derives authority:
+  only typed_review.allowed_actions decides what is offered.
 
   page_header(actions=...) is deliberately NOT used: that path still emits the
   obsolete h-10 button tier. Title and breadcrumb come from the macro; the
   action row below uses the DESIGN.md h-9 recipe.
 #}
 
-{% block title %}{% set _typed = typed_review | default(none) %}{% if _typed %}{{ _typed.identity.review_number or 'ARB review' }}{% else %}{{ review.review_number }}: {{ review.title }}{% endif %}{% endblock %}
+{% block title %}{{ typed_review.identity.review_number or 'ARB review' }}{% endblock %}
 
-{% block extra_css %}{% set _typed = typed_review | default(none) %}
-{# The legacy body depends on this @apply block. The typed workspace uses
-   semantic token utilities directly and must not inherit it. #}
-{% if not _typed %}
-<style>
-.detail-section {
-    @apply bg-card rounded-lg shadow p-6 border border-border mb-6;
-}
-.detail-section h2 {
-    @apply text-lg font-semibold text-foreground mb-4;
-}
-.status-badge {
-    @apply px-3 py-1 text-sm font-medium rounded-full;
-}
-.status-badge.draft {
-    @apply bg-muted text-foreground;
-}
-.status-badge.submitted {
-    @apply bg-primary/10 text-primary;
-}
-.status-badge.under_review {
-    @apply bg-warning/10 text-warning;
-}
-.status-badge.approved {
-    @apply bg-success/10 text-success;
-}
-.status-badge.approved_with_conditions {
-    @apply bg-success/10 text-success;
-}
-.status-badge.rejected {
-    @apply bg-destructive/10 text-destructive;
-}
-.status-badge.deferred {
-    @apply bg-warning/10 text-warning;
-}
-.priority-badge {
-    @apply px-2 py-1 text-xs font-medium rounded-full;
-}
-.priority-badge.critical {
-    @apply bg-destructive/10 text-destructive;
-}
-.priority-badge.high {
-    @apply bg-warning/10 text-warning;
-}
-.priority-badge.medium {
-    @apply bg-muted text-foreground;
-}
-.priority-badge.low {
-    @apply bg-muted text-muted-foreground;
-}
-.score-card {
-    @apply bg-muted rounded-lg p-4 border border-border;
-}
-.score-value {
-    @apply text-2xl font-bold text-foreground;
-}
-.score-label {
-    @apply text-sm text-muted-foreground;
-}
-.checklist-item {
-    @apply flex items-center justify-between py-2 border-b border-border last:border-b-0;
-}
-.checklist-item.completed {
-    @apply bg-success/5;
-}
-.comment-card {
-    @apply bg-muted rounded-lg p-4 border border-border;
-}
-.comment-type {
-    @apply px-2 py-1 text-xs font-medium rounded-full;
-}
-.comment-type.general {
-    @apply bg-muted text-foreground;
-}
-.comment-type.concern {
-    @apply bg-destructive/10 text-destructive;
-}
-.comment-type.recommendation {
-    @apply bg-primary/10 text-primary;
-}
-.comment-type.condition {
-    @apply bg-warning/10 text-warning;
-}
-.comment-type.approval {
-    @apply bg-success/10 text-success;
-}
-</style>
-{% endif %}
-{% endblock %}
+{% block extra_css %}{# The legacy body depended on this @apply block. The typed workspace uses
+   semantic token utilities directly and must not inherit it. #}{% endblock %}
 
-{% block content %}{% set _typed = typed_review | default(none) %}
-{# The typed branch rebinds `review` to the read-model view, which shadows the
+{% block content %}
+{# The typed workspace rebinds `review` to the read-model view, which shadows the
    ORM row for every included partial. Capture it first: a partial that needs a
    stored column (the recorded decision, say) has no other way to reach it. #}
 {% set _orm_review = review %}
-{% if _typed %}
-{% set review = _typed %}
+{% set review = typed_review %}
 {% set _identity = review.identity or {} %}
 {% set _subject = review.subject or {} %}
 {% set _review_url = url_for('arb.review_detail', id=_identity.review_item_id) if _identity.review_item_id else '' %}
@@ -151,20 +54,15 @@
         {% include 'arb/partials/_typed_review_failed.html' %}
     {% endif %}
 </div>
-{% else %}
-{% include 'arb/partials/_legacy_review_detail.html' %}
-{% endif %}
 {% endblock %}
 
-{% block extra_head_js %}{% set _typed = typed_review | default(none) %}
-{% if _typed %}
+{% block extra_head_js %}
 <script src="{{ url_for('static', filename='js/arb/typed_governance.js') }}" defer></script>
-{% else %}
-<script>
-  window.__ARB_CONFIG__ = window.__ARB_CONFIG__ || {};
-  window.__ARB_CONFIG__.assessReviewUrl = '/arb/api/reviews/{{ review.id }}/assess';
-</script>
-<script src="{{ url_for('static', filename='js/arb/review_detail.js') }}"></script>
+{# arbDocPanel and arbPrebriefPanel back the documents and AI pre-brief
+   partials included from _typed_review_workspace.html. Both are advisory /
+   read-and-attach only: neither writes to the typed review graph. Kept
+   inline rather than in a shared file, matching this page's own
+   dashboard.html precedent for its AI Queue Triage panel. #}
 <script>
 function arbDocPanel(parentType, parentId) {
     return {
@@ -184,10 +82,8 @@ function arbDocPanel(parentType, parentId) {
                 const d = await Platform.fetch(this.listUrl());
                 this.documents = d.documents || [];
                 this.error = null;
-            } catch(e) {
+            } catch (e) {
                 this.error = 'Failed to load documents';
-                // The error toast is already shown by Platform.fetch (unless silent:true)
-                // We keep the inline error state for UI feedback.
             }
         },
 
@@ -203,18 +99,14 @@ function arbDocPanel(parentType, parentId) {
                 const d = await Platform.fetch(this.uploadUrl(), {
                     method: 'POST',
                     body: fd,
-                    // Platform.fetch will automatically add CSRF token for mutating methods
-                    // No need to manually set X-CSRFToken header
                 });
                 if (d.success) {
                     this.documents.unshift(d.document);
                 } else {
                     this.error = d.error || 'Upload failed';
                 }
-            } catch(e) {
+            } catch (e) {
                 this.error = 'Upload failed';
-                // Platform.fetch already shows a toast for the error
-                // We keep the inline error state for UI feedback
             } finally {
                 this.uploading = false;
                 event.target.value = '';
@@ -224,25 +116,11 @@ function arbDocPanel(parentType, parentId) {
 
         formatDate(iso) {
             if (!iso) return '';
-            try { return new Date(iso).toLocaleDateString(); } catch(e) { return iso; }
+            try { return new Date(iso).toLocaleDateString(); } catch (e) { return iso; }
         }
     };
 }
 </script>
-
-<script>
-/* ARB-102: conditions tracker Alpine component (read-only).
-   The per-condition editors were removed: they PATCHed
-   /arb/api/reviews/<id>/conditions/<idx>, which was never implemented, so every
-   change 404ed and silently reverted on reload. Conditions are set when the ARB
-   decision is recorded (arb.record_decision). */
-function conditionsTracker(initialConditions) {
-    return {
-        conditions: initialConditions || []
-    };
-}
-</script>
-
 <script>
 /* AI pre-brief panel (reviewer assist). Advisory only: calls
    POST /arb/api/reviews/<id>/ai-prebrief, which writes nothing to the
@@ -257,15 +135,10 @@ function arbPrebriefPanel(reviewId) {
             this.loading = true;
             this.error = null;
             try {
-                const d = await Platform.fetch.post(`/arb/api/reviews/${reviewId}/ai-prebrief`, null, {
-                    // Platform.fetch will automatically add CSRF token for POST
-                    // No need to manually set headers
-                });
+                const d = await Platform.fetch.post(`/arb/api/reviews/${reviewId}/ai-prebrief`, null, {});
                 this.prebrief = d.prebrief;
             } catch (e) {
                 this.error = e.message || 'AI pre-brief failed';
-                // Platform.fetch already shows a toast for the error
-                // We keep the inline error state for UI feedback
             } finally {
                 this.loading = false;
                 if (window.lucide) lucide.createIcons();
@@ -274,5 +147,4 @@ function arbPrebriefPanel(reviewId) {
     };
 }
 </script>
-{% endif %}
 {% endblock %}

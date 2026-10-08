@@ -1,0 +1,44 @@
+{# GA4 loader with Consent Mode — loads only after consent cookie is 'accepted'.
+   Consent Mode defaults: ad_storage=denied, analytics_storage=denied.
+   Script carries the CSP nonce. #}
+{% if config.GA4_MEASUREMENT_ID %}
+<script nonce="{{ csp_nonce }}">
+  (function() {
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    window.gtag = gtag;
+
+    // Consent Mode v2 defaults — denied until user accepts
+    gtag('consent', 'default', {
+      'ad_storage': 'denied',
+      'analytics_storage': 'denied',
+      'ad_user_data': 'denied',
+      'ad_personalization': 'denied'
+    });
+
+    // Listen for consent change from banner
+    window.addEventListener('analytics:consent', function(e) {
+      if (e.detail && e.detail.consent === 'accepted' && !window._ga4Loaded) {
+        window._ga4Loaded = true;
+
+        // Load the GA4 script
+        var script = document.createElement('script');
+        script.async = true;
+        script.src = 'https://www.googletagmanager.com/gtag/js?id=' + '{{ config.GA4_MEASUREMENT_ID }}';
+        script.nonce = '{{ csp_nonce }}';
+        document.head.appendChild(script);
+
+        gtag('js', new Date());
+        gtag('config', '{{ config.GA4_MEASUREMENT_ID }}', {
+          'send_page_view': true
+        });
+
+        // Update consent to granted for analytics only
+        gtag('consent', 'update', {
+          'analytics_storage': 'granted'
+        });
+      }
+    });
+  })();
+</script>
+{% endif %}

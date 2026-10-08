@@ -23,6 +23,7 @@ flask --app manage backfill-kanban-card-org || echo 'WARN kanban card tenancy ba
 flask --app manage backfill-saved-diagram-tenancy || echo 'WARN saved-diagram tenancy backfill skipped - composer diagrams keep nullable organization_id until it runs; rows left NULL are invisible to every org (CMP-01)'
 flask --app manage drop-audit-log-viewpoint-fk || echo 'WARN audit-log viewpoint-FK drop skipped - composer audit writes keep failing with a FK violation until it runs (CMP-03)'
 flask --app manage backfill-architect-role
+flask --app manage backfill-decision-register-consolidation || echo 'WARN decision register consolidation backfill skipped - decision_ledger rows remain untenanted and architecture_decision_records rows stay unpaired with the canonical register until it runs' >&2
 flask --app manage backfill-solution-risk-merge || echo 'WARN solution risk merge backfill skipped - solution risks stay unlinked from the one risk register (no risk_entity_links row, no shared score history) until it runs'
 # RUN-01: copy ARB, ArchiMate composer and rationalisation audit history into
 # soc2_audit_log (the system of record per ADR 0008). Runs here because
@@ -31,6 +32,25 @@ flask --app manage backfill-solution-risk-merge || echo 'WARN solution risk merg
 # Idempotent: a row whose retired_into_id is set is skipped.
 flask --app manage backfill-audit-trail || echo 'WARN audit trail backfill skipped - older audit entries from ARB, ArchiMate composer and rationalisation stores remain uncopied until it runs (RUN-01)' >&2
 flask --app manage backfill-review-queue-approvals || echo 'WARN approval-queue consolidation backfill skipped - pending rows from review_queue_items, relationship_suggestions and solution_blueprint_proposals remain uncopied until it runs' >&2
+
+# ADR 0008 / unified_work_packages tenancy and consolidation. The unified
+# work packages table predates TenantMixin; reconcile-schema above adds
+# organization_id as NULL. The first backfill attributes every existing row
+# to its owning organisation (linked programme or element, else creator,
+# else quarantine). The merge copies rows from the four legacy stores
+# (work_packages, roadmap_work_packages, technology_roadmap_initiatives,
+# implementation_work_packages) into unified_work_packages with provenance.
+# The second backfill picks up rows that the merge resolved through a FK
+# its own attribution chain did not try. Each command is idempotent.
+flask --app manage backfill-work-package-org || echo 'WARN work package tenancy backfill skipped - unified_work_packages rows without an organisation are invisible to every org until this runs'
+flask --app manage merge-work-package-stores || echo 'WARN work package store merge skipped - legacy work package stores will not appear in the unified view until this runs'
+flask --app manage backfill-work-package-org || echo 'WARN work package tenancy second pass skipped - merged rows that resolved through a new FK remain unattributed until this runs'
+# The generic history trigger reconcile-schema cannot create, then
+# one seeded version per pre-existing element/relationship. Trigger first so
+# the backfill's "no entity_history row at all" check is not racing a
+# concurrent write that the trigger would otherwise have versioned.
+flask --app manage apply-entity-history-trigger || echo 'WARN entity-history trigger skipped - no version is recorded for a changed element/relationship until it runs' >&2
+flask --app manage backfill-entity-history || echo 'WARN entity-history backfill skipped - pre-existing elements/relationships have no history version until it runs' >&2
 
 # ADR 0008 -- give unified_capabilities (the canonical capability store, per
 # app/models/unified_capability.py and docs/adr/0008-one-system-of-record.md) a

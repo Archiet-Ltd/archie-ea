@@ -147,6 +147,7 @@ def _permission_denied_result(tool_name: str, user) -> dict:
 # Permission.GENERAL (write access). Stored with each refusal so an
 # administrator reads which rule refused the call, not only that it was refused.
 WRITE_PERMISSION_RULE = "write_permission"
+WRITES_PAUSED_RULE = "writes_paused"
 REFUSED_TOOL_CALL_ACTION = "tool_refused"
 REFUSED_TOOL_CALL_TABLE = "ai_tool_call"
 _SECRET_ARGUMENT = re.compile(r"pass(word)?|secret|token|api[_-]?key|credential|auth", re.I)
@@ -226,6 +227,44 @@ def record_refused_tool_call(user, tool_name: str, arguments, *, via: str) -> No
         logger.warning("Could not record the refused tool call '%s'", tool_name, exc_info=True)
 
 
+def record_paused_tool_call(user, tool_name: str, arguments, *, paused_by_name: str,
+                            paused_reason: str) -> None:
+    """Record that an AI tool call was refused because writes are paused.
+
+    Written through ``AuditLog.log`` to the append-only audit log under the
+    refusing user's organisation. Called before any tool handler runs when the
+    organisation's stop-all-writes switch is active. Never raises.
+    """
+    try:
+        from flask import has_request_context, request
+
+        from app.models.audit_log import AuditLog
+
+        values = {
+            "organization_id": getattr(user, "organization_id", None),
+            "user_id": getattr(user, "id", None),
+            "action": REFUSED_TOOL_CALL_ACTION,
+            "table_name": REFUSED_TOOL_CALL_TABLE,
+            "new_value": {
+                "tool": tool_name,
+                "rule": WRITES_PAUSED_RULE,
+                "rule_description": (
+                    "Agent writes are paused for this organisation "
+                    "(paused by %s): %s" % (paused_by_name, paused_reason)
+                ),
+                "role": getattr(user, "role_name", None) or "no role",
+                "via": "oversight",
+                "arguments": _summarise_arguments(arguments),
+            },
+        }
+        if has_request_context():
+            values["ip_address"] = (request.remote_addr or "")[:45] or None
+            values["user_agent"] = (request.headers.get("User-Agent") or "")[:500] or None
+        AuditLog.log(**values)
+    except Exception:
+        logger.warning("Could not record the paused tool call '%s'", tool_name, exc_info=True)
+
+
 def _duplicate_tool_result(noun: str, existing) -> dict:
     """The tool-call analogue of a 409 (ARCH-030).
 
@@ -254,10 +293,12 @@ class ToolCall:
 
 class ToolExecutor:
 
-    def __init__(self, user_id: int):
+    def __init__(self, user_id: int, persona: str = None):
         self.user_id = user_id
         self._resolver = EntityResolver()
         self._org_id = None  # cached lazily
+        self._persona = persona
+        self._charter_checked = None  # cached result of the charter check
 
     @staticmethod
     def _coverage(rows, total, noun):
@@ -366,6 +407,52 @@ class ToolExecutor:
         if not handler:
             return {"success": False, "error": f"Unknown tool: {tool_call.name}"}
 
+        # Charter enforcement: a tool call must be within the persona's charter
+        # bounds. This is checked BEFORE the permission check so a refused
+        # charter-bound call is surfaced as the charter refusal, not a
+        # permission denial — the persona has no business calling this tool,
+        # regardless of the user's own permissions.
+        persona = self._persona
+        if persona:
+            try:
+                org_id = self._get_organization_id()
+                from app.models.agent_charter import AgentCharter
+
+                if not AgentCharter.tool_allowed(persona, tool_call.name, org_id):
+                    logger.warning(
+                        "ToolExecutor: refusing tool '%s' for persona '%s' — outside charter bounds",
+                        tool_call.name, persona,
+                    )
+                    return {
+                        "success": False,
+                        "error": (
+                            f"I can't run '{tool_call.name}' — the {persona.replace('_', ' ')} "
+                            f"charter does not permit this action. If this is something you "
+                            f"need, switch to a persona whose scope covers it, or ask an "
+                            f"administrator to amend the charter."
+                        ),
+                        "code": "CHARTER_REFUSED",
+                        "charter_refused": True,
+                        "persona": persona,
+                        "tool": tool_call.name,
+                    }
+            except Exception:
+                # Fail CLOSED: if the charter cannot be read, refuse the call.
+                logger.exception(
+                    "ToolExecutor: charter check failed for persona '%s' tool '%s' — refusing",
+                    persona, tool_call.name,
+                )
+                return {
+                    "success": False,
+                    "error": (
+                        f"I can't run '{tool_call.name}' — the charter for "
+                        f"{persona.replace('_', ' ')} could not be verified. "
+                        f"An administrator should check the charter is correctly seeded."
+                    ),
+                    "code": "CHARTER_UNAVAILABLE",
+                    "charter_refused": True,
+                }
+
         schema = TOOL_SCHEMA_BY_NAME.get(tool_call.name)
         # Fail CLOSED: an unregistered/unclassified tool is treated as mutating,
         # matching AgentRunner._should_queue's own fail-closed rule for the same
@@ -373,6 +460,41 @@ class ToolExecutor:
         mutates = True if schema is None else bool(schema.get("mutates", True))
         if mutates:
             user = _load_acting_user(self.user_id)
+
+            # Oversight pause check: if the organisation's stop-all-writes
+            # switch is active, refuse every mutating call before it reaches
+            # the write-permission check or the approval queue. The pause
+            # takes effect on the next dispatch, not on a poll.
+            if user is not None:
+                org_id = self._get_organization_id()
+                from app.models.agent_oversight_state import AgentOversightState
+                oversight_state = AgentOversightState.get_for_org(org_id)
+                if oversight_state.is_paused():
+                    paused_by_name = "Unknown"
+                    if oversight_state.paused_by_id:
+                        paused_by_user = _load_acting_user(oversight_state.paused_by_id)
+                        if paused_by_user:
+                            paused_by_name = paused_by_user.full_name()
+                    logger.warning(
+                        "ToolExecutor: refusing mutating tool '%s' for user_id=%s — writes paused",
+                        tool_call.name, self.user_id,
+                    )
+                    record_paused_tool_call(
+                        user, tool_call.name, tool_call.arguments,
+                        paused_by_name=paused_by_name,
+                        paused_reason=oversight_state.reason or "No reason given",
+                    )
+                    return {
+                        "success": False,
+                        "error": (
+                            "Agent writes are paused for this organisation "
+                            "(paused by %s): %s"
+                            % (paused_by_name, oversight_state.reason or "No reason given")
+                        ),
+                        "code": "WRITES_PAUSED",
+                        "writes_paused": True,
+                    }
+
             if not user or not self._user_can_write():
                 logger.warning(
                     "ToolExecutor: refusing mutating tool '%s' for user_id=%s — no write permission",

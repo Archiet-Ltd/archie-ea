@@ -335,6 +335,25 @@ else:
         deleted_at = db.Column(db.DateTime, nullable=True)
         deleted_by = db.Column(db.Integer, nullable=True)
 
+        # Model history: the interval this row's
+        # current state has held, and when it was recorded. Nullable per
+        # ADR-0002 (reconcile-schema is add-only/nullable) -- valid_from and
+        # recorded_at are backfilled for existing rows (from the audit log
+        # where an entry exists, NULL/"unknown" otherwise) by
+        # backfill-entity-history; new rows are stamped by the same trigger
+        # that writes entity_history (app/models/entity_history.py). A row
+        # with valid_to set has been superseded by a later version and is no
+        # longer the current state, which superseded_at also records, once,
+        # for the version that ended it; last_confirmed is the latest time
+        # any read or re-import observed this row unchanged, letting a very
+        # old, never-touched row be told apart from one that simply never
+        # changed and was reconfirmed recently.
+        valid_from = db.Column(db.DateTime, nullable=True)
+        valid_to = db.Column(db.DateTime, nullable=True)
+        recorded_at = db.Column(db.DateTime, nullable=True)
+        superseded_at = db.Column(db.DateTime, nullable=True)
+        last_confirmed = db.Column(db.DateTime, nullable=True)
+
         # Relationship tracking
         parent_id = db.Column(db.Integer, db.ForeignKey("archimate_elements.id"), nullable=True)
 
@@ -528,6 +547,14 @@ else:
         # database, which left the import review queue with nothing to triage.
         derived_from = db.Column(db.String(40), nullable=True, index=True)
 
+        # Model history: same columns and rationale as
+        # ArchiMateElement's above.
+        valid_from = db.Column(db.DateTime, nullable=True)
+        valid_to = db.Column(db.DateTime, nullable=True)
+        recorded_at = db.Column(db.DateTime, nullable=True)
+        superseded_at = db.Column(db.DateTime, nullable=True)
+        last_confirmed = db.Column(db.DateTime, nullable=True)
+
         # When a person confirmed an inferred relationship. NULL with a
         # derived_from set means "still to be looked at" - that pair is the whole
         # import review queue. Kept as a timestamp rather than a boolean so the
@@ -620,7 +647,7 @@ class WorkflowInstanceArchiMateElement(db.Model):
         )
 
 
-class Requirement(db.Model):
+class Requirement(TenantMixin, db.Model):
     __tablename__ = "requirements"
 
     # In fast-init/test contexts we may define a lightweight Requirement in

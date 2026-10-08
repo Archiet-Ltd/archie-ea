@@ -5,7 +5,7 @@ segment_id: S3
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /enterprise-architecture/value-streams-at-risk
+url_slug: /use-cases/value-streams-at-risk
 ---
 
 # Which value streams are at risk because the capabilities under them are immature?
@@ -28,4 +28,4 @@ it becomes an incident, not after.
 
 - [Portfolio](/modules/portfolio)
 - [Value Streams](/modules/value-streams)
-- [Show capability maturity as a heat map](/enterprise-architecture/capability-maturity)
+- [Show capability maturity as a heat map](/use-cases/capability-maturity-heatmap)

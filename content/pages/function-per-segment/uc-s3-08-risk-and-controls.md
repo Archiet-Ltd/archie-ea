@@ -5,7 +5,7 @@ segment_id: S3
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /enterprise-architecture/risk-and-controls
+url_slug: /use-cases/risk-and-control-gaps
 ---
 
 # Which risks and control gaps touch this goal, and who owns the mitigation?

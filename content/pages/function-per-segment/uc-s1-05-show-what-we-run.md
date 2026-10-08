@@ -5,7 +5,7 @@ segment_id: S1
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /startups/show-what-we-run
+url_slug: /use-cases/show-investors-what-we-run
 ---
 
 # Show an investor what we run and who owns it, in an afternoon
@@ -28,4 +28,4 @@ other question.
 
 - [Applications](/modules/applications)
 - [Org Chart & RACI](/modules/org-chart)
-- [What must be true for our revenue stream?](/startups/revenue-stream-risk)
+- [What must be true for our revenue stream?](/use-cases/revenue-stream-risk)
