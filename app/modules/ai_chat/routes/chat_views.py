@@ -105,6 +105,7 @@ def _fallback_persona_config() -> Dict[str, Any]:
                 "procurement",
                 "application_manager",
             ],
+            "owners": ["business_owner"],
         },
     }
 

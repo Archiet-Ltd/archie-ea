@@ -419,6 +419,21 @@ PERSONA_CONFIGS = {
             "Summarize the current role distribution across the tenant.",
         ],
     },
+    "business_owner": {
+        "name": "AI Business Owner Guide",
+        "icon": "briefcase",
+        "color": "slate",  # token-migration-ok: PERSONA_CONFIGS colour label, not a CSS class
+        "description": "Plain answers on what the business runs on, what it costs and what is changing",
+        "expertise": ["Plain-language answers", "Cost and risk", "Change in flight"],
+        "focus_areas": ["Applications", "Cost", "Risk", "Change"],
+        "default_domain": "general",
+        "context_priority": ["applications", "solutions"],
+        "sample_prompts": [
+            "What does the business run on?",
+            "What changes are in flight and which are stuck?",
+            "Where should I look first for cost or risk?",
+        ],
+    },
 }
 
 
@@ -674,6 +689,7 @@ class MultiDomainChatService:
                     "application_manager",
                 ],
                 "operations": ["platform_admin"],
+                "owners": ["business_owner"],
             },
         }
 

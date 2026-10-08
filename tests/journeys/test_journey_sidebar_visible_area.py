@@ -236,10 +236,11 @@ def test_a_long_label_wraps_in_the_mobile_drawer_too(app, client, browser):
     "solution_architect", "enterprise_architect", "business_architect", "cto", "security_architect",
     "data_architect", "procurement", "application_manager", "portfolio_manager", "arb_member",
     "platform_admin", "technology_architect", "application_architect",
+    "business_owner",
 ])
 def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
     """Repositioning and restyling the sidebar must not add, remove or rename a link,
-    or change a zone's membership or order, for any of the thirteen personas."""
+    or change a zone's membership or order, for any of the fourteen personas."""
     import html as html_module
     import re
 

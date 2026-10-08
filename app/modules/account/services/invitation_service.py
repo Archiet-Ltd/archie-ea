@@ -29,7 +29,7 @@ from app.flask_email import deliver_email, mail_available
 from app.models import User
 from app.models.org_role import VALID_ORG_ROLES, OrgRole
 from app.models.pending_invitation import PendingInvitation
-from app.models.user import ROLE_PLATFORM_ADMIN, ROLE_SOLUTION_ARCHITECT, VALID_ROLES
+from app.models.user import ADMINISTRATOR_ROLES, ROLE_SOLUTION_ARCHITECT, VALID_ROLES
 
 _log = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ MAIL_UNAVAILABLE = (
 
 # Personas an organisation administrator may give a teammate. Platform
 # administration is not the organisation's to hand out.
-INVITABLE_PERSONAS = [r for r in VALID_ROLES if r != ROLE_PLATFORM_ADMIN]
+INVITABLE_PERSONAS = [r for r in VALID_ROLES if r not in ADMINISTRATOR_ROLES]
 
 
 class InvitationError(Exception):

@@ -580,6 +580,7 @@ def init_context_processors(app):
         "procurement": {"application"},
         "application_manager": {"application"},
         "platform_admin": {"application", "tools", "data", "utilities", "admin"},
+        "business_owner": {"application", "tools", "data", "utilities", "admin"},
     }
     ENTERPRISE_ROLE_SECTION_MAP = {
         role: sections | _LEGACY_SECTION_ALIASES.get(role, set())

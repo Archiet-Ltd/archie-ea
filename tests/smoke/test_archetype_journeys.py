@@ -42,6 +42,7 @@ JOURNEY = {
                              "/architecture/data-lineage"],
     "technology_architect":  ["/technology/radar/", "/applications/"],
     "application_architect": ["/applications/", "/interface-register/"],
+    "business_owner":        ["/intelligence/twin-map", "/applications/"],
     # R1-B36 (TB-0146/TB-0170): promoted from unassignable to assignable.
     "finance":              ["/procurement/spend", "/procurement/licenses"],
     "compliance":           ["/dashboard/compliance"],

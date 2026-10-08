@@ -217,6 +217,20 @@ POLICY = {
 for _allowed in POLICY.values():
     _allowed.add("platform_admin")
 
+# business_owner is admitted wherever requires_role() or a section gate admits
+# platform_admin (ADMINISTRATOR_ROLES in app/models/user.py). The smoke persona
+# holds the ordinary Architect role, so rows guarded by Permission.ADMINISTER or
+# the cross-tenant flag (/admin/audit-log, /admin/errors, /admin/team, billing)
+# correctly stay closed to it here.
+for _path in (
+    "/procurement/contracts", "/procurement/licenses", "/procurement/compliance",
+    "/my-applications/", "/my-applications/list", "/my-applications/health",
+    "/interface-register/", "/interface-register/new",
+    "/interface-register/comparison", "/interface-register/costing",
+    "/compliance/data-subject-requests", "/compliance/personal-data-trace",
+):
+    POLICY[_path].add("business_owner")
+
 ACCOUNT_POST_POLICY = {
     "/account/switch-organization": set(ARCHETYPES),
 }
@@ -421,7 +435,7 @@ def test_transformation_api_authorisation_matrix(
 INTERFACE_REGISTER_PERMITTED = {
     "solution_architect", "enterprise_architect", "business_architect",
     "security_architect", "data_architect", "technology_architect",
-    "application_architect", "platform_admin",
+    "application_architect", "business_owner", "platform_admin",
 }
 
 

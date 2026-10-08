@@ -301,7 +301,7 @@ def require_roles(*allowed_roles):
                 user_roles.add(enterprise_role)
                 if enterprise_role.endswith("_architect"):
                     user_roles.add("architect")
-                elif enterprise_role == "platform_admin" and may_administer:
+                elif enterprise_role in ("platform_admin", "business_owner") and may_administer:
                     user_roles.add("admin")
 
             if hasattr(current_user, "role_archetype") and current_user.role_archetype:

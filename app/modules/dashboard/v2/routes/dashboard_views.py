@@ -719,7 +719,7 @@ def api_onboarding_complete():
     valid_roles = {
         "solution_architect", "enterprise_architect",
         "arb_member", "portfolio_manager", "platform_admin",
-        "cto", "application_manager", "procurement",
+        "cto", "application_manager", "procurement", "business_owner",
     }
     if new_role and new_role in valid_roles:
         current_user.enterprise_role = new_role

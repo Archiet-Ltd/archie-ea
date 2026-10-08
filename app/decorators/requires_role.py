@@ -14,7 +14,7 @@ from typing import List, Union
 from flask import abort, current_app, request
 from flask_login import current_user
 
-from app.models.user import ROLE_PLATFORM_ADMIN
+from app.models.user import ADMINISTRATOR_ROLES, ROLE_PLATFORM_ADMIN
 from app.utils.role_access import get_user_role
 
 
@@ -27,7 +27,7 @@ def may_handle_data_subject_requests(user):
     """True when ``user`` may open the data-subject request pages: the roles in
     DATA_SUBJECT_REQUEST_ROLES, and platform_admin as ``requires_role`` always
     admits it."""
-    return get_user_role(user) in DATA_SUBJECT_REQUEST_ROLES + [ROLE_PLATFORM_ADMIN]
+    return get_user_role(user) in DATA_SUBJECT_REQUEST_ROLES + sorted(ADMINISTRATOR_ROLES)
 
 
 def requires_role(allowed_roles: Union[str, List[str]]):
@@ -61,9 +61,10 @@ def requires_role(allowed_roles: Union[str, List[str]]):
     if isinstance(allowed_roles, str):
         allowed_roles = [allowed_roles]
 
-    # Always allow platform_admin
-    if ROLE_PLATFORM_ADMIN not in allowed_roles:
-        allowed_roles = list(allowed_roles) + [ROLE_PLATFORM_ADMIN]
+    # Always allow the administrator roles (platform_admin and business_owner)
+    allowed_roles = list(allowed_roles) + [
+        r for r in sorted(ADMINISTRATOR_ROLES) if r not in allowed_roles
+    ]
 
     def decorator(f):
         @wraps(f)

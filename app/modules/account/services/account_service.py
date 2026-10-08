@@ -150,6 +150,9 @@ class AccountService:
             password=password,
             confirmed=confirmed,
             organization_id=org.id,
+            # Self-serve sign-ups start on the small, plain-language owner view.
+            # Authority is unchanged: grant_org_admin() below is what carries it.
+            enterprise_role="business_owner",
         )
         # The user owns the organisation just created for them, so granting
         # org-admin here is always a grant in their own organisation.
