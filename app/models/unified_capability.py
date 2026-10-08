@@ -50,6 +50,13 @@ class HybridCapabilityTenantMixin:
     This is intentionally separate from ``TenantMixin`` because the ordinary
     equality filter would hide shared reference rows.  The model-specific event
     handlers below provide its read and write mechanism.
+
+    This exact pattern has since been generalised into ``HybridTenantMixin``
+    (``app/models/mixins/core.py``) for its own shared-catalogue tables. This
+    class becomes a plain alias of that one once the capability-store
+    consolidation merges and this model's own event handlers below are
+    retired in favour of the generic ones; kept distinct for now so this
+    change does not touch that other file beyond this comment.
     """
 
     @declared_attr

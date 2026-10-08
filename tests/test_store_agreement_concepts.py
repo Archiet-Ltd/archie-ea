@@ -70,9 +70,15 @@ EXPECTED = {
         "app.models.enterprise_intelligence.ApplicationOwnership",
         "app.models.application_portfolio.ApplicationComponent",
     ],
+    # ArchitectureDecisionRecord dropped from this list by the decision-register
+    # consolidation: every row is dual-write paired into ArchitectureDecision
+    # (app.models.adr.ArchitectureDecisionRecord.pair_with_canonical_register()),
+    # so it is a satellite detail-store for review-board fields the canonical
+    # model has no column for, not an independent answer to "how many
+    # architecture decisions" -- see scripts/check_store_agreement.py's own
+    # "architecture decisions" entry for the full reasoning.
     "architecture decisions": [
         "app.models.architecture_decision.ArchitectureDecision",
-        "app.models.adr.ArchitectureDecisionRecord",
         "/arb/api/decisions",
     ],
     "pending AI change approvals": [

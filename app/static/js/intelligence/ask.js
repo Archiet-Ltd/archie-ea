@@ -51,6 +51,15 @@ function askSurface() {
         accountabilityState: 'idle',
         accountabilityBusy: false,
         owners: [],
+        dataState: 'idle',
+        dataBusy: false,
+        dataObjects: [],
+        dataFlows: [],
+        complianceState: 'idle',
+        complianceBusy: false,
+        controls: [],
+        violations: [],
+        lastScanAt: null,
 
         init() {
             this.twinMapUrl = this.$el.getAttribute('data-twin-map-url') || '';
@@ -89,6 +98,10 @@ function askSurface() {
                 this.loadStrategy(option.id);
             } else if (this.openKey === 'accountability') {
                 this.loadAccountability(option.id);
+            } else if (this.openKey === 'data') {
+                this.loadData(option.id);
+            } else if (this.openKey === 'compliance') {
+                this.loadCompliance(option.id);
             } else {
                 this.load(option.id);
             }
@@ -287,6 +300,67 @@ function askSurface() {
                 Intelligence.refreshIcons();
                 if (self.accountabilityState === 'ready' || self.accountabilityState === 'empty') {
                     Intelligence.showResults(self.$refs.accountabilityResultsHeading);
+                }
+            });
+        },
+
+        /* L7: what data the element holds or produces and where it flows. No
+           provenance-drawer sync -- like L4 this is a lookup, not a traversal. */
+        async loadData(elementId) {
+            this.answeredKey = 'data';
+            this._dataLoadSeq = (this._dataLoadSeq || 0) + 1;
+            var seq = this._dataLoadSeq;
+            this.dataBusy = true;
+            this.dataState = 'loading';
+            try {
+                var payload = await Intelligence.fetchData(elementId);
+                if (seq !== this._dataLoadSeq) return;
+                this.dataObjects = Intelligence.buildDataObjects(payload);
+                this.dataFlows = Intelligence.buildFlows(payload);
+                this.dataState = (this.dataObjects.length || this.dataFlows.length) ? 'ready' : 'empty';
+            } catch (err) {
+                if (seq !== this._dataLoadSeq) return;
+                this.dataObjects = [];
+                this.dataFlows = [];
+                this.dataState = 'error';
+            }
+            this.dataBusy = false;
+            var self = this;
+            this.$nextTick(function () {
+                Intelligence.refreshIcons();
+                if (self.dataState === 'ready' || self.dataState === 'empty') {
+                    Intelligence.showResults(self.$refs.dataResultsHeading);
+                }
+            });
+        },
+
+        /* Compliance (under L6): a lookup, no provenance-drawer sync. */
+        async loadCompliance(elementId) {
+            this.answeredKey = 'compliance';
+            this._complianceLoadSeq = (this._complianceLoadSeq || 0) + 1;
+            var seq = this._complianceLoadSeq;
+            this.complianceBusy = true;
+            this.complianceState = 'loading';
+            try {
+                var payload = await Intelligence.fetchCompliance(elementId);
+                if (seq !== this._complianceLoadSeq) return;
+                this.controls = Intelligence.buildControls(payload);
+                this.violations = Intelligence.buildViolations(payload);
+                this.lastScanAt = payload.last_scan_at || null;
+                this.complianceState = (this.controls.length || this.violations.length) ? 'ready' : 'empty';
+            } catch (err) {
+                if (seq !== this._complianceLoadSeq) return;
+                this.controls = [];
+                this.violations = [];
+                this.lastScanAt = null;
+                this.complianceState = 'error';
+            }
+            this.complianceBusy = false;
+            var self = this;
+            this.$nextTick(function () {
+                Intelligence.refreshIcons();
+                if (self.complianceState === 'ready' || self.complianceState === 'empty') {
+                    Intelligence.showResults(self.$refs.complianceResultsHeading);
                 }
             });
         },

@@ -245,7 +245,8 @@ class TestShouldQueue:
                 "raw": raw_mock,
             }
 
-        def _mock_queue_approval(self, tc):
+        def _mock_queue_approval(self, tc, persona=None):
+            assert persona == "enterprise_architect", f"persona={persona!r}"
             return 9999  # fake approval ID
 
         runner = AgentRunner(user_id=1, auto_execute=True)
@@ -354,6 +355,7 @@ class TestHandlerDispatch:
             "submit_for_arb_review",
         ]
         for name in sample_tools:
+            assert name in TOOL_SCHEMA_BY_NAME, f"{name}: no registered tool schema"
             # Verify the handler method exists
             handler = getattr(executor, f"_tool_{name}", None)
             assert handler is not None, (
@@ -643,12 +645,20 @@ class TestApprovalExecutionParity:
 
 
 class TestApprovalExpiry:
-    """I2: POST /ai-chat/tools/approve/<id> checked status but not expiry, so
-    a stale Confirm click on a PENDING-but-expired row would still execute.
-    Mirrors the legacy check already present in
-    AIChatApprovalService.approve_and_execute."""
+    """Overdue-not-expired: an approval past expires_at is overdue,
+    not expired — it stays actionable indefinitely, escalating to the
+    organisation's administrators instead of refusing. Both
+    /ai-chat/tools/approve/<id> and /ai-chat/approvals/<id>/approve dispatch
+    through AIChatApprovalService.approve_and_execute, so both must still
+    execute an overdue approval rather than 409.
 
-    def test_dedicated_endpoint_rejects_expired_approval(self, app, client, db_session, make_org, monkeypatch):
+    Superseded the previous version of this class, named for the opposite
+    (pre-consolidation) behaviour: a real Confirm click on an overdue row is not a
+    "stale" click to refuse — the whole point of this brief is that it must
+    still work.
+    """
+
+    def test_dedicated_endpoint_executes_an_overdue_approval(self, app, client, db_session, make_org, monkeypatch):
         from datetime import datetime, timedelta
 
         org = make_org("gov")
@@ -659,7 +669,7 @@ class TestApprovalExpiry:
 
         def _fake_execute(self, tool_call):
             executed.append(tool_call)
-            return {"success": True, "message": "should not run", "result": {}}
+            return {"success": True, "message": "executed", "result": {}}
 
         import app.modules.ai_chat.tools.executor as executor_module
 
@@ -667,41 +677,49 @@ class TestApprovalExpiry:
 
         record = _make_tool_use_approval(
             db_session, user, tool_name="create_solution",
-            expires_at=datetime.utcnow() - timedelta(hours=1),
+            expires_at=datetime.utcnow() - timedelta(hours=1),  # overdue
         )
         db_session.commit()
 
         _login_second_approver(client, db_session, org)
         resp = client.post(f"/ai-chat/tools/approve/{record.id}")
-        assert resp.status_code == 409
-        assert "expired" in resp.get_json()["error"].lower()
-        assert executed == []  # never reached the executor
+        assert resp.status_code == 200, resp.get_json()
+        assert len(executed) == 1, "an overdue approval must still reach the executor"
 
         from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
 
         refreshed = db_session.get(AIChatCRUDApproval, record.id)
-        assert refreshed.status == ApprovalStatus.EXPIRED
+        assert refreshed.status == ApprovalStatus.APPROVED
+        assert refreshed.is_overdue() is False  # no longer PENDING, so not overdue either
 
-    def test_legacy_endpoint_already_rejected_expired_approval(self, app, client, db_session, make_org, monkeypatch):
-        """Not a new fix — approve_and_execute already had this check
-        (ai_chat_approval_service.py). Pinned here so both endpoints are
-        proven to agree, not just individually correct."""
+    def test_legacy_endpoint_also_executes_an_overdue_approval(self, app, client, db_session, make_org, monkeypatch):
+        """Not a new fix on this endpoint specifically — it delegates to the
+        same approve_and_execute as the dedicated endpoint above. Pinned here
+        so both endpoints are proven to agree, not just individually correct.
+        """
         from datetime import datetime, timedelta
 
         org = make_org("gov")
         user = _make_user(db_session, org)
         _login(client, user.id)
 
+        def _fake_execute(self, tool_call):
+            return {"success": True, "message": "executed", "result": {}}
+
+        import app.modules.ai_chat.tools.executor as executor_module
+
+        monkeypatch.setattr(executor_module.ToolExecutor, "execute", _fake_execute)
+
         record = _make_tool_use_approval(
             db_session, user, tool_name="create_solution",
-            expires_at=datetime.utcnow() - timedelta(hours=1),
+            expires_at=datetime.utcnow() - timedelta(hours=1),  # overdue
         )
         db_session.commit()
 
         _login_second_approver(client, db_session, org)
         resp = client.post(f"/ai-chat/approvals/{record.id}/approve")
-        assert resp.status_code == 409
-        assert "expired" in resp.get_json()["error"].lower()
+        assert resp.status_code == 200, resp.get_json()
+        assert "expired" not in str(resp.get_json()).lower()
 
 
 class TestRequireAIApprovalDefaultsOn:

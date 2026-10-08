@@ -475,11 +475,19 @@ class AgentRunner:
                     )
             api_keys = LLMService._get_all_api_keys(provider)
             if not api_keys:
-                return self._fallback("No API keys configured for provider: " + provider)
+                return self._finalize(
+                    self._fallback("No API keys configured for provider: " + provider),
+                    user_message=user_message, domain=domain, context=context,
+                    persona=persona,
+                )
             api_key = api_keys[0]
         except Exception as e:
             logger.warning("AgentRunner: provider selection failed: %s", e)
-            return self._fallback(str(e))
+            return self._finalize(
+                self._fallback(str(e)),
+                user_message=user_message, domain=domain, context=context,
+                persona=persona,
+            )
 
         # Verify provider supports tool use
         # openrouter and deepseek use OpenAI-compatible API with tool calling
@@ -490,7 +498,8 @@ class AgentRunner:
                 provider,
             )
             return self._text_only_fallback(
-                user_message, system_prompt, provider, model, api_key, LLMService
+                user_message, system_prompt, provider, model, api_key, LLMService,
+                user_message=user_message, domain=domain, context=context, persona=persona,
             )
 
         # Resolve base_url for OpenAI-compatible third-party providers
@@ -514,7 +523,7 @@ class AgentRunner:
         messages = self._prepare_history(history)
         messages.append({"role": "user", "content": user_message})
         trusted_workspace_id = (context or {}).get("_trusted_workspace_id")
-        executor = ToolExecutor(self.user_id)
+        executor = ToolExecutor(self.user_id, persona=persona)
         actions_taken = []
         required_actions = []
         pending_approvals = []
@@ -531,17 +540,28 @@ class AgentRunner:
                 )
             except Exception as e:
                 logger.exception("AgentRunner LLM call failed (iteration %d)", iteration)
-                return self._fallback(f"LLM call failed: {e}")
+                return self._finalize(
+                    self._fallback(f"LLM call failed: {e}"),
+                    user_message=user_message, domain=domain, context=context,
+                    persona=persona, model_used=model,
+                )
 
             # Text-only response — we're done
             if not llm_resp.get("tool_calls"):
-                return {
-                    "response": llm_resp.get("text", ""),
-                    "actions_taken": actions_taken,
-                    "required_actions": required_actions,
-                    "pending_approvals": pending_approvals,
-                    "sources": sources,
-                }
+                return self._finalize(
+                    {
+                        "response": llm_resp.get("text", ""),
+                        "actions_taken": actions_taken,
+                        "required_actions": required_actions,
+                        "pending_approvals": pending_approvals,
+                        "sources": sources,
+                    },
+                    user_message=user_message,
+                    domain=domain,
+                    context=context,
+                    persona=persona,
+                    model_used=model,
+                )
 
             # Process each tool call
             tool_results = []
@@ -560,7 +580,7 @@ class AgentRunner:
                     # (destructive/significant regardless of the gate), or it
                     # mutates and this session has auto-execute off - the
                     # write-approval gate described in toggle_auto_execute.
-                    approval_id = self._queue_approval(tc)
+                    approval_id = self._queue_approval(tc, persona=persona)
                     pending_approvals.append({
                         "approval_id": approval_id,
                         "tool": tc.name,
@@ -606,18 +626,25 @@ class AgentRunner:
 
         # Hit iteration cap
         logger.warning("AgentRunner hit MAX_ITERATIONS=%d for user_id=%s", MAX_ITERATIONS, self.user_id)
-        return {
-            "response": (
-                "I've completed the available steps. Here's what was done:\n"
-                + "\n".join(f"- {a['message']}" for a in actions_taken)
-                if actions_taken
-                else "I reached the action limit without completing all steps. Please try again with a simpler request."
-            ),
-            "actions_taken": actions_taken,
-            "required_actions": required_actions,
-            "pending_approvals": pending_approvals,
-            "sources": sources,
-        }
+        return self._finalize(
+            {
+                "response": (
+                    "I've completed the available steps. Here's what was done:\n"
+                    + "\n".join(f"- {a['message']}" for a in actions_taken)
+                    if actions_taken
+                    else "I reached the action limit without completing all steps. Please try again with a simpler request."
+                ),
+                "actions_taken": actions_taken,
+                "required_actions": required_actions,
+                "pending_approvals": pending_approvals,
+                "sources": sources,
+            },
+            user_message=user_message,
+            domain=domain,
+            context=context,
+            persona=persona,
+            model_used=model,
+        )
 
     # ------------------------------------------------------------------ #
     # System prompt construction                                           #
@@ -1034,27 +1061,35 @@ class AgentRunner:
             return True
         return False
 
-    def _queue_approval(self, tc: "ToolCall") -> int:
+    def _queue_approval(self, tc: "ToolCall", persona: Optional[str] = None) -> int:
         """Write a pending AIChatCRUDApproval record and return its ID."""
-        from datetime import datetime, timedelta
-        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
-        from app import db
+        from app.modules.ai_chat.services.ai_chat_approval_service import (
+            _load_acting_user,
+            create_approval_record,
+        )
 
-        record = AIChatCRUDApproval(
-            user_id=self.user_id,
+        # Consolidation: routed through the one writer of ai_chat_crud_approvals
+        # instead of constructing the row directly, which left organization_id
+        # NULL here (invisible to every organisation-scoped query and to
+        # escalate_overdue_approvals). _load_acting_user, not User.query.get():
+        # the agent runner loops over tenants inside one session, and get()
+        # returning an identity-map hit from a different organisation's turn
+        # would bypass the tenant filter entirely.
+        actor = _load_acting_user(self.user_id)
+        approval = create_approval_record(
+            organization_id=actor.organization_id if actor else None,
             operation_type="tool_use",
             entity_type=tc.name,
             original_command=tc.name,
-            operation_payload=json.dumps(tc.arguments),
+            operation_payload=tc.arguments,
             summary=self._approval_summary(tc),
-            status=ApprovalStatus.PENDING,
-            expires_at=datetime.utcnow() + timedelta(hours=24),
+            user_id=self.user_id,
             chat_session_id=self.chat_session_id,
             agent_turn_id=self._turn_id,
+            expiry_minutes=24 * 60,  # unchanged: this caller's own 24h window
+            persona=persona,
         )
-        db.session.add(record)
-        db.session.commit()
-        return record.id
+        return approval.id
 
     # Human-readable business-term label for a tool name, used by the generic
     # fallback in _approval_summary below (ARCH-023). Kept separate from the
@@ -1144,8 +1179,126 @@ class AgentRunner:
             "error": reason,
         }
 
+    def _record_run(
+        self,
+        persona: Optional[str],
+        domain: str,
+        user_message: str,
+        context: Optional[dict],
+        actions_taken: list,
+        pending_approvals: list,
+        sources: list,
+        outcome: str,
+        success: bool,
+        model_used: Optional[str] = None,
+    ) -> Optional[str]:
+        """Write one AgentRunRecord for this agent invocation.
+        
+        Returns None on success, or an error string if the record could not be
+        written. The caller (``_finalize``) surfaces this in the result dict so
+        the caller can act on it instead of silently losing the record.
+        """
+        try:
+            from flask import g, has_request_context
+
+            from app.models.agent_charter import AgentCharter
+            from app.models.agent_run_record import AgentRunRecord
+
+            org_id = None
+            if has_request_context():
+                org_id = getattr(g, "current_org_id", None)
+            if org_id is None:
+                from sqlalchemy import text
+
+                from app import db as _ra_db
+                row = _ra_db.session.execute(
+                    text("SELECT organization_id FROM users WHERE id = :uid"),
+                    {"uid": self.user_id},
+                ).fetchone()
+                org_id = int(row[0]) if row and row[0] else None
+            if org_id is None:
+                return
+
+            charter_version = None
+            if persona:
+                charter = AgentCharter.current_for(persona, org_id)
+                if charter:
+                    charter_version = charter.version
+
+            record = AgentRunRecord(
+                organization_id=org_id,
+                user_id=self.user_id,
+                persona=persona,
+                charter_version=charter_version,
+                inputs={
+                    "user_message": user_message,
+                    "domain": domain,
+                    "context": context,
+                },
+                tools_called=[
+                    {
+                        "tool": a["tool"],
+                        "arguments": a.get("arguments"),
+                        "result": a.get("result"),
+                        "mutates": a.get("mutates"),
+                    }
+                    for a in actions_taken
+                ] if actions_taken else None,
+                records_read=[
+                    {"type": s["type"], "id": s["id"], "name": s["name"]}
+                    for s in (sources or [])
+                ] if sources else None,
+                proposals=[
+                    {
+                        "approval_id": p["approval_id"],
+                        "tool": p["tool"],
+                        "summary": p.get("summary"),
+                    }
+                    for p in pending_approvals
+                ] if pending_approvals else None,
+                outcome=outcome,
+                success=success,
+                domain=domain,
+                model_used=model_used,
+            )
+            from app import db as _rr_db
+            _rr_db.session.add(record)
+            _rr_db.session.commit()
+            return None
+        except Exception:
+            logger.warning("AgentRunner: failed to write run record", exc_info=True)
+            return "Run record could not be written — the run completed but was not recorded"
+
+    def _finalize(
+        self,
+        result: dict,
+        user_message: str,
+        domain: str,
+        context: Optional[dict],
+        persona: Optional[str],
+        model_used: Optional[str] = None,
+    ) -> dict:
+        """Record the run and return the result dict."""
+        record_error = self._record_run(
+            persona=persona,
+            domain=domain,
+            user_message=user_message,
+            context=context,
+            actions_taken=result.get("actions_taken", []),
+            pending_approvals=result.get("pending_approvals", []),
+            sources=result.get("sources", []),
+            outcome=result.get("response", result.get("error", "")),
+            success=not result.get("error"),
+            model_used=model_used,
+        )
+        if record_error:
+            result["run_record_error"] = record_error
+        return result
+
     def _text_only_fallback(
-        self, message: str, system_prompt: str, provider: str, model: str, api_key: str, LLMService
+        self, message: str, system_prompt: str, provider: str, model: str, api_key: str, LLMService,
+        user_message: str = "", domain: str = "general", context: Optional[dict] = None,
+        persona: Optional[str] = None,
     ) -> dict:
         """Run a plain text call (no tools) for unsupported providers."""
         try:
@@ -1153,10 +1306,23 @@ class AgentRunner:
             text, _ = LLMService._call_llm_with_failover(
                 prompt=prompt, model=model, provider=provider
             )
-            return {
-                "response": text,
-                "actions_taken": [],
-                "pending_approvals": [],
-            }
+            return self._finalize(
+                {
+                    "response": text,
+                    "actions_taken": [],
+                    "pending_approvals": [],
+                },
+                user_message=user_message or message,
+                domain=domain,
+                context=context,
+                persona=persona,
+                model_used=model,
+            )
         except Exception as e:
-            return self._fallback(str(e))
+            return self._finalize(
+                self._fallback(str(e)),
+                user_message=user_message or message,
+                domain=domain,
+                context=context,
+                persona=persona,
+            )

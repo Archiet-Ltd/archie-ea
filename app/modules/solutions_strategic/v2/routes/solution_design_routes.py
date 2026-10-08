@@ -56,6 +56,7 @@ from app.models.solution_sad_models import SolutionADRDirect, SolutionAPQCProces
 from app.models.solution_governance import SolutionNotification
 from app.jobs.tenant_safe_job import tenant_scope
 from app.models.solution_models import Solution
+from app.utils.tenant_users import escape_like_literal
 from app.utils.route_guards import require_entity
 from app.services.feature_flag_service import FeatureFlagService
 from app.utils.pagination import safe_int_arg
@@ -1082,7 +1083,7 @@ def list_solutions():
 
         # PLT-019: Apply BU domain scope filter
         if bu_filter_active and not show_all_override and bu_name:
-            _safe_bu = bu_name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            _safe_bu = escape_like_literal(bu_name)
             query = query.filter(
                 Solution.business_domain.ilike(f"%{_safe_bu}%", escape="\\")
             )
@@ -1104,7 +1105,7 @@ def list_solutions():
 
         # Apply search filter (escape LIKE wildcards to prevent injection)
         if search:
-            safe_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            safe_search = escape_like_literal(search)
             query = query.filter(
                 or_(
                     Solution.name.ilike(f"%{safe_search}%", escape="\\"),
@@ -5128,6 +5129,22 @@ def _engine_archimate_cleanup(solution_ids):
         _sp_exe(f"DELETE FROM archimate_contracts      WHERE model_id           IN ({mids_str})")
         _sp_exe(f"DELETE FROM archimate_representations WHERE model_id          IN ({mids_str})")
         _sp_exe(f"DELETE FROM archimate_resources       WHERE model_id          IN ({mids_str})")
+        # This is a full solution teardown, so the paired canonical row goes
+        # with its source ADR record rather than being left dangling. Three
+        # steps, in order: architecture_decision_records.retired_into_id is a
+        # plain (NO ACTION) FK into architecture_decisions, so deleting the
+        # parent row first raises ForeignKeyViolation while a child still
+        # points at it -- break the link first (capturing the ids into a
+        # temp table, since the UPDATE below would otherwise lose them
+        # before the next statement can read them back), then delete the
+        # now-unreferenced canonical rows, then the source rows.
+        _sp_exe("CREATE TEMP TABLE IF NOT EXISTS _teardown_canonical_ids (id integer) ON COMMIT DROP")
+        _sp_exe(f"INSERT INTO _teardown_canonical_ids "
+                f"SELECT retired_into_id FROM architecture_decision_records "
+                f"WHERE architecture_model_id IN ({mids_str}) AND retired_into_id IS NOT NULL")
+        _sp_exe(f"UPDATE architecture_decision_records SET retired_into_id = NULL "
+                f"WHERE architecture_model_id IN ({mids_str})")
+        _sp_exe("DELETE FROM architecture_decisions WHERE id IN (SELECT id FROM _teardown_canonical_ids)")
         _sp_exe(f"DELETE FROM architecture_decision_records WHERE architecture_model_id IN ({mids_str})")
         _sp_exe(f"DELETE FROM business_collaborations   WHERE model_id          IN ({mids_str})")
         _sp_exe(f"DELETE FROM business_interactions     WHERE model_id          IN ({mids_str})")

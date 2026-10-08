@@ -18,12 +18,15 @@ from datetime import date
 from typing import Any, Dict, List, Optional
 
 from app import db
+from app.services.application_cost_accessor import get_annual_cost
 
 
 # The fields that a well-governed application record should carry. Weighted so
 # the score reflects decision-relevance, not just field count: ownership, cost,
 # criticality and lifecycle matter more to a portfolio decision than a support
 # URL. This is the rubric the completeness ring is scored against.
+# Cost is checked via the accessor (get_annual_cost) rather than a direct
+# attribute, so the single accessor principle is upheld.
 _COMPLETENESS_FIELDS = [
     ("application_owner", "Owner", 3),
     ("business_domain", "Business domain", 2),
@@ -38,6 +41,11 @@ _COMPLETENESS_FIELDS = [
     ("description", "Description", 1),
 ]
 
+
+def _has_cost_value(app: Any) -> bool:
+    """Check if the application has a recorded annual cost via the accessor."""
+    return get_annual_cost(app) is not None
+
 # Lifecycle stages we treat as "sunset" for the end-of-life signal.
 _SUNSET_STAGES = {"retiring", "sunset", "decommissioning", "end_of_life",
                   "end-of-life", "deprecated", "retire"}
@@ -51,14 +59,40 @@ def _has_value(v: Any) -> bool:
     return True
 
 
-def compute_completeness(app: Any) -> Dict[str, Any]:
-    """Weighted % of key fields populated, plus the list of what is missing."""
+def _owner_count(app_id: int, org_id: int) -> int:
+    """Read ApplicationOwner rows for *app_id* in the given organisation."""
+    from app.models.application_owner import ApplicationOwner
+    return ApplicationOwner.query.filter(
+        ApplicationOwner.application_id == app_id,
+        ApplicationOwner.organization_id == org_id,
+    ).count()
+
+
+def compute_completeness(app: Any, owner_count: Optional[int] = None) -> Dict[str, Any]:
+    """Weighted % of key fields populated, plus the list of what is missing.
+
+    The "Owner" field is considered populated when there is at least one
+    ApplicationOwner row for this application, regardless of the legacy
+    text column.
+    """
+    org_id = getattr(app, "organization_id", None)
     got = 0
     total = 0
     missing: List[str] = []
+    owner_count = owner_count if owner_count is not None else (_owner_count(app.id, org_id) if org_id else 0)
     for attr, label, weight in _COMPLETENESS_FIELDS:
         total += weight
-        if _has_value(getattr(app, attr, None)):
+        if attr == "application_owner":
+            if owner_count > 0:
+                got += weight
+            else:
+                missing.append(label)
+        elif attr == "total_cost_of_ownership":
+            if _has_cost_value(app):
+                got += weight
+            else:
+                missing.append(label)
+        elif _has_value(getattr(app, attr, None)):
             got += weight
         else:
             missing.append(label)
@@ -104,6 +138,7 @@ def _capabilities(app_id: int, org_id: Optional[int]) -> List[Dict[str, Any]]:
     # ApplicationCapabilityMapping carries organization_id but does NOT inherit
     # TenantMixin, so do_orm_execute injects no tenant predicate — it must be
     # scoped by hand or the join reads every organisation's mappings.
+
     if org_id is None:
         raise ValueError(
             "application has no organization_id; refusing to run an unscoped "
@@ -165,11 +200,11 @@ def _diagrams(app: Any) -> List[Dict[str, Any]]:
     el_id = getattr(app, "archimate_element_id", None)
     if not el_id:
         return []
-    # Unguarded for the same reason as _capabilities: an import failure here is a
-    # defect, and returning [] would read on the page as "appears in no diagrams".
     from app.models.archimate_core import (  # noqa: PLC0415
         SavedDiagram, SavedDiagramElement,
     )
+    # Unguarded for the same reason as _capabilities: an import failure here is a
+    # defect, and returning [] would read on the page as "appears in no diagrams".
     q = (db.session.query(SavedDiagram)
          .join(SavedDiagramElement, SavedDiagramElement.diagram_id == SavedDiagram.id)
          .filter(SavedDiagramElement.element_id == el_id).distinct())
@@ -178,23 +213,31 @@ def _diagrams(app: Any) -> List[Dict[str, Any]]:
 
 
 def _linked_risks(app_id: int) -> List[Dict[str, Any]]:
-    """H1: risks mapped to this application via the Risk Register's
+    """Risks mapped to this application via the Risk Register's
     "Map to…" picker (RiskEntityLink). Import deferred to avoid a module-load
     cycle (risk_service imports app.services.archimate_backbone)."""
     from app.services.risk_service import links_for_entity
-
     return links_for_entity("application", app_id)
 
 
 def build_fact_sheet(app: Any) -> Dict[str, Any]:
     """Assemble the full fact sheet for one ApplicationComponent instance."""
     org_id = getattr(app, "organization_id", None)
+    annual_cost = get_annual_cost(app)
+    license_cost = getattr(app, "license_cost_annual", None)
+    from app.models.application_owner import ApplicationOwner  # noqa: PLC0415
+
+    application_owners = ApplicationOwner.get_display_rows_for_application(app.id, org_id) if org_id else []
+
     return {
         "app": app,
-        "completeness": compute_completeness(app),
+        "completeness": compute_completeness(app, owner_count=len(application_owners)),
         "lifecycle": _lifecycle_signal(app),
         "capabilities": _capabilities(app.id, org_id),
         "dependencies": _dependencies(app),
         "diagrams": _diagrams(app),
         "linked_risks": _linked_risks(app.id),
+        "annual_cost_formatted": ('{:,.0f}'.format(annual_cost) if annual_cost is not None else '—'),
+        "license_cost_formatted": ('{:,.0f}'.format(license_cost) if license_cost is not None else '—'),
+        "application_owners": application_owners,
     }
