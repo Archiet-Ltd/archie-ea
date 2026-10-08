@@ -40,7 +40,7 @@ governance — as one open-source product, self-hostable, built specifically on 
 | Vendor | Bizzdesign (following the 2024 merger with MEGA and Alfabet) | Archiet Ltd |
 | Licence | Proprietary | Open source, AGPL, plus a commercial licence |
 | Self-hostable | Not stated on the vendor's own product page | Yes |
-| Pricing | Not published on the vendor's product page | Not published; free to self-host under AGPL |
+| Pricing | Not published on the vendor's product page | Published at /pricing; free to self-host under AGPL |
 | Disciplines | Enterprise Architecture, Application Portfolio Management, Technology Portfolio Management, Business Process Management, Data Management, Governance/Risk/Compliance | Modelling, application portfolio, business case, governance — one product |
 | Modelling notation | Not stated on the vendor's product page | ArchiMate 3.2, specifically |
 

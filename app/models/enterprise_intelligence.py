@@ -208,6 +208,15 @@ class ApplicationOwnership(TenantMixin, db.Model):
 
     notes = db.Column(db.Text)
 
+    # Consolidation: points to the ApplicationOwner row this record was
+    # merged into during backfill
+    retired_into_id = db.Column(
+        db.Integer,
+        db.ForeignKey("application_owners.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -259,7 +268,10 @@ class ApplicationUsage(db.Model):
 
 class ApplicationCost(db.Model):
     """
-    Financial tracking for applications - TCO, licensing, support costs
+    RETIRED — The annual cost of an application is now stored in
+    ApplicationComponent.total_cost_of_ownership and accessed through
+    app.services.application_cost_accessor.get_annual_cost().
+    This table exists for historical data only; no new writes arrive here.
     """
 
     __tablename__ = "application_costs"

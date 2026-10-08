@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S4-02, segment: S4}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Industry Reference Frameworks
@@ -21,7 +22,7 @@ and adapt it — a running start for anyone who's never modelled their business 
 
 ## Where you'll meet it
 
-- [Set it up from our spreadsheet in an afternoon](/services-ops/set-up-in-an-afternoon)
+- [Set it up from our spreadsheet in an afternoon](/use-cases/set-up-in-an-afternoon)
 
 ## Related modules
 

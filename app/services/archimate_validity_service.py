@@ -505,6 +505,42 @@ class ArchimateValidityService:
                 "description": f"{source_type} realises {target_type}",
             })
 
+        # Active -> Active (same layer): Serving, Triggering, Flow.
+        # ArchiMate 3.2 Appendix B permits the dynamic and dependency
+        # relationships between active structure elements of one layer (an
+        # application component serving, triggering or passing data to another,
+        # an interface serving the component that uses it) -- the basis of the
+        # Application Cooperation viewpoint. The Appendix B table in
+        # app/config/archimate_relationship_matrix.py already lists them; without
+        # this rule the Composer refused the most common application-landscape
+        # connection there is.
+        if src_aspect == "active" and tgt_aspect == "active":
+            results.append({
+                "type": "serving",
+                "tier": "standard",
+                "description": f"{source_type} serves {target_type}",
+            })
+            results.append({
+                "type": "flow",
+                "tier": "standard",
+                "description": f"Transfer of data from {source_type} to {target_type}",
+            })
+            results.append({
+                "type": "triggering",
+                "tier": "standard",
+                "description": f"{source_type} triggers {target_type}",
+            })
+
+        # Behaviour -> Active: Serving. A service serves the active structure
+        # element that uses it (ArchiMate 3.2 §5.4.1, e.g. an application
+        # service serves an application component).
+        if src_aspect == "behaviour" and tgt_aspect == "active":
+            results.append({
+                "type": "serving",
+                "tier": "standard",
+                "description": f"{source_type} serves {target_type}",
+            })
+
         # CMP-060: active→behaviour realization (ArchiMate 3.2 §5.3.1)
         # An active structure element can realize a behaviour element of the same layer
         # (e.g. ApplicationComponent realizes ApplicationService,

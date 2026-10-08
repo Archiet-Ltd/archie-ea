@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ast
 import uuid
+from pathlib import Path
 
 import pytest
 from sqlalchemy import Column, Integer, String, Table, create_engine, inspect, text
@@ -182,6 +184,57 @@ def test_existing_schema_reconciles_additive_columns_idempotently(app, _schema):
         with app.app_context(), db.engine.begin() as connection:
             connection.execute(text(f'DROP TABLE IF EXISTS "{table_name}"'))
         db.metadata.remove(model_table)
+
+
+@pytest.mark.timeout(60)
+def test_reconcile_reflects_full_schema_without_one_connection_per_table(app, _schema):
+    """Regression: reconciling the whole mapped schema used to hang.
+
+    `_reconcile` used to build its top-level Inspector from `db.engine`, and
+    then call `get_columns()` with it once per table in `db.metadata.tables`
+    across two full passes (the NOT-NULL drift scan, then the ADD COLUMN
+    scan). `db.engine.connect()` opens a brand-new physical connection every
+    time it's called, and the test suite's engine is configured with
+    `NullPool` (every checkout is a fresh connect, nothing stays pooled), so
+    on the ~800-table model that was roughly 1,600 extra physical
+    PostgreSQL connections for one `_reconcile()` call. That turned a merely
+    slow operation into something that blew straight through a 90 second
+    test timeout - the failure mode reported against this file - rather than
+    completing (if slowly).
+
+    The fix reflects off `db.session`'s own already-open connection instead,
+    so this counts how many *new* physical connections a single dry-run
+    reconciliation opens and asserts it stays in the range the remaining,
+    untouched single-table call sites in this module account for (measured
+    at roughly 100-115 on the current model) rather than regressing back
+    into the thousands. The `@pytest.mark.timeout` above is a second,
+    independent signal: a real regression would not finish inside it.
+    """
+    from sqlalchemy import event
+
+    connect_count = {"n": 0}
+
+    def _count_connect(dbapi_connection, connection_record):  # noqa: ARG001
+        connect_count["n"] += 1
+
+    with app.app_context():
+        event.listen(db.engine, "connect", _count_connect)
+        try:
+            added, failed, _missing, _blocking = _reconcile(dry_run=True)
+            assert failed == []
+            assert added is not None  # a real result, not a short-circuited no-op
+        finally:
+            event.remove(db.engine, "connect", _count_connect)
+
+    assert connect_count["n"] < 300, (
+        f"reconcile-schema opened {connect_count['n']} new physical "
+        "connections during a single dry run over the full schema - that is "
+        "in the range a per-table inspect(db.engine) reflection call would "
+        "produce again (roughly 1,600+ on this model), not the ~100-115 the "
+        "remaining single-table call sites account for. See the fix for "
+        "PR132's inspect(db.engine) deadlock/connection-churn pattern in "
+        "_reconcile()."
+    )
 
 
 def test_existing_command_table_is_upgraded_before_new_guarded_tables(
@@ -529,20 +582,28 @@ def test_task9_history_tables_and_dropped_triggers_reconcile_idempotently(
             connection.execute(
                 text(
                     "INSERT INTO work_packages (id, name, organization_id) "
-                    "VALUES (901, 'Task 9 guarded work', 1); "
+                    "VALUES (901, 'Task 9 guarded work', 1)"
+                )
+            )
+            connection.execute(
+                text(
                     "INSERT INTO delivery_export_attempts "
                     "(id, organization_id, work_package_id, provider_key, attempt_key, "
                     " request_json, status, error_class, error_message, attempted_by_id, "
                     " completed_at) VALUES "
                     "(902, 1, 901, 'delivery', :attempt_key, '{}'::json, 'failed', "
-                    " 'ConnectionError', 'unavailable', 1, clock_timestamp()); "
+                    " 'ConnectionError', 'unavailable', 1, clock_timestamp())"
+                ),
+                {"attempt_key": "9" * 64},
+            )
+            connection.execute(
+                text(
                     "INSERT INTO outcome_measurements "
                     "(id, organization_id, benefit_id, value, observed_at, "
                     " source_identity, source_version, recorded_by_id) VALUES "
                     "(903, 1, 200, 1.000000, clock_timestamp(), "
                     " 'ledger:run-cost', 'v1', 1)"
-                ),
-                {"attempt_key": "9" * 64},
+                )
             )
             with pytest.raises(Exception, match="completed delivery export attempts"):
                 with connection.begin_nested():
@@ -617,20 +678,28 @@ def test_task9_history_guard_definition_drift_is_detected_and_repaired(
             connection.execute(
                 text(
                     "INSERT INTO work_packages (id, name, organization_id) "
-                    "VALUES (911, 'Task 9 definition guarded work', 1); "
+                    "VALUES (911, 'Task 9 definition guarded work', 1)"
+                )
+            )
+            connection.execute(
+                text(
                     "INSERT INTO delivery_export_attempts "
                     "(id, organization_id, work_package_id, provider_key, attempt_key, "
                     " request_json, status, error_class, error_message, attempted_by_id, "
                     " completed_at) VALUES "
                     "(912, 1, 911, 'delivery', :attempt_key, '{}'::json, 'failed', "
-                    " 'ConnectionError', 'unavailable', 1, clock_timestamp()); "
+                    " 'ConnectionError', 'unavailable', 1, clock_timestamp())"
+                ),
+                {"attempt_key": "8" * 64},
+            )
+            connection.execute(
+                text(
                     "INSERT INTO outcome_measurements "
                     "(id, organization_id, benefit_id, value, observed_at, "
                     " source_identity, source_version, recorded_by_id) VALUES "
                     "(913, 1, 200, 1.000000, clock_timestamp(), "
                     " 'ledger:run-cost', 'v1', 1)"
-                ),
-                {"attempt_key": "8" * 64},
+                )
             )
             with pytest.raises(Exception, match="completed delivery export attempts"):
                 with connection.begin_nested():
@@ -650,9 +719,59 @@ def test_task9_history_guard_definition_drift_is_detected_and_repaired(
                     )
 
 
-def test_genuine_pre_feature_schema_backfills_roadmap_and_repairs_delivery_fks(
+def _task9_parameterized_multicommand_execute_sites():
+    source = Path(__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    target_tests = {
+        "test_task9_history_tables_and_dropped_triggers_reconcile_idempotently",
+        "test_task9_history_guard_definition_drift_is_detected_and_repaired",
+    }
+
+    offenders = []
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name not in target_tests:
+            continue
+        for descendant in ast.walk(node):
+            if not isinstance(descendant, ast.Call):
+                continue
+            if not (
+                isinstance(descendant.func, ast.Attribute)
+                and descendant.func.attr == "execute"
+                and descendant.args
+            ):
+                continue
+            sql_call = descendant.args[0]
+            if not (
+                isinstance(sql_call, ast.Call)
+                and isinstance(sql_call.func, ast.Name)
+                and sql_call.func.id == "text"
+                and sql_call.args
+                and isinstance(sql_call.args[0], ast.Constant)
+                and isinstance(sql_call.args[0].value, str)
+            ):
+                continue
+            sql_text = sql_call.args[0].value
+            has_parameters = len(descendant.args) > 1 or bool(descendant.keywords)
+            if has_parameters and ";" in sql_text:
+                offenders.append(f"{node.name}:{descendant.lineno}")
+    return offenders
+
+
+def test_task9_regression_avoids_parameterized_multicommand_sql_blocks():
+    """Parameterized multi-command SQL breaks prepared execution on psycopg v3."""
+    assert _task9_parameterized_multicommand_execute_sites() == []
+
+
+def test_genuine_pre_feature_schema_adds_the_roadmap_tenant_column_and_repairs_delivery_fks(
     app, pre_feature_transformation_schema
 ):
+    """reconcile-schema adds the nullable organization_id column it finds
+    missing and reports that addition -- it does not write a row's tenant
+    value. That row-level backfill is ``flask backfill-layer-tenancy``'s job
+    alone (app/commands/backfill_layer_tenancy.py), per the single-write-path
+    consolidation: a schema run must never fail the deploy over a tenant row
+    it did not, itself, create.
+    """
     _schema_name, isolated_engine = pre_feature_transformation_schema
     with app.app_context():
         dry_added, dry_failed, _missing, _blocking = _reconcile(dry_run=True)
@@ -680,16 +799,15 @@ def test_genuine_pre_feature_schema_backfills_roadmap_and_repairs_delivery_fks(
 
         first_added, first_failed, _missing, _blocking = _reconcile(dry_run=False)
         assert first_failed == []
-        assert (
-            "backfill.strategic_roadmap_items.organization_id "
-            ":: before=1, updated=1, unresolved=0, conflicts=0"
-        ) in first_added
+        assert not any(
+            item.startswith("backfill.strategic_roadmap_items") for item in first_added
+        )
 
         with isolated_engine.connect() as connection:
             roadmap_org = connection.scalar(
                 text("SELECT organization_id FROM strategic_roadmap_items WHERE id = 100")
             )
-            assert roadmap_org == 1
+            assert roadmap_org is None
             benefit_fk = connection.execute(
                 text(
                     """
@@ -718,9 +836,15 @@ def test_genuine_pre_feature_schema_backfills_roadmap_and_repairs_delivery_fks(
         assert not any(item.startswith("backfill.strategic_roadmap_items") for item in second_added)
 
 
-def test_pre_feature_roadmap_without_tenant_provenance_is_reported_not_guessed(
+def test_pre_feature_roadmap_without_tenant_provenance_is_left_for_the_backfill_command(
     app, pre_feature_transformation_schema
 ):
+    """An unprovenanced roadmap row is not reconcile-schema's to resolve or
+    report on: it leaves the row exactly as it found it (nullable column,
+    NULL value) with no failure recorded, so ``flask backfill-layer-tenancy``
+    -- the one place allowed to write organization_id on an existing row --
+    is the only thing that assigns or defers it.
+    """
     _schema_name, isolated_engine = pre_feature_transformation_schema
     with app.app_context():
         _added, failed, _missing, _blocking = _reconcile(dry_run=False)
@@ -737,14 +861,8 @@ def test_pre_feature_roadmap_without_tenant_provenance_is_reported_not_guessed(
             )
 
         added, failed, _missing, _blocking = _reconcile(dry_run=False)
-        assert any(
-            item == (
-                "backfill.strategic_roadmap_items.organization_id "
-                ":: before=1, updated=0, unresolved=1, conflicts=0"
-            )
-            for item in added
-        )
-        assert any("1 unresolved row(s)" in item for item in failed)
+        assert not any(item.startswith("backfill.strategic_roadmap_items") for item in added)
+        assert failed == []
         with isolated_engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT organization_id FROM strategic_roadmap_items WHERE id = 101")

@@ -130,19 +130,27 @@ def init_security(app):
         # and blocks Alpine.js/Lucide/DOMPurify which are loaded from unpkg/jsdelivr without nonces.
         from flask import current_app as _app
 
+        # Conditionally add GA4/Clarity hosts to CSP when configured
+        _ga4_hosts = ""
+        _clarity_hosts = ""
+        if _app.config.get("GA4_MEASUREMENT_ID"):
+            _ga4_hosts = " https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com"
+        if _app.config.get("CLARITY_PROJECT_ID"):
+            _clarity_hosts = " https://www.clarity.ms https://c.bing.com"
+
         if _app.debug:
             csp_directives = [
                 "default-src 'self'",
                 "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
                 "https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
                 "https://d3js.org https://cdn.segment.com https://www.google-analytics.com "
-                "https://esm.sh",
+                "https://esm.sh" + _ga4_hosts + _clarity_hosts,
                 "style-src 'self' 'unsafe-inline' "
                 "https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
                 "https://fonts.googleapis.com",
                 "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net",
-                "connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://cdn.segment.com https://www.google-analytics.com https://esm.sh ws://localhost:* wss://localhost:*",
-                "img-src 'self' data: blob: https://api.qrserver.com",
+                "connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://cdn.segment.com https://www.google-analytics.com https://esm.sh ws://localhost:* wss://localhost:*" + _ga4_hosts + _clarity_hosts,
+                "img-src 'self' data: blob: https://api.qrserver.com" + _ga4_hosts + _clarity_hosts,
                 "frame-src 'self' https://snack.expo.dev",
                 "object-src 'none'",
                 "report-uri /api/csp-report",
@@ -206,7 +214,7 @@ def init_security(app):
                 # CodeMirror loads as ES modules from esm.sh (no eval), so nothing
                 # else on the write surface needs the directive either.
                 f"script-src 'self' 'nonce-{nonce}' 'strict-dynamic' "
-                "https://esm.sh",  # CodeMirror 6 ES module imports
+                "https://esm.sh" + _ga4_hosts + _clarity_hosts,  # CodeMirror 6 ES module imports
                 # ARCH-070. The blanket style-src 'unsafe-inline' is gone,
                 # split into the two directives it was conflating:
                 #
@@ -235,8 +243,8 @@ def init_security(app):
                 f"style-src-elem 'self' 'nonce-{nonce}' https://fonts.googleapis.com",
                 "style-src-attr 'unsafe-inline'",
                 "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com",
-                "connect-src 'self' https://esm.sh",  # CodeMirror 6 ES module imports
-                "img-src 'self' data: blob: https://api.qrserver.com",
+                "connect-src 'self' https://esm.sh" + _ga4_hosts + _clarity_hosts,  # CodeMirror 6 ES module imports
+                "img-src 'self' data: blob: https://api.qrserver.com" + _ga4_hosts + _clarity_hosts,
                 "frame-src 'self' https://snack.expo.dev",
                 "object-src 'none'",
                 "base-uri 'self'",     # stop <base> rewriting every relative URL
@@ -296,7 +304,7 @@ def init_security(app):
         return response
 
     # Wire MetricsCollector to request pipeline for automatic tracking, and
-    # (TB-0165) the same request into the Prometheus HTTP counters that
+    # the same request into the Prometheus HTTP counters that
     # app/services/platform_slo_service.py reads -- one collector recording
     # every request, not two (CLAUDE.md ADR 0008).
     try:

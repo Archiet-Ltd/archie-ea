@@ -22,9 +22,10 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
-from flask import render_template
+from flask import render_template, url_for
 
 
 # The families DESIGN.md bans outright, plus the four the typed ARB blueprint
@@ -389,9 +390,12 @@ def test_typed_queue_partial_renders_no_header_breadcrumb_or_h1(app):
     assert 'aria-label="Breadcrumb"' not in body
 
 
-def test_review_and_queue_templates_are_dispatchers_with_one_header_each(app):
-    """The dispatchers must not render both branches, which would duplicate the
-    wrapper, the breadcrumb and the <h1>."""
+def test_review_and_queue_templates_render_one_header_and_no_legacy_dispatch(app):
+    """The templates must not render more than one wrapper/breadcrumb/<h1>, and
+    the typed/legacy dispatch this once guarded has been removed entirely: the
+    typed workspace and typed queue are now the only code path, so there is no
+    second branch left to duplicate the header, and the legacy partials these
+    templates used to fall through into no longer exist to be referenced."""
     source_review = app.jinja_env.loader.get_source(app.jinja_env, "arb/review_detail.html")[0]
     source_queue = app.jinja_env.loader.get_source(app.jinja_env, "arb/dashboard.html")[0]
 
@@ -399,11 +403,11 @@ def test_review_and_queue_templates_are_dispatchers_with_one_header_each(app):
     for source in (source_review, source_queue):
         code = strip_comments.sub("", source)
         assert code.count("page_header(") == 1
-        assert "{% if _typed %}" in code or "{% if not _typed %}" in code
+        assert "{% if _typed %}" not in code and "{% if not _typed %}" not in code
 
-    # The typed branch never falls through into the legacy body.
-    assert "arb/partials/_legacy_review_detail.html" in source_review
-    assert "arb/partials/_legacy_dashboard.html" in source_queue
+    # The legacy dispatch and its partials are gone, not merely unreached.
+    assert "arb/partials/_legacy_review_detail.html" not in source_review
+    assert "arb/partials/_legacy_dashboard.html" not in source_queue
 
 
 # --------------------------------------------------------------------------
@@ -561,6 +565,56 @@ def test_missing_canonical_url_does_not_render_a_dead_link(app):
 
     assert "Open subject" not in body
     assert "No canonical subject link is recorded" in body
+
+
+# --------------------------------------------------------------------------
+# Linked-solution card: the restored "View Solution" capability
+# --------------------------------------------------------------------------
+
+def test_solution_subject_review_renders_view_solution_link(app):
+    """A review backed by `_orm_review.solution` links to the live Solution row.
+
+    `_orm_review` is the ORM review arb/review_detail.html captures before
+    rebinding `review` to the typed read-model mapping; `.solution` is the
+    same direct relationship the dead legacy template read.
+    """
+    orm_review = SimpleNamespace(
+        solution=SimpleNamespace(id=42, name="Unified Billing Platform")
+    )
+    body = _render(
+        app,
+        "arb/partials/_typed_review_workspace.html",
+        review=available_review(),
+        decision_action_url="/arb/reviews/7/decision",
+        _orm_review=orm_review,
+    )
+
+    assert "View Solution" in body
+    assert "Unified Billing Platform" in body
+    with app.test_request_context("/arb/"):
+        expected_url = url_for("solution_design.view_solution", solution_id=42)
+    assert expected_url in body
+
+
+def test_review_with_no_linked_solution_renders_no_view_solution_link(app):
+    """No `_orm_review.solution` row means no View Solution link, not a dead one."""
+    orm_review = SimpleNamespace(solution=None)
+    body = _render(
+        app,
+        "arb/partials/_typed_review_workspace.html",
+        review=available_review(),
+        decision_action_url="/arb/reviews/7/decision",
+        _orm_review=orm_review,
+    )
+
+    assert "View Solution" not in body
+
+
+def test_review_body_without_orm_review_renders_no_view_solution_link(app):
+    """`_render_review_body` never passes `_orm_review`; this must not error."""
+    body = _render_review_body(app, available_review())
+
+    assert "View Solution" not in body
 
 
 # --------------------------------------------------------------------------

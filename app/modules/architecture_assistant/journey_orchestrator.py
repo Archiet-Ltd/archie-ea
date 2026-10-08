@@ -195,23 +195,139 @@ class JourneyOrchestrator:
     # ── Step 2: Capability Derivation ────────────────────────────────
 
     def derive_capabilities(self, problem_description: str, motivation_elements: list = None) -> dict:
-        """Step 2: Derive business capabilities + technical + application + compliance."""
-        from app.modules.architecture_assistant.capability_derivation import CapabilityDerivationService
-        svc = CapabilityDerivationService()
+        """Step 2: Derive business capabilities + technical + application + compliance.
+        
+        Capability derivation now reads directly from the canonical business-capability
+        store and the compliance requirement table, without the intermediate
+        CapabilityDerivationService which was a duplicate implementation.
+        """
+        from app.models.business_capabilities import BusinessCapability
+        from app.modules.solutions_strategic.v2.routes.solution_ai_routes import _match_against_catalog
 
-        result = svc.derive_business_capabilities(problem_description, motivation_elements)
-        return result
+        caps = BusinessCapability.query.order_by(BusinessCapability.name).all()
+        if not caps:
+            return {"capabilities": [], "gap_summary": ""}
 
-    def get_capability_details(self, capability_id: int, capability_name: str, business_domain: str = "") -> dict:
-        """Get technical caps, coverage gaps, compliance, and APQC links for one capability."""
-        from app.modules.architecture_assistant.capability_derivation import CapabilityDerivationService
-        svc = CapabilityDerivationService()
+        # Map capabilities into the shape the downstream JourneyOrchestrator expects
+        suggestions = [{"name": c.name, "id": c.id, "description": getattr(c, "description", "")} for c in caps]
+
+        try:
+            from app.modules.ai_chat.services.solution_ai_service import SolutionAIService
+            ai_service = SolutionAIService()
+            ai_result = ai_service.suggest_capabilities(
+                solution_description=problem_description,
+                existing_capabilities=[{"id": c.id, "name": c.name} for c in caps],
+                motivation_elements=motivation_elements,
+            )
+            if ai_result.get("success") and ai_result.get("capabilities"):
+                matched = _match_against_catalog(
+                    suggestions=ai_result["capabilities"],
+                    catalog_caps=caps,
+                    problem_brief=problem_description,
+                )
+                result = matched if isinstance(matched, dict) else {"capabilities": matched}
+                return result
+        except Exception:
+            pass
+        return {"capabilities": suggestions, "gap_summary": ""}
+
+    def get_capability_details(self, capability_id: int,
+                               capability_name: str,
+                               business_domain: str = "") -> dict:
+        """Get technical caps, coverage gaps, compliance, and APQC links for one capability.
+
+        Reads from the canonical stores directly instead of through the removed
+        CapabilityDerivationService.
+        """
+        from app.models.technical_capability import TechnicalCapability
+        from app.models.application_layer import ApplicationComponent
+        from app.models.business_capabilities import ApplicationCapabilityCoverage
+        from app.modules.ai_chat.services.solution_ai_service import _token_overlap
+
+        # Technical capabilities — ACM domain match
+        tech_caps = []
+        try:
+            all_tech = TechnicalCapability.query.order_by(TechnicalCapability.level_number).all()
+            for tc in all_tech:
+                overlap = _token_overlap(capability_name, getattr(tc, "name", ""))
+                if overlap >= 0.3:
+                    tech_caps.append({
+                        "id": tc.id,
+                        "name": tc.name,
+                        "acm_domain": getattr(tc, "acm_domain", ""),
+                        "level": getattr(tc, "level", None),
+                        "description": getattr(tc, "description", ""),
+                        "match_score": round(overlap, 2),
+                        "match_type": "exact" if overlap >= 0.7 else "partial",
+                        "source": "catalog",
+                    })
+            tech_caps.sort(key=lambda x: x["match_score"], reverse=True)
+            tech_caps = tech_caps[:10]
+        except Exception:
+            pass
+
+        # Coverage gaps
+        coverage = []
+        try:
+            rows = ApplicationCapabilityCoverage.query.filter_by(
+                capability_id=capability_id
+            ).order_by(ApplicationCapabilityCoverage.coverage_percentage.desc()).all()
+            app_ids = [c.application_component_id for c in rows]
+            apps = ApplicationComponent.query.filter(
+                ApplicationComponent.id.in_(app_ids)
+            ).all() if app_ids else []
+            apps_by_id = {a.id: a for a in apps}
+            coverage = [{
+                "application_id": c.application_component_id,
+                "application_name": (
+                    apps_by_id[c.application_component_id].name
+                    if c.application_component_id in apps_by_id
+                    else f"App {c.application_component_id}"
+                ),
+                "coverage_percentage": c.coverage_percentage,
+                "support_level": getattr(c, "support_level", None),
+                "is_strategic": getattr(c, "is_strategic", False),
+                "confidence_score": getattr(c, "confidence_score", None),
+            } for c in rows]
+        except Exception:
+            pass
+
+        # Compliance requirements
+        compliance = []
+        try:
+            from app.modules.architecture_assistant.services.compliance_service import (
+                query_compliance_requirements,
+            )
+            compliance = query_compliance_requirements(capability_id)
+        except Exception:
+            pass
+
+        # APQC links
+        apqc_processes = []
+        try:
+            from app.models.business_capabilities import BusinessCapability
+            all_caps = BusinessCapability.query.filter(
+                BusinessCapability.code.isnot(None)
+            ).all()
+            for cap in all_caps:
+                score = _token_overlap(capability_name, cap.name)
+                if score >= 0.5:
+                    apqc_processes.append({
+                        "id": cap.id,
+                        "name": cap.name,
+                        "code": getattr(cap, "code", ""),
+                        "match_score": round(score, 2),
+                    })
+            apqc_processes.sort(key=lambda x: x["match_score"], reverse=True)
+            apqc_processes = apqc_processes[:5]
+        except Exception:
+            pass
 
         return {
-            "technical_capabilities": svc.match_technical_capabilities(capability_name, business_domain),
-            "coverage": svc.get_coverage_gaps(capability_id),
-            "compliance": svc.get_compliance_requirements(capability_id),
-            "apqc_processes": svc.link_apqc_processes(capability_name, capability_id),
+            "technical_capabilities": tech_caps,
+            "coverage": coverage,
+            "compliance": compliance,
+            "apqc_processes": apqc_processes,
         }
 
     # ── Step 3: Architecture Generation ──────────────────────────────
@@ -608,7 +724,10 @@ class JourneyOrchestrator:
                                 acm_props["capability_source"] = {
                                     "value": el_data["capability_source"], "source": "derived"
                                 }
-                            proposal = SolutionBlueprintProposal(
+                            from app.services.solution_blueprint_service import (
+                                create_solution_blueprint_proposal,
+                            )
+                            proposal = create_solution_blueprint_proposal(
                                 solution_id=self.solution_id,
                                 archimate_type=el_type,
                                 name=el_name,
@@ -621,7 +740,6 @@ class JourneyOrchestrator:
                                 acm_properties=acm_props,
                                 organization_id=_org_id,
                             )
-                            db.session.add(proposal)
 
                         # Flush after each element so partial persistence works
                         db.session.flush()
@@ -707,8 +825,11 @@ class JourneyOrchestrator:
                                     ).first()
                                     if not _existing_proposal2:
                                         from app.modules.architecture_assistant.property_service import PropertyService
+                                        from app.services.solution_blueprint_service import (
+                                            create_solution_blueprint_proposal,
+                                        )
                                         _acm_props2 = PropertyService().get_default_properties(_gel_type)
-                                        _proposal2 = SolutionBlueprintProposal(
+                                        _proposal2 = create_solution_blueprint_proposal(
                                             solution_id=self.solution_id,
                                             archimate_type=_gel_type,
                                             name=_gel_name,
@@ -721,7 +842,6 @@ class JourneyOrchestrator:
                                             acm_properties=_acm_props2,
                                             organization_id=_org_id,
                                         )
-                                        db.session.add(_proposal2)
                                         _auto_accepted += 1
                                         persisted_by_layer.setdefault(_gl, []).append({
                                             "id": _el2.id, "type": _gel_type, "name": _gel_name,
@@ -1342,6 +1462,20 @@ class JourneyOrchestrator:
         if not element:
             return {"error": f"Element {element_id} not found"}
 
+        governed_values = None
+        if "acm_properties" in updates and isinstance(updates["acm_properties"], dict):
+            # The organisation's governed property definitions are checked
+            # before anything on the element changes: a refused value stores
+            # nothing, not even the other fields in the same patch.
+            from app.modules.architecture_assistant.property_service import GovernedPropertyService
+
+            governed_values, property_errors = GovernedPropertyService().validate_updates(
+                updates.get("type") or element.type, updates["acm_properties"],
+                organization_id=element.organization_id,
+            )
+            if property_errors:
+                return {"error": " ".join(property_errors), "property_errors": property_errors}
+
         old_name = element.name
         old_type = element.type
         if "name" in updates and updates["name"]:
@@ -1352,10 +1486,10 @@ class JourneyOrchestrator:
             element.type = updates["type"]
         if "layer" in updates and updates["layer"]:
             element.layer = updates["layer"]
-        if "acm_properties" in updates and isinstance(updates["acm_properties"], dict):
+        if governed_values is not None:
             # Merge patch — only update the provided keys
             existing = dict(element.acm_properties or {})
-            for key, val in updates["acm_properties"].items():
+            for key, val in governed_values.items():
                 existing[key] = {"value": val, "source": "user"}
             element.acm_properties = existing
 
@@ -2525,6 +2659,13 @@ class JourneyOrchestrator:
         proposal = SolutionBlueprintProposal.query.get(proposal_id)
         if not proposal:
             return {"error": "Proposal not found"}
+        from app.modules.architecture_assistant.property_service import GovernedPropertyService
+
+        properties, property_errors = GovernedPropertyService().validate_updates(
+            proposal.archimate_type, properties,
+        )
+        if property_errors:
+            return {"error": " ".join(property_errors), "property_errors": property_errors}
         svc = PropertyService()
         proposal.acm_properties = svc.merge_properties(proposal.acm_properties or {}, properties)
         db.session.commit()
@@ -2555,7 +2696,9 @@ class JourneyOrchestrator:
         # Group templates by archimate_type (one DB query)
         types_needed = list({p.archimate_type for p in proposals})
         templates_by_type = {}
-        all_templates = AcmPropertyTemplate.query.filter(
+        from app.modules.architecture_assistant.property_service import template_query
+
+        all_templates = template_query().filter(
             AcmPropertyTemplate.archimate_type.in_(types_needed)
         ).all()
         for t in all_templates:

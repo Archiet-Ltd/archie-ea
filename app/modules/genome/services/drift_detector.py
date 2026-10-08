@@ -90,6 +90,28 @@ _RETIRING_LIFECYCLE = {"deprecated", "retired", "decommissioned", "sunset"}
 NEAR_DUPLICATE_THRESHOLD = 0.6
 
 
+def compute_blocking_key(name: str) -> str:
+    """Cheap blocking key for near-duplicate candidate grouping.
+
+    Groups elements by the first token of their normalized name so that only
+    elements within the same group need to be compared pairwise. This reduces
+    the O(n²) comparison space to O(groups × avg_group_size²).
+
+    Exposed as a public function so the matcher can reuse the same key
+    for consistent grouping across the genome pipeline.
+
+    Args:
+        name: the element name (may be None or empty).
+
+    Returns:
+        A lowercase first-token string, or the empty string for a blank name.
+        Deterministic: same name always yields the same key.
+    """
+    if not name or not name.strip():
+        return ""
+    return (name.strip().split()[0] or "").lower()
+
+
 def detect_model_drift(org_id: int, session=None) -> Dict[str, Any]:
     """Scan the genome for one org and return a spec-hashed drift report.
 
@@ -476,24 +498,32 @@ def _detect_near_duplicates(elements):
 
     Silent near-duplicate proliferation is how a system of record rots. Reuses the
     platform's repaired fuzzy path (``DuplicateDetectionUtils.is_duplicate`` in
-    ``mode='fuzzy'``). Compares only within the same layer (an application and a
-    capability sharing a name is legitimate). Deterministic: elements are already
-    id-ordered, pairs are formed lower-id-first, and each element joins at most one
-    cluster (its first match), so clustering is order-stable.
+    ``mode='fuzzy'``). Compares only within the same layer AND the same blocking
+    key (first token of the normalized name), so an application and a capability
+    sharing a name is legitimate, and elements whose names start with different
+    words are never compared — the blocking key reduces the O(n²) comparison
+    space to O(groups × avg_group_size²). Deterministic: elements are already
+    id-ordered, pairs are formed lower-id-first, and each element joins at most
+    one cluster (its first match), so clustering is order-stable.
     """
     from app.modules.duplicate_detection.services.duplicate_detection_utils import (
         DuplicateDetectionUtils,
     )
 
-    by_layer: Dict[Any, List[Any]] = {}
+    # Group by (layer, blocking_key) — two-level grouping so only elements in
+    # the same layer AND with the same first token are compared pairwise.
+    by_block: Dict[tuple, List[Any]] = {}
     for e in elements:
         if not (e.name or "").strip():
             continue
-        by_layer.setdefault(e.layer, []).append(e)
+        key = (e.layer, compute_blocking_key(e.name))
+        by_block.setdefault(key, []).append(e)
 
     out = []
-    for layer in sorted(by_layer, key=lambda x: (x is None, str(x))):
-        group = by_layer[layer]  # already id-ordered from the caller
+    # Sort keys for deterministic output: layer first (None last), then token.
+    for (layer, _token), group in sorted(
+        by_block.items(), key=lambda kv: (kv[0][0] is None, str(kv[0][0]), kv[0][1])
+    ):
         assigned = set()
         for i, a in enumerate(group):
             if a.id in assigned:
@@ -563,6 +593,7 @@ def _spec_hash(report: Dict[str, Any]) -> str:
 
 
 __all__ = [
+    "compute_blocking_key",
     "detect_model_drift",
     "REPORT_VERSION",
     "SIGNAL_ORDER",

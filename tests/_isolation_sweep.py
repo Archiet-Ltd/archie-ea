@@ -357,6 +357,14 @@ class Seeder:
         self.token = token
         self.shared_models = shared_models
         self.n = 0
+        # A seeded row's primary-key value, captured the moment it is flushed.
+        # A retry (tests/_isolation_sweep.py's _drive, well after the first
+        # commit and the session churn _request causes between requests) may
+        # call seed() again for a table already in ``context``; by then that
+        # row is expired and detached, and reading an attribute off it raises
+        # DetachedInstanceError. The id itself was already a plain value the
+        # moment it was flushed, so keep that instead of the row.
+        self.pks = {}
 
     def marker(self):
         self.n += 1
@@ -369,8 +377,8 @@ class Seeder:
             return self.org_id
         if ttable == "users":
             return self.user_id
-        if ttable in context:
-            return getattr(context[ttable], _attr_for(context[ttable], fk.column))
+        if ttable in self.pks:
+            return self.pks[ttable]
         target = table_models().get(ttable)
         if target is None or depth >= 3:
             if col.nullable:
@@ -379,18 +387,20 @@ class Seeder:
         if col.nullable and not tenant_owned(target, self.shared_models):
             return None
         try:
-            parent = self.seed(target, context, depth + 1)
+            self.seed(target, context, depth + 1)
         except Unseedable:
             if col.nullable:
                 return None
             raise
-        return getattr(parent, _attr_for(parent, fk.column))
+        return self.pks[target.__table__.name]
 
     def _value(self, col, marker, context, depth):
         import sqlalchemy as sa
 
         if col.name == "organization_id":
             return self.org_id
+        if col.name == "adm_phase":
+            return "A"
         if col.foreign_keys:
             return self._fk_value(col, context, depth)
         t = col.type
@@ -474,6 +484,7 @@ class Seeder:
             first = (str(exc).splitlines() or [""])[0][:200]
             raise Unseedable("%s: %s" % (type(exc).__name__, first)) from exc
         context[table_name] = row
+        self.pks[table_name] = getattr(row, _attr_for(row, list(model.__table__.primary_key.columns)[0]))
         return row
 
 
@@ -672,7 +683,47 @@ def _classify(case, ctx, seeded, resp_b, resp_a, changed_a, unresolved):
     return "unproven", "owner control answered %d (B %d)%s" % (a_status, b_status, note)
 
 
-def _drive(case, ctx, shared_models):
+_REQUIRED_RE = re.compile(
+    r"\b((?:[a-z][a-z0-9_]*\s*,\s*)*(?:[a-z][a-z0-9_]*\s+and\s+)?[a-z][a-z0-9_]*)\s+(?:is|are)\s+required\b"
+    r"|\b([a-z][a-z0-9_]*)\s+required\b"
+)
+
+# How many missing fields the retry (below) will add across one case's whole
+# drive, and how it decides a free-text value is enough versus a real row is
+# needed. Guards from the lead's ruling on the coverage-sweep brief.
+MAX_RETRY_FIELDS = 3
+
+
+def _missing_fields(resp):
+    """Field names a 400/422 names as required, read from the response body.
+
+    Recognises ``{"error": "X is required"}``, ``{"errors": ["X is
+    required", ...]}``, ``{"message": "X required"}`` and a conjunction of
+    several names in one sentence (``"X and Y are required"``,
+    ``"X, Y and Z are required"``). Anything else yields no fields, which
+    is the safe fallback: the route stays unproven rather than guessed at.
+    """
+    data = resp.get_json(silent=True)
+    if not isinstance(data, dict):
+        return []
+    texts = [v for k in ("error", "message") if isinstance(v := data.get(k), str)]
+    errs = data.get("errors")
+    if isinstance(errs, list):
+        texts.extend(e for e in errs if isinstance(e, str))
+    fields = []
+    for text in texts:
+        m = _REQUIRED_RE.search(text)
+        if not m:
+            continue
+        subject = m.group(1) or m.group(2)
+        for part in re.split(r"\s*,\s*|\s+and\s+", subject):
+            part = part.strip()
+            if part and part not in fields:
+                fields.append(part)
+    return fields
+
+
+def _drive(case, ctx, shared_models, param_models=None):
     from app import db
 
     unresolved = [p for p in case.params if case.models.get(p) is None]
@@ -711,10 +762,10 @@ def _drive(case, ctx, shared_models):
 
     url = _fill_url(case.rule, values)
     kwargs = {}
+    probe = ctx["token"] + "w"
     if case.method in WRITE_METHODS:
         # Fields most write handlers accept, so a write that goes through shows
         # as a changed row rather than a no-op on an empty body.
-        probe = ctx["token"] + "w"
         kwargs["json"] = {"name": probe, "title": probe, "description": probe, "notes": probe}
     seeded = re.compile(re.escape(ctx["token"]) + r"\d")
 
@@ -734,14 +785,87 @@ def _drive(case, ctx, shared_models):
     resp_a = _request(ctx, ctx["user_a"], url, case.method, kwargs)
     changed_a = case.method in WRITE_METHODS and any(
         a != b for a, b in zip([_snapshot(i) for i in idents], before))
+
+    # A missing-required-field 400/422 proves nothing either way -- B's
+    # refusal is indistinguishable from the same validation wall the owner
+    # just hit. Add the field the owner's own response names and ask both
+    # again, so a write that is otherwise provable is not left "unproven"
+    # for a reason that has nothing to do with tenant isolation. B's verdict
+    # after this point is judged only on the retried request, never the one
+    # above. Guarded: at most MAX_RETRY_FIELDS fields, one lookup per field,
+    # free-text fields get a fixed marker, an "..._id" field gets a real row
+    # of its inferred model seeded in A's own organisation -- never a bare
+    # number -- and if no model can be inferred the route stays unproven,
+    # with that reason recorded rather than guessed at.
+    added, stop_reason = [], None
+    while (case.method in WRITE_METHODS and resp_a.status_code in (400, 422)
+           and len(added) < MAX_RETRY_FIELDS):
+        missing = [f for f in _missing_fields(resp_a) if f not in added]
+        if not missing:
+            break
+        for field in missing:
+            if len(added) >= MAX_RETRY_FIELDS:
+                break
+            if field.endswith("_id"):
+                # A real row, not a bare number: a made-up id would just move
+                # the route from "unproven" to a false "not_refused" if it
+                # resolves to nothing, or a false LEAK if it collides with
+                # someone else's row. Resolved through the same codebase-wide
+                # param-name reading enumerate_cases uses for URL params
+                # (codebase_param_models), since a JSON field is named the
+                # same way the model it refers to is everywhere else. The
+                # earlier attempt at this read the seeded row's attribute
+                # straight off Seeder's ``context`` after the drive's first
+                # commit and several _request-driven session churns, by
+                # which point that row is expired and detached --
+                # DetachedInstanceError. Seeder now keeps each row's primary
+                # key as a plain value (``self.pks``) the moment it is
+                # flushed, so nothing here ever reads an attribute off a row
+                # that might have outlived its session.
+                model = (param_models or {}).get(field)
+                if model is None:
+                    stop_reason = "no model inferred for %r" % field
+                    break
+                try:
+                    seeder.seed(model, context)
+                except Unseedable as exc:
+                    stop_reason = "%s: %s" % (field, exc)
+                    break
+                kwargs["json"][field] = seeder.pks[model.__table__.name]
+                added.append(field)
+                continue
+            kwargs["json"][field] = probe
+            added.append(field)
+        if stop_reason:
+            break
+        db.session.commit()
+
+        resp_b = _request(ctx, ctx["user_b"], url, case.method, kwargs)
+        case.b_status = resp_b.status_code
+        leak = bool(seeded.search(resp_b.get_data(as_text=True))
+                    or seeded.search(resp_b.headers.get("Location") or ""))
+        changed_b = any(a != b for a, b in zip([_snapshot(i) for i in idents], before))
+        if leak or changed_b:
+            case.status = LEAK
+            case.detail = "B answered %d%s%s (after adding %s)" % (
+                resp_b.status_code, " with A's record" if leak else "",
+                " and changed A's row" if changed_b else "", ", ".join(added))
+            return
+        resp_a = _request(ctx, ctx["user_a"], url, case.method, kwargs)
+        changed_a = any(a != b for a, b in zip([_snapshot(i) for i in idents], before))
+
     case.status, case.detail = _classify(case, ctx, seeded, resp_b, resp_a, changed_a, unresolved)
+    note = ("retried with %s" % ", ".join(added)) if added else (
+        ("retry stopped: %s" % stop_reason) if stop_reason else None)
+    if note:
+        case.detail = "%s; %s" % (case.detail, note) if case.detail else note
 
 
-def drive(app, case, login, shared_models):
+def drive(app, case, login, shared_models, param_models=None):
     started = time.time()
     try:
         with world(app, login) as ctx:
-            _drive(case, ctx, shared_models)
+            _drive(case, ctx, shared_models, param_models)
     except Exception as exc:  # noqa: BLE001 - recorded on the case, never swallowed
         case.status = "error"
         case.detail = "%s: %s" % (type(exc).__name__, (str(exc).splitlines() or [""])[0][:200])
@@ -760,7 +884,7 @@ def run_sweep(app, login, policy, only=None):
     with no_background_threads():
         for case in cases:
             case.models = resolve_models(app, case.rule, case.params, by_name, param_models)
-            drive(app, case, login, policy.shared_models)
+            drive(app, case, login, policy.shared_models, param_models)
     return cases, excluded
 
 

@@ -9,6 +9,9 @@
   GET  /api/v1/intelligence/programme/<element_id>
   GET  /api/v1/intelligence/strategy/<element_id>
   GET  /api/v1/intelligence/accountability/<element_id>
+  GET  /api/v1/intelligence/data/<element_id>
+  GET  /api/v1/intelligence/compliance/<element_id>
+  GET  /api/v1/intelligence/traceability/<element_id>
   GET  /api/v1/intelligence/yield
 
 Each new route was added to this EXISTING blueprint rather than a new
@@ -23,10 +26,11 @@ in this codebase.
 
 from __future__ import annotations
 
-from flask import Blueprint, current_app, g, request
+from flask import Blueprint, current_app, request
 from flask_login import current_user, login_required
 
 from app.modules.intelligence.services.reason_codes import validate_reason_code
+from app.utils.tenant import current_organization_id
 from app.utils.api_response import error_response, not_found_response, success_response
 
 # NEW-4 fix: these two DE-14 reason codes are structurally unreachable in the
@@ -40,10 +44,10 @@ _NO_TENANT_CONTEXT_REASON = validate_reason_code("no_tenant_context")
 _ELEMENT_NOT_FOUND_REASON = validate_reason_code("element_not_found")
 _FINANCIAL_DATA_RESTRICTED_REASON = validate_reason_code("financial_data_restricted")
 
-# Roles with budget authority elsewhere in this codebase (ROLE_SECTION_ACCESS
-# already gates rationalization/TCO/procurement views to this same set) --
-# reused, not a new authority list invented for this endpoint.
-_FINANCIAL_DATA_ROLES = frozenset({"cto", "portfolio_manager", "platform_admin"})
+# The single cost-visibility rule lives in role_access.py so every
+# surface that redacts financial figures shares one authority.  Import it;
+# do not define a second list.
+from app.utils.role_access import COST_VISIBILITY_ROLES, get_user_role
 
 intelligence_api = Blueprint(
     "intelligence_api", __name__, url_prefix="/api/v1/intelligence"
@@ -65,31 +69,12 @@ def _redact_financial_fields(rows: list, fields: tuple[str, ...], reason_field: 
     can't see this." A caller with budget authority sees the real value and
     this function is a no-op for them.
     """
-    from app.utils.role_access import get_user_role
-
-    if get_user_role(current_user) in _FINANCIAL_DATA_ROLES:
+    if get_user_role(current_user) in COST_VISIBILITY_ROLES:
         return
     for row in rows:
         for field in fields:
             row[field] = None
         row[reason_field] = _FINANCIAL_DATA_RESTRICTED_REASON
-
-
-def _current_organization_id() -> int | None:
-    """The plain int this request belongs to -- never an ORM object.
-
-    ``g.current_org_id`` is what the tenant-isolation listeners key off
-    (CLAUDE.md "Multi-tenancy is implicit"), and is what
-    ``run_for_each_tenant``'s per-tenant loop restores when it finishes, so
-    reading it here (rather than ``current_user.organization`` -- an ORM
-    relationship) is both the correct source and avoids holding an object
-    reference across the recompute call.
-    """
-    org_id = getattr(g, "current_org_id", None)
-    if org_id is not None:
-        return int(org_id)
-    org_id = getattr(current_user, "organization_id", None)
-    return int(org_id) if org_id is not None else None
 
 
 @intelligence_api.route("/derivation/recompute", methods=["POST"])
@@ -110,7 +95,7 @@ def recompute_derivation():
             status_code=400,
         )
 
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request", code="NO_TENANT_CONTEXT", status_code=400
@@ -176,7 +161,7 @@ def get_derived_fact_provenance(derived_id: int):
     double-scopes it -- so this 404s -- never 403, never a leak of another
     tenant's row existing.
     """
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request", code="NO_TENANT_CONTEXT", status_code=400
@@ -333,7 +318,7 @@ def value_streams_at_risk():
                 status_code=400,
             )
 
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -415,7 +400,7 @@ def cross_layer_impact(element_id: int):
 
     layer = request.args.get("layer")
 
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -467,6 +452,37 @@ def cross_layer_impact(element_id: int):
     )
 
 
+@intelligence_api.route("/traceability/<int:element_id>", methods=["GET"])
+@login_required
+def traceability_check(element_id: int):
+    """Does this element trace up to a capability and down to technology?
+
+    Serialises ``TraceabilityCheckService.check``, which reads the same walk
+    as the impact route above. An element outside the caller's organisation
+    answers exactly as one that does not exist.
+    """
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    from app.modules.intelligence.services.traceability_check_service import TraceabilityCheckService
+
+    result = TraceabilityCheckService.check(element_id, organization_id)
+    if result.get("state") != "checked":
+        return error_response(
+            "Element not found",
+            code="NOT_FOUND",
+            details={"reason": _ELEMENT_NOT_FOUND_REASON},
+            status_code=404,
+        )
+    return success_response(result)
+
+
 @intelligence_api.route("/risk/<int:element_id>", methods=["GET"])
 @login_required
 def risk_for_element(element_id: int):
@@ -501,7 +517,7 @@ def risk_for_element(element_id: int):
                 status_code=400,
             )
 
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -566,7 +582,7 @@ def portfolio_component_for_element(element_id: int):
     already use; see the service method's own docstring for why
     duplicate-detection and TCO history are not offered here.
     """
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -642,7 +658,7 @@ def programme_for_element(element_id: int):
                 status_code=400,
             )
 
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -718,7 +734,7 @@ def strategy_for_element(element_id: int):
                 status_code=400,
             )
 
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -775,7 +791,7 @@ def accountability_for_element(element_id: int):
     only the body of the answer is a permanent honest empty state until
     that reader exists.
     """
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -809,6 +825,95 @@ def accountability_for_element(element_id: int):
     )
 
 
+@intelligence_api.route("/data/<int:element_id>", methods=["GET"])
+@login_required
+def data_for_element(element_id: int):
+    """L7: "what data does this hold or produce, who stewards it, and where does it flow?"
+    Serialises ``IntelligenceQueryService.data_for_element`` through ``success_response``
+    -- same error-handling pattern as the other lenses, no business logic here. The
+    element/tenant pre-checks are real: no tenant context is 400, an element that is not
+    this organisation's (or does not exist) is the same 404, so a foreign id cannot be told
+    from a missing one.
+    """
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    from app.models import ArchiMateElement
+
+    element = ArchiMateElement.query.filter_by(id=element_id).first()
+    if element is None:
+        return error_response(
+            "Element not found",
+            code="NOT_FOUND",
+            details={"reason": _ELEMENT_NOT_FOUND_REASON},
+            status_code=404,
+        )
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    result = IntelligenceQueryService.data_for_element(element_id)
+
+    return success_response(
+        {
+            "data_objects": result["data_objects"],
+            "flows": result["flows"],
+            "elements": result.get("elements") or {},
+            "reasons": result.get("reasons") or [],
+            "as_of": result.get("as_of"),
+        }
+    )
+
+
+@intelligence_api.route("/compliance/<int:element_id>", methods=["GET"])
+@login_required
+def compliance_for_element(element_id: int):
+    """Compliance (under L6): "which regulations and controls apply to this, and which
+    controls have no evidence of being met?" Serialises
+    ``IntelligenceQueryService.compliance_for_element`` through ``success_response``.
+    No tenant context is 400; an element that is not this organisation's (or does not
+    exist) is the same 404, so a foreign id cannot be told from a missing one.
+    """
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    from app.models import ArchiMateElement
+
+    element = ArchiMateElement.query.filter_by(id=element_id).first()
+    if element is None:
+        return error_response(
+            "Element not found",
+            code="NOT_FOUND",
+            details={"reason": _ELEMENT_NOT_FOUND_REASON},
+            status_code=404,
+        )
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    result = IntelligenceQueryService.compliance_for_element(element_id)
+
+    return success_response(
+        {
+            "controls": result["controls"],
+            "open_violations": result["open_violations"],
+            "last_scan_at": result.get("last_scan_at"),
+            "reasons": result.get("reasons") or [],
+            "as_of": result.get("as_of"),
+        }
+    )
+
+
 @intelligence_api.route("/yield", methods=["GET"])
 @login_required
 def derivation_yield():
@@ -819,7 +924,7 @@ def derivation_yield():
     view function name is deliberately ``derivation_yield``, not
     ``cross_layer_impact``, which is already taken in this file).
     """
-    organization_id = _current_organization_id()
+    organization_id = current_organization_id()
     if organization_id is None:
         return error_response(
             "no tenant context for this request",
@@ -832,6 +937,132 @@ def derivation_yield():
 
     result = IntelligenceQueryService.derivation_yield(organization_id)
     return success_response(result)
+
+
+@intelligence_api.route("/catalogue", methods=["GET"])
+@login_required
+def query_catalogue_list():
+    """R1-B39: list the named questions a Portfolio Manager or Business
+    Owner can ask or run directly."""
+    from app.modules.intelligence.services.query_catalogue import list_entries
+
+    return success_response({"entries": list_entries()})
+
+
+@intelligence_api.route("/catalogue/<string:entry_id>", methods=["GET"])
+@login_required
+def query_catalogue_run(entry_id):
+    """R1-B39: run one catalogue entry by id, with its declared parameters
+    taken from the query string. Serves both the screen and this API with
+    the same rows (TB-0107) -- the entry itself is the only query engine."""
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    from app.modules.intelligence.services.query_catalogue import CATALOGUE, run_entry
+
+    entry = CATALOGUE.get(entry_id)
+    if entry is None:
+        return not_found_response(f"no catalogue entry named '{entry_id}'")
+
+    params = {name: request.args.get(name) for name in entry.params if request.args.get(name) is not None}
+    result = run_entry(entry_id, organization_id, **params)
+    return success_response({"entry_id": entry_id, "title": entry.title, "params": params, **result})
+
+
+@intelligence_api.route("/ask", methods=["POST"])
+@login_required
+def ask_nl_question():
+    """R1-B39: a plain-language question, interpreted onto one catalogue
+    entry and run. The interpretation (which entry, which parameters) is
+    always returned alongside the answer so the caller can show it and
+    let the user correct a misread parameter by re-POSTing with
+    ``entry_id``/``params`` set directly (TB-0108)."""
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    body = request.get_json(silent=True) or {}
+    question = body.get("question", "")
+
+    from app.modules.intelligence.services.query_catalogue import CATALOGUE, run_entry
+    from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+    if body.get("entry_id"):
+        # The user corrected the interpretation -- run exactly what they
+        # chose. ``entry_id`` and ``params`` come straight off the request
+        # body, so both are checked before anything touches them: an
+        # unhashable ``entry_id`` (a list/dict) would raise at the first
+        # ``in CATALOGUE`` lookup below, and a non-dict ``params`` would
+        # raise on the ``**`` spread into ``run_entry`` further down.
+        raw_entry_id = body["entry_id"]
+        if not isinstance(raw_entry_id, str):
+            return error_response(
+                "entry_id must be a string",
+                code="INVALID_ENTRY_ID",
+                status_code=400,
+            )
+
+        raw_params = body.get("params")
+        if raw_params is not None and not isinstance(raw_params, dict):
+            return error_response(
+                "params must be an object",
+                code="INVALID_PARAMS",
+                status_code=400,
+            )
+        caller_params = raw_params or {}
+
+        # Same filtering the GET /catalogue/<entry_id> route already does:
+        # only the entry's own declared parameter names, and only string
+        # values, ever reach ``run_entry`` -- this is what keeps a caller
+        # from smuggling ``organization_id``/``entry_id`` (or anything else)
+        # into the ``**params`` spread below. An unknown entry_id simply
+        # yields no params; the existing "not in CATALOGUE" check further
+        # down is what turns that into the honest "could not map" response.
+        entry = CATALOGUE.get(raw_entry_id)
+        safe_params = (
+            {
+                name: caller_params[name]
+                for name in entry.params
+                if isinstance(caller_params.get(name), str)
+            }
+            if entry is not None
+            else {}
+        )
+
+        interpretation = {
+            "entry_id": raw_entry_id,
+            "params": safe_params,
+            "confidence": 1.0,
+            "method": "corrected",
+            "title": entry.title if entry is not None else None,
+        }
+    else:
+        interpretation = interpret(question)
+
+    entry_id = interpretation["entry_id"]
+    if entry_id is None or entry_id not in CATALOGUE:
+        return success_response(
+            {
+                "question": question,
+                "interpretation": interpretation,
+                "answer": None,
+                "reason": "could not map this question to a known catalogue entry",
+            }
+        )
+
+    result = run_entry(entry_id, organization_id, **interpretation["params"])
+    return success_response({"question": question, "interpretation": interpretation, **result})
 
 
 __all__ = ["intelligence_api"]

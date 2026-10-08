@@ -6,7 +6,7 @@ Shared by the account blueprint's two tiers (``routes/account_routes.py`` and
 ``v2/routes/account_routes.py``) so there is one implementation of each flow;
 each tier's route is a one-line call into here.
 """
-from flask import current_app, flash, redirect, render_template, request, url_for
+from flask import current_app, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user
 
 from app.flask_email import mail_available
@@ -16,6 +16,7 @@ from app.modules.account.forms.account_forms import (
     RequestResetPasswordForm,
 )
 from app.modules.account.services.account_service import AccountService
+from app.services import buy_intent
 
 MAIL_UNAVAILABLE_RESET = (
     "E-mail is not available on this server, so a reset link cannot be sent. "
@@ -44,7 +45,20 @@ def register_view(trial=False):
     """Sign-up. With ``trial`` the new organisation starts on a trial, reached
     from the demonstration banner; the demonstration visitor is signed out
     first so the trial belongs to the person signing up."""
+    chosen = buy_intent.requested()
+    if chosen is None and buy_intent.plan_given():
+        # An unknown plan key: send the visitor back to choose one.
+        return redirect("/pricing")
+    if chosen is not None and current_user.is_authenticated:
+        # Already has an account and is signed in: straight to that plan.
+        return redirect(buy_intent.target_url(*chosen))
     form = RegistrationForm()
+    if request.method == "GET":
+        # A visitor reaching the sign-up form, not a retry after a failed
+        # POST -- see app/services/public_analytics_service.py.
+        from app.services.public_analytics_service import log_signup_started
+
+        log_signup_started()
     if form.validate_on_submit():
         if trial:
             from app.services.demonstration_service import is_demonstration_org_id
@@ -65,6 +79,12 @@ def register_view(trial=False):
 
             start_trial(_user)
             db.session.commit()
+        from app.services.public_analytics_service import log_signup_completed
+
+        log_signup_completed()
+        if chosen is not None:
+            # After sign_up: signing the new account in starts a fresh session.
+            buy_intent.remember(chosen)
         if confirmation == "sent":
             return redirect(url_for("account.unconfirmed"))
         if confirmation == "failed":
@@ -79,8 +99,14 @@ def register_view(trial=False):
             "server, so no confirmation message was sent.".format(current_app.config['APP_NAME']),
             "info",
         )
+        if chosen is not None:
+            # Usable at once: sign in and go straight to that plan's checkout.
+            return redirect(url_for("account.login", plan=chosen[0], interval=chosen[1]))
         return redirect(url_for("main.index"))
-    return render_template("account/register.html", form=form, trial=trial)
+    return render_template(
+        "account/register.html", form=form, trial=trial,
+        signin_args={"plan": chosen[0], "interval": chosen[1]} if chosen else {},
+    )
 
 
 def reset_request_view():
@@ -174,8 +200,13 @@ def confirm_view(token):
         )
     if current_user.is_authenticated and current_user.id == user.id:
         flash(message, "success")
+        held = buy_intent.remembered_url()
+        if held:
+            session.pop(buy_intent.SESSION_KEY, None)
+            return redirect(held)
         return redirect(_after_confirmation_url(user))
     flash(message + " Sign in to continue.", "form-success")
+    # The chosen plan stays in the session; signing in lands on its checkout.
     return redirect(url_for("account.login"))
 
 

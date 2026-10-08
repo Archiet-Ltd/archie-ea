@@ -251,10 +251,11 @@ def seed_demo_mappings_command(org_id, dry_run):
     # default returns None and the whole seed aborts on the constraint.
     # The lookups in seed_demo_mappings still name the organisation explicitly;
     # this context is for the listeners downstream, not a substitute for them.
-    from flask import current_app, g
+    from flask import current_app
 
-    with current_app.test_request_context("/"):
-        g.current_org_id = org_id
+    from app.jobs.tenant_safe_job import tenant_scope
+
+    with current_app.test_request_context("/"), tenant_scope(org_id):
         stats = seed_demo_mappings(org_id, dry_run=dry_run)
     verb = "would link" if dry_run else "linked"
     click.echo(

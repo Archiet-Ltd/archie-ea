@@ -4,11 +4,24 @@ import logging
 from collections import defaultdict
 
 from flask import render_template
+from werkzeug.exceptions import NotFound
 
 from app import db
+from app.models.application_portfolio import ApplicationComponent
 from app.models.archimate_core import ArchiMateElement
 
 logger = logging.getLogger(__name__)
+
+
+def _verify_app_in_org(app_id, org_id, *, raise_not_found=False):
+    """Return the application only when it belongs to ``org_id``."""
+    app = ApplicationComponent.query.filter_by(
+        id=app_id,
+        organization_id=org_id,
+    ).first()
+    if app is None and raise_not_found:
+        raise NotFound()
+    return app
 
 
 def _query_archimate_by_layer(app_id):

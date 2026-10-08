@@ -54,6 +54,11 @@
                     {% endfor %}
 
                     {{ f.end_form(form) }}
+
+                    <div class="mt-4 text-center text-sm text-muted-foreground" data-testid="register-signin">
+                        Already have an account?
+                        <a href="{{ url_for('account.login', **(signin_args or {})) }}" class="text-primary font-medium hover:underline">Sign in</a>
+                    </div>
                 </div>
             </div>
         </div>

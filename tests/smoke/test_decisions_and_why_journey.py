@@ -218,3 +218,119 @@ def test_an_architect_records_a_decision_finds_it_from_the_element_and_asks_why(
     links.nth(1).get_by_role("link", name=names["gateway"]).click()
     page.wait_for_url(re.compile(r"/archimate/elements/%s/impact$" % ours["gateway"]))
     expect(page.locator("[data-element-decisions]").get_by_role("link", name=title)).to_be_visible()
+
+
+def test_ai_authored_decision_shows_its_assumptions_and_affected_systems(
+    page, live_server, two_organisations
+):
+    """The AI chat, workbench and solution-options-advisor creation paths set
+    assumptions/affected_systems/decided_by_label directly on the canonical
+    row -- this is a real browser check that a human opening that decision
+    actually sees them, not just that the columns exist."""
+    ours = two_organisations["ours"]
+    title = "AI-recorded: retire the legacy batch scheduler %s" % uuid.uuid4().hex[:6]
+
+    from app import create_app, db
+    from app.models.architecture_decision import ArchitectureDecision
+    from app.models.user import User
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = User.query.filter_by(email=ours["email"]).one().organization_id
+        decision = ArchitectureDecision(
+            title=title, status="proposed", organization_id=org_id,
+            assumptions="The scheduler has no remaining active jobs as of the cutover date.",
+            affected_systems=["Batch Scheduler", "Nightly ETL"],
+            decided_by_label="AI Solution Architect (automated)",
+        )
+        db.session.add(decision)
+        db.session.commit()
+        decision_id = decision.id
+
+    _login(page, live_server, ours["email"])
+    page.goto("%s/architecture/decisions/%s" % (live_server, decision_id), wait_until="domcontentloaded")
+    expect(page.get_by_role("heading", name=title)).to_be_visible()
+    scope = page.get_by_role("heading", name="Assumptions & Scope").locator("..")
+    expect(scope.get_by_text("AI Solution Architect (automated)", exact=True)).to_be_visible()
+    expect(scope.get_by_text("The scheduler has no remaining active jobs as of the cutover date.", exact=True)).to_be_visible()
+    expect(scope.get_by_text("Batch Scheduler", exact=True)).to_be_visible()
+    expect(scope.get_by_text("Nightly ETL", exact=True)).to_be_visible()
+
+
+def _seed_decision_due_for_review(org_id, title):
+    """A decision whose review_date has already arrived, with no outcome yet --
+    the exact shape `due_for_review()` looks for."""
+    import datetime
+
+    from app import db
+    from app.models.architecture_decision import ArchitectureDecision
+
+    row = ArchitectureDecision(
+        decision_id="RD-%s" % uuid.uuid4().hex[:6], title=title, status="accepted",
+        organization_id=org_id, review_date=datetime.date(2020, 1, 1),
+        context="Vendor contract signed for an initial term.",
+    )
+    db.session.add(row)
+    db.session.commit()
+    return row.id
+
+
+def test_review_due_record_outcome_and_precedent_search_journey(
+    page, live_server, two_organisations
+):
+    """A decision due for review is found from the Due For
+    Review list, its outcome is recorded there, and it is afterwards
+    findable by precedent search -- all three new surfaces this release
+    adds, and none of another organisation's decisions leak into any of
+    them.
+    """
+    ours = two_organisations["ours"]
+    other = two_organisations["other"]
+    title = "Renew the managed-database contract %s" % uuid.uuid4().hex[:6]
+
+    from app import create_app
+
+    app = create_app("testing")
+    with app.app_context():
+        from app.models.user import User
+
+        ours_org_id = User.query.filter_by(email=ours["email"]).one().organization_id
+        other_org_id = User.query.filter_by(email=other["email"]).one().organization_id
+        decision_id = _seed_decision_due_for_review(ours_org_id, title)
+        _seed_decision_due_for_review(other_org_id, "Their contract renewal, not ours")
+
+    _login(page, live_server, ours["email"])
+
+    # Due for review: shows ours, never the other organisation's.
+    page.goto(live_server + "/architecture/decisions/due-for-review", wait_until="domcontentloaded")
+    expect(page.get_by_role("link", name=title)).to_be_visible()
+    assert "not ours" not in page.content()
+    page.get_by_role("link", name="Record Outcome").first.click()
+    page.wait_for_url(re.compile(r"/architecture/decisions/%s/record-outcome$" % decision_id))
+
+    # The original decision's context is shown read-only on the way to
+    # recording an outcome, so the reviewer is not judging it blind.
+    details = page.locator("details", has_text="Original decision record")
+    details.locator("summary").click()
+    expect(details).to_contain_text("Vendor contract signed for an initial term.")
+
+    outcome_text = "Still the right vendor; renewed for another 12 months."
+    page.fill("#review_outcome", outcome_text)
+    page.get_by_role("button", name="Record Outcome").click()
+    page.wait_for_url(re.compile(r"/architecture/decisions/%s$" % decision_id))
+
+    # Recorded and rendered on the decision's own page.
+    expect(page.get_by_text(outcome_text)).to_be_visible()
+
+    # No longer due: recording an outcome with no next review date clears it.
+    page.goto(live_server + "/architecture/decisions/due-for-review", wait_until="domcontentloaded")
+    expect(page.get_by_role("link", name=title)).not_to_be_visible()
+
+    # Precedent search finds it by title text, never the other organisation's.
+    page.goto(live_server + "/architecture/decisions/precedent-search", wait_until="domcontentloaded")
+    search_form = page.locator("form[action*='precedent-search']")
+    search_form.locator("input[name=q]").fill("managed-database contract")
+    search_form.get_by_role("button", name="Search", exact=True).click()
+    page.wait_for_url(re.compile(r"/architecture/decisions/precedent-search\?"))
+    expect(page.get_by_role("link", name=title)).to_be_visible()
+    assert "not ours" not in page.content()
