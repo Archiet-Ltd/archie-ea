@@ -10,6 +10,7 @@ from flask_login import login_required
 
 from app.decorators import admin_required
 from app.extensions import db
+from app.middleware.tenant_decorators import require_org_or_platform_admin
 from app.models.user import ROLE_DISPLAY_NAMES, VALID_ROLES, User
 
 # Use the existing admin blueprint - this will be imported by admin_routes
@@ -33,6 +34,19 @@ def edit_user_role(user_id):
 @admin_required
 def update_user_role(user_id):
     """Update a user's enterprise role."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while the User.query filter below
+    # correctly scopes the lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and rewrite
+    # org B's own member's enterprise role. Found by the sweep that found
+    # change_user_email's identical gap in admin_routes.py (commit
+    # 7ae1b168); same tenant_decorators.require_org_or_platform_admin guard
+    # used by every other fixed route on this branch, applied here since
+    # this is the view function that actually answers POST
+    # /admin/user/<user_id>/role.
+    require_org_or_platform_admin(g.current_org_id)
     # admin_required is org-scoped admin, not platform_admin — restrict to the
     # current org (tenant-scoping-ok: fixes cross-org role-escalation IDOR).
     user = User.query.filter_by(id=user_id, organization_id=g.current_org_id).first_or_404()
