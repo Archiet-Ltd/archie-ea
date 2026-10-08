@@ -5,14 +5,13 @@ Allows platform admins to assign enterprise roles to users.
 Part of North Star Persona MVP.
 """
 
-from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
-from flask_login import current_user, login_required
+from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from flask_login import login_required
 
 from app.decorators import admin_required
 from app.extensions import db
-from app.middleware.tenant_decorators import is_platform_admin
+from app.middleware.tenant_decorators import require_org_or_platform_admin
 from app.models.user import ROLE_DISPLAY_NAMES, VALID_ROLES, User
-from app.services.rbac_service import rbac_service
 
 # Use the existing admin blueprint - this will be imported by admin_routes
 user_role_bp = Blueprint("user_role", __name__)
@@ -43,14 +42,11 @@ def update_user_role(user_id):
     # OrgRole in org B can switch the active session to org B and rewrite
     # org B's own member's enterprise role. Found by the sweep that found
     # change_user_email's identical gap in admin_routes.py (commit
-    # 7ae1b168); same is_platform_admin / rbac_service.is_org_admin(...,
-    # g.current_org_id) guard, applied here since this is the view function
-    # that actually answers POST /admin/user/<user_id>/role.
-    if not (
-        is_platform_admin(current_user)
-        or rbac_service.is_org_admin(current_user, g.current_org_id)
-    ):
-        abort(403)
+    # 7ae1b168); same tenant_decorators.require_org_or_platform_admin guard
+    # used by every other fixed route on this branch, applied here since
+    # this is the view function that actually answers POST
+    # /admin/user/<user_id>/role.
+    require_org_or_platform_admin(g.current_org_id)
     # admin_required is org-scoped admin, not platform_admin — restrict to the
     # current org (tenant-scoping-ok: fixes cross-org role-escalation IDOR).
     user = User.query.filter_by(id=user_id, organization_id=g.current_org_id).first_or_404()
