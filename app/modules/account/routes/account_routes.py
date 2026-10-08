@@ -684,6 +684,25 @@ def sso_callback(provider):
 
         db.session.commit()
 
+    # R1-B12 PR 2 (TB-0144/PB-0100): the same MFA gate login() applies to a
+    # password sign-in, applied here too -- an administrator must complete
+    # multi-factor before SSO can finish the login, whether enrolling for
+    # the first time or entering a code from an already-enrolled
+    # authenticator app. Checked before the session-fixation reset inside
+    # login_and_register() below, so an IdP response alone never mints a
+    # real session for an administrator account. There is no "remember me"
+    # checkbox in an SSO flow, matching this route's own unconditional
+    # remember=True below; _mfa_pending_next has no equivalent "next" here
+    # either, matching _complete_login_after_mfa()'s own empty-string
+    # fallback.
+    from app.services import mfa_service
+
+    if mfa_service.required_for(user):
+        session["_mfa_pending_user_id"] = user.id
+        session["_mfa_pending_remember"] = True
+        session["_mfa_pending_next"] = ""
+        return redirect(url_for("account.mfa_challenge"))
+
     # Establish Flask-Login session (same as password login)
     from app.services import session_registry
 

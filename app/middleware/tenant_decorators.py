@@ -48,9 +48,10 @@ def is_platform_admin(user):
     with both, which is how a real platform admin is meant to be set up.
 
     Extracted so every caller that needs this exact predicate — the
-    decorator below, and app/modules/admin/team_routes.py's platform-admin
-    branch — shares one implementation rather than each re-typing the same
-    two-flag check.
+    decorator below, and require_org_or_platform_admin further down, which
+    app/modules/admin/team_routes.py's platform-admin branch now calls
+    through rather than re-typing — shares one implementation rather than
+    each re-typing the same two-flag check.
     """
     from app.models import Permission
 
@@ -74,3 +75,28 @@ def platform_admin_required(f):
             abort(403)
         return f(*args, **kwargs)
     return decorated
+
+
+def require_org_or_platform_admin(org_id):
+    """Abort 403 unless the current user is this org's admin or a platform
+    admin.
+
+    A plain, importable function rather than a decorator: every call site
+    needs it as an inline guard with an explicit ``org_id`` argument --
+    usually ``g.current_org_id``, but a caller may also pass a path
+    parameter's org_id directly (see app/modules/admin/team_routes.py,
+    whose own private copy this replaces). Lives here, alongside
+    ``is_platform_admin``/``platform_admin_required``, which it already
+    depends on, so every caller that needs this exact two-vocabulary check
+    (platform-wide admin OR this organisation's own admin) shares one
+    implementation rather than each hand-writing the same
+    ``if not (is_platform_admin(current_user) or
+    rbac_service.is_org_admin(current_user, org_id)): abort(403)`` block.
+    """
+    from app.services.rbac_service import rbac_service
+
+    if is_platform_admin(current_user):
+        return
+    if rbac_service.is_org_admin(current_user, org_id):
+        return
+    abort(403)
