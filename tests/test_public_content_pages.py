@@ -175,6 +175,16 @@ BANNED_CLAIMS = [
         "codebase",
     ),
     (
+        "who's accountable, what's at risk",
+        "the accountability lens is withdrawn -- accountability_for_element "
+        "(query_service.py:1538) returns no owners, with ownership_reader_not_built, for "
+        "every element; D-24 removed this claim from /about and the homepage, and it must "
+        "not reappear on a vs or use-case page either. Narrower than a bare "
+        "'who's accountable': /about:11, vision/home.md:18 and modules/org-chart.md:31 all "
+        "say 'who's accountable for it/what', describing recorded ownership rather than an "
+        "Ask-lens answer, and D-24 confirmed that phrasing is true and must stay",
+    ),
+    (
         "every suggestion traced to its source",
         "only a derived connection (computed from other data, see "
         "app/modules/intelligence/services/derived_facts.py's provenance field) carries a "

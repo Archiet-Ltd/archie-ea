@@ -43,7 +43,7 @@ licence instead of AGPL.
 | What it is | A modelling editor — you create and sketch ArchiMate models and diagrams by hand | A platform — modelling, plus derivation, governance workflows and plain-language questions over any element you pick |
 | Self-hostable | Desktop application, runs locally | Yes, self-hosted or managed |
 | Derivation / impact analysis | Not part of the tool's own stated scope | Built in — shows its reasoning for every connection it works out |
-| Plain-language questions over an element | Not part of the tool's own stated scope | Built in — pick an element, get a fixed set of questions (what breaks, who's accountable, what's at risk and more) answered directly |
+| Plain-language questions over an element | Not part of the tool's own stated scope | Built in — pick an element, get a fixed set of questions (what breaks and who gets called, what's at risk, what we're trying to achieve and more) answered directly |
 | Governance workflows | Not part of the tool's own stated scope | Built in |
 | Pricing | Free | Published at /pricing; free to self-host under AGPL |
 
