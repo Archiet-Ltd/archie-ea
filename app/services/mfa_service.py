@@ -34,17 +34,25 @@ def required_for(user) -> bool:
     """True when ``user`` must complete MFA before a login is allowed to
     finish.
 
-    Administrators (either flag -- see app/models/user.py's reconciled
-    is_org_admin/is_platform_admin pair, R1-B12 PR 1) must always complete
-    MFA, whether or not they have enrolled yet: an unenrolled administrator
-    is sent to enrol, not let through.
+    Administrators must always complete MFA, whether or not they have
+    enrolled yet: an unenrolled administrator is sent to enrol, not let
+    through. "Administrator" here is either a platform admin
+    (``is_platform_admin``) or an organisation admin of ANY organisation the
+    user belongs to -- their own home organisation or one they were invited
+    into (``rbac_service.is_org_admin_anywhere``, second refuter pass,
+    R1) -- not only their home organisation, which is all
+    ``User.is_org_admin`` itself can answer (see its own docstring on
+    app/models/user.py). An administrator of only a deactivated organisation
+    does not count; see ``rbac_service.org_ids_for``.
 
     The one exception is ``_admin_mfa_bypass_active()`` below -- see its own
     docstring for exactly what that is and is not."""
     if user is None:
         return False
+    from app.services.rbac_service import rbac_service
+
     is_admin = bool(
-        getattr(user, "is_org_admin", False) or getattr(user, "is_platform_admin", False)
+        rbac_service.is_org_admin_anywhere(user) or getattr(user, "is_platform_admin", False)
     )
     if not is_admin:
         return False

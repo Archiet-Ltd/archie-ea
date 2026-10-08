@@ -180,6 +180,143 @@ def test_mfa_challenge_with_no_pending_login_redirects_to_login(app):
 
 
 # ---------------------------------------------------------------------------
+# An administrator invited into a FOREIGN organisation (not their home
+# organisation) must be gated on MFA exactly like a home-organisation
+# administrator -- required_for() used to check only User.is_org_admin,
+# which only ever answers for the user's own home organisation, so this
+# class of administrator signed in on a password alone with no MFA step at
+# all (second refuter pass, R1).
+# ---------------------------------------------------------------------------
+
+
+def _make_user_with_org_role(db_session, home_org, *, role_org=None, role="org_admin"):
+    """A user whose HOME organisation membership carries no admin authority
+    at all (plain default Role), but who optionally holds a real OrgRole
+    grant in a different organisation they were invited into -- not a
+    database shortcut on the User row."""
+    from app.models.user import User
+
+    user = User(
+        email=f"invited-{uuid.uuid4().hex[:8]}@example.com",
+        organization_id=home_org.id,
+        confirmed=True,
+    )
+    user.password = _PASSWORD
+    db_session.add(user)
+    db_session.commit()
+    if role_org is not None:
+        from app.models.org_role import OrgRole
+
+        OrgRole.set_role(role_org.id, user.id, role, granted_by_id=user.id)
+        db_session.commit()
+    return user
+
+
+def test_an_org_admin_of_an_invited_org_not_home_org_is_sent_to_mfa_on_password_login(
+    app, db_session, make_org
+):
+    home_org = make_org("mfa-gate-invited-home")
+    other_org = make_org("mfa-gate-invited-other")
+    user = _make_user_with_org_role(db_session, home_org, role_org=other_org)
+
+    client = app.test_client()
+    resp = client.post(
+        "/account/login",
+        data={"email": user.email, "password": _PASSWORD, "remember_me": ""},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    assert "/mfa-challenge" in resp.headers.get("Location", "")
+
+
+def test_sso_callback_sends_an_org_admin_of_an_invited_org_to_the_mfa_challenge(
+    app, db_session, make_org, monkeypatch
+):
+    home_org = make_org("sso-mfa-gate-invited-home")
+    other_org = make_org("sso-mfa-gate-invited-other")
+    user = _make_user_with_org_role(db_session, home_org, role_org=other_org)
+
+    client = app.test_client()
+    userinfo = {
+        "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "email": user.email,
+        "given_name": "Invited",
+        "family_name": "Admin",
+    }
+    resp = _sso_callback(client, monkeypatch, db_session, userinfo)
+
+    assert resp.status_code in (302, 303), resp.get_data(as_text=True)
+    assert "/mfa-challenge" in resp.headers.get("Location", "")
+    with client.session_transaction() as sess:
+        assert sess.get("_mfa_pending_user_id") == user.id
+        assert "_user_id" not in sess
+    dash = client.get("/dashboard/overview")
+    assert dash.status_code in (302, 401)
+
+
+def test_a_user_with_no_org_role_admin_row_anywhere_is_not_sent_to_mfa_no_regression(
+    app, db_session, make_org
+):
+    home_org = make_org("mfa-gate-no-admin-anywhere-home")
+    user = _make_user_with_org_role(db_session, home_org, role_org=None)
+
+    client = app.test_client()
+    resp = client.post(
+        "/account/login",
+        data={"email": user.email, "password": _PASSWORD, "remember_me": ""},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    assert "/mfa-challenge" not in resp.headers.get("Location", "")
+
+
+def test_an_org_admin_of_only_a_deactivated_org_is_not_sent_to_mfa(
+    app, db_session, make_org
+):
+    home_org = make_org("mfa-gate-deactivated-only-home")
+    deactivated_org = make_org("mfa-gate-deactivated-only-other")
+    deactivated_org.is_active = False
+    db_session.commit()
+    user = _make_user_with_org_role(db_session, home_org, role_org=deactivated_org)
+
+    client = app.test_client()
+    resp = client.post(
+        "/account/login",
+        data={"email": user.email, "password": _PASSWORD, "remember_me": ""},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    assert "/mfa-challenge" not in resp.headers.get("Location", "")
+
+
+def test_an_org_admin_of_a_deactivated_org_is_still_gated_if_also_admin_elsewhere(
+    app, db_session, make_org
+):
+    """The deactivated organisation is excluded from the id set, but it must
+    not poison the whole lookup: a user who is ALSO an admin of a separate,
+    active organisation is still gated on MFA."""
+    from app.models.org_role import OrgRole
+
+    home_org = make_org("mfa-gate-deactivated-plus-home")
+    deactivated_org = make_org("mfa-gate-deactivated-plus-deactivated")
+    deactivated_org.is_active = False
+    active_org = make_org("mfa-gate-deactivated-plus-active")
+    db_session.commit()
+    user = _make_user_with_org_role(db_session, home_org, role_org=deactivated_org)
+    OrgRole.set_role(active_org.id, user.id, "org_admin", granted_by_id=user.id)
+    db_session.commit()
+
+    client = app.test_client()
+    resp = client.post(
+        "/account/login",
+        data={"email": user.email, "password": _PASSWORD, "remember_me": ""},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    assert "/mfa-challenge" in resp.headers.get("Location", "")
+
+
+# ---------------------------------------------------------------------------
 # /api/auth/login: the same MFA gate, applied to the JSON API endpoint
 # (hot-fix for a complete MFA bypass -- this endpoint used to call
 # session_registry.login_and_register unconditionally after a correct

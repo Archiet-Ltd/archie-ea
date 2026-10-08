@@ -62,6 +62,45 @@ class RBACService:
             return True
         return False
 
+    def org_ids_for(self, user):
+        """Every ACTIVE organisation ``user`` belongs to: the home
+        organisation plus each ``OrgRole`` row, excluding any organisation
+        that is itself deactivated (``Organization.is_active`` False) -- a
+        user cannot still switch into a deactivated organisation (see
+        ``app/middleware/tenant_context.py``'s session-switch check), so an
+        ``OrgRole`` row pointing at one must not count toward "every
+        organisation this user belongs to" for callers that use this to
+        decide authority (e.g. ``is_org_admin_anywhere`` below).
+        """
+        from app.models.org_role import OrgRole
+        from app.models.organization import Organization
+
+        ids = set()
+        if user.organization_id is not None:
+            ids.add(user.organization_id)
+        rows = OrgRole.query.filter(OrgRole.user_id == user.id).all()
+        ids.update(row.organization_id for row in rows)
+        if not ids:
+            return ids
+        active_ids = {
+            row[0]
+            for row in Organization.query.filter(
+                Organization.id.in_(ids), Organization.is_active.is_(True)
+            ).with_entities(Organization.id).all()
+        }
+        return ids & active_ids
+
+    def is_org_admin_anywhere(self, user):
+        """True when ``user`` administers any ACTIVE organisation they
+        belong to (home organisation or an invited one via ``OrgRole``).
+
+        Used where "is this user an administrator of anything" must be
+        answered regardless of which specific organisation granted it --
+        e.g. ``mfa_service.required_for``, which must require MFA for an
+        administrator invited into a foreign organisation exactly as it
+        does for a home-organisation administrator."""
+        return any(self.is_org_admin(user, org_id) for org_id in self.org_ids_for(user))
+
     def can_edit(self, org_id, user_id):
         """True if role is org_admin or architect (hierarchy level >= 1)."""
         role = self.get_user_role(org_id, user_id)
