@@ -1421,11 +1421,11 @@ def api_get_export_history(analysis_id):
 @application_mgmt.route("/api/capabilities", methods=["GET"])
 @login_required
 def api_get_capabilities():
-    """Get list of business capabilities for dropdown."""
+    """Get list of capabilities for dropdown."""
     try:
-        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.order_by(BusinessCapability.name).all()
+        capabilities = UnifiedCapability.query.order_by(UnifiedCapability.name).all()
 
         return jsonify(
             [
@@ -2433,8 +2433,9 @@ def api_submit_stakeholder_scores(analysis_id, input_id):
         if not si:
             return jsonify({"error": "Stakeholder input not found"}), 404
 
-        # Only the stakeholder themselves (or admin) can submit
-        if si.stakeholder_id != current_user.id and not current_user.is_admin:
+        # Only the stakeholder themselves (or admin) can submit. is_admin is a method:
+        # testing the bare attribute is always truthy, so this never used to deny anyone.
+        if si.stakeholder_id != current_user.id and not current_user.is_admin():
             return jsonify({"error": "Only the invited stakeholder can submit scores"}), 403
 
         data = request.get_json()
@@ -2540,9 +2541,15 @@ def api_get_stakeholder_consensus(analysis_id):
 )
 @login_required
 def api_remove_stakeholder(analysis_id, input_id):
-    """Remove a stakeholder from an analysis."""
+    """Remove a stakeholder from an analysis (analysis owner or admin only)."""
     try:
-        from app.models.vendor_analysis import StakeholderInput
+        from app.models.vendor_analysis import OptionsAnalysis, StakeholderInput
+
+        # The organisation fence arrives with OptionsAnalysis's tenant column.
+        # tenant-scoping-ok: access is decided by _check_analysis_access (owner or admin) on the next line
+        denied = _check_analysis_access(db.session.get(OptionsAnalysis, analysis_id))
+        if denied:
+            return denied
 
         si = StakeholderInput.query.filter_by(
             id=input_id, analysis_id=analysis_id

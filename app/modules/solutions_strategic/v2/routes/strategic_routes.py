@@ -829,6 +829,22 @@ def api_create_initiative_from_impact():
 # ============================================================================
 
 
+def _health_overrides():
+    """Capability health overrides visible to the caller's organisation.
+
+    An override carries no organisation column; the capability it overrides does.
+    The inner join lets the automatic tenant filter on ``BusinessCapability``
+    apply to every override read or changed here.
+    """
+    return CapabilityHealthOverride.query.join(
+        BusinessCapability, CapabilityHealthOverride.capability_id == BusinessCapability.id
+    )
+
+
+def _health_override_in_org(override_id):
+    return _health_overrides().filter(CapabilityHealthOverride.id == override_id).first()
+
+
 @strategic_bp.route("/api/capability-health/overrides", methods=["POST"])
 @login_required
 @audit_log("create_health_override")
@@ -905,13 +921,13 @@ def api_list_health_overrides():
         active_only = request.args.get("active", "false").lower() == "true"
         capability_id = request.args.get("capability_id", type=int)
         
-        query = CapabilityHealthOverride.query
+        query = _health_overrides()
         
         if active_only:
-            query = query.filter_by(active=True)
+            query = query.filter(CapabilityHealthOverride.active.is_(True))
         
         if capability_id:
-            query = query.filter_by(capability_id=capability_id)
+            query = query.filter(CapabilityHealthOverride.capability_id == capability_id)
         
         overrides = query.order_by(CapabilityHealthOverride.created_at.desc()).all()
         
@@ -930,7 +946,7 @@ def api_list_health_overrides():
 def api_get_health_override(override_id):
     """Get a specific capability health override."""
     try:
-        override = CapabilityHealthOverride.query.get(override_id)
+        override = _health_override_in_org(override_id)
         
         if not override:
             return jsonify({"success": False, "error": "Override not found"}), 404
@@ -948,7 +964,7 @@ def api_update_health_override(override_id):
     """Update an existing capability health override."""
     try:
         
-        override = CapabilityHealthOverride.query.get(override_id)
+        override = _health_override_in_org(override_id)
         
         if not override:
             return jsonify({"success": False, "error": "Override not found"}), 404
@@ -996,7 +1012,7 @@ def api_update_health_override(override_id):
 def api_delete_health_override(override_id):
     """Deactivate a capability health override (soft delete)."""
     try:
-        override = CapabilityHealthOverride.query.get(override_id)
+        override = _health_override_in_org(override_id)
         
         if not override:
             return jsonify({"success": False, "error": "Override not found"}), 404

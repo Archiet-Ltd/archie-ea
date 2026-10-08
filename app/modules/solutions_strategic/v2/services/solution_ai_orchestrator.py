@@ -4509,7 +4509,6 @@ CRITICAL -- TRACEABILITY:
             ConstraintType,
         )
         from app.models.solution_lifecycle_models import (
-            SolutionRisk,
             SolutionMetric,
             SolutionTCOItem,
             SolutionPlateau,
@@ -4871,24 +4870,34 @@ CRITICAL -- TRACEABILITY:
             failed['conflict_flags'] = str(e)
 
         # --- Risks (depends on constraints) ---
+        # Writes through the canonical risk register (app/services/risk_service.py)
+        # -- the one writer -- instead of creating a SolutionRisk row directly, so
+        # no new row reaches the superseded store. risk_service.create_risk
+        # commits per call, so (unlike the old db.session.begin_nested() wrapper,
+        # no longer needed here) one bad row cannot roll back an earlier one
+        # already created in this same loop. The canonical Risk model has no
+        # constraint_id column, so the link to the constraint a risk was derived
+        # from is kept the same way every other risk-to-entity relationship
+        # already is: a RiskEntityLink (entity_type="constraint").
+        from app.modules.solutions_strategic.v2.routes.solution_routes import _level_to_int
+        from app.services import risk_service
         for risk in parsed.get('risks', []):
             try:
-                with db.session.begin_nested():
-                    resolved_constraint_id = self._resolve_by_name(constraints_by_name, risk.get('constraint_name'))
-                    r = SolutionRisk(
-                        solution_id=solution.id,
-                        risk_description=risk.get('risk_description', ''),
-                        impact=risk.get('impact', 'medium'),
-                        probability=risk.get('probability', 'medium'),
-                        mitigation=risk.get('mitigation', ''),
-                        status='open',
-                        owner=risk.get('owner', ''),
-                        created_by_id=user_id,
-                    )
-                    r.constraint_id = resolved_constraint_id
-                    db.session.add(r)
-                    db.session.flush()
-                    created['risks'] += 1
+                resolved_constraint_id = self._resolve_by_name(constraints_by_name, risk.get('constraint_name'))
+                description = risk.get('risk_description', '')
+                r = risk_service.create_risk(
+                    solution_id=solution.id,
+                    title=(description[:255] or f"Risk for solution {solution.id}"),
+                    description=description,
+                    likelihood=_level_to_int(risk.get('probability', 'medium')),
+                    impact=_level_to_int(risk.get('impact', 'medium')),
+                    owner=risk.get('owner') or None,
+                    mitigation_plan=risk.get('mitigation') or None,
+                )
+                risk_service.add_risk_link(r.id, "solution", solution.id)
+                if resolved_constraint_id:
+                    risk_service.add_risk_link(r.id, "constraint", resolved_constraint_id)
+                created['risks'] += 1
             except Exception as exc:
                 logger.warning(f"Error creating risk: {exc}")
 

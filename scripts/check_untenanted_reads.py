@@ -76,7 +76,7 @@ REPO = Path(__file__).resolve().parent.parent
 APP = REPO / "app"
 TABLE_LIST = REPO / "scripts" / "unfenced_tables.txt"
 
-FENCE_BASES = ("TenantMixin", "HybridCapabilityTenantMixin")
+FENCE_BASES = ("TenantMixin", "HybridCapabilityTenantMixin", "HybridTenantMixin")
 MODEL_BASES = ("db.Model", "Model", "Base")
 MARKER = "tenant-scoping-ok"
 # The hatch needs a reason: `tenant-scoping-ok: <why>`. A bare marker does not exempt a read.
@@ -97,7 +97,21 @@ SKIP_DIRS = ("app/models/", "app/commands/", "app/_bootstrap/")
 AMBIGUOUS: set[str] = set()
 
 # Global reference data: shared by every organisation by design. Each needs a reason.
-GLOBAL_MODELS: dict[str, str] = {}
+GLOBAL_MODELS: dict[str, str] = {
+    "VendorOrganization": (
+        "shared vendor catalogue, deliberately not tenant-scoped (ADR-0003, see the model docstring): "
+        "facts about the vendor in the world, name globally unique"
+    ),
+    "APQCProcess": (
+        "the APQC process classification framework, a shared reference catalogue: rows are created only by "
+        "the seed commands (seed_capabilities, seed_apqc_vendor_mapping); the tenant-specific link is "
+        "SolutionAPQCProcess"
+    ),
+    "TechnicalCapability": (
+        "the ACM technical capability catalogue, shared reference data: code is globally unique and rows are "
+        "created only by the seed commands (seed_capabilities, acm seed-capabilities)"
+    ),
+}
 
 
 class ModelInfo:

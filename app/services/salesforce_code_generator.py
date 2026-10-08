@@ -11,7 +11,7 @@ import os
 from typing import Dict, List, Optional
 
 from flask import current_app
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.services.llm_service import LLMService
 from app.services.mdd_code_generation_service import CodeArtifact, TechnologyStack, UMLElement
@@ -47,6 +47,7 @@ class SalesforceCodeGenerator:
         os.makedirs(templates_path, exist_ok=True)
 
         env = Environment(
+            autoescape=select_autoescape(("html.j2", "htm.j2"), default_for_string=False, default=False),
             loader=FileSystemLoader(templates_path), trim_blocks=True, lstrip_blocks=True
         )
 

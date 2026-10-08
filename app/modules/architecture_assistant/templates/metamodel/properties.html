@@ -1,0 +1,112 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, section_card, empty_state %}
+
+{% block title %}Element properties{% endblock %}
+
+{% block content %}
+{% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+{% set field_classes = 'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring' %}
+<div class="p-6 space-y-6">
+    {{ page_shell(
+        title='Element properties',
+        subtitle='Typed properties your organisation requires on each kind of element, and which elements are still missing them.',
+        breadcrumb=[('Home', home_url), ('Element properties', none)]
+    ) }}
+
+    {% call section_card(title='Your properties') %}
+        {% if rows %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm" data-testid="metamodel-definitions">
+                <thead>
+                    <tr class="border-b border-border text-left text-muted-foreground">
+                        <th scope="col" class="py-2 pr-4 font-medium">Property</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Element type</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Value</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Required</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Elements missing a value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    {% set d = row.definition %}
+                    <tr class="border-b border-border" data-definition-key="{{ d.property_key }}">
+                        <td class="py-2 pr-4">
+                            <a href="{{ url_for('metamodel_properties.detail', definition_id=d.id) }}"
+                               class="font-medium text-primary hover:underline">{{ d.display_name }}</a>
+                        </td>
+                        <td class="py-2 pr-4 text-foreground">{{ d.archimate_type }}</td>
+                        <td class="py-2 pr-4 text-foreground">
+                            {{ type_labels.get(d.property_type, d.property_type) }}{% if d.enum_options %}: {{ d.enum_options | join(', ') }}{% endif %}
+                        </td>
+                        <td class="py-2 pr-4 text-foreground">{{ 'Yes' if d.is_mandatory else 'No' }}</td>
+                        <td class="py-2 pr-4 tabular-nums text-foreground">
+                            {% if row.missing_count is none %}
+                            <span title="Only required properties are counted">—</span>
+                            {% else %}{{ row.missing_count }}{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        {{ empty_state('sliders-horizontal', 'No properties defined yet',
+                       'Add a property below to require a typed value on every element of one type.' if can_define
+                       else 'An enterprise architect adds the properties your organisation requires.') }}
+        {% endif %}
+    {% endcall %}
+
+    {% if can_define %}
+    {% call section_card(title='Add a property') %}
+        <form method="post" action="{{ url_for('metamodel_properties.define') }}" class="space-y-4" data-testid="metamodel-define-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if error %}
+            <p role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" data-testid="metamodel-define-error">{{ error }}</p>
+            {% endif %}
+            <div class="grid gap-4 md:grid-cols-2">
+                <div class="space-y-1">
+                    <label for="mm-type" class="text-sm font-medium text-foreground">Element type</label>
+                    <select id="mm-type" name="archimate_type" required class="{{ field_classes }}">
+                        <option value="">Choose a type</option>
+                        {% for t in element_types %}
+                        <option value="{{ t }}" {% if form.get('archimate_type') == t %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="space-y-1">
+                    <label for="mm-name" class="text-sm font-medium text-foreground">Property name</label>
+                    <input id="mm-name" name="display_name" type="text" maxlength="128" required
+                           value="{{ form.get('display_name', '') }}" placeholder="For example: Recovery time objective (hours)"
+                           class="{{ field_classes }}">
+                </div>
+                <div class="space-y-1">
+                    <label for="mm-value-type" class="text-sm font-medium text-foreground">Value</label>
+                    <select id="mm-value-type" name="property_type" required class="{{ field_classes }}">
+                        {% for key, label in value_types %}
+                        <option value="{{ key }}" {% if form.get('property_type') == key %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="space-y-1">
+                    <label for="mm-allowed" class="text-sm font-medium text-foreground">Allowed values (for a list, one per line)</label>
+                    <textarea id="mm-allowed" name="allowed_values" rows="3"
+                              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ form.get('allowed_values', '') }}</textarea>
+                </div>
+                <div class="space-y-1 md:col-span-2">
+                    <label for="mm-help" class="text-sm font-medium text-foreground">Guidance for whoever fills it in</label>
+                    <input id="mm-help" name="help_text" type="text" value="{{ form.get('help_text', '') }}" class="{{ field_classes }}">
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="mm-mandatory" name="mandatory" {% if form.get('mandatory') %}checked{% endif %} class="rounded border-input">
+                <label for="mm-mandatory" class="text-sm text-foreground">Every element of this type must have a value</label>
+            </div>
+            <button type="submit"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                Add property
+            </button>
+        </form>
+    {% endcall %}
+    {% endif %}
+</div>
+{% endblock %}

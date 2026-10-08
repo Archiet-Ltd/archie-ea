@@ -760,6 +760,10 @@ let ComposerPersistence = (function() {
                     if (rel.description) link.set('description', rel.description);
                     if (rel.access_mode) link.set('accessMode', rel.access_mode);
                     if (rel.flow_label) link.set('flowLabel', rel.flow_label);
+                    /* Label the reloaded link the way it was labelled when drawn: what a
+                       flow carries, or the access mode, not just the bare type. */
+                    if (rel.flow_label) link.label(0, { attrs: { text: { text: rel.flow_label } } });
+                    else if (rel.access_mode && (rel.type || '').toLowerCase() === 'access') link.label(0, { attrs: { text: { text: 'access (' + rel.access_mode + ')' } } });
                     if (rel.custom_label) {
                         link.set('customLabel', rel.custom_label);
                         applyCustomLabel(link, rel.custom_label);
@@ -1951,6 +1955,10 @@ let ComposerPersistence = (function() {
                 let link = createLink(src, tgt, rel.type || 'association', rel.id);
                 if (rel.access_mode) link.set('accessMode', rel.access_mode);
                 if (rel.flow_label) link.set('flowLabel', rel.flow_label);
+                /* Label the reloaded link the way it was labelled when drawn: what a
+                   flow carries, or the access mode, not just the bare type. */
+                if (rel.flow_label) link.label(0, { attrs: { text: { text: rel.flow_label } } });
+                else if (rel.access_mode && (rel.type || '').toLowerCase() === 'access') link.label(0, { attrs: { text: { text: 'access (' + rel.access_mode + ')' } } });
                 if (rel.connection_spec) link.set('connectionSpec', rel.connection_spec);
                 if (rel.custom_label) {
                     link.set('customLabel', rel.custom_label);
@@ -2451,6 +2459,10 @@ let ComposerPersistence = (function() {
                     if (rel.description) link.set('description', rel.description);
                     if (rel.access_mode) link.set('accessMode', rel.access_mode);
                     if (rel.flow_label) link.set('flowLabel', rel.flow_label);
+                    /* Label the reloaded link the way it was labelled when drawn: what a
+                       flow carries, or the access mode, not just the bare type. */
+                    if (rel.flow_label) link.label(0, { attrs: { text: { text: rel.flow_label } } });
+                    else if (rel.access_mode && (rel.type || '').toLowerCase() === 'access') link.label(0, { attrs: { text: { text: 'access (' + rel.access_mode + ')' } } });
                     if (rel.custom_label) {
                         link.set('customLabel', rel.custom_label);
                         applyCustomLabel(link, rel.custom_label);

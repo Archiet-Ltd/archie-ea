@@ -382,10 +382,10 @@ Return ONLY a JSON object with exactly these keys:
         # 1. Import ArchiMate elements ----------------------------------------
         import_result = None
         if xml_content:
-            service = ArchiMateImportService()
             try:
-                parsed = service.parse_oef_xml(xml_content)
-                import_result = service.execute_import(parsed, strategy=strategy)
+                import_result = ArchiMateImportService().import_xml(
+                    xml_content, strategy=strategy
+                )
             except (ValueError, Exception) as exc:
                 logger.warning("ArchiMate import failed during brownfield setup: %s", exc)
                 import_result = {"created": 0, "error": str(exc)}

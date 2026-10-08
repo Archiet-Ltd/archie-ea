@@ -50,6 +50,13 @@ class HybridCapabilityTenantMixin:
     This is intentionally separate from ``TenantMixin`` because the ordinary
     equality filter would hide shared reference rows.  The model-specific event
     handlers below provide its read and write mechanism.
+
+    This exact pattern has since been generalised into ``HybridTenantMixin``
+    (``app/models/mixins/core.py``) for its own shared-catalogue tables. This
+    class becomes a plain alias of that one once the capability-store
+    consolidation merges and this model's own event handlers below are
+    retired in favour of the generic ones; kept distinct for now so this
+    change does not touch that other file beyond this comment.
     """
 
     @declared_attr
@@ -837,6 +844,16 @@ class ValueStreamStage(TenantMixin, db.Model):
     target_duration = Column(db.Integer)  # Target in hours/days
     current_duration = Column(db.Integer)  # Current in hours/days
     quality_gate = Column(db.Boolean, default=False)
+
+    # What must be true for work to enter / leave this stage, who takes part in
+    # it and what value it hands on (BIZBOK stage definition). Free text, one
+    # item per line for stakeholders and value items. Nullable so
+    # `flask reconcile-schema` can add them to existing databases; NULL means
+    # "not recorded" and renders as an em dash, never as an empty list.
+    entry_criteria = Column(db.Text, nullable=True)
+    exit_criteria = Column(db.Text, nullable=True)
+    stakeholders = Column(db.Text, nullable=True)
+    value_items = Column(db.Text, nullable=True)
 
     # Timestamps
     created_at = Column(db.DateTime, default=datetime.utcnow)

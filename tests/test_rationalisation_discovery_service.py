@@ -24,6 +24,7 @@ from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 from app.models.archimate_relationship_sync import _ensure_relationship
 from app.models.business_capabilities import BusinessCapability
 from app.models.organization import Organization
+from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
 from app.models.transformation_db_guards import ensure_transformation_db_guards
 from app.models.strategic import StrategicInitiative
 from app.models.transformation_evidence import (
@@ -78,6 +79,11 @@ def _seed_scope(session, *, suffix: str, commit: bool = False) -> DiscoveryScope
     )
     session.add(organization)
     session.flush()
+    # Callers add more people than Community admits; record a plan that has room.
+    session.add(Subscription(
+        organization_id=organization.id, plan=SubscriptionPlan.enterprise,
+        status=SubscriptionStatus.active, seats_purchased=0,
+    ))
     architect = User(
         email=f"architect-{suffix}@example.test",
         organization_id=organization.id,
@@ -501,6 +507,10 @@ def committed_scope(app, _schema):
                         ),
                         {"organization_id": scope.organization_id},
                     )
+                connection.execute(
+                    text("DELETE FROM subscriptions WHERE organization_id = :organization_id"),
+                    {"organization_id": scope.organization_id},
+                )
                 connection.execute(
                     text("DELETE FROM organizations WHERE id = :organization_id"),
                     {"organization_id": scope.organization_id},

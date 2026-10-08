@@ -15,6 +15,7 @@ from app.models.roadmap import RoadmapTask
 from app.models.roadmap_models import RoadmapDeliverable
 from app.models.unified_capability import BusinessDomain, UnifiedCapability
 from app.models.unified_work_package import UnifiedWorkPackage
+from app.utils.tenant_users import escape_like_literal
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +154,30 @@ def list_users_for_assignment():
     try:
         from app.models.user import User
 
-        users = User.query.filter_by(organization_id=g.current_org_id).order_by(User.first_name.asc()).all()
+        q = (request.args.get("q") or request.args.get("search") or "").strip()
+        limit = request.args.get("limit", type=int)
+        # An erased person (data-subject erasure clears the e-mail address) is not a
+        # candidate for any assignment picker.
+        query = User.query.filter(
+            User.organization_id == g.current_org_id, User.email.isnot(None)
+        )
+
+        if q:
+            escaped = escape_like_literal(q)
+            like = f"%{escaped}%"
+            query = query.filter(
+                db.or_(
+                    User.first_name.ilike(like, escape="\\"),
+                    User.last_name.ilike(like, escape="\\"),
+                    User.email.ilike(like, escape="\\"),
+                )
+            )
+
+        query = query.order_by(User.first_name.asc(), User.last_name.asc(), User.email.asc())
+        if limit is not None and limit > 0:
+            query = query.limit(min(limit, 50))
+
+        users = query.all()
         return jsonify(
             {
                 "success": True,

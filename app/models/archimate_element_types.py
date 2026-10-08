@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Set
 
+from app.models.constants import ArchiMateLayer
+
 # =============================================================================
 # Element Type Data Classes
 # =============================================================================
@@ -1020,7 +1022,7 @@ class ArchiMateElementTypes:
     IMPLEMENTATION_ELEMENTS = {
         "WorkPackage": ElementTypeDefinition(
             name="WorkPackage",
-            layer="implementation_migration",
+            layer=ArchiMateLayer.IMPLEMENTATION,
             aspect="behavior",
             description="A series of actions designed to achieve specific results",
             notation_symbol="Pink rounded rectangle with arrow",
@@ -1037,7 +1039,7 @@ class ArchiMateElementTypes:
         ),
         "Deliverable": ElementTypeDefinition(
             name="Deliverable",
-            layer="implementation_migration",
+            layer=ArchiMateLayer.IMPLEMENTATION,
             aspect="passive",
             description="A precisely-defined outcome of a work package",
             notation_symbol="Pink rectangle",
@@ -1053,7 +1055,7 @@ class ArchiMateElementTypes:
         ),
         "ImplementationEvent": ElementTypeDefinition(
             name="ImplementationEvent",
-            layer="implementation_migration",
+            layer=ArchiMateLayer.IMPLEMENTATION,
             aspect="behavior",
             description="A state change that marks a transition or a release",
             notation_symbol="Pink rounded rectangle with lightning",
@@ -1069,7 +1071,7 @@ class ArchiMateElementTypes:
         ),
         "Plateau": ElementTypeDefinition(
             name="Plateau",
-            layer="implementation_migration",
+            layer=ArchiMateLayer.IMPLEMENTATION,
             aspect="passive",
             description="A relatively stable state of the architecture that exists during a period",
             notation_symbol="Pink rectangle with horizontal lines",
@@ -1085,7 +1087,7 @@ class ArchiMateElementTypes:
         ),
         "Gap": ElementTypeDefinition(
             name="Gap",
-            layer="implementation_migration",
+            layer=ArchiMateLayer.IMPLEMENTATION,
             aspect="passive",
             description="A statement of difference between two plateaus",
             notation_symbol="Pink rectangle with gap indicator",
@@ -1677,7 +1679,7 @@ class ArchiMateElementTypes:
             "technology": cls.TECHNOLOGY_ELEMENTS,
             "physical": cls.PHYSICAL_ELEMENTS,
             "motivation": cls.MOTIVATION_ELEMENTS,
-            "implementation_migration": cls.IMPLEMENTATION_ELEMENTS,
+            ArchiMateLayer.IMPLEMENTATION: cls.IMPLEMENTATION_ELEMENTS,
         }
         return layer_map.get(layer, {})
 
@@ -1836,7 +1838,7 @@ class ArchiMateElementTypes:
         if layer == "motivation":
             valid_relationships.append("influence")  # Motivation elements use influence
 
-        if layer == "implementation_migration":
+        if layer in {ArchiMateLayer.IMPLEMENTATION, "implementation_migration"}:
             valid_relationships.extend(["realization", "triggering"])
 
         # Remove duplicates and return sorted list

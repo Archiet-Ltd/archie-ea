@@ -75,7 +75,8 @@ class SolutionIssueService:
         self,
         issue_id: int,
         assigned_to_id: int,
-        organization_id: Optional[int] = None
+        organization_id: Optional[int] = None,
+        solution_id: Optional[int] = None
     ) -> SolutionIssue:
         """
         Assign issue to a user.
@@ -85,12 +86,14 @@ class SolutionIssueService:
             assigned_to_id: User to assign to
             organization_id: Caller's organisation; assigned_to_id is refused
                 unless it names a user of this organisation
+            solution_id: Solution the issue is expected to belong to (the URL's
+                solution); a mismatch is reported the same way as a missing issue
 
         Returns:
             SolutionIssue: Updated issue
         """
         issue = db.session.query(SolutionIssue).get(issue_id)
-        if not issue:
+        if not issue or (solution_id is not None and issue.solution_id != solution_id):
             raise ValueError(f"Issue {issue_id} not found")
 
         if assigned_to_id and not user_in_org(assigned_to_id, organization_id):
@@ -100,28 +103,37 @@ class SolutionIssueService:
         db.session.commit()
 
         return issue
-    
+
     def escalate_issue(
         self,
         issue_id: int,
         escalated_to_id: int,
-        escalation_reason: str
+        escalation_reason: str,
+        organization_id: Optional[int] = None,
+        solution_id: Optional[int] = None
     ) -> SolutionIssue:
         """
         Escalate an issue to higher authority.
-        
+
         Args:
             issue_id: Issue to escalate
             escalated_to_id: User to escalate to
             escalation_reason: Why escalating
-        
+            organization_id: Caller's organisation; escalated_to_id is refused
+                unless it names a user of this organisation
+            solution_id: Solution the issue is expected to belong to (the URL's
+                solution); a mismatch is reported the same way as a missing issue
+
         Returns:
             SolutionIssue: Updated issue
         """
         issue = db.session.query(SolutionIssue).get(issue_id)
-        if not issue:
+        if not issue or (solution_id is not None and issue.solution_id != solution_id):
             raise ValueError(f"Issue {issue_id} not found")
-        
+
+        if escalated_to_id and not user_in_org(escalated_to_id, organization_id):
+            raise ValueError("Invalid escalated_to_id")
+
         issue.escalated_to_id = escalated_to_id
         issue.escalation_reason = escalation_reason
         issue.escalation_count += 1
@@ -171,23 +183,26 @@ class SolutionIssueService:
         self,
         issue_id: int,
         resolved_by_id: int,
-        resolution_notes: Optional[str] = None
+        resolution_notes: Optional[str] = None,
+        solution_id: Optional[int] = None
     ) -> SolutionIssue:
         """
         Mark issue as resolved.
-        
+
         Args:
             issue_id: Issue to resolve
-            resolved_by_id: Who resolved it
+            resolved_by_id: Who resolved it — the acting user, not a request value
             resolution_notes: How it was resolved
-        
+            solution_id: Solution the issue is expected to belong to (the URL's
+                solution); a mismatch is reported the same way as a missing issue
+
         Returns:
             SolutionIssue: Updated issue
         """
         issue = db.session.query(SolutionIssue).get(issue_id)
-        if not issue:
+        if not issue or (solution_id is not None and issue.solution_id != solution_id):
             raise ValueError(f"Issue {issue_id} not found")
-        
+
         issue.status = 'resolved'
         issue.resolved_by_id = resolved_by_id
         issue.resolved_at = datetime.utcnow()

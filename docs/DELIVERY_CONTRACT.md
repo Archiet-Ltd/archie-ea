@@ -83,7 +83,7 @@ not represented as qualification evidence.
 | Role | Gate tags | Gates (re-measured 3 Sep 2026, `docs-drift` keeps this row honest from here on) |
 |---|---|---|
 | UX / frontend architect (lint only — see note) | `ui`, `a11y` | 25 (no gate carries `a11y`) |
-| security architect | `security`, `airgap` | 15 |
+| security architect | `security`, `airgap` | 17 |
 | QA / test lead | `qa`, `runtime` | 8 |
 | software / technical architect | `architecture`, `correctness` | 2 (`correctness` only; no gate carries `architecture`) |
 | data architect | `schema`, `db` | 2 (`db` only; no gate carries `schema`) |

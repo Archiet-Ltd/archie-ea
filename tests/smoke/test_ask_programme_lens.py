@@ -49,6 +49,7 @@ def _seed_programme_graph(org_id):
         wp = UnifiedWorkPackage(
             name="%s cloud migration" % noun,
             archimate_element_id=service.id,
+            organization_id=org_id,
             business_capability="Ledger",
             status="in_progress",
             progress_percentage=55.0,
@@ -68,6 +69,9 @@ def programme_graph(seeded, live_server):
 
 
 def _login(page, base, email):
+    # Sign in from a signed-out browser: switching persona mid-test otherwise
+    # lands on the login page already authenticated, which redirects away.
+    page.context.clear_cookies()
     page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.fill("#email", email)
     page.fill("#password", PASSWORD)

@@ -81,6 +81,7 @@ def _backfill_outcome_org(dry_run):
         return
 
     conn.execute(text(
+        # tenancy-ok: one-time backfill, retirement 2026-12-31
         'UPDATE "outcomes" AS o SET organization_id = e.organization_id '
         'FROM "archimate_elements" AS e '
         'WHERE o.archimate_element_id = e.id AND o.organization_id IS NULL'
@@ -93,6 +94,7 @@ def _backfill_outcome_org(dry_run):
 
     if after_element:
         conn.execute(text(
+            # tenancy-ok: one-time backfill, retirement 2026-12-31
             'UPDATE "outcomes" AS o SET organization_id = m.organization_id '
             'FROM "architecture_models" AS m '
             'WHERE o.architecture_id = m.id AND o.organization_id IS NULL'
