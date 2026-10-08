@@ -463,6 +463,37 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # Webhook delivery recovery: rows left "pending"/"retrying" (queue full,
+        # cancelled at exit, a dead worker) are handed back to the delivery
+        # dispatcher every 5 minutes, organisation by organisation.
+        def run_webhook_delivery_sweep():
+            with app.app_context():
+                try:
+                    from app.jobs.tenant_safe_job import run_for_each_tenant
+                    from app.services.webhook_service import WebhookService
+
+                    run_for_each_tenant(
+                        app,
+                        "webhook_delivery_sweep",
+                        lambda organization_id: WebhookService().sweep_stale_deliveries(
+                            organization_id
+                        ),
+                    )
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error(
+                        "APScheduler webhook-delivery-sweep error: %s", exc
+                    )
+
+        scheduler.add_job(
+            func=run_webhook_delivery_sweep,
+            trigger=IntervalTrigger(minutes=5),
+            id="webhook_delivery_sweep",
+            name="Webhook Delivery Sweep",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # Teams meeting intelligence: Graph callRecords subscriptions expire
         # every 3 days — renew twice daily; renew_if_needed re-creates the
         # subscription if Graph has already dropped it. No-op when the

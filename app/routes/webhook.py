@@ -15,7 +15,9 @@ from flask_login import current_user
 
 from app import csrf
 from app.decorators import audit_log, require_auth
+from app.middleware.tenant_decorators import is_platform_admin
 from app.services.rate_limiter import RateLimitExceeded, _rate_limiter
+from app.services.rbac_service import rbac_service
 from app.services.webhook_service import WebhookService
 from app.utils.pagination import safe_int_arg
 webhook_bp = Blueprint("webhook", __name__, url_prefix="/api/webhooks")
@@ -24,6 +26,18 @@ webhook_bp = Blueprint("webhook", __name__, url_prefix="/api/webhooks")
 # app-wide limiter already holds each user to 30 writes a minute).
 PUBLISH_RATE_LIMIT = 120
 PUBLISH_RATE_WINDOW_SECONDS = 60
+
+
+def _is_webhook_admin() -> bool:
+    """Admin of the organisation the user is acting in now (the one admin
+    predicate behind org_admin_required / rbac_service.require_role, judged for
+    g.current_org_id, not the home organisation), or a platform admin."""
+    if not getattr(current_user, "is_authenticated", False):
+        return False
+    if is_platform_admin(current_user):
+        return True
+    org_id = getattr(g, "current_org_id", None)
+    return org_id is not None and bool(rbac_service.is_org_admin(current_user, org_id))
 
 
 # IP-based rate limiter for the public webhook receiver endpoint
@@ -259,7 +273,7 @@ def list_events():
         service = WebhookService()
 
         # Only allow admins to list all events
-        if not hasattr(request, "user_roles") or "admin" not in request.user_roles:
+        if not _is_webhook_admin():
             return jsonify({"success": False, "error": "Admin access required"}), 403
 
         events = service.get_events(
@@ -284,7 +298,7 @@ def retry_event(event_id):
         service = WebhookService()
 
         # Only allow admins to retry events
-        if not hasattr(request, "user_roles") or "admin" not in request.user_roles:
+        if not _is_webhook_admin():
             return jsonify({"success": False, "error": "Admin access required"}), 403
 
         success = service.retry_event(event_id)

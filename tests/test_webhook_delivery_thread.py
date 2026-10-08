@@ -51,11 +51,15 @@ class _Receiver:
 @pytest.fixture(autouse=True)
 def _allow_loopback_receivers(request, monkeypatch):
     """The local receivers sit on 127.0.0.1, which the outbound URL guard
-    rightly refuses. Tests of the guard itself (name contains "ssrf") keep it."""
+    rightly refuses, and so does the connected-peer check. Tests of the guards
+    themselves (name contains "ssrf") keep both."""
     if "ssrf" in request.node.name:
         return
     monkeypatch.setattr(
         "app.services.webhook_service.validate_outbound_url", lambda url, **kw: url, raising=False
+    )
+    monkeypatch.setattr(
+        "app.services.webhook_service._peer_is_public", lambda address: True, raising=False
     )
 
 
@@ -1062,3 +1066,446 @@ def test_d5_deliverable_checks_the_organisation_without_tenant_scope(app, commit
         assert WebhookService._deliverable(inactive, org_b) is False
         assert WebhookService._deliverable(None, org_b) is False
         db.session.remove()
+
+
+# ===========================================================================
+# Round 4: HTTPS deadline, claim tokens, periodic sweep, admin routes, rebinding
+# ===========================================================================
+
+
+@pytest.fixture(scope="module")
+def tls_material(tmp_path_factory):
+    """A throwaway certificate for 127.0.0.1 / localhost (the receiver's)."""
+    import datetime as dt
+    import ipaddress
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "localhost")])
+    now = dt.datetime.now(dt.timezone.utc)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - dt.timedelta(days=1))
+        .not_valid_after(now + dt.timedelta(days=2))
+        .add_extension(
+            x509.SubjectAlternativeName(
+                [x509.DNSName("localhost"), x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]
+            ),
+            critical=False,
+        )
+        .sign(key, hashes.SHA256())
+    )
+    folder = tmp_path_factory.mktemp("tls")
+    cert_path, key_path = folder / "cert.pem", folder / "key.pem"
+    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(
+        key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.NoEncryption(),
+        )
+    )
+    return str(cert_path), str(key_path)
+
+
+@pytest.fixture
+def trust_tls(tls_material, monkeypatch):
+    monkeypatch.setenv("REQUESTS_CA_BUNDLE", tls_material[0])
+    return tls_material
+
+
+class _TlsRawServer(_RawServer):
+    """_RawServer behind TLS. Mode "handshake" accepts the TCP connection and
+    never answers the ClientHello (the connect phase stalls)."""
+
+    def __init__(self, mode, material):
+        import ssl
+
+        self._tls_mode = mode
+        self._ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        self._ctx.load_cert_chain(*material)
+        super().__init__("hang" if mode == "handshake" else mode)
+        self.url = self.url.replace("http://", "https://")
+
+    def _serve(self, conn):
+        if self._tls_mode != "handshake":
+            try:
+                conn = self._ctx.wrap_socket(conn, server_side=True)
+            except OSError:
+                return
+        super()._serve(conn)
+
+
+def _wrap_scripted_in_tls(sock, material):
+    import ssl
+
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(*material)
+    return ctx.wrap_socket(sock, server_side=True)
+
+
+@pytest.mark.parametrize("mode", ["body", "headers", "hang", "handshake"])
+def test_r31_https_receiver_is_cut_off_at_the_deadline(app, committed_orgs, trust_tls, mode):
+    org_a, _ = committed_orgs[0]
+    drip = _TlsRawServer(mode, trust_tls)
+    try:
+        _subscribe(app, org_a, drip.url)
+        started = time.time()
+        event_id, future = _publish_with(app, org_a, {"n": 1}, attempt_deadline=1.0, timeout=30)
+        future.result(15)  # a TLS drip was still alive after 60s before the fix
+        elapsed = time.time() - started
+        assert elapsed < 3.0, f"{mode}: attempt ran {elapsed:.1f}s against a 1s deadline"
+        (row,) = _row(app, org_a, event_id)
+        assert row["status"] == "failed" and "deadline" in row["error"], row
+    finally:
+        drip.close()
+
+
+def test_r31_https_receiver_that_answers_still_delivers(app, committed_orgs, trust_tls):
+    """The tracked TLS connection is a normal one when the receiver behaves."""
+    org_a, _ = committed_orgs[0]
+    secure = _Scripted(200)
+    secure.server.socket = _wrap_scripted_in_tls(secure.server.socket, trust_tls)
+    url = secure.url.replace("http://", "https://")
+    try:
+        _subscribe(app, org_a, url)
+        event_id, future = _publish_with(app, org_a, {"n": 1})
+        future.result(15)
+        assert len(secure.requests) == 1
+        (row,) = _row(app, org_a, event_id)
+        assert row["status"] == "success", row
+    finally:
+        secure.close()
+
+
+@pytest.mark.parametrize("mode", ["hang", "body"])
+def test_r31_https_hanging_receiver_does_not_delay_another_organisation(
+    app, committed_orgs, trust_tls, mode
+):
+    org_a, org_b = committed_orgs[0]
+    bad = _TlsRawServer(mode, trust_tls)
+    fast = _Scripted(200)
+    futures = []
+    try:
+        _subscribe(app, org_a, bad.url)
+        _subscribe(app, org_b, fast.url)
+        for i in range(8):
+            futures.append(_publish_with(app, org_a, {"n": i}, attempt_deadline=1.0, timeout=30)[1])
+        started = time.time()
+        _, future_b = _publish_with(app, org_b, {"b": 1}, attempt_deadline=1.0)
+        future_b.result(1.0 + 2.5)
+        assert time.time() - started < 1.0 + 2.5
+        assert len(fast.requests) == 1
+        assert bad.max_live <= 2, f"org A had {bad.max_live} deliveries in flight"
+    finally:
+        bad.close()
+        for f in futures:
+            if f is not None:
+                f.result(30)
+        fast.close()
+
+
+def test_r31_connect_phase_runs_under_the_attempt_deadline():
+    """The connection's own timeout is cut to what is left of the deadline."""
+    from app.services import webhook_service as ws
+
+    seen = {}
+
+    class Base:
+        timeout = 30
+
+        def _new_conn(self):
+            seen["timeout"] = self.timeout
+            raise OSError("stop")
+
+    class Conn(ws._TrackSocketMixin, Base):
+        pass
+
+    with ws._AttemptGuard(1.0):
+        with pytest.raises(OSError):
+            Conn()._new_conn()
+    assert seen["timeout"] <= 1.0
+    seen.clear()
+    expired = ws._AttemptGuard(0.01)
+    time.sleep(0.05)
+    with expired:
+        with pytest.raises(OSError):
+            Conn()._new_conn()
+    assert "timeout" not in seen, "a connect was attempted after the deadline had passed"
+
+
+# ---- R3-2: claim tokens and the computed stale threshold -------------------
+
+
+def test_r32_stale_threshold_is_computed_from_the_retry_config(app):
+    from app.services.webhook_service import WebhookService
+
+    with app.test_request_context("/"):
+        service = WebhookService()
+        service.max_retries = 3
+        service.retry_delay = 300
+        service.attempt_deadline = 10.0
+        # 3 attempts x 10s + backoff 300s + 600s + 60s margin
+        assert service._stale_after().total_seconds() >= 3 * 10 + 300 + 600 + 60
+        service.retry_delay = 0
+        assert service._stale_after().total_seconds() < 600
+
+
+def test_r32_retry_while_the_first_worker_is_alive_sends_exactly_once(app, committed_orgs):
+    from sqlalchemy import text
+
+    from app import db
+
+    org_a, _ = committed_orgs[0]
+    receiver = _Scripted(statuses=(500, 200))
+    try:
+        _subscribe(app, org_a, receiver.url)
+        # A long backoff: the live worker's row sits "retrying" for 700s, far
+        # longer than the old fixed ten minutes.
+        event_id, future = _publish_with(app, org_a, {"n": 1}, max_retries=2, retry_delay=700)
+        assert _wait_for(lambda: len(receiver.requests) == 1)
+        assert _wait_for(lambda: [r["status"] for r in _row(app, org_a, event_id)] == ["retrying"])
+        with app.app_context():
+            db.session.execute(
+                text("UPDATE webhook_deliveries SET last_attempt_at = last_attempt_at - interval '11 minutes' "
+                     "WHERE event_id = :e"), {"e": event_id},
+            )
+            db.session.commit()
+        _retry_with(app, org_a, event_id, max_retries=2, retry_delay=700).result(10)
+        time.sleep(0.3)
+        assert len(receiver.requests) == 1, "a second POST went out while the first worker was alive"
+    finally:
+        receiver.close()
+
+
+def test_r32_a_slower_worker_cannot_overwrite_a_newer_claim(app, committed_orgs):
+    from sqlalchemy import text
+
+    from app import db
+
+    org_a, _ = committed_orgs[0]
+    receiver = _Scripted(statuses=(200,), delay=1.5)
+    try:
+        _subscribe(app, org_a, receiver.url)
+        event_id, future = _publish_with(app, org_a, {"n": 1})
+        assert _wait_for(lambda: len(receiver.requests) == 1)
+        # Another claimant takes the row (new token) and records its own result.
+        with app.app_context():
+            db.session.execute(
+                text("UPDATE webhook_deliveries SET status = 'failed', error_message = 'newer claim', "
+                     "attempt_count = 7, last_attempt_at = (now() at time zone 'utc') + interval '1 second' "
+                     "WHERE event_id = :e"), {"e": event_id},
+            )
+            db.session.commit()
+        future.result(15)  # the first worker now finishes its 200
+        (row,) = _row(app, org_a, event_id)
+        assert row["status"] == "failed" and row["error"] == "newer claim" and row["attempts"] == 7, row
+    finally:
+        receiver.close()
+
+
+# ---- R3-3: periodic sweep and admin authorisation --------------------------
+
+
+def _scheduler_job(app, monkeypatch, job_id):
+    """Register the app's scheduler jobs without starting a scheduler."""
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    import app._bootstrap.extensions as ext
+
+    monkeypatch.setattr(BackgroundScheduler, "start", lambda self, *a, **k: None)
+    monkeypatch.setattr(ext, "_scheduler_belongs_in_this_process", lambda: True)
+    monkeypatch.setitem(app.config, "TESTING", False)
+    app.extensions.pop("ea_workflow_scheduler", None)
+    try:
+        ext.init_scheduler(app)
+        scheduler = app.extensions["ea_workflow_scheduler"]
+        return scheduler.get_job(job_id)
+    finally:
+        app.extensions.pop("ea_workflow_scheduler", None)
+        app.config["TESTING"] = True
+
+
+def test_r33_sweep_job_is_registered_on_the_existing_scheduler_every_5_minutes(app, monkeypatch):
+    from datetime import timedelta
+
+    from app.jobs.tenant_safe_job import PLATFORM_JOBS, TENANT_JOBS
+
+    job = _scheduler_job(app, monkeypatch, "webhook_delivery_sweep")
+    assert job is not None, "no webhook_delivery_sweep job on the APScheduler"
+    assert job.trigger.interval == timedelta(minutes=5)
+    assert "webhook_delivery_sweep" in (PLATFORM_JOBS | TENANT_JOBS)
+
+
+def test_r33_the_sweep_sends_stale_pending_and_retrying_rows_but_not_fresh_or_failed(
+    app, committed_orgs, monkeypatch
+):
+    from datetime import datetime, timedelta
+
+    from app import db
+    from app.models.webhook import WebhookDelivery
+
+    org_a, org_b = committed_orgs[0]
+    receiver = _Scripted(200)
+    other = _Scripted(200)
+    try:
+        sub_a = _subscribe(app, org_a, receiver.url)
+        sub_b = _subscribe(app, org_b, other.url)
+        event_a = _new_event(app, org_a, {"a": 1})
+        event_b = _new_event(app, org_b, {"b": 1})
+        old = datetime.utcnow() - timedelta(minutes=30)
+        rows = [
+            ("stale-pending", "pending", old, None, sub_a, event_a, org_a),
+            ("stale-retrying", "retrying", datetime.utcnow(), old, sub_a, event_a, org_a),
+            ("fresh-pending", "pending", datetime.utcnow(), None, sub_a, event_a, org_a),
+            ("failed", "failed", old, old, sub_a, event_a, org_a),
+            ("other-org", "pending", old, None, sub_b, event_b, org_b),
+        ]
+        with app.app_context():
+            for tag, status, created, last, sub, event, org in rows:
+                db.session.add(WebhookDelivery(
+                    id=str(uuid.uuid4()), event_id=event, subscription_id=sub,
+                    organization_id=org, event_type="application.created",
+                    payload={"tag": tag}, status=status, attempt_count=0,
+                    created_at=created, last_attempt_at=last,
+                ))
+            db.session.commit()
+        job = _scheduler_job(app, monkeypatch, "webhook_delivery_sweep")
+        job.func()  # what the scheduler does every 5 minutes
+        assert _wait_for(lambda: len(receiver.requests) >= 2 and len(other.requests) >= 1, 15)
+        time.sleep(0.5)
+        assert sorted(json.loads(r["body"])["tag"] for r in receiver.requests) == [
+            "stale-pending", "stale-retrying"]
+        assert [json.loads(r["body"])["tag"] for r in other.requests] == ["other-org"]
+    finally:
+        receiver.close()
+        other.close()
+
+
+def _hook_user(db_session, org, role_name="Administrator"):
+    from app.models.user import Role, User
+
+    role = Role.query.filter_by(name=role_name).first()
+    user = User(
+        email=f"hook-admin-{uuid.uuid4().hex[:8]}@example.com", first_name="T", last_name="U",
+        organization_id=org.id, role=role, confirmed=True,
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def test_r33_routes_use_the_active_org_admin_check(app, db_session, make_org, login_as, client, monkeypatch):
+    from app.models.webhook import WebhookEvent
+    from app.services.webhook_service import WebhookService
+
+    retried = []
+    # The delivery worker has its own connection, which this fixture's joined
+    # transaction cannot share; only the authorisation is under test here.
+    monkeypatch.setattr(WebhookService, "retry_event", lambda self, event_id: retried.append(event_id) or True)
+
+    org = make_org("hookroutes")
+    admin = _hook_user(db_session, org)
+    admin.grant_org_admin()
+    viewer = _hook_user(db_session, org, role_name="User")
+    db_session.add(WebhookEvent(
+        id=str(uuid.uuid4()), event_type="x.y", payload={}, user_id="1", event_metadata={},
+        organization_id=org.id,
+    ))
+    db_session.flush()
+    login_as(client, viewer)
+    assert client.get("/api/webhooks/events").status_code == 403
+    assert client.post("/api/webhooks/events/nope/retry").status_code == 403
+    login_as(client, admin)
+    resp = client.get("/api/webhooks/events")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert resp.get_json()["success"] is True
+    event_id = resp.get_json()["data"][0]["id"]
+    retry = client.post(f"/api/webhooks/events/{event_id}/retry")
+    assert retry.status_code == 200, retry.get_data(as_text=True)
+    assert retried == [event_id]
+
+
+def test_r33_admin_of_the_home_org_is_not_admin_of_the_org_they_switched_into(
+    app, db_session, make_org
+):
+    from flask import g
+    from flask_login import login_user
+
+    from app.routes.webhook import _is_webhook_admin
+
+    home, other = make_org("home"), make_org("other")
+    admin = _hook_user(db_session, home)
+    admin.grant_org_admin()
+    with app.test_request_context("/"):
+        login_user(admin)
+        g.current_org_id = home.id
+        assert _is_webhook_admin() is True
+        g.current_org_id = other.id
+        assert _is_webhook_admin() is False
+
+
+# ---- R3-4: the connected peer is judged by the ssrf_guard rule --------------
+
+
+def test_r34_ssrf_dns_rebinding_to_loopback_is_refused_at_connect(app, committed_orgs, monkeypatch):
+    import socket as socket_module
+
+    org_a, _ = committed_orgs[0]
+    internal = _Scripted(200, body=b"internal secret")
+    port = internal.server.server_address[1]
+    real = socket_module.getaddrinfo
+    calls = {"n": 0}
+
+    def rebinding(host, *args, **kwargs):
+        if host != "rebind.example":
+            return real(host, *args, **kwargs)
+        calls["n"] += 1
+        address = "93.184.216.34" if calls["n"] == 1 else "127.0.0.1"  # TTL 0: public, then loopback
+        return [(socket_module.AF_INET, socket_module.SOCK_STREAM, 6, "", (address, port))]
+
+    monkeypatch.setattr(socket_module, "getaddrinfo", rebinding)
+    try:
+        _subscribe(app, org_a, f"http://rebind.example:{port}/hook")
+        event_id, future = _publish_with(app, org_a, {"n": 1}, max_retries=3)
+        future.result(15)
+        assert calls["n"] >= 2, "the host was not resolved a second time"
+        assert internal.requests == [], "the signed POST reached the loopback service"
+        (row,) = _row(app, org_a, event_id)
+        assert row["status"] == "failed" and row["attempts"] == 1, row
+        assert "not a public address" in row["error"]
+        assert "internal secret" not in (row["response_body"] or "")
+    finally:
+        internal.close()
+
+
+# ---- L-1: a test delivery is one attempt -----------------------------------
+
+
+def test_l1_test_delivery_makes_one_attempt(app, committed_orgs):
+    from flask import g
+
+    from app.services.webhook_service import WebhookService
+
+    org_a, _ = committed_orgs[0]
+    receiver = _Scripted(statuses=(500,))
+    try:
+        sub_id = _subscribe(app, org_a, receiver.url)
+        with app.test_request_context("/"):
+            g.current_org_id = org_a
+            service = WebhookService()
+            service.max_retries = 3
+            service.retry_delay = 0
+            result = service.test_subscription(sub_id, "1")
+        assert result["success"] is False and result["attempts"] == 1
+        assert len(receiver.requests) == 1
+    finally:
+        receiver.close()

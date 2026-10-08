@@ -107,6 +107,7 @@ TENANT_JOBS: frozenset[str] = frozenset({
     "ea_workflow_scheduler",        # visited via run_for_each_tenant
 "event_log_relay",              # visited via run_for_each_tenant
     "model_health_scan",            # per-org drift detection + store
+    "webhook_delivery_sweep",       # visited via run_for_each_tenant
 })
 
 

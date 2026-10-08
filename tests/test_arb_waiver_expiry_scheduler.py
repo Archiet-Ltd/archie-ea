@@ -89,6 +89,7 @@ def test_scheduler_disabled_preserves_established_jobs(monkeypatch):
         "error_digest",
         "approval_escalation",
         "event_log_relay",
+        "webhook_delivery_sweep",
         "event_log_partition_maintenance",
     }
 
@@ -114,6 +115,7 @@ def test_malformed_optional_interval_does_not_disable_established_jobs(monkeypat
         "error_digest",
         "approval_escalation",
         "event_log_relay",
+        "webhook_delivery_sweep",
         "event_log_partition_maintenance",
     }
 
@@ -142,6 +144,7 @@ def test_overflowing_optional_trigger_does_not_disable_established_jobs(monkeypa
         "error_digest",
         "approval_escalation",
         "event_log_relay",
+        "webhook_delivery_sweep",
         "event_log_partition_maintenance",
     }
 
@@ -162,5 +165,6 @@ def test_optional_add_job_failure_does_not_disable_established_jobs(monkeypatch)
         "error_digest",
         "approval_escalation",
         "event_log_relay",
+        "webhook_delivery_sweep",
         "event_log_partition_maintenance",
     }
