@@ -47,9 +47,11 @@ the ArchiMate 3.2 open standard, so your model is never locked in.
 
 ## What you can ask today
 
-What breaks if this fails, and who gets called. Which value streams are at risk and why. Who's
-accountable, and where that trail runs cold. Every answer carries its own reasoning — open it,
-check it, never just trust a number because a page said so.
+What breaks if this fails, and who gets called. Which value streams are at risk and why. Every
+answer carries its own reasoning — open it, check it, never just trust a number because a page
+said so.
+
+## Also built in
 
 **Find what you're paying for twice.** Run duplicate detection across your whole application list,
 review the overlapping groups it finds, and add them to a consolidation plan.

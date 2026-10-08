@@ -536,13 +536,12 @@ def test_withdrawn_page_is_noindex_but_live_page_is_not(app):
 
 
 def test_indexnow_submission_matches_sitemap_urls(app, monkeypatch):
-    """The ping-indexnow CLI command and /sitemap.xml are now built from the
-    one feed set this merge consolidates PR419's is_held/MERGED_PAGES and
-    this branch's own withdrawal mechanism into (load_feed_pages()) --
-    asserts the two surfaces' own, actually-rendered outputs agree page
-    URL for page URL, not just that both happen to call the same function
-    name today. A held, merged or withdrawn page missing from one surface
-    but not the other would be caught here.
+    """The ping-indexnow CLI command and /sitemap.xml are now both built
+    from the one shared path list (public_pages.feed_page_paths()) --
+    asserts the two surfaces' own, actually-rendered outputs agree path
+    for path, with no subtraction hiding a gap between them. A held,
+    merged or withdrawn page, or a hub view, missing from one surface but
+    not the other would be caught here.
     """
     from urllib.parse import urlparse
 
@@ -570,16 +569,10 @@ def test_indexnow_submission_matches_sitemap_urls(app, monkeypatch):
     sitemap_paths = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml))
     submitted_paths = {urlparse(url).path or "/" for url in submitted}
 
-    # /vs and /use-cases are hub views, not PublicPage content -- the
-    # sitemap lists them explicitly (same as the home page); IndexNow
-    # submits only the home page plus every real content page.
-    sitemap_content_paths = sitemap_paths - {"/", "/vs", "/use-cases"}
-    submitted_content_paths = submitted_paths - {"/"}
-
-    assert submitted_content_paths == sitemap_content_paths, (
+    assert submitted_paths == sitemap_paths, (
         "IndexNow's page URL set does not match the sitemap's:\n"
-        f"only in IndexNow: {sorted(submitted_content_paths - sitemap_content_paths)}\n"
-        f"only in sitemap: {sorted(sitemap_content_paths - submitted_content_paths)}"
+        f"only in IndexNow: {sorted(submitted_paths - sitemap_paths)}\n"
+        f"only in sitemap: {sorted(sitemap_paths - submitted_paths)}"
     )
 
 

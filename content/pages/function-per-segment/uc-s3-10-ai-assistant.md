@@ -20,9 +20,9 @@ model. It sounds confident either way — only one of those is trustworthy.
 
 ## What Entelim already does, and what it's building
 
-Entelim's own [AI Chat](/modules/ai-chat) is live today, on a paid plan: one chat page backed by
-direct access to the same questions Ask answers, so it reasons from your real model rather than a
-plausible-sounding guess.
+Entelim's own [AI Chat](/modules/ai-chat) is live today, on a paid plan: one chat page backed
+directly by your model data: it reads your model's own records and shows which ones it cites, so
+you can check an answer rather than take it on faith.
 
 What's still coming is access for an AI assistant your team already uses elsewhere, outside
 Entelim's own chat page: MCP read tools over the same questions Ask answers.

@@ -46,5 +46,5 @@ something real instead of a blank box.
 ## Related
 
 - [Business Model Canvas](/use-cases/business-model-canvas-on-one-page)
-- [Show an investor what we run, in an afternoon](/use-cases/show-investors-what-we-run)
-- [What must be true for our revenue stream](/use-cases/revenue-stream-risk)
+- [Show an investor what we run, in an afternoon](/use-cases/architecture-map-for-due-diligence)
+- [What must be true for our revenue stream](/use-cases/value-streams-at-risk)

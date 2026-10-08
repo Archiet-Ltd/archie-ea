@@ -97,8 +97,8 @@ def test_every_page_canonical_is_self_referencing(app):
 
 def test_ping_indexnow_excludes_a_withdrawn_page(app, monkeypatch):
     """The `ping-indexnow` CLI command (app/commands/indexnow_commands.py)
-    builds its URL list from load_feed_pages(), the same feed set the
-    sitemap and llms.txt are built from -- a page withdrawn from discovery
+    builds its URL list from public_pages.feed_page_paths(), the same path
+    list the sitemap is built from -- a page withdrawn from discovery
     (state: not_planned) must not be submitted to IndexNow either.
 
     Exercises the real command (not a re-implementation of its URL-building
@@ -137,7 +137,14 @@ def test_ping_indexnow_excludes_a_withdrawn_page(app, monkeypatch):
         )
 
     feed_pages = load_feed_pages()
-    assert len(submitted) == len(feed_pages) + 1  # +1 for the site root "/"
+    # +3: the site root "/" plus the /vs and /use-cases hub views, which
+    # are not PublicPage content and so are not in feed_pages -- see
+    # public_pages.feed_page_paths(), the one path list this command and
+    # /sitemap.xml are both built from (D-26: a manual ping used to miss
+    # the two hub pages the sitemap always listed).
+    assert len(submitted) == len(feed_pages) + 3
+    assert any(url.endswith("/vs") for url in submitted)
+    assert any(url.endswith("/use-cases") for url in submitted)
     for page in feed_pages:
         assert any(url.endswith(page.url) for url in submitted), (
             f"ping-indexnow did not submit live page {page.url}"

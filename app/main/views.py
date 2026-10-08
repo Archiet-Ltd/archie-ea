@@ -437,34 +437,22 @@ def robots_txt():
 def sitemap_xml():
     """Serve sitemap.xml for SEO — generated from public content pages.
 
-    Built from load_feed_pages(), not load_all_pages(): a HOLD-verdict page,
-    a MERGE-verdict page (301s elsewhere -- the old URL is not a second
-    entry for content that now lives at the target) and a page withdrawn
-    from discovery (front matter ``state: not_planned``) are all excluded --
-    see app/services/public_pages.py::load_feed_pages.
+    Built from feed_page_paths(), the one path list shared with the
+    IndexNow CLI (app/commands/indexnow_commands.py), so the two cannot
+    drift apart: it already excludes a HOLD-verdict page, a MERGE-verdict
+    page (301s elsewhere -- the old URL is not a second entry for content
+    that now lives at the target) and a page withdrawn from discovery
+    (front matter ``state: not_planned``) -- see
+    app/services/public_pages.py::load_feed_pages / feed_page_paths.
     """
-    from app.services.public_pages import load_feed_pages
+    from app.services.public_pages import feed_page_paths
 
-    pages = load_feed_pages()
     base_url = "https://entelim.org"
     urls = []
-    # Homepage is not a content page but is the most important URL
-    urls.append(
-        f"  <url><loc>{base_url}/</loc><priority>1.0</priority></url>"
-    )
-    # The /vs comparison hub and the /use-cases index are views, not content
-    # pages from load_all_pages(), so each needs its own entry here, same as
-    # the homepage above.
-    urls.append(
-        f"  <url><loc>{base_url}/vs</loc></url>"
-    )
-    urls.append(
-        f"  <url><loc>{base_url}/use-cases</loc></url>"
-    )
-    for p in pages:
-        urls.append(
-            f"  <url><loc>{base_url}{p.url}</loc></url>"
-        )
+    for path in feed_page_paths():
+        # Homepage is not a content page but is the most important URL.
+        priority = "<priority>1.0</priority>" if path == "/" else ""
+        urls.append(f"  <url><loc>{base_url}{path}</loc>{priority}</url>")
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
     from flask import Response
     return Response(xml, mimetype="application/xml")

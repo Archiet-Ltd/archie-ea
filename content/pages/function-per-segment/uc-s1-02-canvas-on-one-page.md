@@ -32,5 +32,4 @@ your own model data, so you start from something real instead of a blank box.
 ## Related
 
 - [If our one cloud platform or payment provider goes down, what stops?](/use-cases/single-point-of-failure)
-- [What must be true for our revenue stream?](/use-cases/revenue-stream-risk)
-- [Which boxes on my canvas depend on things we haven't built yet?](/use-cases/canvas-dependencies)
+- [What must be true for our revenue stream?](/use-cases/value-streams-at-risk)

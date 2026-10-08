@@ -31,4 +31,4 @@ Coming in an upcoming release. Join the waiting list and we'll tell you the day 
 ## Related
 
 - [Put our business model on one page](/use-cases/business-model-canvas-on-one-page)
-- [What must be true for our revenue stream?](/use-cases/revenue-stream-risk)
+- [What must be true for our revenue stream?](/use-cases/value-streams-at-risk)

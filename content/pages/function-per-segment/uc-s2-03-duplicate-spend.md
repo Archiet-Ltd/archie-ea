@@ -25,5 +25,4 @@ review the overlapping groups it finds, and add them to a consolidation plan.
 ## Related
 
 - [Rationalization](/modules/rationalization)
-- [Duplicate Detection](/modules/duplicate-detection)
 - [What breaks if this service fails, and who gets called?](/use-cases/what-breaks-and-who-gets-called)

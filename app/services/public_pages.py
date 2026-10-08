@@ -663,6 +663,21 @@ def load_feed_pages() -> list[PublicPage]:
     ]
 
 
+def feed_page_paths() -> list[str]:
+    """Every path that belongs in a "submit/list every page" surface: the
+    homepage, the /vs and /use-cases hub views (not PublicPage content, so
+    load_feed_pages() alone does not carry them) and every path from
+    load_feed_pages() itself.
+
+    The sitemap (app/main/views.py::sitemap_xml) and the IndexNow CLI
+    (app/commands/indexnow_commands.py::ping_indexnow_command) both build
+    their URL set from this one list, so the two cannot drift apart again
+    the way they did when each built its own (see
+    tests/test_public_content_pages.py::test_indexnow_submission_matches_sitemap_urls).
+    """
+    return ["/", "/vs", "/use-cases"] + [page.url for page in load_feed_pages()]
+
+
 def load_page(family: str, slug: str | None = None) -> PublicPage | None:
     """Load a single page by family and optional slug."""
     if family not in FAMILY_DIR_MAP:

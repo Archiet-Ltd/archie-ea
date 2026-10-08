@@ -24,9 +24,9 @@ same twin the product sells, not a spreadsheet kept alongside it. That practice 
 
 ## Built for your AI assistants too
 
-A general assistant can guess at your architecture. It can't know it. Entelim's own AI chat queries
-your twin directly, backed by the same questions Ask answers, so an answer comes from your real
-model, not a plausible-sounding guess.
+A general assistant can guess at your architecture. It can't know it. Entelim's own AI chat is
+backed directly by your model data: it reads your model's own records and shows which ones it
+cites, so you can check an answer rather than take it on faith.
 
 ## Open source, so nobody's locked in
 
@@ -39,8 +39,7 @@ format.
 
 ## What Entelim answers
 
-What breaks if this fails, and who gets called. What you're paying for twice. Which value streams
-are at risk and why. Who's accountable, and where that trail runs cold. Every answer carries its own
-reasoning, open to check, never just a number on a page.
+What breaks if this fails, and who gets called. Which value streams are at risk and why. Every
+answer carries its own reasoning, open to check, never just a number on a page.
 
 See [what Entelim covers](/features), [how it's priced](/pricing), or [get in touch](/contact).
