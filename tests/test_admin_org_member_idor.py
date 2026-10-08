@@ -337,6 +337,318 @@ class TestChangeEmailSessionSwitchIDOR:
             assert reloaded.email == new_email
 
 
+class TestSetPasswordSessionSwitchIDOR:
+    """Same session-switch IDOR class as ``TestChangeEmailSessionSwitchIDOR``
+    above, for ``set_user_password``. Found by the sweep that found
+    ``change_user_email``'s gap (routed from the PR424 reviewer finding):
+    ``admin_required`` only checks the caller's own, organisation-independent
+    ``Permission.ADMINISTER`` bit, so once the attacker's active session is
+    switched into the victim's organisation, the only remaining gate is this
+    route's own authorization check. This is the most severe of the four --
+    it sets a new password directly, completing an account takeover with no
+    password-reset-flow step."""
+
+    def test_admin_with_viewer_role_in_other_org_cannot_set_its_admin_password(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.org_role import OrgRole
+        from app.models.user import User
+
+        org_a = _make_org(db_session, "pw-sw-a")
+        org_b = _make_org(db_session, "pw-sw-b")
+        attacker = _make_user(db_session, org_a, is_org_admin=True, is_platform_admin=False)
+        victim = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        victim_password_hash = victim.password_hash
+        OrgRole.set_role(org_b.id, attacker.id, "viewer", granted_by_id=attacker.id)
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, attacker)
+            switched = client.post(
+                "/account/switch-organization",
+                data={"organization_id": str(org_b.id)},
+                follow_redirects=False,
+            )
+            assert switched.status_code == 302
+
+            resp = client.post(
+                f"/admin/user/{victim.id}/set-password",
+                data={
+                    "password": "pwned-Password123!",
+                    "password2": "pwned-Password123!",
+                },
+            )
+
+        assert resp.status_code == 403
+
+        with app.app_context():
+            reloaded = User.query.get(victim.id)
+            # Byte-for-byte: a route that still hashed and wrote the new
+            # password before hitting a later check would be a real residual
+            # bug this assertion exists to catch, not just "got a 403".
+            assert reloaded.password_hash == victim_password_hash
+
+    def test_genuine_org_admin_can_still_set_password_within_own_org(
+        self, app, db_session, login_as, client
+    ):
+        from werkzeug.security import check_password_hash
+
+        from app.models.user import User
+
+        org_b = _make_org(db_session, "pw-sw-legit-b")
+        admin_b = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        target = _make_user(
+            db_session, org_b, email=f"pw-target-{uuid.uuid4().hex[:8]}@example.com"
+        )
+        target_id = target.id
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin_b)
+            resp = client.post(
+                f"/admin/user/{target_id}/set-password",
+                data={
+                    "password": "NewValidPassw0rd!",
+                    "password2": "NewValidPassw0rd!",
+                },
+                follow_redirects=False,
+            )
+
+        assert resp.status_code == 302
+
+        with app.app_context():
+            reloaded = User.query.get(target_id)
+            assert check_password_hash(reloaded.password_hash, "NewValidPassw0rd!")
+
+
+class TestBulkDeleteSessionSwitchIDOR:
+    """Same session-switch IDOR class, for the bulk-delete API
+    (``DELETE /admin/api/users/bulk``). The delete query is already correctly
+    scoped to ``g.current_org_id``, which is exactly the problem once the
+    attacker's session is switched into the victim organisation: the query
+    then legitimately targets the victim org's own users, and
+    ``admin_required`` alone no longer stops it."""
+
+    def test_admin_with_viewer_role_in_other_org_cannot_bulk_delete_its_user(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.org_role import OrgRole
+        from app.models.user import User
+
+        org_a = _make_org(db_session, "bulk-sw-a")
+        org_b = _make_org(db_session, "bulk-sw-b")
+        attacker = _make_user(db_session, org_a, is_org_admin=True, is_platform_admin=False)
+        victim = _make_user(
+            db_session, org_b, email=f"bulk-victim-{uuid.uuid4().hex[:8]}@example.com"
+        )
+        victim_id = victim.id
+        OrgRole.set_role(org_b.id, attacker.id, "viewer", granted_by_id=attacker.id)
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, attacker)
+            switched = client.post(
+                "/account/switch-organization",
+                data={"organization_id": str(org_b.id)},
+                follow_redirects=False,
+            )
+            assert switched.status_code == 302
+
+            resp = client.delete(
+                "/admin/api/users/bulk",
+                json={"ids": [victim_id]},
+            )
+
+        assert resp.status_code == 403
+
+        with app.app_context():
+            # Provably unchanged: the victim row still exists at all, not
+            # just "the response said 403".
+            assert User.query.get(victim_id) is not None
+
+    def test_genuine_org_admin_can_still_bulk_delete_within_own_org(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.user import User
+
+        org_b = _make_org(db_session, "bulk-sw-legit-b")
+        admin_b = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        target = _make_user(
+            db_session, org_b, email=f"bulk-target-{uuid.uuid4().hex[:8]}@example.com"
+        )
+        target_id = target.id
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin_b)
+            resp = client.delete(
+                "/admin/api/users/bulk",
+                json={"ids": [target_id]},
+            )
+
+        assert resp.status_code == 200
+        assert resp.get_json()["deleted"] == 1
+
+        with app.app_context():
+            assert User.query.get(target_id) is None
+
+
+class TestWebhookSettingsSessionSwitchIDOR:
+    """Same session-switch IDOR class, for ``webhook_settings``. Once
+    switched, the attacker could plant a webhook URL they control into the
+    victim organisation (``WebhookSubscription``'s ``TenantMixin`` auto-scopes
+    the new row to ``g.current_org_id``, which by then legitimately is the
+    victim org), which then streams the victim org's events out to them."""
+
+    def test_admin_with_viewer_role_in_other_org_cannot_plant_its_webhook(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.org_role import OrgRole
+        from app.models.webhook import WebhookSubscription
+
+        org_a = _make_org(db_session, "wh-sw-a")
+        org_b = _make_org(db_session, "wh-sw-b")
+        attacker = _make_user(db_session, org_a, is_org_admin=True, is_platform_admin=False)
+        OrgRole.set_role(org_b.id, attacker.id, "viewer", granted_by_id=attacker.id)
+        db_session.commit()
+
+        attacker_url = f"https://evil.example.com/{uuid.uuid4().hex[:8]}"
+
+        with app.app_context():
+            login_as(client, attacker)
+            switched = client.post(
+                "/account/switch-organization",
+                data={"organization_id": str(org_b.id)},
+                follow_redirects=False,
+            )
+            assert switched.status_code == 302
+
+            resp = client.post(
+                "/admin/webhook-settings",
+                data={
+                    "url": attacker_url,
+                    "description": "pwned",
+                    "webhook_type": "generic",
+                },
+            )
+
+        assert resp.status_code == 403
+
+        with app.app_context():
+            planted = WebhookSubscription.query.filter_by(url=attacker_url).first()
+            assert planted is None
+
+    def test_genuine_org_admin_can_still_add_webhook_within_own_org(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.webhook import WebhookSubscription
+
+        org_b = _make_org(db_session, "wh-sw-legit-b")
+        admin_b = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        db_session.commit()
+
+        legit_url = f"https://legit.example.com/{uuid.uuid4().hex[:8]}"
+
+        with app.app_context():
+            login_as(client, admin_b)
+            resp = client.post(
+                "/admin/webhook-settings",
+                data={
+                    "url": legit_url,
+                    "description": "legit",
+                    "webhook_type": "generic",
+                },
+                follow_redirects=False,
+            )
+
+        assert resp.status_code == 302
+
+        with app.app_context():
+            created = WebhookSubscription.query.filter_by(
+                organization_id=org_b.id, url=legit_url
+            ).first()
+            assert created is not None
+
+
+class TestChangeEnterpriseRoleSessionSwitchIDOR:
+    """Same session-switch IDOR class, for
+    ``POST /admin/user/<user_id>/role`` (``update_user_role`` in
+    ``app/modules/admin/routes/user_role_routes.py`` -- a sibling file to
+    ``admin_routes.py``, registered onto the same ``/admin`` blueprint
+    prefix, that already scoped its lookup to ``g.current_org_id`` directly
+    in the query rather than through ``get_user_or_404`` but shared the same
+    gap: ``admin_required`` alone, with no check that the caller is actually
+    an admin of the organisation now active)."""
+
+    def test_admin_with_viewer_role_in_other_org_cannot_change_its_role(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.org_role import OrgRole
+        from app.models.user import VALID_ROLES, User
+
+        org_a = _make_org(db_session, "role-sw-a")
+        org_b = _make_org(db_session, "role-sw-b")
+        attacker = _make_user(db_session, org_a, is_org_admin=True, is_platform_admin=False)
+        victim = _make_user(
+            db_session, org_b, email=f"role-victim-{uuid.uuid4().hex[:8]}@example.com"
+        )
+        victim_id = victim.id
+        victim_role_before = victim.enterprise_role
+        OrgRole.set_role(org_b.id, attacker.id, "viewer", granted_by_id=attacker.id)
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, attacker)
+            switched = client.post(
+                "/account/switch-organization",
+                data={"organization_id": str(org_b.id)},
+                follow_redirects=False,
+            )
+            assert switched.status_code == 302
+
+            resp = client.post(
+                f"/admin/user/{victim_id}/role",
+                data={"enterprise_role": VALID_ROLES[0]},
+            )
+
+        assert resp.status_code == 403
+
+        with app.app_context():
+            reloaded = User.query.get(victim_id)
+            # Byte-for-byte: a route that still wrote the new role before
+            # hitting a later check would be a real residual bug this
+            # assertion exists to catch, not just "got a 403".
+            assert reloaded.enterprise_role == victim_role_before
+
+    def test_genuine_org_admin_can_still_change_role_within_own_org(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.user import VALID_ROLES, User
+
+        org_b = _make_org(db_session, "role-sw-legit-b")
+        admin_b = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        target = _make_user(
+            db_session, org_b, email=f"role-target-{uuid.uuid4().hex[:8]}@example.com"
+        )
+        target_id = target.id
+        chosen_role = VALID_ROLES[0]
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin_b)
+            resp = client.post(
+                f"/admin/user/{target_id}/role",
+                data={"enterprise_role": chosen_role},
+                follow_redirects=False,
+            )
+
+        assert resp.status_code == 302
+
+        with app.app_context():
+            reloaded = User.query.get(target_id)
+            assert reloaded.enterprise_role == chosen_role
+
+
 class TestAdminUserActionRoutes:
     """Deletion by POST only, a refused delete is a flashed
     message rather than a 500, and the role page renders with the full

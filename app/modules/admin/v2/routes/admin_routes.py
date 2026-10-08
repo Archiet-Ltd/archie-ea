@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 
 from flask import (
     Blueprint,
+    abort,
     flash,
     g,
     jsonify,
@@ -601,6 +602,21 @@ def change_account_type(user_id):
 @audit_log("set_user_password")
 def set_user_password(user_id):
     """Set or reset a user's password."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and set a new
+    # password for org B's own administrator -- full account takeover, no
+    # reset-flow step needed. Found by the sweep that found change_user_email's
+    # identical gap (commit 7ae1b168); same is_platform_admin /
+    # rbac_service.is_org_admin(..., g.current_org_id) guard.
+    if not (
+        is_platform_admin(current_user)
+        or rbac_service.is_org_admin(current_user, g.current_org_id)
+    ):
+        abort(403)
     user = _svc.get_user_or_404(user_id)
     form = CreatePasswordForm()
     if form.validate_on_submit():
@@ -3283,6 +3299,20 @@ def api_list_users():
 @admin_required
 def api_bulk_delete_users():
     """Bulk delete users by IDs (cannot delete yourself)."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while the delete
+    # query below correctly scopes to g.current_org_id. Without this guard,
+    # a caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and delete
+    # org B's users outright. Found by the sweep that found
+    # change_user_email's identical gap (commit 7ae1b168); same
+    # is_platform_admin / rbac_service.is_org_admin(..., g.current_org_id)
+    # guard.
+    if not (
+        is_platform_admin(current_user)
+        or rbac_service.is_org_admin(current_user, g.current_org_id)
+    ):
+        abort(403)
     data = request.get_json() or {}
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
@@ -3856,6 +3886,21 @@ def report_builder():
 @audit_log("update_webhook_settings")
 def webhook_settings():
     """PLT-015: Manage Slack/Teams webhook subscriptions and notification settings."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while
+    # WebhookSubscription's TenantMixin scopes the query/create below to
+    # g.current_org_id. Without this guard, a caller who is an
+    # Administrator in org A but holds only a Viewer OrgRole in org B can
+    # switch the active session to org B and plant a webhook URL they
+    # control into org B, which then streams org B's events out to them.
+    # Found by the sweep that found change_user_email's identical gap
+    # (commit 7ae1b168); same is_platform_admin /
+    # rbac_service.is_org_admin(..., g.current_org_id) guard.
+    if not (
+        is_platform_admin(current_user)
+        or rbac_service.is_org_admin(current_user, g.current_org_id)
+    ):
+        abort(403)
     from app.models.webhook import WebhookSubscription
 
     VALID_EVENTS = [
