@@ -53,7 +53,6 @@ _DATES = ("start_date", "end_date")
 _LINKS = {
     "owner_id": "users",
     "capability_id": "unified_capabilities",
-    "archimate_element_id": "archimate_elements",
     "application_component_id": "application_components",
     "goal_id": "goals",
     "triggering_business_event_id": "business_events",
@@ -149,6 +148,49 @@ def _check_link(column: str, value: Any, organization_id: int) -> Optional[int]:
     return value
 
 
+def element_refusal_sql(element: str, org: str, copy: str = "NULL", earlier: bool = False) -> str:
+    """The one element rule, as SQL: NULL when copy `copy` of organisation `org` may hold element
+    `element`, else the first failed condition: 'organisation', 'type' (not a WorkPackage), or
+    'shared' (another copy holds it; with `earlier`, one with a smaller id)."""
+    other = f"ow.id < {copy}" if earlier else f"ow.id IS DISTINCT FROM {copy}"
+    return (
+        "(CASE "
+        f"WHEN NOT EXISTS (SELECT 1 FROM archimate_elements ae WHERE ae.id = {element} "  # tenancy-ok: the organisation test is this expression
+        f"AND ae.organization_id = {org}) THEN 'organisation' "
+        f"WHEN NOT EXISTS (SELECT 1 FROM archimate_elements ae WHERE ae.id = {element} "  # tenancy-ok: same
+        "AND ae.type = 'WorkPackage') THEN 'type' "
+        f"WHEN EXISTS (SELECT 1 FROM unified_work_packages ow WHERE ow.archimate_element_id = {element} "  # tenancy-ok: same
+        f"AND {other}) THEN 'shared' END)"
+    )
+
+
+def element_refusal(element_id, organization_id, copy_id=None, connection=None) -> Optional[str]:
+    """None when the copy (None: a new one) may hold the element, else the failed condition."""
+    from sqlalchemy import text
+
+    sql = "SELECT " + element_refusal_sql(
+        "CAST(:e AS integer)", "CAST(:o AS integer)", "CAST(:c AS bigint)")
+    return (connection or db.session).execute(
+        text(sql), {"e": element_id, "o": organization_id, "c": copy_id}).scalar()
+
+
+def _check_element(wp: UnifiedWorkPackage, value: Any, organization_id: int) -> Optional[int]:
+    if value in (None, ""):
+        return None
+    try:
+        value = int(value)
+    except (TypeError, ValueError) as exc:
+        raise WorkPackageError("archimate_element_id must be an id.") from exc
+    refusal = element_refusal(value, organization_id, wp.id)
+    if refusal == "organisation":
+        raise WorkPackageNotFound("Linked record not found.")
+    if refusal == "type":
+        raise WorkPackageError("The element must be a work package element.")
+    if refusal == "shared":
+        raise WorkPackageError("Another work package already holds that element.")
+    return value
+
+
 def _apply(wp: UnifiedWorkPackage, fields: Dict[str, Any], organization_id: int) -> None:
     for key in fields:
         if key not in _EDITABLE:
@@ -169,6 +211,8 @@ def _apply(wp: UnifiedWorkPackage, fields: Dict[str, Any], organization_id: int)
                 raise WorkPackageError("Level must be a whole number.") from exc
         elif key == "color":
             value = None if value in (None, "") else str(value)[:20]
+        elif key == "archimate_element_id":
+            value = _check_element(wp, value, organization_id)
         elif key in _LINKS:
             value = _check_link(key, value, organization_id)
         elif key == "parent_id":

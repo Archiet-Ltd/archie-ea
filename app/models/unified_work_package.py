@@ -48,6 +48,11 @@ class UnifiedWorkPackage(TenantMixin, db.Model):
             "uq_unified_wp_source_copy", "source_table", "source_id",
             unique=True, postgresql_where=text("source_table IS NOT NULL"),
         ),
+        # One copy per ArchiMate element (the rule is element_refusal_sql in work_package_service).
+        Index(
+            "uq_unified_wp_archimate_element", "archimate_element_id",
+            unique=True, postgresql_where=text("archimate_element_id IS NOT NULL"),
+        ),
     )
 
     # === Primary Key ===

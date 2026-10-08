@@ -62,6 +62,7 @@ from datetime import datetime
 import click
 from flask.cli import with_appcontext
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 
@@ -397,6 +398,8 @@ _AUDIT_COLUMNS = ("created_at", "updated_at")
 # association_links_migrated_at values come from _utcnow(), taken before the association rows are read.
 # SQLSTATEs of a lock conflict: deadlock detected, serialization failure, lock not available.
 _LOCK_CONFLICTS = ("40P01", "40001", "55P03")
+_ELEMENT_INDEX = "uq_unified_wp_archimate_element"
+_MOVED_LINKS = "_moved_links"
 
 
 def _utcnow():
@@ -426,57 +429,68 @@ def _column_targets(spec):
     return out
 
 
-def _element_taken_sql(element, org, copy="NULL"):
-    """SQL for the one rule: a copy of `org` takes source element `element` (joined as ae) only if
-    it is that organisation's, a WorkPackage, and used by no other copy."""
-    return (f"(ae.organization_id = {org} AND ae.type = 'WorkPackage' AND NOT EXISTS (SELECT 1 FROM "  # tenancy-ok: same
-            f"unified_work_packages ow WHERE ow.archimate_element_id = {element} AND ow.id IS DISTINCT FROM {copy}))")
+def _element_refused(stats, table, uid, element, element_org, org_id, condition):
+    logger.warning("element not taken: work package %s, element %s, condition %s (element "
+                   "organisation %s, copy organisation %s)", uid, element, condition, element_org, org_id)
+    stats.add(f"{table}: source element not taken", 1)
 
 
-def _element_refused(stats, table, uid, element, element_org, org_id):
-    logger.warning("element not taken: work package %s, element %s of organisation %s, copy of "
-                   "organisation %s", uid, element, element_org, org_id)
-    stats.add(f"{table}: source element of another organisation not taken", 1)
+def _move_relationships(executor, rel_ids, new_element, org):
+    """Point these relationships (those of organisation `org` only) at `new_element` as their source."""
+    if rel_ids:
+        executor.execute(text(
+            "UPDATE archimate_relationships SET source_id = :new "  # tenancy-ok: restricted to the copy's organisation below
+            "WHERE id = ANY(:rel_ids) AND organization_id = :org"),
+            {"new": new_element, "rel_ids": sorted(rel_ids), "org": org})
+
+
+def _copy_link_ids(conn, org_id, uid):
+    from app.services import work_package_service as svc
+
+    return {r[1] for r in svc._link_rows(org_id, wp_ids=[uid], connection=conn)}
 
 
 def _move_links_with_element(conn, table, source_ids, stats):
-    """A copy takes its source's element only by _element_taken_sql (else it keeps its own, logged);
-    a taken element gets the copy's plateau and gap relationships. Returns the source ids refused."""
+    """A copy takes its source's element only by element_refusal_sql (else it keeps its own, logged);
+    a taken element gets the copy's plateau and gap relationships. A source element cleared to NULL
+    returns the copy's link ids in `moved` ({unified id: ids}). Returns the source ids refused, `moved`."""
     from app.services import work_package_service as svc
 
     rows = conn.execute(text(
         "SELECT u.id, u.organization_id, u.archimate_element_id, s.id, s.archimate_element_id, "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
-        f"ae.organization_id, {_element_taken_sql('s.archimate_element_id', 'u.organization_id', 'u.id')} "
+        "(SELECT ae.organization_id FROM archimate_elements ae WHERE ae.id = s.archimate_element_id), "
+        f"{svc.element_refusal_sql('s.archimate_element_id', 'u.organization_id', 'u.id')} "
         "FROM unified_work_packages u "  # tenancy-ok: same
         f'JOIN "{table}" s ON s.id = u.source_id '  # tenancy-ok: same
-        "LEFT JOIN archimate_elements ae ON ae.id = s.archimate_element_id "  # tenancy-ok: same
-        "WHERE u.source_table = :t AND s.id = ANY(:ids) AND s.archimate_element_id IS NOT NULL "
-        "AND u.archimate_element_id IS DISTINCT FROM s.archimate_element_id"),
+        "WHERE u.source_table = :t AND s.id = ANY(:ids) "
+        "AND u.archimate_element_id IS DISTINCT FROM s.archimate_element_id ORDER BY s.id"),
         {"t": table, "ids": list(source_ids)}).fetchall()
-    refused, used = set(), set()
-    for uid, org_id, old, source_id, new, element_org, taken in rows:
-        if not taken or new in used:
-            _element_refused(stats, table, uid, new, element_org, org_id)
+    refused, used, moved = set(), set(), {}
+    for uid, org_id, old, source_id, new, element_org, why in rows:
+        if new is None:
+            moved[uid] = sorted(_copy_link_ids(conn, org_id, uid))
+            continue
+        if new in used:
+            why = "shared"
+            stats.add(f"{table}: source element taken by an earlier row", 1)
+        if why:
+            _element_refused(stats, table, uid, new, element_org, org_id, why)
             refused.add(source_id)
         else:
             used.add(new)
-        if source_id not in refused and old is not None:
-            rel_ids = sorted({r[1] for r in svc._link_rows(org_id, wp_ids=[uid], connection=conn)})
-            if rel_ids:
-                conn.execute(text(
-                    "UPDATE archimate_relationships SET source_id = :new "  # tenancy-ok: restricted to the copy's organisation below
-                    "WHERE id = ANY(:rel_ids) AND organization_id = :org"),
-                    {"new": new, "rel_ids": rel_ids, "org": org_id})
-    return refused
+            if old is not None:
+                _move_relationships(conn, _copy_link_ids(conn, org_id, uid), new, org_id)
+    return refused, moved
 
 
-def _update_existing(conn, spec, changed, stats):
+def _update_existing(conn, spec, changed, stats, moved=None):
     """Bridge only: a source row edited after its copy was made updates the
     copy's *changed* columns, and nothing else. `changed` is
     {source id: {source column, ...}}; a row whose changed columns map to
     nothing writes nothing, so edits made on the one store's own screens
-    survive an old screen saving a different field. An element column is taken only
-    from the copy's own organisation, and the links move with it."""
+    survive an old screen saving a different field. An element column is taken only by
+    element_refusal_sql, in a savepoint: a unique violation on the element index is a refusal as
+    'shared'. The links move with it; `moved` collects {unified id: link ids} of cleared elements."""
     table = spec["table"]
     targets = _column_targets(spec)
     groups = {}
@@ -488,21 +502,68 @@ def _update_existing(conn, spec, changed, stats):
         wanted |= {c for c in _AUDIT_COLUMNS if c in targets}
         groups.setdefault(tuple(sorted(wanted)), []).append(int(source_id))
     for columns, ids in groups.items():
-        refused = _move_links_with_element(conn, table, ids, stats) if "archimate_element_id" in columns else set()
-        rest = tuple(c for c in columns if c != "archimate_element_id")
-        batches = [(columns, [i for i in ids if i not in refused]), (rest, sorted(refused))]
-        for cols, batch in batches:
-            if not batch:
-                continue
-            assigns = [f"{t} = {e}" for c in cols for t, e in targets[c]]
-            sql = (
-                f"UPDATE unified_work_packages AS u SET {', '.join(assigns)} "
-                f'FROM "{table}" s '
-                "WHERE u.source_table = :source_table AND u.source_id = s.id AND s.id = ANY(:ids) "
-                "AND s.retired_into_id IS NOT NULL"
-            )
-            stats.add(f"{table}: updated", conn.execute(
-                text(sql), {"source_table": table, "ids": batch}).rowcount)
+        if "archimate_element_id" in columns:
+            _write_element_group(conn, table, targets, columns, ids, stats,
+                                 moved if moved is not None else {})
+        else:
+            _write_group(conn, table, targets, columns, ids, stats, {})
+
+
+def _write_group(conn, table, targets, columns, ids, stats, moved):
+    refused = set()
+    if "archimate_element_id" in columns:
+        refused, moved_here = _move_links_with_element(conn, table, ids, stats)
+        moved.update(moved_here)
+    rest = tuple(c for c in columns if c != "archimate_element_id")
+    for cols, batch in ((columns, [i for i in ids if i not in refused]), (rest, sorted(refused))):
+        if not batch:
+            continue
+        assigns = [f"{t} = {e}" for c in cols for t, e in targets[c]]
+        sql = (
+            f"UPDATE unified_work_packages AS u SET {', '.join(assigns)} "
+            f'FROM "{table}" s '
+            "WHERE u.source_table = :source_table AND u.source_id = s.id AND s.id = ANY(:ids) "
+            "AND s.retired_into_id IS NOT NULL"
+        )
+        stats.add(f"{table}: updated", conn.execute(
+            text(sql), {"source_table": table, "ids": batch}).rowcount)
+
+
+def _is_element_conflict(exc):
+    orig = getattr(exc, "orig", None)
+    code = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+    return code == "23505" and _ELEMENT_INDEX in str(exc)
+
+
+def _write_element_group(conn, table, targets, columns, ids, stats, moved):
+    """_write_group in a savepoint; on an element index violation, row by row, the row that still
+    conflicts being refused as 'shared' and written without the element."""
+    def attempt(cols, batch):
+        part_stats, part_moved = _Stats(), {}
+        try:
+            with conn.begin_nested():
+                _write_group(conn, table, targets, cols, batch, part_stats, part_moved)
+        except IntegrityError as exc:
+            if not _is_element_conflict(exc):
+                raise
+            return False
+        stats.merge(part_stats)
+        moved.update(part_moved)
+        return True
+
+    if attempt(columns, ids):
+        return
+    rest = tuple(c for c in columns if c != "archimate_element_id")
+    for source_id in ids:
+        if attempt(columns, [source_id]):
+            continue
+        row = conn.execute(text(
+            "SELECT u.id, u.organization_id, s.archimate_element_id FROM unified_work_packages u "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+            f'JOIN "{table}" s ON s.id = u.source_id WHERE u.source_table = :t AND s.id = :i'),
+            {"t": table, "i": source_id}).first()
+        if row is not None:
+            _element_refused(stats, table, row[0], row[2], None, row[1], "shared")
+        attempt(rest, [source_id])
 
 
 def _apply_dependency_changes(conn, table, dependency_changes, stats):
@@ -813,15 +874,18 @@ def sync_source_rows(conn, table, ids=None, *, update_existing=False, fallback_o
             return stats
 
     inserted = _insert_missing(conn, spec, ids, stats, fallback_org_id)
+    moved = {}
     if update_existing:
         if changed:
-            _update_existing(conn, spec, changed, stats)
+            _update_existing(conn, spec, changed, stats, moved)
         if dependency_changes and table in _DEP_SOURCE_COLUMN:
             _apply_dependency_changes(conn, table, dependency_changes, stats)
         if relation_changes and spec.get("union_links"):
             _apply_relation_changes(conn, table, relation_changes, stats)
     _fill_missing(conn, spec, ids, stats)
     pending_links = _links_to_apply(conn, table, inserted, link_changes, relation_changes)
+    for uid, rel_ids in moved.items():
+        pending_links.setdefault(uid, {})[_MOVED_LINKS] = rel_ids
 
     if ids is not None:
         # Only a copy with no organisation yet needs placing (and warning about); a
@@ -1194,7 +1258,8 @@ def apply_link_changes(changes, *, replace=True, stats=None):
     ArchiMate relationships, one savepoint per work package. With `replace` the
     value replaces the relationship of its kind (None clears it), except for a target
     the old store's association tables still hold for that work package; without
-    `replace`, a link is only added. Two more keys carry the old store's association
+    `replace`, a link is only added. `_moved_links` (relationship ids) gives a copy whose element
+    was cleared an element of its own and moves them to it. Two more keys carry the old store's association
     tables: `_associations` adds a relationship for each association row and marks the
     unified row (once, never again); `_association_changes` applies the ids an old
     screen added and removed. A link whose plateau or gap is missing or belongs to
@@ -1248,8 +1313,13 @@ def apply_link_changes(changes, *, replace=True, stats=None):
                     db.select(UnifiedWorkPackage).where(UnifiedWorkPackage.id == uid)).scalar_one()
                 # The organisation may have just been written by SQL (placement).
                 db.session.expire(wp, ["organization_id", "archimate_element_id"])
+                if _MOVED_LINKS in values:
+                    # The copy's element was cleared: it gets its own, and its links go there.
+                    svc._ensure_element(wp)
+                    db.session.flush()
+                    _move_relationships(db.session, values[_MOVED_LINKS], wp.archimate_element_id, org_id)
                 for key, value in values.items():
-                    if key in (_ASSOC_MIGRATE, _ASSOC_CHANGES):
+                    if key in (_ASSOC_MIGRATE, _ASSOC_CHANGES, _MOVED_LINKS):
                         continue
                     try:
                         links = svc._resolve_links({key: value}, org_id)
@@ -1372,6 +1442,36 @@ def _apply_association_changes(wp, org_id, change, stats, source_id=None):
             stats.add(f"unified_work_packages: {key[:-3]} relationships created", 1)
 
 
+def clear_untaken_elements(executor, stats=None, dry_run=False):
+    """Apply the one element rule (element_refusal_sql) to every copy: clear the element of a copy
+    holding another organisation's or a non-WorkPackage element, then of all but the smallest id of
+    those sharing one. Deletes nothing; a cleared copy gets its own element at its first link.
+    `executor` is a connection or a session; `dry_run` rolls the writes back. Returns the count."""
+    from app.services import work_package_service as svc
+
+    def clear(conditions, earlier):
+        sql = (
+            "WITH c AS (SELECT u.id, u.archimate_element_id AS element, "
+            f"{svc.element_refusal_sql('u.archimate_element_id', 'u.organization_id', 'u.id', earlier)} AS why "
+            "FROM unified_work_packages u WHERE u.archimate_element_id IS NOT NULL) "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+            "UPDATE unified_work_packages u SET archimate_element_id = NULL FROM c "  # tenancy-ok: same
+            f"WHERE u.id = c.id AND c.why IN ({conditions}) RETURNING u.id, c.element, c.why")
+        return executor.execute(text(sql)).fetchall()
+
+    savepoint = executor.begin_nested()
+    try:
+        cleared = clear("'organisation', 'type'", False) + clear("'shared'", True)
+    except Exception:
+        savepoint.rollback()
+        raise
+    (savepoint.rollback if dry_run else savepoint.commit)()
+    for uid, element, why in cleared:
+        logger.warning("element cleared: work package %s, element %s, condition %s", uid, element, why)
+    if stats is not None:
+        stats.add("unified_work_packages: element cleared", len(cleared))
+    return len(cleared)
+
+
 def _link_columns_to_relationships(stats, dry_run=False, unified_ids=None):
     """The one-time migration of a work package's plateau and gap links into the
     ArchiMate relationships (realization to the plateau's element, association to the
@@ -1390,6 +1490,7 @@ def _link_columns_to_relationships(stats, dry_run=False, unified_ids=None):
     another organisation, or one that no longer exists, is counted and dropped with
     the column. A row whose links failed to write keeps its values for the next
     run. PR 3 drops the columns, the marker and the tables."""
+    clear_untaken_elements(db.session, stats, dry_run)
     clock = _utcnow()  # before the association rows are read
     scope = "AND id = ANY(:uids) " if unified_ids is not None else ""
     params = {"uids": list(unified_ids)} if unified_ids is not None else {}

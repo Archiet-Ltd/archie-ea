@@ -450,17 +450,18 @@ def test_risk_level_none_vs_default_disclosed(app, db_session, make_org):
 
     org = make_org("plategap-risk-default")
     a = _element(db_session, org.id, "A")
+    a_none = _element(db_session, org.id, "A (explicit none)")  # one element per work package
     default_wp = _work_package(db_session, a, name="Default risk")
-    explicit_none_wp = _work_package(db_session, a, name="Explicit none")
+    explicit_none_wp = _work_package(db_session, a_none, name="Explicit none")
     # Set AFTER construction so the column's own default does not fill it.
     explicit_none_wp.risk_level = None
     db_session.commit()
 
     with app.test_request_context("/"):
         g.current_org_id = org.id
-        result = IntelligenceQueryService.programme_for_element(a.id)
+        results = [IntelligenceQueryService.programme_for_element(e.id) for e in (a, a_none)]
 
-    by_name = {wp["name"]: wp for wp in result["work_packages"]}
+    by_name = {wp["name"]: wp for result in results for wp in result["work_packages"]}
     assert by_name["Default risk"]["risk_level"] == "medium"
     assert by_name["Default risk"]["risk_level_default_possible"] is True
     assert by_name["Explicit none"]["risk_level"] is None
@@ -569,6 +570,9 @@ def test_three_new_selects_regardless_of_package_count(app, db_session, make_org
     g1 = _gap(db_session, org.id, name="G1")
     _work_package(db_session, a, name="WP1", plateau_id=p1.id, gap_id=g1.id)
     db_session.commit()
+    # An element now holds one work package; the lens still reads a list of them, so the
+    # batching is exercised on a database without the element index (rolled back with the test).
+    db_session.execute(db.text("DROP INDEX IF EXISTS uq_unified_wp_archimate_element"))  # tenancy-ok: test fixture
 
     def _counts():
         statement_counter.statements.clear()

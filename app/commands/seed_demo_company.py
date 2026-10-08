@@ -1023,12 +1023,14 @@ _GAPS = [
 # ═════════════════════════════════════════════════════════════════════════════
 
 def _resolve_elements(org_id):
-    """Return {name: ArchiMateElement} for all elements in this org."""
+    """Return {name: ArchiMateElement} for all elements in this org; where a work package's own
+    element shares a seeded element's name, the first-created (seeded) element wins."""
     from app.models import ArchiMateElement
 
     rows = (
         db.session.query(ArchiMateElement)
         .filter(ArchiMateElement.organization_id == org_id)
+        .order_by(ArchiMateElement.id.desc())
         .all()
     )
     return {r.name: r for r in rows}
@@ -1380,7 +1382,6 @@ def seed_demo_company() -> dict:
              estimated, actual, el_name, cap_code) in _WORK_PACKAGES:
             if name in existing_wps:
                 continue
-            el = elements.get(el_name)
             cap = caps.get(cap_code)
             work_package_service.create_work_package(
                 organization_id=org_id,
@@ -1391,7 +1392,6 @@ def seed_demo_company() -> dict:
                 end_date=today + _dt.timedelta(days=start_offset + duration),
                 estimated_cost=estimated,
                 actual_cost=actual,
-                archimate_element_id=el.id if el else None,
                 capability_id=cap.id if cap else None,
                 business_capability=cap.name if cap else "",
                 assigned_to="Ivo Reed",
