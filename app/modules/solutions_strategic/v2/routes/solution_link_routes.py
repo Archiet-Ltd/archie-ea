@@ -16,6 +16,7 @@ from .solution_design_routes import (
     solution_design_bp,
 )
 from app.utils.pagination import safe_int_arg
+from app.utils.tenant_users import escape_like_literal
 
 logger = logging.getLogger(__name__)
 
@@ -638,7 +639,7 @@ def search_adrs():
         return jsonify({"results": []})
     try:
         from app.models.adr import ArchitectureDecisionRecord
-        safe_q = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        safe_q = escape_like_literal(q)
         results = ArchitectureDecisionRecord.query.filter(
             or_(
                 ArchitectureDecisionRecord.title.ilike(f"%{safe_q}%", escape="\\"),

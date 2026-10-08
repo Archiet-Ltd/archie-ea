@@ -539,7 +539,7 @@ class TechnologyEvent(TenantMixin, db.Model):
 # ============================================================================
 
 
-class Resource(db.Model):
+class Resource(TenantMixin, db.Model):
     """
     ArchiMate 3.2 Resource - Asset owned or controlled to achieve objectives
 

@@ -14,6 +14,11 @@ from typing import Optional
 from app.extensions import db
 
 
+def escape_like_literal(value: str) -> str:
+    """Escape SQL LIKE wildcards so ``%`` and ``_`` match literally."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def user_in_org(user_id, org_id) -> Optional[object]:
     """The user with ``user_id`` who belongs to ``org_id``, else ``None``.
 

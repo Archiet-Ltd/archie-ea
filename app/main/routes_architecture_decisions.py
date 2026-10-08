@@ -170,7 +170,7 @@ def view_decision(decision_id):
 def edit_decision(decision_id):
     decision = ArchitectureDecision.query.get_or_404(decision_id)
     if request.method == "POST":
-        decision.title = request.form.get("title")
+        decision.title = request.form.get("title") or decision.title
         decision.status = request.form.get("status", "proposed")
         decision.adm_phase = request.form.get("adm_phase")
         decision.context = request.form.get("context")

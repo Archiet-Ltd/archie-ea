@@ -245,7 +245,8 @@ class TestShouldQueue:
                 "raw": raw_mock,
             }
 
-        def _mock_queue_approval(self, tc):
+        def _mock_queue_approval(self, tc, persona=None):
+            assert persona == "enterprise_architect", f"persona={persona!r}"
             return 9999  # fake approval ID
 
         runner = AgentRunner(user_id=1, auto_execute=True)
@@ -342,6 +343,7 @@ class TestHandlerDispatch:
     def test_dispatch_to_handler_by_name(self, monkeypatch):
         """ToolExecutor.execute dispatches to the correct per-tool handler."""
         from app.modules.ai_chat.tools.executor import ToolExecutor, ToolCall
+        from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME
 
         executor = ToolExecutor(user_id=1)
         # Test a representative sample of hand-written tools
@@ -353,6 +355,7 @@ class TestHandlerDispatch:
             "submit_for_arb_review",
         ]
         for name in sample_tools:
+            assert name in TOOL_SCHEMA_BY_NAME, f"{name}: no registered tool schema"
             # Verify the handler method exists
             handler = getattr(executor, f"_tool_{name}", None)
             assert handler is not None, (

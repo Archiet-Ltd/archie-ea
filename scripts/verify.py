@@ -1106,6 +1106,34 @@ def gate_raw_sql_tenancy(baseline: int) -> Result:
     return Result("raw-sql-tenancy", PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_raw_sql_tenancy_writes(baseline: int) -> Result:
+    """organization_id written on a tenant table outside the one command allowed to.
+
+    A ratchet, not a hard zero: the dedicated commands that predate
+    app/commands/backfill_layer_tenancy.py as the single policy home are
+    counted here, not excused, and fall out of this baseline one at a time as
+    they retire. A new write outside that one file raises the count and fails
+    the build; the fix is to move the write into the canonical command, not
+    to raise the baseline.
+
+    This is rule 2 of the same file rule 1 (raw-sql-tenancy, above) already
+    registers -- one cached tenant-table list, two shapes of the same
+    problem: a raw SQL string naming a tenant table, found by walking string
+    literals rather than trusting a comment.
+    """
+    proc = _run([sys.executable, "scripts/check_raw_sql_tenancy.py", "--count", "--rule", "writes"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("raw-sql-tenancy-writes", FAIL, f"could not parse: {proc.stdout!r}")
+    detail = ""
+    if count > baseline:
+        detail = _run(
+            [sys.executable, "scripts/check_raw_sql_tenancy.py", "--rule", "writes"]
+        ).stdout[-1500:]
+    return Result("raw-sql-tenancy-writes", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
 def gate_tenant_scoping(baseline: int) -> Result:
     """ORM queries over a tenant-owned-but-unmixed model with no org predicate.
 
@@ -1714,6 +1742,11 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("raw-sql-tenancy", "raw SQL on tenant tables without an org predicate",
              "ratchet", lambda: gate_raw_sql_tenancy(baseline["raw_sql_tenancy"]),
              remediation="scope the query, or append 'tenancy-ok: <reason>'",
+             tags=["static", "security"]),
+        Gate("raw-sql-tenancy-writes", "organization_id written outside the one backfill command",
+             "ratchet", lambda: gate_raw_sql_tenancy_writes(baseline["raw_sql_tenancy_writes"]),
+             remediation="derive or assign organization_id only in "
+                         "app/commands/backfill_layer_tenancy.py",
              tags=["static", "security"]),
         Gate("tenant-scoping", "ORM queries on tenant-owned-but-unmixed models without an org predicate",
              "ratchet", lambda: gate_tenant_scoping(baseline["tenant_scoping"]),
