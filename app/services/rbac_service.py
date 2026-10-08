@@ -62,6 +62,25 @@ class RBACService:
             return True
         return False
 
+    def org_ids_for(self, user):
+        """Every organisation ``user`` belongs to: the home organisation plus
+        each ``OrgRole`` row. Reads rows only, so it answers the same
+        for a deactivated user as for an active one."""
+        from app.models.org_role import OrgRole
+
+        ids = set()
+        if user.organization_id is not None:
+            ids.add(user.organization_id)
+        rows = OrgRole.query.filter(  # tenant-scoping-ok: membership lookup by user, whose purpose is to list every organisation.
+            OrgRole.user_id == user.id
+        ).all()
+        ids.update(row.organization_id for row in rows)
+        return ids
+
+    def is_org_admin_anywhere(self, user):
+        """True when ``user`` administers any organisation they belong to."""
+        return any(self.is_org_admin(user, org_id) for org_id in self.org_ids_for(user))
+
     def can_edit(self, org_id, user_id):
         """True if role is org_admin or architect (hierarchy level >= 1)."""
         role = self.get_user_role(org_id, user_id)

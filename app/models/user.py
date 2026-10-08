@@ -185,6 +185,9 @@ class User(UserMixin, db.Model):
     # SSO / Enterprise Identity (S0-01)
     external_id = db.Column(db.String(255), index=True)
     sso_provider = db.Column(db.String(50))
+    # The identity provider's SCIM directory id (``externalId``). SCIM reads and
+    # writes only this column; no sign-in path reads it (PR 424 v3, V3-01b).
+    scim_external_id = db.Column(db.String(255), nullable=True)
 
     # Provisioning and leaver state (R1-B26 PR 1, TB-0143). A deactivated user
     # keeps every row they own (no hard delete anywhere); the state lives here

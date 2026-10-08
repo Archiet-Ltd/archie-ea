@@ -240,7 +240,7 @@ def _attrs_from_resource(body):
             attrs["email"] = str(email)
     attrs.update(_name_from(body))
     if "externalId" in body:
-        attrs["external_id"] = str(body["externalId"]) if body["externalId"] is not None else ""
+        attrs["scim_external_id"] = str(body["externalId"]) if body["externalId"] is not None else ""
     if "active" in body:
         attrs["active"] = _parse_bool(body["active"])
     return attrs
@@ -278,7 +278,7 @@ def _apply_user_value(attrs, key, value, op):
         elif isinstance(value, dict):
             attrs.update(_name_from({"name": value}))
     elif lowered == "externalid":
-        attrs["external_id"] = "" if op == "remove" else (str(value) if value is not None else "")
+        attrs["scim_external_id"] = "" if op == "remove" else (str(value) if value is not None else "")
     elif lowered.startswith("emails"):
         if op == "remove":
             return
@@ -355,8 +355,8 @@ def _user_resource(user):
     if full:
         resource["name"]["formatted"] = full
         resource["displayName"] = full
-    if user.external_id:
-        resource["externalId"] = user.external_id
+    if user.scim_external_id:
+        resource["externalId"] = user.scim_external_id
     return resource
 
 
@@ -430,7 +430,7 @@ def scim_list_users():
             raise ProvisioningError("Unsupported filter.", scim_type="invalidFilter")
         value = match.group("value")
         if match.group("attr").lower() == "externalid":
-            query = query.filter(User.external_id == value)
+            query = query.filter(User.scim_external_id == value)
         else:
             query = query.filter(func.lower(User.email) == value.strip().lower())
     total = query.count()
