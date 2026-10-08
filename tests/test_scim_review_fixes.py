@@ -516,9 +516,22 @@ def _password_user(db_session, org, label, *, administrator=False, mfa=False):
     return user
 
 
+_VOLATILE_HEADERS = {"date", "x-request-id"}
+
+
+def _header_set(resp):
+    """The full header set, excluding only per-request values."""
+    return sorted(
+        (k.lower(), re.sub(r"nonce-[A-Za-z0-9_\-=+/]+", "nonce-", v))  # the CSP nonce is per request
+        for k, v in resp.headers.items()
+        if k.lower() not in _VOLATILE_HEADERS
+    )
+
+
 def _v2_login(client, email, password):
     resp = client.post("/account/login", data={"email": email, "password": password, "remember_me": ""})
-    return resp.status_code, _strip(resp.get_data(as_text=True)), resp.headers.get("Location")
+    return (resp.status_code, _strip(resp.get_data(as_text=True)), resp.headers.get("Location"),
+            _header_set(resp))
 
 
 def _v1_login(app, email, password):
@@ -530,12 +543,13 @@ def _v1_login(app, email, password):
     ):
         view = getattr(v1.login, "__wrapped__", v1.login)
         resp = app.make_response(view())
-        return resp.status_code, _strip(resp.get_data(as_text=True)), resp.headers.get("Location")
+        return (resp.status_code, _strip(resp.get_data(as_text=True)), resp.headers.get("Location"),
+                _header_set(resp))
 
 
 def _api_login(client, email, password):
     resp = client.post("/api/auth/login", json={"email": email, "password": password})
-    return resp.status_code, resp.get_data(as_text=True)
+    return resp.status_code, resp.get_data(as_text=True), _header_set(resp)
 
 
 def test_d07_form_logins_answer_a_deactivated_user_exactly_like_a_wrong_password(
@@ -554,6 +568,7 @@ def test_d07_form_logins_answer_a_deactivated_user_exactly_like_a_wrong_password
         assert right[0] == wrong[0]
         assert right[1] == wrong[1]
         assert right[2] == wrong[2]
+        assert right[3] == wrong[3]  # D-07: equal full header set, Set-Cookie included
         assert "Invalid email or password." in right[1]
         assert "not active" not in right[1]
 
@@ -586,7 +601,7 @@ def test_d07_a_deactivated_administrator_with_mfa_never_reaches_the_challenge(
     admin = _password_user(db_session, org, "leaveradmin", administrator=True, mfa=True)
     provisioning_service.deactivate_user(admin, reason="leaver_deprovisioned", actor="test")
 
-    status, _body, location = _v2_login(client, admin.email, _PASSWORD)
+    status, _body, location, _headers = _v2_login(client, admin.email, _PASSWORD)
     assert status == 200 and not location
     with client.session_transaction() as sess:
         assert "_mfa_pending_user_id" not in sess
