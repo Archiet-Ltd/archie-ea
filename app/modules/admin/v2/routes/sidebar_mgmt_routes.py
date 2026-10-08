@@ -31,6 +31,12 @@ mark_blueprint_guardrailed(sidebar_mgmt_bp_v2)
 
 @sidebar_mgmt_bp_v2.route("/items", methods=["GET"])
 @timed_route
+# SidebarMenuItem carries no organization_id -- it is platform-wide sidebar
+# config. Every mutating route below (toggle/toggle_section/toggle_subsection/
+# reset_all_items) already requires platform_admin_required; this read-only
+# listing was the one left on admin_required, letting any tenant's own admin
+# read it (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def list_sidebar_items():
     """List all sidebar menu items with hierarchical grouping."""

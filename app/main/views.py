@@ -1069,6 +1069,7 @@ def integrations():
 
 @main.route("/settings")
 @login_required
+@platform_admin_required
 @admin_required
 def settings():
     """System Settings - Application configuration and user preferences.
@@ -1086,6 +1087,13 @@ def settings():
 # any authenticated user of any tenant could read it. The page that consumes it
 # (settings/index.html) is linked only from the Administration sidebar section,
 # so gating it on admin matches how it is actually reached.
+#
+# admin_required alone was not enough either: it is satisfied by
+# Permission.ADMINISTER, a GLOBAL flag every self-registered user holds for
+# their own organisation, so any tenant's own admin -- not just a platform
+# admin -- could read this platform-wide table. platform_admin_required
+# closes that (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def get_system_settings():
     """Return all saved system settings as JSON."""
@@ -1115,6 +1123,11 @@ def get_system_settings():
 @login_required
 # The write half of the same global table: with @login_required alone, any
 # authenticated user could rewrite platform-wide configuration for every tenant.
+#
+# Same gap as get_system_settings above: admin_required alone let any
+# tenant's own admin rewrite this platform-wide table. platform_admin_required
+# closes that (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def save_system_settings():
     """Persist system settings to the database."""

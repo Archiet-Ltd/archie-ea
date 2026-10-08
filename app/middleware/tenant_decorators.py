@@ -7,7 +7,7 @@ Tenant-aware authorization decorators.
 
 from functools import wraps
 
-from flask import abort, jsonify, request
+from flask import abort, g, jsonify, request
 from flask_login import current_user, login_required
 
 
@@ -21,15 +21,48 @@ def _wants_json():
 
 
 def org_admin_required(f):
-    """Require authenticated user who is an org admin."""
+    """Require authenticated user who is an org admin of the ACTIVE organisation.
+
+    ``current_user.is_org_admin`` (app/models/user.py) is a property that
+    always answers "is this user an org-admin of their own HOME
+    organisation" -- it is computed from ``self.organization_id``, never
+    from ``g.current_org_id``. Delegating this decorator's check to that
+    property carried the identical cross-organisation escalation
+    ``admin_required`` (app/_decorators_base.py) had: switching the active
+    session into any organisation the user holds even a read-only OrgRole
+    in (e.g. an accepted invitation) satisfied this decorator too, because
+    the home-org-only property never saw the switch. Resolving directly
+    from ``rbac_service.is_org_admin(current_user, g.current_org_id)``
+    instead closes that gap; ``is_platform_admin`` (below, same module) lets
+    an actual platform admin through regardless of which organisation is
+    active, same OR used everywhere else this pattern applies.
+
+    Deliberately does not touch ``User.is_org_admin`` itself or any of its
+    other callers -- that property's home-org answer is still correct for
+    other, non-decorator uses. ``rbac_service`` is imported here rather than
+    at module level to avoid a circular import, matching
+    ``is_platform_admin``'s own deferred import of ``app.models.Permission``.
+    """
     @wraps(f)
     @login_required
     def decorated(*args, **kwargs):
-        if not getattr(current_user, "is_org_admin", False):
+        from app.services.rbac_service import rbac_service
+
+        active_org_id = getattr(g, "current_org_id", None)
+        if not (
+            is_platform_admin(current_user)
+            or rbac_service.is_org_admin(current_user, active_org_id)
+        ):
             if _wants_json():
                 return jsonify({"error": "Organization admin access required"}), 403
             abort(403)
         return f(*args, **kwargs)
+
+    # Discoverability marker for tests/test_admin_rbac_active_org_enforcement.py's
+    # url_map-wide sweep -- see the matching comment on admin_required
+    # (app/_decorators_base.py) for why this survives further stacking.
+    decorated._active_org_rbac_gate = "org_admin_required"
+
     return decorated
 
 

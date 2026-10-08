@@ -1,6 +1,6 @@
 from functools import wraps
 
-from flask import abort, current_app
+from flask import abort, current_app, g
 from flask_login import current_user
 
 from app.models import Permission
@@ -25,7 +25,72 @@ def permission_required(permission):
 
 
 def admin_required(f):
-    return permission_required(Permission.ADMINISTER)(f)
+    """Require Permission.ADMINISTER AND organisation-admin authority in the
+    ACTIVE organisation (``g.current_org_id``) -- not merely a global Role flag.
+
+    Permission.ADMINISTER (via ``current_user.can()``) answers "does this
+    user's Role carry administrator authority at all". That is a GLOBAL flag
+    on the user's own Role, independent of which organisation is active in
+    the session. Every self-registered user is granted Administrator of
+    their own organisation (``AccountService.register_user`` /
+    ``User.grant_org_admin``), so Permission.ADMINISTER alone was the only
+    foothold an attacker needed: accept any invitation into a victim
+    organisation (even as a read-only Viewer), switch the session's active
+    organisation to it (``app/middleware/tenant_context.py``), and every
+    ``@admin_required`` route acted with full administrator authority over
+    the victim organisation -- because ``TenantMixin`` silently scopes the
+    underlying query to ``g.current_org_id`` while this decorator never
+    checked it. ``rbac_service.is_org_admin`` is the one correct,
+    already-org-scoped check (it takes an explicit ``org_id`` and only falls
+    back to the global Administrator role for the user's OWN organisation);
+    ``is_platform_admin`` lets an actual platform admin through regardless of
+    which organisation is active, same as every other decorator that offers
+    that OR.
+
+    Imports are deferred (not module-level) to avoid a circular import:
+    ``app.middleware.tenant_decorators`` and ``app.services.rbac_service``
+    are not safely importable from this module at load time, matching the
+    deferred-import style already used elsewhere in this file (see
+    ``require_feature``, ``audit_log``) and in
+    ``app.middleware.tenant_decorators.is_platform_admin`` itself.
+
+    Built on top of ``permission_required(Permission.ADMINISTER)(f)`` (one
+    call, at decoration time) rather than re-implemented inline:
+    ``tests/test_admin_route_authorisation.py``'s ``_guarded()`` detects an
+    ADMINISTER-gated view by walking the decorated function's
+    ``__closure__`` for a cell literally holding ``Permission.ADMINISTER``
+    (decorator names are useless for this -- ``functools.wraps`` makes every
+    wrapper's ``__name__`` match the view it wraps). An inline
+    ``current_user.can(Permission.ADMINISTER)`` check written directly in
+    this function's own body would read ``Permission`` as a module global,
+    not a closure cell, and silently blind that test. Keeping
+    ``permission_required``'s own closure in the chain (as
+    ``permission_gated``, referenced below) preserves it.
+    """
+    permission_gated = permission_required(Permission.ADMINISTER)(f)
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
+        active_org_id = getattr(g, "current_org_id", None)
+        if not (
+            is_platform_admin(current_user)
+            or rbac_service.is_org_admin(current_user, active_org_id)
+        ):
+            abort(403)
+        return permission_gated(*args, **kwargs)
+
+    # Discoverability marker for tests/test_admin_rbac_active_org_enforcement.py's
+    # url_map-wide sweep: functools.wraps propagates __dict__ (and so this
+    # attribute) up through however many further decorators are stacked on
+    # top, so the marker survives on app.view_functions[endpoint] regardless
+    # of stacking order or depth. Not read by any runtime code path -- test
+    # introspection only.
+    decorated_function._active_org_rbac_gate = "admin_required"
+
+    return decorated_function
 
 
 def governance_gate_reader_required(f):
