@@ -287,7 +287,9 @@ def test_n05_provisioning_service_has_no_org_admin_forwarder():
 # ---------------------------------------------------------------------------
 
 
-def test_d07_api_login_headers_of_a_deactivated_account_equal_a_wrong_password(client, db_session, make_org):
+def test_d07_api_login_headers_of_a_deactivated_account_equal_a_wrong_password(
+    client, db_session, make_org, monkeypatch
+):
     from app.services import provisioning_service
 
     org = make_org("d07v2")
@@ -295,7 +297,16 @@ def test_d07_api_login_headers_of_a_deactivated_account_equal_a_wrong_password(c
     leaver = _password_user(db_session, org, "apileaver2")
     provisioning_service.deactivate_user(leaver, reason="leaver_deprovisioned", actor="test")
 
+    from app.services import session_registry
+
+    touched = []
+    real = session_registry.login_and_register
+    monkeypatch.setattr(
+        session_registry, "login_and_register",
+        lambda *a, **k: touched.append(1) or real(*a, **k),
+    )
     right = client.post("/api/auth/login", json={"email": leaver.email, "password": _PASSWORD})
+    assert touched == []  # nothing touched the session for a deactivated account
     wrong = client.post("/api/auth/login", json={"email": leaver.email, "password": "not-the-password"})
     assert right.status_code == wrong.status_code == 401
     assert right.get_data() == wrong.get_data()
