@@ -63,6 +63,9 @@ from datetime import datetime
 from app.utils.pagination import safe_int_arg
 
 strategic_bp = Blueprint("strategic", __name__, url_prefix="/strategic")
+
+
+@strategic_bp.route("/capability-health")
 @login_required
 def capability_health():
     """Capability health dashboard."""
