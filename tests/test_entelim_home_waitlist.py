@@ -62,13 +62,33 @@ class TestHomePage:
         assert "Enterprise Architecture Platform" not in html
 
     def test_home_page_has_waitlist_form(self, client):
-        """The waitlist form with email and consent fields is present."""
+        """The notify-me form with email and consent fields is still present,
+        demoted below the real start-free/buy-a-plan CTAs (AC: the waitlist
+        POST handler still works unchanged)."""
         resp = client.get("/")
         assert resp.status_code == 200
         html = resp.data.decode()
         assert 'id="email"' in html
         assert 'id="consent"' in html
-        assert "Join the waiting list" in html
+        assert "Notify me" in html
+
+    def test_home_page_hero_links_to_registration(self, client):
+        """The hero's primary CTA is a real "Start free" link to registration,
+        not a waiting-list anchor -- the product accepts signups today."""
+        resp = client.get("/")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "Start free" in html
+        assert '/account/register' in html
+        assert "Join the waiting list" not in html
+
+    def test_home_page_has_pricing_plan_buttons(self, client):
+        """The former waitlist section now shows the real buy-a-plan CTAs."""
+        resp = client.get("/")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert 'data-testid="home-pricing-buy"' in html
+        assert 'data-testid="buy-enterprise"' in html
 
     def test_signed_in_user_is_redirected_to_dashboard(self, client, db_session, make_org, login_as):
         """Signed-in visitors redirect to the dashboard."""
