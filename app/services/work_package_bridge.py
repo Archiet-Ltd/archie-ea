@@ -323,10 +323,6 @@ def _defer_links(session, wanted):
                 for attr, (added, removed) in value.items():
                     old_added, old_removed = entry[key].get(attr, ((), ()))
                     entry[key][attr] = (list(old_added) + list(added), list(old_removed) + list(removed))
-            elif key == "_relink" and key in entry:
-                # Two element changes before the link step: keep the links of both.
-                for attr, ids in value.items():
-                    entry[key][attr] = list(dict.fromkeys(list(entry[key].get(attr, ())) + list(ids)))
             else:
                 entry[key] = value
 

@@ -1,7 +1,7 @@
 """R1-B04 PR 2 fix round 6: defects N5-01 to N5-04 of the fifth review of PR 421.
 
-N5-02 a copy that takes its source row's element keeps the old element and re-creates its
-links from the new one (round 7: no element is ever deleted); N5-01 both sides of the old store's association tables
+N5-02 a copy that takes its source row's element keeps the old element (no element is ever
+deleted) and its plateau and gap links move to the new one (round 8); N5-01 both sides of the old store's association tables
 are bridged and the deploy heals association rows written after its marker; N5-03 lock
 conflicts fail the request and locks are taken in id order; N5-04 removing an association
 keeps what the old row still holds in its own column.
@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -40,7 +40,7 @@ def _element(db_session, org, name="Spare element", element_type="ApplicationCom
         organization_id=org.id)
 
 
-# -- N5-02: an element change keeps the old element and re-creates the links --------
+# -- N5-02: an element change keeps the old element and moves the links ------------
 
 
 def test_element_change_keeps_crosswalk_and_incoming_relationship(db_session, make_org):
@@ -86,9 +86,10 @@ def test_element_change_keeps_crosswalk_and_incoming_relationship(db_session, ma
     # The copy's plateau and gap links read the same as before, now from the new element.
     assert _links(db_session, org, copy) == before
     assert sorted(t for t, _target in _relationships_of(copy)) == ["association", "realization"]
-    # The old element keeps every relationship it had, outgoing ones included.
+    # Round 8: the plateau and gap links moved with the copy, so the old element no longer
+    # carries them (it keeps its incoming relationship and its crosswalk row).
     assert _scalar(db_session, "SELECT count(*) FROM archimate_relationships "
-                   "WHERE source_id = %s" % old_element_id) == 2
+                   "WHERE source_id = %s" % old_element_id) == 0
 
 
 def test_new_row_links_read_from_its_current_element(app, db_session, make_org):
@@ -386,11 +387,10 @@ def test_failed_link_step_does_not_move_marker(app, db_session, make_org, monkey
 
 
 def test_marker_and_created_at_share_one_clock(app, db_session, make_org, monkeypatch):
-    """The model default of created_at and the consolidation's marker both call
-    datetime.utcnow(); with that clock set far from the database's, a deploy still heals
-    exactly the row written after it, and never restores a link removed on a new screen."""
-    from datetime import timedelta
-
+    """The consolidation's one clock seam, _utcnow(), gives every marker value; the rows the
+    test inserts carry created_at values from the same clock, set explicitly. With that clock
+    far from the database's, a deploy still heals exactly the row written after it, and never
+    restores a link removed on a new screen."""
     from app.commands import consolidate_work_packages as cwp
     from app.models.relationship_tables import gap_work_packages
     from app.services import work_package_bridge
@@ -399,10 +399,8 @@ def test_marker_and_created_at_share_one_clock(app, db_session, make_org, monkey
     ticks = iter(range(1, 10000))
     base = datetime(2031, 6, 1, 12, 0, 0)
 
-    class SkewedClock(datetime):
-        @classmethod
-        def utcnow(cls):
-            return base + timedelta(minutes=next(ticks))
+    def skewed():
+        return base + timedelta(minutes=next(ticks))
 
     org, _user = _org_with_user(db_session, make_org, "n604")
     first, second = _gap(db_session, org), _gap(db_session, org)
@@ -410,15 +408,11 @@ def test_marker_and_created_at_share_one_clock(app, db_session, make_org, monkey
     copy = _copy("work_packages", legacy.id, org)
     _marker(db_session, copy.id, None)
 
-    monkeypatch.setattr(cwp, "datetime", SkewedClock)
-    column = gap_work_packages.c.created_at
-    skewed = lambda _ctx: SkewedClock.utcnow()  # noqa: E731
-    monkeypatch.setattr(column.default, "arg", skewed)
-    # The engine reads the default through this memoized description, not through .arg.
-    monkeypatch.setattr(column, "_default_description_tuple", (skewed, False, True, False))
+    monkeypatch.setattr(cwp, "_utcnow", skewed)
 
     def add(gap):
-        db_session.execute(gap_work_packages.insert().values(gap_id=gap.id, work_package_id=legacy.id))
+        db_session.execute(gap_work_packages.insert().values(
+            gap_id=gap.id, work_package_id=legacy.id, created_at=skewed()))
         db_session.commit()
 
     add(first)
