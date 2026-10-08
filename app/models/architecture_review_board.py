@@ -2734,7 +2734,7 @@ if not _FAST_INIT:
 
 if not _FAST_INIT:
 
-    class ChangeRequest(db.Model):
+    class ChangeRequest(TenantMixin, db.Model):
         """Formal architecture change request for TOGAF Phase H governance.
 
         Records a proposed change to the current architecture baseline.
@@ -2742,6 +2742,13 @@ if not _FAST_INIT:
         to process the change through relevant ADM phases.
 
         TOGAF ADM Phase H: Architecture Change Management.
+
+        PR 297 defect 2/3: organization_id added via migration
+        20261008_change_request_organization_id, backfilled from
+        arb_review_item_id's own tenant. A row with no review item has
+        no derivable tenant and keeps a NULL organization_id -- same as
+        every other TenantMixin model, the ORM listener then excludes it
+        from every tenant-scoped query rather than guessing its owner.
         """
 
         __tablename__ = "arb_change_requests"
