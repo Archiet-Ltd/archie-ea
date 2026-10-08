@@ -1445,7 +1445,8 @@ def _apply_association_changes(wp, org_id, change, stats, source_id=None):
 def clear_untaken_elements(executor, stats=None, dry_run=False):
     """Apply the one element rule (element_refusal_sql) to every copy: clear the element of a copy
     holding another organisation's or a non-WorkPackage element, then of all but the smallest id of
-    those sharing one. Deletes nothing; a cleared copy gets its own element at its first link.
+    those sharing one. Skips a copy with no organisation. Runs only from the migration
+    (20261008_uwp_element_unique), never per deploy. Deletes nothing; a cleared copy gets its own element at its first link.
     `executor` is a connection or a session; `dry_run` rolls the writes back. Returns the count."""
     from app.services import work_package_service as svc
 
@@ -1453,7 +1454,8 @@ def clear_untaken_elements(executor, stats=None, dry_run=False):
         sql = (
             "WITH c AS (SELECT u.id, u.archimate_element_id AS element, "
             f"{svc.element_refusal_sql('u.archimate_element_id', 'u.organization_id', 'u.id', earlier)} AS why "
-            "FROM unified_work_packages u WHERE u.archimate_element_id IS NOT NULL) "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+            "FROM unified_work_packages u WHERE u.archimate_element_id IS NOT NULL "
+            "AND u.organization_id IS NOT NULL) "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
             "UPDATE unified_work_packages u SET archimate_element_id = NULL FROM c "  # tenancy-ok: same
             f"WHERE u.id = c.id AND c.why IN ({conditions}) RETURNING u.id, c.element, c.why")
         return executor.execute(text(sql)).fetchall()
@@ -1490,7 +1492,6 @@ def _link_columns_to_relationships(stats, dry_run=False, unified_ids=None):
     another organisation, or one that no longer exists, is counted and dropped with
     the column. A row whose links failed to write keeps its values for the next
     run. PR 3 drops the columns, the marker and the tables."""
-    clear_untaken_elements(db.session, stats, dry_run)
     clock = _utcnow()  # before the association rows are read
     scope = "AND id = ANY(:uids) " if unified_ids is not None else ""
     params = {"uids": list(unified_ids)} if unified_ids is not None else {}

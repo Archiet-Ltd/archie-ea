@@ -76,6 +76,8 @@ def _element_row(db_session, element_id):
 
 
 def test_r9_deploy_clears_shared_component_element(app, db_session, make_org, bridge_off):  # noqa: F811
+    from app.commands.consolidate_work_packages import clear_untaken_elements
+
     org, _user = _org_with_user(db_session, make_org, "r901a")
     _drop_index(db_session)
     shared = _element(db_session, org, "Shared component")  # an ApplicationComponent element
@@ -87,6 +89,8 @@ def test_r9_deploy_clears_shared_component_element(app, db_session, make_org, br
     ids = (copy_1.id, copy_2.id)
     db_session.commit()
 
+    clear_untaken_elements(db_session)  # the migration's step; the deploy commands no longer run it
+    db_session.commit()
     _merge(app)
 
     db_session.expire_all()
@@ -102,6 +106,8 @@ def test_r9_deploy_clears_shared_component_element(app, db_session, make_org, br
 
 
 def test_r9_deploy_clears_other_org_element(app, db_session, make_org, bridge_off):  # noqa: F811
+    from app.commands.consolidate_work_packages import clear_untaken_elements
+
     org, _user = _org_with_user(db_session, make_org, "r902a")
     other = make_org("r902b")
     _drop_index(db_session)
@@ -113,6 +119,8 @@ def test_r9_deploy_clears_other_org_element(app, db_session, make_org, bridge_of
     copy_id = copy.id
     db_session.commit()
 
+    clear_untaken_elements(db_session)  # the migration's step; the deploy commands no longer run it
+    db_session.commit()
     _merge(app)
 
     db_session.expire_all()
@@ -423,3 +431,57 @@ def test_r9_earliest_old_row_takes_free_element(db_session, make_org, bridge_off
     copies = [_copy("work_packages", row.id, org) for row in rows]
     assert [c.archimate_element_id for c in copies] == [free.id, None, None]
     assert stats["work_packages: source element taken by an earlier row"] == 2
+
+
+# -- R9-01 / R9-02: the clean-up is the migration's, and skips a copy with no organisation ---
+
+
+def test_r9_retyped_element_keeps_links_after_link_step(app, db_session, make_org, bridge_off):  # noqa: F811
+    """P10: a copy whose element was retyped keeps its plateau and gap links; only the migration cleans."""
+    from app.commands.consolidate_work_packages import _Stats, _link_columns_to_relationships
+
+    org, _user = _org_with_user(db_session, make_org, "r910a")
+    legacy = _legacy(db_session, org, "Bridged")
+    plateau, gap = _plateau_of(db_session, org, legacy), _gap(db_session, org)
+    _raw_association(db_session, "gap", legacy.id, gap.id)
+    element = _wp_element(db_session, org)
+    element_id = element.id
+    copy = _unified(db_session, org, legacy, element_id)
+    copy_id = copy.id
+    element.type = "Deliverable"
+    db_session.commit()
+
+    _link_columns_to_relationships(_Stats())
+
+    db_session.expire_all()
+    copy = _copy("work_packages", legacy.id, org)
+    assert copy.id == copy_id and copy.archimate_element_id == element_id
+    links = _links(db_session, org, copy)
+    assert links["plateau_ids"] == [plateau.id]
+    assert links["gap_ids"] == [gap.id]
+
+
+def test_r9_copy_without_organisation_keeps_element(db_session, make_org):
+    from sqlalchemy import text
+
+    from app.commands.consolidate_work_packages import clear_untaken_elements
+    from app.models.unified_work_package import UnifiedWorkPackage
+
+    org = make_org("r911a")
+    element = _wp_element(db_session, org)
+    element_id = element.id
+    row = UnifiedWorkPackage(name="No organisation", organization_id=None,
+                             source_table="work_packages", source_id=987911,
+                             archimate_element_id=element_id)
+    db_session.add(row)
+    db_session.flush()
+    row_id = row.id
+    db_session.execute(text("UPDATE unified_work_packages SET organization_id = NULL WHERE id = :i"),  # tenancy-ok: test fixture
+                       {"i": row_id})  # a column default fills an unset organisation on insert
+    db_session.expire_all()
+    assert db_session.get(UnifiedWorkPackage, row_id).organization_id is None
+
+    assert clear_untaken_elements(db_session) == 0
+
+    db_session.expire_all()
+    assert db_session.get(UnifiedWorkPackage, row_id).archimate_element_id == element_id
