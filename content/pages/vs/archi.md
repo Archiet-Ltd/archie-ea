@@ -53,8 +53,8 @@ licence instead of AGPL.
   browser across every layer — the same Open Group exchange format Archi itself produces.
 - **Derivation with provenance.** Entelim shows its reasoning for every connection it works out, in a
   proof drawer you can open, not a number you have to trust.
-- **Find what you're paying for twice.** Duplicate detection across your application list: pick an
-  application and see it directly, not a question Ask answers.
+- **Find what you're paying for twice.** Run duplicate detection across your whole application list,
+  review the overlapping groups it finds, and add them to a consolidation plan.
 - **A business case built from your own figures**, never invented to fill a gap.
 
 ## Bringing your model across

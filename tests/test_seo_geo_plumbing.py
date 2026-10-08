@@ -105,14 +105,19 @@ def test_no_page_links_to_cross_page_waitlist_anchor(app):
             assert "/#waitlist" not in html, f"{url}: still links to /#waitlist"
 
 
-def test_home_page_still_has_its_own_same_page_waitlist_anchor(app):
-    """Documents the deliberate exclusion above: the home page's own
-    waiting-list section still exists on main (PR414, which removes it,
-    has not merged yet) and still uses a same-page anchor, not a dead
-    cross-page link."""
+def test_home_page_has_no_waitlist_anchor_at_all(app):
+    """Updates the deliberate exclusion above for this branch's own, already
+    landed state: "Start free, not a waiting list, on every live page" (the
+    PR this brief's own description calls PR414) merged on this branch
+    before this round started, so the home page's CTA goes straight to
+    sign-up -- no waiting-list section, same-page anchor or id remains for
+    this test to find."""
     with app.test_client() as client:
         html = client.get("/").data.decode()
-    assert 'id="waitlist"' in html
+    assert "waitlist" not in html.lower(), (
+        "home page should carry no waitlist section or anchor -- "
+        "'Start free, not a waiting list' already landed on this branch"
+    )
 
 
 # ── FAQPage JSON-LD generalised beyond comparison pages ───────────────────
@@ -208,11 +213,20 @@ def test_faq_jsonld_renders_on_a_non_comparison_page(app):
 def test_page_with_no_faq_section_gets_no_faq_node():
     """A page with no "## Frequently asked ..." section at all gets no
     FAQPage node -- the generalisation only fires on a real section, it
-    does not invent one."""
+    does not invent one.
+
+    ai-chat, not applications: a later, unrelated page-standard rewrite
+    added a "## Frequently asked questions" section to applications.md, so
+    it no longer fits this fixture's purpose -- ai-chat has no such section
+    today."""
     from app.services.public_pages import build_jsonld
 
-    page = load_page("module", slug="applications")
+    page = load_page("module", slug="ai-chat")
     assert page is not None
+    assert "Frequently asked" not in page.body_html, (
+        "ai-chat.md now has a FAQ section -- pick a different fixture page "
+        "with none, same as this test originally relied on applications.md"
+    )
     ld = json.loads(build_jsonld(page))
     assert _faq_node(ld) is None
 

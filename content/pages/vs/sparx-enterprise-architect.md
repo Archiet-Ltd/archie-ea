@@ -55,8 +55,8 @@ and its own [plans and pricing](/pricing) published directly.
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
   browser across every layer.
 - **CSV and Excel import** for anything not already in ArchiMate form.
-- **Find what you're paying for twice.** Duplicate-spend detection and a consolidation plan,
-  reached from the application itself, not a question Ask answers.
+- **Find what you're paying for twice.** Run duplicate detection across your whole application list,
+  review the overlapping groups it finds, and add them to a consolidation plan.
 - **A business case built from your own figures**, computed only from data that actually exists in
   your model.
 

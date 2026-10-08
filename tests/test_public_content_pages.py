@@ -535,6 +535,54 @@ def test_withdrawn_page_is_noindex_but_live_page_is_not(app):
         )
 
 
+def test_indexnow_submission_matches_sitemap_urls(app, monkeypatch):
+    """The ping-indexnow CLI command and /sitemap.xml are now built from the
+    one feed set this merge consolidates PR419's is_held/MERGED_PAGES and
+    this branch's own withdrawal mechanism into (load_feed_pages()) --
+    asserts the two surfaces' own, actually-rendered outputs agree page
+    URL for page URL, not just that both happen to call the same function
+    name today. A held, merged or withdrawn page missing from one surface
+    but not the other would be caught here.
+    """
+    from urllib.parse import urlparse
+
+    captured = {}
+
+    def _fake_ping_indexnow(app, urls, base_url=None):
+        captured["urls"] = list(urls)
+        return {"status_code": 200, "body": "ok"}
+
+    monkeypatch.setattr(
+        "app.services.indexnow_service.ping_indexnow", _fake_ping_indexnow
+    )
+
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["ping-indexnow"])
+    assert result.exit_code == 0, result.output
+
+    submitted = captured.get("urls")
+    assert submitted is not None, (
+        "ping-indexnow did not call ping_indexnow (is INDEXNOW_API_KEY unset?)"
+    )
+
+    with app.test_client() as client:
+        sitemap_xml = client.get("/sitemap.xml").data.decode()
+    sitemap_paths = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml))
+    submitted_paths = {urlparse(url).path or "/" for url in submitted}
+
+    # /vs and /use-cases are hub views, not PublicPage content -- the
+    # sitemap lists them explicitly (same as the home page); IndexNow
+    # submits only the home page plus every real content page.
+    sitemap_content_paths = sitemap_paths - {"/", "/vs", "/use-cases"}
+    submitted_content_paths = submitted_paths - {"/"}
+
+    assert submitted_content_paths == sitemap_content_paths, (
+        "IndexNow's page URL set does not match the sitemap's:\n"
+        f"only in IndexNow: {sorted(submitted_content_paths - sitemap_content_paths)}\n"
+        f"only in sitemap: {sorted(sitemap_content_paths - submitted_content_paths)}"
+    )
+
+
 def _strings_in(value):
     if isinstance(value, str):
         yield value
@@ -661,8 +709,14 @@ def test_llms_full_txt_contains_all_use_case_titles(app):
 
         for page in use_case_pages:
             if _is_merged(page) or page.is_held:
-                assert page.title not in text, (
-                    f"llms-full.txt should not contain merged/held/withdrawn use-case title '{page.title}'"
+                # Checked as its own "## {title}" section heading, not a
+                # bare substring: a held/merged page's title can still
+                # legitimately appear inside a still-included page's own
+                # body copy (a "Related" link naming it by title), which
+                # is not the same as llms-full.txt carrying its own entry.
+                assert f"## {page.title}" not in text, (
+                    f"llms-full.txt should not contain a merged/held/withdrawn use-case "
+                    f"section for '{page.title}'"
                 )
                 continue
             assert page.title in text, f"llms-full.txt missing use-case title '{page.title}'"
@@ -703,8 +757,16 @@ def test_llms_full_txt_includes_urls(app):
 
         for page in target_pages:
             if _is_merged(page) or page.is_held:
-                assert page.url not in text, (
-                    f"llms-full.txt should not include merged/held/withdrawn page URL {page.url}"
+                # Checked as its own "URL: https://entelim.org<path>" line
+                # (the exact format llms_full_txt emits for an included
+                # page's own entry), not a bare substring: a held/merged
+                # page's old URL can still legitimately appear as an
+                # inline link inside a still-included page's own body
+                # copy, which is not the same as llms-full.txt carrying
+                # its own entry for that page.
+                assert f"URL: https://entelim.org{page.url}" not in text, (
+                    f"llms-full.txt should not include a merged/held/withdrawn "
+                    f"page entry for {page.url}"
                 )
                 continue
             assert page.url in text, f"llms-full.txt missing URL {page.url}"

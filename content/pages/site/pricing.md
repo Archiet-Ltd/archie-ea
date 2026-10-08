@@ -18,8 +18,8 @@ people. Every question, the Business Model Canvas, the twin map, file import, an
 
 ## Startup — $49/month ($490/year)
 
-Ten people. For founders and small services firms, 5 to 50 people. Everything in Community, plus
-audit export and email support.
+For founders and small services firms, 5 to 50 people. Ten people and email support, everything in
+Community included.
 
 ## Team — $29/editor/month ($290/editor/year)
 

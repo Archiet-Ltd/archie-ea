@@ -82,7 +82,7 @@ PLANS: Tuple[Plan, ...] = (
         key="startup",
         name="Startup",
         summary=(
-            "Ten people. Everything in Community, plus audit export and email support."
+            "Ten people and email support, everything in Community included."
         ),
         purchasable=True,
         user_limit=10,

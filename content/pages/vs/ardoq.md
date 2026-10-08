@@ -46,8 +46,8 @@ Entelim alongside it — import what you have and compare the two directly.
 
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
   browser across every layer.
-- **Duplicate-spend detection and rationalisation**, reached by picking an application directly,
-  not from a question Ask answers.
+- **Find what you're paying for twice.** Run duplicate detection across your whole application list,
+  review the overlapping groups it finds, and add them to a consolidation plan.
 - **A business case built from your own figures** — capex, opex, three-year TCO, ROI and payback,
   never invented to fill a gap.
 - **Full ArchiMate 3.2 modelling**, where Ardoq's own metamodel is deliberately notation-agnostic.

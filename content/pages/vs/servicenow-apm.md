@@ -45,8 +45,8 @@ published directly.
 
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
   browser across every layer.
-- **Find what you're paying for twice.** Duplicate detection across your application list and a
-  consolidation plan: pick an application and see them directly, not a question Ask answers.
+- **Find what you're paying for twice.** Run duplicate detection across your whole application list,
+  review the overlapping groups it finds, and add them to a consolidation plan.
 - **A business case built from your own figures**, never invented to fill a gap.
 - **Full ArchiMate 3.2 modelling**, named explicitly rather than left undocumented.
 

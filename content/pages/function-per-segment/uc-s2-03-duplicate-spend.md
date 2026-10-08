@@ -19,9 +19,8 @@ talked to each other. Nobody set out to waste money — nobody had a single list
 
 ## What Entelim answers
 
-Ask what you're paying for twice, and get a straight line into duplicate detection across your
-application list, a consolidation plan, and spend broken down by category — so the savings are as
-visible as the waste was.
+Find what you're paying for twice. Run duplicate detection across your whole application list,
+review the overlapping groups it finds, and add them to a consolidation plan.
 
 ## Related
 
