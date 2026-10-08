@@ -1,7 +1,7 @@
 """R1-B04 PR 2 fix round 6: defects N5-01 to N5-04 of the fifth review of PR 421.
 
-N5-02 a copy that takes its source row's element only moves links off, and removes, an
-element made in this transaction; N5-01 both sides of the old store's association tables
+N5-02 a copy that takes its source row's element keeps the old element and re-creates its
+links from the new one (round 7: no element is ever deleted); N5-01 both sides of the old store's association tables
 are bridged and the deploy heals association rows written after its marker; N5-03 lock
 conflicts fail the request and locks are taken in id order; N5-04 removing an association
 keeps what the old row still holds in its own column.
@@ -40,15 +40,14 @@ def _element(db_session, org, name="Spare element", element_type="ApplicationCom
         organization_id=org.id)
 
 
-# -- N5-02: follow and delete only an element made in this transaction ------------
+# -- N5-02: an element change keeps the old element and re-creates the links --------
 
 
-def test_element_follow_keeps_crosswalk_and_incoming_relationship(db_session, make_org):
+def test_element_change_keeps_crosswalk_and_incoming_relationship(db_session, make_org):
     from app.models.archimate_core import ArchiMateElement
     from app.models.external_identity_crosswalk import ExternalIdentityCrosswalk
     from app.models.models import ArchiMateRelationship
     from app.services import work_package_service as svc
-    from app.services.archimate_backbone import CREATED_ELEMENTS_KEY
 
     org, _user = _org_with_user(db_session, make_org, "n502a")
     plateau, gap = _plateau(db_session, org), _gap(db_session, org)
@@ -56,7 +55,6 @@ def test_element_follow_keeps_crosswalk_and_incoming_relationship(db_session, ma
     copy = _copy("work_packages", legacy.id, org)
     svc.update_work_package(copy.id, organization_id=org.id, plateau_id=plateau.id, gap_id=gap.id)
     old_element_id = copy.archimate_element_id
-    assert old_element_id in db_session.info[CREATED_ELEMENTS_KEY]  # made in this transaction
 
     # Another record has pointed at that element since: an identity crosswalk row and an
     # incoming relationship from another element.
@@ -67,7 +65,6 @@ def test_element_follow_keeps_crosswalk_and_incoming_relationship(db_session, ma
         source_id=other.id, target_id=old_element_id, type="association", organization_id=org.id)
     db_session.add(incoming)
     db_session.commit()
-    assert not db_session.info.get(CREATED_ELEMENTS_KEY)  # the transaction ended
 
     before = _links(db_session, org, copy)
     assert before == {"plateau_ids": [plateau.id], "gap_ids": [gap.id]}
@@ -94,7 +91,7 @@ def test_element_follow_keeps_crosswalk_and_incoming_relationship(db_session, ma
                    "WHERE source_id = %s" % old_element_id) == 2
 
 
-def test_element_made_in_this_transaction_is_followed_and_dropped(app, db_session, make_org):
+def test_new_row_links_read_from_its_current_element(app, db_session, make_org):
     from flask import g
 
     from app.models import ArchiMateElement
@@ -107,42 +104,64 @@ def test_element_made_in_this_transaction_is_followed_and_dropped(app, db_sessio
         old = gap_archimate_service.create_work_package_for_gap(gap)  # wp.gaps.append(gap)
         db_session.flush()
         copy = _copy("work_packages", old.id, org)
-        assert _links(db_session, org, copy)["gap_ids"] == [gap.id]
-        # The row was flushed before its element was made, so the copy briefly linked from
-        # an element of its own: the link followed the copy to the shared element and the
-        # spare element, which this transaction made, is gone.
+        # The row was flushed before its element was made, so the copy first linked from an
+        # element of its own. It now points at the shared element and the first one stays in
+        # place; the links read from the copy's current element are exactly the gap set.
         assert copy.archimate_element_id == old.archimate_element_id
+        assert ArchiMateElement.query.filter_by(name=old.name, organization_id=org.id).count() == 2
+        assert _links(db_session, org, copy) == {"plateau_ids": [], "gap_ids": [gap.id]}
         assert [t for _k, t in _relationships_of(copy)] == [gap.archimate_element_id]
-        assert ArchiMateElement.query.filter_by(name=old.name, organization_id=org.id).count() == 1
 
 
-def test_drop_unused_elements_only_deletes_created_ones(db_session, make_org):
-    """The deletion cannot reach an element outside the set of those this transaction
-    made, and not one that any table with a foreign key to it still holds."""
-    from app.commands.consolidate_work_packages import _drop_unused_elements, _element_references
-    from app.models.external_identity_crosswalk import ExternalIdentityCrosswalk
+def test_bridge_and_deploy_never_delete_an_element(app, db_session, make_org):
+    from flask import g
+
+    from app.services import work_package_bridge
+    from app.services.gap_archimate_service import gap_archimate_service
+
+    def elements():
+        return _scalar(db_session, "SELECT count(*) FROM archimate_elements")
 
     org, _user = _org_with_user(db_session, make_org, "n502c")
-    unreferenced = _element(db_session, org)
-    referenced = _element(db_session, org)
-    db_session.add(ExternalIdentityCrosswalk(
-        source_system="crm", external_id="x-1", element_id=referenced.id, organization_id=org.id))
+    gap, plateau = _gap(db_session, org), _plateau(db_session, org)
+    seen = [elements()]
+
+    # An old-screen create with a plateau and a gap.
+    legacy = _legacy(db_session, org, "Old row")
+    legacy.plateaus.append(plateau)
+    legacy.gaps.append(gap)
     db_session.flush()
-    conn = db_session.connection()
+    seen.append(elements())
 
-    _drop_unused_elements(conn, "work_packages", [unreferenced.id, referenced.id], set())
-    _drop_unused_elements(conn, "work_packages", [unreferenced.id, referenced.id])  # no set at all
-    assert _scalar(db_session, "SELECT count(*) FROM archimate_elements WHERE id IN (%s, %s)"
-                   % (unreferenced.id, referenced.id)) == 2
+    # An old-screen edit that changes the element column.
+    taken = _element(db_session, org, "Old screen element", element_type="WorkPackage")
+    seen.append(elements())
+    legacy.archimate_element_id = taken.id
+    db_session.flush()
+    seen.append(elements())
+    assert _links(db_session, org, _copy("work_packages", legacy.id, org)) == {
+        "plateau_ids": [plateau.id], "gap_ids": [gap.id]}
 
-    _drop_unused_elements(conn, "work_packages", [unreferenced.id, referenced.id],
-                          {unreferenced.id, referenced.id})
-    assert _scalar(db_session, "SELECT count(*) FROM archimate_elements WHERE id = %s" % unreferenced.id) == 0
-    assert _scalar(db_session, "SELECT count(*) FROM archimate_elements WHERE id = %s" % referenced.id) == 1  # the crosswalk row holds it
-    assert ("external_identity_crosswalk", "element_id") in _element_references(conn)
+    # The full deploy sequence, twice.
+    db_session.commit()
+    with work_package_bridge.suspended():
+        _merge(app)
+        seen.append(elements())
+        _merge(app)
+        seen.append(elements())
 
-    source = (ROOT / "app/commands/consolidate_work_packages.py").read_text(encoding="utf-8")
-    assert "wanted = [e for e in element_ids if e in created]" in source
+    # The new-row gap case.
+    with app.test_request_context("/"):
+        g.current_org_id = org.id
+        gap_archimate_service.create_work_package_for_gap(_gap(db_session, org))
+        db_session.flush()
+    seen.append(elements())
+    assert seen == sorted(seen), seen
+
+    for path in ("app/commands/consolidate_work_packages.py", "app/services/work_package_bridge.py"):
+        source = (ROOT / path).read_text(encoding="utf-8")
+        assert "DELETE FROM archimate_elements" not in source, path
+        assert "delete(ArchiMateElement" not in source, path
 
 
 # -- N5-01: both sides of the association, and a deploy that heals -----------------
@@ -307,13 +326,117 @@ def test_bridge_advances_marker_so_deploy_does_not_re_add(app, db_session, make_
     assert _links(db_session, org, copy)["gap_ids"] == []
 
 
-def test_marker_writes_use_the_utc_wall_clock():
-    source = (ROOT / "app/commands/consolidate_work_packages.py").read_text(encoding="utf-8")
-    for number, line in enumerate(source.splitlines(), 1):
-        if "association_links_migrated_at =" in line and "SET" in line:
-            assert "CURRENT_TIMESTAMP" not in line, (number, line)
-            assert "_MARKER_NOW" in line, (number, line)
-    assert "clock_timestamp()" in source
+def test_bridge_heals_unbridged_rows_before_moving_marker(app, db_session, make_org):
+    from app.services import work_package_bridge
+
+    org, _user = _org_with_user(db_session, make_org, "n601a")
+    gap, plateau = _gap(db_session, org), _plateau(db_session, org)
+    legacy = _legacy(db_session, org, "Old row")
+    copy = _copy("work_packages", legacy.id, org)
+    before = _marker(db_session, copy.id)
+    assert before is not None  # a deployed, marked row
+
+    # A Core insert of a gap association row, unbridged.
+    _raw_association(db_session, "gap", legacy.id, gap.id, role="primary")
+    assert _links(db_session, org, copy) == {"plateau_ids": [], "gap_ids": []}
+
+    # An ordinary old-screen edit of the same work package adds a plateau through the ORM.
+    legacy.plateaus.append(plateau)
+    db_session.flush()
+    assert _links(db_session, org, copy) == {"plateau_ids": [plateau.id], "gap_ids": [gap.id]}
+    advanced = _marker(db_session, copy.id)
+    assert advanced > before
+    db_session.commit()
+
+    with work_package_bridge.suspended():
+        out = _merge(app)
+    assert "association links migrated" not in out
+    assert _links(db_session, org, copy) == {"plateau_ids": [plateau.id], "gap_ids": [gap.id]}
+    assert _marker(db_session, copy.id) == advanced
+
+
+def test_failed_link_step_does_not_move_marker(app, db_session, make_org, monkeypatch):
+    from app.commands import consolidate_work_packages as cwp
+    from app.services import work_package_bridge
+
+    org, _user = _org_with_user(db_session, make_org, "n601b")
+    gap, plateau = _gap(db_session, org), _plateau(db_session, org)
+    legacy = _legacy(db_session, org, "Old row")
+    copy = _copy("work_packages", legacy.id, org)
+    before = _marker(db_session, copy.id)
+    _raw_association(db_session, "gap", legacy.id, gap.id)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("link step forced to fail")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(cwp, "_migrate_associations", fail)
+        legacy.plateaus.append(plateau)
+        db_session.flush()
+    assert _marker(db_session, copy.id) == before  # rolled back with the links
+    assert _links(db_session, org, copy) == {"plateau_ids": [], "gap_ids": []}
+    db_session.commit()
+
+    # The rows are newer than the marker, so the next deploy applies them.
+    with work_package_bridge.suspended():
+        out = _merge(app)
+    assert "rows with association links to migrate: 1" in out
+    assert _links(db_session, org, copy) == {"plateau_ids": [plateau.id], "gap_ids": [gap.id]}
+    assert _marker(db_session, copy.id) > before
+
+
+def test_marker_and_created_at_share_one_clock(app, db_session, make_org, monkeypatch):
+    """The model default of created_at and the consolidation's marker both call
+    datetime.utcnow(); with that clock set far from the database's, a deploy still heals
+    exactly the row written after it, and never restores a link removed on a new screen."""
+    from datetime import timedelta
+
+    from app.commands import consolidate_work_packages as cwp
+    from app.models.relationship_tables import gap_work_packages
+    from app.services import work_package_bridge
+    from app.services import work_package_service as svc
+
+    ticks = iter(range(1, 10000))
+    base = datetime(2031, 6, 1, 12, 0, 0)
+
+    class SkewedClock(datetime):
+        @classmethod
+        def utcnow(cls):
+            return base + timedelta(minutes=next(ticks))
+
+    org, _user = _org_with_user(db_session, make_org, "n604")
+    first, second = _gap(db_session, org), _gap(db_session, org)
+    legacy = _legacy(db_session, org, "Old row")
+    copy = _copy("work_packages", legacy.id, org)
+    _marker(db_session, copy.id, None)
+
+    monkeypatch.setattr(cwp, "datetime", SkewedClock)
+    column = gap_work_packages.c.created_at
+    skewed = lambda _ctx: SkewedClock.utcnow()  # noqa: E731
+    monkeypatch.setattr(column.default, "arg", skewed)
+    # The engine reads the default through this memoized description, not through .arg.
+    monkeypatch.setattr(column, "_default_description_tuple", (skewed, False, True, False))
+
+    def add(gap):
+        db_session.execute(gap_work_packages.insert().values(gap_id=gap.id, work_package_id=legacy.id))
+        db_session.commit()
+
+    add(first)
+    with work_package_bridge.suspended():
+        assert "gap association links migrated: 1" in _merge(app)
+    assert _links(db_session, org, copy)["gap_ids"] == [first.id]
+    assert _marker(db_session, copy.id) > base
+
+    # The first link is removed on a new screen; a second row is written after the marker.
+    svc.update_work_package(copy.id, organization_id=org.id, gap_id=None)
+    db_session.commit()
+    add(second)
+    with work_package_bridge.suspended():
+        out = _merge(app)
+        assert "gap association links migrated: 1" in out  # exactly the new row
+        assert "rows with association links to migrate: 1" in out
+        assert "association links migrated" not in _merge(app)
+    assert _links(db_session, org, copy)["gap_ids"] == [second.id]
 
 
 # -- N5-03: lock conflicts fail the request ---------------------------------------

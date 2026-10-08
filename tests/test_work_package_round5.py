@@ -287,13 +287,13 @@ def test_old_screen_gap_append_and_remove_bridged(app, db_session, make_org):
         assert _links(db_session, org, copy)["gap_ids"] == [gap.id]
         assert _marker(db_session, copy.id) is not None
         # The row is flushed before its element is made, so the copy briefly linked from
-        # an element of its own: the link followed the copy to the shared element and the
-        # spare element is gone.
+        # an element of its own: the copy now points at the shared element, the first one
+        # stays in place (nothing is deleted) and the links read from the current element.
         from app.models import ArchiMateElement
 
         assert copy.archimate_element_id == old.archimate_element_id
         assert [t for _k, t in _relationships_of(copy)] == [gap.archimate_element_id]
-        assert ArchiMateElement.query.filter_by(name=old.name, organization_id=org.id).count() == 1
+        assert ArchiMateElement.query.filter_by(name=old.name, organization_id=org.id).count() == 2
 
         # A child inherits the parent's gaps: a new row whose association rows are
         # written in the same flush as the row.

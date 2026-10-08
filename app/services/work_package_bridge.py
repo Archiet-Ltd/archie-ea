@@ -285,9 +285,6 @@ def _after_flush(session, flush_context):
         return
 
     from app.commands.consolidate_work_packages import sync_source_rows
-    from app.services.archimate_backbone import CREATED_ELEMENTS_KEY
-
-    created_elements = session.info.get(CREATED_ELEMENTS_KEY) or set()
 
     conn = session.connection()
     caller = _caller_org()
@@ -297,7 +294,6 @@ def _after_flush(session, flush_context):
             changed=changed.get(table), dependency_changes=dependency_changes.get(table),
             link_changes=link_changes.get(table), relation_changes=relation_changes.get(table),
             defer_links=lambda wanted, _s=session: _defer_links(_s, wanted),
-            created_elements=created_elements,
         )
         marks = {
             row[0]: row[1:] for row in conn.execute(
@@ -391,27 +387,9 @@ def _flush_then_link(original):
     return flush
 
 
-def _forget_created_elements(session, *_args):
-    """The elements made in this transaction are only known to it: forget them when it ends
-    (commit) or is rolled back (the whole transaction or a savepoint)."""
-    from app.services.archimate_backbone import CREATED_ELEMENTS_KEY
-
-    session.info.pop(CREATED_ELEMENTS_KEY, None)
-
-
-def _forget_after_commit(session):
-    # A savepoint released inside the transaction (the link step runs in one) is not the end
-    # of the transaction: the elements it made are still this transaction's.
-    if not session.in_nested_transaction():
-        _forget_created_elements(session)
-
-
 def register(app=None):
     """Install the session listeners once per process (create_app may run many times)."""
-    for name, fn in (("before_flush", _before_flush), ("after_flush", _after_flush),
-                     ("after_commit", _forget_after_commit),
-                     ("after_rollback", _forget_created_elements),
-                     ("after_soft_rollback", _forget_created_elements)):
+    for name, fn in (("before_flush", _before_flush), ("after_flush", _after_flush)):
         if not event.contains(Session, name, fn):
             event.listen(Session, name, fn)
     if not getattr(Session.flush, "_wp_bridge_wrapped", False):

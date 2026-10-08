@@ -40,9 +40,6 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-# session.info key: ids of the elements given to unified work packages in this transaction.
-CREATED_ELEMENTS_KEY = "work_package_elements_created"
-
 # The domain -> ArchiMate mapping from DESIGN.md. Solution* variants are the
 # journey layer's own motivation entities and map to the same element types.
 ELEMENT_TYPES: Dict[str, tuple] = {
@@ -194,9 +191,4 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
         provenance=properties
     )
     obj.archimate_element_id = element.id
-    if type_name == "UnifiedWorkPackage":
-        # The element is new in this transaction: the work package bridge may move links
-        # off it and remove it again if the copy takes its source row's element instead
-        # (consolidate_work_packages._follow_source_element). Cleared on commit/rollback.
-        session.info.setdefault(CREATED_ELEMENTS_KEY, set()).add(element.id)
     return element
