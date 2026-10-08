@@ -32,11 +32,13 @@ def test_norm_helpers():
     )
     assert _norm_layer("implementation & migration") == "implementation"
     assert _norm_layer("Implementation & Migration") == "implementation"
+    assert _norm_layer("implementation_migration") == "implementation"
     assert _norm_layer("business") == "business"
     assert _norm_rel("RealizationRelationship") == "realization"
     assert _norm_rel("Realization") == "realization"
     assert _norm_rel("realization") == "realization"
     assert _norm_rel("Flow") == "flow"
+    assert _norm_rel("Uses") == "serving"
 
 
 def test_cmp33_workpackage_valid_in_implementation_migration_layer():

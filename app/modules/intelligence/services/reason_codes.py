@@ -12,8 +12,12 @@ gate enforces this mechanically at the template layer, out of scope here).
 from __future__ import annotations
 
 # sdd-v2.md § API-8 — the original sixteen members, the two T-004 additions,
-# the one T-005 addition, the Portfolio and Programme lenses' three
-# additions and the four T-S1 additions below (twenty-six total), exactly,
+# the one T-005 addition, the Portfolio, Programme and Strategy lenses' four
+# additions, the Accountability lens's two plus its withdrawal reason,
+# role-gating's addition, the four T-S1 additions, the programme lens's own
+# plateau/gap pair, the two maturity-read-helper additions, the
+# Portfolio-block's three additions, the licence-sync addition and the four
+# connection-explanation additions below (forty-three total), exactly,
 # nothing invented.
 REASON_CODES = frozenset(
     {
@@ -116,6 +120,72 @@ REASON_CODES = frozenset(
         "no_capability_linked",
         "value_stream_not_linked_to_model",
         "dependency_direction_unknown",
+        # L7 (Data lens) additions: Ask's Data lens lists the DataObject rows
+        # linked to the picked element. Most elements have none, an honest
+        # absence; an object with neither a steward nor an owner recorded is a
+        # distinct fact (nobody is named, not that the name failed to load);
+        # and an object with no lineage edge recorded in or out has no known
+        # flow. Each stays tied to its own absence condition.
+        "no_data_recorded",
+        "no_steward_recorded",
+        "no_lineage_recorded",
+        # Compliance (under L6) additions: Ask's Compliance question reads the
+        # controls an application is mapped to. No mapping is an honest
+        # absence (never "0% compliant"); a mapped control with neither
+        # evidence nor a verification date is a distinct fact from "not
+        # mapped"; and no policy scan on record means the last-scan time is
+        # unknown, not that everything passed.
+        "no_compliance_controls_recorded",
+        "no_control_evidence",
+        "no_policy_scan_recorded",
+        # The programme lens's own plateau/gap block: a work package's stored
+        # plateau_id/gap_id may be unset (a nullable FK), or, in principle,
+        # point at a record belonging to a different tenant (the FK itself
+        # carries no tenant check, so the select that resolves it is what
+        # enforces the boundary) -- both are honest absences, not errors.
+        "no_plateau_recorded",
+        "no_gap_recorded",
+        # Maturity read helper additions: the canonical maturity surface's
+        # one batched read (CapabilityHeatmapService.maturity_for_elements /
+        # .maturity_for_capability_ids) has two absence conditions the
+        # existing "no_maturity_recorded" does not distinguish -- a current
+        # level recorded with no target to compare it against, and (reserved
+        # for a later reader) an answer with no Capability element in its
+        # chain at all.
+        "no_maturity_target_recorded",
+        "no_capability_in_chain",
+        # The Portfolio lens's component block adds cost, health and
+        # licence facts read from the columns already entered on the
+        # resolved ApplicationComponent (and the two tables keyed off it).
+        # Each part of that block carries its own absence condition,
+        # distinct from the pre-existing no_application_component (no
+        # component at all): a component can exist with no cost figures
+        # entered, no owner-recorded health status, no fiscal-period cost
+        # row and no licence entitlement rows, independently of one
+        # another.
+        "no_cost_recorded",
+        "no_health_recorded",
+        "no_licence_recorded",
+        # A licence's usage columns are only ever populated once a sync has
+        # run against the source system; quantity_used carries a column
+        # default of zero for a licence that has never been synced, so
+        # comparing it against quantity_entitled would report an invented
+        # under-use finding rather than a measurement. Distinct from
+        # no_licence_recorded above, which means no licence rows exist for
+        # the component at all.
+        "licence_usage_not_synced",
+        # Connection explanation additions: the "Why?" read of one derived
+        # row (services/explanation.py) turns its stored chain back into the
+        # drawn relationships. A chain id that no longer resolves inside the
+        # organisation, a relationship nobody is recorded as having drawn or
+        # with no creation time, and a rule id the rule table does not
+        # describe are each an honest absence shown as "not recorded" --
+        # never dropped, never filled in. An element on the chain that does
+        # not resolve reuses the existing element_not_found.
+        "relationship_not_recorded",
+        "drawn_by_not_recorded",
+        "drawn_at_not_recorded",
+        "rule_not_recorded",
     }
 )
 

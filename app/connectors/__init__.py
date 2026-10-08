@@ -1,14 +1,16 @@
 """
 Connectors Package
 
-Enterprise system connectors for the platform:
-- ServiceNow CMDB: Configuration management database
-- Jira ALM: Application lifecycle management
-- Datadog APM: Application performance monitoring
-- Abacus EA Tool: Enterprise architecture repository (Avolution)
+Connector implementations for external systems, in progress:
+- ServiceNow CMDB, Jira ALM, Datadog APM: authenticate and field-map
+  records from the source system, then log them rather than persisting
+  them -- there is no write path into this platform's data yet.
+- Abacus EA Tool: fetches applications, capabilities and relationships
+  from Avolution's API; also does not persist them.
 
-All connectors implement the BaseConnector interface with standardized
-field mapping, event-driven sync, and reconciliation workflows.
+No connector instance is registered with ConnectorManager anywhere in this
+codebase, so the connector dashboard's manual sync action is not available
+for any of the above today.
 """
 
 from .abacus import AbacusConnector, create_abacus_connector

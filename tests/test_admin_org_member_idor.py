@@ -50,13 +50,9 @@ organization/member/user API. Result: 13 distinct URL rules (one, /admin/user/
     org_id comes from the caller's own session (`_require_org_id()`), not
     from the URL — see app/modules/admin/team_routes.py — so it cannot
     target another tenant's row no matter what user_id is supplied.
-  - /account/join-from-invite/<user_id>/<token> loads the user by id with no
-    org filter (tenant-scoping-ok, pre-auth flow, no org context exists
-    yet), but the real gate is the signed, single-use confirmation token
-    checked in User.confirm_account(token); without the correct token the
-    request is rejected regardless of user_id. This is a different threat
-    model (a stolen/guessed link, not tenant-admin privilege) so it is noted
-    here for completeness but is out of scope for this IDOR class.
+  - /account/join-from-invite/<user_id>/<token> is retired: it loads no user
+    and only redirects to /account/join/<token>, where the invitation is found
+    by the digest of a stored single-use secret, so user_id selects nothing.
 
 All the scoping mechanisms above (@platform_admin_required,
 get_user_or_404's organization_id filter, team_routes' session-derived

@@ -1,0 +1,71 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% block title %}Personal-Data Trace — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {{ page_header(
+        title='Personal-Data Trace',
+        description='Where a personal-data category goes: the systems recorded as using it, the suppliers behind each system, and the AI systems that use it. Each step names the recorded link it rests on.',
+        breadcrumbs=[
+            {'label': 'Home', 'href': url_for('main.index')},
+            {'label': 'Data Subject Requests', 'href': url_for('gdpr_bp.dsr_index')},
+            {'label': 'Personal-Data Trace'}
+        ]
+    ) }}
+
+    {% if not categories %}
+    {{ empty_state(
+        icon='database',
+        title='No personal-data category recorded',
+        description='Mark a data entity as holding personal data in the data entity catalogue to trace it here.',
+        cta_text=None
+    ) }}
+    {% else %}
+    <form method="GET" action="{{ url_for('gdpr_bp.dsr_trace') }}" class="flex flex-wrap items-end gap-3" data-testid="trace-form">
+        <div>
+            <label for="trace-category" class="block text-sm font-medium mb-1">Personal-data category</label>
+            <select id="trace-category" name="category_id" required data-testid="trace-category"
+                class="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                <option value="" {% if not selected %}selected{% endif %} disabled>Select…</option>
+                {% for c in categories %}
+                <option value="{{ c.id }}" {% if selected and c.id == selected.id %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" data-testid="trace-submit"
+            class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4">
+            Trace
+        </button>
+    </form>
+
+    {% if traced %}
+    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="trace-result">
+        <div class="p-4 border-b border-border bg-muted/30">
+            <h2 class="text-lg font-semibold">{{ traced.category.name }}</h2>
+        </div>
+        {% if traced.systems %}
+        <ul class="divide-y divide-border">
+            {% for s in traced.systems %}
+            <li class="px-4 py-3 text-sm space-y-1" data-testid="trace-system">
+                <p><span class="font-medium">{{ s.name }}</span>
+                   <span class="text-xs text-muted-foreground">— {{ s.path | join(' → ') }}{% if s.relationship %} ({{ s.relationship }}){% endif %}</span></p>
+                <p class="text-xs"><span class="text-muted-foreground">Suppliers:</span>
+                    {% if s.processors %}
+                    {% for p in s.processors %}{{ p.name }} ({{ p.link }}){% if not loop.last %}; {% endif %}{% endfor %}
+                    {% else %}—{% endif %}
+                </p>
+                <p class="text-xs" data-testid="trace-ai"><span class="text-muted-foreground">AI systems:</span> {{ s.ai_systems }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="px-4 py-6 text-sm text-muted-foreground" data-testid="trace-none">No system is recorded as using this category. AI systems: not recorded.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

@@ -322,7 +322,13 @@ def agent_configuration(agent_name):
                     }
                 )
         else:
-            # POST - update configuration
+            # POST - update configuration. One row per agent name serves every organisation, so
+            # changing it is a platform-admin action.
+            from app.middleware.tenant_decorators import is_platform_admin
+
+            if not is_platform_admin(current_user):
+                return jsonify({"success": False, "error": "Platform admin access required"}), 403
+
             data = request.get_json() or {}
 
             config = AgentConfiguration.query.filter_by(agent_name=agent_name).first()
@@ -1022,8 +1028,15 @@ def get_decision_logs():
         if days:
             since = datetime.utcnow() - timedelta(days=days)
 
+        # Prompts and decisions are personal to the user who triggered them: everyone sees their
+        # own, and only a platform admin sees every user's.
+        from app.middleware.tenant_decorators import is_platform_admin
+
         logs = LLMService.get_decision_log(
-            decision_type=decision_type, user_id=None, limit=limit, since=since  # All users
+            decision_type=decision_type,
+            user_id=None if is_platform_admin(current_user) else current_user.id,
+            limit=limit,
+            since=since,
         )
 
         return jsonify({"success": True, "decision_logs": logs, "count": len(logs)})

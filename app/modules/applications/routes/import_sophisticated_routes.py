@@ -827,6 +827,7 @@ def upload_excel_applications():
     file.seek(0)  # Reset for downstream parsing
     file_hash = hashlib.sha256(file_content).hexdigest()[:16]
     idempotency_window = 300  # 5 minutes
+    # tenant-scoping-ok: keyed to the signed-in user, who belongs to one organisation
     recent_dup = ImportSessionLog.query.filter(
         ImportSessionLog.user_id == current_user.id,
         ImportSessionLog.filename == filename,
@@ -1561,6 +1562,7 @@ def import_manual_applications():
         audit = ImportSessionLog(
             session_id=str(uuid.uuid4()), operation_type="import",
             user_id=current_user.id,
+            organization_id=g.current_org_id,
             import_source="unified_applications", started_at=started_at, completed_at=completed_at,
             status="completed", records_processed=len(applications),
             records_created=records_created,
@@ -1615,9 +1617,12 @@ def import_history():
         )
 
         # Get total count for pagination
+        # tenant-scoping-ok: keyed to the signed-in user, who belongs to one organisation
+        from flask import g
         total_query = ImportSessionLog.query.filter(
             ImportSessionLog.user_id == current_user.id,
-            ImportSessionLog.import_source == import_source
+            ImportSessionLog.import_source == import_source,
+            ImportSessionLog.organization_id == g.current_org_id,
         )
         total = total_query.count()
 

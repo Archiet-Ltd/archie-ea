@@ -43,6 +43,7 @@ except ImportError:
     get_queue = None
 
 from app.extensions import csrf, db
+from app.services.billing_plans import PlanLimitReached
 from ..forms.admin_forms import (
     APISettingsForm,
     ChangeAccountTypeForm,
@@ -53,6 +54,7 @@ from ..forms.admin_forms import (
 )
 from app.modules.account.forms.account_forms import CreatePasswordForm
 from app.decorators import admin_required, audit_log, governance_gate_reader_required
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models import APISettings, EditableHTML, Permission, Role, User
 from app.models.organization import Organization
 from app.models.feature_flags import FeatureFlag, FeatureState, FeatureType
@@ -130,6 +132,22 @@ def dashboard():
 # ============================================================================
 
 
+def _plan_limit():
+    """(org id, people-limit status) for the signed-in admin's organisation.
+
+    The form shows the limit and an upgrade link instead of the submit when
+    the plan is full. The refusal itself is made when the user is saved
+    (billing_plans.check_capacity), which also covers two admins adding the
+    last place at once: the second sees the same limit message.
+    """
+    org_id = getattr(current_user, "organization_id", None)
+    if org_id is None:
+        return None, None
+    from app.services.billing_plans import user_limit_status
+
+    return org_id, user_limit_status(org_id)
+
+
 @admin_bp.route("/new-user", methods=["GET", "POST"])
 @login_required
 @rbac_service.require_role("org_admin")
@@ -138,26 +156,24 @@ def dashboard():
 def new_user():
     """Create a new user."""
     form = NewUserForm()
-    if form.validate_on_submit():
-        # Enforce seat limit before creating the user
-        org_id = getattr(current_user, "organization_id", None)
-        if org_id is not None:
-            from app.services.usage_metering_service import UsageMeteringService
-            if not UsageMeteringService.check_seat_limit(org_id):
-                return jsonify({
-                    "error": "seat_limit_exceeded",
-                    "message": "Upgrade your plan to add more users.",
-                }), 402
-
-        user = _svc.create_user(
-            first_name=form.first_name.data,
-            last_name=form.last_name.data,
-            email=form.email.data,
-            password=form.password.data,
-            role=form.role.data,
-        )
-        flash("User {} successfully created".format(user.full_name()), "form-success")
-    return render_template("admin/new_user.html", form=form)
+    org_id, plan_limit = _plan_limit()
+    if form.validate_on_submit() and not (plan_limit and plan_limit["limit_reached"]):
+        try:
+            user = _svc.create_user(
+                first_name=form.first_name.data,
+                last_name=form.last_name.data,
+                email=form.email.data,
+                password=form.password.data,
+                role=form.role.data,
+                organization_id=org_id,
+            )
+        except PlanLimitReached as exc:
+            db.session.rollback()
+            plan_limit = exc.status
+        else:
+            flash("User {} successfully created".format(user.full_name()), "form-success")
+            org_id, plan_limit = _plan_limit()
+    return render_template("admin/new_user.html", form=form, plan_limit=plan_limit)
 
 
 @admin_bp.route("/invite-user", methods=["GET", "POST"])
@@ -168,25 +184,36 @@ def new_user():
 def invite_user():
     """Invites a new user to create an account and set their own password."""
     form = InviteUserForm()
-    if form.validate_on_submit():
-        # Enforce seat limit before inviting the user
-        org_id = getattr(current_user, "organization_id", None)
-        if org_id is not None:
-            from app.services.usage_metering_service import UsageMeteringService
-            if not UsageMeteringService.check_seat_limit(org_id):
-                return jsonify({
-                    "error": "seat_limit_exceeded",
-                    "message": "Upgrade your plan to add more users.",
-                }), 402
+    org_id, plan_limit = _plan_limit()
+    if form.validate_on_submit() and not (plan_limit and plan_limit["limit_reached"]):
+        from app.modules.account.services.invitation_service import InvitationError
 
-        user = _svc.invite_user(
-            first_name=form.first_name.data,
-            last_name=form.last_name.data,
-            email=form.email.data,
-            role=form.role.data,
-        )
-        flash("User {} successfully invited".format(user.full_name()), "form-success")
-    return render_template("admin/new_user.html", form=form)
+        try:
+            user, delivered, error = _svc.invite_user(
+                first_name=form.first_name.data,
+                last_name=form.last_name.data,
+                email=form.email.data,
+                role=form.role.data,
+                organization_id=org_id,
+            )
+        except PlanLimitReached as exc:
+            db.session.rollback()
+            plan_limit = exc.status
+        except InvitationError as exc:
+            db.session.rollback()
+            flash(exc.message, "form-error")
+        else:
+            if delivered:
+                flash("Invitation sent to {}.".format(user.email), "form-success")
+            else:
+                flash(
+                    "The invitation to {} could not be sent: {} Resend it from the Team page.".format(
+                        user.email, error
+                    ),
+                    "form-error",
+                )
+            org_id, plan_limit = _plan_limit()
+    return render_template("admin/new_user.html", form=form, plan_limit=plan_limit)
 
 
 @admin_bp.route("/manage-users")
@@ -357,7 +384,7 @@ def delete_user(user_id):
 
 @admin_bp.route("/_update_editor_contents", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("admin_editor_update")
 def update_editor_contents():
     """Update the contents of an editor."""
@@ -827,7 +854,7 @@ def consolidation_status():
 
 @admin_bp.route("/feature-flags")
 @login_required
-@admin_required
+@platform_admin_required
 def feature_flags():
     """Feature flags management page with pagination."""
     page = safe_int_arg('page', 1, minimum=1)
@@ -902,7 +929,7 @@ def feature_flags():
 
 @admin_bp.route("/feature-flags/new", methods=["GET", "POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("admin_feature_flag_create")
 def feature_flag_new():
     """Create new feature flag."""
@@ -953,7 +980,7 @@ def feature_flag_new():
 
 @admin_bp.route("/feature-flags/<int:id>/edit", methods=["GET", "POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("admin_feature_flag_edit")
 def feature_flag_edit(id):
     """Edit feature flag."""
@@ -1012,7 +1039,7 @@ def feature_flag_edit(id):
 
 @admin_bp.route("/feature-flags/<int:id>/toggle", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("admin_feature_flag_toggle")
 def feature_flag_toggle(id):
     """Quick toggle feature enabled/disabled."""
@@ -1041,7 +1068,7 @@ def feature_flag_toggle(id):
 
 @admin_bp.route("/feature-flags/<int:id>/delete", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("admin_feature_flag_delete")
 def feature_flag_delete(id):
     """Delete feature flag."""
@@ -1065,7 +1092,7 @@ def feature_flag_delete(id):
 
 @admin_bp.route("/feature-flags/discover-sidebar")
 @login_required
-@admin_required
+@platform_admin_required
 def feature_flags_discover_sidebar():
     """Discover sidebar menu items for feature flagging."""
     try:
@@ -1108,7 +1135,7 @@ def feature_flags_discover_sidebar():
 
 @admin_bp.route("/feature-flags/discover-sidebar/create", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("admin_feature_flags_bulk_create")
 def feature_flags_create_from_sidebar():
     """Create feature flags from selected sidebar items."""
@@ -1190,7 +1217,7 @@ def feature_flags_create_from_sidebar():
 
 @admin_bp.route("/abacus-settings", methods=["GET", "POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("admin_abacus_settings_save")
 def abacus_settings():
     """Manage Abacus connector configuration."""
@@ -1382,7 +1409,7 @@ def abacus_settings():
 
 @admin_bp.route("/abacus-settings/test-connection", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("test_abacus_connection")
 def test_abacus_connection():
     """Test Abacus connection."""
@@ -1470,7 +1497,7 @@ def test_abacus_connection():
 
 @admin_bp.route("/abacus-settings/trigger-sync", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("admin_abacus_sync_trigger")
 def trigger_abacus_sync():
     """Trigger manual Abacus synchronization."""
@@ -1519,7 +1546,7 @@ def trigger_abacus_sync():
 
 @admin_bp.route("/abacus-settings/sync-status", methods=["GET"])
 @login_required
-@admin_required
+@platform_admin_required
 def abacus_sync_status():
     """API endpoint to check current sync job status."""
     from app.models import Job
@@ -1553,7 +1580,7 @@ def abacus_sync_status():
 
 @admin_bp.route("/abacus-settings/cancel-job/<int:job_id>", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("admin_abacus_job_cancel")
 def cancel_abacus_job(job_id):
     """Cancel a running or pending Abacus sync job."""
@@ -1587,7 +1614,7 @@ def cancel_abacus_job(job_id):
 
 @admin_bp.route("/abacus-settings/stats", methods=["GET"])
 @login_required
-@admin_required
+@platform_admin_required
 def abacus_stats():
     """Get Abacus import statistics."""
     try:
@@ -1758,7 +1785,7 @@ def governance_gates_delete(gate_id):
 
 @admin_bp.route("/abacus-settings/discover-filters", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def discover_abacus_filters():
     """Discover available filter dimensions from the Abacus API."""
     import asyncio
@@ -1812,7 +1839,7 @@ def discover_abacus_filters():
 
 @admin_bp.route("/abacus-dashboard", methods=["GET"])
 @login_required
-@admin_required
+@platform_admin_required
 def abacus_dashboard():
     """Display Abacus sync dashboard with health metrics and statistics."""
     from app.models.application_portfolio import ApplicationComponent
@@ -3547,7 +3574,7 @@ def vendor_pricing_import():
 
 @admin_bp.route("/vendor-pricing/confirm", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def vendor_pricing_confirm():
     """Confirm staged pricing items — write to VendorProductPricing as contract_verified."""
     from difflib import SequenceMatcher
@@ -3863,7 +3890,7 @@ def power_platform_import():
 
 @admin_bp.route("/integrations/servicenow", methods=["GET", "POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def servicenow_integration():
     """Manage ServiceNow CMDB integration configuration."""
     from flask_wtf import FlaskForm
@@ -4021,7 +4048,7 @@ def servicenow_integration():
 
 @admin_bp.route("/integrations/servicenow/test-connection", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def servicenow_test_connection():
     """Test ServiceNow CMDB connection."""
     from app.modules.vendors.connectors.servicenow_connector import ServiceNowConnector
@@ -4069,7 +4096,7 @@ def servicenow_test_connection():
 
 @admin_bp.route("/integrations/servicenow/trigger-sync", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log
 def servicenow_trigger_sync():
     """Trigger immediate ServiceNow CMDB sync."""
@@ -4138,7 +4165,7 @@ def servicenow_trigger_sync():
 
 @admin_bp.route("/integrations/servicenow/sync-status", methods=["GET"])
 @login_required
-@admin_required
+@platform_admin_required
 def servicenow_sync_status():
     """Get ServiceNow sync status and statistics."""
     from app.models.application_portfolio import ApplicationComponent

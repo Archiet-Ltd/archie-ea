@@ -1137,6 +1137,9 @@ def api_process_link_ops(app_id, link_id):
     """
     Delete a process link.
     """
+    # The link carries no organisation of its own; the application does. Resolve it
+    # outside the try below, whose broad except would turn the 404 into a 500.
+    ApplicationComponent.query.get_or_404(app_id)
     try:
         from app.models.relationship_tables import ApplicationProcessSupport
 

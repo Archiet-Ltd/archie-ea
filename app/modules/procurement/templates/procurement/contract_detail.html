@@ -58,6 +58,18 @@
                         <dt class="text-sm text-muted-foreground">Auto Renewal</dt>
                         <dd class="font-medium">{{ 'Yes' if contract.auto_renewal else 'No' }}</dd>
                     </div>
+                    <div data-testid="contract-model-element">
+                        <dt class="text-sm text-muted-foreground">Architecture model</dt>
+                        <dd class="font-medium">
+                            {% if contract.archimate_element_id and 'archimate.element_impact_graph_page' in flask.current_app.view_functions %}
+                            <a href="{{ url_for('archimate.element_impact_graph_page', element_id=contract.archimate_element_id) }}"
+                               class="inline-flex items-center gap-1 text-primary hover:underline">
+                                <i data-lucide="git-fork" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                                Contract element
+                            </a>
+                            {% else %}—{% endif %}
+                        </dd>
+                    </div>
                 </dl>
                 {% if contract.contract_description %}
                 <div class="mt-4 pt-4 border-t border-border">

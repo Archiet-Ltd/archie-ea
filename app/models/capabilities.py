@@ -174,6 +174,19 @@ class ArchiMateCapability(db.Model):
         ),
     )
 
+    # Set once by `flask backfill-capability-catalogs` (ADR 0008): points at
+    # the `unified_capabilities` row this legacy row's capability is now
+    # represented by -- the linked `business_capability`'s own projection when
+    # `business_capability_id` is set, otherwise the reference-scope row
+    # created (or matched by archimate_id / normalised name) for this row.
+    # NULL means "not yet processed"; the backfill is idempotent on it.
+    retired_into_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("unified_capabilities.id", ondelete="SET NULL", use_alter=True),
+        nullable=True,
+        index=True,
+    )
+
     # Relationships
     parent = db.relationship(
         "ArchiMateCapability", remote_side="ArchiMateCapability.id", backref="children"
@@ -275,6 +288,17 @@ class EnterpriseCapability(db.Model):
             ondelete="SET NULL",
             use_alter=True,
         ),
+    )
+
+    # Set once by `flask backfill-capability-catalogs` (ADR 0008): points at
+    # the `unified_capabilities` row this legacy row's capability is now
+    # represented by. See ArchiMateCapability.retired_into_id for the full
+    # explanation; the two tables are backfilled by the same command.
+    retired_into_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("unified_capabilities.id", ondelete="SET NULL", use_alter=True),
+        nullable=True,
+        index=True,
     )
 
     # Relationships - Many-to-Many associations

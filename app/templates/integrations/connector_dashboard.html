@@ -6,7 +6,7 @@
 {% block content %}
 <div class="mx-auto px-4 py-6" x-data="connectorDashboard()">
   <!-- Header -->
-  {{ page_shell(title='Connector Health Dashboard', breadcrumb=[('Home', '/'), ('Connector Health Dashboard', none)], subtitle='Monitor external system integrations (Datadog, Jira, ServiceNow, Salesforce)') }}
+  {{ page_shell(title='Connector Health Dashboard', breadcrumb=[('Home', '/'), ('Connector Health Dashboard', none)], subtitle='Monitor connector configuration and sync history. Manual sync is not available yet.') }}
 
   <!-- Loading State -->
   <div x-show="loading" x-cloak class="flex items-center justify-center py-12">
@@ -101,9 +101,11 @@
                     class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90" aria-label="Action">
               Test Connection
             </button>
-            <button type="button" @click="triggerSync(selectedConnector.id)"
-                    class="px-4 py-2 bg-accent text-accent-foreground rounded-md text-sm hover:bg-accent/90" aria-label="Action">
-              Trigger Sync
+            <button type="button" disabled
+                    class="px-4 py-2 bg-muted text-muted-foreground rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Sync is not available for this connector yet"
+                    aria-label="Sync is not available for this connector yet">
+              Sync Not Available
             </button>
           </div>
         </div>

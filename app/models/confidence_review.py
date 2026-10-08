@@ -170,6 +170,14 @@ class ReviewQueueItem(TenantMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Consolidation: set by `flask backfill-review-queue-approvals` on
+    # the row's canonical ai_chat_crud_approvals copy. NULL until backfilled;
+    # this table stays readable (never dropped), it just stops gaining new
+    # rows once the constructor site is repointed.
+    retired_into_id = db.Column(
+        db.Integer, db.ForeignKey("ai_chat_crud_approvals.id"), nullable=True
+    )
+
     # Relationships
     threshold = db.relationship("ConfidenceThreshold", back_populates="review_items")
     assigned_to = db.relationship("User", foreign_keys=[assigned_to_id], backref="assigned_reviews")

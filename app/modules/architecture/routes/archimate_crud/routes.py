@@ -3,6 +3,7 @@ Architecture CRUD Routes
 Unified dashboard for managing Motivation, Strategy, and Business layer elements
 """
 
+import copy
 import re
 from datetime import datetime
 
@@ -20,6 +21,7 @@ from flask_login import login_required
 from sqlalchemy import or_
 
 from app import db
+from app.utils.tenant_users import escape_like_literal
 from . import archimate_crud
 from .services.ai_generation_service import AIGenerationService
 from .services.field_configs import (
@@ -43,6 +45,7 @@ from app.models.application_layer import (
 )
 from app.models.archimate_business import Contract
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+from app.modules.intelligence.services.crosswalk_service import CrosswalkService
 from app.models.archimate_missing_elements import (
     MissingBusinessCollaboration,
     MissingBusinessInteraction,
@@ -693,7 +696,7 @@ def api_layer_elements(layer):
                 if hasattr(model_class, "archimate_element_id"):
                     q = q.filter(model_class.archimate_element_id.is_(None))
                 if search:
-                    safe_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                    safe_search = escape_like_literal(search)
                     filters = []
                     if hasattr(
                         model_class, "name"
@@ -810,7 +813,7 @@ def api_layer_elements(layer):
                 ArchiMateElement.type.in_(query_types),
             )
             if search:
-                safe_s = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                safe_s = escape_like_literal(search)
                 ae_q = ae_q.filter(
                     or_(
                         ArchiMateElement.name.ilike(f"%{safe_s}%", escape="\\"),
@@ -910,7 +913,7 @@ def list_elements(layer, element_type):
 
     # Apply search filter (escape LIKE wildcards to prevent injection)
     if search:
-        safe_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        safe_search = escape_like_literal(search)
         if hasattr(model_class, "name"):
             query = query.filter(model_class.name.ilike(f"%{safe_search}%", escape="\\"))
         if hasattr(model_class, "description"):
@@ -1157,6 +1160,7 @@ def detail_element(layer, element_type, element_id):
 
     # Auto-discover displayable fields from the model
     display_fields = _get_display_fields(element, model_class)
+    external_links = CrosswalkService.get_links_for_element(ae_id or element.id)
 
     return render_template(
         "archimate_crud/detail.html",
@@ -1166,6 +1170,7 @@ def detail_element(layer, element_type, element_id):
         relationships=relationships,
         source_ae_id=ae_id,
         display_fields=display_fields,
+        external_links=external_links,
         layer_config=LAYER_CONFIG,
     )
 
@@ -1197,6 +1202,7 @@ def update_element(layer, element_type, element_id):
     if request.method == "POST":
         try:
             data = request.get_json() if request.is_json else request.form.to_dict()
+            _ae_before = _archimate_element_state(element, _from_ae)
 
             # Update basic fields
             if hasattr(
@@ -1231,10 +1237,11 @@ def update_element(layer, element_type, element_id):
                         archimate_element.description = getattr(
                             element, "description", ""
                         )  # model-safety-ok: polymorphic ArchiMate elements
-
             # As-is / to-be state (ArchiMateElement.plateau), if the form set it.
             # Works for a native ArchiMateElement (element itself) and a linked one.
             _apply_architecture_state(element, data)
+
+            _record_element_update(_ae_before, _archimate_element_state(element, _from_ae))
 
             db.session.commit()
 
@@ -1275,6 +1282,53 @@ def update_element(layer, element_type, element_id):
         selected_layer=_selected_layer_for(layer),
         element_field_configs=ELEMENT_FIELD_CONFIGS,
     )
+
+
+def _archimate_element_state(element, from_ae):
+    """(id, name, description, custom_properties) of the ArchiMate element behind ``element``."""
+    target = element
+    if not from_ae:
+        linked = getattr(element, "archimate_element_id", None)
+        target = ArchiMateElement.query.get(linked) if linked else None
+    if target is None or not isinstance(target, ArchiMateElement):
+        return None
+    return {
+        "id": target.id,
+        "name": target.name,
+        "description": target.description,
+        "custom_properties": copy.deepcopy(target.custom_properties or {}),
+    }
+
+
+def _record_element_update(before, after):
+    """Record an edit of an ArchiMate element in the organisation's audit trail.
+
+    Same transaction as the edit; the restore-before-import screen reads these
+    entries to offer later changes for applying again.
+    """
+    if not before or not after or before == after:
+        return
+    from flask import g
+    from flask_login import current_user
+
+    from app.models.audit_log import AuditLog
+    from app.services.audit_log_service import AuditLogService
+
+    changed = [k for k in ("name", "description", "custom_properties") if before.get(k) != after.get(k)]
+    if not changed:
+        return
+    org_id = getattr(g, "current_org_id", None) or getattr(current_user, "organization_id", None)
+    db.session.add(AuditLog(
+        organization_id=org_id,
+        user_id=getattr(current_user, "id", None),
+        action="update",
+        table_name="archimate_elements",
+        record_id=after["id"],
+        old_value={k: before[k] for k in changed},
+        new_value={k: after[k] for k in changed},
+        ip_address=AuditLogService._resolve_ip(),
+        user_agent=(AuditLogService._resolve_ua() or None),
+    ))
 
 
 @archimate_crud.route(

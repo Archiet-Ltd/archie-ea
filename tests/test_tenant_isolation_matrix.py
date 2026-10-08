@@ -16,6 +16,9 @@ This file asserts three things:
   3. Bulk UPDATE and DELETE are documented as bypassing the filter entirely, and
      that remains true - so the documentation stays honest and anyone writing a
      bulk write knows they must scope it themselves.
+  4. Every identifier-bearing route in the booted url_map refuses another
+     organisation's identifiers - the route sweep at the end of this file,
+     with its coverage figure ratcheted in verification_baseline.json.
 
 The gap this closes was real: ApplicationDocument carries organization_id but no
 mixin, and the delete handler forgot to scope, so any authenticated user could
@@ -35,6 +38,12 @@ INTENTIONALLY_GLOBAL = {
     # Authentication and platform administration must resolve across tenants.
     "User": "login resolves by email before an org context exists",
     "AuditLog": "platform-wide audit trail; scoping it would hide cross-tenant events",
+    "PendingInvitation": (
+        "an invitation belongs to the inviting organisation but is read by an "
+        "invitee from another one, and redeemed from an e-mailed link before any "
+        "organisation is known; the Team page, resend and withdraw put "
+        "organization_id in their own predicates"
+    ),
     "SSOConfig": "read during authentication, before a tenant is known",
     "Subscription": "billing is administered platform-side",
     "UsageEvent": "metering is aggregated platform-side",
@@ -81,6 +90,31 @@ INTENTIONALLY_GLOBAL = {
         "a bug' from 'the deploy just broke everything'; organization_id/user_id "
         "are plain nullable columns kept for attribution, not filtering (see the "
         "model's own docstring, app/models/error_event.py)"
+    ),
+    "AcmPropertyTemplate": (
+        "NULL organization_id is a shared platform template every organisation "
+        "reads; a value is that organisation's own definition, read by that "
+        "organisation only (PropertyService.template_query, the model's own "
+        "comment) — TenantMixin would hide the shared NULL rows from everyone"
+    ),
+    "LLMInteraction": (
+        "queried by user_id (implies one tenant), by pipeline_stage_id -> "
+        "architecture_id (same), or by an explicit organization_id filter in "
+        "every caller that reports or lists interactions across a tenant "
+        "(llm_cost_tracker.py's _get_organization_spending, "
+        "LLMService's decision-log query, TRNT-072)"
+    ),
+    "ImportSessionLog": (
+        "organization_id is nullable (rows written before the column existed "
+        "stay valid, and the model's own comment says a row with no "
+        "organisation is never offered as a restore point); every real query "
+        "already adds an explicit organization_id filter "
+        "(import_restore_service.py's restore lookup, "
+        "import_snapshot_service.py's snapshot listing/creation, "
+        "import_sophisticated_routes.py's idempotency check) — adding "
+        "TenantMixin on top would need to decide how it treats those "
+        "existing nullable-org rows, which is its own deliberate change, "
+        "not something to fold into documenting the current state"
     ),
 }
 
@@ -260,3 +294,251 @@ def test_bulk_delete_is_tenant_filtered(app):
         Organization.query.filter(Organization.id.in_([a_id, b_id])).delete(
             synchronize_session=False)
         db.session.commit()
+
+
+# =============================================================================
+# The route sweep: every identifier-bearing route refuses another
+# organisation's identifiers.
+# =============================================================================
+#
+# The tests above prove the MECHANISM. This section proves the ROUTES: it walks
+# every rule in the booted url_map that carries a record identifier, seeds that
+# record in organisation A, and asks for it as organisation B -- then asks again
+# as A, because B's refusal only means something when the owner is served. The
+# engine is tests/_isolation_sweep.py; the policy it runs under is all here.
+#
+# Coverage is the share of in-scope routes (one rule, one method) PROVEN to
+# refuse: the owner is served, and B gets 403/404/410, is redirected away, is
+# served without A's record, or -- for a write -- changes nothing where the
+# owner's identical write does. It is printed on every run and ratcheted as
+# ``tenant_isolation_route_coverage_pct`` in verification_baseline.json, the one
+# ratchet in that file where higher is better, so it cannot fall.
+#
+# A route that is not proven is one of: a LEAK (fails this test unless it is in
+# KNOWN_LEAKS below), "unfenced" (its record type carries no organisation at
+# all -- the list a security architect asks for), or a route the sweep could not
+# yet drive to a verdict ("unproven", "unresolved", "unseedable", "not_refused",
+# "b_error", "error"). Only named exclusions and named shared catalogues leave
+# the denominator.
+
+from tests import _isolation_sweep as sweep  # noqa: E402
+
+import json as _json  # noqa: E402
+import pathlib as _pathlib  # noqa: E402
+
+COVERAGE_KEY = "tenant_isolation_route_coverage_pct"
+_BASELINE_PATH = _pathlib.Path(__file__).resolve().parent.parent / "verification_baseline.json"
+
+# An integer path parameter names a record, except these, which count or index
+# within a record whose own id is another parameter of the same rule.
+NON_IDENTIFIER_INTS = {
+    "condition_idx", "condition_index", "version", "v1", "v2", "step", "step_num",
+}
+
+# A string parameter names a record when it is spelled like one. ``*_key`` and
+# ``*_code`` parameters (prompt_key, viewpoint_key, industry_code, ...) name
+# entries in platform catalogues, and layer/format/filename/path name no record
+# at all, so neither makes a rule identifier-bearing.
+STRING_IDENTIFIER = r"^(id|uuid|slug|token)$|_(id|uuid|ref|slug|token)$"
+
+# Exclusions by path parameter: the identifier is not an organisation's record.
+EXCLUDED_PARAMS = {
+    "token": (
+        "an unguessable share, invitation or reset token: the token is the grant, "
+        "resolved before any organisation is known, so there is no other "
+        "organisation's token to refuse"
+    ),
+    "org_id": (
+        "platform administration of organisations themselves, gated on the "
+        "cross-tenant is_platform_admin flag and pinned by "
+        "tests/test_platform_admin_isolation.py"
+    ),
+    "organization_id": "as org_id",
+}
+
+# Exclusions by endpoint prefix: the whole blueprint serves no tenant record.
+EXCLUDED_ENDPOINT_PREFIXES = {
+    "static": "static files",
+}
+
+# Exclusions by exact endpoint.
+EXCLUDED_ENDPOINTS: dict[str, str] = {
+    "solution_design.mark_solution_notification_read": (
+        "SolutionNotification has no organisation of its own (solution_id is "
+        "nullable, so there is no required parent to derive one from either); "
+        "the route scopes by the specific recipient's own user_id "
+        "(filter_by(id=notification_id, user_id=current_user.id)), which "
+        "another organisation's user can never match -- a narrower guarantee "
+        "than organisation-scoping, not a gap in it"
+    ),
+}
+
+# Record types that belong to no organisation by design. A route whose
+# identifiers name only these is out of scope, with this reason. Any other
+# record type without an organisation is reported as "unfenced" and counts
+# against coverage -- being left off this list is the safe default.
+SHARED_MODELS = {
+    "VendorOrganization": "the vendor catalogue is shared reference data (see INTENTIONALLY_GLOBAL)",
+    "VendorProduct": "the vendor product catalogue is shared reference data",
+    "VendorProductPricing": "INTENTIONALLY_GLOBAL: vendor catalogue is shared reference data",
+    "TechnicalCapabilityVendorMapping": "maps two shared catalogues (reference capabilities to catalogue vendors)",
+    "APQCProcess": "the APQC process classification framework, a published reference model",
+    "TechnicalCapability": "the ACM technical reference model, organised by its seven domains",
+    "ElementTemplate": "reusable element templates from published frameworks (PCF, ITIL, COBIT)",
+    "FrameworkConfigurationTemplate": "pre-defined configuration templates shipped with the platform",
+    "FrameworkExtension": "the catalogue of extensions available to every organisation",
+    "RequirementTemplate": "the requirement template library shipped with the platform",
+    "SolutionTemplate": "reusable solution architecture templates shipped with the platform",
+    "CodegenTemplateSet": "the code template marketplace, shared by every organisation",
+    "ARBGovernanceStandard": "INTENTIONALLY_GLOBAL: shared governance standards catalogue",
+    "ARBWorkflowStage": "INTENTIONALLY_GLOBAL: shared workflow stage catalogue",
+    "EAWorkflowDefinition": "INTENTIONALLY_GLOBAL: shared workflow template catalogue",
+    "SolutionScoringConfig": "INTENTIONALLY_GLOBAL: scoring defaults are platform-level",
+    "ScoringConfiguration": "rationalisation scoring weights are platform-wide configuration",
+    "FeatureFlag": "platform feature flags, administered platform-side",
+    "SidebarMenuItem": "platform navigation, writable only by a platform administrator",
+    "Role": "role definitions shared by every organisation",
+}
+
+# Leaks the sweep finds in code another open change owns. Each stays a strict
+# expected failure naming its owner (test_known_leak_is_still_open below), so it
+# turns red the moment the owner's fix lands and the entry must come out.
+_PR258 = "PR 258 (scoring/consolidation): consolidation entries are fenced through their application"
+_PR274 = "PR 274 and PR 218 edit solution_design_routes.py; the fix waits for them to land"
+KNOWN_LEAKS = {
+    "DELETE /api/roadmap/deliverables/<int:deliverable_id>": (
+        "PR 265 (work package stores): a deliverable is scoped through its work package"),
+    "PUT /api/roadmap/deliverables/<int:deliverable_id>": "PR 265 (work package stores), as above",
+    "DELETE /api/v1/mappings/application-to-vendor/<int:mapping_id>": "PR 269 (vendor/contract)",
+    "DELETE /api/v1/mappings/unified-to-application/<int:mapping_id>": "capability store brief",
+    "DELETE /api/v1/mappings/unified-to-vendor-org/<int:mapping_id>": "capability store brief",
+    "DELETE /capability-map/api/archimate-mappings/<int:mapping_id>": "capability store brief",
+    "DELETE /consolidation-list/api/entry/<int:entry_id>": _PR258,
+    "PUT /consolidation-list/api/entry/<int:entry_id>": _PR258,
+    "GET /consolidation-list/api/entry/<int:entry_id>/detail": _PR258,
+    # PR 220 and PR 218 landed (verified: test_known_leak_is_still_open was
+    # XPASS(strict) on every one of these 14 routes) -- all proven, not
+    # leaking, so their entries come out rather than mask a real regression.
+    "DELETE /solutions/<int:solution_id>/archimate-elements/<int:mapping_id>": _PR274,
+    "DELETE /solutions/<int:solution_id>/capabilities/<int:mapping_id>": _PR274,
+    "POST /solutions/<int:solution_id>/copilot-insights/<int:insight_id>/dismiss": _PR274,
+    "GET /solutions/api/<int:solution_id>/reasoning/<int:reasoning_id>": _PR274,
+    "GET /solutions/api/registry/specs/<int:spec_id>": _PR274,
+}
+
+POLICY = sweep.Policy(
+    non_identifier_ints=NON_IDENTIFIER_INTS,
+    string_identifier=STRING_IDENTIFIER,
+    excluded_params=EXCLUDED_PARAMS,
+    excluded_endpoint_prefixes=EXCLUDED_ENDPOINT_PREFIXES,
+    excluded_endpoints=EXCLUDED_ENDPOINTS,
+    shared_models=SHARED_MODELS,
+)
+
+
+def _coverage_baseline():
+    data = _json.loads(_BASELINE_PATH.read_text(encoding="utf-8"))
+    return data.get("ratchets", {}).get(COVERAGE_KEY)
+
+
+def _report(cases, excluded):
+    """The coverage figure and every route that is not proven, grouped."""
+    import collections
+
+    proven, in_scope, percent = sweep.coverage(cases)
+    by_status = collections.Counter(c.status for c in cases)
+    lines = [
+        "",
+        "Tenant isolation sweep: %d identifier-bearing routes (%d excluded by name, "
+        "%d naming only shared catalogues)" % (
+            len(cases) + len(excluded), len(excluded), by_status.get(sweep.SHARED, 0)),
+        "  coverage: %s%% -- %d of %d in-scope routes proven to refuse another organisation"
+        % (percent, proven, in_scope),
+    ]
+    for status in (sweep.LEAK,) + sweep.NOT_PROVEN:
+        if by_status.get(status):
+            lines.append("  %-12s %d" % (status, by_status[status]))
+    unfenced = sorted({
+        name
+        for c in cases if c.status == "unfenced"
+        for name in c.detail.split(" carries")[0].replace("record type ", "").split(", ")})
+    if unfenced:
+        lines.append("  record types with no organisation (%d): %s" % (len(unfenced), ", ".join(unfenced)))
+    return "\n".join(lines), percent
+
+
+@pytest.fixture
+def sweep_app(app):
+    """This module's app (its fixture runs create_all) with CSRF off, as a test
+    client drives it."""
+    previous = app.config.get("WTF_CSRF_ENABLED")
+    app.config["WTF_CSRF_ENABLED"] = False
+    yield app
+    app.config["WTF_CSRF_ENABLED"] = previous
+
+
+def test_every_identifier_bearing_route_refuses_another_organisations_identifiers(
+    sweep_app, login_as
+):
+    """Drive every identifier-bearing route as organisation B against organisation
+    A's records; no route may hand B A's record or change it for B.
+
+    Also holds the coverage figure to its ratchet, so the proven share of routes
+    cannot fall -- a new identifier-bearing route has to be proven, or it lowers
+    the figure and fails here.
+    """
+    cases, excluded = sweep.run_sweep(sweep_app, login_as, POLICY)
+    report, percent = _report(cases, excluded)
+    print(report)
+
+    leaks = [c for c in cases if c.status == sweep.LEAK and c.key not in KNOWN_LEAKS]
+    assert not leaks, (
+        "TENANT LEAK: %d route(s) served or changed another organisation's record:\n  %s\n%s"
+        % (len(leaks), "\n  ".join("%s  [%s] %s" % (c.key, c.rule.endpoint, c.detail) for c in leaks),
+           report))
+
+    harness_errors = [c for c in cases if c.status == "error"]
+    assert len(harness_errors) <= MAX_HARNESS_ERRORS, (
+        "the sweep itself failed on %d routes (allowed %d):\n  %s"
+        % (len(harness_errors), MAX_HARNESS_ERRORS,
+           "\n  ".join("%s: %s" % (c.key, c.detail) for c in harness_errors)))
+
+    baseline = _coverage_baseline()
+    assert baseline is not None, "%s is missing from verification_baseline.json" % COVERAGE_KEY
+    assert percent >= baseline, (
+        "isolation coverage fell from %s%% to %s%%. A new or changed identifier-bearing "
+        "route is not proven to refuse another organisation.\n%s" % (baseline, percent, report))
+
+
+# Routes the harness itself could not drive (an unexpected exception while
+# seeding or classifying), measured at 6 when this test was written. Each is
+# named in the failure message; the ceiling keeps a harness regression from
+# hiding behind the coverage figure.
+MAX_HARNESS_ERRORS = 6
+
+
+def test_every_exclusion_names_its_reason():
+    """An exclusion or shared-catalogue entry without a reason is not a decision."""
+    for table in (EXCLUDED_PARAMS, EXCLUDED_ENDPOINT_PREFIXES, EXCLUDED_ENDPOINTS,
+                  SHARED_MODELS, KNOWN_LEAKS):
+        blank = [k for k, why in table.items() if not str(why).strip()]
+        assert not blank, "exclusions with no reason: %s" % blank
+
+
+@pytest.mark.parametrize(
+    "route",
+    [pytest.param(k, marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason=v))
+     for k, v in sorted(KNOWN_LEAKS.items())],
+)
+def test_known_leak_is_still_open(sweep_app, login_as, route):
+    """Each handed-off leak, driven on its own: it must refuse once fixed.
+
+    Strict: when the owner's fix lands this XPASSes, which fails the run, and the
+    entry comes out of KNOWN_LEAKS.
+    """
+    cases, _excluded = sweep.run_sweep(sweep_app, login_as, POLICY, only=lambda c: c.key == route)
+    if not cases:
+        # Not an AssertionError, so it is not absorbed by the expected failure.
+        raise LookupError("%s is no longer an identifier-bearing route in the url_map" % route)
+    assert all(c.status != sweep.LEAK for c in cases), "; ".join(
+        "%s: %s" % (c.key, c.detail) for c in cases)

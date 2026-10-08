@@ -78,6 +78,17 @@ def delete_document_file(doc_id):
         flash("Access denied.", "danger")
         return redirect(url_for("unified_applications.application_list"))
 
+    # Ownership check: only the uploader (by user id) or an administrator can delete.
+    from app.modules.applications.routes.document_routes import _may_delete_document
+    if not _may_delete_document(document, current_user):
+        flash("Access denied.", "error")
+        return redirect(
+            url_for(
+                "unified_applications.application_detail",
+                id=document.application_component_id,
+            )
+        )
+
     # csrf-ok: global CSRFProtect active
 
     try:

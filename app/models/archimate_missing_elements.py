@@ -265,6 +265,7 @@ def create_stakeholder_archimate(mapper, connection, target):
 
         result = connection.execute(
             insert(ArchiMateElement.__table__).values(
+                organization_id=target.organization_id,
                 name=target.name,
                 type="Stakeholder",
                 layer="Motivation",

@@ -33,4 +33,5 @@ from . import (  # noqa: F401, E402
     archimate_cap_routes,
     vendor_matrix_routes,
     tree_routes,
+    ownership_routes,
 )
