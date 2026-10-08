@@ -87,9 +87,16 @@ def is_active_org_admin(user=None) -> bool:
     above already makes, extracted so inline checks scattered across route
     modules can call it instead of re-typing (or mistyping, as an
     unparenthesized ``current_user.is_admin`` bound-method reference did)
-    the active-org-vs-home-org distinction themselves. Mirrors
-    ``solutions_strategic.v2.routes.solution_design_routes._is_active_org_admin``,
-    which predates this shared copy and is left as-is there.
+    the active-org-vs-home-org distinction themselves.
+
+    R3-4 (PR 428 round 4): round 3 left a byte-for-byte duplicate of this
+    exact function as ``solutions_strategic.v2.routes.solution_design_routes
+    ._is_active_org_admin`` (and, found separately in this round, a second
+    one in ``app/application_mgmt/vendor_analysis_routes.py``), on the
+    grounds that it predated this shared copy. The reuse rule (ADR 0008,
+    "one system of record per concept") does not carve out an exception for
+    "it was there first" -- both duplicates are deleted and every call site
+    now imports this one.
     """
     user = user if user is not None else current_user
     if not getattr(user, "is_authenticated", False):

@@ -1230,7 +1230,7 @@ def withdraw_solution(solution_id: int):
         solution.created_by_id == current_user.id
         or (solution.solution_owner and solution.solution_owner.lower() == current_user.email.lower())
     )
-    if not is_owner and not getattr(current_user, "is_admin", False):
+    if not is_owner and not is_active_org_admin():
         return jsonify({
             "success": False,
             "error": "Only the solution owner or an admin can withdraw a solution.",

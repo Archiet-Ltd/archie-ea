@@ -62,6 +62,7 @@ rather than leave a second "admin anywhere" implementation importable.)
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 import pytest
 from werkzeug.routing.converters import (
@@ -260,6 +261,206 @@ def _seed_real_entities_for_sweep(db_session, victim_org, attacker):
         real_entities["role_id"] = admin_role.id
     if prompt_key is not None:
         real_entities["prompt_key"] = prompt_key
+
+    # R3-2 (PR 428 round 4): 69 of the 144 `require_roles`-marked rules used
+    # an argument name this fixture didn't seed, so the sweep accepted 404
+    # for them -- the review's own example, DELETE /enterprise/capabilities/
+    # <capability_id>, was one. Every decorator this sweep drives
+    # (admin_required, org_admin_required, governance_gate_reader_required,
+    # require_roles, role_required, utils.rbac.require_role,
+    # security.rbac.require_permission) wraps its view function in the
+    # standard Python decorator shape -- it runs its own check and returns
+    # before ever calling the wrapped view -- so for the attacker this sweep
+    # drives (correctly refused), the seeded value's real "meaning" to that
+    # specific route's body never matters: the body never runs. That is
+    # also why one row per argument NAME (not one per route) is enough even
+    # where two unrelated routes happen to share an argument name for two
+    # different models (e.g. "stage_id" is ARBWorkflowStage in
+    # arb_workflow.py and ValueStreamStage in value_stream.py) -- seeding
+    # either is equally safe here, because this fixture only ever exercises
+    # the decorator-refused path, never the view body.
+    #
+    # Two names are deliberately left unseeded rather than papering over a
+    # genuine ambiguity: "id" is used by both an `<int:id>` and a
+    # `<string:id>` rule in this same marked set (application_api's
+    # api_arch_elements/api_arch_element_ops), and a couple of its "id"
+    # sibling arguments on that SAME rule (api_arch_element_ops's
+    # "element_id") are therefore also moot to seed in isolation -- the rule
+    # stays in the pre-existing, more permissive (403 or 404) bucket, same
+    # as before this round. "key" (admin.seed) is not a database row at all
+    # (a literal seed-catalogue key); left to the existing placeholder.
+    from app.models.ai_audit_log import AIAuditLog
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate import ArchitectureElement, Relationship
+    from app.models.architecture_review_board import ARBSession
+    from app.models.business_case import BusinessCase
+    from app.models.business_model import BusinessModelCanvas
+    from app.models.capability_set import CapabilitySet
+    from app.models.compliance_models import (
+        ComplianceControl,
+        CompliancePolicy,
+        ComplianceViolation,
+    )
+    from app.models.implementation_migration import TechnologyRoadmapInitiative
+    from app.models.process_data import BusinessProcess
+    from app.models.relationship_tables import ApplicationProcessSupport
+    from app.models.solution_architect_models import SolutionRequirement
+    from app.models.solution_governance import SolutionVersion
+    from app.models.unified_capability import ValueStream, ValueStreamStage
+    from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
+    from app.application_mgmt.framework_catalogue_routes import RegulatoryFramework
+
+    sweep_app = ApplicationComponent(
+        name=f"Sweep App {suffix}", organization_id=victim_org.id
+    )
+    db_session.add(sweep_app)
+
+    framework = RegulatoryFramework(
+        code=f"SWEEP-{suffix}", name=f"Sweep Framework {suffix}"
+    )
+    db_session.add(framework)
+
+    process = BusinessProcess(name=f"Sweep Process {suffix}")
+    db_session.add(process)
+    db_session.flush()
+
+    link = ApplicationProcessSupport(
+        application_component_id=sweep_app.id, business_process_id=process.id
+    )
+    db_session.add(link)
+
+    compliance_control = ComplianceControl(
+        framework_id=framework.id,
+        control_code=f"SWEEP-{suffix}",
+        title=f"Sweep Control {suffix}",
+    )
+    db_session.add(compliance_control)
+    db_session.flush()
+
+    mapping = ApplicationComplianceControl(
+        application_id=sweep_app.id,
+        control_id=compliance_control.id,
+        organization_id=victim_org.id,
+    )
+    db_session.add(mapping)
+
+    arb_session = ARBSession(
+        board_number=f"SWEEP-{suffix}",
+        name=f"Sweep ARB Session {suffix}",
+        scheduled_date=datetime.utcnow(),
+        organization_id=victim_org.id,
+    )
+    db_session.add(arb_session)
+
+    entry = AIAuditLog(action="sweep_probe", model_name="sweep-model")
+    db_session.add(entry)
+
+    capability_set = CapabilitySet(
+        user_id=attacker.id, name=f"Sweep Set {suffix}", capability_ids="[]"
+    )
+    db_session.add(capability_set)
+
+    initiative = TechnologyRoadmapInitiative(
+        name=f"Sweep Initiative {suffix}", fiscal_year_start=2026, fiscal_year_end=2027
+    )
+    db_session.add(initiative)
+
+    element = ArchitectureElement(
+        name=f"Sweep Element {suffix}", element_type="application_component"
+    )
+    db_session.add(element)
+    db_session.flush()
+
+    other_element = ArchitectureElement(
+        name=f"Sweep Element Target {suffix}", element_type="application_component"
+    )
+    db_session.add(other_element)
+    db_session.flush()
+
+    relationship = Relationship(
+        source_id=element.id, target_id=other_element.id, relationship_type="association"
+    )
+    db_session.add(relationship)
+
+    business_case = BusinessCase(organization_id=victim_org.id)
+    db_session.add(business_case)
+
+    canvas = BusinessModelCanvas(organization_id=victim_org.id)
+    db_session.add(canvas)
+
+    policy = CompliancePolicy(name=f"Sweep Policy {suffix}")
+    db_session.add(policy)
+    db_session.flush()
+
+    violation = ComplianceViolation(policy_id=policy.id, description="sweep probe")
+    db_session.add(violation)
+
+    requirement = SolutionRequirement(
+        name=f"Sweep Requirement {suffix}", description="sweep probe"
+    )
+    db_session.add(requirement)
+
+    solution_version = SolutionVersion(
+        solution_id=solution.id,
+        version_number=1,
+        solution_snapshot={},
+        organization_id=victim_org.id,
+    )
+    db_session.add(solution_version)
+
+    vendor_org = VendorOrganization(name=f"Sweep Vendor {suffix}")
+    db_session.add(vendor_org)
+    db_session.flush()
+
+    vendor_product = VendorProduct(
+        vendor_organization_id=vendor_org.id, name=f"Sweep Product {suffix}"
+    )
+    db_session.add(vendor_product)
+
+    value_stream = ValueStream(
+        name=f"Sweep Value Stream {suffix}", organization_id=victim_org.id
+    )
+    db_session.add(value_stream)
+    db_session.flush()
+
+    value_stream_stage = ValueStreamStage(
+        name=f"Sweep Stage {suffix}",
+        value_stream_id=value_stream.id,
+        stage_order=1,
+        organization_id=victim_org.id,
+    )
+    db_session.add(value_stream_stage)
+
+    db_session.flush()
+
+    real_entities.update({
+        "app_id": sweep_app.id,
+        "application_id": sweep_app.id,
+        "framework_id": framework.id,
+        "link_id": link.id,
+        "mapping_id": mapping.id,
+        "session_id": arb_session.id,
+        "review_item_id": arb_session.id,
+        "entry_id": entry.id,
+        "set_id": capability_set.id,
+        "initiative_id": initiative.id,
+        "element_id": element.id,
+        "rel_id": relationship.id,
+        "relationship_id": relationship.id,
+        "business_case_id": business_case.id,
+        "canvas_id": canvas.id,
+        "capability_id": abacus_cap.id,
+        "violation_id": violation.id,
+        "req_id": requirement.id,
+        "version_id": solution_version.id,
+        "condition_idx": 0,
+        "vendor_id": vendor_org.id,
+        "product_id": vendor_product.id,
+        "value_stream_id": value_stream.id,
+        "stage_id": value_stream_stage.id,
+        "context_id": f"sweep-context-{suffix}",
+    })
     return real_entities
 
 

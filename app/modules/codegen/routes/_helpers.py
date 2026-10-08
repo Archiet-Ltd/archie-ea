@@ -83,7 +83,7 @@ def _check_access(solution, user=None):
         return False
     if getattr(solution, "created_by_id", None) == user.id:
         return True
-    is_admin_attr = getattr(user, "is_admin", False)
+    is_admin_attr = getattr(user, "is_admin", False)  # is-admin-called-ok: called via callable() just below, not left bare
     is_admin = is_admin_attr() if callable(is_admin_attr) else bool(is_admin_attr)
     if is_admin:
         try:

@@ -17,6 +17,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from app import db
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.ai_service import AIPromptTemplate
 from app.modules.ai_chat.services.multi_domain_chat_service import PERSONA_CONFIGS
 
@@ -118,8 +119,19 @@ def admin_prompts_data():
 
 @unified_ai_chat_bp.route("/admin/prompts/<persona_key>/update", methods=["POST"])
 @login_required
+@platform_admin_required
 def admin_prompt_update(persona_key):
-    """Update (or create) a DB override for a persona's prompt config."""
+    """Update (or create) a DB override for a persona's prompt config.
+
+    R3-3 (PR 428 round 4, settling with review-pr430-v3.md's DEF-6/PR 430
+    ruling): ``_require_admin()`` (active-org) is not the right authority
+    for ``AIPromptTemplate`` -- a table with no organisation column, whose
+    rows are shown to every tenant. ``platform_admin_required`` is the
+    operative check here; ``_require_admin()`` is kept as well (a no-op
+    once platform_admin_required has already passed) so the function stays
+    safe to call on its own from any future caller that doesn't stack the
+    decorator.
+    """
     _require_admin()
 
     if persona_key not in PERSONA_CONFIGS:
@@ -173,8 +185,12 @@ def admin_prompt_update(persona_key):
 
 @unified_ai_chat_bp.route("/admin/prompts/<persona_key>/reset", methods=["POST"])
 @login_required
+@platform_admin_required
 def admin_prompt_reset(persona_key):
-    """Remove the DB override for a persona, reverting to hardcoded defaults."""
+    """Remove the DB override for a persona, reverting to hardcoded defaults.
+
+    R3-3: same global-resource reasoning as ``admin_prompt_update`` above.
+    """
     _require_admin()
 
     if persona_key not in PERSONA_CONFIGS:

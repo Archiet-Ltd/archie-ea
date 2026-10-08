@@ -14,36 +14,13 @@ from flask_login import current_user, login_required
 
 from .. import db
 from . import application_mgmt
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.utils.pagination import safe_int_arg
 
 
 VALID_WEIGHT_KEYS = frozenset(
     ["cost", "capability_coverage", "risk", "strategic_fit", "implementation"]
 )
-
-
-def _is_active_org_admin(user) -> bool:
-    """D-4 (admin-rbac-active-org continuation): the "or admin" branch of
-    every owner-or-admin check in this file used to be ``hasattr(user,
-    "is_admin") and user.is_admin()`` -- a global ``Permission.ADMINISTER``
-    flag, independent of which organisation is active in the session. Since
-    every self-registered user is Administrator of their own organisation
-    (OptionsAnalysis/StakeholderInput are both TenantMixin-scoped, so this
-    never crossed organisations, but it did let a Viewer of the ACTIVE
-    organisation -- home-org Administrator of their OWN organisation --
-    read or act on another member's analysis/stakeholder-input row within
-    that organisation), re-derived against ``g.current_org_id`` instead, the
-    same predicate ``admin_required``/``org_admin_required`` already use.
-    """
-    if not hasattr(user, "is_authenticated") or not user.is_authenticated:
-        return False
-    from flask import g
-
-    from app.middleware.tenant_decorators import is_platform_admin
-    from app.services.rbac_service import rbac_service
-
-    active_org_id = getattr(g, "current_org_id", None)
-    return is_platform_admin(user) or rbac_service.is_org_admin(user, active_org_id)
 
 
 def _resolve_vendor_name(vendor_option):
@@ -122,7 +99,7 @@ def _check_analysis_access(analysis):
     if not analysis:
         return jsonify({"error": "Analysis not found"}), 404
     if analysis.created_by_id != current_user.id:
-        if not _is_active_org_admin(current_user):
+        if not is_active_org_admin(current_user):
             return jsonify({"error": "Access denied"}), 403
     return None
 
@@ -157,7 +134,7 @@ def vendor_analysis_detail(analysis_id):
     analysis = load_entity(OptionsAnalysis, analysis_id)
     if analysis is None:
         abort(404, description="Analysis not found")
-    if analysis.created_by_id != current_user.id and not _is_active_org_admin(current_user):
+    if analysis.created_by_id != current_user.id and not is_active_org_admin(current_user):
         abort(403)
     return render_template(
         "application_mgmt/vendor_analysis_detail.html", analysis_id=analysis_id
@@ -2456,8 +2433,8 @@ def api_submit_stakeholder_scores(analysis_id, input_id):
             return jsonify({"error": "Stakeholder input not found"}), 404
 
         # Only the stakeholder themselves (or an admin of the active
-        # organisation -- see _is_active_org_admin) can submit.
-        if si.stakeholder_id != current_user.id and not _is_active_org_admin(current_user):
+        # organisation -- see tenant_decorators.is_active_org_admin) can submit.
+        if si.stakeholder_id != current_user.id and not is_active_org_admin(current_user):
             return jsonify({"error": "Only the invited stakeholder can submit scores"}), 403
 
         data = request.get_json()

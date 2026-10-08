@@ -3344,12 +3344,6 @@ def api_bulk_delete_users():
 @admin_bp_v2.route("/api/roles", methods=["GET"])
 @timed_route
 @login_required
-# Role (app/models/user.py) is a GLOBAL table (Administrator/Architect/
-# Viewer/User/Approver, no organization_id) shared by every tenant.
-# admin_required alone let any tenant's own admin read, create, rename,
-# re-permission or delete rows in this platform-wide role catalogue -- e.g.
-# flip the default "Architect" sign-up role to carry Permission.ADMINISTER
-# for every future sign-up on every tenant (R1 admin-rbac systemic fix).
 @platform_admin_required
 @admin_required
 def api_list_roles():
