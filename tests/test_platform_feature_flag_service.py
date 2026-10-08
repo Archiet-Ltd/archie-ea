@@ -158,3 +158,85 @@ def test_delete_refuses_a_non_platform_admin_caller(app, db_session, make_org):
             platform_feature_flag_service.delete_feature_flag(flag)
 
     assert db_session.get(FeatureFlag, flag_id) is not None
+
+
+def test_two_organisations_neither_tenant_admin_can_write_feature_flag(app, db_session, make_org):
+    """Prove that the platform-admin check is not accidentally scoped to a
+    specific organisation. Two organisations, two tenant admins (one per org):
+    neither can create, toggle, or delete a FeatureFlag through the service
+    layer. Only a platform admin can."""
+    from app.models.feature_flags import FeatureFlag, FeatureState, FeatureType
+    from app.services import platform_feature_flag_service
+    from werkzeug.exceptions import Forbidden
+
+    import uuid
+
+    org_a = make_org("ff-two-org-a")
+    org_b = make_org("ff-two-org-b")
+
+    tenant_admin_a = _user(db_session, org_a)
+    tenant_admin_b = _user(db_session, org_b)
+    platform_admin = _user(db_session, org_a, platform=True)
+
+    flag = _flag(db_session)
+    db_session.commit()
+
+    # Capture IDs before any _login_as call (which expunges the session)
+    ta_a_id = tenant_admin_a.id
+    ta_b_id = tenant_admin_b.id
+    pa_id = platform_admin.id
+    flag_id = flag.id
+
+    # Tenant admin from org A cannot create
+    with app.test_request_context():
+        _login_as(db_session, ta_a_id)
+        with pytest.raises(Forbidden):
+            platform_feature_flag_service.create_feature_flag(
+                key=f"should_not_exist_a_{uuid.uuid4().hex[:8]}", name="x",
+                feature_type=FeatureType.FUNCTIONALITY, state=FeatureState.STABLE,
+            )
+
+    # Tenant admin from org B cannot create
+    with app.test_request_context():
+        _login_as(db_session, ta_b_id)
+        with pytest.raises(Forbidden):
+            platform_feature_flag_service.create_feature_flag(
+                key=f"should_not_exist_b_{uuid.uuid4().hex[:8]}", name="x",
+                feature_type=FeatureType.FUNCTIONALITY, state=FeatureState.STABLE,
+            )
+
+    # Tenant admin from org A cannot toggle
+    with app.test_request_context():
+        _login_as(db_session, ta_a_id)
+        flag_a = db_session.get(FeatureFlag, flag_id)
+        with pytest.raises(Forbidden):
+            platform_feature_flag_service.toggle_feature_flag(flag_a)
+
+    # Tenant admin from org B cannot toggle
+    with app.test_request_context():
+        _login_as(db_session, ta_b_id)
+        flag_b = db_session.get(FeatureFlag, flag_id)
+        with pytest.raises(Forbidden):
+            platform_feature_flag_service.toggle_feature_flag(flag_b)
+
+    # Tenant admin from org A cannot delete
+    with app.test_request_context():
+        _login_as(db_session, ta_a_id)
+        flag_c = db_session.get(FeatureFlag, flag_id)
+        with pytest.raises(Forbidden):
+            platform_feature_flag_service.delete_feature_flag(flag_c)
+
+    # Tenant admin from org B cannot delete
+    with app.test_request_context():
+        _login_as(db_session, ta_b_id)
+        flag_d = db_session.get(FeatureFlag, flag_id)
+        with pytest.raises(Forbidden):
+            platform_feature_flag_service.delete_feature_flag(flag_d)
+
+    # Platform admin CAN toggle (prove the service works for authorised callers)
+    with app.test_request_context():
+        _login_as(db_session, pa_id)
+        flag_e = db_session.get(FeatureFlag, flag_id)
+        was_enabled = flag_e.enabled
+        platform_feature_flag_service.toggle_feature_flag(flag_e)
+        assert flag_e.enabled is not was_enabled

@@ -231,6 +231,33 @@ def test_named_platform_models_is_the_confirmed_real_five():
     }
 
 
+def test_integration_named_count_matches_baseline():
+    """Run scan() against the real app/ directory and assert the named-model
+    count equals the expected baseline (10). This test fails on main because
+    the FeatureFlag write routes there are still gated by @admin_required
+    instead of @platform_admin_required, so the named count on main is higher.
+    On this branch the count is exactly 10 (all from ExternalSystem/Job routes
+    pending PR #314)."""
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    script = Path(__file__).resolve().parent.parent / "scripts" / "check_platform_admin_coverage.py"
+    spec = importlib.util.spec_from_file_location("check_platform_admin_coverage", script)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["check_platform_admin_coverage"] = mod
+    spec.loader.exec_module(mod)
+
+    models = mod.platform_wide_models()
+    hits = mod.scan(models=models)
+    named_hits = [h for h in hits if set(h["models"]) & mod.NAMED_PLATFORM_MODELS]
+    assert len(named_hits) == 10, (
+        f"Expected 10 named-model hits (ExternalSystem/Job routes pending PR #314), "
+        f"got {len(named_hits)}. If PR #314 has merged, update this baseline. "
+        f"Hits: {[(h['file'], h['function'], h['models']) for h in named_hits]}"
+    )
+
+
 def test_named_count_filters_hits_to_only_named_models(tmp_path):
     """The --named-count filter (verified at the main()/CLI boundary): a hit
     on a model outside NAMED_PLATFORM_MODELS (PlatformWide, this fake tree's
