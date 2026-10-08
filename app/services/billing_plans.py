@@ -466,19 +466,22 @@ def _flush_changes(session) -> Dict[int, _Change]:
                 and (not reactivated.added or reactivated.added[0] is None)
                 and obj.organization_id is not None
             ):
-                # A leaver coming back takes a seat again.
-                change = at(obj.organization_id)
-                change.joining += 1
+                # A leaver coming back takes a seat again in every organisation
+                # they belong to: the home organisation and each OrgRole one.
                 held = OrgRole.__table__
-                is_reader = session.connection().execute(
-                    select(held.c.id).where(
-                        held.c.user_id == obj.id,
-                        held.c.organization_id == obj.organization_id,
-                        held.c.role == "viewer",
+                roles = {
+                    row.organization_id: row.role
+                    for row in session.connection().execute(
+                        select(held.c.organization_id, held.c.role).where(
+                            held.c.user_id == obj.id
+                        )
                     )
-                ).first()
-                if is_reader is not None:
-                    change.demoted += 1
+                }
+                for org_id in {obj.organization_id, *roles}:
+                    change = at(org_id)
+                    change.joining += 1
+                    if roles.get(org_id) == "viewer":
+                        change.demoted += 1
         elif isinstance(obj, OrgRole) and obj.organization_id is not None:
             history = sa_inspect(obj).attrs.role.history
             if not (history.added and history.deleted):
