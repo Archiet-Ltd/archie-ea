@@ -144,6 +144,7 @@ ACTION_SCIM_TOKEN_ISSUED = "scim_token_issued"
 ACTION_SCIM_TOKEN_REVOKED = "scim_token_revoked"
 ACTION_SCIM_AUTH_FAILED = "scim_auth_failed"
 ACTION_OWNER_TRANSFERRED = "owner_transferred"
+ACTION_SSO_EMAIL_MISMATCH = "sso_email_mismatch"
 
 
 def _actor_extra(actor, extra):
@@ -198,6 +199,15 @@ def record_scim_auth_failed(reason, organization_id=None, token_prefix=None):
     if token_prefix:
         extra["token_prefix"] = token_prefix
     return _record(ACTION_SCIM_AUTH_FAILED, organization_id=organization_id, extra=extra)
+
+
+def record_sso_email_mismatch(org_id, user, provider):
+    """A global sign-in whose identity-provider email differs from the account's.
+
+    Records the provider and the user id only, never either address.
+    """
+    return _record(ACTION_SSO_EMAIL_MISMATCH, user=user, organization_id=org_id,
+                   record_id=user.id, extra={"provider": provider, "subject_user_id": user.id})
 
 
 def record_owner_transferred(org_id, owner_row_id, from_user_id, to_user_id, actor_id,

@@ -479,6 +479,7 @@ def scim_patch_user(user_id):
 @_route("/Users/<user_id>", ["DELETE"])
 def scim_delete_user(user_id):
     user = _user_or_404(user_id)
+    provisioning_service.require_sole_organisation(user, _org_id())
     provisioning_service.deactivate_user(
         user, reason=provisioning_service.REASON_LEAVER, actor=_actor()
     )
