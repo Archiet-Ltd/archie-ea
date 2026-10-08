@@ -12,7 +12,7 @@ from app import db
 from app.middleware.tenant_decorators import is_platform_admin
 from app.models.application_duplicate_detection import duplicate_group_members
 from app.models.application_portfolio import ApplicationComponent
-from app.models.unified_duplicate_detection import unified_group_members
+from app.models.unified_duplicate_detection import UnifiedDuplicateGroup, unified_group_members
 
 
 def group_visible_to_caller(group):
@@ -24,7 +24,7 @@ def group_visible_to_caller(group):
     org_id = getattr(g, "current_org_id", None)
     if org_id is None:
         return False
-    if hasattr(group, "detection_run_id"):  # UnifiedDuplicateGroup
+    if isinstance(group, UnifiedDuplicateGroup):
         stmt = select(unified_group_members.c.application_id).where(
             unified_group_members.c.group_id == group.id
         )

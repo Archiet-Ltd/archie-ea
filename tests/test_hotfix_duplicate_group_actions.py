@@ -159,3 +159,76 @@ class TestDuplicateGroupActionsByOrg:
                 # Not refused. (The add path may still answer 400/500 for another
                 # organisation's members, which the tenant filter hides from it.)
                 assert client.post(url, json=body).status_code not in (403, 404), url
+
+
+class TestLegacyGroupIdsDoNotCrossTables:
+    """A legacy DuplicateGroup is judged by its own member table, never by a
+    unified group that happens to share its numeric id."""
+
+    @staticmethod
+    def _legacy_with_distinct_id(db_session, apps):
+        from app.models.unified_duplicate_detection import UnifiedDuplicateGroup
+
+        for _ in range(12):  # shift the legacy sequence past every unified id
+            _legacy_group(db_session, apps)
+        legacy = _legacy_group(db_session, apps)
+        db_session.commit()
+        assert UnifiedDuplicateGroup.query.get(legacy.id) is None
+        return legacy
+
+    def test_owner_succeeds_and_other_org_gets_404(self, app, login_as, client, db_session, scene, impl):
+        from app.models.application_duplicate_detection import DuplicateGroup
+
+        _, user_a, user_b, _, apps_a = scene
+        legacy = self._legacy_with_distinct_id(db_session, apps_a)
+        lid = legacy.id
+        base = "/duplicate-detection"
+        urls = [
+            (f"{base}/api/groups/{lid}/ignore", {"reason": "hf"}),
+            (f"{base}/api/groups/{lid}/add-to-consolidation", {}),
+            (f"{base}/api/consolidation-recommendation/{lid}/approve", {}),
+            (f"{base}/api/consolidation-recommendation/{lid}/reject", {"reason": "hf"}),
+        ]
+        with app.app_context():
+            login_as(client, user_b)
+            for url, body in urls:
+                assert client.post(url, json=body).status_code == 404, url
+            db_session.expire_all()
+            assert DuplicateGroup.query.get(lid).status not in ("ignored", "approved", "rejected")
+
+            login_as(client, user_a)
+            # add-to-consolidation on a legacy group has an unrelated existing
+            # failure (the model has no .name); owner must at least not be refused.
+            assert client.post(*[urls[1][0]], json={}).status_code != 404
+            for url, body in (urls[2], urls[3], urls[0]):
+                assert client.post(url, json=body).status_code == 200, url
+            db_session.expire_all()
+            assert DuplicateGroup.query.get(lid).status == "ignored"
+
+    def test_colliding_unified_id_of_other_org_does_not_grant_access(
+        self, app, login_as, client, db_session, scene, impl
+    ):
+        from app.models.application_duplicate_detection import DuplicateGroup
+        from app.models.unified_duplicate_detection import UnifiedDuplicateGroup, unified_group_members
+
+        _, _, user_b, _, apps_a = scene
+        org_b_app = _make_app(db_session, user_b.organization)
+        legacy = self._legacy_with_distinct_id(db_session, apps_a)
+        lid = legacy.id
+        clash = UnifiedDuplicateGroup(id=lid, name="HF clash", similarity_score=0.9)
+        db_session.add(clash)
+        db_session.flush()
+        db_session.execute(unified_group_members.insert().values(group_id=lid, application_id=org_b_app.id))
+        db_session.commit()
+        base = "/duplicate-detection"
+        try:
+            with app.app_context():
+                login_as(client, user_b)
+                assert client.post(f"{base}/api/consolidation-recommendation/{lid}/approve", json={}).status_code == 404
+                assert client.post(f"{base}/api/consolidation-recommendation/{lid}/reject", json={}).status_code == 404
+                db_session.expire_all()
+                assert DuplicateGroup.query.get(lid).status not in ("approved", "rejected")
+        finally:
+            db_session.execute(unified_group_members.delete().where(unified_group_members.c.group_id == lid))
+            db_session.delete(db_session.get(UnifiedDuplicateGroup, lid))
+            db_session.commit()
