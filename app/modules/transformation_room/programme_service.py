@@ -988,7 +988,7 @@ class TransformationProgrammeService:
     @staticmethod
     def _server_roles(user) -> set[str]:
         roles = {user.enterprise_role} if user.enterprise_role else set()
-        if user.is_org_admin:
+        if user.is_admin():
             roles.add("organization_admin")
         if user.is_platform_admin:
             roles.add("platform_admin")

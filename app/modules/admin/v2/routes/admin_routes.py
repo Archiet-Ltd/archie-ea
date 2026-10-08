@@ -48,9 +48,12 @@ import json
 from datetime import datetime, timedelta
 from html import escape
 
+from werkzeug.exceptions import HTTPException
+
 from app import csrf
 from app.extensions import db
 from app.services.billing_plans import PlanLimitReached
+from app.services import solution_prompt_override_service
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
 from ...forms.admin_forms import (
@@ -66,6 +69,7 @@ from app.decorators import admin_required, audit_log, governance_gate_reader_req
 from app.middleware.tenant_decorators import org_admin_required, platform_admin_required
 from app.models import APISettings, EditableHTML, Permission, Role, User
 from app.models.organization import Organization
+from app.models.org_role import OrgRole
 from app.models.ai_service import AIPromptTemplate, AIPromptTemplateVersion
 from app.models.feature_flags import FeatureFlag, FeatureState, FeatureType
 from app.modules.admin.v2.services.llm_service_v2 import test_api_key
@@ -491,7 +495,7 @@ def registered_users():
     # /admin/organizations read as a platform undercounting itself rather
     # than the same figure viewed at two different scopes. Name the scope
     # and surface the platform-wide total so the two views reconcile.
-    current_org = Organization.query.get(g.current_org_id)
+    current_org = db.session.get(Organization, g.current_org_id)
     platform_total_users = User.query.count()
     return render_template(
         "admin/registered_users.html",
@@ -1480,7 +1484,7 @@ def feature_flags_create_from_sidebar():
 @admin_bp_v2.route("/abacus-settings", methods=["GET", "POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("update_abacus_settings")
 def abacus_settings():
     """Manage Abacus connector configuration."""
@@ -1702,7 +1706,7 @@ def abacus_settings():
 @admin_bp_v2.route("/abacus-settings/test-connection", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("test_abacus_connection")
 def test_abacus_connection():
     """Test Abacus connection."""
@@ -1791,7 +1795,7 @@ def test_abacus_connection():
 @admin_bp_v2.route("/abacus-settings/trigger-sync", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("trigger_abacus_sync")
 def trigger_abacus_sync():
     """Trigger manual Abacus synchronization."""
@@ -1843,7 +1847,7 @@ def trigger_abacus_sync():
 @admin_bp_v2.route("/abacus-settings/sync-status", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def abacus_sync_status():
     """API endpoint to check current sync job status."""
     from app.models import Job
@@ -1878,7 +1882,7 @@ def abacus_sync_status():
 @admin_bp_v2.route("/abacus-settings/cancel-job/<int:job_id>", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("cancel_abacus_job")
 def cancel_abacus_job(job_id):
     """Cancel a running or pending Abacus sync job."""
@@ -1914,7 +1918,7 @@ def cancel_abacus_job(job_id):
 
 @admin_bp_v2.route("/abacus-settings/clear-stale-jobs", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def clear_stale_abacus_jobs():
     """Force-clear sync jobs stuck in_progress for more than 1 hour."""
     from app.models import Job  # local import to match pattern
@@ -1941,7 +1945,7 @@ def clear_stale_abacus_jobs():
 
 @admin_bp_v2.route("/abacus-settings/discover-types", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def discover_abacus_types():
     """Discover available ComponentType names from the Abacus API."""
     import asyncio
@@ -1984,7 +1988,7 @@ def discover_abacus_types():
 @admin_bp_v2.route("/abacus-settings/stats", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def abacus_stats():
     """Get Abacus import statistics."""
     try:
@@ -2026,7 +2030,7 @@ def abacus_stats():
 @admin_bp_v2.route("/abacus-settings/discover-filters", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def discover_abacus_filters():
     """Discover available filter dimensions from the Abacus API.
 
@@ -2084,7 +2088,7 @@ def discover_abacus_filters():
 @admin_bp_v2.route("/abacus-dashboard", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def abacus_dashboard():
     """Display Abacus sync dashboard with health metrics and statistics."""
     from app.models.application_portfolio import ApplicationComponent
@@ -2166,7 +2170,7 @@ def abacus_dashboard():
 
 @admin_bp_v2.route("/abacus-settings/save-relationship-mappings", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def save_relationship_mappings():
     """Save custom OutConnection → ArchiMate relationship mappings."""
     from app.config.abacus_field_mapping import save_outconnection_mappings
@@ -2193,7 +2197,7 @@ def save_relationship_mappings():
 
 @admin_bp_v2.route("/abacus-settings/relationship-mappings", methods=["GET"])
 @login_required
-@admin_required
+@platform_admin_required
 def get_relationship_mappings():
     """Get current OutConnection → ArchiMate relationship mappings."""
     from app.config.abacus_field_mapping import (
@@ -4737,10 +4741,6 @@ def _get_capability_suggestion_default():
         return "(Could not load default prompt)"
 
 
-def _override_key(prompt_key):
-    return f"solution_prompt_{prompt_key}"
-
-
 @admin_bp_v2.route("/solution-prompts")
 @timed_route
 @login_required
@@ -4759,7 +4759,7 @@ def solution_prompts_data():
     prompts = []
 
     for key, config in defaults.items():
-        override_name = _override_key(key)
+        override_name = solution_prompt_override_service.override_key(key)
         override = AIPromptTemplate.query.filter_by(name=override_name).first()
 
         prompts.append({
@@ -4781,7 +4781,7 @@ def solution_prompts_data():
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/update", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("update_solution_prompt")
 def solution_prompt_update(prompt_key):
     """Save a custom override for a solution prompt."""
@@ -4795,42 +4795,13 @@ def solution_prompt_update(prompt_key):
     if not prompt_text:
         return jsonify({"error": "Prompt text cannot be empty"}), 400
 
-    override_name = _override_key(prompt_key)
-    override = AIPromptTemplate.query.filter_by(name=override_name).first()
-
-    if not override:
-        override = AIPromptTemplate(
-            name=override_name,
-            description=defaults[prompt_key]["description"],
-            system_prompt=prompt_text,
-            user_prompt_template="",
-            category="solution_prompt",
-            updated_by_id=current_user.id,
-            version=1,
-        )
-        db.session.add(override)
-    else:
-        # A-05: snapshot the state being replaced before mutating — see the
-        # equivalent legacy-blueprint route in solution_prompt_admin.py for
-        # the full rationale. This admin/v2 copy is the one actually
-        # registered at boot (USE_ADMIN_GUARDRAILS defaults on, see
-        # CLAUDE.md "Two parallel code layouts"), so the history/diff/
-        # rollback endpoints below live here, not only in the legacy module.
-        db.session.add(AIPromptTemplateVersion(
-            template_name=override.name,
-            version=override.version or 1,
-            system_prompt=override.system_prompt,
-            change_type="update",
-            updated_by_id=override.updated_by_id,
-        ))
-        override.system_prompt = prompt_text
-        override.updated_at = datetime.utcnow()
-        override.updated_by_id = current_user.id
-        override.version = (override.version or 1) + 1
-
     try:
-        db.session.commit()
+        override = solution_prompt_override_service.update_override(
+            prompt_key, defaults[prompt_key]["description"], prompt_text
+        )
         logger.info("Solution prompt override saved for %s by user %s", prompt_key, current_user.id)
+    except HTTPException:
+        raise
     except Exception:
         db.session.rollback()
         logger.exception("Failed to save solution prompt override for %s", prompt_key)
@@ -4857,7 +4828,7 @@ def solution_prompt_update(prompt_key):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/reset", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("reset_solution_prompt")
 def solution_prompt_reset(prompt_key):
     """Remove custom override, reverting to hardcoded default."""
@@ -4865,25 +4836,15 @@ def solution_prompt_reset(prompt_key):
     if prompt_key not in defaults:
         return jsonify({"error": f"Unknown prompt: {prompt_key}"}), 404
 
-    override_name = _override_key(prompt_key)
-    override = AIPromptTemplate.query.filter_by(name=override_name).first()
-
-    if override:
-        try:
-            db.session.add(AIPromptTemplateVersion(
-                template_name=override.name,
-                version=override.version or 1,
-                system_prompt=override.system_prompt,
-                change_type="reset",
-                updated_by_id=current_user.id,
-            ))
-            db.session.delete(override)
-            db.session.commit()
-            logger.info("Solution prompt override reset for %s by user %s", prompt_key, current_user.id)
-        except Exception:
-            db.session.rollback()
-            logger.exception("Failed to reset solution prompt for %s", prompt_key)
-            return jsonify({"error": "Database error resetting prompt"}), 500
+    try:
+        solution_prompt_override_service.reset_override(prompt_key)
+        logger.info("Solution prompt override reset for %s by user %s", prompt_key, current_user.id)
+    except HTTPException:
+        raise
+    except Exception:
+        db.session.rollback()
+        logger.exception("Failed to reset solution prompt for %s", prompt_key)
+        return jsonify({"error": "Database error resetting prompt"}), 500
 
     config = defaults[prompt_key]
     return jsonify({
@@ -4922,7 +4883,7 @@ def solution_prompt_history(prompt_key):
     if prompt_key not in defaults:
         return jsonify({"error": f"Unknown prompt: {prompt_key}"}), 404
 
-    override_name = _override_key(prompt_key)
+    override_name = solution_prompt_override_service.override_key(prompt_key)
     override = AIPromptTemplate.query.filter_by(name=override_name).first()
     history = (
         AIPromptTemplateVersion.query.filter_by(template_name=override_name)
@@ -4969,7 +4930,7 @@ def solution_prompt_diff(prompt_key):
 
     from_v = request.args.get("from", "current")
     to_v = request.args.get("to", "current")
-    override_name = _override_key(prompt_key)
+    override_name = solution_prompt_override_service.override_key(prompt_key)
 
     try:
         from_text = _version_content_v2(prompt_key, from_v, override_name)
@@ -5000,7 +4961,7 @@ def solution_prompt_diff(prompt_key):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/rollback/<int:version>", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("rollback_solution_prompt")
 def solution_prompt_rollback(prompt_key, version):
     """A-05: restore a prior version's content as the live override."""
@@ -5008,44 +4969,18 @@ def solution_prompt_rollback(prompt_key, version):
     if prompt_key not in defaults:
         return jsonify({"error": f"Unknown prompt: {prompt_key}"}), 404
 
-    override_name = _override_key(prompt_key)
-    target = AIPromptTemplateVersion.query.filter_by(
-        template_name=override_name, version=version
-    ).order_by(AIPromptTemplateVersion.id.desc()).first()
-    if not target:
-        return jsonify({"error": f"No version {version} found for {prompt_key}"}), 404
-
-    override = AIPromptTemplate.query.filter_by(name=override_name).first()
-
     try:
-        if override:
-            db.session.add(AIPromptTemplateVersion(
-                template_name=override.name,
-                version=override.version or 1,
-                system_prompt=override.system_prompt,
-                change_type="update",
-                updated_by_id=current_user.id,
-            ))
-            override.system_prompt = target.system_prompt
-            override.updated_at = datetime.utcnow()
-            override.updated_by_id = current_user.id
-            override.version = (override.version or 1) + 1
-        else:
-            override = AIPromptTemplate(
-                name=override_name,
-                description=defaults[prompt_key]["description"],
-                system_prompt=target.system_prompt,
-                user_prompt_template="",
-                category="solution_prompt",
-                updated_by_id=current_user.id,
-                version=1,
-            )
-            db.session.add(override)
-        db.session.commit()
+        override = solution_prompt_override_service.rollback_override(
+            prompt_key, version, defaults[prompt_key]["description"]
+        )
+        if override is None:
+            return jsonify({"error": f"No version {version} found for {prompt_key}"}), 404
         logger.info(
             "Solution prompt %s rolled back to version %s by user %s",
             prompt_key, version, current_user.id,
         )
+    except HTTPException:
+        raise
     except Exception:
         db.session.rollback()
         logger.exception("Failed to roll back solution prompt %s to version %s", prompt_key, version)
@@ -5498,7 +5433,6 @@ _ORG_USER_SORT_COLUMNS = {
     "name": (User.first_name, User.last_name),
     "email": (User.email,),
     "persona": (User.enterprise_role,),
-    "org_admin": (User.is_org_admin,),
 }
 
 
@@ -5518,14 +5452,23 @@ def organization_detail(org_id):
     # Python method, not a column SQL can order by.
     sort_key = request.args.get("sort", "name")
     direction = request.args.get("dir", "asc")
-    columns = _ORG_USER_SORT_COLUMNS.get(sort_key, _ORG_USER_SORT_COLUMNS["name"])
-    order = [c.desc() if direction == "desc" else c.asc() for c in columns]
-    users = User.query.filter_by(organization_id=org.id).order_by(*order, User.id).all()
+    # org_admin sort uses the one canonical check (rbac_service.is_org_admin),
+    # not the denormalised _is_org_admin column, so it is handled in Python.
+    if sort_key == "org_admin":
+        from app.services.rbac_service import rbac_service
+
+        users = User.query.filter_by(organization_id=org.id).order_by(User.id).all()
+        users.sort(key=lambda u: rbac_service.is_org_admin(u, org.id), reverse=(direction == "desc"))
+    else:
+        columns = _ORG_USER_SORT_COLUMNS.get(sort_key, _ORG_USER_SORT_COLUMNS["name"])
+        order = [c.desc() if direction == "desc" else c.asc() for c in columns]
+        users = User.query.filter_by(organization_id=org.id).order_by(*order, User.id).all()
+    valid_sort_keys = set(_ORG_USER_SORT_COLUMNS.keys()) | {"org_admin"}
     return render_template(
         "admin/organizations/detail.html", org=org, users=users,
         limits=user_limit_status(org.id),
         get_role_display_name=get_role_display_name,
-        current_sort=sort_key if sort_key in _ORG_USER_SORT_COLUMNS else "name",
+        current_sort=sort_key if sort_key in valid_sort_keys else "name",
         current_dir=direction if direction in ("asc", "desc") else "asc",
     )
 
@@ -5599,9 +5542,24 @@ def toggle_org_admin(org_id, user_id):
     if user.organization_id != org_id:
         flash("User does not belong to this organization.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
-    user.is_org_admin = not user.is_org_admin
+    # is_org_admin derives from is_admin() (Permission.ADMINISTER). Toggle the
+    # Administrator role assignment through the one grant/revoke authority
+    # (app/models/user.py) instead of each route re-deriving its own copy,
+    # and sync the OrgRole table so team-management routes (which read
+    # OrgRole via rbac_service.is_org_admin) see the same answer.  This route
+    # only ever reaches a user whose own organization_id equals org_id
+    # (checked above), so this is always a grant/revoke in their own
+    # organisation.
+    if user.is_admin():
+        user.revoke_org_admin()
+        OrgRole.query.filter_by(
+            organization_id=org_id, user_id=user_id
+        ).delete(synchronize_session=False)
+    else:
+        user.grant_org_admin()
+        OrgRole.set_role(org_id, user_id, "org_admin")
     db.session.commit()
-    role_label = "granted" if user.is_org_admin else "revoked"
+    role_label = "granted" if user.is_admin() else "revoked"
     flash(f'Org-admin role {role_label} for {user.full_name() or user.email}.', "success")
     return redirect(url_for("admin.organization_detail", org_id=org_id))
 
@@ -5624,9 +5582,22 @@ def organization_delete(org_id):
         flash("Cannot delete — no Default organization to reassign users.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
 
-    moved = User.query.filter_by(organization_id=org.id).update(
-        {"organization_id": default_org.id, "is_org_admin": False},
-        synchronize_session=False,
+    # Move all users to Default org.  Preserve each user's existing role;
+    # only downgrade users who currently hold the Administrator role (the
+    # system of record for org-admin).  A Viewer stays a Viewer, an Architect
+    # stays an Architect — only an Administrator is reset to the default role
+    # (a no-op for a platform admin — see User.revoke_org_admin).
+    users = User.query.filter_by(organization_id=org.id).all()
+    moved = 0
+    for user in users:
+        user.organization_id = default_org.id
+        if user.is_admin():
+            user.revoke_org_admin()
+        moved += 1
+    # Remove OrgRole rows for the deleted organisation so no stale
+    # per-organisation role grants survive.
+    OrgRole.query.filter_by(organization_id=org.id).delete(
+        synchronize_session=False
     )
 
     org_name = org.name
@@ -5656,7 +5627,17 @@ def remove_user_from_org(org_id, user_id):
         return redirect(url_for("admin.organization_detail", org_id=org_id))
 
     user.organization_id = default_org.id
-    user.is_org_admin = False
+    # Preserve the user's existing role.  Only downgrade users who currently
+    # hold the Administrator role (the system of record for org-admin).
+    # A Viewer stays a Viewer, an Architect stays an Architect (and this is a
+    # no-op for a platform admin — see User.revoke_org_admin).
+    if user.is_admin():
+        user.revoke_org_admin()
+    # Remove OrgRole rows for the old organisation so team-management
+    # routes (which read OrgRole via rbac_service) see the same answer.
+    OrgRole.query.filter_by(
+        organization_id=org_id, user_id=user_id
+    ).delete(synchronize_session=False)
     db.session.commit()
     flash(f'{user.full_name() or user.email} moved to Default organization.', "success")
     return redirect(url_for("admin.organization_detail", org_id=org_id))

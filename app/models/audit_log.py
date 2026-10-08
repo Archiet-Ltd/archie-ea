@@ -155,7 +155,7 @@ class AuditLog(db.Model):
         try:
             from app.models.user import User
 
-            u = User.query.get(self.user_id)
+            u = User.query.filter_by(id=self.user_id).first()
             return u.email if u and getattr(u, "email", None) else str(self.user_id)
         except Exception:
             return str(self.user_id)
@@ -168,11 +168,19 @@ class AuditLog(db.Model):
     def description(self):
         if not self.action:
             return ""
+        if self.action == "tool_refused" and isinstance(self.new_value, dict):
+            # A refused AI tool call: which tool, and the rule that refused it.
+            return "AI tool '%s' refused. %s" % (
+                self.new_value.get("tool") or "unknown",
+                self.new_value.get("rule_description") or "",
+            )
         _rec = f"#{self.record_id}" if self.record_id else ""
         return f"{self.action} {self.table_name or ''}{_rec}".strip()
 
     @property
     def status(self):
+        if self.action == "tool_refused":
+            return "refused"
         return ""  # not tracked
 
     @property

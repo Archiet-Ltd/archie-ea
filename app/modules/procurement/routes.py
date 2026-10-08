@@ -12,7 +12,7 @@ from datetime import date, timedelta
 from flask import render_template, request
 from flask_login import current_user, login_required
 
-from app.decorators import requires_procurement
+from app.decorators import requires_procurement, requires_procurement_or_finance
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
 
@@ -39,7 +39,12 @@ def _compliance_summary(licenses):
     re-querying - one source of truth per request.
     """
     total_entitled = sum(lic.quantity_entitled or 0 for lic in licenses)
-    total_consumed = sum(lic.quantity_deployed or 0 for lic in licenses)
+    # Utilisation is measured only over entitlements whose deployment is
+    # recorded; an unrecorded one is neither "0 consumed" nor left in the
+    # denominator to drag the ratio down.
+    recorded = [lic for lic in licenses if lic.quantity_deployed is not None]
+    total_consumed = sum(lic.quantity_deployed for lic in recorded)
+    measured_entitled = sum(lic.quantity_entitled or 0 for lic in recorded)
     return {
         "total": len(licenses),
         "compliant": sum(1 for lic in licenses if lic.compliance_status == "compliant"),
@@ -49,7 +54,7 @@ def _compliance_summary(licenses):
         "total_consumed": total_consumed,
         # Guarded: an empty tenant has nothing entitled, and a ZeroDivisionError
         # on day one is the same class of failure this whole exercise is fixing.
-        "utilization": round(total_consumed / total_entitled * 100, 1) if total_entitled > 0 else None,
+        "utilization": round(total_consumed / measured_entitled * 100, 1) if measured_entitled > 0 else None,
     }
 
 
@@ -182,7 +187,7 @@ def renewals_dashboard():
 
 @procurement_bp.route("/licenses")
 @login_required
-@requires_procurement
+@requires_procurement_or_finance
 def licenses_list():
     """List all license entitlements for current organization."""
     org_id = current_user.organization_id
@@ -272,7 +277,7 @@ def compliance_dashboard():
 
 @procurement_bp.route("/spend")
 @login_required
-@requires_procurement
+@requires_procurement_or_finance
 def spend_analytics():
     """Spend analytics dashboard."""
     org_id = current_user.organization_id

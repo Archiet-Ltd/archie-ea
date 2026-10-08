@@ -14,6 +14,7 @@ from sqlalchemy import and_, or_, select
 from app.models.application_owner import ApplicationOwner
 from app.models.application_portfolio import APPLICATION_HEALTH_STATUSES, ApplicationComponent
 from app.models.user import User
+from app.utils.tenant_users import escape_like_literal
 
 
 def _ownership_rows(
@@ -92,7 +93,7 @@ def _search_clause(search: str):
     The text is matched literally: a backslash, percent sign or underscore in it
     stands for itself rather than acting as a pattern character.
     """
-    escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    escaped = escape_like_literal(search)
     term = f"%{escaped}%"
     return or_(
         ApplicationComponent.name.ilike(term, escape="\\"),

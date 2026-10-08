@@ -5,7 +5,7 @@ L1/L5/L6 already use -- no second traversal implementation, no fabricated
 budget figures.
 
 Fixtures (app, db_session, make_org) are discovered via
-app/modules/intelligence/tests/conftest.py's own import of tests.conftest,
+app/modules/conftest.py's import of tests.conftest,
 same pattern as test_query_service.py. No import needed here.
 """
 

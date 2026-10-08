@@ -25,6 +25,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Any, Dict, Optional, Type
 
+from app.models.constants import ArchiMateRelationshipType
 
 
 logger = logging.getLogger(__name__)
@@ -785,33 +786,7 @@ class ArchiMateExchangeService:
         """
         Normalize relationship type to standard ArchiMate type.
         """
-        type_aliases = {
-            "Serves": "Serving",
-            "ServingRelationship": "Serving",
-            "Uses": "Serving",
-            "Accesses": "Access",
-            "AccessRelationship": "Access",
-            "Influences": "Influence",
-            "InfluenceRelationship": "Influence",
-            "Triggers": "Triggering",
-            "TriggeringRelationship": "Triggering",
-            "Flows": "Flow",
-            "FlowRelationship": "Flow",
-            "Composes": "Composition",
-            "CompositionRelationship": "Composition",
-            "Aggregates": "Aggregation",
-            "AggregationRelationship": "Aggregation",
-            "Assigns": "Assignment",
-            "AssignmentRelationship": "Assignment",
-            "Realizes": "Realization",
-            "RealizationRelationship": "Realization",
-            "Specializes": "Specialization",
-            "SpecializationRelationship": "Specialization",
-            "Associates": "Association",
-            "AssociationRelationship": "Association",
-        }
-
-        return type_aliases.get(rel_type, rel_type)
+        return ArchiMateRelationshipType.normalize(rel_type, pascal_case=True) or rel_type
 
     def _build_relationship_xml(
         self,

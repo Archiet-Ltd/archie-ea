@@ -232,15 +232,16 @@ class TestAggregateFinancials:
             )
             db.session.add(allocation)
 
-            # UnifiedCapability is a parallel capability framework with its own id
-            # space (see service.aggregate_financials docstring: this lookup is a
-            # best-effort secondary source, not guaranteed to align with
-            # BusinessCapability). Pin its id to capability.id explicitly so this
-            # test deterministically exercises that secondary lookup path.
-            unified = UnifiedCapability(
-                id=capability.id, name=f"Unified {suffix}", annual_cost=20000.0, roi_percentage=15.0
-            )
-            db.session.add(unified)
+            # Inserting the BusinessCapability projected it into unified_capabilities
+            # (ADR 0008 write-time sync). aggregate_financials reaches that row by its
+            # provenance, so give the projected row the costs rather than inserting a
+            # second capability under a pinned id -- a pinned id collides with the
+            # projection's own sequence-assigned row on a fresh database.
+            unified = UnifiedCapability.query.filter_by(
+                source_table="business_capability", source_id=str(capability.id)
+            ).one()
+            unified.annual_cost = 20000.0
+            unified.roi_percentage = 15.0
 
             solution = Solution(
                 name=f"Solution {suffix}",
@@ -251,22 +252,6 @@ class TestAggregateFinancials:
             )
             db.session.add(solution)
             db.session.flush()
-
-            # UnifiedCapability(id=capability.id) above sets the PK explicitly,
-            # which does NOT advance the Postgres identity sequence. Realign it to
-            # MAX(id) so a later autoincrement insert (e.g. the value-stream test
-            # sharing this DB) doesn't reuse the id and hit unified_capabilities_pkey.
-            try:
-                from sqlalchemy import text
-
-                db.session.execute(
-                    text(
-                        "SELECT setval(pg_get_serial_sequence('unified_capabilities', 'id'), "
-                        "(SELECT COALESCE(MAX(id), 1) FROM unified_capabilities))"
-                    )
-                )
-            except Exception:
-                pass
 
             business_case = BusinessCase(
                 title=f"Business Case {suffix}",
@@ -285,6 +270,7 @@ class TestAggregateFinancials:
             assert report["strategic_initiative"] is not None
             assert report["capability_cost_allocation"] is not None
             assert report["unified_capability"] is not None
+            assert report["unified_capability"]["id"] == unified.id
             assert report["solution"] is not None
 
             # capex candidates: initiative.budget_allocated=100000, solution.actual_cost=35000 -> max = 100000

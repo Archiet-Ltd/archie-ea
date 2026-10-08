@@ -32,11 +32,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from .. import db
+from .mixins import HybridTenantMixin, TenantMixin
 
 logger = logging.getLogger(__name__)
 
 
-class CapabilityFrameworkConfiguration(db.Model):
+class CapabilityFrameworkConfiguration(HybridTenantMixin, db.Model):
     """
     Framework Configuration Model
 
@@ -222,12 +223,17 @@ class CapabilityFrameworkConfiguration(db.Model):
         }
 
 
-class FrameworkInstance(db.Model):
+class FrameworkInstance(TenantMixin, db.Model):
     """
     Framework Instance Model
 
     Active instance of a framework configuration.
     Tracks actual implementation and usage.
+
+    Unlike its siblings in this file, an instance records one organisation's
+    own adoption (implementation team, adoption rate, maturity) of a shared
+    configuration -- real per-organisation data, not a reusable template, so
+    it is fenced (TenantMixin) rather than left shared (HybridTenantMixin).
     """
 
     __tablename__ = "framework_instances"
@@ -299,7 +305,7 @@ class FrameworkInstance(db.Model):
         return f"<FrameworkInstance {self.instance_name}>"
 
 
-class FrameworkExtension(db.Model):
+class FrameworkExtension(HybridTenantMixin, db.Model):
     """
     Framework Extension Model
 
@@ -379,7 +385,7 @@ class FrameworkExtension(db.Model):
         return f"<FrameworkExtension {self.extension_name}>"
 
 
-class FrameworkMigrationMapping(db.Model):
+class FrameworkMigrationMapping(HybridTenantMixin, db.Model):
     """
     Framework Migration Mapping
 
@@ -474,7 +480,7 @@ class FrameworkMigrationMapping(db.Model):
         return f"<FrameworkMigrationMapping {self.migration_name}>"
 
 
-class FrameworkConfigurationTemplate(db.Model):
+class FrameworkConfigurationTemplate(HybridTenantMixin, db.Model):
     """
     Framework Configuration Template
 
@@ -546,7 +552,7 @@ class FrameworkConfigurationTemplate(db.Model):
         return f"<FrameworkConfigurationTemplate {self.template_name}>"
 
 
-class FrameworkValidationRule(db.Model):
+class FrameworkValidationRule(HybridTenantMixin, db.Model):
     """
     Framework Validation Rule
 

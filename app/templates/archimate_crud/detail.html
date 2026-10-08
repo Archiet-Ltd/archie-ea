@@ -219,6 +219,10 @@
             </dl>
         </div>
         {% endif %}
+
+        {% with external_links = external_links|default([]) %}
+        {% include 'intelligence/_external_ids.html' %}
+        {% endwith %}
     </div>
 
     <!-- ── RELATIONSHIPS TAB ── -->
