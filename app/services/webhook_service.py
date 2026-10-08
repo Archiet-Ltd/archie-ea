@@ -2,18 +2,43 @@
 Webhook service for managing event-driven notifications
 """
 
+import hashlib
+import hmac
 import json
 import threading
 import time
 import uuid
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
+from types import SimpleNamespace
 from typing import Dict, List, Optional
+from urllib.parse import urlparse
 
 import requests
 from flask import current_app
 
 from app.extensions import db
 from app.models.webhook import WebhookDelivery, WebhookEvent, WebhookSubscription
+from app.utils.ssrf_guard import BlockedOutboundURL, validate_outbound_url
+
+# One bounded pool per process runs every background delivery. A thread per
+# event let a hanging receiver pile up unlimited workers.
+_DEFAULT_DELIVERY_WORKERS = 8
+# A delivery row left "pending" this long was lost with its process.
+PENDING_STALE_AFTER = timedelta(minutes=10)
+
+_executor: Optional[ThreadPoolExecutor] = None
+_executor_lock = threading.Lock()
+
+
+def _get_delivery_executor(max_workers: int) -> ThreadPoolExecutor:
+    global _executor
+    with _executor_lock:
+        if _executor is None:
+            _executor = ThreadPoolExecutor(
+                max_workers=max(1, int(max_workers)), thread_name_prefix="webhook-delivery"
+            )
+        return _executor
 
 
 class WebhookService:
@@ -23,6 +48,9 @@ class WebhookService:
         self.max_retries = current_app.config.get("WEBHOOK_MAX_RETRIES", 3)
         self.retry_delay = current_app.config.get("WEBHOOK_RETRY_DELAY", 60)  # seconds
         self.timeout = current_app.config.get("WEBHOOK_TIMEOUT", 30)  # seconds
+        self.max_workers = current_app.config.get(
+            "WEBHOOK_DELIVERY_MAX_WORKERS", _DEFAULT_DELIVERY_WORKERS
+        )
 
     def create_subscription(
         self,
@@ -155,24 +183,24 @@ class WebhookService:
         # Find matching subscriptions
         subscriptions = self._find_matching_subscriptions(event_type, payload)
 
-        # Deliver to subscriptions asynchronously
-        if subscriptions:
-            # A bare thread has no application context, so every db.session /
-            # current_app call in the delivery path raised and the thread died
-            # silently. Capture the real app (same idiom as flask_email) and
-            # hand the thread plain ids, not request-session ORM instances.
-            org_id = event.organization_id
-            subscription_ids = [
-                s.id
-                for s in subscriptions
-                if org_id is None or s.organization_id == org_id
-            ]
-            self._delivery_thread = threading.Thread(
-                target=self._run_delivery_in_app_context,
-                args=(current_app._get_current_object(), event.id, org_id, subscription_ids),
-                daemon=True,
+        # Deliver to subscriptions asynchronously on the bounded pool. The worker
+        # has no request, so it gets the real app and plain ids, not ORM
+        # instances bound to this request's session.
+        org_id = event.organization_id
+        if org_id is None:
+            current_app.logger.error(
+                f"Webhook event {event.id} ({event_type}) has no organization; nothing delivered"
             )
-            self._delivery_thread.start()
+        elif subscriptions:
+            subscription_ids = [s.id for s in subscriptions if s.organization_id == org_id]
+            if subscription_ids:
+                self._delivery_future = _get_delivery_executor(self.max_workers).submit(
+                    self._run_delivery_in_app_context,
+                    current_app._get_current_object(),
+                    event.id,
+                    org_id,
+                    subscription_ids,
+                )
 
         current_app.logger.info(
             f"Published event {event_type} with {len(subscriptions)} subscriptions"
@@ -218,64 +246,84 @@ class WebhookService:
 
         return True
 
+    @staticmethod
+    def _snapshot_subscription(subscription: WebhookSubscription) -> SimpleNamespace:
+        """Plain copy of what delivery needs, so no ORM object (and no open
+        transaction) is touched while the network call is in flight."""
+        return SimpleNamespace(
+            id=subscription.id,
+            organization_id=subscription.organization_id,
+            url=subscription.url,
+            headers=dict(subscription.headers or {}),
+            secret=subscription.secret,
+            webhook_type=getattr(subscription, "webhook_type", "generic") or "generic",  # model-safety-ok
+        )
+
+    @staticmethod
+    def _deliverable(subscription, org_id) -> bool:
+        """Active at delivery time and owned by the event's organisation."""
+        return (
+            subscription is not None
+            and bool(subscription.is_active)
+            and subscription.organization_id == org_id
+        )
+
     def _run_delivery_in_app_context(self, app, event_id, org_id, subscription_ids):
-        """Thread body: deliver one event inside its own application context.
+        """Worker body: deliver one event inside its own application context.
 
         Re-loads the event and subscriptions by id under the event's tenant
         scope, so nothing from the publishing request's session is shared with
-        this thread. Never raises: failures are logged through the captured app.
+        this worker. Never raises: failures are logged through the captured app.
         """
-        from contextlib import nullcontext
-
         from app.jobs.tenant_safe_job import tenant_scope
 
+        if org_id is None:
+            app.logger.error(f"Webhook event {event_id} has no organization; nothing delivered")
+            return
         with app.app_context():
             try:
-                scope = tenant_scope(org_id) if org_id is not None else nullcontext()
-                with scope:
+                with tenant_scope(org_id):
                     event = db.session.get(WebhookEvent, event_id)
-                    subscriptions = [
-                        s
-                        for s in (db.session.get(WebhookSubscription, sid) for sid in subscription_ids)
-                        if s is not None
-                    ]
-                    if event is not None and subscriptions:
-                        self._deliver_to_subscriptions(event, subscriptions)
-            except Exception as e:  # never let the thread die silently
+                    if event is None or event.organization_id != org_id:
+                        return
+                    snapshots = []
+                    for sid in subscription_ids:
+                        sub = db.session.get(WebhookSubscription, sid)
+                        if self._deliverable(sub, org_id):
+                            snapshots.append(self._snapshot_subscription(sub))
+                    event_data = {
+                        "event_type": event.event_type,
+                        "payload": event.payload,
+                        "metadata": event.event_metadata,
+                        "event_id": event.id,
+                        "timestamp": event.created_at.isoformat(),
+                    }
+                    db.session.remove()  # no transaction or connection held from here on
+                    self._deliver_snapshots(event_data, snapshots)
+            except Exception as e:  # never let the worker die silently
                 try:
                     db.session.rollback()
                 except Exception:
                     pass
-                app.logger.error(f"Webhook delivery thread failed for event {event_id}: {e}")
+                app.logger.error(f"Webhook delivery failed for event {event_id}: {e}")
             finally:
                 try:
                     db.session.remove()
                 except Exception:
                     pass
 
-    def _deliver_to_subscriptions(
-        self, event: WebhookEvent, subscriptions: List[WebhookSubscription]
-    ):
-        """Deliver event to multiple subscriptions"""
-        for subscription in subscriptions:
+    def _deliver_snapshots(self, event_data: Dict, snapshots: List[SimpleNamespace]):
+        for snap in snapshots:
             try:
-                self._deliver_webhook(
-                    subscription,
-                    {
-                        "event_type": event.event_type,
-                        "payload": event.payload,
-                        "metadata": event.event_metadata,
-                        "event_id": event.id,
-                        "timestamp": event.created_at.isoformat(),
-                    },
-                )
+                self._deliver_webhook(snap, event_data)
             except Exception as e:
                 try:
                     db.session.rollback()
                 except Exception:
                     pass
                 current_app.logger.error(
-                    f"Failed to deliver event {event.id} to subscription {subscription.id}: {str(e)}"
+                    f"Failed to deliver event {event_data.get('event_id')} "
+                    f"to subscription {snap.id}: {e}"
                 )
 
     # ------------------------------------------------------------------
@@ -395,92 +443,130 @@ class WebhookService:
             return self.format_slack_payload(event_data)
         return event_data
 
-    def _deliver_webhook(self, subscription: WebhookSubscription, event_data: Dict) -> Dict:
-        """Deliver webhook to a single subscription"""
+    def _outbound_headers(self, snap, formatted_payload: Dict) -> Dict:
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "Enterprise-Architecture-Webhook/1.0",
-            **(subscription.headers or {}),
+            **(snap.headers or {}),
         }
-
-        # Format payload according to webhook_type (teams/slack/generic)
-        formatted_payload = self._build_payload_for_subscription(subscription, event_data)
-
-        # Add signature if secret is configured (sign the formatted payload)
-        if subscription.secret:
+        # Signature is set last and covers the formatted payload.
+        if snap.secret:
             payload_str = json.dumps(formatted_payload, sort_keys=True)
-            import hashlib
-            import hmac
-
-            signature = hmac.new(
-                subscription.secret.encode(), payload_str.encode(), hashlib.sha256
+            headers["X-Webhook-Signature"] = hmac.new(
+                snap.secret.encode(), payload_str.encode(), hashlib.sha256
             ).hexdigest()
-            headers["X-Webhook-Signature"] = signature
+        return headers
+
+    def _deliver_webhook(self, subscription, event_data: Dict) -> Dict:
+        """Deliver webhook to a single subscription (ORM row or snapshot)."""
+        snap = (
+            subscription
+            if isinstance(subscription, SimpleNamespace)
+            else self._snapshot_subscription(subscription)
+        )
+        formatted_payload = self._build_payload_for_subscription(snap, event_data)
+        headers = self._outbound_headers(snap, formatted_payload)
 
         delivery = WebhookDelivery(
             id=str(uuid.uuid4()),
-            subscription_id=subscription.id,
-            # Explicit, not the column default: this runs on a background thread
-            # (see _deliver_to_subscriptions) with no request context, so
-            # TenantMixin's g.current_org_id-reading default can't resolve it.
-            # The subscription itself was already org-scoped before the thread
-            # started, so it's the trustworthy source here.
-            organization_id=subscription.organization_id,
+            event_id=event_data.get("event_id"),
+            subscription_id=snap.id,
+            # Explicit, not the column default: this runs on a worker with no
+            # request context, so TenantMixin's g.current_org_id default can't
+            # resolve it. The subscription was org-checked before delivery.
+            organization_id=snap.organization_id,
             event_type=event_data.get("event_type"),
             payload=formatted_payload,
             status="pending",
             attempt_count=0,
             created_at=datetime.utcnow(),
         )
-
+        delivery_id = delivery.id
         db.session.add(delivery)
         db.session.commit()
 
-        # Attempt delivery
-        success = self._attempt_delivery(delivery, subscription.url, headers, formatted_payload)
+        success, attempts = self._attempt_delivery(delivery_id, snap, headers, formatted_payload)
+        return {"delivery_id": delivery_id, "success": success, "attempts": attempts}
 
-        return {"delivery_id": delivery.id, "success": success, "attempts": delivery.attempt_count}
+    def _record_attempt(self, delivery_id: str, **fields) -> None:
+        """Write one attempt's outcome in its own short transaction."""
+        try:
+            delivery = db.session.get(WebhookDelivery, delivery_id)
+            if delivery is not None:
+                for key, value in fields.items():
+                    setattr(delivery, key, value)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        finally:
+            db.session.remove()
 
-    def _attempt_delivery(
-        self, delivery: WebhookDelivery, url: str, headers: Dict, payload: Dict
-    ) -> bool:
-        """Attempt to deliver webhook with retries"""
+    def _attempt_delivery(self, delivery_id: str, snap, headers: Dict, payload: Dict):
+        """Send with retries. Holds no transaction or pooled connection while
+        the HTTP call is in flight; each outcome is a new short transaction.
+
+        Returns (success, attempts). Logs the subscription id and URL host only:
+        the full URL is a bearer credential for Slack/Teams/Azure endpoints.
+        """
+        url = snap.url
+        host = urlparse(url).hostname or "unknown-host"
+        label = f"subscription {snap.id} (host {host})"
+
+        try:
+            validate_outbound_url(url, require_https=False)
+        except BlockedOutboundURL as e:
+            self._record_attempt(
+                delivery_id,
+                status="failed",
+                attempt_count=1,
+                last_attempt_at=datetime.utcnow(),
+                error_message=f"Blocked outbound URL: {e}"[:500],
+            )
+            current_app.logger.error(f"Webhook to {label} blocked by outbound URL guard")
+            return False, 1
+
+        attempts = 0
         for attempt in range(self.max_retries):
+            attempts = attempt + 1
+            now = datetime.utcnow()
             try:
-                delivery.attempt_count = attempt + 1
-                delivery.last_attempt_at = datetime.utcnow()
-
                 response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
-
-                delivery.response_status = response.status_code
-                delivery.response_body = response.text[:1000]  # Limit response size
-
-                if response.status_code >= 200 and response.status_code < 300:
-                    delivery.status = "success"
-                    delivery.delivered_at = datetime.utcnow()
-                    db.session.commit()
-                    current_app.logger.info(f"Successfully delivered webhook to {url}")
-                    return True
-                else:
-                    delivery.status = "failed"
-                    delivery.error_message = f"HTTP {response.status_code}: {response.text[:200]}"
-                    db.session.commit()
-
-                    if attempt < self.max_retries - 1:
-                        time.sleep(self.retry_delay * (attempt + 1))  # Exponential backoff
-
             except requests.RequestException as e:
-                delivery.status = "failed"
-                delivery.error_message = str(e)
-                db.session.commit()
-
-                if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay * (attempt + 1))
+                self._record_attempt(
+                    delivery_id,
+                    status="failed",
+                    attempt_count=attempts,
+                    last_attempt_at=now,
+                    error_message=str(e)[:500],
+                )
+            else:
+                outcome = dict(
+                    attempt_count=attempts,
+                    last_attempt_at=now,
+                    response_status=response.status_code,
+                    response_body=response.text[:1000],
+                )
+                if 200 <= response.status_code < 300:
+                    self._record_attempt(
+                        delivery_id, status="success", delivered_at=datetime.utcnow(),
+                        error_message=None, **outcome,
+                    )
+                    current_app.logger.info(f"Delivered webhook to {label}")
+                    return True, attempts
+                self._record_attempt(
+                    delivery_id,
+                    status="failed",
+                    error_message=f"HTTP {response.status_code}: {response.text[:200]}",
+                    **outcome,
+                )
+            if attempt < self.max_retries - 1:
+                time.sleep(self.retry_delay * (attempt + 1))  # Exponential backoff
 
         current_app.logger.error(
-            f"Failed to deliver webhook to {url} after {self.max_retries} attempts"
+            f"Failed to deliver webhook to {label} after {self.max_retries} attempts"
         )
-        return False
+        return False, attempts
 
     def get_events(self, limit: int = 50, offset: int = 0) -> List[WebhookEvent]:
         """Get webhook events (admin function)"""
@@ -492,26 +578,73 @@ class WebhookService:
         )
 
     def retry_event(self, event_id: str) -> bool:
-        """Retry delivering a failed event"""
+        """Retry this event's failed deliveries, and deliveries left pending
+        for over ten minutes (a worker lost with its process). Runs on the same
+        bounded pool and delivery body as first delivery: signed, with the
+        subscription's custom headers."""
         event = WebhookEvent.query.get(event_id)
         if not event:
             return False
-
-        # Find failed deliveries for this event
-        failed_deliveries = WebhookDelivery.query.filter_by(
-            event_type=event.event_type, status="failed"
-        ).all()
-
-        for delivery in failed_deliveries:
-            subscription = self.get_subscription_by_id(delivery.subscription_id)
-            if subscription:
-                threading.Thread(
-                    target=self._attempt_delivery,
-                    args=(delivery, subscription.url, {}, delivery.payload),
-                    daemon=True,
-                ).start()
-
+        org_id = event.organization_id
+        if org_id is None:
+            current_app.logger.error(f"Webhook event {event_id} has no organization; no retry")
+            return True
+        self._delivery_future = _get_delivery_executor(self.max_workers).submit(
+            self._run_retry_in_app_context,
+            current_app._get_current_object(),
+            event_id,
+            org_id,
+        )
         return True
+
+    def _run_retry_in_app_context(self, app, event_id, org_id):
+        from sqlalchemy import and_, or_
+
+        from app.jobs.tenant_safe_job import tenant_scope
+
+        if org_id is None:
+            app.logger.error(f"Webhook event {event_id} has no organization; no retry")
+            return
+        with app.app_context():
+            try:
+                with tenant_scope(org_id):
+                    stale = datetime.utcnow() - PENDING_STALE_AFTER
+                    rows = WebhookDelivery.query.filter(
+                        WebhookDelivery.event_id == event_id,
+                        or_(
+                            WebhookDelivery.status == "failed",
+                            and_(
+                                WebhookDelivery.status == "pending",
+                                WebhookDelivery.created_at < stale,
+                            ),
+                        ),
+                    ).all()
+                    work = []
+                    for delivery in rows:
+                        sub = db.session.get(WebhookSubscription, delivery.subscription_id)
+                        if self._deliverable(sub, org_id):
+                            snap = self._snapshot_subscription(sub)
+                            work.append((delivery.id, snap, delivery.payload))
+                    db.session.remove()
+                    for delivery_id, snap, payload in work:
+                        try:
+                            self._attempt_delivery(
+                                delivery_id, snap, self._outbound_headers(snap, payload), payload
+                            )
+                        except Exception as e:
+                            db.session.rollback()
+                            app.logger.error(f"Retry of delivery {delivery_id} failed: {e}")
+            except Exception as e:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                app.logger.error(f"Webhook retry failed for event {event_id}: {e}")
+            finally:
+                try:
+                    db.session.remove()
+                except Exception:
+                    pass
 
     def process_incoming_webhook(self, subscription_id: str, payload: Dict, headers: Dict) -> Dict:
         """Process an incoming webhook from external services"""
