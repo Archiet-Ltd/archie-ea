@@ -175,7 +175,16 @@
                         <span class="text-xs text-muted-foreground">—</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3 text-sm text-muted-foreground">{{ entity.system_of_record or '—' }}</td>
+                    <td class="px-4 py-3 text-sm text-muted-foreground">
+                        {% if entity.system_of_record_application %}
+                        {{ entity.system_of_record_application.name }}
+                        {% elif entity.system_of_record %}
+                        <span>{{ entity.system_of_record }}</span>
+                        <span class="text-xs">(legacy label)</span>
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
                     <td class="px-4 py-3 text-right">
                         <a href="{{ url_for('data_architecture.edit_data_entity', entity_id=entity.id) }}"
                            class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">

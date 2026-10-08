@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S1-04, segment: S1}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Value Streams
@@ -22,7 +23,7 @@ that aren't mature enough yet.
 
 ## Where you'll meet it
 
-- [What must be true for our revenue stream?](/startups/revenue-stream-risk)
+- [What must be true for our revenue stream?](/use-cases/revenue-stream-risk)
 
 ## Related modules
 

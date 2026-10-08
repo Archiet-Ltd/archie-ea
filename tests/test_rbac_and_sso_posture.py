@@ -283,10 +283,13 @@ def test_oidc_sign_in_routes_404_when_disabled(app):
 
 
 # The single registered rule that names SAML: the per-organisation callback
-# (app/modules/auth/sso_routes.py). It is the explicit refusal for an
-# organisation whose SSO configuration says SAML: it answers 400 to every
-# request, reads no assertion and signs nobody in. Any other rule that names
-# SAML, in its path or its endpoint, is a SAML sign-in route and must not exist.
+# (app/modules/auth/sso_routes.py). SAML 2.0 is implemented (R1-B12 PR 2):
+# this is now the real Assertion Consumer Service that verifies a POSTed
+# <Response>'s signature against the organisation's configured IdP
+# certificate. A request with no matching session state or SSO
+# configuration still answers 400, never a 5xx -- the request itself is
+# invalid, not a server fault. Any OTHER rule that names SAML, in its path
+# or its endpoint, would be a second SAML route and must not exist.
 _SAML_REFUSAL = ("/auth/sso/callback/saml", "sso.sso_callback_saml")
 
 
@@ -312,22 +315,26 @@ def test_no_saml_sign_in_route_is_registered(app):
     )
 
 
-def test_the_per_organisation_saml_callback_only_refuses(app):
-    """The one SAML-named rule is a GET-only refusal that answers 400, never a 5xx.
+def test_the_per_organisation_saml_callback_is_post_only_and_fails_closed(app):
+    """The one SAML-named rule is the real Assertion Consumer Service
+    (R1-B12 PR 2): POST-only, per the SAML 2.0 HTTP-POST binding the IdP
+    uses to deliver a <Response>, and GET is refused.
 
-    A request here can never be a server fault — nothing is implemented to
-    fault — so the status line says so: 400, not 5xx.
+    A request with no matching login-session state (no SSOConfig found,
+    nothing to verify against) still answers 400, never a 5xx -- the
+    request itself is invalid, not a server fault.
     """
     rules = [rule for rule in app.url_map.iter_rules() if rule.endpoint == _SAML_REFUSAL[1]]
     assert len(rules) == 1 and rules[0].rule == _SAML_REFUSAL[0]
-    assert rules[0].methods - {"HEAD", "OPTIONS"} == {"GET"}, (
-        "the per-organisation SAML callback must not accept a POST"
+    assert rules[0].methods - {"HEAD", "OPTIONS"} == {"POST"}, (
+        "the per-organisation SAML callback must be POST-only (HTTP-POST binding)"
     )
 
-    resp = app.test_client().get(_SAML_REFUSAL[0])
-    assert resp.status_code == 400
-    assert resp.status_code < 500
-    assert "error" in resp.get_json()
+    get_resp = app.test_client().get(_SAML_REFUSAL[0])
+    assert get_resp.status_code == 405
+
+    post_resp = app.test_client().post(_SAML_REFUSAL[0], data={"SAMLResponse": "not-a-real-response"})
+    assert post_resp.status_code < 500
 
 
 @pytest.mark.parametrize("module_path,blueprint_name", [

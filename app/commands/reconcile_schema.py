@@ -55,6 +55,7 @@ _TRANSFORMATION_TABLES = (
     "command_materialisations",
     "operation_results",
     "transformation_outbox_events",
+    "event_log",
     "transformation_candidates",
     "candidate_overlap_dispositions",
     "candidate_signals",
@@ -1026,157 +1027,6 @@ def _column_clause(col, dialect):
     return re.sub(r"\s+NOT\s+NULL\b", "", rendered).strip()
 
 
-def _backfill_roadmap_organizations(*, dry_run, existing_tables, added, failed):
-    """Recover the tenant key for RoadmapItems that predate TenantMixin.
-
-    A roadmap item's canonical programme is the only trustworthy tenant
-    provenance available in the old schema.  Rows without that provenance are
-    reported and left untouched; guessing would risk assigning another
-    organisation's data to the active tenant.
-    """
-    from sqlalchemy import inspect, text
-
-    required = {"strategic_roadmap_items", "strategic_initiatives"}
-    if not required <= existing_tables:
-        return
-    live_columns = {
-        column["name"]
-        for column in inspect(db.engine).get_columns("strategic_roadmap_items")
-    }
-    if "organization_id" not in live_columns:
-        return
-
-    before = db.session.scalar(
-        text(
-            "SELECT count(*) FROM strategic_roadmap_items "
-            "WHERE organization_id IS NULL"
-        )
-    )
-    eligible = db.session.scalar(
-        text(
-            """
-            SELECT count(*)
-            FROM strategic_roadmap_items r
-            JOIN strategic_initiatives p ON p.id = r.initiative_id
-            WHERE r.organization_id IS NULL
-              AND p.organization_id IS NOT NULL
-            """
-        )
-    )
-    conflicts = db.session.scalar(
-        text(
-            """
-            SELECT count(*)
-            FROM strategic_roadmap_items r
-            JOIN strategic_initiatives p ON p.id = r.initiative_id
-            WHERE r.organization_id IS NOT NULL
-              AND p.organization_id IS NOT NULL
-              AND r.organization_id <> p.organization_id
-            """
-        )
-    )
-    unresolved = before - eligible
-    updated = eligible
-    if not dry_run and eligible:
-        result = db.session.execute(
-            text(
-                """
-                UPDATE strategic_roadmap_items AS r
-                SET organization_id = p.organization_id
-                FROM strategic_initiatives AS p
-                WHERE r.initiative_id = p.id
-                  AND r.organization_id IS NULL
-                  AND p.organization_id IS NOT NULL
-                """
-            )
-        )
-        updated = result.rowcount
-        db.session.commit()
-
-    if before or conflicts:
-        added.append(
-            "backfill.strategic_roadmap_items.organization_id "
-            f":: before={before}, updated={updated}, "
-            f"unresolved={unresolved}, conflicts={conflicts}"
-        )
-    if unresolved:
-        failed.append(
-            "backfill.strategic_roadmap_items.organization_id: "
-            f"{unresolved} unresolved row(s); no programme tenant provenance"
-        )
-    if conflicts:
-        failed.append(
-            "backfill.strategic_roadmap_items.organization_id: "
-            f"{conflicts} existing row(s) conflict with their programme tenant"
-        )
-
-
-def _backfill_roadmap_task_organizations(*, dry_run, existing_tables, added, failed):
-    """Recover the tenant key for RoadmapTask rows that predate TenantMixin.
-
-    roadmap_tasks.archimate_element_id is nullable and carries no FK constraint
-    by this model's own long-standing convention (see roadmap.py), so it is the
-    only available provenance -- resolved via the already-scoped
-    archimate_elements table. Rows with no element link, or one pointing at a
-    since-deleted/unresolvable element, are left NULL and reported, not guessed.
-    """
-    from sqlalchemy import inspect, text
-
-    required = {"roadmap_tasks", "archimate_elements"}
-    if not required <= existing_tables:
-        return
-    live_columns = {
-        c["name"] for c in inspect(db.engine).get_columns("roadmap_tasks")
-    }
-    if "organization_id" not in live_columns:
-        return
-
-    before = db.session.scalar(
-        text("SELECT count(*) FROM roadmap_tasks WHERE organization_id IS NULL")
-    )
-    if not before:
-        return
-    eligible = db.session.scalar(
-        text(
-            """
-            SELECT count(*)
-            FROM roadmap_tasks t
-            JOIN archimate_elements e ON e.id = t.archimate_element_id
-            WHERE t.organization_id IS NULL
-              AND e.organization_id IS NOT NULL
-            """
-        )
-    )
-    updated = eligible
-    if not dry_run and eligible:
-        result = db.session.execute(
-            text(
-                """
-                UPDATE roadmap_tasks AS t
-                SET organization_id = e.organization_id
-                FROM archimate_elements AS e
-                WHERE e.id = t.archimate_element_id
-                  AND t.organization_id IS NULL
-                  AND e.organization_id IS NOT NULL
-                """
-            )
-        )
-        updated = result.rowcount
-        db.session.commit()
-    unresolved = before - updated
-    added.append(
-        f"backfill.roadmap_tasks.organization_id :: before={before}, "
-        f"updated={updated}, unresolved={unresolved}"
-    )
-    if unresolved:
-        failed.append(
-            f"backfill.roadmap_tasks.organization_id: {unresolved} row(s) have "
-            "no archimate_element_id link (or it names no live element) -- no "
-            "tenant provenance available; will stop appearing in roadmap views "
-            "until re-linked to an element or manually assigned an org"
-        )
-
-
 def _backfill_sso_mapping_organizations(*, dry_run, existing_tables, added, failed):
     """Recover the tenant key for SSO group-role mappings that predate TenantMixin.
 
@@ -1480,6 +1330,7 @@ def _backfill_webhook_organizations(*, dry_run, existing_tables, added, failed):
     updated = 0
     if not dry_run and before:
         result = db.session.execute(
+            # tenancy-ok: one-time backfill, retirement 2026-12-31
             text(
                 """
                 UPDATE webhook_deliveries AS d
@@ -1495,6 +1346,7 @@ def _backfill_webhook_organizations(*, dry_run, existing_tables, added, failed):
         db.session.commit()
         if "webhook_events" in existing_tables:
             result = db.session.execute(
+                # tenancy-ok: one-time backfill, retirement 2026-12-31
                 text(
                     """
                     UPDATE webhook_deliveries AS d
@@ -1561,6 +1413,7 @@ def _backfill_document_chunk_organizations(*, dry_run, existing_tables, added, f
     updated = eligible
     if not dry_run and eligible:
         result = db.session.execute(
+            # tenancy-ok: one-time backfill, retirement 2026-12-31
             text(
                 """
                 UPDATE document_chunk_embeddings AS c
@@ -2143,7 +1996,21 @@ def _reconcile(dry_run=False):
     """
     from sqlalchemy import inspect, text
 
-    insp = inspect(db.engine)
+    # Reflect off db.session's own connection, not db.engine. db.engine.connect()
+    # opens a brand-new physical connection on every call; under the test
+    # suite's NullPool (tests/config.py TestingConfig), each of those is a
+    # fresh connect()+close() round trip, and this function reflects every
+    # mapped table twice (the blocking-NOT-NULL scan below, then the
+    # ADD COLUMN scan after it) — on the ~800-table model that is roughly
+    # 1,600 extra physical connections per call, which is what turned
+    # tests/test_schema_reconciliation.py from slow into a 90s-timeout hang
+    # rather than a passing (if slightly slow) run. Reusing the session's one
+    # already-open connection for every reflection call removes those extra
+    # connections entirely. It also closes the PR132 risk by construction:
+    # there is no second connection left that could block on a lock the
+    # session's own uncommitted DDL is holding.
+    conn = db.session.connection()
+    insp = inspect(conn)
     active_schema = db.session.scalar(text("SELECT current_schema()"))
     existing_tables = set(insp.get_table_names(schema=active_schema))
     dialect = db.engine.dialect
@@ -2166,6 +2033,16 @@ def _reconcile(dry_run=False):
     for table in db.metadata.tables.values():
         if table.name not in existing_tables:
             continue
+        # Re-fetch db.session's connection every outer iteration rather than
+        # reusing the Inspector built above: a successful ADD COLUMN further
+        # down this loop commits, and committing releases/invalidates the
+        # specific Connection object SQLAlchemy had checked out for it — an
+        # Inspector still bound to that stale Connection raises
+        # ResourceClosedError the next time it is used. db.session.connection()
+        # transparently starts a new one when the previous transaction ended,
+        # so this is always the live connection, never a stale one.
+        conn = db.session.connection()
+        insp = inspect(conn)
         live_cols = {c["name"] for c in insp.get_columns(table.name)}
         for col in table.columns:
             if col.name in live_cols:
@@ -2216,18 +2093,6 @@ def _reconcile(dry_run=False):
         added=added,
         failed=failed,
         blocking=blocking,
-    )
-    _backfill_roadmap_organizations(
-        dry_run=dry_run,
-        existing_tables=existing_tables,
-        added=added,
-        failed=failed,
-    )
-    _backfill_roadmap_task_organizations(
-        dry_run=dry_run,
-        existing_tables=existing_tables,
-        added=added,
-        failed=failed,
     )
     _backfill_sso_mapping_organizations(
         dry_run=dry_run,

@@ -1,0 +1,48 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+
+{% block title %}{{ model.name }} — Standards check — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6">
+  {{ page_shell(
+      title=model.name,
+      subtitle='Standards check: ' ~ result.entities_checked ~ ' data entities checked, ' ~ result.breaches|length ~ ' breaches.',
+      breadcrumb=[('Home', url_for('main.index')), ('Data governance', url_for('data_governance.entities')), ('Standards check', url_for('data_governance.models')), (model.name, None)],
+      tabs=tabs
+  ) }}
+  {% if not model.conceptual_model %}
+  <p class="mb-4 text-sm text-muted-foreground" data-testid="no-entities-note">
+    This model has no conceptual model linked, so only its own name was checked — no entities were reached.
+  </p>
+  {% endif %}
+  {% if result.breaches %}
+  <div class="rounded-lg border border-border bg-card overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm" data-testid="breach-table">
+        <thead class="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wide">
+          <tr>
+            <th class="text-left px-4 py-2.5">Standard</th>
+            <th class="text-left px-4 py-2.5">Subject</th>
+            <th class="text-left px-4 py-2.5">Finding</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+          {% for b in result.breaches %}
+          <tr data-testid="breach-{{ b.standard }}">
+            <td class="px-4 py-2.5"><span class="font-medium">{{ b.standard }}</span>
+              <span class="block text-xs text-muted-foreground">{{ b.standard_title }}</span></td>
+            <td class="px-4 py-2.5">{{ b.subject }}</td>
+            <td class="px-4 py-2.5">{{ b.finding }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  {{ empty_state(icon='check-circle', headline='No breaches',
+      body='Everything reached by this model meets the standards checked.') }}
+  {% endif %}
+</div>
+{% endblock %}

@@ -245,7 +245,8 @@ class TestShouldQueue:
                 "raw": raw_mock,
             }
 
-        def _mock_queue_approval(self, tc):
+        def _mock_queue_approval(self, tc, persona=None):
+            assert persona == "enterprise_architect", f"persona={persona!r}"
             return 9999  # fake approval ID
 
         runner = AgentRunner(user_id=1, auto_execute=True)
@@ -354,7 +355,7 @@ class TestHandlerDispatch:
             "submit_for_arb_review",
         ]
         for name in sample_tools:
-            schema = TOOL_SCHEMA_BY_NAME.get(name)
+            assert name in TOOL_SCHEMA_BY_NAME, f"{name}: no registered tool schema"
             # Verify the handler method exists
             handler = getattr(executor, f"_tool_{name}", None)
             assert handler is not None, (

@@ -1,32 +1,25 @@
 ---
 page_family: site
 title: "Contact"
-page_role: "Real contact routes only — no invented email address."
-source: COMMERCIAL-LICENSE.md (reqarchitect.com, archiet.com), app/main/views.py (waitlist form)
-cta: waiting_list
+page_role: "Sales and support routes. Commercial questions use the same enquiry form as the offer pages; no invented email address."
+cta: inquiry
+offer: sales_enquiry
+offer_summary: "I'd like to talk to sales about Entelim."
+inquiry_consent_text: "Used to follow up about your question."
 ---
 
 # Contact
 
-## Launch news
+## Sales questions
 
-The fastest way to hear from us directly is to [join the waiting list](/#waitlist) — every signup
-gets an email when Entelim launches, and nothing else.
-
-## Commercial licensing and hosted plans
-
-Commercial licensing, hosted deployments and enterprise support are handled through Archiet Ltd's
-own sites:
-
-- [reqarchitect.com](https://reqarchitect.com) — managed, governed enterprise architecture.
-- [archiet.com](https://archiet.com) — spec-driven code generation built on Entelim.
-
-Reach out through either site to discuss a commercial licence, a hosted plan, or enterprise support.
+Entelim is live and priced — sales questions are answered directly here, not on a waiting
+list. Tell us a little about what you need below and we will follow up about pricing, a
+hosted plan, or a commercial licence.
 
 ## Bugs, feature requests and security issues
 
 Entelim is licensed under AGPL-3.0. For a bug, a feature request, or a security issue, use
-[reqarchitect.com](https://reqarchitect.com) or [archiet.com](https://archiet.com) above — please
+[reqarchitect.com](https://reqarchitect.com) or [archiet.com](https://archiet.com) — please
 report a security issue privately rather than in public, so it can be fixed first.
 
 ## Already have an account?

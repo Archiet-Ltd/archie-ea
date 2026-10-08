@@ -596,7 +596,15 @@ def simple_group_detail(group_id):
                 """
             ),
             {"group_id": group.id, **({"org": _org} if _org is not None else {})},
-        ).mappings()
+        ).mappings().all()  # materialise: a Result has no __bool__/__len__, "if not app_rows" was always False
+
+        if not app_rows:
+            # No member application is visible to the caller's organisation (either the
+            # group has none, or every member belongs to a different organisation).
+            # UnifiedDuplicateGroup itself carries no organisation column, so this is the
+            # only tenant signal available; treat it the same as "group not found" rather
+            # than reveal the group's own name, similarity scores and estimated savings.
+            return "Group not found", 404
 
         for app in app_rows:
             technology_stack = app.get("technology_stack")

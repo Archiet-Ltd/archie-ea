@@ -128,3 +128,33 @@ def test_a_platform_administrator_can_still_manage_scoring_configurations(
 
     deleted = client.delete(f"/dashboard/api/scoring-configurations/{config_id}")
     assert deleted.status_code == 200
+
+
+def test_the_services_defence_in_depth_refusal_stays_a_403_not_a_500(
+    app, db_session, make_org, client, login_as, monkeypatch
+):
+    """pr324-review-v1 nit 1: scoring_configuration_service._require_platform_admin
+    raises Forbidden (an HTTPException) when a caller reaches it without the
+    route's own @platform_admin_required having already refused them. Before
+    this fix, the route's bare `except Exception` caught that Forbidden too,
+    turning a would-be 403 into a logged 500 with a rollback. Simulated here by
+    making the service itself raise Forbidden -- the same path the real guard
+    takes, not by removing the route's decorator (the platform admin used below
+    would legitimately pass that decorator; the service is what refuses them)."""
+    from werkzeug.exceptions import Forbidden
+
+    from app.services import scoring_configuration_service
+
+    _tenant, platform_id = _world(db_session, make_org)
+
+    def _always_forbidden(*args, **kwargs):
+        raise Forbidden()
+
+    monkeypatch.setattr(
+        scoring_configuration_service, "create_scoring_configuration", _always_forbidden
+    )
+
+    _login(db_session, client, login_as, platform_id)
+    response = client.post("/dashboard/api/scoring-configurations", json=_VALID_PAYLOAD)
+
+    assert response.status_code == 403

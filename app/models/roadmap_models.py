@@ -110,6 +110,15 @@ class RoadmapWorkPackage(db.Model):
     sync_status = Column(String(20), default="synced")  # synced, pending, error
     automation_metadata = Column(Text)  # JSON string for additional automation data
 
+    # this store is retired into unified_work_packages (never dropped).
+    # NULL until `merge-work-package-stores` copies the row across.
+    retired_into_id = Column(
+        BigInteger,
+        ForeignKey("unified_work_packages.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Relationships
     deliverables = relationship(
         "RoadmapDeliverable", back_populates="work_package", cascade="all, delete-orphan"
@@ -345,6 +354,11 @@ class RoadmapGap(db.Model):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = Column(Integer, ForeignKey("users.id"))
     updated_by = Column(Integer, ForeignKey("users.id"))
+
+    # Set once this row has been merged into the one gap register (app.models.
+    # implementation_migration.Gap) by app/commands/consolidate_gaps.py. NULL
+    # means not yet merged; the row itself is never dropped (CLAUDE.md).
+    retired_into_id = Column(Integer, ForeignKey("gaps.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Relationships
     source_capability = relationship("UnifiedCapability", backref="related_roadmap_gaps")
