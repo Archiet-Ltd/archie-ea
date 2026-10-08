@@ -524,7 +524,7 @@ class TestWebhookSettingsSessionSwitchIDOR:
             assert switched.status_code == 302
 
             resp = client.post(
-                "/admin/webhook-settings",
+                "/admin/webhook-settings/create",
                 data={
                     "url": attacker_url,
                     "description": "pwned",
@@ -552,7 +552,7 @@ class TestWebhookSettingsSessionSwitchIDOR:
         with app.app_context():
             login_as(client, admin_b)
             resp = client.post(
-                "/admin/webhook-settings",
+                "/admin/webhook-settings/create",
                 data={
                     "url": legit_url,
                     "description": "legit",
@@ -561,7 +561,9 @@ class TestWebhookSettingsSessionSwitchIDOR:
                 follow_redirects=False,
             )
 
-        assert resp.status_code == 302
+        # The create view renders the settings page inline (so the
+        # one-time generated secret can be shown), not a redirect.
+        assert resp.status_code == 200
 
         with app.app_context():
             created = WebhookSubscription.query.filter_by(

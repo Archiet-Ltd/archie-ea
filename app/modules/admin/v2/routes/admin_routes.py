@@ -4014,6 +4014,10 @@ def webhook_settings():
 @audit_log("webhook_sub_create")
 def webhook_settings_create():
     """Create a subscription through the one writer; a generated secret is shown once."""
+    # tenant-scoping-ok: see webhook_settings()'s own guard comment -- the
+    # same cross-org session-switch IDOR applies here too, since this is
+    # the endpoint that actually writes the WebhookSubscription row.
+    require_org_or_platform_admin(g.current_org_id)
     from app.services.webhook_service import (
         WebhookError,
         WebhookSecretUnavailable,
