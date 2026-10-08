@@ -534,10 +534,10 @@ def change_user_email(user_id):
     # correctly scopes its lookup to g.current_org_id. Without this guard, a
     # caller who is an Administrator in org A but holds only a Viewer
     # OrgRole in org B can switch the active session to org B and change
-    # org B's own administrator's email out from under them. Routed from a
-    # PR424 reviewer's finding; reuses the same tenant_decorators
-    # .require_org_or_platform_admin guard PR424 already applied to this
-    # file's SSO-settings and leaver-management routes.
+    # org B's own administrator's email out from under them. Same
+    # tenant_decorators.require_org_or_platform_admin guard used by every
+    # other fixed route on this branch (set_user_password,
+    # api_bulk_delete_users, webhook_settings, the D4-D6 routes).
     require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     form = ChangeUserEmailForm()
