@@ -99,47 +99,29 @@ def test_no_template_guards_on_an_uncalled_user_method(app):
     )
 
 
-def test_admin_required_actually_denies_a_non_admin(app):
-    """The same bug in decorator form: getattr on a method is always truthy.
+def test_second_admin_required_implementation_is_gone():
+    """R2-4 (PR 428 round 3): D-5 consolidated every route onto the one
+    canonical ``app.decorators.admin_required`` (``app._decorators_base``),
+    but left a second, unrelated ``admin_required`` defined in
+    ``app/utils/decorators.py`` -- "admin anywhere" logic (a bare
+    ``is_admin``/``is_superuser``/``role == "admin"`` check) with no
+    active-org check, reachable by anyone who typed
+    ``from app.utils.decorators import admin_required``. Nothing imported it
+    (confirmed before deleting -- its last route caller,
+    ``adm_kanban_view.init_phases``, already used the canonical
+    ``app.decorators.admin_required``), so it was deleted outright rather
+    than fixed in place: one implementation, not two.
 
-    app/utils/decorators.py resolved `is_admin` with a bare getattr, so the
-    decorator never rejected anyone. It no longer guards any route in this
-    codebase (adm_kanban_view.init_phases, its last caller, was moved onto
-    the canonical app.decorators.admin_required in the admin-rbac systemic
-    fix, since this module's own decorator never checked the session's
-    active organisation either) -- this test exercises the decorator
-    function directly to prove it still behaves correctly in isolation,
-    regardless of whether anything currently imports it.
+    This replaces the previous version of this test, which exercised that
+    module's decorator directly with a duck-typed user. Coverage for "does
+    the canonical admin_required actually deny a non-admin in the active
+    organisation" already lives in
+    test_admin_rbac_active_org_enforcement.py's url_map-wide sweep
+    (test_a_viewer_of_the_active_org_is_refused_by_every_admin_required_route)
+    and its anonymous-request test -- both exercise the one real decorator
+    rather than a stand-in, so nothing is lost by not re-deriving it here.
     """
-    from werkzeug.exceptions import Forbidden
+    import importlib
 
-    from app.utils.decorators import admin_required
-
-    @admin_required
-    def protected():
-        return "reached"
-
-    class NotAnAdmin:
-        is_authenticated = True
-
-        def is_admin(self):
-            return False
-
-    class AnAdmin:
-        is_authenticated = True
-
-        def is_admin(self):
-            return True
-
-    import app.utils.decorators as decorators_module
-
-    original = decorators_module.current_user
-    try:
-        decorators_module.current_user = NotAnAdmin()
-        with pytest.raises(Forbidden):
-            protected()
-
-        decorators_module.current_user = AnAdmin()
-        assert protected() == "reached", "a real admin must still get through"
-    finally:
-        decorators_module.current_user = original
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("app.utils.decorators")

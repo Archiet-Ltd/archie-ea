@@ -64,11 +64,19 @@ def _check_access(solution, user=None):
     function (like solution_design_routes.py's own ``_check_solution_access``)
     must also work with no request context at all, and because
     tests/test_solution_codegen_access_agreement.py exercises it with a bare
-    duck-typed user object (no ``.role``/``.can()``/``.organization_id``) --
-    degrading to the legacy global ``is_admin()`` answer whenever the richer,
-    organisation-aware check cannot be made (no real ``User``/``Solution``
-    shape to check it against) preserves that contract exactly, while a real
-    request with real models gets the fixed, active-org-aware answer.
+    duck-typed user object (no ``.role``/``.can()``/``.organization_id``).
+
+    R2-6 (PR 428 round 3): the richer check used to DEGRADE TO THE LEGACY
+    GLOBAL ``is_admin()`` ANSWER (``return True``) whenever it could not be
+    made -- the solution has no ``organization_id``, the user object has
+    none either, or ``rbac_service.is_org_admin`` raised. That is fail
+    OPEN: any holder of the global ADMINISTER flag was admitted to a
+    solution's codegen workbench the active organisation had no
+    relationship to at all, the moment either input was missing or the
+    lookup errored. Fails closed instead (mirrors the matching fix in
+    solution_design_routes.py's ``_check_solution_access``): when the
+    richer check cannot be made, this branch grants nothing and falls
+    through to the ``is_platform_admin``/stakeholder-email checks below.
     """
     user = user if user is not None else current_user
     if not user.is_authenticated:
@@ -82,13 +90,17 @@ def _check_access(solution, user=None):
             from app.services.rbac_service import rbac_service
 
             org_id = getattr(solution, "organization_id", None)
-            if org_id is not None and hasattr(user, "organization_id"):
-                if rbac_service.is_org_admin(user, org_id):
-                    return True
-            else:
+            if (
+                org_id is not None
+                and hasattr(user, "organization_id")
+                and rbac_service.is_org_admin(user, org_id)
+            ):
                 return True
-        except Exception:  # noqa: BLE001 - degrade to the legacy global answer
-            return True
+        except Exception:  # noqa: BLE001 - fail closed; fall through below
+            logger.exception(
+                "is_org_admin check failed in codegen._check_access; "
+                "denying the admin-branch grant rather than degrading to it"
+            )
     if getattr(user, "is_platform_admin", False):
         return True
     stakeholder_emails = (

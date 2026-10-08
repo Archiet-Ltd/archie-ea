@@ -91,11 +91,22 @@ def _check_solution_access(solution, user=None) -> bool:
     this call is actually about) rather than ``g.current_org_id``, both
     because this function must also work with no request context at all,
     and because tests/test_solution_codegen_access_agreement.py exercises
-    it with a bare duck-typed user object (no
-    ``.role``/``.can()``/``.organization_id``) -- degrading to the legacy
-    global ``is_admin()`` answer whenever the richer, organisation-aware
-    check cannot be made preserves that contract exactly, while a real
-    request with real models gets the fixed, active-org-aware answer.
+    it with a bare duck-typed user object (no ``.role``/``.can()``/
+    ``.organization_id``).
+
+    R2-6 (PR 428 round 3): the richer check used to DEGRADE TO THE LEGACY
+    GLOBAL ``is_admin()`` ANSWER (``return True``) whenever it could not be
+    made -- the solution has no ``organization_id``, the user object has
+    none either, or ``rbac_service.is_org_admin`` raised. That is fail
+    OPEN: any holder of the global ADMINISTER flag (every self-registered
+    user, in their own organisation) was admitted to a solution the active
+    organisation had no relationship to at all, the moment either input was
+    missing or the lookup errored -- worse than the bug this PR's main
+    commit already fixed elsewhere, because it fires on bad data, not just
+    a switched session. Fails closed instead: when the richer check cannot
+    be made, this branch grants nothing and falls through to the
+    ``is_platform_admin``/stakeholder-email checks below, same as a
+    non-admin user already relies on.
     """
     user = user if user is not None else current_user
     if solution.created_by_id == user.id:
@@ -107,13 +118,17 @@ def _check_solution_access(solution, user=None) -> bool:
             from app.services.rbac_service import rbac_service
 
             org_id = getattr(solution, "organization_id", None)
-            if org_id is not None and hasattr(user, "organization_id"):
-                if rbac_service.is_org_admin(user, org_id):
-                    return True
-            else:
+            if (
+                org_id is not None
+                and hasattr(user, "organization_id")
+                and rbac_service.is_org_admin(user, org_id)
+            ):
                 return True
-        except Exception:  # noqa: BLE001 - degrade to the legacy global answer
-            return True
+        except Exception:  # noqa: BLE001 - fail closed; fall through below
+            logger.exception(
+                "is_org_admin check failed in _check_solution_access; "
+                "denying the admin-branch grant rather than degrading to it"
+            )
     if getattr(user, "is_platform_admin", False):
         return True
     _stakeholder_emails = [
@@ -3205,7 +3220,7 @@ def api_reasoning_detail(solution_id, reasoning_id):
 def api_infer_code_specs(solution_id):
     """Use LLM to propose schema fields for all app elements in a solution."""
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         abort(403)
 
     try:
@@ -3223,7 +3238,7 @@ def api_infer_code_specs(solution_id):
 def api_confirm_code_spec(solution_id, element_id):
     """Confirm (and optionally edit) LLM-proposed fields for an app element."""
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         abort(403)
 
     from app.models.solution_sad_models import SolutionAppElement
@@ -3257,7 +3272,7 @@ def api_confirm_code_spec(solution_id, element_id):
 def api_generate_specs(solution_id):
     """Generate OpenAPI, JSON Schema, and AsyncAPI specs from solution blueprint."""
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         abort(403)
 
     try:
@@ -3281,7 +3296,7 @@ def api_download_specs(solution_id):
     import zipfile
 
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         abort(403)
 
     try:
@@ -3705,7 +3720,7 @@ def api_publish_spec(solution_id):
     from app.models.published_api_spec import PublishedAPISpec
 
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         abort(403)
 
     # Generate the current spec
@@ -4268,7 +4283,7 @@ def export_solution_sad(solution_id: int):
     as the detail page but renders a standalone, styled document.
     """
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         abort(403)
 
     ctx = _build_solution_detail_context(solution)
@@ -4325,7 +4340,7 @@ def export_solution_sad(solution_id: int):
 def export_solution_markdown(solution_id: int):
     """Export solution as Markdown document (ENT-011)."""
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         abort(403)
     # Build markdown
     lines = [
@@ -4492,7 +4507,7 @@ def export_archimate_oef(solution_id):
     from app.services.archimate_oef_export_service import archimate_oef_export_service
 
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         abort(403)
 
     try:
@@ -4629,7 +4644,7 @@ def save_solution_as_template(solution_id: int):
     )
     from app.models.solution_lifecycle_models import SolutionRisk, SolutionMetric, SolutionTCOItem, SolutionPlateau
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         abort(403)
     data = request.get_json() or {}
     name = (data.get("name") or solution.name or "Untitled Template").strip()[:255]
@@ -4716,7 +4731,7 @@ def edit_solution(solution_id: int):
     solution = Solution.query.get_or_404(solution_id)
 
     # Verify ownership
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         flash("You don't have permission to edit this solution", "error")
         abort(403)
 
@@ -5708,7 +5723,7 @@ def delete_solution(solution_id: int):
     solution = Solution.query.get_or_404(solution_id)
 
     # Verify ownership
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         return jsonify({"success": False, "error": "Permission denied"}), 403
 
     try:
@@ -6187,7 +6202,7 @@ def api_get_solution(solution_id: int):
     solution = Solution.query.get_or_404(solution_id)
 
     # Verify ownership
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         return jsonify({"success": False, "error": "Permission denied"}), 403
 
     return jsonify(
@@ -6397,7 +6412,7 @@ def api_solution_work_packages(solution_id, wp_id=None):
 
     solution = Solution.query.get_or_404(solution_id)
 
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         return jsonify({"success": False, "error": "Permission denied"}), 403
 
     try:
@@ -6485,7 +6500,7 @@ def api_update_solution(solution_id: int):
     solution = Solution.query.get_or_404(solution_id)
 
     # Verify ownership
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         return jsonify({"success": False, "error": "Permission denied"}), 403
 
     data = request.get_json()
@@ -6587,7 +6602,7 @@ def api_delete_solution(solution_id: int):
     solution = Solution.query.get_or_404(solution_id)
 
     # Verify ownership
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         return jsonify({"success": False, "error": "Permission denied"}), 403
 
     try:
@@ -7700,7 +7715,7 @@ def update_roadmap_item(solution_id: int):
     """Update a single roadmap item in a solution."""
     solution = Solution.query.get_or_404(solution_id)
 
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         return jsonify({"success": False, "error": "Permission denied"}), 403
 
     try:
@@ -7762,7 +7777,7 @@ def delete_roadmap_items(solution_id: int):
     """Delete selected roadmap items from a solution."""
     solution = Solution.query.get_or_404(solution_id)
 
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not _is_active_org_admin():
         return jsonify({"success": False, "error": "Permission denied"}), 403
 
     try:

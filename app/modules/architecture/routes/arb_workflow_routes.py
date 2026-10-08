@@ -32,6 +32,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import audit_log, require_roles
 from app.extensions import db
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.user import Permission
 from app.modules.transformation_room.arb_decision_adapter import (
     TypedARBDecisionAdapter,
@@ -720,9 +721,9 @@ def transition_stage(review_item_id: int):
             },
         })
 
-    # Force transition requires admin
+    # Force transition requires admin (in the active organisation)
     force = data.get("force", False)
-    if force and not current_user.is_admin:
+    if force and not is_active_org_admin():
         return (
             jsonify({"success": False, "error": "Force transition requires admin privileges"}),
             403,

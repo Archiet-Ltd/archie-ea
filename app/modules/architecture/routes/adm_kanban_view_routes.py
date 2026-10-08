@@ -21,9 +21,10 @@ from flask import (
     request,
     url_for,
 )
-from flask_login import current_user, login_required
+from flask_login import login_required
 
 from app.decorators import admin_required, audit_log
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.adm_kanban import create_adm_phases, KanbanCard
 from app.models.archimate_core import ArchiMateElement
 
@@ -73,7 +74,7 @@ def boards_detail_redirect(rest):
 def init_phases():
     """Initialize ADM phases (admin only)"""
     try:
-        if not current_user.is_admin:
+        if not is_active_org_admin():
             flash("Admin access required.", "error")
             return redirect(url_for("adm_kanban_view.index"))
 

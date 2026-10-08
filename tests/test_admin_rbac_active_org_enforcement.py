@@ -54,9 +54,9 @@ a live gap even though they don't carry this test's marker. (A second such
 implementation, ``app.utils.decorators.admin_required``, had exactly one
 caller -- ``adm_kanban_view.init_phases`` -- which has been moved onto the
 canonical ``app.decorators.admin_required`` fixed in this branch, so it now
-carries the marker and is swept below like any other route; the old module
-still exists, in case anything else references it later, but nothing in
-this codebase imports it for a route any more.)
+carries the marker and is swept below like any other route. R2-4 (PR 428
+round 3) deleted the now-uncalled ``app.utils.decorators`` module outright
+rather than leave a second "admin anywhere" implementation importable.)
 """
 
 from __future__ import annotations
@@ -448,9 +448,7 @@ def test_admin_required_denies_anonymous_without_crashing(app):
     admin_required's), so no route currently reachable over HTTP exercises
     this -- confirmed by inspecting every admin_required call site's
     decorator order. That is exactly why this has to be a direct unit test
-    of the decorator itself, matching
-    tests/test_template_auth_guards.py::test_admin_required_actually_denies_a_non_admin's
-    same approach for a different decorator: a future route that uses
+    of the decorator itself: a future route that uses
     admin_required on its own, with nothing else above it, must still get a
     clean 403, not a 500, and only a test that doesn't depend on today's
     particular routing can catch a regression in that.

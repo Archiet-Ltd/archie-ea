@@ -110,6 +110,12 @@ def governance_gate_reader_required(f):
             abort(403)
         return f(*args, **kwargs)
 
+    # R2-5 (PR 428 round 3): discoverability marker for the url_map sweep
+    # (tests/test_admin_rbac_active_org_enforcement.py) -- see the matching
+    # comment on admin_required above for why this survives further
+    # decorator stacking.
+    decorated_function._active_org_rbac_gate = "governance_gate_reader_required"
+
     return decorated_function
 
 
@@ -271,9 +277,27 @@ def role_required(*roles):
                 return f(*args, **kwargs)
             if not hasattr(current_user, "enterprise_role"):
                 abort(403)
-            if current_user.enterprise_role not in roles:
+            # R2-5 (PR 428 round 3): extending the url_map sweep to
+            # role_required surfaced a second "admin anywhere" path: when
+            # *roles* lists "platform_admin" literally (as
+            # metamodel_property_routes.DEFINING_ROLES does), the raw
+            # `current_user.enterprise_role in roles` membership test below
+            # was satisfied directly by that column's value -- which
+            # defaults to "platform_admin" for every legacy account
+            # ("existing users get full access", app/models/user.py), not
+            # actual platform authority. A genuine platform admin is
+            # already let through by is_platform_admin() above; reaching
+            # this point means that check already failed, so the raw
+            # column can never stand in for it here.
+            if current_user.enterprise_role == "platform_admin" or current_user.enterprise_role not in roles:
                 abort(403)
             return f(*args, **kwargs)
+
+        # R2-5 (PR 428 round 3): discoverability marker for the url_map
+        # sweep (tests/test_admin_rbac_active_org_enforcement.py) -- see the
+        # matching comment on admin_required above for why this survives
+        # further decorator stacking.
+        decorated_function._active_org_rbac_gate = "role_required"
 
         return decorated_function
 
@@ -294,23 +318,23 @@ def require_roles(*allowed_roles):
     Returns:
         403 Forbidden if user lacks required roles
     """
+    def _normalize_role_name(raw_role):
+        if raw_role is None:
+            return None
+        role_name = str(raw_role).strip().lower()
+        if role_name.startswith("<role '") and role_name.endswith("'>"):
+            role_name = role_name[7:-2]
+        role_name = role_name.replace(" ", "_")
+        if role_name == "administrator":
+            return "admin"
+        return role_name
+
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if not current_user.is_authenticated:
                 abort(401)
 
-            def _normalize_role_name(raw_role):
-                if raw_role is None:
-                    return None
-                role_name = str(raw_role).strip().lower()
-                if role_name.startswith("<role '") and role_name.endswith("'>"):
-                    role_name = role_name[7:-2]
-                role_name = role_name.replace(" ", "_")
-                if role_name == "administrator":
-                    return "admin"
-                return role_name
-            
             # Get user roles (handle different user model formats)
             user_roles = set()
             
@@ -417,16 +441,42 @@ def require_roles(*allowed_roles):
             # fix does not touch); re-derive it from the same active-org
             # predicate admin_required/org_admin_required already use, rather
             # than trust whatever the paths above contributed.
-            if "admin" in user_roles:
+            #
+            # R2-5 (PR 428 round 3): extending the url_map sweep to
+            # require_roles instances that list "platform_admin" literally
+            # (e.g. tech_radar.classify's
+            # @require_roles("admin", ..., "platform_admin")) surfaced a
+            # second, unscrubbed path to the same bug: line ~403 above adds
+            # the RAW enterprise_role string to user_roles whenever the
+            # account may write at all, and enterprise_role defaults to
+            # "platform_admin" for every legacy account ("existing users get
+            # full access" -- app/models/user.py). That default is a
+            # backward-compatibility label, not platform authority, but the
+            # only check above gating it was the same global
+            # Permission.ADMINISTER flag as "admin" -- so a home-org
+            # Administrator, Viewer-only in the ACTIVE organisation, who had
+            # never had their enterprise_role persona changed from its
+            # install default, satisfied @require_roles(..., "platform_admin")
+            # the same way they used to satisfy "admin" before this fix.
+            # Re-derived against the one real platform-admin predicate
+            # instead of discarded outright, since "platform_admin" (unlike
+            # "admin") claims PLATFORM authority specifically -- an org-admin
+            # of the active organisation is not that, so only
+            # is_platform_admin applies here, not the is_org_admin fallback
+            # "admin" gets.
+            if "admin" in user_roles or "platform_admin" in user_roles:
                 from app.middleware.tenant_decorators import is_platform_admin
                 from app.services.rbac_service import rbac_service
 
                 active_org_id = getattr(g, "current_org_id", None)
+                user_is_platform_admin = is_platform_admin(current_user)
                 if not (
-                    is_platform_admin(current_user)
+                    user_is_platform_admin
                     or rbac_service.is_org_admin(current_user, active_org_id)
                 ):
                     user_roles.discard("admin")
+                if not user_is_platform_admin:
+                    user_roles.discard("platform_admin")
 
             # Check if user has any of the required roles (case-insensitive)
             required = set(
@@ -441,9 +491,21 @@ def require_roles(*allowed_roles):
                     f"has roles {user_roles}, required {required}"
                 )
                 abort(403)
-            
+
             return f(*args, **kwargs)
-        
+
+        # R2-5 (PR 428 round 3): only when "admin" is among the roles this
+        # instance actually requires -- the active-org re-derivation above
+        # is specifically what closes the "admin anywhere" escalation, and
+        # that branch never runs for a require_roles("architect", ...) call
+        # that never asked for "admin" at all. Marking those too would make
+        # the url_map sweep expect a 403 from a persona-only gate it was
+        # never meant to enforce, which enterprise_role (a global persona
+        # flag) can legitimately satisfy regardless of which organisation
+        # is active.
+        if any(_normalize_role_name(r) == "admin" for r in allowed_roles):
+            decorated_function._active_org_rbac_gate = "require_roles"
+
         return decorated_function
-    
+
     return decorator

@@ -168,6 +168,21 @@ def require_role(*roles):
 
             return f(*args, **kwargs)
 
+        # R2-5 (PR 428 round 3): discoverability marker for the url_map
+        # sweep (tests/test_admin_rbac_active_org_enforcement.py), set only
+        # when this instance actually requires more than the "viewer"
+        # floor -- a no-op require_role() (or one that only ever asks for
+        # "viewer") passes every authenticated user by design, and marking
+        # that would make the sweep expect a 403 the decorator was never
+        # meant to produce.
+        _required_level = (
+            min(_ROLE_HIERARCHY.index(r) for r in roles if r in _ROLE_HIERARCHY)
+            if any(r in _ROLE_HIERARCHY for r in roles)
+            else 0
+        )
+        if _required_level > 0:
+            wrapper._active_org_rbac_gate = "require_role"
+
         return wrapper
 
     return decorator

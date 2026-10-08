@@ -79,6 +79,26 @@ def is_platform_admin(user):
     return bool(is_flagged_platform_admin and has_administer_permission)
 
 
+def is_active_org_admin(user=None) -> bool:
+    """The one predicate for "is this user an admin of the ACTIVE organisation".
+
+    R2-1/R2-2 (PR 428 round 3): the same judgement ``org_admin_required``
+    above already makes, extracted so inline checks scattered across route
+    modules can call it instead of re-typing (or mistyping, as an
+    unparenthesized ``current_user.is_admin`` bound-method reference did)
+    the active-org-vs-home-org distinction themselves. Mirrors
+    ``solutions_strategic.v2.routes.solution_design_routes._is_active_org_admin``,
+    which predates this shared copy and is left as-is there.
+    """
+    user = user if user is not None else current_user
+    if not getattr(user, "is_authenticated", False):
+        return False
+    from app.services.rbac_service import rbac_service
+
+    active_org_id = getattr(g, "current_org_id", None)
+    return is_platform_admin(user) or rbac_service.is_org_admin(user, active_org_id)
+
+
 def platform_admin_required(f):
     """Require authenticated user who is a platform admin (cross-org access).
 

@@ -29,6 +29,7 @@ from sqlalchemy import or_
 
 from app import db
 from app.decorators import require_roles
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.adm_kanban import KanbanCard
 from app.models.application_portfolio import ApplicationComponent
 from app.models.audit_log import AuditLog
@@ -1272,7 +1273,7 @@ def patch_requirement_status(req_id):
     if req.solution_id:
         from app.models.solution_models import Solution
         sol = Solution.query.get(req.solution_id)
-        if sol and sol.created_by_id != current_user.id and not current_user.is_admin:
+        if sol and sol.created_by_id != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Forbidden: you do not own this solution"}), 403
 
     data = request.get_json() or {}
@@ -1341,7 +1342,7 @@ def enrich_requirement(req_id):
     if req.solution_id:
         from app.models.solution_models import Solution
         sol = Solution.query.get(req.solution_id)
-        if sol and sol.created_by_id != current_user.id and not current_user.is_admin:
+        if sol and sol.created_by_id != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Forbidden: you do not own this solution"}), 403
 
     data = request.get_json() or {}

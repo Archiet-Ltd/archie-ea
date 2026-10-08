@@ -52,6 +52,29 @@ class ResourceDomain(Enum):
     SECURITY = "security"
 
 
+# Baseline (non-admin) permission bits per domain -- see
+# ``RBACManager._get_role_permissions`` for why this excludes any
+# admin-only escalation. Hoisted to module scope (R2-5, PR 428 round 3) so
+# ``require_permission`` can tell, at decoration time, whether a given
+# (domain, permission) pair is already open to every authenticated user --
+# the `_active_org_rbac_gate` url_map sweep marker belongs only on the
+# domain/permission pairs baseline access does NOT already grant, since
+# marking one everyone legitimately passes (e.g. ResourceDomain.ARCHITECTURE,
+# Permission.READ) would make the sweep expect a 403 the permission model
+# was never meant to produce for a mere Viewer.
+_NON_ADMIN_BASELINE_PERMISSIONS = {
+    ResourceDomain.ARCHITECTURE: Permission.READ.value | Permission.WRITE.value,
+    ResourceDomain.APPLICATIONS: Permission.READ.value | Permission.WRITE.value,
+    ResourceDomain.VENDORS: Permission.READ.value | Permission.WRITE.value,
+    ResourceDomain.CAPABILITIES: Permission.READ.value | Permission.WRITE.value,
+    ResourceDomain.ROADMAP: Permission.READ.value | Permission.WRITE.value,
+    ResourceDomain.COMPLIANCE: Permission.READ.value,
+    ResourceDomain.ADMIN: Permission.NONE.value,
+    ResourceDomain.AUDIT: Permission.NONE.value,
+    ResourceDomain.SECURITY: Permission.NONE.value,
+}
+
+
 class RBACManager:
     """
     Centralized RBAC authorization manager.
@@ -218,20 +241,7 @@ class RBACManager:
         serving one organisation's cached admin-level permissions to
         another the next time the same user is checked in a different one.
         """
-        # Domain-specific permission mapping (non-admin baseline only).
-        domain_permissions = {
-            ResourceDomain.ARCHITECTURE: Permission.READ.value | Permission.WRITE.value,
-            ResourceDomain.APPLICATIONS: Permission.READ.value | Permission.WRITE.value,
-            ResourceDomain.VENDORS: Permission.READ.value | Permission.WRITE.value,
-            ResourceDomain.CAPABILITIES: Permission.READ.value | Permission.WRITE.value,
-            ResourceDomain.ROADMAP: Permission.READ.value | Permission.WRITE.value,
-            ResourceDomain.COMPLIANCE: Permission.READ.value,
-            ResourceDomain.ADMIN: Permission.NONE.value,
-            ResourceDomain.AUDIT: Permission.NONE.value,
-            ResourceDomain.SECURITY: Permission.NONE.value,
-        }
-
-        return domain_permissions.get(resource_domain, Permission.NONE.value)
+        return _NON_ADMIN_BASELINE_PERMISSIONS.get(resource_domain, Permission.NONE.value)
 
     def get_user_domains(self, user: User) -> List[ResourceDomain]:
         """
@@ -320,6 +330,17 @@ def require_permission(
             return f(*args, **kwargs)
 
         wrapper.__name__ = f.__name__
+
+        # R2-5 (PR 428 round 3): discoverability marker for the url_map
+        # sweep (tests/test_admin_rbac_active_org_enforcement.py), set only
+        # when this (domain, permission) pair is NOT already part of the
+        # non-admin baseline -- see _NON_ADMIN_BASELINE_PERMISSIONS above.
+        # Only then is check_permission's active-org admin bypass the one
+        # path that can grant it, which is exactly what this PR fixed.
+        baseline = _NON_ADMIN_BASELINE_PERMISSIONS.get(resource_domain, Permission.NONE.value)
+        if (baseline & permission.value) != permission.value:
+            wrapper._active_org_rbac_gate = "require_permission"
+
         return wrapper
 
     return decorator

@@ -70,7 +70,14 @@ def _can_define() -> bool:
             return True
     except Exception:
         current_app.logger.debug("is_admin unavailable for metamodel role check")
-    return getattr(current_user, "enterprise_role", None) in DEFINING_ROLES
+    # R2-5 (PR 428 round 3): "platform_admin" is DEFINING_ROLES' literal
+    # stand-in for genuine platform authority, already judged above by
+    # is_platform_admin(); it defaults onto every legacy account's
+    # enterprise_role column regardless of real authority, so it must never
+    # be satisfied by the raw column value here (mirrors the matching fix
+    # in app.decorators.role_required).
+    persona = getattr(current_user, "enterprise_role", None)
+    return persona != "platform_admin" and persona in DEFINING_ROLES
 
 
 def _render_index(form=None, error=None, status=200):

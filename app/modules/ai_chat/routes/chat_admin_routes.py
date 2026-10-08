@@ -26,11 +26,19 @@ logger = logging.getLogger(__name__)
 
 
 def _require_admin():
-    """Abort 403 if current user is not an admin."""
-    if not (hasattr(current_user, "is_admin") and current_user.is_admin):
-        # Fallback: check role attribute
-        if not (hasattr(current_user, "role") and current_user.role == "admin"):
-            abort(403)
+    """Abort 403 if current user is not an admin of the ACTIVE organisation.
+
+    R2-2 (PR 428 round 3): ``current_user.is_admin`` (no call) is a bound
+    method reference, always truthy, so this never refused anyone -- a
+    Viewer of the active organisation could read and write every persona
+    prompt override and read the organisation's AI-chat analytics. Judged
+    the same way ``org_admin_required``/``admin_required`` do elsewhere in
+    this PR, against ``g.current_org_id`` rather than a global flag.
+    """
+    from app.middleware.tenant_decorators import is_active_org_admin
+
+    if not is_active_org_admin():
+        abort(403)
 
 
 def _override_key(persona_key):
