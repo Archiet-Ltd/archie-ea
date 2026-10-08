@@ -57,6 +57,7 @@ a second run changes nothing and reports zero.
 import json
 import logging
 import re
+from datetime import datetime
 
 import click
 from flask.cli import with_appcontext
@@ -388,7 +389,24 @@ _ASSOCIATION_SOURCE = "work_packages"
 # Special keys of a link-change dict, beside "plateau_id" and "gap_id".
 _ASSOC_MIGRATE = "_associations"          # migrate the association rows, then mark the row
 _ASSOC_CHANGES = "_association_changes"   # {"gaps"|"plateaus": (ids added, ids removed)}
+_ASSOC_RELINK = "_relink"                 # {"plateau_id"|"gap_id": [ids]}: links an element change must keep
 _AUDIT_COLUMNS = ("created_at", "updated_at")
+# The association tables' created_at is naive UTC written when the row is flushed, so every
+# write of association_links_migrated_at uses the same clock: UTC wall-clock time, not the
+# transaction's start (the transaction timestamp would date a marker before rows written since).
+_MARKER_NOW = "timezone('utc', clock_timestamp())"
+# SQLSTATEs of a lock conflict: deadlock detected, serialization failure, lock not available.
+_LOCK_CONFLICTS = ("40P01", "40001", "55P03")
+
+
+def _is_lock_conflict(exc):
+    """True for a deadlock, serialization failure or lock timeout (the SQLSTATE is on the
+    driver's error, ``orig``, of the SQLAlchemy exception, or on the exception itself)."""
+    for err in (exc, getattr(exc, "orig", None)):
+        code = getattr(err, "sqlstate", None) or getattr(err, "pgcode", None)
+        if code in _LOCK_CONFLICTS:
+            return True
+    return False
 
 
 def _column_targets(spec):
@@ -403,50 +421,119 @@ def _column_targets(spec):
     return out
 
 
-def _follow_source_element(conn, table, source_ids):
-    """The copy takes its source row's ArchiMate element (a column copy). A row is
-    first flushed before its element is made, so the copy may already have linked a
-    plateau or gap from an element of its own: those relationships move to the element
-    the copy is about to take, and the element it leaves is removed if nothing else
-    uses it."""
+def _follow_source_element(conn, table, source_ids, created_elements=()):
+    """The copy takes its source row's ArchiMate element (a column copy). Returns
+    ``(elements left, {unified id: {"_relink": {...}}})``.
+
+    A row is first flushed before its element is made, so the copy may already have linked
+    a plateau or gap from an element of its own. When that element was made in this
+    transaction (``created_elements``, the ids ``sync_archimate_element`` recorded for the
+    session), nothing else can know it: its outgoing realization and association
+    relationships move to the element the copy is about to take, and the element is
+    removed afterwards if nothing uses it. An incoming relationship (target_id) is never
+    moved. Any other element stays exactly as it is, with every relationship and every
+    row that references it; the copy only points at its new element, and the plateau and
+    gap links it read from the old one are returned to be re-created (add-only) from the
+    new one. The deploy merge passes no created elements, so it never follows or deletes."""
+    from app.services import work_package_service as svc
+
     rows = conn.execute(text(
-        "SELECT u.archimate_element_id, s.archimate_element_id "
+        "SELECT u.id, u.organization_id, u.archimate_element_id, s.archimate_element_id "
         f'FROM unified_work_packages u JOIN "{table}" s ON s.id = u.source_id '  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
         "WHERE u.source_table = :t AND s.id = ANY(:ids) AND u.archimate_element_id IS NOT NULL "
         "AND s.archimate_element_id IS NOT NULL AND u.archimate_element_id <> s.archimate_element_id"),
         {"t": table, "ids": list(source_ids)}).fetchall()
-    for left, taken in rows:
-        conn.execute(text(
-            "UPDATE archimate_relationships SET source_id = :new "  # tenancy-ok: keyed by the element the work package is leaving
-            "WHERE source_id = :old AND type IN ('realization', 'association')"),
-            {"new": taken, "old": left})
-    return [left for left, _taken in rows]
+    created = set(created_elements or ())
+    left_behind = []
+    relink = {}
+    for uid, org_id, left, taken in rows:
+        if left in created:
+            conn.execute(text(
+                "UPDATE archimate_relationships SET source_id = :new "  # tenancy-ok: keyed by the element the work package is leaving
+                "WHERE source_id = :old AND type IN ('realization', 'association')"),
+                {"new": taken, "old": left})
+            left_behind.append(left)
+        elif org_id is not None:
+            plateaus, gaps = [], []
+            for _wp, _rel, kind, plateau_id, gap_id in svc._link_rows(
+                    org_id, wp_ids=[uid], connection=conn):
+                if kind == svc._PLATEAU_REL and plateau_id not in plateaus:
+                    plateaus.append(plateau_id)
+                if kind == svc._GAP_REL and gap_id not in gaps:
+                    gaps.append(gap_id)
+            if plateaus or gaps:
+                relink[uid] = {_ASSOC_RELINK: {"plateau_id": plateaus, "gap_id": gaps}}
+    return left_behind, relink
 
 
-def _drop_unused_elements(conn, table, element_ids):
-    """Remove the elements a copy left (see _follow_source_element) if nothing uses them."""
-    for left in element_ids:
+def _element_references(conn):
+    """[(table, column)] of every column that references archimate_elements.id: the
+    foreign keys of the model metadata and of the database catalogue, so a table the
+    models do not declare is still found."""
+    found = set()
+    existing = {
+        (t, c) for t, c in conn.execute(text(
+            "SELECT table_name, column_name FROM information_schema.columns "
+            "WHERE table_schema = ANY(current_schemas(false))"))
+    }
+    metadatas = [db.metadata] + list(getattr(db, "metadatas", {}).values())
+    for metadata in metadatas:
+        for table in metadata.tables.values():
+            for fk in table.foreign_keys:
+                if (fk.column.table.name == "archimate_elements" and fk.column.name == "id"
+                        and (table.name, fk.parent.name) in existing):
+                    found.add((table.name, fk.parent.name))
+    for table, column in conn.execute(text(
+            "SELECT cl.relname, a.attname FROM pg_constraint c "
+            "JOIN pg_class cl ON cl.oid = c.conrelid "
+            "JOIN pg_namespace n ON n.oid = cl.relnamespace "
+            "JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey) "
+            "WHERE c.contype = 'f' AND c.confrelid = to_regclass('archimate_elements') "
+            "AND n.nspname = ANY(current_schemas(false))")):
+        found.add((table, column))
+    return sorted(found)
+
+
+def _drop_unused_elements(conn, table, element_ids, created_elements=()):
+    """Remove an element a copy left (see _follow_source_element), only if it is one this
+    transaction made (``created_elements``) and nothing references it: no relationship at
+    either end, no work package, and no row of any table with a foreign key to
+    archimate_elements.id (found from the metadata, not a list written here)."""
+    created = set(created_elements or ())
+    wanted = [e for e in element_ids if e in created]
+    if not wanted:
+        return
+    guards = [
+        "NOT EXISTS (SELECT 1 FROM archimate_relationships r "
+        "WHERE r.source_id = e.id OR r.target_id = e.id)",
+        "NOT EXISTS (SELECT 1 FROM unified_work_packages w WHERE w.archimate_element_id = e.id)",
+        f'NOT EXISTS (SELECT 1 FROM "{table}" x WHERE x.archimate_element_id = e.id)',
+    ]
+    guards += [
+        f'NOT EXISTS (SELECT 1 FROM "{t}" x WHERE x."{c}" = e.id)'
+        for t, c in _element_references(conn)
+    ]
+    sql = text("DELETE FROM archimate_elements e WHERE e.id = :old AND " + " AND ".join(guards))  # tenancy-ok: the element the copy made for itself a moment ago
+    for left in wanted:
         try:
             with conn.begin_nested():
-                conn.execute(text(
-                    "DELETE FROM archimate_elements e WHERE e.id = :old "  # tenancy-ok: the element the copy made for itself a moment ago
-                    "AND NOT EXISTS (SELECT 1 FROM archimate_relationships r "
-                    "WHERE r.source_id = e.id OR r.target_id = e.id) "
-                    "AND NOT EXISTS (SELECT 1 FROM unified_work_packages w WHERE w.archimate_element_id = e.id) "
-                    f'AND NOT EXISTS (SELECT 1 FROM "{table}" x WHERE x.archimate_element_id = e.id)'),
-                    {"old": left})
-        except Exception:  # noqa: BLE001 - something else still points at it: leave it
+                conn.execute(sql, {"old": left})
+        except Exception as exc:  # noqa: BLE001 - something else still points at it: leave it
+            if _is_lock_conflict(exc):
+                raise
             logger.debug("element %s left in place", left)
 
 
-def _update_existing(conn, spec, changed, stats):
+def _update_existing(conn, spec, changed, stats, created_elements=()):
     """Bridge only: a source row edited after its copy was made updates the
     copy's *changed* columns, and nothing else. `changed` is
     {source id: {source column, ...}}; a row whose changed columns map to
     nothing writes nothing, so edits made on the one store's own screens
-    survive an old screen saving a different field."""
+    survive an old screen saving a different field. Returns the links to re-create
+    when a copy moved to another element ({unified id: {"_relink": ...}})."""
     table = spec["table"]
     targets = _column_targets(spec)
+    relinks = {}
     groups = {}
     for source_id, columns in changed.items():
         columns = set(columns)
@@ -456,7 +543,9 @@ def _update_existing(conn, spec, changed, stats):
         wanted |= {c for c in _AUDIT_COLUMNS if c in targets}
         groups.setdefault(tuple(sorted(wanted)), []).append(int(source_id))
     for columns, ids in groups.items():
-        left = _follow_source_element(conn, table, ids) if "archimate_element_id" in columns else []
+        left, moved = (_follow_source_element(conn, table, ids, created_elements)
+                       if "archimate_element_id" in columns else ([], {}))
+        relinks.update(moved)
         assigns = [f"{t} = {e}" for c in columns for t, e in targets[c]]
         sql = (
             f"UPDATE unified_work_packages AS u SET {', '.join(assigns)} "
@@ -466,7 +555,8 @@ def _update_existing(conn, spec, changed, stats):
         )
         stats.add(f"{table}: updated", conn.execute(
             text(sql), {"source_table": table, "ids": ids}).rowcount)
-        _drop_unused_elements(conn, table, left)
+        _drop_unused_elements(conn, table, left, created_elements)
+    return relinks
 
 
 def _apply_dependency_changes(conn, table, dependency_changes, stats):
@@ -745,7 +835,7 @@ def _union_roadmap_links(conn, ids, stats):
 
 def sync_source_rows(conn, table, ids=None, *, update_existing=False, fallback_org_id=None,
                      changed=None, dependency_changes=None, defer_links=None,
-                     link_changes=None, relation_changes=None):
+                     link_changes=None, relation_changes=None, created_elements=None):
     """Copy rows of a retired store into unified_work_packages.
 
     The one per-row copy path. `ids` restricts it to those source ids (the
@@ -767,6 +857,9 @@ def sync_source_rows(conn, table, ids=None, *, update_existing=False, fallback_o
     attributes did not change is not touched. Applied at once, or, when the caller
     is inside a session flush and cannot flush again, through `defer_links({unified
     id: {"plateau_id": value or None}})`.
+    `created_elements` is the set of element ids this transaction gave to unified work
+    packages (the bridge passes the flushing session's); only such an element is ever
+    followed or deleted when a copy takes its source row's element. None means none.
     Returns a dict of counts (empty when nothing changed).
     """
     stats = _Stats()
@@ -777,15 +870,18 @@ def sync_source_rows(conn, table, ids=None, *, update_existing=False, fallback_o
             return stats
 
     inserted = _insert_missing(conn, spec, ids, stats, fallback_org_id)
+    relinks = {}
     if update_existing:
         if changed:
-            _update_existing(conn, spec, changed, stats)
+            relinks = _update_existing(conn, spec, changed, stats, created_elements)
         if dependency_changes and table in _DEP_SOURCE_COLUMN:
             _apply_dependency_changes(conn, table, dependency_changes, stats)
         if relation_changes and spec.get("union_links"):
             _apply_relation_changes(conn, table, relation_changes, stats)
     _fill_missing(conn, spec, ids, stats)
     pending_links = _links_to_apply(conn, table, inserted, link_changes, relation_changes)
+    for uid, values in relinks.items():
+        pending_links.setdefault(uid, {}).update(values)
 
     if ids is not None:
         # Only a copy with no organisation yet needs placing (and warning about); a
@@ -850,7 +946,7 @@ def _mark_association_links(conn, unified_ids):
     unified_ids = list(unified_ids)
     if unified_ids:
         conn.execute(
-            text("UPDATE unified_work_packages SET association_links_migrated_at = CURRENT_TIMESTAMP "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+            text(f"UPDATE unified_work_packages SET association_links_migrated_at = {_MARKER_NOW} "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
                  "WHERE id = ANY(:ids) AND association_links_migrated_at IS NULL"),
             {"ids": unified_ids})
 
@@ -1162,12 +1258,26 @@ def apply_link_changes(changes, *, replace=True, stats=None):
     package's links only, is logged, and leaves the transaction usable. The unified
     row is locked (FOR UPDATE) before its links are read, so concurrent edits run one
     after the other. Returns the unified ids whose links were handled (all of them
-    but the ones that failed)."""
+    but the ones that failed).
+
+    A lock conflict (deadlock detected, serialization failure, lock not available) is not
+    contained: it is re-raised after the savepoint has rolled back, so the flush and the
+    request fail and roll back whole rather than leave the two stores apart. A call that
+    touches several work packages takes every lock first, in ascending id order, before it
+    reads or writes any link, so two calls cannot wait on each other in opposite orders."""
     from app.models.unified_work_package import UnifiedWorkPackage
     from app.services import work_package_service as svc
 
     stats = stats if stats is not None else _Stats()
     done = []
+    for uid in sorted(changes):
+        try:
+            with db.session.begin_nested():
+                svc.lock_work_package(uid)
+        except Exception as exc:  # noqa: BLE001
+            if _is_lock_conflict(exc):
+                raise
+            logger.warning("work package %s not locked before its links: %s", uid, exc)
     for uid, values in sorted(changes.items()):
         org_id = None
         # The read of the row sits inside the savepoint too, so a failure anywhere in a
@@ -1190,9 +1300,17 @@ def apply_link_changes(changes, *, replace=True, stats=None):
                 wp = db.session.execute(  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
                     db.select(UnifiedWorkPackage).where(UnifiedWorkPackage.id == uid)).scalar_one()
                 # The organisation may have just been written by SQL (placement).
-                db.session.expire(wp, ["organization_id"])
+                db.session.expire(wp, ["organization_id", "archimate_element_id"])
+                if values.get(_ASSOC_RELINK):
+                    # The copy moved to another element: its links come first, so a change
+                    # below (a replace, a removal) acts on them.
+                    relink = values[_ASSOC_RELINK]
+                    _apply_association_changes(wp, org_id, {
+                        "plateaus": (relink.get("plateau_id", ()), ()),
+                        "gaps": (relink.get("gap_id", ()), ()),
+                    }, stats)
                 for key, value in values.items():
-                    if key in (_ASSOC_MIGRATE, _ASSOC_CHANGES):
+                    if key in (_ASSOC_MIGRATE, _ASSOC_CHANGES, _ASSOC_RELINK):
                         continue
                     try:
                         links = svc._resolve_links({key: value}, org_id)
@@ -1213,14 +1331,24 @@ def apply_link_changes(changes, *, replace=True, stats=None):
                     svc._apply_links(wp, links, org_id, replace=replace, rollback=False,
                                      round_trip=False, keep=keep)
                 if values.get(_ASSOC_CHANGES) and source_id is not None:
-                    _apply_association_changes(wp, org_id, values[_ASSOC_CHANGES], stats)
-                if values.get(_ASSOC_MIGRATE) and source_id is not None:
-                    _migrate_associations(wp, org_id, source_id, stats)
+                    _apply_association_changes(wp, org_id, values[_ASSOC_CHANGES], stats,
+                                               source_id=source_id)
+                    # The association rows are written; a row the bridge handled is never
+                    # added again by a deploy. A row not yet migrated keeps its empty marker:
+                    # advancing it would skip the older rows the deploy has yet to migrate.
                     db.session.execute(text(
-                        "UPDATE unified_work_packages SET association_links_migrated_at = CURRENT_TIMESTAMP "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+                        f"UPDATE unified_work_packages SET association_links_migrated_at = {_MARKER_NOW} "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+                        "WHERE id = :i AND association_links_migrated_at IS NOT NULL"), {"i": uid})
+                if values.get(_ASSOC_MIGRATE) and source_id is not None:
+                    since = values[_ASSOC_MIGRATE] if isinstance(values[_ASSOC_MIGRATE], datetime) else None
+                    _migrate_associations(wp, org_id, source_id, stats, since=since)
+                    db.session.execute(text(
+                        f"UPDATE unified_work_packages SET association_links_migrated_at = {_MARKER_NOW} "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
                         "WHERE id = :i"), {"i": uid})
             done.append(uid)
         except Exception as exc:  # noqa: BLE001 - a link failure must not take the transaction down
+            if _is_lock_conflict(exc):
+                raise
             logger.warning(
                 "plateau/gap links rolled back: work package %s, values %s, organisation %s: %s",
                 uid, values, org_id, exc)
@@ -1228,26 +1356,38 @@ def apply_link_changes(changes, *, replace=True, stats=None):
     return done
 
 
-def _association_ids(source_id, key):
+def _association_ids(source_id, key, since=None):
     """Ids of the plateaus (key plateau_id) or gaps (gap_id) the old row `source_id`
-    holds in its association table, in the order they were written."""
+    holds in its association table, in the order they were written. With `since`, only
+    the rows written after that time (naive UTC, like created_at)."""
     for assoc_table, link_key in _ASSOCIATIONS.values():
         if link_key == key:
+            later = " AND created_at > :since" if since is not None else ""
+            params = {"i": source_id, **({"since": since} if since is not None else {})}
             return [r[0] for r in db.session.execute(text(
-                f"SELECT {key} FROM {assoc_table} WHERE work_package_id = :i ORDER BY id"),  # tenancy-ok: keyed by the work package's own id
-                {"i": source_id})]
+                f"SELECT {key} FROM {assoc_table} WHERE work_package_id = :i{later} ORDER BY id"),  # tenancy-ok: keyed by the work package's own id
+                params)]
     return []
 
 
-def _migrate_associations(wp, org_id, source_id, stats):
+def _column_ids(source_id, key):
+    """{the id} when the old row's own column of that name still holds one, else {}."""
+    if key not in _LINK_SOURCE_COLUMNS.get(_ASSOCIATION_SOURCE, ()):
+        return set()
+    value = db.session.execute(text(
+        f'SELECT "{key}" FROM "{_ASSOCIATION_SOURCE}" WHERE id = :i'), {"i": source_id}).scalar()  # tenancy-ok: keyed by the work package's own id
+    return {value} if value is not None else set()
+
+
+def _migrate_associations(wp, org_id, source_id, stats, since=None):
     """Add a relationship for each row of the old row's association tables (adding
-    only; the rows stay). A plateau or gap that is missing or of another
-    organisation is counted and skipped."""
+    only; the rows stay), or only the rows written after `since`. A plateau or gap that
+    is missing or of another organisation is counted and skipped."""
     from app.services import work_package_service as svc
 
     for _attr, (_table, key) in _ASSOCIATIONS.items():
         present = {t for _rid, t in svc._link_targets(wp, key, org_id)}
-        for target_id in dict.fromkeys(_association_ids(source_id, key)):
+        for target_id in dict.fromkeys(_association_ids(source_id, key, since)):
             if target_id in present:
                 continue
             try:
@@ -1263,13 +1403,17 @@ def _migrate_associations(wp, org_id, source_id, stats):
             stats.add(f"unified_work_packages: {key[:-3]} association links migrated", 1)
 
 
-def _apply_association_changes(wp, org_id, change, stats):
+def _apply_association_changes(wp, org_id, change, stats, source_id=None):
     """An old screen's edit of WorkPackage.gaps / .plateaus: the ids added get a
-    relationship, the ids removed lose theirs."""
+    relationship, the ids removed lose theirs -- except an id the old row still holds,
+    in its own plateau_id column or in a remaining association row of its own."""
     from app.services import work_package_service as svc
 
     for attr, (added, removed) in change.items():
         key = _ASSOCIATIONS[attr][1]
+        if removed and source_id is not None:
+            still = set(_association_ids(source_id, key)) | _column_ids(source_id, key)
+            removed = [t for t in removed if t not in still]
         if removed:
             stats.add(f"unified_work_packages: {key[:-3]} relationships removed",
                       svc.remove_link_targets(wp, key, org_id, removed))
@@ -1309,11 +1453,21 @@ def _link_columns_to_relationships(stats, dry_run=False, unified_ids=None):
     run. PR 3 drops the columns, the marker and the tables."""
     scope = "AND id = ANY(:uids) " if unified_ids is not None else ""
     params = {"uids": list(unified_ids)} if unified_ids is not None else {}
+    # A marked row with an association row written after its marker (by a writer the bridge
+    # did not see) is migrated again, adding only those rows.
+    later = " OR ".join(
+        f"EXISTS (SELECT 1 FROM {table} a WHERE a.work_package_id = source_id "
+        "AND a.created_at > association_links_migrated_at)"
+        for table, _key in _ASSOCIATIONS.values())
+    has_later = (f"(source_table = :src AND association_links_migrated_at IS NOT NULL "
+                 f"AND source_id IS NOT NULL AND ({later}))")
     rows = db.session.execute(text(
-        "SELECT id, plateau_id, gap_id, source_table, source_id, association_links_migrated_at "
+        "SELECT id, plateau_id, gap_id, source_table, source_id, association_links_migrated_at, "
+        f"{has_later} "
         "FROM unified_work_packages "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
         "WHERE organization_id IS NOT NULL AND (plateau_id IS NOT NULL OR gap_id IS NOT NULL "
-        "OR (source_table = :src AND association_links_migrated_at IS NULL)) "
+        "OR (source_table = :src AND association_links_migrated_at IS NULL) "
+        f"OR {has_later}) "
         + scope + "ORDER BY id"
     ), dict(params, src=_ASSOCIATION_SOURCE)).fetchall()
     holding = _rows_with_associations(
@@ -1321,7 +1475,7 @@ def _link_columns_to_relationships(stats, dry_run=False, unified_ids=None):
         [r[4] for r in rows if r[3] == _ASSOCIATION_SOURCE and r[5] is None and r[4] is not None])
     changes = {}
     empty_marks = []
-    for wp_id, plateau_id, gap_id, source_table, source_id, marked in rows:
+    for wp_id, plateau_id, gap_id, source_table, source_id, marked, newer in rows:
         values = {}
         if plateau_id is not None:
             values["plateau_id"] = plateau_id
@@ -1332,6 +1486,8 @@ def _link_columns_to_relationships(stats, dry_run=False, unified_ids=None):
                 values[_ASSOC_MIGRATE] = True
             else:
                 empty_marks.append(wp_id)
+        elif newer:
+            values[_ASSOC_MIGRATE] = marked
         if values:
             changes[wp_id] = values
     stats.add("unified_work_packages: link columns to migrate",

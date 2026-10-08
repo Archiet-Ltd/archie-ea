@@ -286,7 +286,7 @@ def _resolve_links(fields: Dict[str, Any], organization_id: int) -> Dict[str, An
 
 
 def _link_rows(
-    organization_id: int, wp_ids=None, plateau_ids=None, gap_ids=None
+    organization_id: int, wp_ids=None, plateau_ids=None, gap_ids=None, connection=None
 ) -> List[tuple]:
     """The one reader of the plateau and gap link encoding.
 
@@ -295,7 +295,9 @@ def _link_rows(
     (realization) or a gap (association), ordered by relationship id. The one
     organisation predicate sits here: the relationship, the work package and the
     plateau or gap must all belong to ``organization_id``; another organisation's
-    rows never appear. ``wp_ids``, ``plateau_ids`` and ``gap_ids`` narrow the read."""
+    rows never appear. ``wp_ids``, ``plateau_ids`` and ``gap_ids`` narrow the read.
+    ``connection`` runs the read on that connection instead of ``db.session`` (the bridge,
+    inside a flush)."""
     from app.models.implementation_migration import Gap, Plateau
     from app.models.models import ArchiMateRelationship
 
@@ -331,7 +333,7 @@ def _link_rows(
         query = query.where(Plateau.id.in_(list(plateau_ids)))
     if gap_ids is not None:
         query = query.where(Gap.id.in_(list(gap_ids)))
-    return [tuple(row) for row in db.session.execute(query).all()]
+    return [tuple(row) for row in (connection or db.session).execute(query).all()]
 
 
 def _link_targets(wp: UnifiedWorkPackage, key: str, organization_id: int):

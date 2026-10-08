@@ -15,6 +15,9 @@ How it works: a session listener sees every flush.
     the columns that changed (read from the session's attribute history), and a
     changed dependency list as the ids added and removed, so what was edited on
     the one store's own screens is never written over;
+  * a link added or removed from the other side of the old store's association tables
+    (``Gap.work_packages``, ``Plateau.work_packages``) is read from that side's history
+    and applied the same way, so the two sides of one association are bridged once;
   * a deleted row of a retired store removes its copy through
     ``work_package_service.delete_work_package`` (dependency clean-up included);
   * a retired row whose copy was deleted carries ``retired_at`` and is never
@@ -157,6 +160,60 @@ def _changes_of(obj, table):
     return columns, dependency_change, link_change, relation_change
 
 
+_OWNERS = None
+
+
+def _association_owners():
+    """{mapped class: association key}: the classes whose ``work_packages`` collection is
+    the other side of WorkPackage.gaps / WorkPackage.plateaus."""
+    global _OWNERS
+    if _OWNERS is None:
+        from app.models.implementation_migration import Gap, Plateau
+
+        _OWNERS = {Gap: "gaps", Plateau: "plateaus"}
+    return _OWNERS
+
+
+def _owner_side_changes(session, objs, new_objects):
+    """{work package id: {"gaps"|"plateaus": (gap or plateau ids added, ids removed)}} read
+    from the ``work_packages`` history of dirty or new gaps and plateaus, with the work
+    package objects. A work package that is new in this flush is left to the insert path,
+    which reads the association rows it was flushed with."""
+    owners = _association_owners()
+    changes = {}
+    found = {}
+    for obj in objs:
+        key = owners.get(type(obj))
+        if key is None or getattr(obj, "id", None) is None:
+            continue
+        state = inspect(obj)
+        if "work_packages" not in state.mapper.relationships:
+            continue
+        history = state.attrs["work_packages"].history
+        if not history.has_changes():
+            continue
+        for index, members in enumerate((history.added, history.deleted)):
+            for wp in members or ():
+                wp_state = inspect(wp)
+                if getattr(wp, "id", None) is None or wp in new_objects \
+                        or wp_state.deleted or wp_state.was_deleted:
+                    continue
+                found[wp.id] = wp
+                entry = changes.setdefault(wp.id, {}).setdefault(key, ([], []))
+                if obj.id not in entry[index]:
+                    entry[index].append(obj.id)
+    return changes, found
+
+
+def _merge_relation_change(into, extra):
+    """Union of two {"gaps"|"plateaus": (added, removed)} dicts, in order. A change seen
+    from both sides of an association (back_populates) is the same ids, so it applies once."""
+    for key, (added, removed) in extra.items():
+        old_added, old_removed = into.get(key, ((), ()))
+        into[key] = (list(dict.fromkeys(list(old_added) + list(added))),
+                     list(dict.fromkeys(list(old_removed) + list(removed))))
+
+
 def _table_of(tables, obj):
     for cls, name in tables.items():
         if isinstance(obj, cls):
@@ -204,7 +261,8 @@ def _after_flush(session, flush_context):
     link_changes = {}
     relation_changes = {}
     new_objects = set(session.new)
-    for obj in list(session.new) + [o for o in session.dirty if session.is_modified(o)]:
+    touched = list(session.new) + [o for o in session.dirty if session.is_modified(o)]
+    for obj in touched:
         table = _table_of(tables, obj)
         if table is not None and getattr(obj, "id", None) is not None:
             pending.setdefault(table, {})[obj.id] = obj
@@ -218,10 +276,18 @@ def _after_flush(session, flush_context):
                     link_changes.setdefault(table, {})[obj.id] = link_change
                 if relation_change:
                     relation_changes.setdefault(table, {})[obj.id] = relation_change
+    owner_changes, owner_wps = _owner_side_changes(session, touched, new_objects)
+    for wp_id, change in owner_changes.items():
+        pending.setdefault(_ASSOCIATION_TABLE, {}).setdefault(wp_id, owner_wps[wp_id])
+        _merge_relation_change(
+            relation_changes.setdefault(_ASSOCIATION_TABLE, {}).setdefault(wp_id, {}), change)
     if not pending:
         return
 
     from app.commands.consolidate_work_packages import sync_source_rows
+    from app.services.archimate_backbone import CREATED_ELEMENTS_KEY
+
+    created_elements = session.info.get(CREATED_ELEMENTS_KEY) or set()
 
     conn = session.connection()
     caller = _caller_org()
@@ -231,6 +297,7 @@ def _after_flush(session, flush_context):
             changed=changed.get(table), dependency_changes=dependency_changes.get(table),
             link_changes=link_changes.get(table), relation_changes=relation_changes.get(table),
             defer_links=lambda wanted, _s=session: _defer_links(_s, wanted),
+            created_elements=created_elements,
         )
         marks = {
             row[0]: row[1:] for row in conn.execute(
@@ -245,6 +312,7 @@ def _after_flush(session, flush_context):
 
 
 _PENDING_LINKS = "work_package_bridge_pending_links"
+_ASSOCIATION_TABLE = "work_packages"
 
 
 def _defer_links(session, wanted):
@@ -259,6 +327,10 @@ def _defer_links(session, wanted):
                 for attr, (added, removed) in value.items():
                     old_added, old_removed = entry[key].get(attr, ((), ()))
                     entry[key][attr] = (list(old_added) + list(added), list(old_removed) + list(removed))
+            elif key == "_relink" and key in entry:
+                # Two element changes before the link step: keep the links of both.
+                for attr, ids in value.items():
+                    entry[key][attr] = list(dict.fromkeys(list(entry[key].get(attr, ())) + list(ids)))
             else:
                 entry[key] = value
 
@@ -319,9 +391,27 @@ def _flush_then_link(original):
     return flush
 
 
+def _forget_created_elements(session, *_args):
+    """The elements made in this transaction are only known to it: forget them when it ends
+    (commit) or is rolled back (the whole transaction or a savepoint)."""
+    from app.services.archimate_backbone import CREATED_ELEMENTS_KEY
+
+    session.info.pop(CREATED_ELEMENTS_KEY, None)
+
+
+def _forget_after_commit(session):
+    # A savepoint released inside the transaction (the link step runs in one) is not the end
+    # of the transaction: the elements it made are still this transaction's.
+    if not session.in_nested_transaction():
+        _forget_created_elements(session)
+
+
 def register(app=None):
     """Install the session listeners once per process (create_app may run many times)."""
-    for name, fn in (("before_flush", _before_flush), ("after_flush", _after_flush)):
+    for name, fn in (("before_flush", _before_flush), ("after_flush", _after_flush),
+                     ("after_commit", _forget_after_commit),
+                     ("after_rollback", _forget_created_elements),
+                     ("after_soft_rollback", _forget_created_elements)):
         if not event.contains(Session, name, fn):
             event.listen(Session, name, fn)
     if not getattr(Session.flush, "_wp_bridge_wrapped", False):
