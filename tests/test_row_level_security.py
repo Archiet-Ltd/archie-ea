@@ -559,7 +559,7 @@ def test_newly_added_tenant_table_agent_registrations_is_scoped(rls, world):
     with rls.owner.begin() as connection:
         ids = [
             connection.execute(
-                text("INSERT INTO agent_registrations (name, purpose, status, organization_id) VALUES (:n, 'rls test', 'active', :o) RETURNING id"),
+                text("INSERT INTO agent_registrations (name, purpose, status, created_at, organization_id) VALUES (:n, 'rls test', 'active', now(), :o) RETURNING id"),
                 {"n": f"Agent {o}", "o": o},
             ).scalar_one()
             for o in (a, b)
