@@ -186,6 +186,15 @@ def test_mfa_challenge_with_no_pending_login_redirects_to_login(app):
 # which only ever answers for the user's own home organisation, so this
 # class of administrator signed in on a password alone with no MFA step at
 # all (second refuter pass, R1).
+#
+# MFA authority fails closed on an organisation's active state (third
+# refuter pass, R5/R6): deactivation is not enforced at login or at
+# session-switch time -- neither user_can_access_org nor
+# switch_active_organization checks Organization.is_active -- so an
+# administrator of a deactivated organisation (home or invited) can still
+# reach it and must still be challenged. A prior round filtered
+# org_ids_for down to active organisations only, which let such an
+# administrator through on a password alone; that filtering is gone.
 # ---------------------------------------------------------------------------
 
 
@@ -270,9 +279,66 @@ def test_a_user_with_no_org_role_admin_row_anywhere_is_not_sent_to_mfa_no_regres
     assert "/mfa-challenge" not in resp.headers.get("Location", "")
 
 
-def test_an_org_admin_of_only_a_deactivated_org_is_not_sent_to_mfa(
+def test_an_administrator_whose_home_organisation_is_deactivated_is_still_sent_to_mfa(
     app, db_session, make_org
 ):
+    """R5 (regression, home-organisation side): deactivation is not
+    enforced at login or at session-switch time, so an administrator whose
+    home organisation is deactivated can still sign in and switch into it
+    exactly as before -- a prior round's active-only filter on
+    org_ids_for let this administrator reach /admin on a password alone,
+    with no MFA step at all."""
+    org = make_org("mfa-gate-home-deactivated")
+    admin = _make_admin(db_session, org, mfa_enabled=False)
+    org.is_active = False
+    db_session.commit()
+
+    client = app.test_client()
+    resp = client.post(
+        "/account/login",
+        data={"email": admin.email, "password": _PASSWORD, "remember_me": ""},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    assert "/mfa-challenge" in resp.headers.get("Location", "")
+
+
+def test_an_administrator_whose_home_organisation_is_active_null_is_still_sent_to_mfa(
+    app, db_session, make_org
+):
+    """R6: NULL Organization.is_active means legacy-active in this
+    codebase's own convention (see app/jobs/tenant_safe_job.py's
+    isnot(False) filter, "NULL is legacy-active"), the opposite of the
+    is_(True) filter a prior round wrote, which would have treated this
+    administrator as if their organisation were inactive. Pinned even
+    though org_ids_for no longer filters on active state at all, so a
+    future reintroduction of filtering is caught regardless of which
+    direction it gets the NULL case wrong."""
+    org = make_org("mfa-gate-home-active-null")
+    admin = _make_admin(db_session, org, mfa_enabled=False)
+    org.is_active = None
+    db_session.commit()
+
+    client = app.test_client()
+    resp = client.post(
+        "/account/login",
+        data={"email": admin.email, "password": _PASSWORD, "remember_me": ""},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    assert "/mfa-challenge" in resp.headers.get("Location", "")
+
+
+def test_an_org_admin_of_only_a_deactivated_invited_org_is_still_sent_to_mfa(
+    app, db_session, make_org
+):
+    """R5 (regression, invited-organisation side -- the exact scenario the
+    third review reproduced): a user whose HOME organisation carries no
+    admin authority at all, but who holds an org_admin OrgRole grant in a
+    different, deactivated organisation they were invited into, is still
+    challenged on MFA. A prior round's active-only filter on org_ids_for
+    excluded the deactivated organisation from the id set entirely, so
+    this administrator signed in on a password alone and reached /admin."""
     home_org = make_org("mfa-gate-deactivated-only-home")
     deactivated_org = make_org("mfa-gate-deactivated-only-other")
     deactivated_org.is_active = False
@@ -286,15 +352,16 @@ def test_an_org_admin_of_only_a_deactivated_org_is_not_sent_to_mfa(
         follow_redirects=False,
     )
     assert resp.status_code in (302, 303)
-    assert "/mfa-challenge" not in resp.headers.get("Location", "")
+    assert "/mfa-challenge" in resp.headers.get("Location", "")
 
 
 def test_an_org_admin_of_a_deactivated_org_is_still_gated_if_also_admin_elsewhere(
     app, db_session, make_org
 ):
-    """The deactivated organisation is excluded from the id set, but it must
-    not poison the whole lookup: a user who is ALSO an admin of a separate,
-    active organisation is still gated on MFA."""
+    """A user who is an org_admin of both a deactivated organisation and a
+    separate, active one is gated on MFA either way -- org_ids_for applies
+    no active-state filtering at all now, so neither organisation is ever
+    excluded from the lookup in the first place."""
     from app.models.org_role import OrgRole
 
     home_org = make_org("mfa-gate-deactivated-plus-home")
@@ -507,6 +574,37 @@ def test_sso_callback_sends_an_mfa_enrolled_administrator_to_the_challenge(
         assert "_user_id" not in sess
     dash = client.get("/dashboard/overview")
     assert dash.status_code in (302, 401)
+
+
+def test_sso_callback_mfa_pending_sets_remember_false(
+    app, db_session, make_org, monkeypatch
+):
+    """R8: the v2 SSO callback's own MFA-pending branch always sets
+    ``_mfa_pending_remember`` to False, matching this same route's non-MFA
+    path (``session_registry.login_and_register(user)``, no ``remember=``
+    argument, which itself defaults to False) -- SSO has no "remember me"
+    checkbox, so there is nothing truthy to carry into either path. Pinned
+    so a future refactor cannot silently flip the MFA-pending branch back
+    to True and so put it out of step with its own route's non-MFA
+    behaviour."""
+    secret = pyotp.random_base32()
+    org = make_org("sso-mfa-gate-remember-false")
+    admin = _make_admin(db_session, org, mfa_enabled=True, mfa_secret=secret)
+
+    client = app.test_client()
+    userinfo = {
+        "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "email": admin.email,
+        "given_name": "Ada",
+        "family_name": "Lovelace",
+    }
+    resp = _sso_callback(client, monkeypatch, db_session, userinfo)
+
+    assert resp.status_code in (302, 303), resp.get_data(as_text=True)
+    assert "/mfa-challenge" in resp.headers.get("Location", "")
+    with client.session_transaction() as sess:
+        assert sess.get("_mfa_pending_user_id") == admin.id
+        assert sess.get("_mfa_pending_remember") is False
 
 
 def test_sso_callback_still_logs_in_a_plain_user_no_regression(

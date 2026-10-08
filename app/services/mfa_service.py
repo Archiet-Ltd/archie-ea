@@ -36,14 +36,20 @@ def required_for(user) -> bool:
 
     Administrators must always complete MFA, whether or not they have
     enrolled yet: an unenrolled administrator is sent to enrol, not let
-    through. "Administrator" here is either a platform admin
-    (``is_platform_admin``) or an organisation admin of ANY organisation the
-    user belongs to -- their own home organisation or one they were invited
-    into (``rbac_service.is_org_admin_anywhere``, second refuter pass,
-    R1) -- not only their home organisation, which is all
-    ``User.is_org_admin`` itself can answer (see its own docstring on
-    app/models/user.py). An administrator of only a deactivated organisation
-    does not count; see ``rbac_service.org_ids_for``.
+    through. "Administrator" here is any of three things: a platform admin
+    (``is_platform_admin``); an admin of the user's own home organisation
+    (``user.is_org_admin``, kept here explicitly as defence-in-depth even
+    though ``is_org_admin_anywhere`` below also covers the home
+    organisation); or an organisation admin of ANY organisation the user
+    belongs to -- their own home organisation or one they were invited into
+    (``rbac_service.is_org_admin_anywhere``, second refuter pass, R1).
+
+    This does not exempt an administrator of only a deactivated
+    organisation: deactivation is not enforced at login or at
+    session-switch time, so such an administrator can still sign in and
+    switch into it exactly as before, and MFA authority fails closed on
+    that fact rather than leaning on enforcement that does not exist
+    elsewhere (third refuter pass, R5; see ``rbac_service.org_ids_for``).
 
     The one exception is ``_admin_mfa_bypass_active()`` below -- see its own
     docstring for exactly what that is and is not."""
@@ -52,7 +58,9 @@ def required_for(user) -> bool:
     from app.services.rbac_service import rbac_service
 
     is_admin = bool(
-        rbac_service.is_org_admin_anywhere(user) or getattr(user, "is_platform_admin", False)
+        getattr(user, "is_platform_admin", False)
+        or getattr(user, "is_org_admin", False)
+        or rbac_service.is_org_admin_anywhere(user)
     )
     if not is_admin:
         return False
