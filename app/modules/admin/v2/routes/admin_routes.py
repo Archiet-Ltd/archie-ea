@@ -66,7 +66,12 @@ from ...forms.admin_forms import (
 )
 from app.modules.account.forms.account_forms import CreatePasswordForm
 from app.decorators import admin_required, audit_log, governance_gate_reader_required
-from app.middleware.tenant_decorators import org_admin_required, platform_admin_required
+from app.middleware.tenant_decorators import (
+    is_platform_admin,
+    org_admin_required,
+    platform_admin_required,
+)
+from app.services.rbac_service import rbac_service
 from app.models import APISettings, EditableHTML, Permission, Role, User
 from app.models.organization import Organization
 from app.models.org_role import OrgRole
@@ -524,6 +529,23 @@ def user_info(user_id):
 @audit_log("change_user_email")
 def change_user_email(user_id):
     """Change a user's email."""
+    from flask import abort
+
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and change
+    # org B's own administrator's email out from under them. Routed from a
+    # PR424 reviewer's finding; reuses the same is_platform_admin /
+    # rbac_service.is_org_admin(..., g.current_org_id) guard PR424 already
+    # applied to this file's sso_settings/SCIM/leavers routes.
+    if not (
+        is_platform_admin(current_user)
+        or rbac_service.is_org_admin(current_user, g.current_org_id)
+    ):
+        abort(403)
     user = _svc.get_user_or_404(user_id)
     form = ChangeUserEmailForm()
     if form.validate_on_submit():

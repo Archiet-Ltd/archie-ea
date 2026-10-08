@@ -241,6 +241,102 @@ class TestMemberIDOR:
         assert OrgRole.query.get(role_b_id) is not None
 
 
+class TestChangeEmailSessionSwitchIDOR:
+    """Routed from a PR424 reviewer's finding on main: unlike
+    ``TestMemberIDOR.test_org_admin_cannot_change_email_of_another_orgs_user``
+    above (an admin who never leaves their own organisation's session, so
+    ``get_user_or_404``'s ``organization_id=g.current_org_id`` filter alone
+    already 404s the cross-org lookup), this attacker switches their own
+    *active session* into the victim's organisation first.
+
+    A Viewer-level ``OrgRole`` row is enough to pass the organisation
+    switcher's membership check (``AccountService.switch_active_organization``
+    only requires some OrgRole row, any role, to grant the switch), so once
+    switched, ``get_user_or_404`` resolves the victim user just fine --
+    ``g.current_org_id`` now legitimately *is* the victim's organisation.
+    The only thing that can still stop the attacker is this route's own
+    authorization check, which (before the fix) was
+    ``current_user.can(Permission.ADMINISTER)`` alone: a global flag that is
+    True for any Administrator-role user regardless of which organisation is
+    currently active, so it let the switch-in through unchecked.
+    """
+
+    def test_admin_with_viewer_role_in_other_org_cannot_change_its_admin_email(
+        self, app, db_session, login_as, client
+    ):
+        from app.models.org_role import OrgRole
+        from app.models.user import User
+
+        org_a = _make_org(db_session, "sw-a")
+        org_b = _make_org(db_session, "sw-b")
+        # Administrator in org_a (home org) -> current_user.can(Permission.
+        # ADMINISTER) is globally True there, but NOT a platform admin and
+        # NOT an org_admin of org_b.
+        attacker = _make_user(db_session, org_a, is_org_admin=True, is_platform_admin=False)
+        # The real administrator of org_b -- the target of the account
+        # takeover (change email, then a password reset completes it).
+        victim = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        victim_email = victim.email
+        # The attacker's only standing in org_b: an invitation accepted at
+        # Viewer level -- enough to switch the active session into org_b,
+        # nothing more.
+        OrgRole.set_role(org_b.id, attacker.id, "viewer", granted_by_id=attacker.id)
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, attacker)
+            switched = client.post(
+                "/account/switch-organization",
+                data={"organization_id": str(org_b.id)},
+                follow_redirects=False,
+            )
+            # Confirms the switch itself succeeds (a Viewer OrgRole is
+            # sufficient), so the 403 asserted below comes from this route's
+            # own guard, not from the attacker having failed to reach org_b
+            # at all.
+            assert switched.status_code == 302
+
+            resp = client.post(
+                f"/admin/user/{victim.id}/change-email",
+                data={"email": "pwned-session-switch@evil.example.com"},
+            )
+
+        assert resp.status_code == 403
+
+        with app.app_context():
+            reloaded = User.query.get(victim.id)
+            assert reloaded.email == victim_email
+
+    def test_genuine_org_admin_can_still_change_email_within_own_org(
+        self, app, db_session, login_as, client
+    ):
+        """No-regression control: a real administrator of the organisation
+        that is currently active must still be able to change a member's
+        email exactly as before the fix."""
+        from app.models.user import User
+
+        org_b = _make_org(db_session, "sw-legit-b")
+        admin_b = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)
+        target = _make_user(
+            db_session, org_b, email=f"sw-target-{uuid.uuid4().hex[:8]}@example.com"
+        )
+        new_email = f"sw-changed-{uuid.uuid4().hex[:8]}@example.com"
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, admin_b)
+            resp = client.post(
+                f"/admin/user/{target.id}/change-email",
+                data={"email": new_email},
+            )
+
+        assert resp.status_code == 200
+
+        with app.app_context():
+            reloaded = User.query.get(target.id)
+            assert reloaded.email == new_email
+
+
 class TestAdminUserActionRoutes:
     """Deletion by POST only, a refused delete is a flashed
     message rather than a 500, and the role page renders with the full
