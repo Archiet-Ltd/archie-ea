@@ -56,6 +56,7 @@ from app.models.solution_sad_models import SolutionADRDirect, SolutionAPQCProces
 from app.models.solution_governance import SolutionNotification
 from app.jobs.tenant_safe_job import tenant_scope
 from app.models.solution_models import Solution
+from app.utils.tenant_users import escape_like_literal
 from app.utils.route_guards import require_entity
 from app.services.feature_flag_service import FeatureFlagService
 from app.utils.pagination import safe_int_arg
@@ -1082,7 +1083,7 @@ def list_solutions():
 
         # PLT-019: Apply BU domain scope filter
         if bu_filter_active and not show_all_override and bu_name:
-            _safe_bu = bu_name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            _safe_bu = escape_like_literal(bu_name)
             query = query.filter(
                 Solution.business_domain.ilike(f"%{_safe_bu}%", escape="\\")
             )
@@ -1104,7 +1105,7 @@ def list_solutions():
 
         # Apply search filter (escape LIKE wildcards to prevent injection)
         if search:
-            safe_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            safe_search = escape_like_literal(search)
             query = query.filter(
                 or_(
                     Solution.name.ilike(f"%{safe_search}%", escape="\\"),

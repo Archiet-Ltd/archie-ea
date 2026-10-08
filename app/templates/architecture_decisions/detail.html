@@ -240,6 +240,44 @@
         </div>
         {% endif %}
 
+        <!-- Review: review_date/review_outcome/reviewed_at/
+             reviewed_by are set by the due-for-review and record-outcome
+             routes but had no home on this page until now. -->
+        {% if decision.review_date or decision.review_outcome %}
+        <div class="bg-card border border-border rounded-lg p-6">
+            <h2 class="text-base font-semibold text-foreground mb-3 flex items-center gap-2">
+                <i data-lucide="calendar-clock" class="h-4 w-4 text-muted-foreground"></i>
+                Review
+            </h2>
+            <dl class="space-y-2 text-sm">
+                {% if decision.review_date %}
+                <div class="flex gap-2">
+                    <dt class="text-muted-foreground shrink-0">Review date</dt>
+                    <dd class="text-foreground">
+                        {{ decision.review_date.strftime('%B %d, %Y') }}
+                        {% if decision.is_due_for_review %}
+                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/20">Due</span>
+                        {% endif %}
+                    </dd>
+                </div>
+                {% endif %}
+                {% if decision.review_outcome %}
+                <div>
+                    <dt class="text-muted-foreground mb-1">Outcome</dt>
+                    <dd class="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">{{ decision.review_outcome }}</dd>
+                </div>
+                <div class="flex gap-2">
+                    <dt class="text-muted-foreground shrink-0">Reviewed by</dt>
+                    <dd class="text-foreground">
+                        {% if decision.reviewed_by %}{{ decision.reviewed_by.username or decision.reviewed_by.email }}{% else %}—{% endif %}
+                        {% if decision.reviewed_at %} on {{ decision.reviewed_at.strftime('%B %d, %Y') }}{% endif %}
+                    </dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+        {% endif %}
+
         <!-- Impacted ArchiMate Elements -->
         <div class="bg-card border border-border rounded-lg p-6">
             <h2 class="text-base font-semibold text-foreground mb-3 flex items-center gap-2">

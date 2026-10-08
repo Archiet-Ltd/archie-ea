@@ -744,7 +744,17 @@ class ArchiMateImportService:
         element_results: List[Dict[str, Any]] = []
         relationship_results: List[Dict[str, Any]] = []
 
+        # Snapshot for restore: opened before anything is written, on the
+        # import's own session-log row; None outside a signed-in request.
+        from app.services import import_snapshot_service
+
+        snapshot = import_snapshot_service.begin(
+            strategy=strategy, model_name=(parsed_data.get("model_name") or "")[:100]
+        )
         model_id = self._record_model(ArchitectureModel, parsed_data)
+        if snapshot is not None:
+            snapshot.note_model(model_id)
+        created_relationship_ids: List[int] = []
 
         def _element_result(row, identifier: str, status: str) -> None:
             element_results.append({
@@ -821,9 +831,13 @@ class ArchiMateImportService:
                             id_map[identifier] = {"db_id": new_elem.id, "type": elem_type}
                         created += 1
                         created_ids.append(new_elem.id)
+                        if snapshot is not None:
+                            snapshot.note_created_element(new_elem.id)
                         _element_result(new_elem, identifier, "created")
                         created_row = new_elem
                     elif strategy == "update_existing":
+                        if snapshot is not None:
+                            snapshot.note_updated_element(existing)
                         if description is not None:
                             existing.description = description
                         _write_properties(existing, props, merge=True)
@@ -861,7 +875,14 @@ class ArchiMateImportService:
                 continue
 
             if created_row is not None:
-                self._create_domain_row(created_row)
+                domain = self._create_domain_row(created_row)
+                if domain is not None and snapshot is not None:
+                    if domain["created"]:
+                        snapshot.note_domain_created(domain["table"], domain["id"])
+                    else:
+                        snapshot.note_domain_linked(
+                            domain["table"], domain["id"], domain["previous_element_id"]
+                        )
 
         # --- Relationships (second pass, after every element has an id) ---
         type_by_identifier = {ident: info["type"] for ident, info in id_map.items()}
@@ -924,6 +945,7 @@ class ArchiMateImportService:
                         db.session.add(new_rel)
                         db.session.flush()
                         relationships_created += 1
+                        created_relationship_ids.append(new_rel.id)
                         stored_rel, rel_status = new_rel, "created"
                 relationship_results.append({
                     "identifier": rel["identifier"],
@@ -947,6 +969,12 @@ class ArchiMateImportService:
                 })
 
         try:
+            if snapshot is not None:
+                snapshot.note_created_relationships(created_relationship_ids)
+                snapshot.finish({
+                    "created": created, "updated": updated,
+                    "skipped": skipped, "failed": failed,
+                })
             db.session.commit()
         except Exception as exc:
             db.session.rollback()
@@ -1018,7 +1046,7 @@ class ArchiMateImportService:
             return None
 
     @staticmethod
-    def _create_domain_row(element) -> None:
+    def _create_domain_row(element) -> Optional[Dict[str, Any]]:
         """Give a newly created Driver / Goal / ApplicationComponent element
         its domain row, linked back by ``archimate_element_id``.
 
@@ -1084,7 +1112,11 @@ class ArchiMateImportService:
                     if linked is None or db.session.get(ArchiMateElement, linked) is None:
                         existing.archimate_element_id = element.id
                         db.session.flush()
-                    return
+                        return {
+                            "table": cls.__table__.name, "id": existing.id,
+                            "created": False, "previous_element_id": linked,
+                        }
+                    return None
 
                 if is_portfolio:
                     row = cls(
@@ -1102,8 +1134,13 @@ class ArchiMateImportService:
                     )
                 db.session.add(row)
                 db.session.flush()
+                return {
+                    "table": cls.__table__.name, "id": row.id,
+                    "created": True, "previous_element_id": None,
+                }
         except Exception as exc:
             logger.warning(
                 "Could not create the %s domain row for element %s: %s",
                 element.type, element.id, exc,
             )
+        return None

@@ -69,7 +69,7 @@
         <!-- Recorded by the AI chat, workbench or solution-options-advisor
              creation paths, not by this form -- read-only here, since this
              form's POST has nothing to persist a change to them with. -->
-        {% if decision and (decision.assumptions or decision.affected_systems or decision.decided_by_label) %}
+        {% if decision and (decision.assumptions or decision.affected_systems or decision.decided_by_label or decision.review_outcome) %}
         <div class="bg-muted/40 border border-border rounded-lg p-6 space-y-3 text-sm">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Recorded elsewhere, read-only</p>
             {% if decision.decided_by_label %}
@@ -88,6 +88,12 @@
             <div>
                 <dt class="text-muted-foreground mb-1">Affected systems</dt>
                 <dd class="text-foreground">{{ decision.affected_systems | join(', ') }}</dd>
+            </div>
+            {% endif %}
+            {% if decision.review_outcome %}
+            <div>
+                <dt class="text-muted-foreground mb-1">Last review outcome</dt>
+                <dd class="whitespace-pre-wrap text-foreground">{{ decision.review_outcome }}</dd>
             </div>
             {% endif %}
         </div>
@@ -125,6 +131,14 @@
                 <textarea id="alternatives" name="alternatives" rows="4"
                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y font-mono"
                           placeholder="Option A: ...\nOption B: ...">{{ decision.alternatives if decision else '' }}</textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-foreground mb-1.5" for="review_date">Review Date</label>
+                <p class="text-xs text-muted-foreground mb-2">Come back to this decision on or after this date -- a vendor renewal, a deviation granted "for now". Leave blank if this decision does not need a future review.</p>
+                <input type="date" id="review_date" name="review_date"
+                       value="{{ decision.review_date.isoformat() if decision and decision.review_date else '' }}"
+                       class="w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             </div>
         </div>
 
