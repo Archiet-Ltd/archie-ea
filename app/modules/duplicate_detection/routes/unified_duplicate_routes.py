@@ -1236,6 +1236,7 @@ def ai_analyze():
 
 @unified_duplicate_bp.route("/ai/insights/<int:run_id>")
 @login_required
+@platform_admin_required
 def ai_insights(run_id):
     """View AI insights for a specific detection run"""
     try:
@@ -2081,6 +2082,7 @@ def api_group_impact(group_id):
 
 @unified_duplicate_bp.route("/api/statistics/summary")
 @login_required
+@platform_admin_required
 def api_statistics_summary():
     """Statistics summary for the enterprise dashboard."""
     try:

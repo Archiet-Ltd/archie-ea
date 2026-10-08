@@ -1013,6 +1013,7 @@ def api_group_impact(group_id):
 @unified_duplicate_bp_v2.route("/api/statistics/summary")
 @timed_route
 @login_required
+@platform_admin_required
 def api_statistics_summary():
     """Statistics summary for the enterprise dashboard."""
     try:

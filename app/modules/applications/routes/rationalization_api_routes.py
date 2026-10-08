@@ -421,6 +421,7 @@ def rationalization_get_groups():
 
 @unified_applications_bp.route("/rationalization/api/runs")
 @login_required
+@platform_admin_required
 def rationalization_get_runs():
     """Get detection run history."""
     from app.services.unified_duplicate_detection_service import (
@@ -440,6 +441,7 @@ def rationalization_get_runs():
     "/rationalization/api/auto-resolve-exact", methods=["POST"]
 )
 @login_required
+@platform_admin_required
 @audit_log("rationalization_auto_resolve")
 def rationalization_auto_resolve():
     """Auto-resolve exact match duplicate groups."""

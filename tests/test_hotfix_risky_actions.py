@@ -325,3 +325,69 @@ class TestRound2SwitchedOrgViewer(TestGroup4ActiveOrgUserManagement):
             r = client.delete("/admin/api/users/bulk", json={"ids": [tid]})
             assert r.status_code == 403
             assert User.query.get(tid) is not None
+
+
+# ---------------------------------------------------------------------------
+# Round 3 (P437-6, P437-7)
+# ---------------------------------------------------------------------------
+
+ROUND3_ROUTES = [
+    ("post", "/applications/rationalization/api/auto-resolve-exact"),
+    ("get", "/applications/rationalization/api/runs"),
+    ("get", "/duplicate-detection/api/statistics/summary"),
+    ("get", "/duplicate-detection/ai/insights/999999"),
+]
+
+
+class TestRound3PlatformAdminOnly:
+    def _user_role(self, db_session, org):
+        from app.models.user import Role
+
+        Role.insert_roles()
+        user = _make_user(db_session, org)
+        user.role = Role.query.filter_by(name="User").first()
+        user.is_org_admin = False
+        db_session.commit()
+        return user
+
+    @pytest.mark.parametrize("method,url", ROUND3_ROUTES)
+    def test_user_role_and_org_admin_refused(self, app, db_session, login_as, client, actors, method, url):
+        org_admin, _ = actors
+        user = self._user_role(db_session, org_admin.organization)
+        with app.app_context():
+            for actor in (user, org_admin):
+                login_as(client, actor)
+                body = {} if method == "post" else None
+                assert _call(client, method, url, body).status_code == 403
+
+    @pytest.mark.parametrize("method,url", ROUND3_ROUTES)
+    def test_platform_admin_not_refused(self, app, login_as, client, actors, method, url):
+        _, platform_admin = actors
+        with app.app_context():
+            login_as(client, platform_admin)
+            body = {} if method == "post" else None
+            assert _call(client, method, url, body).status_code != 403
+
+    def test_auto_resolve_leaves_other_orgs_group_pending(self, app, db_session, login_as, client, actors):
+        from app.models.unified_duplicate_detection import UnifiedDuplicateGroup
+
+        org_admin, _ = actors
+        group = UnifiedDuplicateGroup(
+            name=f"other-org-{uuid.uuid4().hex[:6]}",
+            similarity_score=1.0,
+            duplicate_type="exact",
+            status="pending",
+        )
+        db_session.add(group)
+        db_session.commit()
+        gid = group.id
+        with app.app_context():
+            login_as(client, org_admin)
+            assert client.post("/applications/rationalization/api/auto-resolve-exact", json={}).status_code == 403
+            assert UnifiedDuplicateGroup.query.get(gid).status == "pending"
+
+    def test_group_listings_stay_open_to_org_admin(self, app, login_as, client, actors):
+        org_admin, _ = actors
+        with app.app_context():
+            login_as(client, org_admin)
+            assert client.get("/duplicate-detection/enterprise/groups").status_code != 403
