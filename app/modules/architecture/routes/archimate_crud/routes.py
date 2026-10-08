@@ -2182,9 +2182,12 @@ def api_health_scorecard():
             # Both union halves must carry the same org predicate as every other
             # count in this function -- raw SQL is not reached by with_loader_criteria
             # at all, scoped or not, so leaving either half unfiltered leaks every
-            # organisation's cross-layer pairs to whoever is signed in.
-            _org_predicate = "AND src.organization_id = :org" if _org is not None else ""
-            _cross_sql = f"""
+            # organisation's cross-layer pairs to whoever is signed in. The predicate
+            # is a static part of the query text (never built from the org id, which
+            # is only ever bound as :org) so this isn't the string-built-SQL shape
+            # bandit's B608 flags -- `:org IS NULL` makes the clause a no-op the same
+            # way the old conditional-fragment version did, without an f-string.
+            _cross_sql = """
                 SELECT src_layer, tgt_layer, SUM(cnt) AS cnt FROM (
                     SELECT LOWER(COALESCE(src.layer,'?')) AS src_layer,
                            LOWER(COALESCE(tgt.layer,'?')) AS tgt_layer,
@@ -2194,7 +2197,7 @@ def api_health_scorecard():
                     JOIN archimate_elements tgt ON r.target_id = tgt.id
                     WHERE LOWER(COALESCE(src.layer,'?')) <> LOWER(COALESCE(tgt.layer,'?'))
                       AND LOWER(COALESCE(r.type,'')) NOT IN ('composition','aggregation')
-                      {_org_predicate}
+                      AND (:org IS NULL OR src.organization_id = :org)
                     GROUP BY 1, 2
                     UNION ALL
                     SELECT LOWER(COALESCE(src.layer,'?')) AS src_layer,
@@ -2205,14 +2208,13 @@ def api_health_scorecard():
                     JOIN archimate_elements tgt ON r.target_id = tgt.id
                     WHERE LOWER(COALESCE(src.layer,'?')) <> LOWER(COALESCE(tgt.layer,'?'))
                       AND LOWER(COALESCE(r.rel_type,'')) NOT IN ('composition','aggregation')
-                      {_org_predicate}
+                      AND (:org IS NULL OR src.organization_id = :org)
                     GROUP BY 1, 2
                 ) combined
                 GROUP BY src_layer, tgt_layer
                 ORDER BY cnt DESC
             """
-            _cross_params = {"org": _org} if _org is not None else {}
-            cross_pairs_rows = db.session.execute(text(_cross_sql), _cross_params).fetchall()
+            cross_pairs_rows = db.session.execute(text(_cross_sql), {"org": _org}).fetchall()
             cross_pairs = [{"from": row[0] or "?", "to": row[1] or "?", "count": row[2]} for row in cross_pairs_rows]
         except Exception:
             db.session.rollback()
