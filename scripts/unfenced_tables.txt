@@ -17,10 +17,8 @@ adm_phases
 adm_stakeholder_concurrences
 adr_capability_links
 adr_process_links
-agent_charters
 agent_configurations
 agent_execution_history
-agent_run_records
 agent_schedules
 ai_audit_logs
 ai_chat_approval_audit_log
@@ -67,6 +65,7 @@ apqc_process_hierarchy
 arb_adversarial_reviews
 arb_change_requests
 arb_compliance_checks
+arb_conditions
 arb_derogations
 arb_governance_standards
 arb_submission_packs
@@ -110,6 +109,7 @@ business_interactions
 capability_actor_raci
 capability_archimate_classifications
 capability_domain_definitions
+capability_framework_configuration
 capability_gap_dashboard
 capability_gap_details
 capability_investment_plans
@@ -147,6 +147,7 @@ codegen_scenario_results
 codegen_solution_connectors
 codegen_solution_instances
 codegen_solution_rules
+codegen_solution_versions
 codegen_system_boundaries
 codegen_system_boundary_solutions
 codegen_template_files
@@ -180,7 +181,6 @@ custom_field_definitions
 dashboard_edits
 decision_authority
 decision_capability_links
-decision_ledger
 decommission_plans
 deliverables
 deployment_pipelines
@@ -197,9 +197,11 @@ duplicate_detection_runs
 duplicate_groups
 dynamics_metadata
 ea_workflow_definitions
+editable_html
 element_template_recommendations
 element_template_usage
 element_templates
+enterprise_architecture_frameworks
 enterprise_capabilities
 equipment
 error_events
@@ -208,6 +210,11 @@ experience_elements
 external_systems
 extraction_feedback
 feature_flags
+framework_adoptions
+framework_configuration_templates
+framework_extensions
+framework_migration_mappings
+framework_validation_rules
 frontend_configuration
 functional_requirement
 gap_analysis_recommendations
@@ -227,6 +234,9 @@ import_audit_logs
 import_checkpoints
 import_history
 import_sessions
+industry_apqc_framework
+industry_apqc_process
+industry_frameworks
 initiative_success_metrics
 integration_contracts
 integration_impact_registers
@@ -269,7 +279,6 @@ motivation_values
 non_functional_requirement
 notifications
 optimization_runs
-options_analysis
 org_connector_configs
 org_roles
 organizations
@@ -300,6 +309,7 @@ project_resources
 public_visitor_events
 published_api_specs
 quality_attributes
+quality_frameworks
 rag_metrics
 rag_queries
 rag_results
@@ -307,6 +317,8 @@ rationalization_audit_entries
 rationalization_benefits
 rationalization_policies
 refactoring_tracking
+reference_model
+reference_model_capability
 regulatory_frameworks
 relationship_suggestions
 replacement_plans
@@ -394,7 +406,6 @@ sprints
 sso_configs
 staging_elements
 stakeholder_communications
-stakeholder_inputs
 strategy_resources
 structural_groupings
 structural_junctions
@@ -429,13 +440,13 @@ uml_elements
 uml_methods
 uml_models
 unified_application_capability_mapping
+unified_capabilities
 unified_capability_application_mappings
 unified_capability_process_mapping
 unified_capability_technology_mapping
 unified_capability_vendor_organization_mappings
 unified_detection_runs
 unified_duplicate_groups
-unified_work_packages
 usage_analytics
 usage_events
 user_preferences

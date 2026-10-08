@@ -189,6 +189,24 @@ def install_tenant_filter(app):
         entirely and never reaches ``before_flush`` — those call sites still
         depend entirely on their own route decorator (Part 2/3 of the PR 430
         follow-up fix exactly this for the specific routes found so far).
+
+        D-01 fix (PR 430 round 4, lead review v2): ``session.dirty`` includes
+        an object whenever SQLAlchemy's unit-of-work has it on its "modified"
+        list at all, which also fires for a BACKREF-only change — for
+        example ``user.role = some_role`` back-populates ``Role.users``, so
+        the ``Role`` row she assigned FROM is reported dirty even though no
+        column on ``Role`` itself changed. The real write there is to
+        ``User``/``OrgRole``, already gated by its own route-level check;
+        treating Role as dirty too was a false positive that refused every
+        ordinary role assignment once Role had no allow-list entry (round 3
+        worked around it by allow-listing "roles" outright). Checking
+        ``session.is_modified(obj, include_collections=False)`` for each
+        dirty object answers "did one of THIS object's own column attributes
+        change", ignoring collection/relationship-only changes, so a genuine
+        column edit to a dirty object (an admin actually renaming a Role) is
+        still caught — see
+        tests/test_platform_write_guard_backref_dirty.py for the before/after
+        proof of both halves.
         """
         if not has_request_context():
             return
@@ -197,7 +215,11 @@ def install_tenant_filter(app):
         if is_platform_admin(current_user):
             return
 
-        candidates = list(session.new) + list(session.dirty) + list(session.deleted)
+        genuinely_dirty = [
+            obj for obj in session.dirty
+            if session.is_modified(obj, include_collections=False)
+        ]
+        candidates = list(session.new) + genuinely_dirty + list(session.deleted)
         for obj in candidates:
             if isinstance(obj, TenantMixin):
                 continue

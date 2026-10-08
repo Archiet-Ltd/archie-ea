@@ -25,24 +25,16 @@ import pytest
 
 
 def _non_tenant_table_classes():
-    """{table_name: one representative mapped class} for every non-TenantMixin model."""
-    import app.models  # noqa: F401 -- import every model module so the registry is complete
-    from app import db
-    from app.models.mixins.core import TenantMixin
+    """{table_name: one representative mapped class} for every non-TenantMixin model.
 
-    out = {}
-    for mapper in db.Model.registry.mappers:
-        cls = mapper.class_
-        if issubclass(cls, TenantMixin):
-            continue
-        table = getattr(cls, "__table__", None)
-        if table is None:
-            continue
-        # Joined/single-table inheritance can register more than one mapped
-        # class for the same table; one representative is enough; the guard
-        # itself inspects the table, not which subclass was instantiated.
-        out.setdefault(table.name, cls)
-    return out
+    PR 430 round 4 (D-07): delegates to scripts/tenant_table_registry.py, the
+    one place this walk is implemented, instead of keeping a second copy here
+    that could silently drift from the one scripts/classify_unfenced_tables.py
+    and tests/test_tenant_table_registry_sync.py use.
+    """
+    from scripts.tenant_table_registry import non_tenant_table_classes
+
+    return non_tenant_table_classes()
 
 
 _NON_TENANT_TABLES = sorted(_non_tenant_table_classes())
