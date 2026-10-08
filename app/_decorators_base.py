@@ -68,15 +68,45 @@ def admin_required(f):
 
 
 def governance_gate_reader_required(f):
-    """Allow gate-policy readers without granting configuration authority."""
+    """Allow gate-policy readers without granting configuration authority.
+
+    D-4 (admin-rbac-active-org continuation): the ``may_administer`` check
+    used to be ``current_user.can(Permission.ADMINISTER)`` -- the same
+    global-flag-not-active-org bug ``admin_required`` carried before this
+    PR's main commit fixed it. This guards ``/admin/audit-log``, so a
+    switched-org Viewer (home-org admin of their own organisation) could
+    read and export another organisation's audit trail. Fixed the same way:
+    resolve authority against ``g.current_org_id``.
+
+    ``is_security_architect`` is a global persona flag
+    (``current_user.enterprise_role``), not a per-organisation grant --
+    there is no "security architect of this org" row to check against, so
+    the same active-org switch would let that persona read every
+    organisation's audit log too. Scoped to the user's own home
+    organisation (the one place the persona is actually anchored) rather
+    than removed outright, preserving the original intent (a security
+    architect reads their own organisation's audit trail without needing
+    org-admin standing there).
+    """
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        may_administer = current_user.can(Permission.ADMINISTER)
-        is_security_architect = (
-            getattr(current_user, "enterprise_role", None) == "security_architect"
+        if not current_user.is_authenticated:
+            abort(403)
+
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
+        active_org_id = getattr(g, "current_org_id", None)
+        is_org_admin_here = is_platform_admin(current_user) or rbac_service.is_org_admin(
+            current_user, active_org_id
         )
-        if not (may_administer or is_security_architect):
+        is_security_architect_of_this_org = (
+            getattr(current_user, "enterprise_role", None) == "security_architect"
+            and active_org_id is not None
+            and active_org_id == getattr(current_user, "organization_id", None)
+        )
+        if not (is_org_admin_here or is_security_architect_of_this_org):
             abort(403)
         return f(*args, **kwargs)
 
@@ -195,8 +225,23 @@ def audit_log(action_name: str):
 def role_required(*roles):
     """Restrict access to users whose ``enterprise_role`` is in *roles* (ENT-068).
 
-    Falls back to ``is_admin()`` so existing admin users are never locked out.
-    Must be placed **after** ``@login_required`` in the decorator stack.
+    Falls back to active-org admin authority so existing admin users are
+    never locked out. Must be placed **after** ``@login_required`` in the
+    decorator stack.
+
+    D-4 (admin-rbac-active-org continuation): the admin bypass used to be
+    ``hasattr(current_user, "is_admin") and current_user.is_admin()`` -- a
+    global ``Permission.ADMINISTER`` flag, independent of which organisation
+    is active in the session (``g.current_org_id``). Since every
+    self-registered user is Administrator of their own organisation, a user
+    who merely accepted a Viewer invitation into another organisation and
+    switched their session into it bypassed the ``enterprise_role`` check
+    entirely there too -- the exact bug ``admin_required``/
+    ``org_admin_required`` already fix elsewhere in this PR, reachable at
+    every call site of this decorator (app/modules/applications/routes/
+    coverage_routes.py, app/modules/architecture_assistant/routes/
+    metamodel_property_routes.py, app/modules/capabilities/routes/
+    ownership_routes.py).
 
     Usage::
 
@@ -215,8 +260,14 @@ def role_required(*roles):
         def decorated_function(*args, **kwargs):
             if not current_user.is_authenticated:
                 abort(401)
-            # Backward compat: legacy admin flag overrides role check
-            if hasattr(current_user, "is_admin") and current_user.is_admin():
+
+            from app.middleware.tenant_decorators import is_platform_admin
+            from app.services.rbac_service import rbac_service
+
+            active_org_id = getattr(g, "current_org_id", None)
+            if is_platform_admin(current_user) or rbac_service.is_org_admin(
+                current_user, active_org_id
+            ):
                 return f(*args, **kwargs)
             if not hasattr(current_user, "enterprise_role"):
                 abort(403)
@@ -347,7 +398,36 @@ def require_roles(*allowed_roles):
                 normalized_archetype = _normalize_role_name(current_user.role_archetype)
                 if normalized_archetype:
                     user_roles.add(normalized_archetype)
-            
+
+            # D-4 (admin-rbac-active-org continuation): every path above that
+            # can add "admin" to user_roles does so from a flag that is GLOBAL
+            # to the user -- current_user.role.name == "Administrator" (every
+            # self-registered user is Administrator of their own organisation),
+            # current_user.roles/role_names carrying the same, or
+            # enterprise_role == "platform_admin" paired with the global
+            # Permission.ADMINISTER flag. None of those are scoped to
+            # g.current_org_id, so the exact admin_required/org_admin_required
+            # bug this PR fixes applied here too: a Viewer of the ACTIVE
+            # organisation, home-org Administrator of their OWN organisation,
+            # satisfied @require_roles("admin", ...) on every route guarding
+            # bulk-delete, custom fields, ARB stages, import/export and more.
+            # "admin" is the only value here that claims admin AUTHORITY
+            # (the other values -- architect, business_architect, ... -- are
+            # enterprise_role personas, a separate, broader vocabulary this
+            # fix does not touch); re-derive it from the same active-org
+            # predicate admin_required/org_admin_required already use, rather
+            # than trust whatever the paths above contributed.
+            if "admin" in user_roles:
+                from app.middleware.tenant_decorators import is_platform_admin
+                from app.services.rbac_service import rbac_service
+
+                active_org_id = getattr(g, "current_org_id", None)
+                if not (
+                    is_platform_admin(current_user)
+                    or rbac_service.is_org_admin(current_user, active_org_id)
+                ):
+                    user_roles.discard("admin")
+
             # Check if user has any of the required roles (case-insensitive)
             required = set(
                 normalized
