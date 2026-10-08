@@ -29,6 +29,7 @@ from sqlalchemy import or_
 
 from app import db
 from app.decorators import require_roles
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.adm_kanban import KanbanCard
 from app.models.application_portfolio import ApplicationComponent
 from app.models.audit_log import AuditLog
@@ -1912,8 +1913,25 @@ def cleanup_orphan_requirement_ids():
 
 @enterprise_api_bp.route("/requirements/<int:req_id>/push-to-jira", methods=["POST"])
 @login_required
+@platform_admin_required
 def push_requirement_to_jira(req_id):
-    """Push a single requirement to JIRA as a Story."""
+    """Push a single requirement to JIRA as a Story.
+
+    Platform-admin-only (lead review of PR 430, item 7): acts with the
+    platform's single, shared Jira credential (``JIRA_URL``/``JIRA_USER``/
+    ``JIRA_API_TOKEN`` from app config -- see app/modules/admin/v2/routes/
+    admin_routes.py's ``jira_settings``, which stores the one shared
+    ``ExternalSystem`` row this and every tenant's push would otherwise
+    share) and was ``login_required`` only -- any signed-in user could push
+    any requirement using that shared credential. A per-organisation
+    connector credential already exists elsewhere in this codebase
+    (``OrgConnectorConfig``, app/models/connector_config.py, whose
+    ``connector_type`` already includes ``'jira'`` alongside
+    ``'servicenow'``/``'m365'``), so per-org Jira is a stated direction here
+    -- but this route does not use it, and building that migration is a
+    bigger change than this fix; ``platform_admin_required`` is the default
+    per the brief, flagged here rather than built.
+    """
     from flask import current_app
     jira_url = current_app.config.get('JIRA_URL')
     jira_user = current_app.config.get('JIRA_USER')
@@ -1955,11 +1973,23 @@ def push_requirement_to_jira(req_id):
         else:
             req.jira_push_status = 'failed'
             db.session.commit()
-            return jsonify({"success": False, "error": response.text}), 502
+            # Jira's raw response body (lead review of PR 430, item 7) can
+            # carry project/workflow/instance details about the platform's
+            # shared Jira tenant -- log it server-side, never echo it to the
+            # caller.
+            logger.error(
+                "push_requirement_to_jira: Jira returned %s for req_id=%s: %s",
+                response.status_code, req_id, response.text,
+            )
+            return jsonify({"success": False, "error": "Failed to push to Jira. Please try again or contact your administrator."}), 502
     except requests.exceptions.RequestException as exc:
         req.jira_push_status = 'failed'
         db.session.commit()
-        return jsonify({"success": False, "error": str(exc)}), 502
+        logger.error(
+            "push_requirement_to_jira: request to Jira failed for req_id=%s: %s",
+            req_id, exc,
+        )
+        return jsonify({"success": False, "error": "Failed to reach Jira. Please try again or contact your administrator."}), 502
 
 
 # =============================================================================
@@ -2113,8 +2143,13 @@ def detect_solution_conflicts(solution_id):
 
 @enterprise_api_bp.route("/requirements/<int:req_id>/sync-from-jira", methods=["POST"])
 @login_required
+@platform_admin_required
 def sync_requirement_from_jira(req_id):
-    """Pull current Jira issue status back into platform."""
+    """Pull current Jira issue status back into platform.
+
+    Platform-admin-only -- see ``push_requirement_to_jira``'s docstring
+    above; same shared platform Jira credential.
+    """
     from flask import current_app
     req = SolutionRequirement.query.get_or_404(req_id)
     if not req.jira_issue_key:
@@ -2145,8 +2180,14 @@ def sync_requirement_from_jira(req_id):
 
 @enterprise_api_bp.route("/requirements/sync-all-jira", methods=["GET"])
 @login_required
+@platform_admin_required
 def sync_all_requirements_from_jira():
-    """Sync all requirements that have a jira_issue_key."""
+    """Sync all requirements that have a jira_issue_key.
+
+    Platform-admin-only -- see ``push_requirement_to_jira``'s docstring
+    above; same shared platform Jira credential/operation family, even
+    though this particular route does not call Jira itself yet.
+    """
     reqs = SolutionRequirement.query.filter(
         SolutionRequirement.jira_issue_key != None,
         SolutionRequirement.deleted_at == None

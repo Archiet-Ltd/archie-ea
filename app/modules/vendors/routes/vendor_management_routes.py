@@ -19,6 +19,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import func
 
 from app.decorators import audit_log, require_roles  # dead-code-ok
+from app.middleware.tenant_decorators import platform_admin_required
 from app.extensions import db
 from app.models.vendor_organization import VendorOrganization
 from app.utils.pagination import safe_int_arg
@@ -57,9 +58,16 @@ def vendor_dashboard():
 @vendor_management_bp.route("/create", methods=["GET", "POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_create")
 def create_vendor():
-    """Create new vendor (admin/architect only) with validation."""
+    """Create new vendor (admin/architect only) with validation.
+
+    Platform-admin-only (lead review of PR 430, D-2 follow-up): writes the
+    global, platform-wide ``VendorOrganization`` catalogue. ``require_roles``
+    is kept rather than removed; ``platform_admin_required`` is the
+    operative check.
+    """
     if request.method == "GET":
         return jsonify({"success": True, "message": "Use POST to create vendor"})
 
@@ -367,9 +375,13 @@ def api_list_vendors():
 @vendor_management_bp.route("/api/vendors", methods=["POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_api_create")
 def api_create_vendor():
-    """API: Create vendor with validation and duplicate prevention."""
+    """API: Create vendor with validation and duplicate prevention.
+
+    Platform-admin-only -- see ``create_vendor``'s docstring above.
+    """
     data = request.get_json() or {}
 
     if not data.get("name"):
@@ -443,9 +455,13 @@ def api_get_vendor(vendor_id):
 @vendor_management_bp.route("/api/vendors/<int:vendor_id>", methods=["PUT"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_api_update")
 def api_update_vendor(vendor_id):
-    """API: Update vendor (with allowlist protection)."""
+    """API: Update vendor (with allowlist protection).
+
+    Platform-admin-only -- see ``create_vendor``'s docstring above.
+    """
     vendor = VendorOrganization.query.get_or_404(vendor_id)
     data = request.get_json() or {}
 

@@ -23,6 +23,7 @@ from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
 
 from app import db
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.constants import ArchiMateRelationshipType
 from app.modules.architecture.routes.lucidchart_import_routes import (
     register_lucidchart_import_routes,
@@ -3562,8 +3563,14 @@ def api_composer_context_preview():
 @login_required
 @archimate_bp.route("/api/templates", methods=["POST"])
 @login_required
+@platform_admin_required
 def api_create_template():
     """Create a diagram template from the current viewpoint.
+
+    Platform-admin-only (lead review of PR 430, Part 3): writes the global
+    ``archimate_viewpoint_templates`` table, which carries no
+    ``organization_id`` at all, and was ``login_required`` only -- any
+    signed-in user could add a shared template.
 
     Templates store layout structure (element types + positions) without
     specific element IDs, so the template can be instantiated to create
@@ -5318,8 +5325,14 @@ def api_list_patterns():
 @login_required
 @archimate_bp.route("/api/patterns", methods=["POST"])
 @login_required
+@platform_admin_required
 def api_create_pattern():
     """Save a custom architecture pattern.
+
+    Platform-admin-only (lead review of PR 430, Part 3): writes the global
+    ``archimate_patterns`` table, which carries no ``organization_id`` at
+    all, and was ``login_required`` only -- any signed-in user could add a
+    shared pattern.
 
     JSON Body:
         name (str): Required — pattern name.

@@ -54,6 +54,12 @@ def logged_in_client(app, db_session, org, login_as):
         role=role,
         confirmed=True,
     )
+    # PR 430 route-fixes split, v1 defect 2: /applications/vendors/create
+    # (vendor_display_routes.vendors_create) writes the global VendorOrganization
+    # catalogue and is now platform_admin_required. This fixture exists to
+    # reproduce a template-parsing regression, not an authorisation one, so it
+    # is a platform admin rather than a plain org admin.
+    user.is_platform_admin = True
     db_session.add(user)
     db_session.flush()
 

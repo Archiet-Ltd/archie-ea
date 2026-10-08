@@ -17,6 +17,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from app import db
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.ai_service import AIPromptTemplate
 from app.modules.ai_chat.services.multi_domain_chat_service import PERSONA_CONFIGS
 
@@ -26,8 +27,19 @@ logger = logging.getLogger(__name__)
 
 
 def _require_admin():
-    """Abort 403 if current user is not an admin."""
-    if not (hasattr(current_user, "is_admin") and current_user.is_admin):
+    """Abort 403 if current user is not an admin.
+
+    Bug fix (lead review of PR 430, item 5): this tested
+    ``current_user.is_admin`` -- ``User.is_admin`` is a plain method
+    (``app/models/user.py``), not a ``@property``, so the unparenthesised
+    reference evaluated to the bound method object itself, which is always
+    truthy. ``hasattr(...) and current_user.is_admin`` was therefore always
+    true for any authenticated user, the ``not (...)`` was therefore always
+    false, and the whole check -- including the role-attribute fallback --
+    never ran: this function has been a complete no-op for any signed-in
+    user since it was written. Fixed by calling it, ``current_user.is_admin()``.
+    """
+    if not (hasattr(current_user, "is_admin") and current_user.is_admin()):
         # Fallback: check role attribute
         if not (hasattr(current_user, "role") and current_user.role == "admin"):
             abort(403)
@@ -110,8 +122,17 @@ def admin_prompts_data():
 
 @unified_ai_chat_bp.route("/admin/prompts/<persona_key>/update", methods=["POST"])
 @login_required
+@platform_admin_required
 def admin_prompt_update(persona_key):
-    """Update (or create) a DB override for a persona's prompt config."""
+    """Update (or create) a DB override for a persona's prompt config.
+
+    Platform-admin-only (lead review of PR 430, item 5): persona prompts are
+    platform-wide, not org-scoped, so even a correctly-working
+    ``_require_admin()`` (an org-level check at best) is not the right
+    authority for a genuinely global resource. ``_require_admin()`` is kept
+    (now actually functional, see its own fix above);
+    ``platform_admin_required`` is the operative check.
+    """
     _require_admin()
 
     if persona_key not in PERSONA_CONFIGS:
@@ -165,8 +186,12 @@ def admin_prompt_update(persona_key):
 
 @unified_ai_chat_bp.route("/admin/prompts/<persona_key>/reset", methods=["POST"])
 @login_required
+@platform_admin_required
 def admin_prompt_reset(persona_key):
-    """Remove the DB override for a persona, reverting to hardcoded defaults."""
+    """Remove the DB override for a persona, reverting to hardcoded defaults.
+
+    Platform-admin-only -- see ``admin_prompt_update``'s docstring above.
+    """
     _require_admin()
 
     if persona_key not in PERSONA_CONFIGS:

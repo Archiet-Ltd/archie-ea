@@ -372,14 +372,35 @@ class AuditLogger:
         start_date: datetime = None,
         end_date: datetime = None,
         limit: int = 100,
+        organization_id: Optional[int] = None,
     ) -> List[AuditEvent]:
         """
         Query audit trail with filters.
+
+        DEF-5 (review-pr430-v3.md, 2026-10-08): AuditEvent carries no
+        ``organization_id`` column of its own -- it is keyed only by
+        ``user_id`` (a plain integer, no FK). Passing ``organization_id``
+        scopes the read to events whose ``user_id`` belongs to a user in
+        that organisation; an event with no ``user_id`` at all (a
+        system-level event, not attributable to any one organisation's
+        action) is excluded from every organisation-scoped read rather than
+        shown to one arbitrarily -- a platform admin passes ``None`` to see
+        every event, attributable or not.
 
         Returns:
             List of audit events matching criteria
         """
         query = AuditEvent.query
+
+        if organization_id is not None:
+            from app.models.user import User
+
+            query = query.filter(
+                AuditEvent.user_id.isnot(None),
+                AuditEvent.user_id.in_(
+                    db.session.query(User.id).filter(User.organization_id == organization_id)
+                ),
+            )
 
         if user_id:
             query = query.filter(AuditEvent.user_id == user_id)

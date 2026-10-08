@@ -10,11 +10,18 @@
        see the tenant-scoping-ok note in admin_routes.py::registered_users). State
        that scope explicitly so "2 users" here and "22 users" summed across
        /admin/organizations read as the same number viewed at two scopes, not a
-       drift or a leak. #}
+       drift or a leak.
+
+       D-04 (PR 430 round 3): the platform-wide reconciliation total is only
+       ever passed to this template for an actual platform admin — an
+       ordinary org admin's response has platform_total_users=None, and this
+       renders the plain description with no total at all rather than a bare
+       "None" or a blank number. #}
     {{ page_header(
         title='Registered Users',
         description='View and manage users registered to ' ~ (current_org.name if current_org else 'this organization')
-            ~ ' (' ~ users|length ~ ' of ' ~ platform_total_users ~ ' users platform-wide — see Organizations for the full breakdown).',
+            ~ (' (' ~ users|length ~ ' of ' ~ platform_total_users ~ ' users platform-wide — see Organizations for the full breakdown).'
+               if platform_total_users is not none else '.'),
         breadcrumbs=[
             {'label': 'Admin', 'href': url_for('admin.index')},
             {'label': 'Registered Users'}

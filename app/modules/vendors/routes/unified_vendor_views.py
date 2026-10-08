@@ -22,6 +22,8 @@ from sqlalchemy import text
 logger = logging.getLogger(__name__)
 
 from app.decorators import audit_log, require_roles
+from app.exceptions import AuthorizationError
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.vendor_organization import VendorOrganization
 from app.extensions import db
 from app.modules.vendors.services.vendor_onboarding_service import (
@@ -366,8 +368,18 @@ def vendor_catalog():
 @unified_vendors_bp.route("/create", methods=["GET", "POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 def create_vendor():
-    """Create new vendor - renders simple create form."""
+    """Create new vendor - renders simple create form.
+
+    Platform-admin-only (lead review of PR 430, D-2 follow-up): the actual
+    create submission writes the global, platform-wide ``VendorOrganization``
+    catalogue (app/modules/applications/routes/vendor_display_routes.py's
+    ``vendors_create``, fixed the same way below). Gating this form the same
+    way keeps a tenant admin from even reaching a create UI for a resource
+    they cannot write. ``require_roles`` is kept rather than removed;
+    ``platform_admin_required`` is the operative check.
+    """
     return render_template(
         "vendors/create_simple.html",
     )
@@ -383,9 +395,13 @@ def vendor_detail(vendor_id):
 @unified_vendors_bp.route("/<int:vendor_id>/edit", methods=["GET", "PUT", "POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_edit")
 def edit_vendor(vendor_id):
-    """Edit vendor organization - real implementation."""
+    """Edit vendor organization - real implementation.
+
+    Platform-admin-only -- see ``create_vendor``'s docstring above.
+    """
     from app.modules.vendors.forms import CreateVendorForm
     from app.models.vendor.vendor_organization import VendorOrganization
 
@@ -435,9 +451,19 @@ def edit_vendor(vendor_id):
 @unified_vendors_bp.route("/<int:vendor_id>/activate", methods=["POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_activate")
 def activate_vendor(vendor_id):
-    """Activate a vendor from catalog to contracted status."""
+    """Activate a vendor from catalog to contracted status.
+
+    Platform-admin-only (D-08, PR 430 round 3, lead review v2, 2026-10-08):
+    this used to rely solely on the structural platform-write guard to
+    refuse a non-platform-admin's write to the global VendorOrganization
+    catalogue, and the broad ``except Exception`` below swallowed that
+    guard's AuthorizationError into a flash message + redirect, so the
+    caller never actually saw a 403 -- see ``create_vendor``'s docstring
+    above for the same pattern already fixed on the sibling routes.
+    """
     try:
         contract_start = request.form.get("contract_start_date")
         contract_end = request.form.get("contract_end_date")
@@ -471,6 +497,8 @@ def activate_vendor(vendor_id):
             )
 
         return redirect(url_for("unified_vendors.vendor_detail", vendor_id=vendor_id))
+    except AuthorizationError:
+        raise
     except Exception as e:
         current_app.logger.error("Error activating vendor %s: %s", vendor_id, e, exc_info=True)
         flash("Error activating vendor. Please try again.", "error")
@@ -484,9 +512,15 @@ def activate_vendor(vendor_id):
 )
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_product_deploy")
 def deploy_vendor_product(vendor_id, product_id):
-    """Deploy a vendor product as an application (canonical flask-base-master flow)."""
+    """Deploy a vendor product as an application (canonical flask-base-master flow).
+
+    Platform-admin-only (D-08, PR 430 round 3, lead review v2, 2026-10-08):
+    see ``activate_vendor``'s docstring above -- same pattern, same guard,
+    same previously-swallowed AuthorizationError.
+    """
     try:
         # Support both form data (modal submit) and JSON (API)
         if request.content_type and "application/json" in request.content_type:
@@ -529,6 +563,8 @@ def deploy_vendor_product(vendor_id, product_id):
             })
         flash(f'Application "{application.name}" deployed successfully.', "success")
         return redirect(url_for("unified_applications.vendor_detail", vendor_id=vendor_id))
+    except AuthorizationError:
+        raise
     except ValueError as e:
         if request.content_type and "application/json" in request.content_type:
             return jsonify({"success": False, "error": str(e)}), 400
