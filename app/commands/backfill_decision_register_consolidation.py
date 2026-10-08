@@ -124,7 +124,9 @@ def _backfill_decision_ledger_org(conn, dry_run, org_id, echo):
         return stats
 
     if derivable:
-        result = conn.execute(text("""
+        result = conn.execute(
+            # tenancy-ok: one-time backfill, retirement 2026-12-31
+            text("""
             UPDATE decision_ledger AS t
                SET organization_id = uc.organization_id
               FROM unified_capabilities uc
@@ -138,6 +140,7 @@ def _backfill_decision_ledger_org(conn, dry_run, org_id, echo):
     remaining_orphan = null_count - stats["backfilled"]
     if remaining_orphan and org_id is not None:
         result = conn.execute(
+            # tenancy-ok: one-time backfill, retirement 2026-12-31
             text('UPDATE "decision_ledger" SET organization_id = :o WHERE organization_id IS NULL'),
             {"o": org_id},
         )

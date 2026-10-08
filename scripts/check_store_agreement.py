@@ -170,8 +170,14 @@ CONCEPTS = {
     # The owner's finding, exactly. Both surfaces answer "how many capabilities
     # does this organisation have"; they read two different tables.
     "capabilities": [
+        # BusinessCapability is the deprecated legacy store, superseded by
+        # UnifiedCapability in PR 1 (feat/r1-one-capability-store). It is kept
+        # in the registry for historical tracking but waived from comparison
+        # because it no longer receives writes and its count will diverge
+        # (typically to 0 after cutover).
         Surface("orm:BusinessCapability", "orm",
-                "app.models.business_capabilities.BusinessCapability"),
+                "app.models.business_capabilities.BusinessCapability",
+                waived="store-agreement-ok: deprecated legacy store, superseded by UnifiedCapability"),
         Surface("orm:UnifiedCapability", "orm",
                 "app.models.unified_capability.UnifiedCapability"),
         Surface("GET /dashboard/api/capabilities", "http",
@@ -185,10 +191,14 @@ CONCEPTS = {
         # ArchiMate-element store) to element_type="Capability", not either
         # BusinessCapability or UnifiedCapability above. Same underlying data
         # endpoint the dashboard's own tab badge calls.
+        # This is a derived mirror view, not the canonical store; give it a
+        # declared narrower scope so it is not compared 1:1 with the
+        # authoritative surfaces. A mirror may lag behind the canonical count.
         Surface("GET /architecture/api/layer/strategy/elements?element_type=Capability",
                 "http",
                 "/architecture/api/layer/strategy/elements?element_type=Capability&per_page=1",
-                extract="pagination.total"),
+                extract="pagination.total",
+                scope="archimate-mirror"),
     ],
     "applications": [
         Surface("orm:ApplicationComponent", "orm",

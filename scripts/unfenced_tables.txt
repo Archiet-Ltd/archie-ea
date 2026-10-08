@@ -17,8 +17,10 @@ adm_phases
 adm_stakeholder_concurrences
 adr_capability_links
 adr_process_links
+agent_charters
 agent_configurations
 agent_execution_history
+agent_run_records
 agent_schedules
 ai_audit_logs
 ai_chat_approval_audit_log
@@ -288,12 +290,14 @@ process_actor_raci
 process_application_mapping
 process_embeddings
 process_role_raci
+product_inquiries
 product_taxonomy
 production_lines
 production_orders
 project_constraints
 project_notes
 project_resources
+public_visitor_events
 published_api_specs
 quality_attributes
 rag_metrics

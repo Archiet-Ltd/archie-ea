@@ -34,6 +34,12 @@ DEFAULT_GROUP_ROLE_MAP = {
     "Application-Managers": "application_manager",
     "Security-Architects": "security_architect",
     "Data-Architects": "data_architect",
+    # R1-B36 (TB-0146): promoted from unassignable to assignable, 2026-10-04.
+    "Finance": "finance",
+    "Compliance": "compliance",
+    "Risk": "risk",
+    "Operations": "operations",
+    "Non-Technical-Owners": "non_technical_owner",
 }
 
 

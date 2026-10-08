@@ -43,6 +43,12 @@ class Subscription(db.Model):  # migration-exempt
     )
     stripe_customer_id = db.Column(db.String(255), nullable=True, index=True)
     stripe_subscription_id = db.Column(db.String(255), nullable=True, index=True)
+    # Set only once a refresh call confirms Monelytics (Archiet's shared
+    # billing service, app/services/monelytics_provider.py) holds an active
+    # subscription for this organisation — never at checkout initiation,
+    # before the shopper has paid. NULL for every organisation on the direct
+    # Stripe path, and for one still on Community.
+    monelytics_subscription_id = db.Column(db.String(255), nullable=True, index=True)
     plan = db.Column(
         db.Enum(SubscriptionPlan),
         nullable=False,
