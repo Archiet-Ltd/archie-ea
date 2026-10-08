@@ -603,6 +603,16 @@ jobs:
           python -m flask --app manage init-db
           python -m flask --app manage schema-upgrade
           python -m flask --app manage reconcile-schema
+      - name: TEMP -- capture a real Linux render of the visual-regression baseline
+        env:
+          SMOKE_VISUAL_UPDATE_BASELINE: "1"
+        run: pytest tests/smoke/test_visual_regression.py -q -p no:randomly --timeout=900 -W ignore::DeprecationWarning || true
+      - name: TEMP -- upload the regenerated baseline for human review
+        uses: actions/upload-artifact@v6
+        with:
+          name: regenerated-visual-baselines
+          path: tests/smoke/visual_baselines/
+          if-no-files-found: warn
       - name: Run archetype journeys
         run: pytest tests/smoke -q -p no:randomly --timeout=900 -W ignore::DeprecationWarning -m "not adversarial and not census and not ai_protocol and not guide_history" --junitxml=tests/smoke/_artifacts/chromium-main.xml
       - name: Interaction-reality census (dead controls, junk modals, silent forms)
