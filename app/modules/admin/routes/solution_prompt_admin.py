@@ -16,7 +16,6 @@ from werkzeug.exceptions import HTTPException
 from app.decorators import audit_log
 from app.middleware.tenant_decorators import platform_admin_required
 from app.extensions import db
-from app.middleware.tenant_decorators import platform_admin_required
 from app.models.ai_service import AIPromptTemplate, AIPromptTemplateVersion
 from app.services import solution_prompt_override_service
 
