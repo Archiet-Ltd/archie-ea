@@ -45,15 +45,18 @@ than a hand-maintained list of routes, so a tenth vulnerable route added
 next month fails here with no one needing to remember to add it anywhere.
 
 Scope note: this sweep only reaches views wrapped by the two decorators
-fixed in this branch. Two other, unrelated implementations of
-"admin_required" exist elsewhere in this codebase
-(``app.utils.decorators.admin_required``, used by exactly one route --
-``adm_kanban_view.init_phases`` -- and ``app.core.auth.decorators.
-admin_required``, used by ``main.settings`` / ``main.get_system_settings`` /
-``main.save_system_settings``, the last three now additionally gated by
-``platform_admin_required`` directly). Neither carries this test's marker
-and neither is touched by this branch; they are a separate, already-flagged
-finding, not a gap in this test.
+fixed in this branch. One other, unrelated implementation of
+"admin_required" exists elsewhere in this codebase --
+``app.core.auth.decorators.admin_required``, used by ``main.settings`` /
+``main.get_system_settings`` / ``main.save_system_settings``, all three now
+additionally gated by ``platform_admin_required`` directly, so they are not
+a live gap even though they don't carry this test's marker. (A second such
+implementation, ``app.utils.decorators.admin_required``, had exactly one
+caller -- ``adm_kanban_view.init_phases`` -- which has been moved onto the
+canonical ``app.decorators.admin_required`` fixed in this branch, so it now
+carries the marker and is swept below like any other route; the old module
+still exists, in case anything else references it later, but nothing in
+this codebase imports it for a route any more.)
 """
 
 from __future__ import annotations

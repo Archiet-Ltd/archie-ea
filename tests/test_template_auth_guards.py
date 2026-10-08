@@ -103,8 +103,13 @@ def test_admin_required_actually_denies_a_non_admin(app):
     """The same bug in decorator form: getattr on a method is always truthy.
 
     app/utils/decorators.py resolved `is_admin` with a bare getattr, so the
-    decorator never rejected anyone. It guards adm_kanban_view.init_phases,
-    a POST that initialises ADM phases.
+    decorator never rejected anyone. It no longer guards any route in this
+    codebase (adm_kanban_view.init_phases, its last caller, was moved onto
+    the canonical app.decorators.admin_required in the admin-rbac systemic
+    fix, since this module's own decorator never checked the session's
+    active organisation either) -- this test exercises the decorator
+    function directly to prove it still behaves correctly in isolation,
+    regardless of whether anything currently imports it.
     """
     from werkzeug.exceptions import Forbidden
 

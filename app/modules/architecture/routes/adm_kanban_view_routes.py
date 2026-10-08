@@ -23,9 +23,8 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
-from app.decorators import audit_log
+from app.decorators import admin_required, audit_log
 from app.models.adm_kanban import create_adm_phases, KanbanCard
-from app.utils.decorators import admin_required
 from app.models.archimate_core import ArchiMateElement
 
 adm_kanban_view_bp = Blueprint("adm_kanban_view", __name__, url_prefix="/adm-kanban")
