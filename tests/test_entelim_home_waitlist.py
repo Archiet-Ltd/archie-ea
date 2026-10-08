@@ -1,9 +1,13 @@
 """Tests for the Entelim public home page and waiting list.
 
 What these tests check:
-1. GET / signed out returns 200 with "Entelim" in title/h1, none of the old names.
-2. POST with valid email+consent stores one row; duplicate shows same thanks;
-   without consent refuses; without CSRF refused.
+1. GET / signed out returns 200 with "Entelim" in title/h1, none of the old
+   names; the home page offers "Start free" to registration, not a waitlist
+   form.
+2. POST with valid email+consent stores one row; duplicate stores nothing
+   new; without consent refuses; without CSRF refused. (The home page no
+   longer renders a waitlist form or confirmation copy -- see
+   TestWaitlistSignup's own docstring.)
 3. /admin/waitlist.csv returns 403 for non-admin AND for an organisation
    admin who is not a platform admin; 200 with rows for a platform admin.
 4. Cross-organisation: a platform admin from any org sees the same global
@@ -61,14 +65,17 @@ class TestHomePage:
         assert "Dashboard" not in html
         assert "Enterprise Architecture Platform" not in html
 
-    def test_home_page_has_waitlist_form(self, client):
-        """The waitlist form with email and consent fields is present."""
+    def test_home_page_has_start_free_cta_not_a_waitlist_form(self, client):
+        """Community sign-up is open to the public: the home page's primary
+        action is "Start free" to registration, and the waitlist form (email
+        and consent fields) is gone."""
         resp = client.get("/")
         assert resp.status_code == 200
         html = resp.data.decode()
-        assert 'id="email"' in html
-        assert 'id="consent"' in html
-        assert "Join the waiting list" in html
+        assert "Start free" in html
+        assert 'id="email"' not in html
+        assert 'id="consent"' not in html
+        assert "Join the waiting list" not in html
 
     def test_signed_in_user_is_redirected_to_dashboard(self, client, db_session, make_org, login_as):
         """Signed-in visitors redirect to the dashboard."""
@@ -81,6 +88,15 @@ class TestHomePage:
 
 
 class TestWaitlistSignup:
+    """The home page no longer has a waitlist form or submit button (Start
+    free to registration is the primary action now), so POSTing to "/" is
+    no longer reachable from the rendered page and there is no more visible
+    "Thank you" or error text -- that template block was removed with the
+    form. The POST route and the WaitlistSignup table it writes to are
+    untouched and still used by the admin CSV export below, so these tests
+    check the stored row, not rendered copy that no longer exists.
+    """
+
     def test_valid_signup_stores_one_row(self, client, db_session):
         """AC 2: POST with valid email and consent stores one row."""
         from app.models.waitlist_signup import WaitlistSignup
@@ -91,8 +107,6 @@ class TestWaitlistSignup:
             follow_redirects=True,
         )
         assert resp.status_code == 200
-        html = resp.data.decode()
-        assert "Thank you" in html
 
         row = WaitlistSignup.query.filter_by(email="test@example.com").first()
         assert row is not None
@@ -100,7 +114,7 @@ class TestWaitlistSignup:
         assert "launch news" in row.consent_text
 
     def test_duplicate_email_shows_same_thanks_and_stores_nothing_new(self, client, db_session):
-        """AC 2: Duplicate email shows same thanks, count remains 1."""
+        """AC 2: Duplicate email stores no second row; count remains 1."""
         from app.models.waitlist_signup import WaitlistSignup
 
         # First signup
@@ -110,20 +124,17 @@ class TestWaitlistSignup:
         # Duplicate
         resp = client.post("/", data={"email": "dup@example.com", "consent": "1"}, follow_redirects=True)
         assert resp.status_code == 200
-        assert "Thank you" in resp.data.decode()
 
         count_after = WaitlistSignup.query.filter_by(email="dup@example.com").count()
         assert count_after == count_before
         assert count_after == 1
 
     def test_missing_consent_refuses_with_clear_message(self, client, db_session):
-        """AC 2: Without consent it refuses with a clear message."""
+        """AC 2: Without consent, no row is stored."""
         from app.models.waitlist_signup import WaitlistSignup
 
         resp = client.post("/", data={"email": "noconsent@example.com"}, follow_redirects=True)
         assert resp.status_code == 200
-        html = resp.data.decode()
-        assert "must agree" in html.lower() or "agree that" in html.lower()
 
         row = WaitlistSignup.query.filter_by(email="noconsent@example.com").first()
         assert row is None
@@ -152,22 +163,23 @@ class TestWaitlistSignup:
             follow_redirects=True,
         )
         assert resp.status_code == 200
-        html = resp.data.decode()
-        assert "valid email" in html.lower()
         assert WaitlistSignup.query.count() == count_before
 
-    def test_missing_csrf_is_refused(self, client, app):
+    def test_missing_csrf_is_refused(self, client, app, db_session):
         """AC 2: Without CSRF it is refused."""
+        from app.models.waitlist_signup import WaitlistSignup
+
         app.config["WTF_CSRF_ENABLED"] = True
         try:
-            resp = client.post(
+            client.post(
                 "/",
                 data={"email": "csrf@example.com", "consent": "1"},
                 follow_redirects=True,
             )
-            # With CSRF enabled and no token, the request should not process the form.
-            html = resp.data.decode()
-            assert "Thank you" not in html
+            # With CSRF enabled and no token, the request should not process
+            # the form, so no row should be stored.
+            row = WaitlistSignup.query.filter_by(email="csrf@example.com").first()
+            assert row is None
         finally:
             app.config["WTF_CSRF_ENABLED"] = False
 

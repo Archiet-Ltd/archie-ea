@@ -1,9 +1,10 @@
 {% extends 'layouts/public_base.html' %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
 {% block full_title %}Entelim — your whole company, one model you can ask{% endblock %}
 {% block meta_description %}
-<meta name="description" content="Entelim is the open-source Enterprise Intelligence Model: enter your website address and see your company's architecture, applications, risks and gaps as one model you can ask. Self-host free under AGPL-3.0.">
+<meta name="description" content="Entelim is the open-source Enterprise Intelligence Model: build your company's architecture, applications, risks and gaps as one model you can ask. Self-host free under AGPL-3.0.">
+<link rel="canonical" href="https://entelim.org/">
 <meta property="og:title" content="Entelim — your whole company, one model you can ask">
-<meta property="og:description" content="Enter your website address and see your company as one model you can ask. Open source, self-host free, forever.">
+<meta property="og:description" content="Build your company as one model you can ask. Open source, self-host free, forever.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "The open-source Enterprise Intelligence Model."}</script>
@@ -42,15 +43,15 @@
       </h1>
 
       <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
-        Enter your website address. Entelim reads your public pages, proposes your canvas, the products you run and the tools that could feed it, then waits for you to confirm. Ask what breaks if something fails, who is on the hook, and what you pay for twice.
+        Build your company's architecture, applications, risks and gaps as one model inside Entelim. Ask what breaks if something fails, who is on the hook, and what you pay for twice.
       </p>
 
       <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-        <a href="#waitlist" class="inline-flex items-center justify-center px-6 py-3 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all duration-200">
-          Join the waiting list
+        <a href="{{ url_for('account.register') }}" class="inline-flex items-center justify-center px-6 py-3 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all duration-200">
+          Start free
         </a>
-        <a href="{{ url_for('account.login') }}" class="inline-flex items-center justify-center px-6 py-3 rounded-md border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
-          Sign in
+        <a href="/pricing" class="inline-flex items-center justify-center px-6 py-3 rounded-md border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
+          Buy
         </a>
       </div>
     </div>
@@ -209,51 +210,6 @@
         <p class="text-sm text-muted-foreground">For enterprise architecture teams. Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</p>
       </div>
     </div>
-  </div>
-</section>
-
-<!-- Waiting list form -->
-<section id="waitlist" class="relative py-20 sm:py-32 bg-muted/30">
-  <div class="mx-auto max-w-lg px-4 sm:px-6">
-    <div class="text-center mb-10 space-y-4">
-      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-        Join the waiting list
-      </h2>
-      <p class="text-muted-foreground">
-        Be the first to know when Entelim launches. We will only use your email for launch news.
-      </p>
-    </div>
-
-    {% if thanks %}
-    <div class="rounded-md bg-success/5 border border-success/20 p-6 text-center">
-      <p class="text-success-emphasis font-medium">Thank you. You are on the list.</p>
-    </div>
-    {% else %}
-    <form method="POST" action="{{ url_for('main.index') }}" class="space-y-6">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="space-y-2">
-        <label for="email" class="text-sm font-medium leading-none block mb-2">Email address</label>
-        <input type="email" id="email" name="email" required
-               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-               placeholder="you@example.com">
-      </div>
-      <div class="flex items-center space-x-2">
-        <input type="checkbox" id="consent" name="consent" value="1" required
-               class="h-4 w-4 rounded border border-primary text-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-        <label for="consent" class="text-sm font-medium leading-none">
-          I agree that my email will be used only for launch news about Entelim.
-        </label>
-      </div>
-      {% if error %}
-      <div class="rounded-md bg-destructive/15 border border-destructive p-4">
-        <p class="text-sm text-destructive-emphasis">{{ error }}</p>
-      </div>
-      {% endif %}
-      <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full">
-        Join the waiting list
-      </button>
-    </form>
-    {% endif %}
   </div>
 </section>
 

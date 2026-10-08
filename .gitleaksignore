@@ -3,11 +3,9 @@
 a7e65b340340b779bfe5c61372f467bddcba15f5:tests/test_connector_sync_mode_derivation.py:generic-api-key:329
 a7e65b340340b779bfe5c61372f467bddcba15f5:tests/test_connector_sync_mode_derivation.py:generic-api-key:383
 
-# INDEXNOW_API_KEY (PR #422) is not a secret -- the IndexNow protocol
-# requires this exact value to be served in plaintext, unauthenticated, at
-# /<key>.txt so search engines can verify it without any credential (see
-# app/main/views.py:indexnow_key_file, app/services/indexnow_service.py).
-# A self-generated verification token, not issued by anyone. This finding
-# surfaces on every PR's full-history gitleaks scan once #422's branch
-# commit enters the scanned history, not just on #422 itself.
+# IndexNow key default (PR 422). The IndexNow protocol requires this value to
+# be served publicly and unauthenticated anyway, so it is not a secret; see
+# config.py's own comment above INDEXNOW_API_KEY. This fingerprint is the
+# commit that first committed the literal value, before the line carried a
+# `# gitleaks:allow` comment.
 34c13deff589a96efaa3e4ee1f05805c20d28883:config.py:generic-api-key:235
