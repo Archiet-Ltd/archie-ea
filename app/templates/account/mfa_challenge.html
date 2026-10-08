@@ -1,0 +1,27 @@
+{% extends 'layouts/public_base.html' %}
+{% block title %}Verification code{% endblock %}
+{% from 'components/accessibility_helpers.html' import skip_to_main, live_region with context %}
+
+{% block content %}
+{{ live_region('mfa-status') }}
+<main id="main-content" class="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4 py-12">
+  <h1 class="text-xl font-semibold text-foreground">Enter your verification code</h1>
+  <p class="mt-2 text-sm text-muted-foreground">
+    Administrator accounts require a code from your authenticator app on every sign-in.
+  </p>
+  <form method="post" action="{{ url_for('account.mfa_challenge') }}" class="mt-6 space-y-4" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div>
+      <label for="mfa-code" class="block text-sm font-medium text-foreground">6-digit code</label>
+      <input
+        id="mfa-code" name="code" type="text" inputmode="numeric" pattern="[0-9]*"
+        autocomplete="one-time-code" maxlength="6" required autofocus
+        class="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-lg tracking-widest"
+      >
+    </div>
+    <button type="submit" class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+      Verify
+    </button>
+  </form>
+</main>
+{% endblock %}

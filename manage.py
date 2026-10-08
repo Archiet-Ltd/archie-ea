@@ -82,13 +82,8 @@ def register_cli_commands(app):
         # create_all() then emits a duplicate "CREATE INDEX" and fails on an empty
         # database. (Production never hit this because its schema was built
         # incrementally.) Drop duplicate same-named indexes per table before creating.
-        for _table in db.metadata.tables.values():
-            _seen = {}
-            for _idx in list(_table.indexes):
-                if _idx.name in _seen:
-                    _table.indexes.discard(_idx)
-                else:
-                    _seen[_idx.name] = _idx
+        from app.commands.schema_migrations import dedupe_metadata_indexes
+        dedupe_metadata_indexes(db.metadata)
         db.create_all()
         # LEGACY WORKAROUNDS: These ALTER TABLE statements add columns that predate
         # alembic tracking. They are idempotent (IF NOT EXISTS) and remain here to
@@ -123,13 +118,10 @@ def register_cli_commands(app):
                 "ALTER TABLE unified_application_capability_mapping "
                 "ADD COLUMN IF NOT EXISTS notes TEXT"
             ))
-        # VA-005: Add enforcement_status and adm_phase columns to principles
-        db.session.execute(text(
-            "ALTER TABLE principles ADD COLUMN IF NOT EXISTS enforcement_status VARCHAR(20) NOT NULL DEFAULT 'advisory'"
-        ))
-        db.session.execute(text(
-            "ALTER TABLE principles ADD COLUMN IF NOT EXISTS adm_phase VARCHAR(5)"
-        ))
+        # VA-005 principles columns and the RAT-114 created_at index. No model
+        # declares them, so the schema baseline creates them from the same list.
+        from app.commands.schema_migrations import ensure_undeclared_schema
+        ensure_undeclared_schema(db.session.connection())
 
         # SA-003: Add Phase C lifecycle planning columns to application_components
         for col_ddl in [
@@ -332,10 +324,6 @@ def register_cli_commands(app):
             db.session.execute(db.text(
                 "CREATE INDEX IF NOT EXISTS idx_rat_audit_app_action "
                 "ON rationalization_audit_entries(application_id, action)"
-            ))
-            db.session.execute(db.text(
-                "CREATE INDEX IF NOT EXISTS idx_rat_audit_created "
-                "ON rationalization_audit_entries(created_at)"
             ))
             db.session.commit()
             print("  \u2713 RAT-114: Created rationalization_audit_entries table")
@@ -915,6 +903,15 @@ def register_cli_commands(app):
         """Seed enterprise-standard ArchiMate Driver, Stakeholder, and Constraint vocabulary records. Safe to run multiple times."""
         from app.commands.seed_motivation_elements import seed_motivation_elements
         seed_motivation_elements()
+
+    # ===== REGULATORY FRAMEWORK CATALOGUE SEEDING =====
+
+    @app.cli.command()
+    def seed_framework_catalogue():
+        """Seed the shared regulatory framework catalogue with ISO 27001, SOC 2 and DORA. Safe to run multiple times."""
+        from app.services.compliance.regulatory_framework_service import RegulatoryFrameworkService
+        seeded = RegulatoryFrameworkService.seed_manufacturing_frameworks()
+        print(f"Framework catalogue: {seeded} frameworks seeded")
 
     # ===== BUSINESS CAPABILITY SEEDING =====
 

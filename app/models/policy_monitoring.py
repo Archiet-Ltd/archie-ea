@@ -392,7 +392,7 @@ class PolicyExemption(db.Model):
         return self.expiry_date < datetime.utcnow().date()
 
 
-class MonitoringBaseline(db.Model):
+class MonitoringBaseline(TenantMixin, db.Model):
     """
     Architecture Monitoring Baseline
 
@@ -426,7 +426,7 @@ class MonitoringBaseline(db.Model):
         }
 
 
-class MonitoringAlert(db.Model):
+class MonitoringAlert(TenantMixin, db.Model):
     """
     Architecture Monitoring Alert
 

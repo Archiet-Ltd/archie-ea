@@ -192,6 +192,7 @@ def backfill_review_queue_org(dry_run):
         if r0_counts.get(item_type, 0) == 0:
             continue
         result = db.session.execute(
+            # tenancy-ok: one-time backfill, retirement 2026-12-31
             db.text(
                 f"UPDATE review_queue_items r SET organization_id = t.organization_id "
                 f"FROM {table_name} t "
@@ -206,6 +207,7 @@ def backfill_review_queue_org(dry_run):
 
     # Step 2: via assigned_to_id → users.organization_id
     result = db.session.execute(
+        # tenancy-ok: one-time backfill, retirement 2026-12-31
         db.text(
             "UPDATE review_queue_items r SET organization_id = u.organization_id "
             "FROM users u "
@@ -218,6 +220,7 @@ def backfill_review_queue_org(dry_run):
 
     # Step 3: via reviewed_by_id → users.organization_id (only rows still NULL)
     result = db.session.execute(
+        # tenancy-ok: one-time backfill, retirement 2026-12-31
         db.text(
             "UPDATE review_queue_items r SET organization_id = u.organization_id "
             "FROM users u "
@@ -230,6 +233,7 @@ def backfill_review_queue_org(dry_run):
 
     # Step 4: via escalated_to_id → users.organization_id (only rows still NULL)
     result = db.session.execute(
+        # tenancy-ok: one-time backfill, retirement 2026-12-31
         db.text(
             "UPDATE review_queue_items r SET organization_id = u.organization_id "
             "FROM users u "

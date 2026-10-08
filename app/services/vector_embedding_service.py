@@ -239,7 +239,7 @@ class VectorEmbeddingService:
         try:
             # Get API configuration
             from app.models.models import APISettings
-            from app.services.llm_service import LLMService  # noqa: F401 — availability probe: the import IS the test
+            from app.services.llm_service import LLMService
 
             # Ensure clean transaction state before query
             try:
@@ -255,6 +255,12 @@ class VectorEmbeddingService:
 
             if not settings or not settings.has_key():
                 raise ValueError("OpenAI API key not configured")
+
+            LLMService._guard_provider_call(
+                "openai",
+                model_config["model"],
+                prompt=text,
+            )
 
             # Use OpenAI API for embeddings
             import openai

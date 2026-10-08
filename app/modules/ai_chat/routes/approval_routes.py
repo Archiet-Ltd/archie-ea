@@ -1,6 +1,6 @@
 """AI chat approval workflow routes."""
 
-from flask import jsonify, request
+from flask import jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
@@ -67,9 +67,27 @@ def reject_pending_approval(approval_id):
     return jsonify(result), _decision_status(result)
 
 
+@unified_ai_chat_bp.route("/approvals/inbox", methods=["GET"])
+@login_required
+def approval_inbox():
+    """Approval inbox page — one queue for every pending change proposal.
+
+    Requires GENERAL permission (write/approval access) — Viewer roles
+    cannot reach this page, matching the sidebar link guard.
+    """
+    from app.models.user import Permission
+
+    if not current_user.can(Permission.GENERAL):
+        from flask import abort
+
+        abort(403)
+    return render_template("ai_chat/approval_inbox.html")
+
+
 __all__ = [
     "pending_approvals",
     "approver_queue",
     "approve_pending_approval",
     "reject_pending_approval",
+    "approval_inbox",
 ]

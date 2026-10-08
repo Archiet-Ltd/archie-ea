@@ -41,11 +41,28 @@ DENIED = "denied"
 # covers it, which matters because the chat sees the whole portfolio.
 POLICY = {
     "/procurement/contracts":  {"procurement", "portfolio_manager"},
-    "/procurement/licenses":   {"procurement", "portfolio_manager"},
+    # R1-B36 (TB-0146): finance added via requires_procurement_or_finance --
+    # licences/spend are a finance persona's own numbers. Deliberately NOT
+    # extended to contracts/renewals/compliance below, which stay
+    # requires_procurement-only.
+    "/procurement/licenses":   {"procurement", "portfolio_manager", "finance"},
+    "/procurement/spend":      {"procurement", "portfolio_manager", "finance"},
     "/procurement/compliance": {"procurement", "portfolio_manager"},
+    # R1-B34 (TB-0135): viewing the register is @login_required only (every
+    # archetype can see a formula's active version); activating a new one
+    # is gated to portfolio_manager by @requires_role in
+    # app/modules/formula_register/routes.py. This row is the view page.
+    "/admin/formula-register/": set(ARCHETYPES),
+    # application_mgmt.compliance_frameworks_dashboard is @login_required only
+    # (RegulatoryFramework/ComplianceControl, a different store from the
+    # procurement compliance page above) -- every persona can reach it.
+    "/dashboard/compliance":   set(ARCHETYPES),
+    # risk.risk_register is @login_required only.
+    "/risks/":                 set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
+    "/applications/ownership-coverage": {"cto", "portfolio_manager"},
     "/ai-chat":                set(ARCHETYPES),
     # Ask and Twin map: both pages carry @login_required and no role gate, so
     # every archetype is expected to reach them. Stating that in two rows is
@@ -55,6 +72,9 @@ POLICY = {
     # impact endpoint they read, not by the page.
     "/intelligence/ask":       set(ARCHETYPES),
     "/intelligence/twin-map":  set(ARCHETYPES),
+# Model Health / Drift: carries @login_required and no role gate, so every
+    # archetype is expected to reach it.
+    "/genome/model-health/":   set(ARCHETYPES),
     # Traceability check and element properties: @login_required and no role
     # gate on the page, so every archetype reads them; the answer is fenced
     # per tenant by the service behind each page. Saving a property definition
@@ -80,6 +100,19 @@ POLICY = {
     # is refused -- inviting people into an organisation is not a persona's
     # job, it is its administrator's.
     "/admin/team":             set(),
+    # R1-B56: Agent Registry (owner/charter/delegated-limits per agent) is
+    # gated to platform_admin via @requires_role / _guard in
+    # agent_registry_routes.py -- registering and activating an agent is
+    # not a persona's job.
+    "/admin/agent-registry/":  set(),
+    # Agent oversight: pause/resume all agent writes, view refused-call log,
+    # and check classification status — all gated by org_admin, which no
+    # seeded archetype except platform_admin holds.
+    "/ai-chat/oversight/state":          set(),
+    "/ai-chat/oversight/refused-calls":  set(),
+    "/ai-chat/oversight/classification/status": set(),
+    # Tool catalogue export: gated by security_architect or platform_admin.
+    "/ai-chat/oversight/catalogue/export": {"security_architect"},
     # Billing: plan, checkout, limits, invoices. Gated by admin_required, which
     # no ordinary persona role carries; only the administrator can buy, change
     # or cancel the organisation's plan.
@@ -129,6 +162,27 @@ POLICY = {
         "solution_architect", "enterprise_architect", "business_architect",
         "security_architect", "data_architect",
     },
+    # Data governance (system of record, undeclared copies, master data
+    # domains, standards check): gated by the same data_integration section
+    # predicate as the Interface Register above, so the same five personas reach
+    # it and arb_member, portfolio_manager, cto, procurement and
+    # application_manager are refused.
+    "/data-governance/entities": {
+        "solution_architect", "enterprise_architect", "business_architect",
+        "security_architect", "data_architect",
+    },
+    "/data-governance/undeclared-copies": {
+        "solution_architect", "enterprise_architect", "business_architect",
+        "security_architect", "data_architect",
+    },
+    "/data-governance/domains": {
+        "solution_architect", "enterprise_architect", "business_architect",
+        "security_architect", "data_architect",
+    },
+    "/data-governance/models": {
+        "solution_architect", "enterprise_architect", "business_architect",
+        "security_architect", "data_architect",
+    },
     # The organisation's audit trail (query, export, verify). Gated by
     # governance_gate_reader_required: administrators, plus security
     # architects as readers. Every other persona is denied.
@@ -143,8 +197,24 @@ POLICY = {
     # persona reaches it from the sidebar footer. The state it shows is
     # platform-wide; the only thing a user changes is their own subscription.
     "/status":                 set(ARCHETYPES),
+    # Gap register: @login_required and no role gate on the
+    # implementation_planning blueprint, so every signed-in persona reaches
+    # it; the gaps it shows are fenced per organisation by Gap's TenantMixin.
+    "/implementation/gaps":    set(ARCHETYPES),
 }
 for _allowed in POLICY.values():
+    _allowed.add("platform_admin")
+
+ACCOUNT_POST_POLICY = {
+    "/account/switch-organization": set(ARCHETYPES),
+}
+
+OVERSIGHT_POST_POLICY = {
+    "/ai-chat/oversight/pause":  set(),
+    "/ai-chat/oversight/resume": set(),
+}
+
+for _allowed in OVERSIGHT_POST_POLICY.values():
     _allowed.add("platform_admin")
 
 # The versioned Transformation Room collection is portfolio data.  These are
@@ -220,6 +290,13 @@ def _observe(page, base, path):
     return ALLOWED if status < 400 else DENIED
 
 
+def _csrf_token(page):
+    """Read the current page's CSRF token without forcing another navigation."""
+    token = page.locator('meta[name="csrf-token"]').get_attribute("content")
+    assert token, "signed-in page did not expose a CSRF token"
+    return token
+
+
 @pytest.fixture
 def page(browser):
     ctx = browser.new_context(viewport={"width": 1280, "height": 900})
@@ -249,7 +326,9 @@ def transformation_users(seeded):
     with app.app_context():
         role = Role.query.filter_by(name="Architect").first()
         assert role is not None
-        for email in emails.values():
+        for archetype, email in emails.items():
+            if archetype == "platform_admin":
+                continue
             user = User.query.filter_by(email=email).one()
             original_role_ids[email] = user.role_id
             user.role = role
@@ -371,6 +450,53 @@ def test_interface_register_edit_route_authorisation(
 
 
 @pytest.fixture(scope="module")
+def seeded_data_entity(seeded):
+    """A real DataEntity in the seeded org, for the entity page's <id> path."""
+    from app import create_app, db
+    from app.models.process_data import DataDomain, DataEntity
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        entity = DataEntity.query.filter_by(organization_id=org_id).order_by(DataEntity.id.desc()).first()
+        if entity is None:
+            domain_name = "Auth-matrix probe domain %s" % org_id
+            entity_name = "Auth-matrix probe entity %s" % org_id
+            domain = DataDomain.query.filter_by(name=domain_name, organization_id=org_id).first()
+            if domain is None:
+                domain = DataDomain(name=domain_name, organization_id=org_id)
+                db.session.add(domain)
+                db.session.flush()
+            entity = DataEntity.query.filter_by(name=entity_name, organization_id=org_id).first()
+            if entity is None:
+                entity = DataEntity(name=entity_name, domain_id=domain.id, organization_id=org_id)
+                db.session.add(entity)
+                db.session.commit()
+            else:
+                db.session.rollback()
+        return entity.id
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_data_entity_page_authorisation(archetype, page, live_server, seeded, seeded_data_entity):
+    """GET /architecture/data-entities/<id> (the entity and its CRUD matrix)
+    carries @login_required and no role gate, like the entity catalog it is
+    opened from, so every archetype in the entity's organisation reaches it.
+    The data is fenced per tenant by the entity lookup, not by a role."""
+    _login(page, live_server, seeded["emails"][archetype])
+    path = "/architecture/data-entities/%d" % seeded_data_entity
+    actual = _observe(page, live_server, path)
+    assert actual == ALLOWED, "%s could not reach %s: expected ALLOWED" % (archetype, path)
+
+
+def test_data_entity_page_rejects_anonymous(page, live_server, seeded_data_entity):
+    path = "/architecture/data-entities/%d" % seeded_data_entity
+    response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert "/account/login" in page.url or (response is not None and response.status >= 400), (
+        "%s was served without signing in" % path)
+
+
+@pytest.fixture(scope="module")
 def seeded_interface_initiative(seeded):
     """A real TechnologyRoadmapInitiative wired to an ArchitectureModel in the
     seeded org, for the comparison POST routes (D5) -- provision_comparison
@@ -463,8 +589,7 @@ def test_interface_register_raise_gap_authorisation(
     asserts the boundary, not the gap-raising business rule already covered
     in tests/test_interface_register_service.py)."""
     _login(page, live_server, seeded["emails"][archetype])
-    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    csrf_token = _csrf_token(page)
     response = page.request.post(
         live_server + "/interface-register/%d/gaps" % seeded_interface_element,
         form={
@@ -529,8 +654,7 @@ def test_interface_register_attach_work_package_authorisation(
     data_integration boundary, observed on the costed-work-package write
     path (US-6 AC6)."""
     _login(page, live_server, seeded["emails"][archetype])
-    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    csrf_token = _csrf_token(page)
     response = page.request.post(
         live_server + "/interface-register/gaps/%d/work-packages" % seeded_interface_gap,
         form={
@@ -552,6 +676,52 @@ def test_interface_register_attach_work_package_authorisation(
             "%s was refused attach_work_package by the data_integration guard "
             "despite being permitted by the GET rows" % archetype
         )
+
+
+@pytest.mark.parametrize("path,allowed", ACCOUNT_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_account_switch_organization_authorisation(
+    archetype, path, allowed, page, live_server, seeded
+):
+    """The organisation switcher is available to any signed-in member."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/account/manage", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('[data-testid="organization-memberships-card"] input[name="csrf_token"]').first.input_value()
+    response = page.request.post(
+        live_server + path,
+        form={
+            "organization_id": str(seeded["ids"]["org"]),
+            "csrf_token": csrf,
+        },
+        max_redirects=0,
+    )
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = ALLOWED if response.status < 400 else DENIED
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
+    )
+
+
+@pytest.mark.parametrize("path,allowed", OVERSIGHT_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_oversight_post_routes_authorisation(
+    archetype, path, allowed, page, live_server, seeded
+):
+    """Oversight POST routes (pause, resume) are gated by org_admin, which
+    no seeded archetype except platform_admin holds."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + path,
+        data={"reason": "Auth-matrix probe", "csrf_token": csrf},
+        max_redirects=0,
+    )
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = ALLOWED if response.status < 400 else DENIED
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
+    )
 
 
 @pytest.fixture(scope="module")
@@ -789,3 +959,116 @@ def test_application_technology_links_refuse_a_read_only_account(
     assert _observe(page, live_server, path) == ALLOWED
     response = _post_technology_link(page, live_server, seeded["ids"]["application"])
     assert response.status == 403, "a Viewer wrote a technology link: %s" % response.status
+
+
+OVERSIGHT_CLASSIFICATION_PERMITTED = {
+    "platform_admin",
+}
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_oversight_classification_check_route_authorisation(
+    archetype, page, live_server, seeded
+):
+    """GET /ai-chat/oversight/classification/check/<tool_name> is gated by
+    org_admin, which no seeded archetype except platform_admin holds."""
+    _login(page, live_server, seeded["emails"][archetype])
+    path = "/ai-chat/oversight/classification/check/create_solution"
+    expected = ALLOWED if archetype in OVERSIGHT_CLASSIFICATION_PERMITTED else DENIED
+    actual = _observe(page, live_server, path)
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
+    )
+
+
+# Restore-before-an-import preview and confirm: enterprise_architect plus
+# platform_admin (always granted by requires_role()). The guard is the same
+# _restore_gate() for both routes; only the HTTP method differs at the same
+# path template.
+RESTORE_PERMITTED = {"enterprise_architect", "platform_admin"}
+
+
+@pytest.fixture(scope="module")
+def seeded_restore_point_log(seeded):
+    """A real ImportSessionLog with snapshot_data in the seeded org,
+    so the preview and restore endpoint tests have a real log_id."""
+    import uuid
+    from datetime import datetime
+
+    from app import create_app, db
+    from app.models.import_audit import ImportSessionLog
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        log = ImportSessionLog.query.filter_by(
+            organization_id=org_id,
+            import_source="oef_model_import",
+        ).first()
+        if log is None:
+            log = ImportSessionLog(
+                session_id=str(uuid.uuid4()),
+                operation_type="import",
+                user_id=seeded["ids"]["solution_architect_user"],
+                organization_id=org_id,
+                import_source="oef_model_import",
+                status="completed",
+                started_at=datetime.utcnow(),
+                snapshot_data={
+                    "version": 1,
+                    "strategy": "skip_duplicates",
+                    "model_name": "Auth-matrix probe model",
+                    "model_id": None,
+                    "created_element_ids": [],
+                    "created_relationship_ids": [],
+                    "updated_elements": {},
+                    "domain_created": [],
+                    "domain_linked": [],
+                },
+            )
+            db.session.add(log)
+            db.session.commit()
+        return log.id
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_restore_preview_authorisation(
+    archetype, page, live_server, seeded, seeded_restore_point_log
+):
+    """GET /architecture/import/oef/restore-points/<log_id> — the guard runs
+    before the log is even resolved, so this observes the restore gate
+    boundary for the route that needs a real log_id."""
+    _login(page, live_server, seeded["emails"][archetype])
+    expected = ALLOWED if archetype in RESTORE_PERMITTED else DENIED
+    path = "/architecture/import/oef/restore-points/%d" % seeded_restore_point_log
+    actual = _observe(page, live_server, path)
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
+    )
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_restore_confirm_authorisation(
+    archetype, page, live_server, seeded, seeded_restore_point_log
+):
+    """POST /architecture/import/oef/restore-points/<log_id>/restore — same
+    restore gate boundary, observed on the write path. A denied archetype
+    must get exactly the 403 the guard renders; an allowed archetype must
+    not be refused by the guard even if the underlying restore fails."""
+    _login(page, live_server, seeded["emails"][archetype])
+    csrf_token = _csrf_token(page)
+    response = page.request.post(
+        live_server + "/architecture/import/oef/restore-points/%d/restore" % seeded_restore_point_log,
+        form={"reapply": "[]", "csrf_token": csrf_token},
+        max_redirects=0,
+    )
+    expected_denied = archetype not in RESTORE_PERMITTED
+    if expected_denied:
+        assert response.status == 403, (
+            "%s reached restore confirm: expected 403, got %s" % (archetype, response.status)
+        )
+    else:
+        assert response.status != 403, (
+            "%s was refused restore confirm by the restore gate despite "
+            "being permitted by the GET rows" % archetype
+        )

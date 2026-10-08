@@ -59,6 +59,15 @@ class TechnologyRoadmapInitiative(db.Model):
     created_at = db.Column(db.DateTime, default=utcnow)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
+    # this store is retired into unified_work_packages (never dropped).
+    # NULL until `merge-work-package-stores` copies the row across.
+    retired_into_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("unified_work_packages.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -170,6 +179,15 @@ class WorkPackage(TenantMixin, db.Model):
 
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    # this store is retired into unified_work_packages (never dropped).
+    # NULL until `merge-work-package-stores` copies the row across.
+    retired_into_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("unified_work_packages.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     architecture = db.relationship("ArchitectureModel", backref="migration_work_packages")
     archimate_element = db.relationship(
@@ -383,6 +401,20 @@ class Deliverable(db.Model):
     )
     assigned_user = db.relationship("User", backref="assigned_migration_deliverables")
     goal = db.relationship("Goal", backref="migration_deliverables")
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description or "",
+            "delivery_status": self.delivery_status,
+            "deliverable_type": self.deliverable_type,
+            "target_date": self.target_date.isoformat() if self.target_date else None,
+            "delivered_date": self.delivered_date.isoformat() if self.delivered_date else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
 
     def is_completed(self) -> bool:
         return self.delivery_status == "completed"
@@ -598,10 +630,26 @@ class Gap(TenantMixin, db.Model):
     Which one is recorded in `gap_kind`. See the note above the class: these are
     different concepts that shared a name, and reporting them as one number is
     how two screens came to disagree.
+
+    TenantMixin declares organization_id NOT NULL, but gaps merged from
+    superseded stores (roadmap_gaps, implementation_gaps, compliance_gaps)
+    cannot always be attributed to an organisation. Override the column to
+    nullable so an unattributable merged row is quarantined
+    (organization_id=NULL) -- invisible to every tenant, never a guess, since
+    the tenant filter's equality comparison never matches a NULL. The
+    gap_register_service.create_gap writer always requires an
+    organisation_id, so direct writes are scoped.
     """
 
     __tablename__ = "gaps"
     __table_args__ = {"extend_existing": True}
+
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     gap_kind = db.Column(
@@ -658,6 +706,14 @@ class Gap(TenantMixin, db.Model):
     # Source capability reference (polymorphic link to capability that has the gap)
     source_capability_type = db.Column(db.String(20), index=True)  # business, technical, process
     source_capability_id = db.Column(db.Integer, index=True)
+
+    # Provenance for a row merged in from a superseded gap store (roadmap_gaps,
+    # implementation_gaps, compliance_gaps -- see app/commands/consolidate_gaps.py).
+    # NULL on a row created directly against this table. Together, unique per
+    # source row (enforced by the merge's NOT EXISTS check, not a DB
+    # constraint -- reconcile-schema is ADD-COLUMN-nullable-only, ADR 0002).
+    source_table = db.Column(db.String(64), nullable=True, index=True)
+    source_id = db.Column(db.Integer, nullable=True, index=True)
 
     # Timeline for roadmap display
     estimated_start_date = db.Column(db.Date)  # When gap resolution should begin
@@ -736,6 +792,22 @@ class Gap(TenantMixin, db.Model):
         else:
             self.gap_type = None
             self.gap_sub_types = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description or "",
+            "gap_type": self.gap_type,
+            "priority": self.priority,
+            "severity": self.severity,
+            "resolution_status": self.resolution_status,
+            "current_state_ref": self.current_state_ref,
+            "target_state_ref": self.target_state_ref,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
 
     def to_roadmap_dict(self) -> dict:
         """Convert to dictionary for roadmap API responses."""

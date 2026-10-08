@@ -31,6 +31,10 @@ different file, so a duplicate split across a base layout and a child template
 is not caught here. That gap is acceptable for a ratchet-style regression gate:
 the two duplicates found in production (accessibility.css, and the three doubled
 `?v=` scripts) were both single-file, and this script keeps them from coming back.
+
+Proven-against: app/templates/layouts/admin_base.html before the asset URL cleanup,
+where hand-appended `?v=` parameters produced doubled `?` static URLs and the same
+stylesheet loaded twice in one template.
 """
 
 from __future__ import annotations

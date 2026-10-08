@@ -1,0 +1,5 @@
+{# smoke-coverage-ok: email template, not a rendered browser page #}
+<p>Offer: {{ inquiry.offer }}</p>
+<p>Name: {{ inquiry.name or "(not given)" }}</p>
+<p>Email: {{ inquiry.email }}</p>
+<p>Page: {{ page_url }}</p>

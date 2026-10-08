@@ -311,3 +311,18 @@ def test_rule_id_is_deterministic_and_distinguishes_rules_for_same_pair():
     assert row_b["rule_id"] != row_a1["rule_id"], (
         "two different rules producing the same (source, target) pair must carry different rule_id values"
     )
+
+
+def test_lowercase_and_legacy_relationship_spellings_match_canonical_derivation_rules():
+    elements = [_el(1), _el(2), _el(3)]
+    relationships = [
+        _rel(10, 1, 2, "servingrelationship"),
+        _rel(20, 2, 3, "accessrelationship"),
+    ]
+
+    derived = ArchiMateDerivationService().compute_derived(elements, relationships)
+    row = _only_row(derived, 1, 3)
+
+    assert row["type"] == "Access"
+    assert row["relationship_chain"] == [10, 20]
+    assert row["rule_id"] == "table:Serving:Access"

@@ -1,5 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'data_governance/_app_picker.html' import app_picker, app_picker_script with context %}
 
 {% block title %}{{ 'Edit' if entity else 'Create' }} Data Entity — {{ config.APP_NAME }}{% endblock %}
 
@@ -89,11 +90,20 @@
                     </select>
                 </div>
 
-                <div>
-                    <label for="system_of_record" class="block text-sm font-medium text-foreground mb-1">System of Record</label>
-                    <input type="text" id="system_of_record" name="system_of_record" value="{{ entity.system_of_record if entity else '' }}"
-                        class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                        placeholder="e.g., SAP ECC, Salesforce">
+                <div class="space-y-3">
+                    {{ app_picker(
+                        'system-of-record-application',
+                        current_system_of_record_application.name if current_system_of_record_application else None,
+                        current_system_of_record_application.id if current_system_of_record_application else None,
+                        false
+                    ) }}
+                    {% if entity and entity.system_of_record and not entity.system_of_record_application_id %}
+                    <div class="rounded-md border border-border bg-muted/30 p-3">
+                        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Legacy label</p>
+                        <p class="mt-1 text-sm text-foreground">{{ entity.system_of_record }}</p>
+                        <p class="mt-1 text-xs text-muted-foreground">Shown read-only until it can be linked to an application.</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -151,3 +161,5 @@
     {% endif %}
 </div>
 {% endblock %}
+
+{% block extra_js %}{{ app_picker_script() }}{% endblock %}

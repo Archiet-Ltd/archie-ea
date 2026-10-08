@@ -1,4 +1,4 @@
-"""Platform service level objectives (TB-0165, REQ-NFR-005).
+"""Platform service level objectives.
 
 Defines availability and p95-latency objectives for the answer, API and
 approval services and measures each one's attainment and error-budget burn
@@ -10,7 +10,7 @@ over the existing exported metrics, grouped by the Flask URL rule those
 counters are labelled with (``app/_bootstrap/security.py`` is the one place
 that increments them, per request, for every route in the app).
 
-Objective definitions (brief R2-B02, "Platform and trust"):
+Objective definitions:
 
 - ``answers`` -- ``/api/v1/intelligence/*`` -- 99.9% availability, p95 <= 2s.
 - ``api``     -- ``/api/v1/*``               -- 99.9% availability, p95 <= 1s.

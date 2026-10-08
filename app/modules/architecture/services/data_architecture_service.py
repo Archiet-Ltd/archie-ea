@@ -370,3 +370,135 @@ class DataArchitectureService:
             "validation_score": overall,
             "data_available": True,
         }
+
+
+# ---------------------------------------------------------------------------
+# Data entity CRUD matrix
+# ---------------------------------------------------------------------------
+#
+# "Which applications create, read, update or delete this data entity" is
+# answered from one store: ArchiMate access relationships from an application
+# component's element to the data entity's element (both mirror into
+# archimate_elements on create). The Composer draws the same relationships, so
+# an access drawn there and one recorded on the data entity page are the same
+# row. ``crud_operations`` carries the C/R/U/D detail ArchiMate's read/write
+# access_mode cannot; access_mode is kept consistent with it.
+
+CRUD_LETTERS = "CRUD"
+
+
+def normalise_crud(operations) -> str:
+    """The distinct C/R/U/D letters in ``operations``, in CRUD order."""
+    chosen = {str(op).strip().upper()[:1] for op in (operations or []) if str(op).strip()}
+    return "".join(letter for letter in CRUD_LETTERS if letter in chosen)
+
+
+def access_mode_for(crud: str):
+    """ArchiMate's access mode for a set of CRUD letters."""
+    reads = "R" in crud
+    writes = any(letter in crud for letter in "CUD")
+    if reads and writes:
+        return "readwrite"
+    if writes:
+        return "write"
+    if reads:
+        return "read"
+    return None
+
+
+def _is_access(rel) -> bool:
+    return (rel.type or "").strip().lower() == "access"
+
+
+def entity_access_matrix(entity) -> List[Dict]:
+    """One row per application recorded as accessing ``entity``.
+
+    Each row: ``application_id`` (the portfolio record, None when the element
+    has none), ``name``, ``cells`` {letter: True | False | None}. None means
+    the relationship says it writes but not whether it creates, updates or
+    deletes (an access drawn with only an ArchiMate access mode); it is never
+    shown as a no.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+
+    element_id = getattr(entity, "archimate_element_id", None)
+    if not element_id:
+        return []
+    rels = [
+        rel for rel in ArchiMateRelationship.query.filter(
+            ArchiMateRelationship.target_id == element_id
+        ).all()
+        if _is_access(rel)
+    ]
+    if not rels:
+        return []
+    source_ids = {rel.source_id for rel in rels}
+    elements = {
+        el.id: el for el in ArchiMateElement.query.filter(ArchiMateElement.id.in_(source_ids)).all()
+        if (el.type or "").replace("_", "").lower() == "applicationcomponent"
+    }
+    apps = {}
+    if elements:
+        apps = {
+            app.archimate_element_id: app for app in ApplicationComponent.query.filter(
+                ApplicationComponent.archimate_element_id.in_(list(elements))
+            ).all()
+        }
+    rows = []
+    for rel in rels:
+        element = elements.get(rel.source_id)
+        if element is None:
+            continue
+        app = apps.get(element.id)
+        crud = rel.crud_operations
+        if crud:
+            cells = {letter: letter in crud for letter in CRUD_LETTERS}
+        else:
+            mode = (rel.access_mode or "").lower()
+            writes = mode in ("write", "readwrite")
+            cells = {"R": (mode in ("read", "readwrite")) if mode else None}
+            for letter in "CUD":
+                cells[letter] = None if (writes or not mode) else False
+        rows.append({
+            "relationship_id": rel.id,
+            "application_id": app.id if app else None,
+            "name": app.name if app else element.name,
+            "cells": cells,
+        })
+    rows.sort(key=lambda row: (row["name"] or "").lower())
+    return rows
+
+
+def record_entity_access(entity, application, operations):
+    """Record that ``application`` performs ``operations`` on ``entity``.
+
+    Upserts the single access relationship between their elements. Raises
+    ValueError when no operation is chosen or either side has no element.
+    """
+    from app import db
+
+    crud = normalise_crud(operations)
+    if not crud:
+        raise ValueError("Choose at least one of create, read, update or delete.")
+    source_id = getattr(application, "archimate_element_id", None)
+    target_id = getattr(entity, "archimate_element_id", None)
+    if not source_id or not target_id:
+        raise ValueError("This application or data entity is not in the architecture model.")
+
+    rel = next(
+        (
+            r for r in ArchiMateRelationship.query.filter(
+                ArchiMateRelationship.source_id == source_id,
+                ArchiMateRelationship.target_id == target_id,
+            ).all()
+            if _is_access(r)
+        ),
+        None,
+    )
+    if rel is None:
+        rel = ArchiMateRelationship(source_id=source_id, target_id=target_id, type="access")
+        db.session.add(rel)
+    rel.crud_operations = crud
+    rel.access_mode = access_mode_for(crud)
+    db.session.commit()
+    return rel

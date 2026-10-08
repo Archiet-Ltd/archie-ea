@@ -48,13 +48,13 @@ import click
 from flask.cli import with_appcontext
 
 from app import db
+from app.models.constants import ArchiMateLayer
 
 TABLE = "archimate_elements"
 
-# Rows needing work: the stored text differs from its own canonical form.
-# Written this way rather than as a list of known layer names so an unexpected
-# value ("STRATEGY", " Business ") is repaired too instead of being skipped.
-_NEEDS_WORK = "layer IS NOT NULL AND layer <> lower(btrim(layer))"
+def _canonical_layer(layer):
+    """Return the canonical stored layer value for a raw database value."""
+    return ArchiMateLayer.normalize(layer)
 
 
 def canonicalise_layer_rows(dry_run=False, org_id=None):
@@ -83,19 +83,30 @@ def canonicalise_layer_rows(dry_run=False, org_id=None):
 
     conn = db.session.connection()
 
-    scanned = conn.execute(
-        text(f"SELECT count(*) FROM {TABLE} WHERE TRUE{scope or ''}"), params
-    ).scalar() or 0
+    scanned_sql = "SELECT count(*) FROM archimate_elements WHERE TRUE"
+    rows_sql = (
+        "SELECT id, layer FROM archimate_elements "
+        "WHERE layer IS NOT NULL"
+    )
+
+    scanned = conn.execute(text(scanned_sql + scope), params).scalar() or 0
 
     rows = conn.execute(
         text(
-            f"SELECT layer, count(*) FROM {TABLE} "  # tenancy-ok: --org-id scopes this; a repair is deliberately cross-tenant by default
-            f"WHERE {_NEEDS_WORK}{scope} GROUP BY layer ORDER BY layer"
+            rows_sql + scope + " ORDER BY id"  # tenancy-ok: --org-id scopes this; a repair is deliberately cross-tenant by default
         ),
         params,
     ).fetchall()
-    by_value = {r[0]: r[1] for r in rows}
-    pending = sum(by_value.values())
+    pending_ids = []
+    by_value = {}
+    canonical_by_id = {}
+    for row_id, stored_layer in rows:
+        canonical = _canonical_layer(stored_layer)
+        if canonical != stored_layer:
+            pending_ids.append(row_id)
+            by_value[stored_layer] = by_value.get(stored_layer, 0) + 1
+            canonical_by_id[row_id] = canonical
+    pending = len(pending_ids)
 
     report = {
         "scanned": scanned,
@@ -107,14 +118,14 @@ def canonicalise_layer_rows(dry_run=False, org_id=None):
         # Nothing was written, so there is nothing to roll back.
         return report
 
-    result = conn.execute(
-        text(
-            f"UPDATE {TABLE} SET layer = lower(btrim(layer)) "  # tenancy-ok: --org-id scopes this; a repair is deliberately cross-tenant by default
-            f"WHERE {_NEEDS_WORK}{scope}"
-        ),
-        params,
+    update_stmt = text(
+        "UPDATE archimate_elements SET layer = :layer WHERE id = :id"  # tenancy-ok: --org-id scopes this; a repair is deliberately cross-tenant by default
     )
-    report["updated"] = result.rowcount
+    updated = 0
+    for row_id in pending_ids:
+        result = conn.execute(update_stmt, {"id": row_id, "layer": canonical_by_id[row_id]})
+        updated += result.rowcount or 0
+    report["updated"] = updated
     db.session.commit()
     return report
 
@@ -139,7 +150,7 @@ def backfill_archimate_layer_casing(dry_run, org_id):
         return
 
     for value, count in sorted(report["by_value"].items()):
-        click.echo(f"    {value!r} -> {value.strip().lower()!r}: {count} row(s)")
+        click.echo(f"    {value!r} -> {_canonical_layer(value)!r}: {count} row(s)")
 
     if dry_run:
         click.echo(f"dry-run: would update {report['would_update']} row(s); no changes committed.")

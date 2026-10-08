@@ -132,9 +132,9 @@ def api_applications():
 def api_capabilities():
     """Capabilities summary with statistics for the network view."""
     try:
-        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.limit(500).all()
+        capabilities = UnifiedCapability.query.limit(500).all()
 
         # Group by L1 capabilities as domain proxies
         domain_stats = []
@@ -162,8 +162,8 @@ def api_capabilities():
                 "name": c.name,
                 "code": getattr(c, 'code', '') or '',
                 "level": getattr(c, 'level', 1),
-                "domain_id": None,
-                "category": getattr(c, 'category', '') or getattr(c, 'business_domain', '') or '',
+                "domain_id": c.domain_id,
+                "category": getattr(c, 'category', '') or (c.domain.name if c.domain else '') or '',
                 "description": getattr(c, 'description', '') or "",
                 "parent_id": getattr(c, 'parent_capability_id', None),
             }
@@ -191,10 +191,10 @@ def api_capabilities_tree():
     """Hierarchical capability tree with gap coverage indicators."""
     try:
         import re as _re
-        from app.models.business_capability import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.order_by(
-            BusinessCapability.level, BusinessCapability.name
+        capabilities = UnifiedCapability.query.order_by(
+            UnifiedCapability.level, UnifiedCapability.name
         ).all()
         if not capabilities:
             return jsonify({"tree": [], "total": 0})
@@ -354,27 +354,43 @@ def api_capabilities_semantic_search():
 @capability_map.route("/api/capabilities/create-missing", methods=["POST"])
 @login_required
 def api_capabilities_create_missing():
-    """Create a capability not in the catalog."""
+    """Create a capability not in the catalog.
+
+    Writes through ensure_capability_record (the single creator for
+    UnifiedCapability) so the map's add/edit controls never write to
+    BusinessCapability directly.
+    """
     try:
-        from app.models.business_capability import BusinessCapability
+        from app.modules.capabilities.services.capability_service import (
+            ensure_capability_record,
+        )
         data = request.get_json(silent=True) or {}
         name = (data.get("name") or "").strip()
         if not name:
             return jsonify({"error": "Name is required"}), 400
 
-        existing = BusinessCapability.query.filter(
-            db.func.lower(BusinessCapability.name) == name.lower()
-        ).first()
-        if existing:
-            return jsonify({"capability": {"id": existing.id, "name": existing.name,
-                                           "level": existing.level}, "created": False})
-
-        cap = BusinessCapability(name=name, level=data.get("level", 2),
-                                 description=data.get("description", ""))
-        db.session.add(cap)
+        cap, created = ensure_capability_record(
+            name=name,
+            level=data.get("level", 2),
+            description=data.get("description", ""),
+            code=data.get("code"),
+            domain_id=data.get("domain_id"),
+            category=data.get("category"),
+            capability_type=data.get("capability_type"),
+            parent_capability_id=data.get("parent_capability_id"),
+            specialization_type=data.get("specialization_type", "BUSINESS"),
+        )
         db.session.commit()
-        return jsonify({"capability": {"id": cap.id, "name": cap.name,
-                                       "level": cap.level}, "created": True})
+        return jsonify(
+            {
+                "capability": {
+                    "id": cap.id,
+                    "name": cap.name,
+                    "level": cap.level,
+                },
+                "created": created,
+            }
+        )
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500

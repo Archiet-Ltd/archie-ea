@@ -33,9 +33,34 @@ class RBACService:
         role = OrgRole.get_role(org_id, user_id)
         return role if role else "viewer"
 
-    def is_org_admin(self, org_id, user_id):
-        """True if the user is an org_admin in the given org."""
-        return self.get_user_role(org_id, user_id) == "org_admin"
+    def is_org_admin(self, user, org_id):
+        """True if ``user`` is an org_admin in ``org_id``.
+
+        This is the one check every caller uses for "is this user an
+        organisation administrator of this organisation" — including
+        ``User.is_org_admin`` for the user's own organisation, which
+        delegates to this function rather than computing its own answer, so
+        the two can never disagree.
+
+        Checks the per-organisation OrgRole table first: a person who
+        belongs to several organisations (an invitation accepted into a
+        foreign organisation) needs that answered per organisation, and
+        OrgRole is where that grant lives. Only when no OrgRole row says
+        otherwise does it fall back to the canonical Administrator-role
+        authority (``user.is_admin()``) — and only for the user's OWN
+        organisation: the Administrator role is global to the user, not
+        scoped to one organisation, so a foreign-organisation OrgRole grant
+        must never make this answer True for the user's own organisation.
+
+        Takes the ``user`` object itself (not an id to re-query), so a grant
+        or revoke made earlier in the same request or test is seen
+        immediately rather than through a fresh, possibly stale read.
+        """
+        if self.get_user_role(org_id, user.id) == "org_admin":
+            return True
+        if user.organization_id == org_id and user.is_admin():
+            return True
+        return False
 
     def can_edit(self, org_id, user_id):
         """True if role is org_admin or architect (hierarchy level >= 1)."""
@@ -68,11 +93,15 @@ class RBACService:
                 org_id = getattr(current_user, "organization_id", None)
                 if org_id is None:
                     abort(403)
-                actual_role = self.get_user_role(org_id, current_user.id)
-                min_level = ROLE_HIERARCHY.get(min_role, 0)
-                actual_level = ROLE_HIERARCHY.get(actual_role, 0)
-                if actual_level < min_level:
-                    abort(403)
+                if min_role == "org_admin":
+                    if not self.is_org_admin(current_user, org_id):
+                        abort(403)
+                else:
+                    actual_role = self.get_user_role(org_id, current_user.id)
+                    min_level = ROLE_HIERARCHY.get(min_role, 0)
+                    actual_level = ROLE_HIERARCHY.get(actual_role, 0)
+                    if actual_level < min_level:
+                        abort(403)
                 return f(*args, **kwargs)
 
             return wrapper
