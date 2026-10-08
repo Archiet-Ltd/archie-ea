@@ -380,9 +380,11 @@ def _register_api_auth(app, csrf):
           Authenticate with email and password to establish a session.
           After successful login, all subsequent API requests will be authenticated via session cookie.
 
-          **Default Admin Credentials:**
-          - Email: flask-base-admin@example.com
-          - Password: password
+          An administrator account enrolled in (or required to enrol in)
+          multi-factor authentication cannot complete sign-in through this
+          endpoint: it always refuses with 401 and error "mfa_required"
+          rather than establishing a session, since this API path has no
+          multi-factor challenge step of its own.
         consumes:
           - application/json
         parameters:
@@ -433,7 +435,10 @@ def _register_api_auth(app, csrf):
                     is_admin:
                       type: boolean
           401:
-            description: Invalid credentials
+            description: |
+              Invalid credentials, or the account requires multi-factor
+              authentication this endpoint cannot complete (two distinct
+              causes sharing this status code; see error for which one).
             schema:
               type: object
               properties:
@@ -442,6 +447,9 @@ def _register_api_auth(app, csrf):
                   example: false
                 error:
                   type: string
+                  enum:
+                    - "Invalid email or password"
+                    - "mfa_required"
                   example: "Invalid email or password"
           400:
             description: Bad request - missing email or password
