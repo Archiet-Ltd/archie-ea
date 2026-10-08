@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S3-13, segment: S3}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Roadmaps
@@ -23,7 +24,7 @@ other.
 
 ## Where you'll meet it
 
-- [Show the path from today's estate to the target state](/enterprise-architecture/target-state-roadmap)
+- [Show the path from today's estate to the target state](/use-cases/target-state-roadmap)
 
 ## Related modules
 

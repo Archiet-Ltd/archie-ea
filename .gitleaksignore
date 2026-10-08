@@ -1,0 +1,11 @@
+# Fake credentials seeded by the connector masking regression test (PR 413). They exist only so the test can prove
+# the API response never echoes a secret; none is a real key. Fingerprints: commit:file:rule:line.
+a7e65b340340b779bfe5c61372f467bddcba15f5:tests/test_connector_sync_mode_derivation.py:generic-api-key:329
+a7e65b340340b779bfe5c61372f467bddcba15f5:tests/test_connector_sync_mode_derivation.py:generic-api-key:383
+
+# IndexNow key default (PR 422). The IndexNow protocol requires this value to
+# be served publicly and unauthenticated anyway, so it is not a secret; see
+# config.py's own comment above INDEXNOW_API_KEY. This fingerprint is the
+# commit that first committed the literal value, before the line carried a
+# `# gitleaks:allow` comment.
+34c13deff589a96efaa3e4ee1f05805c20d28883:config.py:generic-api-key:235
