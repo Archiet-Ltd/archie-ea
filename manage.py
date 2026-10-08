@@ -379,6 +379,7 @@ def register_cli_commands(app):
             ))
 
         db.session.commit()
+        _seed_requirement_templates()
         print("Database tables created (or already exist).")
 
     @app.cli.command()
