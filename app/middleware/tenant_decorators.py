@@ -23,25 +23,12 @@ def _wants_json():
 def org_admin_required(f):
     """Require authenticated user who is an org admin of the ACTIVE organisation.
 
-    ``current_user.is_org_admin`` (app/models/user.py) is a property that
-    always answers "is this user an org-admin of their own HOME
-    organisation" -- it is computed from ``self.organization_id``, never
-    from ``g.current_org_id``. Delegating this decorator's check to that
-    property carried the identical cross-organisation escalation
-    ``admin_required`` (app/_decorators_base.py) had: switching the active
-    session into any organisation the user holds even a read-only OrgRole
-    in (e.g. an accepted invitation) satisfied this decorator too, because
-    the home-org-only property never saw the switch. Resolving directly
-    from ``rbac_service.is_org_admin(current_user, g.current_org_id)``
-    instead closes that gap; ``is_platform_admin`` (below, same module) lets
-    an actual platform admin through regardless of which organisation is
-    active, same OR used everywhere else this pattern applies.
-
-    Deliberately does not touch ``User.is_org_admin`` itself or any of its
-    other callers -- that property's home-org answer is still correct for
-    other, non-decorator uses. ``rbac_service`` is imported here rather than
-    at module level to avoid a circular import, matching
-    ``is_platform_admin``'s own deferred import of ``app.models.Permission``.
+    Resolves directly via ``rbac_service.is_org_admin(current_user,
+    g.current_org_id)`` rather than the ``current_user.is_org_admin``
+    property, which only ever answers for the user's HOME organisation. See
+    the admin-rbac-active-org PR description for the full rationale.
+    ``@login_required`` sits inside this decorator's own wraps, so an
+    anonymous request never reaches the check below.
     """
     @wraps(f)
     @login_required

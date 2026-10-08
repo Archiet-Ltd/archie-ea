@@ -287,3 +287,86 @@ def test_the_same_attacker_is_still_admitted_to_their_own_home_org(
         f"/admin/users ({response.status_code}) -- the sweep above cannot "
         f"be trusted if this fails"
     )
+
+
+def test_admin_required_denies_anonymous_without_crashing(app):
+    """admin_required's new check calls rbac_service.is_org_admin(current_user,
+    ...), which reads current_user.id/.organization_id -- attributes
+    AnonymousUserMixin (app/models/user.py's AnonymousUser) doesn't have.
+    Without the is_authenticated short-circuit in admin_required, an
+    anonymous caller 500s (AttributeError) instead of getting the same 403
+    the old, pre-this-branch admin_required gave.
+
+    Every LIVE route carrying admin_required today also sits behind an
+    outer login_required, org_admin_required or platform_admin_required
+    (each of which has its own, independent login check ahead of
+    admin_required's), so no route currently reachable over HTTP exercises
+    this -- confirmed by inspecting every admin_required call site's
+    decorator order. That is exactly why this has to be a direct unit test
+    of the decorator itself, matching
+    tests/test_template_auth_guards.py::test_admin_required_actually_denies_a_non_admin's
+    same approach for a different decorator: a future route that uses
+    admin_required on its own, with nothing else above it, must still get a
+    clean 403, not a 500, and only a test that doesn't depend on today's
+    particular routing can catch a regression in that.
+    """
+    from werkzeug.exceptions import Forbidden
+
+    from app._decorators_base import admin_required
+    from app.models.user import AnonymousUser
+
+    @admin_required
+    def protected():
+        return "reached"
+
+    import app._decorators_base as decorators_module
+
+    original = decorators_module.current_user
+    try:
+        decorators_module.current_user = AnonymousUser()
+        with pytest.raises(Forbidden):
+            protected()
+    finally:
+        decorators_module.current_user = original
+
+
+def test_g_current_org_id_is_set_by_the_real_before_request_hook(
+    app, db_session, make_org, client, login_as
+):
+    """admin_required reads g.current_org_id via a plain getattr(..., None)
+    fallback, not because it might genuinely be unset for an authenticated
+    request (app/middleware/tenant_context.py's before_request hook always
+    runs, for every request, before any view -- Flask guarantees this), but
+    defensively. This test proves the real hook really does set it to the
+    user's own organisation by the time admin_required's check runs, rather
+    than relying on a mocked g. A real, ordinary admin -- no OrgRole
+    juggling, no session switch -- reaching a genuinely org-scoped
+    admin_required route and succeeding is the end-to-end proof.
+    """
+    from app.models.user import Role, User
+
+    org = make_org("active-org-hook-sanity")
+    admin_role = Role.query.filter_by(name="Administrator").first()
+    if admin_role is None:
+        pytest.skip("no Administrator role seeded in this database")
+
+    admin = User(
+        email=f"active-org-hook-sanity-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="Hook",
+        last_name="Sanity",
+        organization_id=org.id,
+        confirmed=True,
+        role=admin_role,
+    )
+    admin.password = uuid.uuid4().hex
+    db_session.add(admin)
+    db_session.commit()
+
+    login_as(client, admin)
+    response = client.get("/admin/users")
+    assert response.status_code == 200, (
+        f"an ordinary administrator, never having switched organisations, "
+        f"was refused their own organisation's /admin/users "
+        f"({response.status_code}) -- g.current_org_id was not resolved to "
+        f"their home organisation before admin_required's check ran"
+    )

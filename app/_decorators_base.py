@@ -26,51 +26,25 @@ def permission_required(permission):
 
 def admin_required(f):
     """Require Permission.ADMINISTER AND organisation-admin authority in the
-    ACTIVE organisation (``g.current_org_id``) -- not merely a global Role flag.
+    ACTIVE organisation (``g.current_org_id``), not merely a global Role flag.
+    See the admin-rbac-active-org PR description for the full rationale.
 
-    Permission.ADMINISTER (via ``current_user.can()``) answers "does this
-    user's Role carry administrator authority at all". That is a GLOBAL flag
-    on the user's own Role, independent of which organisation is active in
-    the session. Every self-registered user is granted Administrator of
-    their own organisation (``AccountService.register_user`` /
-    ``User.grant_org_admin``), so Permission.ADMINISTER alone was the only
-    foothold an attacker needed: accept any invitation into a victim
-    organisation (even as a read-only Viewer), switch the session's active
-    organisation to it (``app/middleware/tenant_context.py``), and every
-    ``@admin_required`` route acted with full administrator authority over
-    the victim organisation -- because ``TenantMixin`` silently scopes the
-    underlying query to ``g.current_org_id`` while this decorator never
-    checked it. ``rbac_service.is_org_admin`` is the one correct,
-    already-org-scoped check (it takes an explicit ``org_id`` and only falls
-    back to the global Administrator role for the user's OWN organisation);
-    ``is_platform_admin`` lets an actual platform admin through regardless of
-    which organisation is active, same as every other decorator that offers
-    that OR.
-
-    Imports are deferred (not module-level) to avoid a circular import:
-    ``app.middleware.tenant_decorators`` and ``app.services.rbac_service``
-    are not safely importable from this module at load time, matching the
-    deferred-import style already used elsewhere in this file (see
-    ``require_feature``, ``audit_log``) and in
-    ``app.middleware.tenant_decorators.is_platform_admin`` itself.
-
-    Built on top of ``permission_required(Permission.ADMINISTER)(f)`` (one
-    call, at decoration time) rather than re-implemented inline:
-    ``tests/test_admin_route_authorisation.py``'s ``_guarded()`` detects an
-    ADMINISTER-gated view by walking the decorated function's
-    ``__closure__`` for a cell literally holding ``Permission.ADMINISTER``
-    (decorator names are useless for this -- ``functools.wraps`` makes every
-    wrapper's ``__name__`` match the view it wraps). An inline
-    ``current_user.can(Permission.ADMINISTER)`` check written directly in
-    this function's own body would read ``Permission`` as a module global,
-    not a closure cell, and silently blind that test. Keeping
-    ``permission_required``'s own closure in the chain (as
-    ``permission_gated``, referenced below) preserves it.
+    Built on ``permission_required(Permission.ADMINISTER)(f)`` rather than an
+    inline re-check so ``tests/test_admin_route_authorisation.py``'s
+    closure-walking ``_guarded()`` still finds ``Permission.ADMINISTER`` in
+    the chain. The anonymous-user short-circuit below exists because
+    ``rbac_service.is_org_admin`` reads ``user.id``/``user.organization_id``,
+    which ``AnonymousUserMixin`` doesn't have -- without it, an anonymous
+    request would 500 instead of getting today's 403 (or redirect, wherever
+    ``@login_required`` sits above this decorator).
     """
     permission_gated = permission_required(Permission.ADMINISTER)(f)
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return permission_gated(*args, **kwargs)
+
         from app.middleware.tenant_decorators import is_platform_admin
         from app.services.rbac_service import rbac_service
 
