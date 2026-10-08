@@ -182,6 +182,8 @@ class JobQueueService:
         """Execute a specific task type."""
         if task == "abacus_sync":
             return self._execute_abacus_sync(payload, job_id)
+        elif task == "model_health_scan":
+            return self._execute_model_health_scan(payload, job_id)
         else:
             raise ValueError(f"Unknown task type: {task}")
 
@@ -211,6 +213,25 @@ class JobQueueService:
             return loop.run_until_complete(sync_service.async_run_incremental_sync())
         else:
             raise ValueError(f"Unknown sync type: {sync_type}")
+
+    def _execute_model_health_scan(self, payload: Dict[str, Any], job_id: int) -> Dict[str, Any]:
+        """Execute a model-health drift scan for one organisation."""
+        org_id = payload.get("organization_id")
+        if org_id is None:
+            raise ValueError("model_health_scan job requires organization_id in payload")
+
+        from app.jobs.tenant_safe_job import tenant_scope
+        from app.models.drift_report import DriftReport
+        from app.modules.genome.services.drift_detector import detect_model_drift
+
+        with tenant_scope(org_id):
+            report = detect_model_drift(org_id)
+            DriftReport.upsert(org_id, report)
+            db.session.commit()
+            return {
+                "organization_id": org_id,
+                "finding_count": report.get("summary", {}).get("total", 0),
+            }
 
 
 # Global service instance

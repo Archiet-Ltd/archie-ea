@@ -16,6 +16,7 @@ is not migrated; it remains as-is for platform-level system configurations.
 """
 
 import logging
+import re
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -38,6 +39,173 @@ logger = logging.getLogger(__name__)
 # FERNET_KEY, was the only path any of them ever took -- so every existing
 # stored value predates this fix and is plaintext, not a Fernet token.
 _FERNET_PREFIX = b"gAAAAA"
+
+# ConnectorConfig.config and .webhook_config are plain JSON columns that can
+# hold real secrets alongside harmless settings (their own column comments:
+# "API endpoints, credentials, etc." and "Webhook endpoints and secrets") --
+# there is no separate encrypted-credentials column on this model. Returning
+# either raw from an API response leaks whatever secret was stored in it,
+# even to an admin of the connector's own organisation. public_config() /
+# public_webhook_config() below mask any key that looks like it holds a
+# secret before either column is ever serialised.
+#
+# Matched by case-insensitive substring, which is deliberately broad (an
+# unrecognised key shaped like a secret is safer masked than leaked). Two
+# documented exceptions, both scoped to "auth" specifically (the broadest,
+# most collision-prone term here):
+#
+# 1. "auth" must start a word, not just appear inside one -- checked with
+#    _AUTH_WORD_START_RE ((?:^|[^a-z0-9])auth) rather than plain substring
+#    containment. Without this, "oauth" (an extremely common, entirely
+#    harmless config section name) would match, because "auth" literally
+#    occurs inside "oauth" -- which doesn't just over-mask a label, it masks
+#    an entire nested dict of otherwise-fine settings. "authorization" and
+#    "auth_token" still match (the word starts at position 0 or just after
+#    an underscore); "oauth"/"oauth_token" don't trigger via "auth" at all
+#    (though "oauth_token" is still masked anyway, via the separate "token"
+#    term).
+# 2. Even once "auth" starts a word, a key ending in one of
+#    _AUTH_METADATA_SUFFIXES (or naming a URL) is metadata ABOUT an auth
+#    setting, not a credential itself -- e.g. "auth_header_name" (the
+#    header's NAME) or "basic_auth_enabled" (a boolean flag).
+#
+# Every other term here (password, secret, token, api_key/apikey,
+# client_secret, private_key, credential) has no such exception -- e.g.
+# "token_type" still gets masked even though it is usually just a label like
+# "Bearer", because the cost of over-masking a label is cosmetic while the
+# cost of under-masking a real secret is not.
+#
+# "webhook" gets no exception either, including the _url suffix one: a
+# webhook URL (e.g. a Slack/Teams incoming-webhook URL) IS the credential --
+# the path itself is the secret, not something a query string strips off --
+# so any key naming one is fully masked, never just sanitized.
+_SENSITIVE_KEY_TERMS = (
+    "password",
+    "secret",
+    "token",
+    "api_key",
+    "apikey",
+    "client_secret",
+    "private_key",
+    "auth",
+    "credential",
+    "webhook",
+)
+_AUTH_WORD_START_RE = re.compile(r"(?:^|[^a-z0-9])auth")
+_AUTH_METADATA_SUFFIXES = ("_name", "_type", "_method", "_id", "_enabled")
+_MASKED_VALUE = "configured"
+
+# Any OTHER key ending in "_url" (not already fully masked above -- in
+# particular, not one naming a webhook) still isn't safe to return raw: a
+# URL can carry userinfo (user:pass@host) or a secret in its query string
+# (?token=...-/?key=.../?sig=...). These are sanitized rather than masked
+# outright, since the scheme/host/path are normally useful, non-secret
+# information (e.g. an instance URL an admin wants to see) -- see
+# _sanitize_url. This is a key-*name* heuristic, same as the rest of this
+# module; it does not inspect values that happen to look like URLs under an
+# unrelated key name.
+_URL_KEY_SUFFIX = "_url"
+
+
+def _is_sensitive_key(key: str) -> bool:
+    """True if *key* looks like it names a secret that must be fully masked
+    (not merely sanitized) rather than a setting."""
+    if not isinstance(key, str):
+        return False
+    lowered = key.lower()
+    for term in _SENSITIVE_KEY_TERMS:
+        if term == "auth":
+            if not _AUTH_WORD_START_RE.search(lowered):
+                continue
+            if lowered.endswith(_AUTH_METADATA_SUFFIXES + (_URL_KEY_SUFFIX,)):
+                continue
+            return True
+        if term not in lowered:
+            continue
+        return True
+    return False
+
+
+def _is_url_suffixed_key(key: str) -> bool:
+    """True if *key* names a URL field by convention (ends in "_url")."""
+    return isinstance(key, str) and key.lower().endswith(_URL_KEY_SUFFIX)
+
+
+def _sanitize_url(value):
+    """Strip userinfo, query string and fragment from a URL value.
+
+    Scheme, host (with port, unchanged) and path are kept -- normally
+    useful, non-secret information (an instance URL an admin wants to see).
+    Userinfo (``user:pass@``) and the query string/fragment are dropped
+    outright rather than inspected, since a secret there can be named
+    anything (``?token=``, ``?sig=``, ``?key=``, a session id, ...) and
+    guessing at which query parameters are safe is exactly the kind of
+    regex-guess this needs to not be. Uses ``urllib.parse`` for real URL
+    parsing rather than string-splitting on "@"/"?", so it isn't fooled by
+    a path or fragment that happens to contain those characters.
+
+    Non-string input, or a string that fails to parse as a URL at all, is
+    masked outright -- safer than returning something unparsed and
+    potentially still carrying a credential.
+    """
+    if not isinstance(value, str):
+        return value
+    from urllib.parse import urlsplit, urlunsplit
+
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return _MASKED_VALUE
+
+    netloc = parsed.netloc
+    if "@" in netloc:
+        netloc = netloc.rsplit("@", 1)[1]
+    return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
+
+
+def _mask_sensitive(value, *, url_keys_fully_sensitive=False):
+    """Recursively mask or sanitize sensitive-looking dict keys in a
+    JSON-like value.
+
+    Any dict key for which :func:`_is_sensitive_key` is true has its value
+    replaced outright with the literal string "configured", regardless of
+    that value's own shape -- a nested dict or list under a sensitive key is
+    not partially revealed. Any other key ending in "_url" (or named exactly
+    "url") has its value run through :func:`_sanitize_url` instead (stripping
+    userinfo/query/fragment, keeping scheme/host/path) -- unless
+    *url_keys_fully_sensitive* is set, in which case it is masked outright
+    too. Every other key is walked recursively (into nested dicts, and into
+    lists, so a secret nested one or more levels deep -- e.g. a list of
+    per-environment credential blocks -- is still caught). The input is
+    never mutated; a new structure is returned.
+
+    *url_keys_fully_sensitive* exists for :meth:`ConnectorConfig.
+    public_webhook_config`: every URL field inside ``webhook_config`` names a
+    webhook endpoint (the column's own comment: "Webhook endpoints and
+    secrets"), and a webhook URL's path is typically itself the credential
+    (e.g. a Slack/Teams incoming-webhook URL) -- stripping just the userinfo
+    and query string is not enough there, so the whole value is masked.
+    """
+    if isinstance(value, dict):
+        result = {}
+        for k, v in value.items():
+            if not isinstance(k, str):
+                result[k] = _mask_sensitive(v, url_keys_fully_sensitive=url_keys_fully_sensitive)
+                continue
+            is_url_key = k.lower() == "url" or _is_url_suffixed_key(k)
+            if _is_sensitive_key(k) or (url_keys_fully_sensitive and is_url_key):
+                result[k] = _MASKED_VALUE
+            elif is_url_key:
+                result[k] = _sanitize_url(v)
+            else:
+                result[k] = _mask_sensitive(v, url_keys_fully_sensitive=url_keys_fully_sensitive)
+        return result
+    if isinstance(value, list):
+        return [
+            _mask_sensitive(item, url_keys_fully_sensitive=url_keys_fully_sensitive)
+            for item in value
+        ]
+    return value
 
 
 def _decrypt_or_legacy_plaintext(encrypted: str) -> str | None:
@@ -145,6 +313,64 @@ class ConnectorConfig(TenantMixin, db.Model):
 
     def __repr__(self) -> str:
         return f"<ConnectorConfig {self.connector_type} org={self.organization_id}>"
+
+    def derived_sync_mode(self) -> str:
+        """Derive a human-readable sync mode from what's actually configured.
+
+        There is no ``sync_mode`` column on this model -- only ``sync_schedule``
+        (cron expressions for batch sync) and ``webhook_config`` (webhook
+        endpoints/secrets). A connector can have either, both, or neither
+        configured, so the mode is computed here rather than stored, and both
+        the API routes and the dashboard card read it from this one place so
+        they never disagree with each other.
+        """
+        has_schedule = bool(self.sync_schedule)
+        has_webhook = bool(self.webhook_config)
+
+        if has_schedule and has_webhook:
+            return "scheduled, event"
+        if has_schedule:
+            return "scheduled"
+        if has_webhook:
+            return "event"
+        return "manual"
+
+    def public_config(self):
+        """``config``, safe to serialise in an API response.
+
+        ``config`` is a plain JSON column that can hold real credentials
+        (its own comment: "API endpoints, credentials, etc."); returning it
+        raw -- as api_get_connector() used to -- leaks whatever secret was
+        stored in it, even to an admin of the connector's own organisation.
+        This masks every key that looks like it names a secret (see
+        ``_is_sensitive_key``) with the literal string "configured",
+        recursively, so a nested credential is masked too. A key ending in
+        "_url" that isn't otherwise sensitive (e.g. "instance_url") is
+        sanitized rather than masked -- its userinfo/query/fragment are
+        stripped (see ``_sanitize_url``), since a URL can carry a credential
+        there even under a harmless-looking name. Everything else (flags,
+        non-secret settings) passes through unchanged. Returns ``None``/
+        ``{}`` unchanged if ``config`` is falsy.
+        """
+        return _mask_sensitive(self.config) if self.config else self.config
+
+    def public_webhook_config(self):
+        """``webhook_config``, safe to serialise in an API response.
+
+        Same masking as :meth:`public_config`, with one difference:
+        ``url_keys_fully_sensitive=True``. webhook_config's own comment is
+        "Webhook endpoints and secrets" -- every URL field in it names a
+        webhook endpoint, and a webhook URL's path is typically itself the
+        credential (e.g. a Slack/Teams incoming-webhook URL), so sanitizing
+        query/userinfo the way public_config() does for an ordinary URL is
+        not enough here; any URL-shaped key is masked outright instead. No
+        route currently serialises webhook_config directly (only
+        derived_sync_mode()'s boolean presence check reads it), but this is
+        provided so it is never a future leak if one starts to.
+        """
+        if not self.webhook_config:
+            return self.webhook_config
+        return _mask_sensitive(self.webhook_config, url_keys_fully_sensitive=True)
 
 
 class SyncLog(db.Model):

@@ -505,7 +505,10 @@ def test_accountability_answer_is_unchanged_by_the_component_block(app, db_sessi
     db_session.add(unit)
     db_session.flush()
     db_session.add(
-        ApplicationOwnership(application_id=comp.id, organization_unit_id=unit.id, ownership_type="Business Owner")
+ApplicationOwnership(
+            application_id=comp.id, organization_unit_id=unit.id, ownership_type="Business Owner",
+            organization_id=org.id,
+        )
     )
     db_session.commit()
 

@@ -148,11 +148,20 @@ class TestConnectorConfigModelIsTenantScoped:
         """A row backfilled to NULL (origin undeterminable) is hidden from
         every organisation, not shared with all of them.
 
-        Needs a second organisation (org_b) in the database: with only one
-        organisation present, _default_org_id()'s single-tenant fallback
-        (app/models/mixins/core.py) backfills even an explicit
-        organization_id=None to that sole org, which is correct for a real
-        single-tenant deploy but would mask the behaviour this test checks.
+        org_b is requested (and otherwise unused) solely to keep the
+        database shaped like a genuine multi-tenant install while the
+        orphan row below is flushed: ConnectorConfig.organization_id's
+        column default (_default_org_id in app/models/mixins/core.py)
+        deliberately falls back to the one existing Organization when
+        exactly one is present, as a convenience for a fresh self-hosted
+        single-tenant install -- and that default fires for an explicit
+        organization_id=None just as it would for an unset one, since
+        SQLAlchemy cannot tell the two apart at flush time. With only
+        org_a in the database this test's own setup would accidentally
+        look single-tenant and silently get the orphan row assigned to
+        org_a, masking the very no-provenance case under test. A second
+        organisation makes the fallback correctly decline to guess,
+        matching the multi-tenant scenario this assertion describes.
         """
         from app.models.connector_config import ConnectorConfig
 

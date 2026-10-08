@@ -90,12 +90,14 @@ def _default_deny_unauthorized_writes():
 # Import sub-modules to register their routes on the shared blueprint.
 from . import (  # noqa: F401, E402
     auto_mapping_routes,
+    coverage_routes,
     crud_routes,
     document_routes,
     element_routes,
     import_export_routes,
     import_sophisticated_routes,
     list_views,
+    owner_routes,
     rationalization_api_routes,
     update_routes,
     vendor_api_routes,

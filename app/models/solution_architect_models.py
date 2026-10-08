@@ -829,7 +829,7 @@ class SolutionSessionVersion(db.Model):
 # ============================================================================
 
 
-class SolutionADRLink(db.Model):
+class SolutionADRLink(TenantMixin, db.Model):
     """
     Links solution analysis sessions to architecture decisions.
 

@@ -44,6 +44,21 @@ def _refused_rows(page):
     return page.locator("tbody tr", has_text="AI tool '%s' refused" % TOOL)
 
 
+def _run_model_health_scan(org_id):
+    """Run the drift detector and store the report for *org_id* so the
+    model-health page renders findings without a synchronous scan."""
+    from app import create_app, db
+    from app.models.drift_report import DriftReport
+    from app.modules.genome.services.drift_detector import detect_model_drift
+
+    app = create_app("testing")
+    with app.app_context():
+        report = detect_model_drift(org_id)
+        DriftReport.upsert(org_id, report)
+        db.session.commit()
+        db.session.remove()
+
+
 def test_admin_sees_a_viewers_refused_tool_call_with_the_rule(browser, live_server):
     org = create_fresh_org("enterprise_architect", org_admin=True, extra_roles=("business_architect",))
     other = create_fresh_org("enterprise_architect", org_admin=True)
@@ -62,6 +77,11 @@ def test_admin_sees_a_viewers_refused_tool_call_with_the_rule(browser, live_serv
         element_id = _element_ids(page, name)[name]
     finally:
         context.close()
+
+    # Run the drift detector and store the report so the model-health page
+    # shows the orphaned-element finding immediately (the detector is
+    # scheduled, not run synchronously on page load).
+    _run_model_health_scan(org["org_id"])
 
     # The viewer asks for the governed fix Model Health offers for it.
     context, page = _new_page(browser)

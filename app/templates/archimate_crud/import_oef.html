@@ -20,6 +20,10 @@
            class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
             <i data-lucide="arrow-left" class="h-4 w-4" aria-hidden="true"></i> Back to Dashboard
         </a>
+<a href="{{ url_for('architect_ui.import_restore_points') }}" data-testid="link-restore-points"
+           class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
+            <i data-lucide="history" class="h-4 w-4" aria-hidden="true"></i> Restore before an import
+        </a>
     {% endmacro %}
     {{ page_shell(title='Import ArchiMate Model (OEF)', subtitle='Upload an ArchiMate Open Exchange Format XML file', actions_caller=_ps_actions) }}
 

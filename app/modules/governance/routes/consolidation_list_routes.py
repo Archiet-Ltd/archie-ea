@@ -9,6 +9,8 @@ Routes for managing the consolidation list - applications marked for consolidati
 that can be planned for decommissioning, retirement, or added to roadmap.
 """
 
+from decimal import Decimal
+
 from werkzeug.exceptions import HTTPException
 import logging
 from datetime import datetime
@@ -18,6 +20,7 @@ from flask_login import login_required
 from sqlalchemy import or_
 
 from app.decorators import audit_log
+from app.services.application_cost_accessor import set_annual_cost
 
 from .. import db
 from ..models.application_portfolio import ApplicationComponent
@@ -544,7 +547,7 @@ def update_entry(entry_id):
             try:
                 app = ApplicationComponent.query.get(entry.application_id)
                 if app:
-                    app.total_cost_of_ownership = float(data["annual_operating_cost"])
+                    set_annual_cost(app, Decimal(str(data["annual_operating_cost"])))
                     app.updated_at = datetime.utcnow()
             except HTTPException:
                 raise
@@ -990,7 +993,10 @@ def bulk_cost_import():
                     if val:
                         try:
                             numeric_val = float(val.replace(",", "").replace("£", "").replace("$", ""))
-                            setattr(app, model_field, numeric_val)
+                            if model_field == "total_cost_of_ownership":
+                                set_annual_cost(app, Decimal(str(numeric_val)))
+                            else:
+                                setattr(app, model_field, numeric_val)
                             changed = True
                         except ValueError:
                             errors.append(f"Row {row_num}: Invalid number in {csv_field}: {val}")
