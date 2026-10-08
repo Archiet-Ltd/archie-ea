@@ -58,7 +58,21 @@ PLATFORM_WRITE_ALLOWLIST: dict[str, str] = {
         "onboarding fields, welcome-banner dismissal) -- every signed-in "
         "user edits their own User row; row-scoping ('own row only') is "
         "enforced at the route layer, not by this class-level guard -- see "
-        "the limitation noted above"
+        "the limitation noted above. CORRECTION (D-05, lead review v2, "
+        "2026-10-08): that route-layer row-scoping claim did not hold for "
+        "the v1 admin blueprint's user-management routes (change-email, "
+        "set-password and others) before PR 430 round 3 -- they judged "
+        "authority as 'admin of ANY organisation' "
+        "(admin_required/Permission.ADMINISTER, tied to the user's home "
+        "organisation) rather than authority in the organisation the target "
+        "user actually belongs to, so a user who was Administrator of their "
+        "own org but only a Viewer in another could switch their active "
+        "session to that org and still change another org's user's email or "
+        "password. Those routes now check "
+        "rbac_service.is_org_admin(current_user, g.current_org_id) instead "
+        "(app/modules/admin/routes/admin_routes.py's "
+        "_active_org_admin_required); this allow-list entry's own 'own row "
+        "only' scope was never the part that was wrong"
     ),
 
     # ---------------------------------------------------------------
@@ -79,6 +93,20 @@ PLATFORM_WRITE_ALLOWLIST: dict[str, str] = {
         "it before they hold any role in the target org, i.e. before "
         "g.current_org_id could ever equal that org -- TenantMixin's filter "
         "would hide the invitation from the one person who needs to accept it"
+    ),
+    "roles": (
+        "global reference data, not tenant-owned at all (app/models/user.py: "
+        "Role) -- a small fixed catalogue (User/Architect/Administrator/"
+        "Viewer/Approver) seeded once by Role.insert_roles() and shared by "
+        "every organisation. An ordinary role assignment (an org admin "
+        "inviting a teammate, or admin-add-user picking a role) does "
+        "`user.role = some_role`, which SQLAlchemy records as a dirty Role "
+        "row via the back-populated `Role.users` relationship even though no "
+        "column on Role itself changes -- the write is really to the "
+        "User/OrgRole side, already gated by its own route-level check "
+        "(PR 430 round 3, lead review v2, 2026-10-08: this backref-only "
+        "dirty was the specific cause of every invite/admin-add-user "
+        "regression the review's write-path test batch found)"
     ),
     "org_roles": (
         "the role grant a user holds within one organisation -- written when "
@@ -101,7 +129,13 @@ PLATFORM_WRITE_ALLOWLIST: dict[str, str] = {
         "per-organisation SAML/OIDC federation config, written by that "
         "org's own admin for their own org; read during the pre-login IdP "
         "redirect decision, before the request has any org/session context "
-        "to filter on"
+        "to filter on. NOTE (D-06, lead review v2, 2026-10-08): the reason "
+        "above is only about the WRITE this guard controls. On the READ "
+        "side, sso_service.get_config_for_email() resolves email_domain by "
+        "matching across every organisation's row, not only the caller's "
+        "own -- a separate, pre-existing cross-tenant issue (one org can "
+        "claim another org's email domain) that this allow-list entry does "
+        "not fix and is out of scope here; see the dedicated brief for it"
     ),
     "org_connector_configs": (
         "per-organisation third-party connector credentials (ServiceNow, "
@@ -127,6 +161,28 @@ PLATFORM_WRITE_ALLOWLIST: dict[str, str] = {
         "because it is a child of that fenced parent, not an independent "
         "global resource"
     ),
+    "saved_diagram_elements": (
+        "element position within a saved composer diagram "
+        "(app/models/archimate_core.py:SavedDiagramElement), reached only "
+        "through its parent SavedDiagram, which IS TenantMixin and already "
+        "fenced; this row carries no organization_id of its own because it "
+        "is a child of that fenced parent, not an independent resource -- "
+        "written on every ordinary composer save"
+    ),
+    "application_interface_metadata": (
+        "extended technical metadata for one ArchiMate ApplicationInterface "
+        "element (app/models/integration_metadata.py), reached only through "
+        "its parent ArchiMateElement (archimate_element_id, unique, "
+        "non-nullable FK), which IS TenantMixin and already fenced; written "
+        "on an ordinary user's own Interface Register entry"
+    ),
+    "system_dependencies": (
+        "a dependency edge between two ArchiMate elements "
+        "(app/models/integration_metadata.py:SystemDependency), reached only "
+        "through its source/target/interface ArchiMateElement foreign keys, "
+        "all of which ARE TenantMixin and already fenced; written on an "
+        "ordinary user's own Interface Register / dependency-mapping action"
+    ),
 
     # ---------------------------------------------------------------
     # Audit trails. Append-only by design (see each model's own docstring);
@@ -146,6 +202,14 @@ PLATFORM_WRITE_ALLOWLIST: dict[str, str] = {
         "whenever any signed-in user uses an AI feature -- most of the "
         "product's AI surface is used by ordinary, non-platform-admin users"
     ),
+    "import_audit_logs": (
+        "audit trail for the Import Applications workflow "
+        "(app/models/batch_import.py:ImportAuditLog), keyed by user_id with "
+        "no organisation column at all -- same append-only, written-as-a-"
+        "side-effect-of-an-authorised-action pattern as the other entries in "
+        "this block; written automatically on an ordinary user's own import "
+        "and import-restore actions"
+    ),
     "ai_chat_audit_logs": (
         "comprehensive audit trail for AI Chat operations, written "
         "automatically on every chat message/CRUD/approval event for every "
@@ -156,6 +220,113 @@ PLATFORM_WRITE_ALLOWLIST: dict[str, str] = {
         "through its parent AIChatCRUDApproval row "
         "(app/models/ai_chat_crud_approval.py), which IS a TenantMixin model "
         "and already fenced; this log is a child of that fenced parent"
+    ),
+    "audit_events": (
+        "immutable, cryptographically hash-chained security-event log "
+        "(app/security/audit.py: AuditEvent), the same append-only, "
+        "written-as-a-side-effect-of-an-authorised-action pattern as "
+        "soc2_audit_log/ai_audit_logs above -- written automatically on "
+        "every signed-in user's own security-relevant actions (confirmed by "
+        "running tests/smoke/test_archetype_journeys.py on this branch, PR "
+        "430 round 3, 2026-10-08: an ordinary login wrote one of these and "
+        "was refused, with the log line \"Failed to log audit event: "
+        "non-platform-admin insert refused on unscoped table audit_events\" "
+        "-- the guard was silently discarding this tamper-evident security "
+        "log's own entries for every non-platform-admin action, which is "
+        "the opposite of what a security log is for)"
+    ),
+
+    # ---------------------------------------------------------------
+    # The user's own notification/preference row and billing's one-row-per-
+    # organisation subscription record.
+    "notifications": (
+        "the user's own in-app notification (header bell icon), keyed only "
+        "by user_id with no organisation column at all -- every signed-in "
+        "user creates and marks-read only their own rows "
+        "(app/_bootstrap/routes.py scopes every query to current_user.id); "
+        "see app.models.models.Notification"
+    ),
+    "subscriptions": (
+        "one billing row per organisation (app/models/subscription.py: "
+        "Subscription) -- carries a non-nullable, unique organization_id FK "
+        "but is not TenantMixin; app.services.billing_plans.ensure_subscription "
+        "writes/updates this row on an ordinary org admin's own checkout, "
+        "plan-change and cancellation actions for their own organisation. "
+        "This table arguably should be TenantMixin and simply predates the "
+        "mixin's introduction -- flagged for the registry follow-up (D-07) "
+        "rather than converted here"
+    ),
+
+    # ---------------------------------------------------------------
+    # Duplicate/similarity-detection and consolidation-reporting tables.
+    # Every one of these is already listed in scripts/unfenced_tables.txt --
+    # an earlier, separate, already-recorded decision that this entry does
+    # not revisit -- and each is written as a normal side effect of an
+    # ordinary user's own "run duplicate detection" action within their own
+    # session, not an admin action (one of D-01's named broken flows: an
+    # ordinary detection run was refused here before these entries existed).
+    "duplicate_detection_runs": (
+        "execution record for a duplicate-detection run "
+        "(app/models/application_duplicate_detection.py:DuplicateDetectionRun); "
+        "already listed in scripts/unfenced_tables.txt; written whenever an "
+        "ordinary user runs duplicate detection for their own session's data"
+    ),
+    "duplicate_groups": (
+        "a group of applications a detection run found similar "
+        "(app/models/application_duplicate_detection.py:DuplicateGroup), "
+        "child of DuplicateDetectionRun above; already listed in "
+        "scripts/unfenced_tables.txt"
+    ),
+    "duplicate_analyses": (
+        "the detailed similarity analysis for one duplicate group "
+        "(app/models/application_duplicate_detection.py:DuplicateAnalysis); "
+        "already listed in scripts/unfenced_tables.txt"
+    ),
+    "duplicate_app_process_mapping": (
+        "process-mapping input to duplicate detection "
+        "(app/models/application_duplicate_detection.py:ApplicationProcessMapping); "
+        "already listed in scripts/unfenced_tables.txt"
+    ),
+    "consolidation_recommendations": (
+        "a recommendation produced from a duplicate group "
+        "(app/models/application_duplicate_detection.py:ConsolidationRecommendation); "
+        "already listed in scripts/unfenced_tables.txt"
+    ),
+    "simple_duplicate_groups": (
+        "the simplified-detection-mode equivalent of duplicate_groups "
+        "(app/models/simple_duplicate_detection.py:SimpleDuplicateGroup); "
+        "already listed in scripts/unfenced_tables.txt"
+    ),
+    "simple_detection_runs": (
+        "the simplified-detection-mode equivalent of "
+        "duplicate_detection_runs (app/models/simple_duplicate_detection.py:"
+        "SimpleDetectionRun); already listed in scripts/unfenced_tables.txt"
+    ),
+    "unified_detection_runs": (
+        "the current, consolidated detection-run record "
+        "(app/models/unified_duplicate_detection.py:UnifiedDetectionRun), "
+        "superseding the two modes above; already listed in "
+        "scripts/unfenced_tables.txt"
+    ),
+    "unified_duplicate_groups": (
+        "the current, consolidated duplicate-group record "
+        "(app/models/unified_duplicate_detection.py:UnifiedDuplicateGroup); "
+        "already listed in scripts/unfenced_tables.txt"
+    ),
+    "detection_schedules": (
+        "a recurring-schedule configuration for duplicate detection "
+        "(app/models/unified_duplicate_detection.py:DetectionSchedule); "
+        "already listed in scripts/unfenced_tables.txt"
+    ),
+    "application_similarity_analysis": (
+        "pairwise similarity scoring input to the consolidation workflow "
+        "(app/models/application_consolidation.py:ApplicationSimilarityAnalysis); "
+        "already listed in scripts/unfenced_tables.txt"
+    ),
+    "application_duplication_reports": (
+        "a generated report summarising a consolidation analysis "
+        "(app/models/application_consolidation.py:ApplicationDuplicationReport); "
+        "already listed in scripts/unfenced_tables.txt"
     ),
 
     # ---------------------------------------------------------------
@@ -196,6 +367,52 @@ PLATFORM_WRITE_ALLOWLIST: dict[str, str] = {
         "public '/offers/inquire' sales-contact form (app/main/views.py); "
         "reachable by a signed-in user browsing the public offers pages, "
         "not only anonymous visitors, and carries no organisation data at all"
+    ),
+
+    # ---------------------------------------------------------------
+    # Operational telemetry and a share mechanism deliberately built to work
+    # outside any tenant/session context.
+    "error_events": (
+        "aggregated server + client error telemetry (app/models/error_event.py), "
+        "deliberately not tenant-scoped by the model's own design: an error is "
+        "an operational fact about the platform, not the organisation's data, "
+        "and organization_id/user_id are kept as plain nullable attribution "
+        "columns rather than a filter -- read access is already restricted to "
+        "platform admins at the route layer. An ordinary user's own session "
+        "writes this table every time the client-error beacon reports a JS "
+        "exception, or a server-side error occurs while they are signed in"
+    ),
+    "artefact_share_links": (
+        "a revocable, single-organisation share token (app/models/artefact_share.py), "
+        "deliberately not TenantMixin per the model's own docstring: the "
+        "token must resolve from an unauthenticated request, where "
+        "g.current_org_id is None and the automatic tenant filter is a "
+        "documented no-op, so the mixin would misleadingly suggest a "
+        "protection this path cannot use. organization_id is an explicit, "
+        "mandatory, non-nullable column instead, and every owner-side route "
+        "filters on it by hand. An ordinary org member creates one of these "
+        "to share their own organisation's capability map/heatmap/roadmap"
+    ),
+
+    # ---------------------------------------------------------------
+    # Confirmed by running tests/smoke/test_archetype_journeys.py against
+    # this branch (PR 430 round 3, 2026-10-08): the enforcing guard refused
+    # this exact table during an ordinary user's own in-app action, which is
+    # one of this review round's 5 failing Level 10 journeys
+    # (test_operations_subscribes_to_service_status_and_it_persists --
+    # server log: "platform-write-guard: refused insert on UserPreference
+    # (table=user_preferences)", then "POST /status/subscription" 403).
+    "user_preferences": (
+        "the user's own platform-behaviour settings (entry mode, AI-"
+        "suggestion toggles, and -- per this table's reuse by the service-"
+        "status feature -- the signed-in user's own status-page "
+        "subscription), keyed only by user_id (unique, FK to users.id) with "
+        "no organisation column at all; see app/models/ai_suggestion.py: "
+        "UserPreference. Every signed-in user reads and writes only their "
+        "own row (unique constraint on user_id makes a second row for the "
+        "same user impossible); already treated as an owned, deletable-with-"
+        "the-user row elsewhere in this codebase (admin_routes.py's "
+        "api_bulk_delete_users _DELETE_OWNED list)"
     ),
 }
 

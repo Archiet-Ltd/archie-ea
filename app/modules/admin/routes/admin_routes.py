@@ -19,8 +19,11 @@ import os
 from datetime import datetime
 from html import escape
 
+from functools import wraps
+
 from flask import (
     Blueprint,
+    abort,
     flash,
     g,
     jsonify,
@@ -69,6 +72,45 @@ logger = logging.getLogger(__name__)
 _svc = AdminUserService
 
 
+def _active_org_admin_required(f):
+    """Judge admin authority in the user's ACTIVE session organisation
+    (``g.current_org_id``), not their home organisation.
+
+    D-05 (PR 430 round 3, lead review v2, 2026-10-08): ``admin_required``
+    (``current_user.can(Permission.ADMINISTER)``) reads the user's own
+    global ``Role`` -- the one tied to their home ``organization_id`` -- and
+    never looks at which organisation is active in the current session.
+    Switching the active organisation
+    (``AccountService.switch_active_organization``) only ever updates
+    ``g.current_org_id``/the session, never ``current_user.organization_id``,
+    so a user who is Administrator of their OWN home organisation but only a
+    Viewer (or nothing at all) in another organisation could switch their
+    active session to that other organisation and still pass
+    ``admin_required`` there -- it was answering "is this user an admin of
+    ANY organisation", not "of the one whose users this route is about to
+    show or change". Every route below acts on users already scoped to
+    ``g.current_org_id`` (``AdminUserService.get_user_or_404`` and the
+    ``registered_users``/``api_list_users`` listings all filter on it), so
+    the authority check has to be scoped to that same organisation, or the
+    two checks disagree and the route is only as safe as the weaker one.
+
+    A genuine platform admin still passes, same as every other route guarded
+    by ``platform_admin_required`` elsewhere in this file.
+    """
+
+    @wraps(f)
+    def _wrapped(*args, **kwargs):
+        if not getattr(current_user, "is_authenticated", False):
+            abort(403)
+        if is_platform_admin(current_user):
+            return f(*args, **kwargs)
+        if not rbac_service.is_org_admin(current_user, g.current_org_id):
+            abort(403)
+        return f(*args, **kwargs)
+
+    return _wrapped
+
+
 # ============================================================================
 # Dashboard & Index
 # ============================================================================
@@ -84,7 +126,7 @@ def index():
 
 @admin_bp.route("/dashboard-test")
 @login_required
-@admin_required
+@_active_org_admin_required
 def dashboard_test():
     """Admin dashboard test page for dropdown testing."""
     page = safe_int_arg('page', 1, minimum=1)
@@ -106,9 +148,17 @@ def dashboard_test():
 @admin_bp.route("/dashboard")
 @admin_bp.route("/dashboard/overview")  # Issue 1 fix: Support both routes
 @login_required
-@admin_required
+@_active_org_admin_required
 def dashboard():
-    """Admin dashboard with stats and overview."""
+    """Admin dashboard with stats and overview.
+
+    D-05 sweep (PR 430 round 3): same shape as the user-management routes
+    above -- AdminUserService.get_paginated_users() scopes its listing to
+    g.current_org_id, so the authority check guarding it must be scoped to
+    that same organisation too (see _active_org_admin_required's docstring),
+    or a user admin only of their own home org could view another org's
+    user roster after switching their active session to it.
+    """
     page = safe_int_arg('page', 1, minimum=1)
     per_page = safe_int_arg('per_page', 10, minimum=1, maximum=500)
     search_query = request.args.get("search", "")
@@ -224,7 +274,7 @@ def manage_users_redirect():
 
 @admin_bp.route("/users")
 @login_required
-@admin_required
+@_active_org_admin_required
 def registered_users():
     """View all registered users."""
     # admin_required is org-scoped admin, not platform_admin — restrict to the
@@ -250,7 +300,9 @@ def registered_users():
     # app/modules/admin/v2/routes/admin_routes.py::registered_users. Compute
     # it only for an actual platform admin; the shared template omits the
     # reconciliation line entirely when this is None.
-    platform_total_users = User.query.count() if is_platform_admin(current_user) else None
+    platform_total_users = (  # tenant-scoping-ok: gated by is_platform_admin(current_user) above; the platform-wide total is intentional, computed only for a genuine platform admin
+        User.query.count() if is_platform_admin(current_user) else None
+    )
     return render_template(
         "admin/registered_users.html",
         users=users,
@@ -263,7 +315,7 @@ def registered_users():
 @admin_bp.route("/user/<int:user_id>")
 @admin_bp.route("/user/<int:user_id>/info")
 @login_required
-@admin_required
+@_active_org_admin_required
 def user_info(user_id):
     """View a user's profile."""
     user = _svc.get_user_or_404(user_id)
@@ -272,7 +324,7 @@ def user_info(user_id):
 
 @admin_bp.route("/user/<int:user_id>/change-email", methods=["GET", "POST"])
 @login_required
-@admin_required
+@_active_org_admin_required
 @audit_log("admin_user_email_change")
 def change_user_email(user_id):
     """Change a user's email."""
@@ -291,7 +343,7 @@ def change_user_email(user_id):
 
 @admin_bp.route("/user/<int:user_id>/change-account-type", methods=["GET", "POST"])
 @login_required
-@admin_required
+@_active_org_admin_required
 @audit_log("admin_user_role_change")
 def change_account_type(user_id):
     """Change a user's account type."""
@@ -319,7 +371,7 @@ def change_account_type(user_id):
 
 @admin_bp.route("/user/<int:user_id>/set-password", methods=["GET", "POST"])
 @login_required
-@admin_required
+@_active_org_admin_required
 @audit_log("admin_user_password_set")
 def set_user_password(user_id):
     """Set or reset a user's password."""
@@ -339,7 +391,7 @@ def set_user_password(user_id):
 
 @admin_bp.route("/user/<int:user_id>/delete")
 @login_required
-@admin_required
+@_active_org_admin_required
 def delete_user_request(user_id):
     """Request deletion of a user's account."""
     user = _svc.get_user_or_404(user_id)
@@ -348,7 +400,7 @@ def delete_user_request(user_id):
 
 @admin_bp.route("/user/<int:user_id>/_delete", methods=["POST"])
 @login_required
-@admin_required
+@_active_org_admin_required
 def delete_user(user_id):
     """Delete a user's account."""
     if current_user.id == user_id:
@@ -2249,7 +2301,7 @@ def _auto_discover_features(app):
 
 @admin_bp.route("/api/users", methods=["GET"])
 @login_required
-@admin_required
+@_active_org_admin_required
 def api_list_users():
     """Paginated user list API for data table."""
     page = safe_int_arg('page', 1, minimum=1)
@@ -2306,7 +2358,7 @@ def api_list_users():
 
 @admin_bp.route("/api/users/bulk", methods=["DELETE"])
 @login_required
-@admin_required
+@_active_org_admin_required
 def api_bulk_delete_users():
     """Bulk delete users by IDs.
 
@@ -2323,7 +2375,27 @@ def api_bulk_delete_users():
         return jsonify({"error": "ids list required"}), 400
 
     from flask_login import current_user as cu
-    safe_ids = [int(i) for i in ids if int(i) != cu.id]
+    requested_ids = [int(i) for i in ids if int(i) != cu.id]
+    if not requested_ids:
+        return jsonify({"deleted": 0})
+
+    # D-03 sweep (PR 430 round 3, lead review v2, 2026-10-08): the DELETE
+    # statements below are raw SQL (`DELETE FROM users WHERE id = :uid`) with
+    # no organisation predicate of their own, and previously ran for any id
+    # the caller supplied -- an org admin of org A could bulk-delete org B's
+    # users by id, platform-wide, with no cross-org check at all. Every
+    # other route in this blueprint scopes the target user to
+    # g.current_org_id (AdminUserService.get_user_or_404); this one must
+    # too. A genuine platform admin may still act across organisations.
+    if is_platform_admin(current_user):
+        safe_ids = requested_ids
+    else:
+        safe_ids = [
+            row.id for row in User.query.filter(
+                User.id.in_(requested_ids),
+                User.organization_id == g.current_org_id,
+            ).all()
+        ]
     if not safe_ids:
         return jsonify({"deleted": 0})
 

@@ -15,7 +15,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from flask import g, has_request_context
+from flask_login import current_user
+
 from app import db
+from app.middleware.tenant_decorators import is_platform_admin
 from app.models.application_duplicate_detection import (
     DuplicateAnalysis,
     DuplicateDetectionRun,
@@ -1207,6 +1211,30 @@ class UnifiedDuplicateDetectionService:
                     "success": False,
                     "error": f"Application {keep_app_id} is not a member of group {group_id}",
                 }
+
+            # D-03 sweep (PR 430 round 3, lead review v2, 2026-10-08):
+            # UnifiedDuplicateGroup carries no organization_id at all, so
+            # group_id alone does not prove the group's applications belong
+            # to the caller's own organisation. Without this check, an
+            # ordinary authenticated user in any organisation could pass any
+            # group_id here and have this method delete another
+            # organisation's real ApplicationComponent rows. Require every
+            # member application to belong to the caller's active
+            # organisation, unless the caller is a genuine platform admin.
+            if has_request_context() and getattr(current_user, "is_authenticated", False) \
+                    and not is_platform_admin(current_user):
+                current_org_id = getattr(g, "current_org_id", None)
+                foreign = [
+                    app for app in group.applications
+                    if app.organization_id != current_org_id
+                ]
+                if foreign:
+                    group.status = "pending"
+                    db.session.flush()
+                    return {
+                        "success": False,
+                        "error": "Group contains applications outside your organisation",
+                    }
 
             keep_app = ApplicationComponent.query.get(keep_app_id)
             kept_app_name = keep_app.name if keep_app else "Unknown"
