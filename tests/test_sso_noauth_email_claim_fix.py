@@ -497,3 +497,62 @@ def test_route1_new_azure_user_external_id_is_oid_tid_composite_not_raw_sub(app,
     assert created is not None
     assert created.external_id == "common:fresh-oid"
     assert created.external_id != "raw-sub-must-not-be-stored"
+
+
+@pytest.mark.parametrize("module_path", MODULES)
+def test_cross_organisation_forged_email_claim_cannot_sign_in_as_the_victim(
+    app, db_session, module_path, make_org, monkeypatch
+):
+    """Two-organisation proof for the nOAuth fix: an attacker who holds a
+    real account in organisation B presents organisation A's victim's email
+    as an unverified Okta claim. The global (external_id, sso_provider) /
+    verified-email lookup this fix relies on has no organisation column to
+    accidentally scope by, so the review's MEDIUM-1 concern -- that the fix
+    might only "work" because every other test happens to use one
+    organisation -- is checked directly here: the attacker must be refused,
+    the victim's organisation-A account must be completely unchanged, and
+    the attacker's own organisation-B external_id/sso_provider must not be
+    touched either (no accidental link in either direction)."""
+    org_a = make_org("org-a")
+    org_b = make_org("org-b")
+    _enable_sso(db_session)
+
+    victim = _make_user(
+        db_session,
+        f"victim-cross-org-{uuid.uuid4().hex[:6]}@example.com",
+        organization_id=org_a.id,
+    )
+    attacker = _make_user(
+        db_session,
+        f"attacker-cross-org-{uuid.uuid4().hex[:6]}@example.com",
+        organization_id=org_b.id,
+    )
+    db_session.commit()
+    victim_external_id, victim_provider = victim.external_id, victim.sso_provider
+    attacker_external_id, attacker_provider = attacker.external_id, attacker.sso_provider
+
+    # Attacker's own account has no existing SSO link, so the (external_id,
+    # sso_provider) lookup cannot find it (or the victim's) -- the callback
+    # falls through to the email-claim path, correctly lands on the
+    # victim's email, and must refuse rather than sign the attacker in as
+    # the victim just because an unverified claim carries that email.
+    userinfo = {
+        "sub": "attacker-new-okta-sub",
+        "email": victim.email,
+        "email_verified": False,
+        "given_name": "Att",
+        "family_name": "Acker",
+    }
+    resp, flashes = _call_sso_callback(app, module_path, "okta", userinfo, monkeypatch)
+
+    assert _redirect_path(resp) == _expect_path(app, "account.login")
+    assert any(cat == "error" for cat, _msg in flashes), f"expected an error flash, got {flashes}"
+
+    db_session.expire(victim)
+    db_session.expire(attacker)
+    assert victim.external_id == victim_external_id
+    assert victim.sso_provider == victim_provider
+    assert victim.organization_id == org_a.id
+    assert attacker.external_id == attacker_external_id
+    assert attacker.sso_provider == attacker_provider
+    assert attacker.organization_id == org_b.id
