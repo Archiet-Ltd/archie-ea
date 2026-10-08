@@ -164,10 +164,18 @@ def test_load_page_site_family_known_and_unknown_slug():
 
 @pytest.mark.parametrize("slug", SITE_PAGES)
 def test_site_pages_included_in_sitemap_and_llms_txt(app, slug):
-    """Each new page is discoverable through the existing sitemap and llms.txt, unchanged."""
+    """Each new page is discoverable through the existing sitemap and
+    llms.txt -- except /docs, a SEO/GEO audit HOLD-verdict page (no
+    documentation is published yet, so it stays reachable but out of
+    every crawler file and nav/index listing until it is -- see
+    app/services/public_pages.py HELD_PAGE_URLS)."""
     with app.test_client() as client:
         sitemap = client.get("/sitemap.xml").data.decode()
         llms = client.get("/llms.txt").data.decode()
+        if slug == "docs":
+            assert "/docs" not in sitemap, "/sitemap.xml should not list held page /docs"
+            assert "/docs" not in llms, "/llms.txt should not list held page /docs"
+            return
         assert f"/{slug}" in sitemap, f"/sitemap.xml missing /{slug}"
         assert f"/{slug}" in llms, f"/llms.txt missing /{slug}"
 

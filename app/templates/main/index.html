@@ -1,12 +1,15 @@
 {% extends 'layouts/public_base.html' %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
 {% block full_title %}Entelim — your whole company, one model you can ask{% endblock %}
 {% block meta_description %}
-<meta name="description" content="Entelim is the open-source Enterprise Intelligence Model: build your company's architecture, applications, risks and gaps as one model you can ask. Self-host free under AGPL-3.0.">
 <link rel="canonical" href="https://entelim.org/">
+<meta name="description" content="Entelim is the open-source Enterprise Intelligence Model: build your company's architecture, applications, risks and gaps as one model you can ask. Self-host free under AGPL-3.0.">
 <meta property="og:title" content="Entelim — your whole company, one model you can ask">
 <meta property="og:description" content="Build your company as one model you can ask. Open source, self-host free, forever.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Entelim — your whole company, one model you can ask">
+<meta name="twitter:description" content="Build your company as one model you can ask. Open source, self-host free, forever.">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "The open-source Enterprise Intelligence Model."}</script>
 {% if config.GOOGLE_SITE_VERIFICATION %}
 <meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">
@@ -43,7 +46,7 @@
       </h1>
 
       <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
-        Build your company's architecture, applications, risks and gaps as one model inside Entelim. Ask what breaks if something fails, who is on the hook, and what you pay for twice.
+        Build your company's architecture, applications, risks and gaps as one model inside Entelim. Ask what breaks if something fails and who is on the hook.
       </p>
 
       <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
@@ -77,8 +80,8 @@
         <p class="text-muted-foreground text-sm">The capabilities under each stream, how mature they are, and what that puts at risk, answered on <a href="/use-cases/value-streams-at-risk" class="text-primary underline hover:no-underline">its own dedicated page</a>.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">What are we paying for twice?</h3>
-        <p class="text-muted-foreground text-sm">Overlapping applications, gathered into one list you can act on.</p>
+        <h3 class="text-lg font-semibold text-foreground mb-2">Which controls have no evidence they're met?</h3>
+        <p class="text-muted-foreground text-sm">Every control an application maps to, any open policy violation, and when it was last scanned — never a guessed percentage.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
         <h3 class="text-lg font-semibold text-foreground mb-2">What are we trying to achieve here, and how is it tracking?</h3>
@@ -194,8 +197,8 @@
       <div class="rounded-lg border border-border bg-card p-6">
         <h3 class="text-lg font-semibold text-foreground mb-1">Startup</h3>
         <p class="text-2xl font-bold text-foreground mb-1">$49<span class="text-sm font-normal text-muted-foreground">/month</span></p>
-        <p class="text-sm text-muted-foreground mb-3">$490/year. Ten people.</p>
-        <p class="text-sm text-muted-foreground">For founders and small services firms, 5 to 50 people. Everything in Community, plus audit export and email support.</p>
+        <p class="text-sm text-muted-foreground mb-3">$490/year.</p>
+        <p class="text-sm text-muted-foreground">For founders and small services firms, 5 to 50 people. Ten people and email support, everything in Community included.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6 ring-2 ring-primary">
         <h3 class="text-lg font-semibold text-foreground mb-1">Team</h3>

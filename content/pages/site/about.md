@@ -22,6 +22,12 @@ Archiet runs its own operating model in Entelim — roadmap and stop/go decision
 same twin the product sells, not a spreadsheet kept alongside it. That practice is documented on
 [how Archiet runs on Entelim](/how-archiet-runs-on-entelim).
 
+## Built for your AI assistants too
+
+A general assistant can guess at your architecture. It can't know it. Entelim's own AI chat queries
+your twin directly, backed by the same questions Ask answers, so an answer comes from your real
+model, not a plausible-sounding guess.
+
 ## Open source, so nobody's locked in
 
 Entelim is licensed under the GNU Affero General Public License (AGPL-3.0), the same licence that

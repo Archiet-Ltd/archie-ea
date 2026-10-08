@@ -9,12 +9,11 @@ tests/test_public_content_pages.py, tests/test_public_jsonld.py).
 Checks, for every URL currently listed in /sitemap.xml:
   1. it returns 200 (no 404s);
   2. it has a non-empty <meta name="description">;
-  3. it has a <link rel="canonical"> pointing at the canonical this page
-     declares for itself -- its own URL for every page except the small,
-     documented set of comparison pages that canonicalize to archiet.ai
-     (see app/services/public_pages.py::_build_canonical and
-     test_comparison_pages_have_canonical_link in
-     test_public_content_pages.py, which already covers that exception).
+  3. it has a <link rel="canonical"> pointing at its own entelim.org URL --
+     every public page is self-canonical, with no exception, including a
+     comparison page that also carries an archiet.ai external_url for
+     cross-linking only (see app/services/public_pages.py::self_canonical_url
+     and test_comparison_external_url in test_public_content_pages.py).
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ from __future__ import annotations
 import re
 from urllib.parse import urlparse
 
-from app.services.public_pages import CANONICAL_BASE_URL, load_all_pages, load_feed_pages
+from app.services.public_pages import SITE_URL, load_all_pages, load_feed_pages
 
 _LOC_RE = re.compile(r"<loc>([^<]+)</loc>")
 _DESCRIPTION_RE = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"')
@@ -45,10 +44,11 @@ def _sitemap_paths(client) -> list[str]:
 
 
 def _expected_canonical(path: str, pages_by_url: dict) -> str:
-    page = pages_by_url.get(path)
-    if page is not None:
-        return page.effective_canonical_url
-    return CANONICAL_BASE_URL + path
+    # Every public page is self-canonical -- see self_canonical_url -- so
+    # the expected value is always this page's own URL on this domain,
+    # whether or not a PublicPage backs this path (the home page and the
+    # two hub indexes do not).
+    return SITE_URL + path
 
 
 def test_every_sitemap_url_is_crawlable_and_tagged(app):
@@ -82,12 +82,12 @@ def test_every_sitemap_url_is_crawlable_and_tagged(app):
             )
 
 
-def test_every_non_override_page_canonical_is_self_referencing(app):
-    """Outside the documented archiet.ai exception, canonical == own URL."""
+def test_every_page_canonical_is_self_referencing(app):
+    """Every public page -- including a comparison page that also carries
+    an archiet.ai external_url for cross-linking only -- is canonical to
+    its own entelim.org URL, with no exception."""
     for page in load_all_pages():
-        if page.canonical_url:  # the documented archiet.ai exception
-            continue
-        assert page.effective_canonical_url == CANONICAL_BASE_URL + page.url, (
+        assert page.self_canonical_url == SITE_URL + page.url, (
             f"{page.url}: canonical is not self-referencing"
         )
 
@@ -105,7 +105,10 @@ def test_ping_indexnow_excludes_a_withdrawn_page(app, monkeypatch):
     logic) with the network call swapped out, so a regression in the
     command's own loader choice is caught here.
     """
-    withdrawn = [p for p in load_all_pages() if p.is_withdrawn]
+    withdrawn = [
+        p for p in load_all_pages()
+        if p.front_matter.get("state") == "not_planned"
+    ]
     assert withdrawn, (
         "expected at least one withdrawn page (state: not_planned) to exist "
         "on this branch to exercise the exclusion"
