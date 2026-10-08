@@ -9,6 +9,7 @@ link, no unflagged invented price), and the hub's entry in sitemap.xml.
 from __future__ import annotations
 
 import json
+from urllib.parse import urlparse
 
 from app.services.public_pages import (
     CONTENT_ROOT,
@@ -165,3 +166,30 @@ def test_sitemap_includes_vs_hub(app):
     with app.test_client() as client:
         xml = client.get("/sitemap.xml").data.decode()
         assert "<loc>https://entelim.org/vs</loc>" in xml
+
+
+# ── /vs/avolution and /vs/orbus: merged duplicate pages 301 to the survivor ─
+
+OLD_VS_SLUG_REDIRECTS = {
+    "avolution": "/vs/avolution-abacus",
+    "orbus": "/vs/orbus-iserver",
+}
+
+
+def test_old_vs_slugs_301_to_merged_survivor(app):
+    """/vs/avolution and /vs/orbus were separate pages covering the same
+    competitor as /vs/avolution-abacus and /vs/orbus-iserver respectively.
+    The old URLs must 301 to the survivor, not 404, since they may already
+    be indexed."""
+    with app.test_client() as client:
+        for old_slug, new_path in OLD_VS_SLUG_REDIRECTS.items():
+            rv = client.get(f"/vs/{old_slug}", follow_redirects=False)
+            assert rv.status_code == 301, (
+                f"/vs/{old_slug}: expected 301, got {rv.status_code}"
+            )
+            assert urlparse(rv.location).path == new_path, (
+                f"/vs/{old_slug}: redirected to {rv.location!r}, expected {new_path!r}"
+            )
+            # And the survivor it redirects to actually renders.
+            rv2 = client.get(new_path)
+            assert rv2.status_code == 200, f"{new_path}: expected 200, got {rv2.status_code}"

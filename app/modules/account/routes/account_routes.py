@@ -31,6 +31,7 @@ from flask_login import current_user, login_required
 from app.security.audit import audit_logger
 
 _log = logging.getLogger(__name__)
+from app.services import buy_intent
 from app.services.rate_limiter import rate_limit
 
 from . import mail_views
@@ -66,7 +67,7 @@ def login():
         from app.utils.safe_redirect import safe_next_url
 
         return redirect(
-            safe_next_url(request.args.get("next"), url_for("dashboard.overview"))
+            safe_next_url(buy_intent.next_candidate(consume=True), url_for("dashboard.overview"))
         )
     form = LoginForm()
     if form.validate_on_submit():
@@ -97,10 +98,12 @@ def login():
             if mfa_service.required_for(user):
                 session["_mfa_pending_user_id"] = user.id
                 session["_mfa_pending_remember"] = bool(form.remember_me.data)
-                session["_mfa_pending_next"] = request.args.get("next", "")
+                session["_mfa_pending_next"] = buy_intent.next_candidate(consume=True) or ""
                 return redirect(url_for("account.mfa_challenge"))
 
             # Fix Session Fixation: Regenerate session ID after successful authentication
+            # Read before the session is cleared: the chosen plan lives in it.
+            _landing = buy_intent.next_candidate(consume=True)
             session.clear()
             session.modified = True
             _svc.login(user, form.remember_me.data)
@@ -124,7 +127,7 @@ def login():
             from app.utils.safe_redirect import safe_next_url
 
             return redirect(
-                safe_next_url(request.args.get("next"), url_for("dashboard.overview"))
+                safe_next_url(_landing, url_for("dashboard.overview"))
             )
         else:
             try:
@@ -680,6 +683,25 @@ def sso_callback(provider):
             db.session.add(user)
 
         db.session.commit()
+
+    # R1-B12 PR 2 (TB-0144/PB-0100): the same MFA gate login() applies to a
+    # password sign-in, applied here too -- an administrator must complete
+    # multi-factor before SSO can finish the login, whether enrolling for
+    # the first time or entering a code from an already-enrolled
+    # authenticator app. Checked before the session-fixation reset inside
+    # login_and_register() below, so an IdP response alone never mints a
+    # real session for an administrator account. There is no "remember me"
+    # checkbox in an SSO flow, matching this route's own unconditional
+    # remember=True below; _mfa_pending_next has no equivalent "next" here
+    # either, matching _complete_login_after_mfa()'s own empty-string
+    # fallback.
+    from app.services import mfa_service
+
+    if mfa_service.required_for(user):
+        session["_mfa_pending_user_id"] = user.id
+        session["_mfa_pending_remember"] = True
+        session["_mfa_pending_next"] = ""
+        return redirect(url_for("account.mfa_challenge"))
 
     # Establish Flask-Login session (same as password login)
     from app.services import session_registry

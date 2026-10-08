@@ -32,6 +32,7 @@ _log = logging.getLogger(__name__)
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
 from app.security.audit import audit_logger
+from app.services import buy_intent
 from app.services.rate_limiter import rate_limit
 
 from app.modules.account.forms.account_forms import (
@@ -72,7 +73,7 @@ def login():
         from app.utils.safe_redirect import safe_next_url
 
         return redirect(
-            safe_next_url(request.args.get("next"), url_for("dashboard.overview"))
+            safe_next_url(buy_intent.next_candidate(consume=True), url_for("dashboard.overview"))
         )
     form = LoginForm()
     if form.validate_on_submit():
@@ -104,10 +105,12 @@ def login():
             if mfa_service.required_for(user):
                 session["_mfa_pending_user_id"] = user.id
                 session["_mfa_pending_remember"] = bool(form.remember_me.data)
-                session["_mfa_pending_next"] = request.args.get("next", "")
+                session["_mfa_pending_next"] = buy_intent.next_candidate(consume=True) or ""
                 return redirect(url_for("account.mfa_challenge"))
 
             # Fix Session Fixation: Regenerate session ID after successful authentication
+            # Read before the session is cleared: the chosen plan lives in it.
+            _landing = buy_intent.next_candidate(consume=True)
             session.clear()
             session.modified = True
             _svc.login(user, form.remember_me.data)
@@ -131,7 +134,7 @@ def login():
             from app.utils.safe_redirect import safe_next_url
 
             return redirect(
-                safe_next_url(request.args.get("next"), url_for("dashboard.overview"))
+                safe_next_url(_landing, url_for("dashboard.overview"))
             )
         else:
             try:
@@ -634,6 +637,33 @@ def sso_callback(provider):
         db.session.add(user)
         db.session.commit()
 
+    # R1-B12 PR 2 (TB-0144/PB-0100): the same MFA gate login() applies to a
+    # password sign-in, applied here too -- an administrator must complete
+    # multi-factor before SSO can finish the login, whether enrolling for
+    # the first time or entering a code from an already-enrolled
+    # authenticator app. Checked before login_and_register() below mints a
+    # real session, so an IdP response alone never mints a real session for
+    # an administrator account. There is no "remember me" checkbox in an SSO
+    # flow in either case, so this pending value matches this route's own
+    # non-MFA path below (session_registry.login_and_register(user), no
+    # remember= argument, defaults to False) rather than carrying a
+    # "remembered" cookie an MFA-enrolled admin never asked for;
+    # _mfa_pending_next has no equivalent "next" here either, matching
+    # _complete_login_after_mfa()'s own empty-string fallback. v1
+    # account_routes.py's sso_callback() carries the same MFA gate but
+    # keeps its own pending value at True, matching that route's own
+    # non-MFA path, which calls login_and_register(user, remember=True)
+    # explicitly -- USE_ACCOUNT_GUARDRAILS chooses which of the two is
+    # registered, so whichever is live stays internally consistent between
+    # its own MFA and non-MFA paths.
+    from app.services import mfa_service
+
+    if mfa_service.required_for(user):
+        session["_mfa_pending_user_id"] = user.id
+        session["_mfa_pending_remember"] = False
+        session["_mfa_pending_next"] = ""
+        return redirect(url_for("account.mfa_challenge"))
+
     session_registry.login_and_register(user)
-    audit_logger.log("sso_login", user_id=user.id, detail=f"provider={provider}")
+    audit_logger.log_authentication(success=True, method=f"sso:{provider}")
     return redirect(url_for("main.index"))

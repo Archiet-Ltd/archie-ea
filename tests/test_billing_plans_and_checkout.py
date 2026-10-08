@@ -727,20 +727,26 @@ def test_pricing_page_has_a_buy_button_per_plan(app, client):
         resp = client.get("/pricing")
     html = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    assert "/admin/billing/?plan=startup&amp;interval=year#checkout" in html
-    assert "/admin/billing/?plan=team&amp;interval=year#checkout" in html
-    assert "/admin/billing/?plan=team&amp;interval=month#checkout" in html
+    # Buy buttons route through the click-tracking redirect
+    # (app/main/views.py::track_plan_click) before landing on registration, so
+    # the plan-preserving registration URL now travels as the redirect's
+    # "next" parameter.
+    assert "/t/plan-click?plan=startup&amp;next=/account/register?plan%3Dstartup%26interval%3Dyear" in html
+    assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dyear" in html
+    assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dmonth" in html
     assert 'data-testid="buy-enterprise"' in html
 
 
 def test_pricing_contact_sales_button_points_at_the_contact_page(app, client):
-    """'Contact sales' leads to /contact, which now carries the sales enquiry
+    """'Contact sales' leads to /contact (via the click-tracking redirect,
+    app/main/views.py::track_plan_click), which now carries the sales enquiry
     form rather than the old pre-launch waiting list."""
     import re
 
     resp = client.get("/pricing")
     html = resp.get_data(as_text=True)
-    assert re.search(r'<a href="/contact"[^>]*data-testid="buy-enterprise"', html)
+    assert re.search(
+        r'<a href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
 
 
 def test_signing_in_returns_the_visitor_to_the_plan_they_chose(app, db_session, client, login_as, no_billing):

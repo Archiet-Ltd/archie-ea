@@ -1046,7 +1046,7 @@ def test_title_html_entities_decoded_org_chart():
 
 def test_comparison_faq_jsonld_has_entries():
     """Comparison pages with <strong>-format FAQ produce non-empty mainEntity."""
-    for slug in ["leanix", "ardoq", "bizzdesign-hopex", "avolution", "orbus"]:
+    for slug in ["leanix", "ardoq", "bizzdesign-hopex", "avolution-abacus", "orbus-iserver"]:
         page = load_page("comparison", slug=slug)
         assert page is not None, f"Comparison page {slug} not found"
         ld_str = build_jsonld(page)
@@ -1069,8 +1069,8 @@ def test_comparison_faq_jsonld_question_count():
         "leanix": 3,
         "ardoq": 3,
         "bizzdesign-hopex": 2,
-        "avolution": 3,
-        "orbus": 3,
+        "avolution-abacus": 4,
+        "orbus-iserver": 3,
     }
     for slug, expected in expected_counts.items():
         page = load_page("comparison", slug=slug)
