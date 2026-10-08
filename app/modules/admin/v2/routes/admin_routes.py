@@ -66,7 +66,11 @@ from ...forms.admin_forms import (
 )
 from app.modules.account.forms.account_forms import CreatePasswordForm
 from app.decorators import admin_required, audit_log, governance_gate_reader_required
-from app.middleware.tenant_decorators import org_admin_required, platform_admin_required
+from app.middleware.tenant_decorators import (
+    org_admin_required,
+    platform_admin_required,
+    require_org_or_platform_admin,
+)
 from app.models import APISettings, EditableHTML, Permission, Role, User
 from app.models.organization import Organization
 from app.models.org_role import OrgRole
@@ -524,6 +528,17 @@ def user_info(user_id):
 @audit_log("change_user_email")
 def change_user_email(user_id):
     """Change a user's email."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and change
+    # org B's own administrator's email out from under them. Same
+    # tenant_decorators.require_org_or_platform_admin guard used by every
+    # other fixed route on this branch (set_user_password,
+    # api_bulk_delete_users, webhook_settings, the D4-D6 routes).
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     form = ChangeUserEmailForm()
     if form.validate_on_submit():
@@ -544,6 +559,17 @@ def change_user_email(user_id):
 @audit_log("change_account_type")
 def change_account_type(user_id):
     """Change a user's account type."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and demote
+    # org B's own administrator, or promote any of that org's users --
+    # same session-switch IDOR class as change_user_email (commit 7ae1b168)
+    # and set_user_password; same tenant_decorators
+    # .require_org_or_platform_admin guard, reproduced by the refuter.
+    require_org_or_platform_admin(g.current_org_id)
     if current_user.id == user_id:
         flash(
             "You cannot change the type of your own account. Please ask "
@@ -579,6 +605,17 @@ def change_account_type(user_id):
 @audit_log("set_user_password")
 def set_user_password(user_id):
     """Set or reset a user's password."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and set a new
+    # password for org B's own administrator -- full account takeover, no
+    # reset-flow step needed. Found by the sweep that found change_user_email's
+    # identical gap (commit 7ae1b168); same tenant_decorators
+    # .require_org_or_platform_admin guard.
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     form = CreatePasswordForm()
     if form.validate_on_submit():
@@ -609,6 +646,17 @@ def delete_user_request(user_id):
 @admin_required
 def delete_user(user_id):
     """Delete a user's account."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and delete
+    # org B's own administrator -- same session-switch IDOR class as
+    # change_user_email (commit 7ae1b168) and set_user_password; same
+    # tenant_decorators.require_org_or_platform_admin guard, reproduced by
+    # the refuter.
+    require_org_or_platform_admin(g.current_org_id)
     if current_user.id == user_id:
         flash(
             "You cannot delete your own account. Please ask another "
@@ -3270,6 +3318,15 @@ def api_list_users():
 @admin_required
 def api_bulk_delete_users():
     """Bulk delete users by IDs (cannot delete yourself)."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while the delete
+    # query below correctly scopes to g.current_org_id. Without this guard,
+    # a caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and delete
+    # org B's users outright. Found by the sweep that found
+    # change_user_email's identical gap (commit 7ae1b168); same
+    # tenant_decorators.require_org_or_platform_admin guard.
+    require_org_or_platform_admin(g.current_org_id)
     data = request.get_json() or {}
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
@@ -3296,7 +3353,14 @@ def api_bulk_delete_users():
 @platform_admin_required
 @admin_required
 def api_list_roles():
-    """List all roles with user counts and permission flags."""
+    """List all roles with user counts and permission flags.
+
+    Role is a GLOBAL table (app/models/user.py's Role carries no
+    organization_id) -- reachable by any org admin of their own,
+    brand-new organisation, no invitation into anyone else's org needed.
+    platform_admin_required added alongside this route's own
+    admin_required for every /api/roles verb (list/get/create/update/
+    delete), same as the enterprise-roles sibling finding."""
     roles = Role.query.order_by(Role.name).all()
     items = []
     for role in roles:
@@ -3325,7 +3389,8 @@ def api_list_roles():
 @platform_admin_required
 @admin_required
 def api_get_role(role_id):
-    """Get a single role by ID."""
+    """Get a single role by ID. See api_list_roles's docstring: Role is a
+    global table, platform_admin_required required."""
     role = Role.query.get_or_404(role_id)
     users = User.query.filter_by(role_id=role.id, organization_id=g.current_org_id).all()
     return jsonify({
@@ -3349,7 +3414,8 @@ def api_get_role(role_id):
 @platform_admin_required
 @admin_required
 def api_create_role():
-    """Create a new custom role."""
+    """Create a new custom role. See api_list_roles's docstring: Role is a
+    global table, platform_admin_required required."""
     data = request.get_json() or {}
     name = (data.get("name") or "").strip()
     if not name:
@@ -3370,7 +3436,8 @@ def api_create_role():
 @platform_admin_required
 @admin_required
 def api_update_role(role_id):
-    """Update a role name or permissions."""
+    """Update a role name or permissions. See api_list_roles's docstring:
+    Role is a global table, platform_admin_required required."""
     role = Role.query.get_or_404(role_id)
     if role.name in ("Administrator", "User"):
         return jsonify({"success": False, "error": "System roles cannot be modified"}), 403
@@ -3390,7 +3457,9 @@ def api_update_role(role_id):
 @platform_admin_required
 @admin_required
 def api_delete_role(role_id):
-    """Delete a custom role. Reassigns users to the default User role."""
+    """Delete a custom role. Reassigns users to the default User role. See
+    api_list_roles's docstring: Role is a global table,
+    platform_admin_required required."""
     role = Role.query.get_or_404(role_id)
     if role.name in ("Administrator", "User"):
         return jsonify({"success": False, "error": "System roles cannot be deleted"}), 403
@@ -3458,6 +3527,16 @@ def api_enterprise_role_users():
 @admin_required
 def api_assign_enterprise_role():
     """Assign an enterprise role to a user."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while the lookup
+    # below correctly scopes to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and assign
+    # any enterprise role to that org's users -- the JSON API twin of
+    # change_account_type's session-switch IDOR (commit 7ae1b168 class);
+    # same tenant_decorators.require_org_or_platform_admin guard,
+    # reproduced by the refuter.
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.user import VALID_ROLES
     data = request.get_json() or {}
     user_id = data.get("user_id")
@@ -3854,6 +3933,17 @@ def report_builder():
 @audit_log("update_webhook_settings")
 def webhook_settings():
     """PLT-015: Manage Slack/Teams webhook subscriptions and notification settings."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while
+    # WebhookSubscription's TenantMixin scopes the query/create below to
+    # g.current_org_id. Without this guard, a caller who is an
+    # Administrator in org A but holds only a Viewer OrgRole in org B can
+    # switch the active session to org B and plant a webhook URL they
+    # control into org B, which then streams org B's events out to them.
+    # Found by the sweep that found change_user_email's identical gap
+    # (commit 7ae1b168); same tenant_decorators.require_org_or_platform_admin
+    # guard.
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.webhook import WebhookSubscription
 
     VALID_EVENTS = [
