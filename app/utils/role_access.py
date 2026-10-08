@@ -100,6 +100,10 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
         "roadmaps",
         "governance",
         "procurement",  # Read-only access to procurement for cost visibility
+        # R1-B34 (TB-0135): owns the Formula Register (reviews/versions the
+        # composite-score weights) -- see its _link() in this persona's zone
+        # below.
+        "portfolio_management",
     },
     ROLE_CTO: {
         "home",
@@ -134,6 +138,7 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
         "my_applications",
         "data_integration",
         "administration",
+        "portfolio_management",
     },
     # G6 (register close, 1 Sep 2026): security_architect and data_architect
     # were promoted to first-class roles (VALID_ROLES, own charters, own sidebar
@@ -184,11 +189,23 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
     },
 }
 
-# Sections that require specific roles (exclusive access)
+# Sections that require specific roles (exclusive access).
+#
+# Documentary only: can_access_section() below reads ROLE_SECTION_ACCESS (role
+# -> set of sections), not this dict, and nothing in the codebase reads
+# EXCLUSIVE_SECTIONS itself (confirmed by search) -- the actual gate for every
+# section named here is its membership in ROLE_SECTION_ACCESS[role] above.
+# Kept in the same role-list shape as a human-readable index of which
+# sections are role-exclusive; if you are adding a new exclusive section,
+# the line that must change is the role's entry in ROLE_SECTION_ACCESS, not
+# this one.
 EXCLUSIVE_SECTIONS: Dict[str, List[str]] = {
     "administration": [ROLE_PLATFORM_ADMIN],
     "procurement": [ROLE_PROCUREMENT, ROLE_PORTFOLIO_MANAGER, ROLE_PLATFORM_ADMIN],
     "my_applications": [ROLE_APPLICATION_MANAGER, ROLE_PLATFORM_ADMIN],
+    # R1-B34 (TB-0135): Formula Register -- reviewed/versioned by
+    # portfolio_manager; platform_admin sees everything.
+    "portfolio_management": [ROLE_PORTFOLIO_MANAGER, ROLE_PLATFORM_ADMIN],
 }
 
 # Default role if user has no enterprise_role set
@@ -724,7 +741,10 @@ _MY_WORK_LINKS = {
         _BUSINESS_CASE_LINK,
         _TWIN_MAP_LINK,
         # Ownership coverage by business unit — CTO accountability.
-        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users"),
+        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users", requires="cto_or_portfolio_manager"),
+        # R1-B03 PR 2: the one ownership record now also covers capabilities.
+        # Ample headroom in this zone (10 links against SIDEBAR_LINK_BUDGET 32).
+        _link("Capabilities With No Owner", "capability_map.capabilities_no_owner", "user-x", requires="cto_or_portfolio_manager"),
         # R1-B85: supported-estate share, open exceptions, the store-
         # agreement disagreement finder.
         _link("CTO Scorecard", "cto_scorecard.index", "clipboard-list"),
@@ -829,7 +849,10 @@ _MY_WORK_LINKS = {
         # Signature screen: the business cases a portfolio decision rests on.
         _BUSINESS_CASE_LINK,
         # Ownership coverage by business unit — portfolio manager accountability.
-        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users"),
+        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users", requires="cto_or_portfolio_manager"),
+        # R1-B03 PR 2: the one ownership record now also covers capabilities.
+        # Ample headroom in this zone (9 links against SIDEBAR_LINK_BUDGET 32).
+        _link("Capabilities With No Owner", "capability_map.capabilities_no_owner", "user-x", requires="cto_or_portfolio_manager"),
     ],
     ROLE_PROCUREMENT: [
         # Fix round: Overview, Licences and Compliance were reachable from
@@ -1091,6 +1114,21 @@ def link_requires_satisfied(user, requires):
             from app.models.user import Permission
 
             return bool(user.can(Permission.GENERAL))
+        except Exception:  # anonymous / unexpected user object
+            return False
+    if requires == "cto_or_portfolio_manager":
+        # Matches the route guard on Ownership Coverage and Capabilities
+        # With No Owner (@role_required(ROLE_CTO, ROLE_PORTFOLIO_MANAGER),
+        # which also falls back to is_admin()) -- these are enterprise_role
+        # checks, not a Permission bit, so neither "admin" nor "general"
+        # above covers them. R1-B03 PR 2: found both links already leaking
+        # into every persona's /modules/ directory as dead 403 rows, since
+        # no requires= guard existed for an enterprise_role predicate before
+        # this one.
+        try:
+            if hasattr(user, "is_admin") and user.is_admin():
+                return True
+            return getattr(user, "enterprise_role", None) in (ROLE_CTO, ROLE_PORTFOLIO_MANAGER)
         except Exception:  # anonymous / unexpected user object
             return False
     return False

@@ -45,8 +45,8 @@ silently assigned to someone.
 
 ## Where you'll meet it
 
-- [Which systems have no owner, and which owner is a single point of failure?](/scale-up/no-owner)
-- [Which of my people is a single point of failure?](/services-ops/key-person-risk)
+- [Which systems have no owner, and which owner is a single point of failure?](/use-cases/systems-with-no-owner)
+- [Which of my people is a single point of failure?](/use-cases/key-person-risk)
 
 ## Related modules
 

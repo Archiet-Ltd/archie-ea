@@ -442,9 +442,9 @@ def test_get_page_recording_returns_none_for_module_pages():
 def test_get_page_recording_returns_none_for_an_unrecorded_use_case():
     page = PublicPage(
         family="function-per-segment",
-        slug="uc-s3-06-capability-maturity-heatmap",  # not in USE_CASE_VIDEO_CAPTURES,
+        slug="capability-maturity-heatmap",  # not in USE_CASE_VIDEO_CAPTURES,
         # regardless of its own screenshot's pending status
-        url="/use-cases/uc-s3-06-capability-maturity-heatmap",
+        url="/use-cases/capability-maturity-heatmap",
         title="Capability maturity",
         body_html="",
         front_matter={"capture_status": "live"},

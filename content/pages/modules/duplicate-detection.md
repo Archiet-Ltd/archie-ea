@@ -23,7 +23,7 @@ Rationalization is where you act on what it finds.
 
 ## Where you'll meet it
 
-- [What are we paying for twice?](/scale-up/duplicate-spend)
+- [What are we paying for twice?](/use-cases/duplicate-software-spend)
 
 ## Related modules
 

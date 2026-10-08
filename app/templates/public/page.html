@@ -11,6 +11,11 @@
 {% extends 'layouts/public_base.html' %}
 {% block title %}{{ page.title }}{% endblock %}
 
+{% block meta_description %}
+<meta name="description" content="{{ page.description }}">
+<link rel="canonical" href="{{ page.effective_canonical_url }}">
+{% endblock %}
+
 {% block header %}
 {% include 'components/public_navbar.html' %}
 {% endblock %}
@@ -40,10 +45,6 @@
 
 {% block content %}
 <div class="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16">
-  {% if page.canonical_url %}
-  <link rel="canonical" href="{{ page.canonical_url }}">
-  {% endif %}
-
   {% if jsonld %}
   <script type="application/ld+json">{{ jsonld }}</script>
   {% endif %}
@@ -82,8 +83,9 @@
   {% endif %}
 
   {% if page.cta == 'plans' %}
-  {# Buy buttons. Each opens the plan's checkout step on the billing page;
-     a visitor who is not signed in is asked to sign in first and lands there. #}
+  {# Buy buttons. A visitor who is not signed in goes to registration with the
+     plan and interval carried, and lands on that plan's checkout step on the
+     billing page afterwards (signing in instead leads to the same place). #}
   {% set _billing = 'billing.billing_index' in flask.current_app.view_functions %}
   {% set _btn = 'inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 transition-colors' %}
   <section aria-labelledby="buy-heading" class="mt-12 space-y-4" data-testid="pricing-buy">
@@ -93,26 +95,26 @@
       <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
         <p class="font-semibold text-foreground">Community</p>
         <p class="text-sm text-muted-foreground">Free, with no trial clock.</p>
-        <a href="/signup" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Start free</a>
+        <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Start free</a>
       </div>
       {% for key, name in [('startup', 'Startup'), ('team', 'Team')] %}
       <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
         <p class="font-semibold text-foreground">{{ name }}</p>
         {% if _billing %}
-        <a href="{{ url_for('billing.billing_index', plan=key, interval='year') }}#checkout"
+        <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
            class="{{ _btn }} mt-auto bg-primary text-primary-foreground hover:bg-primary/90"
            data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
-        <a href="{{ url_for('billing.billing_index', plan=key, interval='month') }}#checkout"
+        <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
            class="text-sm text-primary underline text-center">or pay monthly</a>
         {% else %}
-        <a href="/contact" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Contact us to buy {{ name }}</a>
+        <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Contact us to buy {{ name }}</a>
         {% endif %}
       </div>
       {% endfor %}
       <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
         <p class="font-semibold text-foreground">Enterprise</p>
         <p class="text-sm text-muted-foreground">Sold by annual contract.</p>
-        <a href="/contact" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent" data-testid="buy-enterprise">Contact sales</a>
+        <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent" data-testid="buy-enterprise">Contact sales</a>
       </div>
     </div>
   </section>
