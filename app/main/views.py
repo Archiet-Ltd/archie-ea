@@ -445,6 +445,8 @@ def sitemap_xml():
     (front matter ``state: not_planned``) -- see
     app/services/public_pages.py::load_feed_pages / feed_page_paths.
     """
+    from html import escape
+
     from app.services.public_pages import feed_page_paths
 
     base_url = "https://entelim.org"
@@ -452,7 +454,7 @@ def sitemap_xml():
     for path in feed_page_paths():
         # Homepage is not a content page but is the most important URL.
         priority = "<priority>1.0</priority>" if path == "/" else ""
-        urls.append(f"  <url><loc>{base_url}{path}</loc>{priority}</url>")
+        urls.append(f"  <url><loc>{base_url}{escape(path)}</loc>{priority}</url>")
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
     from flask import Response
     return Response(xml, mimetype="application/xml")
