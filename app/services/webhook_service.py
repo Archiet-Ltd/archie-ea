@@ -2,13 +2,17 @@
 Webhook service for managing event-driven notifications
 """
 
+import atexit
 import hashlib
 import hmac
+import http.client
 import json
+import socket
 import threading
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
+from collections import defaultdict, deque
+from concurrent.futures import Future
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Dict, List, Optional
@@ -16,29 +20,309 @@ from urllib.parse import urlparse
 
 import requests
 from flask import current_app
+from requests.adapters import HTTPAdapter
+from urllib3.connection import HTTPConnection, HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
 
 from app.extensions import db
 from app.models.webhook import WebhookDelivery, WebhookEvent, WebhookSubscription
 from app.utils.ssrf_guard import BlockedOutboundURL, validate_outbound_url
 
-# One bounded pool per process runs every background delivery. A thread per
-# event let a hanging receiver pile up unlimited workers.
 _DEFAULT_DELIVERY_WORKERS = 8
-# A delivery row left "pending" this long was lost with its process.
+# At most this many deliveries of one organisation are in flight at once; the
+# rest wait in that organisation's own queue and occupy no worker.
+_DEFAULT_PER_ORG_IN_FLIGHT = 2
+# Bound on queued (not yet running) deliveries across the process. Past it the
+# delivery row simply stays "pending" for the stale-pending retry to pick up.
+_DEFAULT_QUEUE_MAX = 1000
+# Wall-clock cap on one send attempt (connect + headers + body), seconds.
+_DEFAULT_ATTEMPT_DEADLINE = 10.0
+# Never read more than this much of a receiver's response.
+MAX_RESPONSE_BYTES = 64 * 1024
+# A delivery row left "pending" (or "retrying") this long was lost with its process.
 PENDING_STALE_AFTER = timedelta(minutes=10)
 
-_executor: Optional[ThreadPoolExecutor] = None
+
+class _FairDispatcher:
+    """Process-wide bounded delivery workers with per-organisation fairness.
+
+    * Workers are daemon threads, so process exit never waits on deliveries.
+    * Each organisation has its own queue; workers take work round-robin across
+      organisations, and an organisation never has more than ``per_org_limit``
+      deliveries running, so one organisation's slow or hanging receivers
+      cannot occupy every worker.
+    * The total queue is bounded: ``submit_for_org`` returns ``None`` when full
+      and the caller leaves the delivery row ``pending``.
+    """
+
+    def __init__(self, workers, per_org_limit, queue_max):
+        self.per_org_limit = max(1, int(per_org_limit))
+        self.queue_max = max(1, int(queue_max))
+        self._cond = threading.Condition()
+        self._queues = {}
+        self._rotation = deque()
+        self._inflight = defaultdict(int)
+        self._queued = 0
+        self._stopping = False
+        self._threads = []
+        for i in range(max(1, int(workers))):
+            t = threading.Thread(
+                target=self._work, name=f"webhook-delivery-{i}", daemon=True
+            )
+            t.start()
+            self._threads.append(t)
+
+    def submit_for_org(self, org_id, fn, *args) -> Optional[Future]:
+        future = Future()
+        with self._cond:
+            if self._stopping or self._queued >= self.queue_max:
+                return None
+            if org_id not in self._queues:
+                self._queues[org_id] = deque()
+                self._rotation.append(org_id)
+            self._queues[org_id].append((future, fn, args))
+            self._queued += 1
+            self._cond.notify_all()
+        return future
+
+    def submit(self, fn, *args) -> Optional[Future]:
+        """ThreadPoolExecutor-shaped entry for work with no organisation."""
+        return self.submit_for_org(None, fn, *args)
+
+    def _next(self):
+        for _ in range(len(self._rotation)):
+            org_id = self._rotation[0]
+            queue = self._queues[org_id]
+            if self._inflight[org_id] < self.per_org_limit:
+                item = queue.popleft()
+                self._queued -= 1
+                self._inflight[org_id] += 1
+                if queue:
+                    self._rotation.rotate(-1)
+                else:
+                    self._rotation.popleft()
+                    del self._queues[org_id]
+                return org_id, item
+            self._rotation.rotate(-1)
+        return None
+
+    def _work(self):
+        while True:
+            with self._cond:
+                picked = None
+                while not self._stopping:
+                    picked = self._next()
+                    if picked is not None:
+                        break
+                    self._cond.wait()
+                if self._stopping:
+                    return
+            org_id, (future, fn, args) = picked
+            try:
+                if future.set_running_or_notify_cancel():
+                    try:
+                        future.set_result(fn(*args))
+                    except BaseException as exc:  # reported through the future
+                        future.set_exception(exc)
+            finally:
+                with self._cond:
+                    self._inflight[org_id] -= 1
+                    if self._inflight[org_id] <= 0:
+                        del self._inflight[org_id]
+                    self._cond.notify_all()
+
+    def shutdown(self, wait=False, cancel_futures=True):
+        """Stop taking work; drop queued work. Rows queued here stay "pending"
+        and the stale-pending retry recovers them. Never joins unless asked."""
+        with self._cond:
+            self._stopping = True
+            dropped = []
+            if cancel_futures:
+                for queue in self._queues.values():
+                    dropped.extend(item[0] for item in queue)
+            self._queues.clear()
+            self._rotation.clear()
+            self._queued = 0
+            self._cond.notify_all()
+        for future in dropped:
+            future.cancel()
+        if wait:
+            for t in self._threads:
+                t.join()
+
+
+_executor: Optional[_FairDispatcher] = None
 _executor_lock = threading.Lock()
 
 
-def _get_delivery_executor(max_workers: int) -> ThreadPoolExecutor:
+def _get_delivery_executor(
+    max_workers: int,
+    per_org_limit: int = _DEFAULT_PER_ORG_IN_FLIGHT,
+    queue_max: int = _DEFAULT_QUEUE_MAX,
+) -> _FairDispatcher:
+    """The process's dispatcher, created lazily (after gunicorn forks)."""
     global _executor
     with _executor_lock:
         if _executor is None:
-            _executor = ThreadPoolExecutor(
-                max_workers=max(1, int(max_workers)), thread_name_prefix="webhook-delivery"
-            )
+            _executor = _FairDispatcher(max_workers, per_org_limit, queue_max)
+            atexit.register(_shutdown_delivery_executor)
         return _executor
+
+
+def _shutdown_delivery_executor() -> None:
+    """At process exit: do not wait on queued or running deliveries."""
+    with _executor_lock:
+        executor = _executor
+    if executor is not None:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+
+def reset_delivery_executor() -> None:
+    """Drop the dispatcher so the next use builds a fresh one (tests, reconfig)."""
+    global _executor
+    with _executor_lock:
+        executor, _executor = _executor, None
+    if executor is not None:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+
+# ---------------------------------------------------------------------------
+# One send attempt with a wall-clock deadline. A socket timeout applies to each
+# read, so a receiver that drips a byte at a time never trips it; a watchdog
+# closes the attempt's sockets when the deadline passes instead.
+# ---------------------------------------------------------------------------
+
+_attempt_local = threading.local()
+
+
+class DeliveryDeadlineExceeded(Exception):
+    pass
+
+
+class _AttemptGuard:
+    def __init__(self, deadline: float):
+        self.deadline = deadline
+        self.expired = False
+        self._socks = []
+        self._lock = threading.Lock()
+        self._timer = None
+
+    @staticmethod
+    def _kill(sock) -> None:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
+    def track(self, sock) -> None:
+        with self._lock:
+            self._socks.append(sock)
+            if self.expired:
+                self._kill(sock)
+
+    def _expire(self) -> None:
+        with self._lock:
+            self.expired = True
+            for sock in self._socks:
+                self._kill(sock)
+
+    def __enter__(self):
+        _attempt_local.guard = self
+        self._timer = threading.Timer(self.deadline, self._expire)
+        self._timer.daemon = True
+        self._timer.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._timer.cancel()
+        _attempt_local.guard = None
+        return False
+
+
+class _TrackSocketMixin:
+    def _new_conn(self):
+        sock = super()._new_conn()
+        guard = getattr(_attempt_local, "guard", None)
+        if guard is not None:
+            guard.track(sock)
+        return sock
+
+
+class _TrackedHTTPConnection(_TrackSocketMixin, HTTPConnection):
+    pass
+
+
+class _TrackedHTTPSConnection(_TrackSocketMixin, HTTPSConnection):
+    pass
+
+
+class _TrackedHTTPPool(HTTPConnectionPool):
+    ConnectionCls = _TrackedHTTPConnection
+
+
+class _TrackedHTTPSPool(HTTPSConnectionPool):
+    ConnectionCls = _TrackedHTTPSConnection
+
+
+class _DeadlineAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        super().init_poolmanager(*args, **kwargs)
+        self.poolmanager.pool_classes_by_scheme = {
+            "http": _TrackedHTTPPool,
+            "https": _TrackedHTTPSPool,
+        }
+
+
+def _post_with_deadline(url, payload, headers, timeout, deadline):
+    """POST once. Returns (status_code, body_text); body_text is None for a
+    redirect (never followed, never read). Raises DeliveryDeadlineExceeded past
+    the wall-clock deadline, or requests/OS errors."""
+    deadline = max(0.05, float(deadline))
+    sock_timeout = max(0.05, min(float(timeout), deadline))
+    started = time.monotonic()
+    guard = _AttemptGuard(deadline)
+    session = requests.Session()
+    session.mount("http://", _DeadlineAdapter())
+    session.mount("https://", _DeadlineAdapter())
+    try:
+        with guard:
+            response = session.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=(sock_timeout, sock_timeout),
+                allow_redirects=False,
+                stream=True,
+            )
+            try:
+                status = response.status_code
+                if 300 <= status < 400:
+                    return status, None
+                body = bytearray()
+                for chunk in response.iter_content(8192):
+                    body.extend(chunk)
+                    if len(body) >= MAX_RESPONSE_BYTES:
+                        break
+                    if time.monotonic() - started > deadline:
+                        raise DeliveryDeadlineExceeded()
+                encoding = response.encoding or "utf-8"
+            finally:
+                response.close()
+        try:
+            text = bytes(body[:MAX_RESPONSE_BYTES]).decode(encoding, "replace")
+        except LookupError:
+            text = bytes(body[:MAX_RESPONSE_BYTES]).decode("utf-8", "replace")
+        return status, text
+    except DeliveryDeadlineExceeded:
+        raise DeliveryDeadlineExceeded(f"delivery exceeded the {deadline:g}s deadline")
+    except (requests.RequestException, OSError, http.client.HTTPException) as exc:
+        if guard.expired or time.monotonic() - started >= deadline:
+            raise DeliveryDeadlineExceeded(
+                f"delivery exceeded the {deadline:g}s deadline"
+            ) from exc
+        raise
+    finally:
+        session.close()
 
 
 class WebhookService:
@@ -50,6 +334,13 @@ class WebhookService:
         self.timeout = current_app.config.get("WEBHOOK_TIMEOUT", 30)  # seconds
         self.max_workers = current_app.config.get(
             "WEBHOOK_DELIVERY_MAX_WORKERS", _DEFAULT_DELIVERY_WORKERS
+        )
+        self.per_org_limit = current_app.config.get(
+            "WEBHOOK_DELIVERY_PER_ORG_IN_FLIGHT", _DEFAULT_PER_ORG_IN_FLIGHT
+        )
+        self.queue_max = current_app.config.get("WEBHOOK_DELIVERY_QUEUE_MAX", _DEFAULT_QUEUE_MAX)
+        self.attempt_deadline = current_app.config.get(
+            "WEBHOOK_DELIVERY_DEADLINE_SECONDS", _DEFAULT_ATTEMPT_DEADLINE
         )
 
     def create_subscription(
@@ -167,7 +458,13 @@ class WebhookService:
     def publish_event(
         self, event_type: str, payload: Dict, user_id: str, metadata: Optional[Dict] = None
     ) -> WebhookEvent:
-        """Publish an event to all subscribed webhooks"""
+        """Publish an event to all subscribed webhooks.
+
+        The event and one "pending" delivery row per matching subscription are
+        written in a single short commit before anything is queued, so no
+        published event can exist without its rows: whatever is lost in memory
+        (a full queue, a restart) is recoverable from the table.
+        """
         event = WebhookEvent(
             id=str(uuid.uuid4()),
             event_type=event_type,
@@ -178,28 +475,60 @@ class WebhookService:
         )
 
         db.session.add(event)
+        db.session.flush()  # resolves the organisation column default
+        org_id = event.organization_id
+
+        subscriptions = (
+            self._find_matching_subscriptions(event_type, payload) if org_id is not None else []
+        )
+        event_data = {
+            "event_type": event_type,
+            "payload": payload,
+            "metadata": event.event_metadata,
+            "event_id": event.id,
+            "timestamp": event.created_at.isoformat(),
+        }
+        subscription_ids = []
+        for sub in subscriptions:
+            if sub.organization_id != org_id:
+                continue
+            db.session.add(
+                WebhookDelivery(
+                    id=str(uuid.uuid4()),
+                    event_id=event.id,
+                    subscription_id=sub.id,
+                    organization_id=org_id,  # explicit: workers have no request context
+                    event_type=event_type,
+                    payload=self._build_payload_for_subscription(sub, event_data),
+                    status="pending",
+                    attempt_count=0,
+                    created_at=datetime.utcnow(),
+                )
+            )
+            subscription_ids.append(sub.id)
         db.session.commit()
 
-        # Find matching subscriptions
-        subscriptions = self._find_matching_subscriptions(event_type, payload)
-
-        # Deliver to subscriptions asynchronously on the bounded pool. The worker
-        # has no request, so it gets the real app and plain ids, not ORM
-        # instances bound to this request's session.
-        org_id = event.organization_id
         if org_id is None:
             current_app.logger.error(
                 f"Webhook event {event.id} ({event_type}) has no organization; nothing delivered"
             )
-        elif subscriptions:
-            subscription_ids = [s.id for s in subscriptions if s.organization_id == org_id]
-            if subscription_ids:
-                self._delivery_future = _get_delivery_executor(self.max_workers).submit(
-                    self._run_delivery_in_app_context,
-                    current_app._get_current_object(),
-                    event.id,
-                    org_id,
-                    subscription_ids,
+        elif subscription_ids:
+            # The worker has no request, so it gets the real app and plain ids,
+            # not ORM instances bound to this request's session.
+            self._delivery_future = _get_delivery_executor(
+                self.max_workers, self.per_org_limit, self.queue_max
+            ).submit_for_org(
+                org_id,
+                self._run_delivery_in_app_context,
+                current_app._get_current_object(),
+                event.id,
+                org_id,
+                subscription_ids,
+            )
+            if self._delivery_future is None:
+                current_app.logger.warning(
+                    f"Webhook delivery queue full; event {event.id} left pending "
+                    f"for {len(subscription_ids)} subscription(s)"
                 )
 
         current_app.logger.info(
@@ -271,9 +600,11 @@ class WebhookService:
     def _run_delivery_in_app_context(self, app, event_id, org_id, subscription_ids):
         """Worker body: deliver one event inside its own application context.
 
-        Re-loads the event and subscriptions by id under the event's tenant
-        scope, so nothing from the publishing request's session is shared with
-        this worker. Never raises: failures are logged through the captured app.
+        Loads the event's "pending" delivery rows (written at publish time) and
+        their subscriptions by id under the event's tenant scope, so nothing
+        from the publishing request's session is shared with this worker. A row
+        whose subscription is no longer deliverable is marked failed. Never
+        raises: failures are logged through the captured app.
         """
         from app.jobs.tenant_safe_job import tenant_scope
 
@@ -286,20 +617,29 @@ class WebhookService:
                     event = db.session.get(WebhookEvent, event_id)
                     if event is None or event.organization_id != org_id:
                         return
-                    snapshots = []
-                    for sid in subscription_ids:
-                        sub = db.session.get(WebhookSubscription, sid)
+                    rows = (
+                        db.session.query(WebhookDelivery)
+                        .filter(
+                            WebhookDelivery.event_id == event_id,
+                            WebhookDelivery.organization_id == org_id,
+                            WebhookDelivery.subscription_id.in_(list(subscription_ids)),
+                            WebhookDelivery.status == "pending",
+                        )
+                        .all()
+                    )
+                    work, undeliverable = [], []
+                    for delivery in rows:
+                        sub = db.session.get(WebhookSubscription, delivery.subscription_id)
                         if self._deliverable(sub, org_id):
-                            snapshots.append(self._snapshot_subscription(sub))
-                    event_data = {
-                        "event_type": event.event_type,
-                        "payload": event.payload,
-                        "metadata": event.event_metadata,
-                        "event_id": event.id,
-                        "timestamp": event.created_at.isoformat(),
-                    }
-                    db.session.remove()  # no transaction or connection held from here on
-                    self._deliver_snapshots(event_data, snapshots)
+                            work.append((delivery.id, self._snapshot_subscription(sub), delivery.payload))
+                        else:
+                            undeliverable.append(delivery.id)
+                    db.session.rollback()
+                    db.session.remove()  # worker thread: nothing held from here on
+                    for delivery_id in undeliverable:
+                        self._fail_undeliverable(delivery_id, org_id)
+                    for delivery_id, snap, formatted in work:
+                        self._claim_and_attempt(delivery_id, org_id, snap, formatted, retry=False)
             except Exception as e:  # never let the worker die silently
                 try:
                     db.session.rollback()
@@ -312,19 +652,91 @@ class WebhookService:
                 except Exception:
                     pass
 
-    def _deliver_snapshots(self, event_data: Dict, snapshots: List[SimpleNamespace]):
-        for snap in snapshots:
+    def _claim_and_attempt(self, delivery_id, org_id, snap, formatted, *, retry: bool) -> bool:
+        """Claim the row atomically, then send. Only the winner sends."""
+        try:
+            if not self._claim_delivery(delivery_id, org_id, retry=retry):
+                return False
+            self._attempt_delivery(
+                delivery_id, snap, self._outbound_headers(snap, formatted), formatted
+            )
+            return True
+        except Exception as e:
             try:
-                self._deliver_webhook(snap, event_data)
-            except Exception as e:
-                try:
-                    db.session.rollback()
-                except Exception:
-                    pass
-                current_app.logger.error(
-                    f"Failed to deliver event {event_data.get('event_id')} "
-                    f"to subscription {snap.id}: {e}"
+                db.session.rollback()
+            except Exception:
+                pass
+            current_app.logger.error(
+                f"Failed to deliver delivery {delivery_id} to subscription {snap.id}: {e}"
+            )
+            return False
+
+    def _claim_delivery(self, delivery_id, org_id, *, retry: bool) -> bool:
+        """One UPDATE moving the row to "retrying", guarded on its current
+        status, so of any number of concurrent claimants exactly one wins.
+
+        First delivery claims "pending". A retry claims "failed", or a row left
+        "pending"/"retrying" so long that its worker was lost with its process;
+        never a fresh "pending" (its worker has it) or a fresh "retrying" (a
+        worker is between attempts).
+        """
+        from sqlalchemy import and_, or_, update
+
+        now = datetime.utcnow()
+        stale = now - PENDING_STALE_AFTER
+        if retry:
+            allowed = or_(
+                WebhookDelivery.status == "failed",
+                and_(WebhookDelivery.status == "pending", WebhookDelivery.created_at < stale),
+                and_(
+                    WebhookDelivery.status == "retrying",
+                    or_(
+                        WebhookDelivery.last_attempt_at.is_(None),
+                        WebhookDelivery.last_attempt_at < stale,
+                    ),
+                ),
+            )
+        else:
+            allowed = WebhookDelivery.status == "pending"
+        try:
+            result = db.session.execute(
+                update(WebhookDelivery)
+                .where(
+                    WebhookDelivery.id == delivery_id,
+                    WebhookDelivery.organization_id == org_id,
+                    allowed,
                 )
+                .values(status="retrying", last_attempt_at=now)
+                .execution_options(synchronize_session=False)
+            )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        return result.rowcount == 1
+
+    def _fail_undeliverable(self, delivery_id, org_id) -> None:
+        from sqlalchemy import update
+
+        try:
+            db.session.execute(
+                update(WebhookDelivery)
+                .where(
+                    WebhookDelivery.id == delivery_id,
+                    WebhookDelivery.organization_id == org_id,
+                    WebhookDelivery.status == "pending",
+                )
+                .values(
+                    status="failed",
+                    last_attempt_at=datetime.utcnow(),
+                    error_message="Subscription is no longer active for this organisation",
+                )
+                .execution_options(synchronize_session=False)
+            )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
 
     # ------------------------------------------------------------------
     # Payload formatters for Teams and Slack
@@ -458,22 +870,20 @@ class WebhookService:
         return headers
 
     def _deliver_webhook(self, subscription, event_data: Dict) -> Dict:
-        """Deliver webhook to a single subscription (ORM row or snapshot)."""
+        """Deliver to a single subscription in the caller's thread (the test
+        route). Writes its own row, claims it and sends exactly like a worker;
+        the request's session is committed, never removed."""
         snap = (
             subscription
             if isinstance(subscription, SimpleNamespace)
             else self._snapshot_subscription(subscription)
         )
         formatted_payload = self._build_payload_for_subscription(snap, event_data)
-        headers = self._outbound_headers(snap, formatted_payload)
 
         delivery = WebhookDelivery(
             id=str(uuid.uuid4()),
             event_id=event_data.get("event_id"),
             subscription_id=snap.id,
-            # Explicit, not the column default: this runs on a worker with no
-            # request context, so TenantMixin's g.current_org_id default can't
-            # resolve it. The subscription was org-checked before delivery.
             organization_id=snap.organization_id,
             event_type=event_data.get("event_type"),
             payload=formatted_payload,
@@ -485,11 +895,16 @@ class WebhookService:
         db.session.add(delivery)
         db.session.commit()
 
+        if not self._claim_delivery(delivery_id, snap.organization_id, retry=False):
+            return {"delivery_id": delivery_id, "success": False, "attempts": 0}
+        headers = self._outbound_headers(snap, formatted_payload)
         success, attempts = self._attempt_delivery(delivery_id, snap, headers, formatted_payload)
         return {"delivery_id": delivery_id, "success": success, "attempts": attempts}
 
     def _record_attempt(self, delivery_id: str, **fields) -> None:
-        """Write one attempt's outcome in its own short transaction."""
+        """Write one attempt's outcome in its own short transaction. The commit
+        releases the connection; the session itself is left alone because this
+        also runs inside a live request (the test route)."""
         try:
             delivery = db.session.get(WebhookDelivery, delivery_id)
             if delivery is not None:
@@ -499,12 +914,16 @@ class WebhookService:
         except Exception:
             db.session.rollback()
             raise
-        finally:
-            db.session.remove()
 
     def _attempt_delivery(self, delivery_id: str, snap, headers: Dict, payload: Dict):
-        """Send with retries. Holds no transaction or pooled connection while
-        the HTTP call is in flight; each outcome is a new short transaction.
+        """Send a claimed row, with retries. Holds no transaction or pooled
+        connection while the HTTP call is in flight; each outcome is a new short
+        transaction. The row stays "retrying" between this worker's own attempts
+        and becomes "failed" only after the last one.
+
+        A redirect is never followed: any 3xx is a failure recorded with its
+        status and no body. Each attempt has a wall-clock deadline and reads at
+        most 64 KB of the response.
 
         Returns (success, attempts). Logs the subscription id and URL host only:
         the full URL is a bearer credential for Slack/Teams/Azure endpoints.
@@ -526,16 +945,22 @@ class WebhookService:
             current_app.logger.error(f"Webhook to {label} blocked by outbound URL guard")
             return False, 1
 
+        total = max(1, int(self.max_retries))
         attempts = 0
-        for attempt in range(self.max_retries):
+        for attempt in range(total):
             attempts = attempt + 1
+            last = attempts >= total
+            fail_status = "failed" if last else "retrying"
             now = datetime.utcnow()
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
-            except requests.RequestException as e:
+                status_code, body = _post_with_deadline(
+                    url, payload, headers, self.timeout, self.attempt_deadline
+                )
+            except (requests.RequestException, DeliveryDeadlineExceeded, OSError,
+                    http.client.HTTPException) as e:
                 self._record_attempt(
                     delivery_id,
-                    status="failed",
+                    status=fail_status,
                     attempt_count=attempts,
                     last_attempt_at=now,
                     error_message=str(e)[:500],
@@ -544,27 +969,39 @@ class WebhookService:
                 outcome = dict(
                     attempt_count=attempts,
                     last_attempt_at=now,
-                    response_status=response.status_code,
-                    response_body=response.text[:1000],
+                    response_status=status_code,
+                    response_body=body[:1000] if body is not None else None,
                 )
-                if 200 <= response.status_code < 300:
+                if 200 <= status_code < 300:
                     self._record_attempt(
                         delivery_id, status="success", delivered_at=datetime.utcnow(),
                         error_message=None, **outcome,
                     )
                     current_app.logger.info(f"Delivered webhook to {label}")
                     return True, attempts
+                if 300 <= status_code < 400:
+                    # Deterministic: retrying the same URL redirects again.
+                    self._record_attempt(
+                        delivery_id,
+                        status="failed",
+                        error_message=f"HTTP {status_code}: redirect not followed",
+                        **outcome,
+                    )
+                    current_app.logger.error(
+                        f"Webhook to {label} answered a redirect ({status_code}); not followed"
+                    )
+                    return False, attempts
                 self._record_attempt(
                     delivery_id,
-                    status="failed",
-                    error_message=f"HTTP {response.status_code}: {response.text[:200]}",
+                    status=fail_status,
+                    error_message=f"HTTP {status_code}: {(body or '')[:200]}",
                     **outcome,
                 )
-            if attempt < self.max_retries - 1:
+            if not last:
                 time.sleep(self.retry_delay * (attempt + 1))  # Exponential backoff
 
         current_app.logger.error(
-            f"Failed to deliver webhook to {label} after {self.max_retries} attempts"
+            f"Failed to deliver webhook to {label} after {total} attempts"
         )
         return False, attempts
 
@@ -578,10 +1015,10 @@ class WebhookService:
         )
 
     def retry_event(self, event_id: str) -> bool:
-        """Retry this event's failed deliveries, and deliveries left pending
-        for over ten minutes (a worker lost with its process). Runs on the same
-        bounded pool and delivery body as first delivery: signed, with the
-        subscription's custom headers."""
+        """Retry this event's failed deliveries, and deliveries left pending or
+        retrying for over ten minutes (a worker lost with its process). Runs on
+        the same bounded dispatcher and send path as first delivery: signed,
+        with the subscription's custom headers, each row claimed atomically."""
         event = WebhookEvent.query.get(event_id)
         if not event:
             return False
@@ -589,12 +1026,17 @@ class WebhookService:
         if org_id is None:
             current_app.logger.error(f"Webhook event {event_id} has no organization; no retry")
             return True
-        self._delivery_future = _get_delivery_executor(self.max_workers).submit(
+        self._delivery_future = _get_delivery_executor(
+            self.max_workers, self.per_org_limit, self.queue_max
+        ).submit_for_org(
+            org_id,
             self._run_retry_in_app_context,
             current_app._get_current_object(),
             event_id,
             org_id,
         )
+        if self._delivery_future is None:
+            current_app.logger.warning(f"Webhook delivery queue full; retry of {event_id} not queued")
         return True
 
     def _run_retry_in_app_context(self, app, event_id, org_id):
@@ -611,11 +1053,19 @@ class WebhookService:
                     stale = datetime.utcnow() - PENDING_STALE_AFTER
                     rows = WebhookDelivery.query.filter(
                         WebhookDelivery.event_id == event_id,
+                        WebhookDelivery.organization_id == org_id,
                         or_(
                             WebhookDelivery.status == "failed",
                             and_(
                                 WebhookDelivery.status == "pending",
                                 WebhookDelivery.created_at < stale,
+                            ),
+                            and_(
+                                WebhookDelivery.status == "retrying",
+                                or_(
+                                    WebhookDelivery.last_attempt_at.is_(None),
+                                    WebhookDelivery.last_attempt_at < stale,
+                                ),
                             ),
                         ),
                     ).all()
@@ -625,15 +1075,10 @@ class WebhookService:
                         if self._deliverable(sub, org_id):
                             snap = self._snapshot_subscription(sub)
                             work.append((delivery.id, snap, delivery.payload))
+                    db.session.rollback()
                     db.session.remove()
                     for delivery_id, snap, payload in work:
-                        try:
-                            self._attempt_delivery(
-                                delivery_id, snap, self._outbound_headers(snap, payload), payload
-                            )
-                        except Exception as e:
-                            db.session.rollback()
-                            app.logger.error(f"Retry of delivery {delivery_id} failed: {e}")
+                        self._claim_and_attempt(delivery_id, org_id, snap, payload, retry=True)
             except Exception as e:
                 try:
                     db.session.rollback()
