@@ -9,7 +9,7 @@
         </a>
 
         <!-- Primary public nav: hidden on narrow screens, the footer carries these links there -->
-        <nav class="hidden md:flex items-center gap-6">
+        <nav aria-label="Primary" class="hidden md:flex items-center gap-6">
             <a href="/features" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
             <a href="/use-cases" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Use cases</a>
             <a href="/vs" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Compare</a>
@@ -62,7 +62,7 @@
             <a href="{{ url_for('account.login') }}" class="text-sm font-medium text-foreground hover:text-primary transition-colors">
                 Sign In
             </a>
-            <a href="{{ url_for('account.register') }}" class="text-sm font-medium bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+            <a href="{{ url_for('account.register') }}" class="public-btn bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
                 Sign Up
             </a>
         {% endif %}
