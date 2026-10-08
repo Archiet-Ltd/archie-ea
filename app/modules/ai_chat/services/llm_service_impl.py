@@ -3242,11 +3242,6 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             if org_id is not None:
                 query = query.filter(LLMInteraction.organization_id == org_id)
 
-            # TRNT-072: tenant scoping
-            org_id = LLMService._resolve_org_id()
-            if org_id is not None:
-                query = query.filter(LLMInteraction.organization_id == org_id)
-
             if user_id:
                 query = query.filter_by(user_id=user_id)
 
