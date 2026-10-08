@@ -39,6 +39,7 @@ from app.modules.duplicate_detection.services.unified_duplicate_detection_servic
 from app.utils.pagination import safe_int_arg
 from app.models.application_portfolio import ApplicationComponent
 from app.utils.route_guards import require_entity_json
+from app.modules.duplicate_detection.group_access import group_visible_to_caller
 
 logger = logging.getLogger(__name__)
 
@@ -1124,7 +1125,7 @@ def approve_consolidation_recommendation(recommendation_id):
     """Approve a consolidation recommendation."""
     try:
         group = DuplicateGroup.query.get(recommendation_id)
-        if not group:
+        if not group or not group_visible_to_caller(group):
             return jsonify({"success": False, "error": "Recommendation not found"}), 404
         group.status = "approved"
         group.reviewed_at = datetime.utcnow()
@@ -1145,7 +1146,7 @@ def reject_consolidation_recommendation(recommendation_id):
         data = request.get_json() or {}
         reason = data.get("reason", "")
         group = DuplicateGroup.query.get(recommendation_id)
-        if not group:
+        if not group or not group_visible_to_caller(group):
             return jsonify({"success": False, "error": "Recommendation not found"}), 404
         group.status = "rejected"
         group.reviewed_at = datetime.utcnow()
@@ -1175,12 +1176,14 @@ def api_add_group_to_consolidation(group_id):
         group = UnifiedDuplicateGroup.query.get(group_id_int)
         if not group:
             legacy_group = DuplicateGroup.query.get(group_id_int)
-            if not legacy_group:
+            if not legacy_group or not group_visible_to_caller(legacy_group):
                 return jsonify({"success": False, "error": f"Group {group_id} not found"}), 404
             application_ids = [app.id for app in legacy_group.applications]
             group_name = legacy_group.name or f"Duplicate Group {group_id_int}"
             estimated_savings = legacy_group.estimated_savings if hasattr(legacy_group, "estimated_savings") else None
         else:
+            if not group_visible_to_caller(group):
+                return jsonify({"success": False, "error": f"Group {group_id} not found"}), 404
             application_ids = [app.id for app in group.applications.all()]
             group_name = group.name or f"Duplicate Group {group_id_int}"
             estimated_savings = group.estimated_savings if hasattr(group, "estimated_savings") else None
@@ -1256,6 +1259,8 @@ def api_ignore_group(group_id):
 
         group = UnifiedDuplicateGroup.query.get(group_id_int)
         if group:
+            if not group_visible_to_caller(group):
+                return jsonify({"success": False, "error": f"Group {group_id} not found"}), 404
             group.status = "ignored"
             group.resolution_action = "no_action"
             if reason:
@@ -1264,7 +1269,7 @@ def api_ignore_group(group_id):
             return jsonify({"success": True, "group_id": group_id_int, "status": group.status})
 
         legacy_group = DuplicateGroup.query.get(group_id_int)
-        if not legacy_group:
+        if not legacy_group or not group_visible_to_caller(legacy_group):
             return jsonify({"success": False, "error": f"Group {group_id} not found"}), 404
 
         legacy_group.status = "ignored"
