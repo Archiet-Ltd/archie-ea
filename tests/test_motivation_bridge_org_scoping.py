@@ -1,4 +1,5 @@
-"""motivation_bridge_service must pass organization_id when creating Outcome/Principle.
+"""motivation_bridge_service must pass organization_id when creating Outcome/Principle/
+Driver/Goal/MotivationBridgeLink.
 
 Once Outcome and Principle gained TenantMixin (organization_id nullable), the
 existing _find_or_create_outcome()/_find_or_create_principle() -- which run
@@ -37,6 +38,13 @@ Without BOTH guards, this test passed against the deliberately-broken,
 pre-fix code during development -- twice, for two different accidental
 reasons -- which is exactly the failure mode ("a test that would pass either
 way") this repo's own delivery contract calls out as worse than no test.
+
+A later review found the identical gap in _find_or_create_driver/
+_find_or_create_goal and the MotivationBridgeLink construction in
+_promote_one once Driver, Goal and MotivationBridgeLink also gained
+TenantMixin: the same file already passed organization_id for
+Outcome/Principle but not for these three. Tests below extend this file's
+own established pattern to them.
 """
 
 from __future__ import annotations
@@ -146,3 +154,98 @@ def test_find_or_create_principle_sets_organization_id(db_session, make_org, ten
         "regression: Principle created by the bridge-motivation CLI with organization_id=NULL "
         "is permanently invisible to every tenant-scoped view"
     )
+
+
+def test_find_or_create_driver_sets_organization_id(db_session, make_org, tenant_ctx):
+    """Outside a request context, org_id must be passed explicitly -- not left
+    to TenantMixin's before_flush default, which cannot see a CLI's tenant."""
+    from app.models.solution_architect_models import DriverType, SolutionDriver
+    from app.services.motivation_bridge_service import _find_or_create_driver
+
+    org, solution, problem, user = _make_problem(db_session, make_org, "driver")
+
+    with tenant_ctx(org.id):
+        sd = SolutionDriver(
+            problem_id=problem.id,
+            name="Regulatory pressure",
+            description="test driver",
+            driver_type=DriverType.EXTERNAL,
+            source="Market analysis",
+        )
+        db_session.add(sd)
+        db_session.flush()
+
+    _clear_leaked_org_context()
+    # Deliberately outside tenant_ctx -- matches `flask bridge-motivation`'s
+    # real execution environment (no request context at all).
+    driver, created = _find_or_create_driver(sd, "Regulatory pressure", org_id=org.id)
+
+    assert created is True
+    assert driver.organization_id == org.id, (
+        "regression: Driver created by the bridge-motivation CLI with organization_id=NULL "
+        "is permanently invisible to every tenant-scoped view"
+    )
+
+
+def test_find_or_create_goal_sets_organization_id(db_session, make_org, tenant_ctx):
+    from app.models.solution_architect_models import SolutionGoal
+    from app.services.motivation_bridge_service import _find_or_create_goal
+
+    org, solution, problem, user = _make_problem(db_session, make_org, "goal")
+
+    with tenant_ctx(org.id):
+        sg = SolutionGoal(
+            problem_id=problem.id,
+            name="Cut onboarding time in half",
+            description="test goal",
+            priority=3,
+        )
+        db_session.add(sg)
+        db_session.flush()
+
+    _clear_leaked_org_context()
+    # Deliberately outside tenant_ctx -- see above.
+    goal, created = _find_or_create_goal(sg, "Cut onboarding time in half", org_id=org.id)
+
+    assert created is True
+    assert goal.organization_id == org.id, (
+        "regression: Goal created by the bridge-motivation CLI with organization_id=NULL "
+        "is permanently invisible to every tenant-scoped view"
+    )
+
+
+def test_promote_solution_motivation_sets_organization_id_on_the_bridge_link(
+    db_session, make_org, tenant_ctx
+):
+    """The full bridge-motivation command path: a MotivationBridgeLink built by
+    _promote_one must carry the solution's own organisation, and a second
+    organisation's run must never see the first organisation's bridged rows."""
+    from app.models.motivation import MotivationBridgeLink
+    from app.models.solution_architect_models import DriverType, SolutionDriver
+    from app.services.motivation_bridge_service import promote_solution_motivation
+
+    org_a, solution_a, problem_a, user_a = _make_problem(db_session, make_org, "promote-a")
+    org_b, solution_b, problem_b, user_b = _make_problem(db_session, make_org, "promote-b")
+
+    with tenant_ctx(org_a.id):
+        db_session.add(SolutionDriver(
+            problem_id=problem_a.id, name="Org A driver", driver_type=DriverType.INTERNAL,
+        ))
+        db_session.flush()
+
+    _clear_leaked_org_context()
+    # Deliberately outside tenant_ctx -- matches the real `flask
+    # bridge-motivation` execution environment (no request context at all).
+    promote_solution_motivation(solution_a.id)
+
+    link = db_session.query(MotivationBridgeLink).filter_by(solution_id=solution_a.id).first()
+    assert link is not None, "expected promote_solution_motivation to bridge the seeded driver"
+    assert link.organization_id == org_a.id, (
+        "regression: MotivationBridgeLink created by the bridge-motivation CLI with "
+        "organization_id=NULL is permanently invisible to every tenant-scoped view"
+    )
+
+    # Org B's own (empty) run must never surface org A's bridged link.
+    promote_solution_motivation(solution_b.id)
+    org_b_links = db_session.query(MotivationBridgeLink).filter_by(solution_id=solution_b.id).all()
+    assert all(row.organization_id != org_a.id for row in org_b_links)

@@ -151,8 +151,9 @@ class AccountService:
             confirmed=confirmed,
             organization_id=org.id,
         )
-        if hasattr(user, "is_org_admin"):
-            user.is_org_admin = True
+        # The user owns the organisation just created for them, so granting
+        # org-admin here is always a grant in their own organisation.
+        user.grant_org_admin()
         db.session.add(user)
         try:
             db.session.flush()
@@ -379,7 +380,12 @@ class AccountService:
         """Accept a pending invitation for the current user.
 
         Returns (success: bool, message: str). On success, creates the
-        OrgRole row and removes the pending invitation.
+        OrgRole row, removes the pending invitation, and — the same as the
+        ``/account/join/<token>`` path (``invitation_service.answer_existing``)
+        — syncs the one canonical admin authority when the invitation is for
+        the user's own organisation, so this route never disagrees with the
+        toggle/team/invitation-link paths about who is an organisation
+        administrator.
         """
         from app.models.pending_invitation import PendingInvitation
 
@@ -400,6 +406,16 @@ class AccountService:
             invitation.role,
             granted_by_id=invitation.invited_by,
         )
+        # The Administrator role is global to the user, not scoped to one
+        # organisation: only touch it when the invitation is for the user's
+        # OWN organisation, exactly as answer_existing does, so accepting an
+        # invitation into a different organisation can never grant or revoke
+        # admin in the user's own one.
+        if invitation.organization_id == user.organization_id:
+            if invitation.role == "org_admin":
+                user.grant_org_admin()
+            elif user.is_admin():
+                user.revoke_org_admin()
         db.session.delete(invitation)
         db.session.commit()
         return True, "Invitation accepted."

@@ -1560,9 +1560,6 @@ def extract_relationships(solution_id):
     Returns proposals in same format as generate_relationships, plus unresolved list.
     """
     from app.models.solution_models import Solution
-    from app.modules.solutions_strategic.v2.services.solution_ai_orchestrator import (
-        SolutionAIOrchestrator,
-    )
 
     Solution.query.get_or_404(solution_id)
 
@@ -1571,17 +1568,10 @@ def extract_relationships(solution_id):
     if not message:
         return jsonify({"error": "message is required"}), 400
 
-    orchestrator = SolutionAIOrchestrator()
-    result = orchestrator.handle_relationship_intent(
-        solution_id=solution_id,
-        user_message=message,
-        user_id=current_user.id,
-    )
-
-    if "error" in result and not result.get("proposals"):
-        return jsonify(result), 400
-
-    return jsonify(result), 200
+    return jsonify({
+        "error": "Relationship extraction from natural language is not yet available. Use the generate endpoint instead.",
+        "proposals": [],
+    }), 400
 
 
 @solution_archimate_bp.route(

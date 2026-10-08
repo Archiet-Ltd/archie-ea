@@ -21,9 +21,9 @@
         // Auth state — guards API calls in sidebar.js
         window.__userAuthenticated = {{ current_user.is_authenticated | tojson }};
         // Plain-language vocabulary for client-side type-name formatting
-        window.__PLAIN_LANGUAGE_NAMES__ = {{ plain_language_names_json | safe }};
-        window.__PLAIN_LAYER_NAMES__ = {{ plain_layer_names_json | safe }};
-        window.__SHOW_ARCHIMATE_NAMES__ = {{ show_archimate_names_js | safe }};
+        window.__PLAIN_LANGUAGE_NAMES__ = {{ plain_language_names | tojson | safe }};
+        window.__PLAIN_LAYER_NAMES__ = {{ plain_layer_names | tojson | safe }};
+        window.__SHOW_ARCHIMATE_NAMES__ = {{ show_archimate_names | tojson | safe }};
     </script>
     
     <!-- Accessibility CSS: loaded once via partials/_head.html (asset_url filter) — do not re-include here (ARCH-061) -->
@@ -221,7 +221,7 @@
        @click.away — the overlay silently ate the user's first click anywhere on the
        page. That is what made "Add Application" and "Import" look inert: the modal
        system was healthy and the first click was simply being spent dismissing this.
-       nav_counts is already computed and cached per tenant for the sidebar, so gating
+       nav_counts is already computed per tenant for this request, so gating
        on it costs no extra query. #}
     {% set _ob_counts = nav_counts | default({}) %}
     {% set _workspace_is_empty = not (

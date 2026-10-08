@@ -19,12 +19,13 @@ unchanged.
 ``app/utils/rbac.py``'s ``require_role("org_admin")`` was considered and not
 used here: its role comes from ``User.is_org_admin`` / ``User.is_platform_admin``
 booleans, not the ``OrgRole`` table this blueprint's own writes maintain.
-``team_change_role()`` below, and ``PendingInvitation`` acceptance
-(app/models/pending_invitation.py), grant "org_admin" by writing an
-``OrgRole`` row only — neither ever sets ``User.is_org_admin`` — so a member
-promoted to org_admin through this very page would immediately fail
-``app/utils/rbac.py``'s check while still passing ``rbac_service.is_org_admin``
-correctly. Switching to it would have swapped one access gap for another.
+``team_change_role()`` below, and every invitation-acceptance path
+(``app/modules/account/services/invitation_service.py`` and
+``account_service.py``), write the ``OrgRole`` row AND call
+``User.grant_org_admin()`` / ``revoke_org_admin()`` (app/models/user.py) so
+a member promoted to org_admin through this page, or through an invitation,
+answers the same way everywhere — ``rbac_service.is_org_admin``,
+``user.is_org_admin``/``is_admin()``, and ``app/utils/rbac.py``'s check alike.
 """
 
 import logging
@@ -57,7 +58,7 @@ def _require_org_or_platform_admin(org_id):
     """Abort 403 unless the current user is this org's admin or a platform admin."""
     if is_platform_admin(current_user):
         return
-    if rbac_service.is_org_admin(org_id, current_user.id):
+    if rbac_service.is_org_admin(current_user, org_id):
         return
     abort(403)
 
@@ -236,6 +237,15 @@ def team_change_role():
         abort(404)
 
     OrgRole.set_role(org_id, user_id, role, granted_by_id=current_user.id)
+    # Keep the User.role (Permission.ADMINISTER authority) in step with the
+    # OrgRole grant so every surface that answers "is this user an org admin"
+    # sees the same answer.  This route only ever reaches a user whose own
+    # organization_id equals org_id (checked above), so this is always a
+    # grant/revoke in the user's own organisation.
+    if role == "org_admin":
+        user.grant_org_admin()
+    elif user.is_admin():
+        user.revoke_org_admin()
     db.session.commit()
     return redirect(url_for("team.team"))
 
@@ -256,5 +266,13 @@ def team_remove_member(user_id):
     ).first()
     if record:
         db.session.delete(record)
+        # Revoke the Administrator role for a user being removed from this
+        # organisation (a no-op for a platform admin — see
+        # User.revoke_org_admin), so rbac_service.is_org_admin() (which falls
+        # back to user.is_admin() for the user's own org) no longer answers
+        # True after membership is deleted.
+        user = db.session.get(User, user_id)
+        if user is not None and user.is_admin():
+            user.revoke_org_admin()
         db.session.commit()
     return jsonify({"status": "removed"})

@@ -501,11 +501,14 @@ def test_accountability_answer_is_unchanged_by_the_component_block(app, db_sessi
     a = _element(db_session, org.id, "A")
     comp = _component(db_session, org.id, a, health_status="critical", total_cost_of_ownership=1.0)
     _cost_row(db_session, comp, fiscal_year=2026, total_cost=1.0)
-    unit = OrganizationUnit(name="Finance", unit_type="Department")
+    unit = OrganizationUnit(name="Finance", unit_type="Department", organization_id=org.id)
     db_session.add(unit)
     db_session.flush()
     db_session.add(
-        ApplicationOwnership(application_id=comp.id, organization_unit_id=unit.id, ownership_type="Business Owner")
+ApplicationOwnership(
+            application_id=comp.id, organization_unit_id=unit.id, ownership_type="Business Owner",
+            organization_id=org.id,
+        )
     )
     db_session.commit()
 

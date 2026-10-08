@@ -15,6 +15,7 @@ from app.decorators import audit_log
 from app.extensions import db
 from app.modules.vendors.services.vendor_product_service import VendorProductService
 from app.utils.pagination import safe_int_arg
+from app.utils.tenant_users import escape_like_literal
 
 logger = logging.getLogger(__name__)
 
@@ -196,7 +197,7 @@ def search_vendor_products():
         try:
             from app.models.vendor.vendor_organization import VendorOrganization
 
-            safe_q = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            safe_q = escape_like_literal(query)
             orgs = (
                 VendorOrganization.query
                 .filter(VendorOrganization.name.ilike(f"%{safe_q}%", escape="\\"))

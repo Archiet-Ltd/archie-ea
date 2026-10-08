@@ -91,6 +91,31 @@ INTENTIONALLY_GLOBAL = {
         "are plain nullable columns kept for attribution, not filtering (see the "
         "model's own docstring, app/models/error_event.py)"
     ),
+    "AcmPropertyTemplate": (
+        "NULL organization_id is a shared platform template every organisation "
+        "reads; a value is that organisation's own definition, read by that "
+        "organisation only (PropertyService.template_query, the model's own "
+        "comment) — TenantMixin would hide the shared NULL rows from everyone"
+    ),
+    "LLMInteraction": (
+        "queried by user_id (implies one tenant), by pipeline_stage_id -> "
+        "architecture_id (same), or by an explicit organization_id filter in "
+        "every caller that reports or lists interactions across a tenant "
+        "(llm_cost_tracker.py's _get_organization_spending, "
+        "LLMService's decision-log query, TRNT-072)"
+    ),
+    "ImportSessionLog": (
+        "organization_id is nullable (rows written before the column existed "
+        "stay valid, and the model's own comment says a row with no "
+        "organisation is never offered as a restore point); every real query "
+        "already adds an explicit organization_id filter "
+        "(import_restore_service.py's restore lookup, "
+        "import_snapshot_service.py's snapshot listing/creation, "
+        "import_sophisticated_routes.py's idempotency check) — adding "
+        "TenantMixin on top would need to decide how it treats those "
+        "existing nullable-org rows, which is its own deliberate change, "
+        "not something to fold into documenting the current state"
+    ),
 }
 
 
@@ -337,7 +362,16 @@ EXCLUDED_ENDPOINT_PREFIXES = {
 }
 
 # Exclusions by exact endpoint.
-EXCLUDED_ENDPOINTS: dict[str, str] = {}
+EXCLUDED_ENDPOINTS: dict[str, str] = {
+    "solution_design.mark_solution_notification_read": (
+        "SolutionNotification has no organisation of its own (solution_id is "
+        "nullable, so there is no required parent to derive one from either); "
+        "the route scopes by the specific recipient's own user_id "
+        "(filter_by(id=notification_id, user_id=current_user.id)), which "
+        "another organisation's user can never match -- a narrower guarantee "
+        "than organisation-scoping, not a gap in it"
+    ),
+}
 
 # Record types that belong to no organisation by design. A route whose
 # identifiers name only these is out of scope, with this reason. Any other
@@ -370,7 +404,6 @@ SHARED_MODELS = {
 # expected failure naming its owner (test_known_leak_is_still_open below), so it
 # turns red the moment the owner's fix lands and the entry must come out.
 _PR258 = "PR 258 (scoring/consolidation): consolidation entries are fenced through their application"
-_PR220 = "PR 220 (options analysis tenant column); PR 218 closes the stakeholder routes"
 _PR274 = "PR 274 and PR 218 edit solution_design_routes.py; the fix waits for them to land"
 KNOWN_LEAKS = {
     "DELETE /api/roadmap/deliverables/<int:deliverable_id>": (
@@ -383,21 +416,9 @@ KNOWN_LEAKS = {
     "DELETE /consolidation-list/api/entry/<int:entry_id>": _PR258,
     "PUT /consolidation-list/api/entry/<int:entry_id>": _PR258,
     "GET /consolidation-list/api/entry/<int:entry_id>/detail": _PR258,
-    "DELETE /dashboard/api/vendor-analysis/<int:analysis_id>": _PR220,
-    "PATCH /dashboard/api/vendor-analysis/<int:analysis_id>": _PR220,
-    "GET /dashboard/api/vendor-analysis/<int:analysis_id>/comparison": _PR220,
-    "DELETE /dashboard/api/vendor-analysis/<int:analysis_id>/options/<int:option_id>": _PR220,
-    "GET /dashboard/api/vendor-analysis/<int:analysis_id>/provenance": _PR220,
-    "DELETE /dashboard/api/vendor-analysis/<int:analysis_id>/requirements/<int:req_id>": _PR220,
-    "PATCH /dashboard/api/vendor-analysis/<int:analysis_id>/requirements/<int:req_id>": _PR220,
-    "GET /dashboard/api/vendor-analysis/<int:analysis_id>/results": _PR220,
-    "DELETE /dashboard/api/vendor-analysis/<int:analysis_id>/scenarios/<int:scenario_id>": _PR220,
-    "DELETE /dashboard/api/vendor-analysis/<int:analysis_id>/stakeholders/<int:input_id>": _PR220,
-    "PATCH /dashboard/api/vendor-analysis/<int:analysis_id>/stakeholders/<int:input_id>/scores": _PR220,
-    "GET /vendor-analysis/<int:analysis_id>/comparison": _PR220,
-    "GET /vendor-analysis/<int:analysis_id>/results": _PR220,
-    "DELETE /solutions/<int:solution_id>/stakeholders/<int:row_id>": (
-        "PR 218 (route ownership gaps) fixes this exact route"),
+    # PR 220 and PR 218 landed (verified: test_known_leak_is_still_open was
+    # XPASS(strict) on every one of these 14 routes) -- all proven, not
+    # leaking, so their entries come out rather than mask a real regression.
     "DELETE /solutions/<int:solution_id>/archimate-elements/<int:mapping_id>": _PR274,
     "DELETE /solutions/<int:solution_id>/capabilities/<int:mapping_id>": _PR274,
     "POST /solutions/<int:solution_id>/copilot-insights/<int:insight_id>/dismiss": _PR274,

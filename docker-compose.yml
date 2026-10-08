@@ -23,12 +23,23 @@ services:
     restart: "no"
     volumes:
       - './:/app'
+      # Read-only, and never application code: lets cutover-capability-tenancy
+      # --apply (run from this script) see the backup the deploy just took,
+      # instead of finding no marker and skipping the cutover every run (see
+      # scripts/database/deploy-schema.sh and deploy/README.md). Defaults to
+      # a project-local, already git-ignored directory ("backups/", .gitignore)
+      # so local dev needs no configuration and simply has no marker to find;
+      # set ARCHIE_BACKUP_HOST_DIR to the real backup folder in production.
+      - '${ARCHIE_BACKUP_HOST_DIR:-./deploy/backups}:/var/backups/archie:ro'
     environment:
       DATABASE_URL: postgresql://archie_deploy:${DATABASE_DEPLOY_PASSWORD}@postgres:5432/archie
       DEV_DATABASE_URL: postgresql://archie_deploy:${DATABASE_DEPLOY_PASSWORD}@postgres:5432/archie
       TEST_DATABASE_URL: postgresql://archie_deploy:${DATABASE_DEPLOY_PASSWORD}@postgres:5432/archie_test
       TRANSFORMATION_COMMAND_CAPABILITY_SECRET: ${TRANSFORMATION_COMMAND_CAPABILITY_SECRET}
       TRANSFORMATION_COMMAND_CAPABILITY_PREVIOUS_SECRETS: ${TRANSFORMATION_COMMAND_CAPABILITY_PREVIOUS_SECRETS:-}
+      # Matches the mount above; explicit rather than relying on the script's
+      # own default staying in sync with where this mounts it.
+      ARCHIE_BACKUP_MARKER: /var/backups/archie/LAST_SUCCESS
     depends_on:
       database-bootstrap:
         condition: service_completed_successfully

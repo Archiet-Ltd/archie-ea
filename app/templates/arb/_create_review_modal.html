@@ -168,10 +168,13 @@
            — arb_read_models._legacy_generic() classifies it "legacy" the
            instant review_cycle_id is never set, with no Submit/Advance action
            ever again. Nothing at creation time said so. Warn here, and require
-           an explicit acknowledgement rather than silently accepting it. #}
+           an explicit acknowledgement rather than silently accepting it.
+           Since then the legacy-generic review page gained a Submit control
+           and the decision bar, so the warning says what is actually true:
+           it can be decided, but only as a stored fact on the review. #}
         <div class="sm:col-span-2" x-show="!formData.adr_id && !formData.architecture_model_id" x-cloak>
           <div class="rounded-md bg-warning/10 border border-warning/30 px-3 py-2 text-sm text-warning-emphasis space-y-2">
-            <p>Without a linked ADR or Architecture Model, this review can never reach the board — no Submit or Decision action will ever appear on it.</p>
+            <p>Without a linked ADR or Architecture Model, this review carries no evidence snapshot. It can still be submitted and decided, but the decision is recorded on this review alone and adds nothing to an ADR's or model's governed record.</p>
             <label class="flex items-start gap-2 font-normal">
               <input type="checkbox" x-model="formData.acknowledge_no_subject" class="mt-0.5">
               <span>I understand this will be a record-only item the board cannot act on.</span>
@@ -203,9 +206,9 @@
   <div x-cloak x-show="errorMsg" class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
   <div class="flex justify-end gap-3 pt-2 border-t border-border">
     <button type="button" data-modal-close="create-arb-review"
-            class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent" aria-label="Action">Cancel</button>
+            class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent">Cancel</button>
     <button type="submit" :disabled="submitting"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50" aria-label="Submit">
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
       <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-cloak x-show="submitting"></i>
       <span x-text="submitting ? 'Submitting...' : 'Submit for Review'"></span>
     </button>

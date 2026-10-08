@@ -7,7 +7,7 @@ module — no inline ``UserSession.query`` in routes or other services (ADR
 
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.extensions import db
 from app.models.user_session import UserSession
@@ -47,7 +47,7 @@ def issue(user, remember=False):
         sid=sid,
         user_id=user.id,
         organization_id=getattr(user, "organization_id", None),
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         ip=ip,
         user_agent=ua,
     )
@@ -88,6 +88,38 @@ def is_active(sid):
     return row is not None and row.revoked_at is None
 
 
+def age_seconds(sid):
+    """Return how many seconds old the session row ``sid`` is, or None if
+    the sid names no row. Used by session_policy.py's administrator
+    absolute-lifetime check (R1-B12 PR 2).
+
+    Computed with Postgres's own ``now() - created_at`` rather than pulling
+    ``created_at`` into Python and subtracting against ``datetime.now()``:
+    ``created_at`` is a plain (timezone-naive) column, and a driver stores
+    an incoming timezone-AWARE Python datetime converted into the
+    connection's session timezone first -- on a server not configured to
+    UTC (as this project's local dev Postgres is not), that silently shifts
+    every stored value by the session's UTC offset. Subtracting entirely
+    inside the same SQL session cancels that offset, because both sides of
+    the subtraction go through the identical conversion; comparing the
+    naive column against a Python-side ``datetime.now(timezone.utc)``, as
+    an earlier version of this function did, does not."""
+    if not sid:
+        return None
+    try:
+        seconds = db.session.execute(
+            db.select(
+                db.func.extract(
+                    "epoch", db.func.now() - UserSession.created_at
+                )
+            ).where(UserSession.sid == sid)
+        ).scalar()
+    except Exception:
+        logger.error("session_registry: age_seconds lookup failed for sid=%s...", sid[:8], exc_info=True)
+        return None
+    return float(seconds) if seconds is not None else None
+
+
 def touch(sid):
     """Best-effort ``last_seen_at`` update, throttled to avoid a write on
     every request. Never raises."""
@@ -97,8 +129,11 @@ def touch(sid):
         row = db.session.get(UserSession, sid)
         if row is None or row.revoked_at is not None:
             return
-        now = datetime.utcnow()
-        if row.last_seen_at is not None and (now - row.last_seen_at) < timedelta(seconds=_TOUCH_THROTTLE_SECONDS):
+        now = datetime.now(timezone.utc)
+        last_seen = row.last_seen_at
+        if last_seen is not None and last_seen.tzinfo is None:
+            last_seen = last_seen.replace(tzinfo=timezone.utc)
+        if last_seen is not None and (now - last_seen) < timedelta(seconds=_TOUCH_THROTTLE_SECONDS):
             return
         row.last_seen_at = now
         db.session.commit()
@@ -116,7 +151,7 @@ def revoke(sid, reason):
         row = db.session.get(UserSession, sid)
         if row is None or row.revoked_at is not None:
             return
-        row.revoked_at = datetime.utcnow()
+        row.revoked_at = datetime.now(timezone.utc)
         row.revoked_reason = reason
         db.session.commit()
     except Exception:
@@ -147,7 +182,7 @@ def revoke_all_for_user(user_id, reason, except_sid=None):
         if except_sid:
             q = q.filter(UserSession.sid != except_sid)
         rows = q.all()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         for row in rows:
             row.revoked_at = now
             row.revoked_reason = reason

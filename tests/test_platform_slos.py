@@ -1,4 +1,4 @@
-"""TB-0165: platform SLO attainment for answers, API and approval services.
+"""Platform SLO attainment for answers, API and approval services.
 
 Uses a fresh, isolated CollectorRegistry (monkeypatched in place of
 ``get_http_metrics_registry``) for every attainment/burn assertion, so these

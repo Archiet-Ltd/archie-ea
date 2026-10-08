@@ -582,7 +582,7 @@
             <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>Import Applications
           </button>
           <button type="button" data-modal-open="modal-create"
-            class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg border border-input bg-background hover:bg-accent text-sm font-medium" aria-label="Action">
+            class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg border border-input bg-background hover:bg-accent text-sm font-medium">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add Application
           </button>
           {% endif %}
@@ -966,9 +966,9 @@
         <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg" role="alert"></div>
         <div class="flex justify-end gap-3 pt-2 border-t">
           <!-- inline-event-ok --><button type="button" @click="Platform.modal.close('modal-create')"
-            class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent" aria-label="Action">Cancel</button>
+            class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent">Cancel</button>
           <button type="submit" :disabled="submitting"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50" aria-label="Submit">
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak aria-hidden="true"></i>
             <span x-text="submitting ? 'Creating...' : 'Add Application'">Add Application</span>
           </button>

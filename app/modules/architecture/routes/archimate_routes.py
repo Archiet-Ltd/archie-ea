@@ -302,7 +302,11 @@ def patch_element(element_id):
 @archimate_bp.route("/api/link/driver-to-goal", methods=["POST"])
 @login_required
 def link_driver_to_goal():
-    """Link an orphan driver to a goal. Body: {driver_id, goal_id}. Updates Goal.driver_id."""
+    """Link an orphan driver to a goal. Body: {driver_id, goal_id}. Updates Goal.driver_id.
+
+    Uses MotivationLayerService.link_driver_to_goal for tenant isolation and
+    overwrite protection. The old URL is preserved.
+    """
     data = request.get_json(silent=True) or {}
     driver_id = data.get("driver_id")
     goal_id = data.get("goal_id")
@@ -313,18 +317,35 @@ def link_driver_to_goal():
         goal_id = int(goal_id)
     except (ValueError, TypeError):
         return jsonify({"error": "driver_id and goal_id must be integers"}), 400
-    from app.models.motivation import Driver, Goal
-    driver = db.session.get(Driver, driver_id)
-    goal = db.session.get(Goal, goal_id)
-    if not driver or not goal:
-        return jsonify({"error": "Driver or Goal not found"}), 404
-    goal.driver_id = driver.id
+
+    from app.utils.tenant import current_organization_id
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return jsonify({"error": "no tenant context"}), 400
+
+    from app.modules.architecture.services.motivation_layer_service import (
+        MotivationLayerService,
+    )
+
     try:
+        result = MotivationLayerService.link_driver_to_goal(
+            driver_id, goal_id, organization_id
+        )
         db.session.commit()
+        return jsonify({
+            "ok": True,
+            "driver_id": result["driver"]["id"],
+            "goal_id": result["goal"]["id"],
+        }), 200
+    except ValueError as exc:
+        db.session.rollback()
+        msg = str(exc)
+        if "already linked" in msg:
+            return jsonify({"error": msg}), 409
+        return jsonify({"error": msg}), 404
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
-    return jsonify({"ok": True, "driver_id": driver.id, "goal_id": goal.id}), 200
 
 
 @archimate_bp.route("/api/link/capability-to-application", methods=["POST"])
@@ -1460,12 +1481,20 @@ def api_create_relationship():
     # picker would ever have offered.
     from app.services.archimate_validity_service import ArchimateValidityService
 
-    if not ArchimateValidityService().is_valid(source_el.type or "", target_el.type or "", rel_type):
-        return api_error(
-            "Invalid " + rel_type + " from " + (source_el.name or "") + " (" + (source_el.type or "")
-            + ") to " + (target_el.name or "") + " (" + (target_el.type or "") + ")",
-            400,
-        )
+    validity = ArchimateValidityService()
+    if not validity.is_valid(source_el.type or "", target_el.type or "", rel_type):
+        # Name the types the metamodel does allow for this pair, so the person
+        # who attempted the connection is told what to draw instead.
+        valid_types = [
+            r["type"] for r in validity.get_valid_relationships(source_el.type or "", target_el.type or "")
+        ]
+        return jsonify({
+            "success": False,
+            "error": "ArchiMate 3.2 does not allow " + rel_type + " from " + (source_el.name or "")
+            + " (" + (source_el.type or "") + ") to " + (target_el.name or "")
+            + " (" + (target_el.type or "") + ")",
+            "valid_types": valid_types,
+        }), 400
 
     # solution_id from the client maps to architecture_id on the model
     arch_id = data.get("solution_id")
@@ -2037,6 +2066,13 @@ def api_get_saved_viewpoint(vp_id):
             "routing_style": rp.routing_style if rp else "manhattan",
             "sequence_order": r.sequence_order,
             "created_at": r.created_at.isoformat() if r.created_at else None,
+            # What was recorded on the relationship when it was drawn; the
+            # Composer's loader restores these, so a reopened view shows what a
+            # flow carries and how data is accessed, not just the bare type.
+            "description": r.description,
+            "access_mode": r.access_mode,
+            "flow_label": r.flow_label,
+            "custom_label": r.custom_label,
         })
 
     return jsonify({
@@ -2754,6 +2790,23 @@ def api_export_saved_viewpoint(vp_id):
     Returns:
         application/xml with ArchiMate Open Exchange Format content.
     """
+    # Hardening pass alongside the snapshot-route fix (same file, same class
+    # of gap): every exporter below reaches the diagram through
+    # load_viewpoint_dict's bare db.session.get(SavedDiagram, vp_id) rather
+    # than the tenant-scoped helper. SavedDiagram IS a TenantMixin, so a
+    # genuinely fresh request (nothing already loaded for this id) still gets
+    # the tenant predicate applied on that SELECT — this is not a currently
+    # reproducible cross-org read, unlike the snapshot routes above. But it is
+    # the same unscoped-lookup-as-authorization pattern, and relies on no
+    # earlier code in the request having already touched this exact
+    # SavedDiagram row (Session.get() answers from the identity map without
+    # re-applying the tenant filter once a row is cached). Verifying ownership
+    # explicitly here removes that dependency rather than leaving it to hold
+    # by accident.
+    vp = _get_saved_diagram_scoped(vp_id)
+    if not vp:
+        return jsonify({"error": "Diagram not found"}), 404
+
     fmt = request.args.get("format", "archimate_exchange")
     _supported = {"archimate_exchange", "mermaid", "lucid", "archi"}
     if fmt not in _supported:
@@ -2974,8 +3027,20 @@ def api_get_snapshot(vp_id, sid):
 
     from app.models.archimate_viewpoint import ArchimateViewpointSnapshot
 
-    snapshot = db.session.get(ArchimateViewpointSnapshot, sid)
-    if not snapshot or snapshot.viewpoint_id != vp_id:
+    # CMP-025/CVE-style fix: verify the viewpoint's ownership FIRST (scoped
+    # query, applies the tenant predicate), THEN load the snapshot scoped to
+    # that already-verified viewpoint in one filtered query. The previous
+    # code loaded the snapshot with a bare db.session.get() (ArchimateViewpointSnapshot
+    # carries no organization_id of its own) and only checked that the
+    # snapshot's own stored viewpoint_id equalled vp_id — an internal
+    # consistency check, not an ownership check, so any organisation's user
+    # supplying another organisation's own (vp_id, sid) pair could read it.
+    vp = _get_saved_diagram_scoped(vp_id)
+    if not vp:
+        return jsonify({"error": "Diagram not found"}), 404
+
+    snapshot = ArchimateViewpointSnapshot.query.filter_by(id=sid, viewpoint_id=vp_id).first()
+    if not snapshot:
         return jsonify({"error": "Snapshot not found"}), 404
 
     return jsonify({
@@ -3003,13 +3068,19 @@ def api_restore_snapshot(vp_id, sid):
     )
     from app.models.archimate_viewpoint import ArchimateViewpointSnapshot
 
-    snapshot = db.session.get(ArchimateViewpointSnapshot, sid)
-    if not snapshot or snapshot.viewpoint_id != vp_id:
-        return jsonify({"error": "Snapshot not found"}), 404
-
+    # CMP-025/CVE-style fix: verify the viewpoint's ownership FIRST (scoped
+    # query, applies the tenant predicate), THEN load the snapshot scoped to
+    # that already-verified viewpoint in one filtered query — see
+    # api_get_snapshot above for the full rationale. Loading the snapshot
+    # first with a bare db.session.get() and only comparing viewpoint_id
+    # afterwards was an internal consistency check, not an ownership check.
     vp = _get_saved_diagram_scoped(vp_id)
     if not vp:
         return jsonify({"error": "Diagram not found"}), 404
+
+    snapshot = ArchimateViewpointSnapshot.query.filter_by(id=sid, viewpoint_id=vp_id).first()
+    if not snapshot:
+        return jsonify({"error": "Snapshot not found"}), 404
 
     snap_data = _json.loads(snapshot.snapshot_json)
 
@@ -4504,7 +4575,12 @@ def api_composer_impact():
         relationships (list): [{source_id, target_id, type}, ...]
 
     Traverses up to 3 hops from the element. Returns affected elements and narrative.
+    Uses stored derived facts when the element_id corresponds to a real database element,
+    falling back to client-side computation for draft diagrams.
     """
+    from flask import g
+    from app.modules.intelligence.services.derived_facts import list_derived_facts
+
     data = request.get_json(silent=True) or {}
     element_id = data.get("element_id")
     elements = data.get("elements") or []
@@ -4513,62 +4589,135 @@ def api_composer_impact():
     if element_id is None:
         return jsonify({"error": "element_id is required"}), 400
 
-    # Build lookup maps
-    el_by_id = {}
-    for el in elements:
-        el_by_id[str(el.get("id", ""))] = el
+    # Try to use stored derived facts if element_id is a real database ID
+    org_id = getattr(g, "current_org_id", None)
+    derived_hop_details = []
+    derived_affected_ids = []
+    used_stored_facts = False
 
-    target_el = el_by_id.get(str(element_id))
-    if not target_el:
-        return jsonify({"error": "Element not found in provided elements list"}), 404
+    if org_id is not None:
+        try:
+            element_id_int = int(element_id)
+            # Query stored derived facts for this element (both directions)
+            derived_facts = list_derived_facts(
+                org_id,
+                include_stale=False,
+                source_element_id=element_id_int,
+                target_element_id=element_id_int,
+                direction="both",
+                max_depth=3,
+            )
+            if derived_facts:
+                used_stored_facts = True
+                # Build hop details from derived facts
+                # Group by depth
+                by_depth = {}
+                for fact in derived_facts:
+                    depth = fact.get("depth", 1)
+                    if depth not in by_depth:
+                        by_depth[depth] = []
+                    by_depth[depth].append(fact)
+                    # Track affected element IDs
+                    if fact["source_element_id"] == element_id_int:
+                        derived_affected_ids.append(str(fact["target_element_id"]))
+                    else:
+                        derived_affected_ids.append(str(fact["source_element_id"]))
 
-    # Build adjacency list (bidirectional -- impact flows both ways)
-    adjacency = {}
-    rel_lookup = {}
-    for rel in relationships:
-        src = str(rel.get("source_id", ""))
-        tgt = str(rel.get("target_id", ""))
-        r_type = (rel.get("type") or "association").lower()
-        adjacency.setdefault(src, []).append(tgt)
-        adjacency.setdefault(tgt, []).append(src)
-        rel_lookup[(src, tgt)] = r_type
-        rel_lookup[(tgt, src)] = r_type
+                for depth in sorted(by_depth.keys()):
+                    hop_elements = []
+                    for fact in by_depth[depth]:
+                        # Determine the other end
+                        other_id = fact["target_element_id"] if fact["source_element_id"] == element_id_int else fact["source_element_id"]
+                        # Find element name from canvas data
+                        other_el = None
+                        for el in elements:
+                            if str(el.get("id", "")) == str(other_id):
+                                other_el = el
+                                break
+                        hop_elements.append({
+                            "element_name": other_el.get("name", "(unknown)") if other_el else "(unknown)",
+                            "element_id": str(other_id),
+                            "relationship": fact.get("derived_type", "association").lower(),
+                        })
+                    if hop_elements:
+                        derived_hop_details.append({
+                            "hop": depth,
+                            "elements": [h["element_name"] for h in hop_elements],
+                            "element_ids": [h["element_id"] for h in hop_elements],
+                            "relationships": [h["relationship"] for h in hop_elements],
+                        })
+        except (ValueError, TypeError):
+            # element_id is not an integer, fall back to client-side computation
+            pass
 
-    # BFS up to 3 hops
-    visited = {str(element_id)}
-    hop_details = []
-    current_frontier = [str(element_id)]
-    max_hops = 3
+    if used_stored_facts and derived_hop_details:
+        # Use stored derived facts
+        hop_details = derived_hop_details
+        affected_ids = derived_affected_ids
+        # Find element name from canvas data
+        el_by_id = {}
+        for el in elements:
+            el_by_id[str(el.get("id", ""))] = el
+        target_el = el_by_id.get(str(element_id))
+        el_name = target_el.get("name", "(unnamed)") if target_el else "(unnamed)"
+    else:
+        # Fall back to client-side computation
+        # Build lookup maps
+        el_by_id = {}
+        for el in elements:
+            el_by_id[str(el.get("id", ""))] = el
 
-    for hop in range(1, max_hops + 1):
-        next_frontier = []
-        hop_elements = []
-        for node_id in current_frontier:
-            for neighbor_id in adjacency.get(node_id, []):
-                if neighbor_id not in visited:
-                    visited.add(neighbor_id)
-                    next_frontier.append(neighbor_id)
-                    neighbor_el = el_by_id.get(neighbor_id, {})
-                    r_type_val = rel_lookup.get((node_id, neighbor_id), "association")
-                    hop_elements.append({
-                        "element_name": neighbor_el.get("name", "(unknown)"),
-                        "element_id": neighbor_id,
-                        "relationship": r_type_val,
-                    })
-        if hop_elements:
-            hop_details.append({
-                "hop": hop,
-                "elements": [h["element_name"] for h in hop_elements],
-                "element_ids": [h["element_id"] for h in hop_elements],
-                "relationships": [h["relationship"] for h in hop_elements],
-            })
-        current_frontier = next_frontier
-        if not current_frontier:
-            break
+        target_el = el_by_id.get(str(element_id))
+        if not target_el:
+            return jsonify({"error": "Element not found in provided elements list"}), 404
 
-    # Build impact narrative
-    affected_ids = list(visited - {str(element_id)})
-    el_name = target_el.get("name", "(unnamed)")
+        # Build adjacency list (bidirectional -- impact flows both ways)
+        adjacency = {}
+        rel_lookup = {}
+        for rel in relationships:
+            src = str(rel.get("source_id", ""))
+            tgt = str(rel.get("target_id", ""))
+            r_type = (rel.get("type") or "association").lower()
+            adjacency.setdefault(src, []).append(tgt)
+            adjacency.setdefault(tgt, []).append(src)
+            rel_lookup[(src, tgt)] = r_type
+            rel_lookup[(tgt, src)] = r_type
+
+        # BFS up to 3 hops
+        visited = {str(element_id)}
+        hop_details = []
+        current_frontier = [str(element_id)]
+        max_hops = 3
+
+        for hop in range(1, max_hops + 1):
+            next_frontier = []
+            hop_elements = []
+            for node_id in current_frontier:
+                for neighbor_id in adjacency.get(node_id, []):
+                    if neighbor_id not in visited:
+                        visited.add(neighbor_id)
+                        next_frontier.append(neighbor_id)
+                        neighbor_el = el_by_id.get(neighbor_id, {})
+                        r_type_val = rel_lookup.get((node_id, neighbor_id), "association")
+                        hop_elements.append({
+                            "element_name": neighbor_el.get("name", "(unknown)"),
+                            "element_id": neighbor_id,
+                            "relationship": r_type_val,
+                        })
+            if hop_elements:
+                hop_details.append({
+                    "hop": hop,
+                    "elements": [h["element_name"] for h in hop_elements],
+                    "element_ids": [h["element_id"] for h in hop_elements],
+                    "relationships": [h["relationship"] for h in hop_elements],
+                })
+            current_frontier = next_frontier
+            if not current_frontier:
+                break
+
+        # Build impact narrative
+        affected_ids = list(visited - {str(element_id)})
+        el_name = target_el.get("name", "(unnamed)")
 
     if not affected_ids:
         narrative = (

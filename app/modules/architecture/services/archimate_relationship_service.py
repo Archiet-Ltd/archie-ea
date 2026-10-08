@@ -204,6 +204,18 @@ class ArchiMateRelationshipService:
             if unknown:
                 logger.warning("Ignored unknown relationship properties: %s", sorted(unknown))
 
+            # The relationship has no free-form properties column (passing one
+            # raised, so this writer never saved anything); each property is
+            # applied to the relationship column of the same name instead.
+            unknown = []
+            for key, value in (properties or {}).items():
+                if key in cls.WRITABLE_PROPERTIES:
+                    setattr(relationship, key, value)
+                else:
+                    unknown.append(key)
+            if unknown:
+                logger.warning("Ignored unknown relationship properties: %s", sorted(unknown))
+
             db.session.add(relationship)
             db.session.flush()
 

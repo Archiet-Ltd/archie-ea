@@ -41,8 +41,13 @@ def _get_user_role(user):
     """Map the current *user* to a role name in ``_ROLE_HIERARCHY``."""
     if getattr(user, "is_platform_admin", False):
         return "super_admin"
-    if getattr(user, "is_org_admin", False):
-        return "org_admin"
+    # org_admin derives from Permission.ADMINISTER (is_admin()),
+    # not from the denormalised is_org_admin column.
+    try:
+        if user.is_admin():
+            return "org_admin"
+    except Exception:  # noqa: BLE001
+        pass
 
     er = (getattr(user, "enterprise_role", "") or "").lower()
     _ARCHITECT_ROLES = {
