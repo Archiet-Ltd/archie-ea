@@ -92,6 +92,21 @@
       {% endif %}
     </aside>
   </div>
+
+  {# ── Readable lists of the same answer the graph draws ─────────────── #}
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+    {% for key, heading, hint in [
+         ('consumers', 'Consumers (depend on this)', 'A change to this element can reach each of these.'),
+         ('providers', 'Providers (this depends on)', 'A change to any of these can reach this element.')] %}
+    <section class="rounded-xl border border-border bg-card p-4" aria-labelledby="impact-{{ key }}-title"
+             data-testid="impact-{{ key }}">
+      <h2 id="impact-{{ key }}-title" class="text-sm font-semibold text-foreground">{{ heading }}</h2>
+      <p class="text-xs text-muted-foreground mt-0.5 mb-3">{{ hint }}</p>
+      <ul id="impact-{{ key }}-list" class="divide-y divide-border"></ul>
+      <p id="impact-{{ key }}-status" class="text-sm text-muted-foreground" aria-live="polite">Loading…</p>
+    </section>
+    {% endfor %}
+  </div>
 </div>
 {% endblock %}
 

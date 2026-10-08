@@ -11,10 +11,10 @@ state instead of a 500.
 """
 
 import logging
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app import db
+from app.datetime_helpers import utcnow
 from app.models.unified_capability import (
     CapabilityValueStreamMapping,
     UnifiedCapability,
@@ -86,7 +86,7 @@ def list_value_streams() -> List[Dict[str, Any]]:
 def get_value_stream(value_stream_id: int) -> Optional[ValueStream]:
     """Fetch a single ValueStream by id, or None."""
     try:
-        return ValueStream.query.get(value_stream_id)
+        return ValueStream.query.filter_by(id=value_stream_id).first()
     except Exception:
         logger.error("Failed to fetch value stream %s", value_stream_id, exc_info=True)
         return None
@@ -142,7 +142,7 @@ def create_value_stream(data: Dict[str, Any]) -> ValueStream:
     "no value streams modelled" while the value-stream page listed them. The column
     now exists (see ValueStream.archimate_element_id), so the ORM path is safe.
     """
-    now = datetime.utcnow()
+    now = utcnow().replace(tzinfo=None)
     vs = ValueStream(
         name=data.get("name"),
         code=data.get("code") or None,
@@ -233,7 +233,32 @@ def _stage_to_dict(stage: ValueStreamStage) -> Dict[str, Any]:
         "target_duration": stage.target_duration,
         "current_duration": stage.current_duration,
         "quality_gate": bool(stage.quality_gate),
+        "entry_criteria": stage.entry_criteria,
+        "exit_criteria": stage.exit_criteria,
+        "stakeholders": stage.stakeholders,
+        "value_items": stage.value_items,
+        "stakeholder_list": _lines(stage.stakeholders),
+        "value_item_list": _lines(stage.value_items),
     }
+
+
+# Stage definition fields captured as free text. An empty submission clears
+# the field back to NULL ("not recorded"), never to an empty string.
+STAGE_TEXT_FIELDS = ("entry_criteria", "exit_criteria", "stakeholders", "value_items")
+
+
+def _lines(value: Optional[str]) -> List[str]:
+    """Split a one-item-per-line text field into its non-blank items."""
+    if not value:
+        return []
+    return [line.strip() for line in str(value).splitlines() if line.strip()]
+
+
+def _clean_text(value) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def create_stage(value_stream_id: int, data: Dict[str, Any]) -> Optional[ValueStreamStage]:
@@ -266,6 +291,7 @@ def create_stage(value_stream_id: int, data: Dict[str, Any]) -> Optional[ValueSt
         target_duration=_to_int(data.get("target_duration")),
         current_duration=_to_int(data.get("current_duration")),
         quality_gate=bool(data.get("quality_gate")),
+        **{field: _clean_text(data.get(field)) for field in STAGE_TEXT_FIELDS},
     )
     db.session.add(stage)
     db.session.commit()
@@ -275,7 +301,7 @@ def create_stage(value_stream_id: int, data: Dict[str, Any]) -> Optional[ValueSt
 def update_stage(stage_id: int, data: Dict[str, Any]) -> Optional[ValueStreamStage]:
     """Update an existing stage."""
     try:
-        stage = ValueStreamStage.query.get(stage_id)
+        stage = ValueStreamStage.query.filter_by(id=stage_id).first()
     except Exception:
         logger.error("Failed to fetch stage %s", stage_id, exc_info=True)
         return None
@@ -295,6 +321,9 @@ def update_stage(stage_id: int, data: Dict[str, Any]) -> Optional[ValueStreamSta
         stage.target_duration = _to_int(data.get("target_duration"))
     if "current_duration" in data:
         stage.current_duration = _to_int(data.get("current_duration"))
+    for field in STAGE_TEXT_FIELDS:
+        if field in data:
+            setattr(stage, field, _clean_text(data.get(field)))
 
     db.session.commit()
     return stage
@@ -411,6 +440,10 @@ def build_bizbok_grid(value_stream_id: int) -> Dict[str, Any]:
             "name": cap.name,
             "code": cap.code,
             "level": cap.level,
+            # Read from the capability record itself; None means nobody has
+            # assessed it and the grid renders an em dash, not a level.
+            "current_maturity_level": cap.current_maturity_level,
+            "target_maturity_level": cap.target_maturity_level,
         }
         for cap_id in capability_ids
         if (cap := capabilities_by_id.get(cap_id)) is not None
@@ -464,7 +497,17 @@ def list_unmapped_capabilities(
         )
         caps = []
 
-    return [{"id": c.id, "name": c.name, "code": c.code, "level": c.level} for c in caps]
+    return [
+        {
+            "id": c.id,
+            "name": c.name,
+            "code": c.code,
+            "level": c.level,
+            "current_maturity_level": c.current_maturity_level,
+            "target_maturity_level": c.target_maturity_level,
+        }
+        for c in caps
+    ]
 
 
 def upsert_mapping_cell(

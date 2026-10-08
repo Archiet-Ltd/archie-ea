@@ -24,6 +24,8 @@ Max chain depth: 5 (prevent combinatorial explosion).
 import logging
 from typing import Any, Dict, List, Set, Tuple
 
+from app.models.constants import ArchiMateRelationshipType
+
 logger = logging.getLogger(__name__)
 
 # ArchiMate 3.2 relationship strength ordering (strongest → weakest)
@@ -51,8 +53,19 @@ _DERIVATION_TABLE = {
 MAX_DEPTH = 5
 
 
+def _canonical_relationship_type(value: str) -> str:
+    """Return the canonical PascalCase relationship type for derivation logic."""
+
+    normalized = ArchiMateRelationshipType.normalize(value, pascal_case=True)
+    if not normalized:
+        return value
+    return normalized
+
+
 def _derive_type(type_a: str, type_b: str) -> str:
     """Compute the derived relationship type from chaining type_a → type_b."""
+    type_a = _canonical_relationship_type(type_a)
+    type_b = _canonical_relationship_type(type_b)
     # If either is transparent, result is the other
     if type_a in _TRANSPARENT:
         return type_b
@@ -80,6 +93,8 @@ def _rule_id(type_a: str, type_b: str) -> str:
     itself; it mirrors the same branch order so the id always matches the
     branch that actually fired.
     """
+    type_a = _canonical_relationship_type(type_a)
+    type_b = _canonical_relationship_type(type_b)
     if type_a in _TRANSPARENT or type_b in _TRANSPARENT:
         branch = "transparent"
     elif (type_a, type_b) in _DERIVATION_TABLE:
@@ -103,6 +118,8 @@ def describe_rule(rule_id):
     if len(parts) != 3:
         return None
     branch, type_a, type_b = parts
+    type_a = _canonical_relationship_type(type_a)
+    type_b = _canonical_relationship_type(type_b)
     if type_a not in STRENGTH_RANK or type_b not in STRENGTH_RANK:
         return None
     if _rule_id(type_a, type_b) != rule_id:
@@ -156,7 +173,7 @@ class ArchiMateDerivationService:
             tgt = rel["target_id"]
             if src not in element_ids or tgt not in element_ids:
                 continue
-            adj.setdefault(src, []).append((tgt, rel["type"], rel["id"]))
+            adj.setdefault(src, []).append((tgt, _canonical_relationship_type(rel["type"]), rel["id"]))
 
         # Existing explicit pairs (source, target) to avoid duplicating
         explicit_pairs: Set[Tuple[int, int]] = set()

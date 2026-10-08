@@ -3,6 +3,7 @@ from app.services.archimate_backbone import sync_archimate_element
 from app import db
 from app.models.risk import Risk, RiskStatus
 from app.models.risk_entity_link import ENTITY_TYPES, RiskEntityLink
+from app.models.risk_score_history import SCORE_KINDS, RiskScoreHistory
 
 
 def get_heat_map_data(solution_id=None):
@@ -102,10 +103,45 @@ def list_risk_links(risk_id):
     return RiskEntityLink.query.filter_by(risk_id=risk_id).order_by(RiskEntityLink.id).all()
 
 
+def _load_linkable_entity(entity_type, entity_id):
+    """Load an Application/Solution/Programme/Constraint row, tenant-scoped.
+
+    Returns ``None`` both when ``entity_id`` does not exist at all and when
+    it belongs to another organisation: the tenant-isolation ORM filter
+    (app/middleware/tenant_isolation.py's do_orm_execute listener) makes
+    those two cases indistinguishable by construction, which is the point --
+    a caller must not learn that a row exists in an organisation it cannot
+    see. ``.filter_by(...).first()`` rather than ``.get()``: ``Query.get()``
+    can be satisfied from the identity map without re-issuing a SELECT, which
+    would bypass the tenant filter for an entity already loaded elsewhere in
+    the same session.
+    """
+    if entity_type == "application":
+        from app.models.application_portfolio import ApplicationComponent
+        return ApplicationComponent.query.filter_by(id=entity_id).first()
+    if entity_type == "solution":
+        from app.models.solution_models import Solution
+        return Solution.query.filter_by(id=entity_id).first()
+    if entity_type == "programme":
+        from app.models.strategic import StrategicInitiative
+        return StrategicInitiative.query.filter_by(id=entity_id).first()
+    if entity_type == "constraint":
+        from app.models.solution_architect_models import SolutionConstraint
+        return SolutionConstraint.query.filter_by(id=entity_id).first()
+    return None
+
+
 def add_risk_link(risk_id, entity_type, entity_id):
     if entity_type not in ENTITY_TYPES:
         raise ValueError(f"entity_type must be one of {ENTITY_TYPES}, got {entity_type!r}")
     Risk.query.get_or_404(risk_id)  # 404s cleanly if the risk does not exist
+    if _load_linkable_entity(entity_type, entity_id) is None:
+        # Covers both "no such row" and "that row belongs to another
+        # organisation" -- refused identically, so a caller learns nothing
+        # about what exists outside its own tenant.
+        raise ValueError(
+            f"{entity_type} {entity_id} was not found in this organisation"
+        )
     existing = RiskEntityLink.query.filter_by(
         risk_id=risk_id, entity_type=entity_type, entity_id=entity_id
     ).first()
@@ -123,12 +159,69 @@ def remove_risk_link(risk_id, link_id):
     db.session.commit()
 
 
-def links_for_entity(entity_type, entity_id):
-    """Risks linked to one Application/Solution/Programme -- the parent-side
-    read for "Linked risks" sections on those entities' own detail pages."""
+def risks_linked_to(entity_type, entity_id):
+    """The Risk rows linked to one Application/Solution/Programme, as ORM
+    objects -- the shared query behind links_for_entity's dicts and any
+    other reader (e.g. the solution risk tab's GET list) that needs the rows
+    themselves rather than their serialised form."""
     links = RiskEntityLink.query.filter_by(entity_type=entity_type, entity_id=entity_id).all()
     if not links:
         return []
     risk_ids = [link.risk_id for link in links]
-    risks = Risk.query.filter(Risk.id.in_(risk_ids)).order_by(Risk.id).all()
-    return [r.to_dict() for r in risks]
+    return Risk.query.filter(Risk.id.in_(risk_ids)).order_by(Risk.id).all()
+
+
+def links_for_entity(entity_type, entity_id):
+    """Risks linked to one Application/Solution/Programme -- the parent-side
+    read for "Linked risks" sections on those entities' own detail pages."""
+    return [r.to_dict() for r in risks_linked_to(entity_type, entity_id)]
+
+
+# --- Inherent/residual scores, stored with history ------------------------
+
+def set_risk_score(risk_id, score_kind, likelihood, impact, recorded_by_id=None):
+    """Record an inherent or residual likelihood/impact score for a risk.
+
+    Stores the score on the Risk row itself -- the score is stored, not only
+    displayed -- and appends one RiskScoreHistory row per actual
+    change. Calling this again with the same (likelihood, impact) updates
+    nothing and adds no history row, matching the idempotent-on-no-change
+    shape the rest of this service already uses (add_risk_link above).
+    """
+    if score_kind not in SCORE_KINDS:
+        raise ValueError(f"score_kind must be one of {SCORE_KINDS}, got {score_kind!r}")
+    # .filter_by(...).first_or_404() rather than .get_or_404(risk_id): Query.get()
+    # can be satisfied from the identity map without re-issuing a SELECT, which
+    # would bypass the tenant filter for a Risk already loaded (by another
+    # organisation's request/session) -- the same reasoning as
+    # _load_linkable_entity above.
+    risk = Risk.query.filter_by(id=risk_id).first_or_404()
+    likelihood, impact = int(likelihood), int(impact)
+    likelihood_attr, impact_attr = f"{score_kind}_likelihood", f"{score_kind}_impact"
+    changed = (
+        getattr(risk, likelihood_attr) != likelihood
+        or getattr(risk, impact_attr) != impact
+    )
+    setattr(risk, likelihood_attr, likelihood)
+    setattr(risk, impact_attr, impact)
+    if changed:
+        db.session.add(RiskScoreHistory(
+            risk_id=risk.id,
+            score_kind=score_kind,
+            likelihood=likelihood,
+            impact=impact,
+            recorded_by_id=recorded_by_id,
+        ))
+    db.session.commit()
+    return risk
+
+
+def risk_score_history(risk_id, score_kind=None):
+    """History rows for one risk, oldest first. Optionally filtered by kind."""
+    # See set_risk_score above for why this is .filter_by(...).first_or_404()
+    # rather than .get_or_404(risk_id).
+    Risk.query.filter_by(id=risk_id).first_or_404()
+    query = RiskScoreHistory.query.filter_by(risk_id=risk_id)
+    if score_kind is not None:
+        query = query.filter_by(score_kind=score_kind)
+    return query.order_by(RiskScoreHistory.recorded_at, RiskScoreHistory.id).all()

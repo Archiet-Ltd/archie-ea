@@ -37,7 +37,7 @@ Entelim alongside it — import what you have and compare the two directly.
 |---|---|---|
 | Licence | Proprietary | Open source, AGPL, plus a commercial licence |
 | Self-hostable | No — SaaS only | Yes |
-| Pricing | Not published; priced per application, tiered, unlimited users included; available on request | Not published; free to self-host under AGPL |
+| Pricing | Not published; priced per application, tiered, unlimited users included; available on request | Published at /pricing; free to self-host under AGPL |
 | Structure | Three outcome-based modules: Visibility, Transformation, Oversight | One product across modelling, application portfolio, business case, and governance |
 | Modelling approach | Flexible metamodel, aligned to TOGAF, BIZBOK, NIST or your own methodology | ArchiMate 3.2, specifically |
 | Add-ons | Sandbox, AI process modelling, sold separately | Included |

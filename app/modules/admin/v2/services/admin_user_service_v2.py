@@ -112,7 +112,17 @@ class AdminUserService:
 
         Returns:
             The newly created User.
+
+        When ``role`` is Administrator, this also writes the OrgRole row and
+        the denormalised ``is_org_admin`` column for the user's organisation
+        (the same organisation ``organization_id`` places them in), so the
+        team page and database-level guards agree with this page about who is
+        an organisation administrator from the moment the account exists --
+        through the one shared helper (app/models/org_role.py), not a second
+        implementation of the grant.
         """
+        from app.models.org_role import apply_admin_role_grant_for_new_user
+
         user = User(
             first_name=first_name,
             last_name=last_name,
@@ -124,6 +134,8 @@ class AdminUserService:
             organization_id=organization_id,
         )
         db.session.add(user)
+        db.session.flush()
+        apply_admin_role_grant_for_new_user(user, role)
         db.session.commit()
         return user
 
@@ -171,8 +183,19 @@ class AdminUserService:
         Args:
             user: User to modify.
             new_role: New Role to assign.
+
+        Crossing the Administrator boundary (either direction) also syncs the
+        per-organisation OrgRole row and the denormalised ``is_org_admin``
+        column, and -- on revoke -- leaves a platform admin's
+        Permission.ADMINISTER untouched, through the one shared helper
+        (app/models/org_role.py) that both the v1 and v2 admin services call,
+        instead of this service re-implementing the state transition (which
+        previously reassigned ``user.role`` unconditionally, stripping a
+        platform admin's Administrator role as a side effect).
         """
-        user.role = new_role
+        from app.models.org_role import apply_admin_role_change
+
+        apply_admin_role_change(user, new_role)
         db.session.add(user)
         db.session.commit()
 

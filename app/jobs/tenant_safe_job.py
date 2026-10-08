@@ -82,6 +82,7 @@ from typing import Callable, Iterator, Sequence
 from flask import g
 
 from app.extensions import db
+from app.utils.tracing import trace_scope
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,8 @@ PLATFORM_JOBS: frozenset[str] = frozenset({
     "error_digest",            # error_events carries no organisation predicate
     "capability_projection",   # all-tenant lock-guarded pass
     "abacus_incremental_sync", # ExternalSystem has no organisation predicate
+    "approval_escalation",     # groups overdue rows by their own organization_id internally
+    "event_log_partition_maintenance",  # partitions are shared across all orgs
 })
 
 TENANT_JOBS: frozenset[str] = frozenset({
@@ -102,6 +105,8 @@ TENANT_JOBS: frozenset[str] = frozenset({
     "typed_arb_waiver_expiry",      # config-driven organisation ids
     "derived_facts_recompute",      # visited via run_for_each_tenant
     "ea_workflow_scheduler",        # visited via run_for_each_tenant
+"event_log_relay",              # visited via run_for_each_tenant
+    "model_health_scan",            # per-org drift detection + store
 })
 
 
@@ -240,13 +245,19 @@ def tenant_scope(organization_id: int) -> Iterator[int]:
 
     _reset_session()                      # nothing inherited from the previous tenant
     previous = getattr(g, "current_org_id", None)
+    previous_scope_org = getattr(g, "_tenant_scope_organization_id", None)
     g.current_org_id = organization_id
+    g._tenant_scope_organization_id = organization_id
     g.current_org = None                  # jobs must not rely on the ORM object
     try:
         yield organization_id
     finally:
         _reset_session()                  # nothing leaks forward to the next tenant
         g.current_org_id = previous
+        if previous_scope_org is None:
+            g.pop("_tenant_scope_organization_id", None)
+        else:
+            g._tenant_scope_organization_id = previous_scope_org
 
 
 # --------------------------------------------------------------------------- #
@@ -336,6 +347,28 @@ def active_organization_ids() -> list[int]:
     return [int(row[0]) for row in rows]
 
 
+def organization_id_of(model, record_id) -> int | None:
+    """The organisation that owns one record, for work handed off to run later.
+
+    A background worker (a spawned process, a Celery task) is given a record id
+    by the request that started it, and runs with no request and therefore no
+    tenant. It resolves the owner here, then does its real work inside
+    ``tenant_scope(owner)``, so every read is filtered and every new row is
+    stamped exactly as the originating request would have done.
+
+    Like ``active_organization_ids`` this is a deliberate, single-column global
+    read by primary key, taken before any tenant is entered. It returns a plain
+    int, never an ORM object, so nothing enters an identity map that a later
+    ``get()`` under the tenant could be served from. ``None`` means there is no
+    such record (or it has no owner); callers refuse rather than run unscoped.
+    """
+    table = model.__table__
+    value = db.session.execute(
+        db.select(table.c.organization_id).where(table.c.id == record_id)
+    ).scalar()
+    return int(value) if value is not None else None
+
+
 # --------------------------------------------------------------------------- #
 # The harness
 # --------------------------------------------------------------------------- #
@@ -366,14 +399,14 @@ def run_for_each_tenant(
       * one tenant's failure never aborts the others, and never disappears —
         it is logged with a traceback and returned in the ``JobRun``.
     """
-    run = JobRun(job_name=job_name, started_at=_dt.datetime.utcnow())
+    run = JobRun(job_name=job_name, started_at=_dt.datetime.now(_dt.UTC))
 
     with app.app_context():
         lock_cm = job_lock(job_name, required=False) if use_lock else _always_acquired()
         with lock_cm as acquired:
             if not acquired:
                 run.skipped_locked = True
-                run.finished_at = _dt.datetime.utcnow()
+                run.finished_at = _dt.datetime.now(_dt.UTC)
                 return run
 
             # Enumerate BEFORE entering any tenant scope, and materialise to a
@@ -395,7 +428,7 @@ def run_for_each_tenant(
             for organization_id in ids:
                 started = time.monotonic()
                 try:
-                    with tenant_scope(organization_id):
+                    with tenant_scope(organization_id), trace_scope("job", job_name):
                         value = func(organization_id)
                         # Commit inside the tenant scope so the flush still
                         # carries this tenant's stamp from before_flush.
@@ -435,7 +468,7 @@ def run_for_each_tenant(
                             organization_id,
                         )
 
-            run.finished_at = _dt.datetime.utcnow()
+            run.finished_at = _dt.datetime.now(_dt.UTC)
             logger.info(
                 "tenant_safe_job: %s finished — %d ok, %d failed, %d ms",
                 job_name,

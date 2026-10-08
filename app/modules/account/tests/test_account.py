@@ -30,10 +30,10 @@ class TestAccountService:
             assert hasattr(AccountService, 'register_user')
 
     def test_queue_email_callable(self, app):
-        """queue_email() is callable."""
+        """The e-mail queueing helper the service sends through is callable."""
         with app.app_context():
-            from app.modules.account.services.account_service import AccountService
-            assert callable(AccountService.queue_email)
+            from app.modules.account.services import account_service
+            assert callable(account_service._queue_email)
 
     def test_change_password_method_exists(self, app):
         """change_password() method exists on AccountService."""
@@ -184,8 +184,15 @@ class TestAccountRoutes:
         assert resp.status_code == 302
 
     def test_before_request_hook_exists(self, app):
-        """before_app_request hook is registered on the blueprint."""
+        """The confirm-your-address hook of the account blueprint in use runs on every request."""
         with app.app_context():
-            from app.modules.account.routes.account_routes import account_bp
-            # before_app_request hooks are stored in before_app_request_funcs
-            assert account_bp.before_app_request_funcs is not None
+            from app.modules.account.routes import account_routes
+            from app.modules.account.v2.routes import account_routes as account_routes_v2
+            # A blueprint's before_app_request hook is recorded on the app,
+            # under the None key that runs for every request. Which account
+            # blueprint is mounted depends on USE_ACCOUNT_GUARDRAILS.
+            hooks = app.before_request_funcs.get(None, [])
+            assert (
+                account_routes.before_request in hooks
+                or account_routes_v2.before_request in hooks
+            )

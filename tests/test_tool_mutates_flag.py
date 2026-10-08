@@ -66,6 +66,18 @@ HAND_WRITTEN = {
     # app/modules/ai_chat/tools/executor.py::_tool_create_programme directly,
     # not assumed from its name.
     "create_programme",
+    # generate_blueprint_narrative overwrites existing section text through
+    # the narrative generation service. Its own description says so, and it
+    # is already tier='approve' so it always queues for confirmation.
+    "generate_blueprint_narrative",
+    # poll_infrastructure checks configured infrastructure endpoints for
+    # reachability; it is classified as external_action and mutates the
+    # infrastructure state (probes may trigger alerts or state changes).
+    "poll_infrastructure",
+    # extract_contract_from_document extracts structured contract terms from
+    # text and persists them; it is classified as external_action and mutates
+    # the contract registry.
+    "extract_contract_from_document",
 }
 
 # The per-ArchiMate-type element tools are GENERATED from ELEMENT_SPECS rather
@@ -145,7 +157,7 @@ def test_a_name_that_sounds_like_a_write_is_not_assumed_to_be_one():
     """
     by_name = {t["name"]: t for t in TOOL_SCHEMAS}
     for read_only in ("propose_rationalization",
-                      "generate_blueprint_narrative", "simulate_impact",
+                      "simulate_impact",
                       "validate_sap_clean_core"):
         assert by_name[read_only]["mutates"] is False, (
             f"{read_only} does not write; flagging it would put a read behind an "

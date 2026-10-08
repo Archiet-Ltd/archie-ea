@@ -23,7 +23,7 @@ import pytest
 from sqlalchemy import event
 
 # Fixtures (app, db_session, make_org, tenant_ctx, client, login_as) come from
-# app/modules/intelligence/tests/conftest.py's import of tests.conftest.
+# app/modules/conftest.py's import of tests.conftest.
 
 FOUR_KEYS = {"id", "name", "type", "layer"}
 
