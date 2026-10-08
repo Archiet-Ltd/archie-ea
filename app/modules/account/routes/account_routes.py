@@ -690,11 +690,6 @@ def sso_callback(provider):
         flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
         return redirect(url_for("account.login"))
 
-    if mfa_service.required_for(user):
-        session["_mfa_pending_user_id"] = user.id
-        session["_mfa_pending_remember"] = True
-        return redirect(url_for("account.mfa_challenge"))
-
     # R1-B12 PR 2 (TB-0144/PB-0100): the same MFA gate login() applies to a
     # password sign-in, applied here too -- an administrator must complete
     # multi-factor before SSO can finish the login, whether enrolling for
@@ -706,8 +701,6 @@ def sso_callback(provider):
     # remember=True below; _mfa_pending_next has no equivalent "next" here
     # either, matching _complete_login_after_mfa()'s own empty-string
     # fallback.
-    from app.services import mfa_service
-
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = True

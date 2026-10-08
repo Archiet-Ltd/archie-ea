@@ -671,8 +671,6 @@ def sso_callback(provider):
     # explicitly -- USE_ACCOUNT_GUARDRAILS chooses which of the two is
     # registered, so whichever is live stays internally consistent between
     # its own MFA and non-MFA paths.
-    from app.services import mfa_service
-
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False
