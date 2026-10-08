@@ -9,9 +9,27 @@ from flask import redirect, url_for, render_template, request, jsonify, current_
 from flask_login import login_required, current_user
 from . import application_mgmt
 from app import db
+from app.middleware.tenant_decorators import is_platform_admin
 from datetime import datetime
 import os
 from app.utils.pagination import safe_int_arg
+
+
+def _vendor_write_denied(vendor):
+    """Fail-closed authorisation for a write to the shared, platform-wide
+    vendor catalogue (refuter review of PR 428, vendor-catalogue findings).
+
+    True (deny) unless the caller is a genuine platform admin or the
+    vendor's own recorded creator. The pattern this replaces treated a
+    missing ``created_by_id`` (every vendor seeded by a migration or seed
+    script, never created through the UI) as "no creator recorded, so
+    anyone may act" -- an ordinary, non-admin, authenticated user could edit
+    or delete any seeded vendor. ``created_by_id == current_user.id`` only
+    ever matches a real creator; it never matches on an absent value.
+    """
+    if is_platform_admin(current_user):
+        return False
+    return vendor.created_by_id != current_user.id
 
 
 # Legacy redirect — /dashboard/vendors → canonical vendor catalogue
@@ -255,9 +273,8 @@ def analyze_document_for_vendor(vendor_id):
     from werkzeug.utils import secure_filename
     
     vendor = VendorOrganization.query.get_or_404(vendor_id)
-    if not (hasattr(current_user, 'is_admin') and current_user.is_admin()):
-        if getattr(vendor, 'created_by_id', None) and vendor.created_by_id != current_user.id:
-            return jsonify({'error': 'Access denied'}), 403
+    if _vendor_write_denied(vendor):
+        return jsonify({'error': 'Access denied'}), 403
 
     try:
         analysis_service = DocumentAnalysisService()
@@ -368,9 +385,8 @@ def apply_analysis_to_vendor(vendor_id):
     from ..services.archimate.document_analysis_service import DocumentAnalysisService
     
     vendor = VendorOrganization.query.get_or_404(vendor_id)
-    if not (hasattr(current_user, 'is_admin') and current_user.is_admin()):
-        if getattr(vendor, 'created_by_id', None) and vendor.created_by_id != current_user.id:
-            return jsonify({'error': 'Access denied'}), 403
+    if _vendor_write_denied(vendor):
+        return jsonify({'error': 'Access denied'}), 403
 
     try:
         data = request.get_json()
@@ -499,10 +515,9 @@ def edit_vendor(vendor_id):
     from datetime import datetime
 
     vendor = VendorOrganization.query.get_or_404(vendor_id)
-    if not (hasattr(current_user, 'is_admin') and current_user.is_admin()):
-        if getattr(vendor, 'created_by_id', None) and vendor.created_by_id != current_user.id:
-            flash('Access denied.', 'error')
-            return redirect(url_for('application_mgmt.vendors_dashboard'))
+    if _vendor_write_denied(vendor):
+        flash('Access denied.', 'error')
+        return redirect(url_for('application_mgmt.vendors_dashboard'))
     form = CreateVendorForm(obj=vendor)
 
     if form.validate_on_submit():
@@ -536,10 +551,9 @@ def delete_vendor(vendor_id):
     from app.models.vendor.vendor_organization import VendorOrganization
 
     vendor = VendorOrganization.query.get_or_404(vendor_id)
-    if not (hasattr(current_user, 'is_admin') and current_user.is_admin()):
-        if getattr(vendor, 'created_by_id', None) and vendor.created_by_id != current_user.id:
-            flash('Access denied.', 'error')
-            return redirect(url_for('application_mgmt.vendors_dashboard'))
+    if _vendor_write_denied(vendor):
+        flash('Access denied.', 'error')
+        return redirect(url_for('application_mgmt.vendors_dashboard'))
     vendor_name = vendor.name
 
     try:
@@ -662,10 +676,9 @@ def activate_vendor(vendor_id):
     from flask import jsonify
 
     vendor = VendorOrganization.query.get_or_404(vendor_id)
-    if not (hasattr(current_user, 'is_admin') and current_user.is_admin()):
-        if getattr(vendor, 'created_by_id', None) and vendor.created_by_id != current_user.id:
-            flash('Access denied.', 'error')
-            return redirect(url_for('application_mgmt.vendors_dashboard'))
+    if _vendor_write_denied(vendor):
+        flash('Access denied.', 'error')
+        return redirect(url_for('application_mgmt.vendors_dashboard'))
 
     try:
         # Get form data
@@ -714,10 +727,9 @@ def deploy_vendor_product(vendor_id, product_id):
     from flask import jsonify
 
     vendor = VendorOrganization.query.get_or_404(vendor_id)
-    if not (hasattr(current_user, 'is_admin') and current_user.is_admin()):
-        if getattr(vendor, 'created_by_id', None) and vendor.created_by_id != current_user.id:
-            flash('Access denied.', 'error')
-            return redirect(url_for('application_mgmt.vendors_dashboard'))
+    if _vendor_write_denied(vendor):
+        flash('Access denied.', 'error')
+        return redirect(url_for('application_mgmt.vendors_dashboard'))
 
     try:
         # Get form data

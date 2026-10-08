@@ -19,6 +19,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import func
 
 from app.decorators import audit_log, require_roles  # dead-code-ok
+from app.middleware.tenant_decorators import platform_admin_required
 from app.extensions import db
 from app.models.vendor_organization import VendorOrganization
 from app.utils.pagination import safe_int_arg
@@ -142,10 +143,18 @@ def vendor_analytics():
 @vendor_management_bp.route("/import", methods=["GET", "POST"])
 @login_required
 @require_roles("admin")
+@platform_admin_required
 @audit_log("vendor_import")
 def import_vendors():
     """
     Bulk import vendors from CSV/Excel (admin only).
+
+    Platform-admin-only (refuter review of PR 428, vendor-catalogue findings)
+    -- writes into the shared, platform-wide ``VendorOrganization``
+    catalogue; see the matching fix in
+    app/modules/vendors/routes/unified_vendor_api.py::delete_vendor.
+    ``require_roles("admin")`` is kept rather than removed;
+    ``platform_admin_required`` is the operative check.
 
     Features:
     - File validation (size, format)
@@ -468,10 +477,17 @@ def api_update_vendor(vendor_id):
 @vendor_management_bp.route("/api/vendors/<int:vendor_id>", methods=["DELETE"])
 @login_required
 @require_roles("admin")
+@platform_admin_required
 @audit_log("vendor_api_delete")
 def api_delete_vendor(vendor_id):
     """
     API: Delete vendor (admin only).
+
+    Platform-admin-only (refuter review of PR 428, vendor-catalogue findings)
+    -- see the matching fix in
+    app/modules/vendors/routes/unified_vendor_api.py::delete_vendor.
+    ``require_roles("admin")`` is kept rather than removed;
+    ``platform_admin_required`` is the operative check.
 
     Cascade deletes:
     - Vendor products (handled by SQLAlchemy cascade)

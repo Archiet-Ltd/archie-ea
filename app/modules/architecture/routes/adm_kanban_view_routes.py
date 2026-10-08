@@ -24,6 +24,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.adm_kanban import create_adm_phases, KanbanCard
 from app.utils.decorators import admin_required
 from app.models.archimate_core import ArchiMateElement
@@ -70,9 +71,19 @@ def boards_detail_redirect(rest):
 @adm_kanban_view_bp.route("/init-phases", methods=["POST"])
 @login_required
 @admin_required
+@platform_admin_required
 @audit_log("init_adm_phases")
 def init_phases():
-    """Initialize ADM phases (admin only)"""
+    """Initialize ADM phases (admin only).
+
+    Platform-admin-only (refuter review of PR 428, D-6): ``ADMPhase`` carries
+    no ``organization_id`` -- ``create_adm_phases()`` upserts one shared set
+    of TOGAF phase rows for every organisation on the platform at once.
+    ``admin_required`` only proves the caller administers *some*
+    organisation, so it let any org admin reset/overwrite that table for
+    every tenant. ``admin_required`` is kept rather than removed;
+    ``platform_admin_required`` is the operative check.
+    """
     try:
         if not current_user.is_admin:
             flash("Admin access required.", "error")

@@ -54,7 +54,7 @@ from ..forms.admin_forms import (
 )
 from app.modules.account.forms.account_forms import CreatePasswordForm
 from app.decorators import admin_required, audit_log, governance_gate_reader_required
-from app.middleware.tenant_decorators import platform_admin_required
+from app.middleware.tenant_decorators import is_platform_admin, platform_admin_required
 from app.models import APISettings, EditableHTML, Permission, Role, User
 from app.models.organization import Organization
 from app.models.feature_flags import FeatureFlag, FeatureState, FeatureType
@@ -245,7 +245,12 @@ def registered_users():
     # the scope explicitly and surface the platform-wide total for
     # reconciliation rather than leaving the admin to discover the gap.
     current_org = Organization.query.get(g.current_org_id)
-    platform_total_users = User.query.count()
+    # D-6 (refuter review of PR 428): this reconciliation total is itself a
+    # cross-tenant leak -- see the matching fix in
+    # app/modules/admin/v2/routes/admin_routes.py::registered_users. Compute
+    # it only for an actual platform admin; the shared template omits the
+    # reconciliation line entirely when this is None.
+    platform_total_users = User.query.count() if is_platform_admin(current_user) else None
     return render_template(
         "admin/registered_users.html",
         users=users,
@@ -2619,8 +2624,16 @@ def api_bulk_delete_users():
 @admin_bp.route("/jira-settings", methods=["GET", "POST"])
 @login_required
 @admin_required
+@platform_admin_required
 def jira_settings():
-    """Manage Jira push integration configuration."""
+    """Manage Jira push integration configuration.
+
+    Platform-admin-only (refuter review of PR 428, D-1 -- see the matching
+    fix and docstring in app/modules/admin/v2/routes/admin_routes.py; this is
+    the v1 module tree's duplicate of the same route, fixed defensively since
+    which tree is registered depends on the USE_ADMIN_GUARDRAILS/
+    USE_NEW_ADMIN flags at deploy time).
+    """
     from flask_wtf import FlaskForm
     from wtforms import BooleanField, PasswordField, StringField
     from wtforms.validators import DataRequired
@@ -2766,6 +2779,7 @@ def jira_settings():
 @admin_bp.route("/jira-settings/test-connection", methods=["POST"])
 @login_required
 @admin_required
+@platform_admin_required
 def jira_test_connection():
     """Test Jira API connectivity."""
     import asyncio
@@ -2886,6 +2900,7 @@ def jira_webhook():
 @admin_bp.route("/jira-settings/save-env-config", methods=["POST"])
 @login_required
 @admin_required
+@platform_admin_required
 def save_env_jira_config():
     """Save .env Jira credentials to database."""
     from app.models.models import ExternalSystem
@@ -2921,6 +2936,7 @@ def save_env_jira_config():
 @admin_bp.route("/jira-settings/trigger-push", methods=["POST"])
 @login_required
 @admin_required
+@platform_admin_required
 def jira_trigger_push():
     """Create a Job and start pushing applications to Jira."""
     from app.models.job import Job, JobStatus
@@ -2958,6 +2974,7 @@ def jira_trigger_push():
 @admin_bp.route("/jira-settings/push-status", methods=["GET"])
 @login_required
 @admin_required
+@platform_admin_required
 def jira_push_status():
     """Return JSON push status for polling."""
     from app.models.job import Job
@@ -2979,6 +2996,7 @@ def jira_push_status():
 @admin_bp.route("/jira-settings/kanban-push-status", methods=["GET"])
 @login_required
 @admin_required
+@platform_admin_required
 def jira_kanban_push_status():
     """Return JSON kanban push status for polling."""
     try:
@@ -2994,6 +3012,7 @@ def jira_kanban_push_status():
 @admin_bp.route("/jira-settings/trigger-kanban-push", methods=["POST"])
 @login_required
 @admin_required
+@platform_admin_required
 def jira_trigger_kanban_push():
     """Push all unpushed KanbanCard rows to Jira."""
     try:
@@ -3009,6 +3028,7 @@ def jira_trigger_kanban_push():
 @admin_bp.route("/jira-settings/push-epics", methods=["POST"])
 @login_required
 @admin_required
+@platform_admin_required
 def jira_push_epics():
     """Create one Jira Epic per ADM phase."""
     try:
@@ -3023,6 +3043,7 @@ def jira_push_epics():
 @admin_bp.route("/jira-settings/push-applications", methods=["POST"])
 @login_required
 @admin_required
+@platform_admin_required
 def jira_push_applications():
     """Push ApplicationComponents to Jira."""
     try:
@@ -3037,6 +3058,7 @@ def jira_push_applications():
 @admin_bp.route("/jira-settings/push-dependencies", methods=["POST"])
 @login_required
 @admin_required
+@platform_admin_required
 def jira_push_dependencies():
     """Create Jira Subtasks from KanbanCard dependencies."""
     try:
@@ -3051,6 +3073,7 @@ def jira_push_dependencies():
 @admin_bp.route("/jira-settings/field-discovery", methods=["GET"])
 @login_required
 @admin_required
+@platform_admin_required
 def jira_field_discovery():
     """Return available Jira fields for the configured project."""
     import asyncio

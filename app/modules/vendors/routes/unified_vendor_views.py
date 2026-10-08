@@ -22,6 +22,7 @@ from sqlalchemy import text
 logger = logging.getLogger(__name__)
 
 from app.decorators import audit_log, require_roles
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.vendor_organization import VendorOrganization
 from app.extensions import db
 from app.modules.vendors.services.vendor_onboarding_service import (
@@ -552,9 +553,17 @@ def vendor_deployment_portfolio(vendor_id):
 @unified_vendors_bp.route("/<int:vendor_id>/delete", methods=["DELETE", "POST"])
 @login_required
 @require_roles("admin")
+@platform_admin_required
 @audit_log("vendor_delete")
 def delete_vendor(vendor_id):
-    """Delete vendor - directly deletes and shows success message."""
+    """Delete vendor - directly deletes and shows success message.
+
+    Platform-admin-only (refuter review of PR 428, vendor-catalogue findings)
+    -- see the matching fix in
+    app/modules/vendors/routes/unified_vendor_api.py::delete_vendor.
+    ``require_roles("admin")`` is kept rather than removed;
+    ``platform_admin_required`` is the operative check.
+    """
     vendor = VendorOrganization.query.get_or_404(vendor_id)
 
     vendor_name = vendor.name
@@ -578,11 +587,17 @@ def delete_vendor(vendor_id):
 @unified_vendors_bp.route("/import", methods=["GET", "POST"])
 @login_required
 @require_roles("admin")
+@platform_admin_required
 @audit_log("vendor_import")
 def import_vendors():
     """
     Bulk import vendors from CSV/Excel.
     Consolidates /vendor-management/import
+
+    Platform-admin-only (refuter review of PR 428, vendor-catalogue findings)
+    -- writes into the same shared, platform-wide ``VendorOrganization``
+    catalogue as ``delete_vendor`` above. ``require_roles("admin")`` is kept
+    rather than removed; ``platform_admin_required`` is the operative check.
     """
     if request.method == "GET":
         if request.headers.get("Accept") == "application/json":
