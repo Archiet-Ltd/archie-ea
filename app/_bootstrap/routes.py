@@ -692,14 +692,28 @@ def _register_metrics(app, csrf):
 
         from app.core.observability.metrics import metrics_collector
 
-        # Protect metrics — require admin auth or localhost
+        # Protect metrics — require PLATFORM admin auth or localhost.
+        #
+        # D-4 (admin-rbac-active-org continuation): this used to accept any
+        # ``current_user.is_admin()`` -- a global Permission.ADMINISTER
+        # flag that every self-registered user holds for their own
+        # organisation, not a platform-wide authority. Operational metrics
+        # span every tenant on the instance, so this was arguably the more
+        # severe end of the admin-anywhere bug class this PR fixes
+        # elsewhere: an ordinary organisation's own admin (no org-switching
+        # needed at all) could read cross-tenant operational metrics.
+        # Tightened to the canonical is_platform_admin predicate rather
+        # than the org-aware admin_required/org_admin_required check used
+        # elsewhere in this PR, since metrics are a genuinely platform-wide
+        # resource, not a per-organisation one.
+        from app.middleware.tenant_decorators import is_platform_admin
+
         is_local = request.remote_addr in ("127.0.0.1", "::1", "localhost")
         is_admin = (
             current_user
             and hasattr(current_user, "is_authenticated")
             and current_user.is_authenticated
-            and hasattr(current_user, "is_admin")
-            and current_user.is_admin()
+            and is_platform_admin(current_user)
         )
 
         if not is_local and not is_admin:

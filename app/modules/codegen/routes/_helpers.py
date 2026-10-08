@@ -48,16 +48,48 @@ def _snake(name):
 
 
 def _check_access(solution, user=None):
-    """Verify current user can access this solution's workbench."""
+    """Verify current user can access this solution's workbench.
+
+    D-4 (admin-rbac-active-org continuation): the admin branch used to be
+    the bare ``user.is_admin()`` callable -- a global Permission.ADMINISTER
+    flag, independent of which organisation is active in the session. Since
+    every self-registered user is Administrator of their own organisation,
+    a user who merely accepted a Viewer invitation into another
+    organisation and switched their session into it could reach any
+    solution's codegen workbench there too, not just their own -- the exact
+    bug admin_required/org_admin_required already fix elsewhere in this PR.
+
+    Re-derived against ``solution.organization_id`` (the solution this call
+    is actually about) rather than ``g.current_org_id``, both because this
+    function (like solution_design_routes.py's own ``_check_solution_access``)
+    must also work with no request context at all, and because
+    tests/test_solution_codegen_access_agreement.py exercises it with a bare
+    duck-typed user object (no ``.role``/``.can()``/``.organization_id``) --
+    degrading to the legacy global ``is_admin()`` answer whenever the richer,
+    organisation-aware check cannot be made (no real ``User``/``Solution``
+    shape to check it against) preserves that contract exactly, while a real
+    request with real models gets the fixed, active-org-aware answer.
+    """
     user = user if user is not None else current_user
     if not user.is_authenticated:
         return False
-    is_admin = getattr(user, "is_admin", False)
-    if (is_admin() if callable(is_admin) else bool(is_admin)):
-        return True
-    if getattr(user, "is_platform_admin", False):
-        return True
     if getattr(solution, "created_by_id", None) == user.id:
+        return True
+    is_admin_attr = getattr(user, "is_admin", False)
+    is_admin = is_admin_attr() if callable(is_admin_attr) else bool(is_admin_attr)
+    if is_admin:
+        try:
+            from app.services.rbac_service import rbac_service
+
+            org_id = getattr(solution, "organization_id", None)
+            if org_id is not None and hasattr(user, "organization_id"):
+                if rbac_service.is_org_admin(user, org_id):
+                    return True
+            else:
+                return True
+        except Exception:  # noqa: BLE001 - degrade to the legacy global answer
+            return True
+    if getattr(user, "is_platform_admin", False):
         return True
     stakeholder_emails = (
         getattr(solution, "solution_owner", None),

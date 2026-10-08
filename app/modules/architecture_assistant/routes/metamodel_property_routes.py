@@ -55,8 +55,18 @@ def _organization_id() -> int | None:
 def _can_define() -> bool:
     if not getattr(current_user, "is_authenticated", False):
         return False
+    # D-4 (admin-rbac-active-org continuation): this used to be
+    # ``current_user.is_admin()`` -- a global Permission.ADMINISTER flag,
+    # independent of which organisation is active in the session (the
+    # mutating route this gates the "Define" UI affordance for,
+    # ``@role_required(*DEFINING_ROLES)`` below, carries the matching fix).
     try:
-        if current_user.is_admin():
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
+        if is_platform_admin(current_user) or rbac_service.is_org_admin(
+            current_user, _organization_id()
+        ):
             return True
     except Exception:
         current_app.logger.debug("is_admin unavailable for metamodel role check")

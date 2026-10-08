@@ -71,19 +71,49 @@ def _check_solution_access(solution, user=None) -> bool:
 
     Access is granted to:
     - The creator (solution.created_by_id)
-    - Admins (user.is_admin)
+    - Admins of the organisation this SOLUTION belongs to
     - Named stakeholders (owner, sponsor, tech lead) matched by email
 
     `user` is accepted explicitly so this check can run outside an HTTP
     request (e.g. from the AI-chat tool executor), where flask_login's
     `current_user` proxy has nothing to resolve against.
+
+    D-4 (admin-rbac-active-org continuation): the admin branch used to be
+    the bare ``user.is_admin()`` callable -- a global Permission.ADMINISTER
+    flag, independent of which organisation is active in the session. Since
+    every self-registered user is Administrator of their own organisation,
+    a user who merely accepted a Viewer invitation into another
+    organisation and switched their session into it could reach any
+    solution there too, not just their own -- the exact bug
+    admin_required/org_admin_required already fix elsewhere in this PR.
+
+    Re-derived against ``solution.organization_id`` directly (the solution
+    this call is actually about) rather than ``g.current_org_id``, both
+    because this function must also work with no request context at all,
+    and because tests/test_solution_codegen_access_agreement.py exercises
+    it with a bare duck-typed user object (no
+    ``.role``/``.can()``/``.organization_id``) -- degrading to the legacy
+    global ``is_admin()`` answer whenever the richer, organisation-aware
+    check cannot be made preserves that contract exactly, while a real
+    request with real models gets the fixed, active-org-aware answer.
     """
     user = user if user is not None else current_user
     if solution.created_by_id == user.id:
         return True
-    is_admin = getattr(user, "is_admin", False)
-    if (is_admin() if callable(is_admin) else bool(is_admin)):
-        return True
+    is_admin_attr = getattr(user, "is_admin", False)
+    is_admin = is_admin_attr() if callable(is_admin_attr) else bool(is_admin_attr)
+    if is_admin:
+        try:
+            from app.services.rbac_service import rbac_service
+
+            org_id = getattr(solution, "organization_id", None)
+            if org_id is not None and hasattr(user, "organization_id"):
+                if rbac_service.is_org_admin(user, org_id):
+                    return True
+            else:
+                return True
+        except Exception:  # noqa: BLE001 - degrade to the legacy global answer
+            return True
     if getattr(user, "is_platform_admin", False):
         return True
     _stakeholder_emails = [
@@ -95,6 +125,32 @@ def _check_solution_access(solution, user=None) -> bool:
         f and user.email and f.strip().lower() == user.email.strip().lower()
         for f in _stakeholder_emails
     )
+
+
+def _is_active_org_admin(user=None) -> bool:
+    """D-4 (admin-rbac-active-org continuation): every "admin sees
+    everything" branch in this file used to be ``hasattr(user, "is_admin")
+    and user.is_admin()`` -- a global Permission.ADMINISTER flag,
+    independent of which organisation is active in the session
+    (``g.current_org_id``). Since every self-registered user is
+    Administrator of their own organisation, a user who merely accepted a
+    Viewer invitation into another organisation and switched their session
+    into it was treated as that organisation's admin there too (seeing
+    every solution/business-unit regardless of ownership, bypassing
+    ``?bu=all``'s own-BU restriction) -- the exact bug
+    ``admin_required``/``org_admin_required`` already fix elsewhere in this
+    PR.
+    """
+    user = user if user is not None else current_user
+    if not getattr(user, "is_authenticated", False):
+        return False
+    from flask import g
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    active_org_id = getattr(g, "current_org_id", None)
+    return is_platform_admin(user) or rbac_service.is_org_admin(user, active_org_id)
 
 
 def _capability_gap_severity(capability) -> str | None:
@@ -1053,7 +1109,7 @@ def list_solutions():
         show_all_override = False
         _user_bu_id = getattr(current_user, "business_unit_id", None)  # model-safety-ok
         _bu_all_requested = request.args.get("bu", "").strip().lower() == "all"
-        if _bu_all_requested and hasattr(current_user, "is_admin") and current_user.is_admin():
+        if _bu_all_requested and _is_active_org_admin():
             show_all_override = True
         elif _user_bu_id:
             try:
@@ -1071,7 +1127,7 @@ def list_solutions():
         # Build base query — admins and review-role personas see all solutions;
         # solution architects and below see only their own.
         _can_see_all = (
-            (hasattr(current_user, 'is_admin') and current_user.is_admin())
+            _is_active_org_admin()
             or (hasattr(current_user, 'can_vote_arb') and current_user.can_vote_arb())
             or (hasattr(current_user, 'can_manage_portfolio') and current_user.can_manage_portfolio())
             or getattr(current_user, 'enterprise_role', None) in ('enterprise_architect', 'cto', 'platform_admin')
@@ -5818,7 +5874,7 @@ def bulk_delete_solutions():
             if ws_filter not in _WORKLIST_BUCKETS:
                 return jsonify({"success": False, "error": "Invalid filter"}), 400
             _can_see_all = (
-                (hasattr(current_user, 'is_admin') and current_user.is_admin())
+                _is_active_org_admin()
                 or (hasattr(current_user, 'can_vote_arb') and current_user.can_vote_arb())
                 or (hasattr(current_user, 'can_manage_portfolio') and current_user.can_manage_portfolio())
                 or getattr(current_user, 'enterprise_role', None) in ('enterprise_architect', 'cto', 'platform_admin')
@@ -5857,7 +5913,7 @@ def bulk_delete_solutions():
             if not solution:
                 errors.append(f"Solution {solution_id} not found")
                 continue
-            if solution.created_by_id != current_user.id and not current_user.is_admin():
+            if solution.created_by_id != current_user.id and not _is_active_org_admin():
                 errors.append(f"Permission denied for solution {solution_id}")
                 continue
             deletable_ids.append(solution_id)
@@ -5924,7 +5980,7 @@ def bulk_delete_solutions():
 def api_list_solutions():
     """Get solutions as JSON — admins and review-role personas see all; others see own."""
     _can_see_all = (
-        (hasattr(current_user, 'is_admin') and current_user.is_admin())
+        _is_active_org_admin()
         or (hasattr(current_user, 'can_vote_arb') and current_user.can_vote_arb())
         or (hasattr(current_user, 'can_manage_portfolio') and current_user.can_manage_portfolio())
         or getattr(current_user, 'enterprise_role', None) in ('enterprise_architect', 'cto', 'platform_admin')
@@ -8144,7 +8200,7 @@ def portfolio_view():
     status_filter = request.args.get("status", "").strip()
     group_by = request.args.get("group_by", "domain").strip()
 
-    if hasattr(current_user, "is_admin") and current_user.is_admin():
+    if _is_active_org_admin():
         query = Solution.query
     else:
         query = Solution.query.filter_by(created_by_id=current_user.id)
@@ -8216,7 +8272,7 @@ def portfolio_api():
     """ENH-022: Portfolio API — solutions grouped by domain or roadmap, with status counts."""
     group_by = request.args.get("group_by", "domain").strip()
 
-    if hasattr(current_user, "is_admin") and current_user.is_admin():
+    if _is_active_org_admin():
         solutions = Solution.query.order_by(Solution.name).all()
     else:
         solutions = Solution.query.filter_by(created_by_id=current_user.id).order_by(Solution.name).all()
@@ -8303,7 +8359,7 @@ def program_view():
     """ENH-023: Program view — all solutions as nodes with dependency relationships."""
     _ensure_solution_dependencies_table()
 
-    if hasattr(current_user, "is_admin") and current_user.is_admin():
+    if _is_active_org_admin():
         solutions = Solution.query.order_by(Solution.name).all()
     else:
         solutions = Solution.query.filter_by(created_by_id=current_user.id).order_by(Solution.name).all()
