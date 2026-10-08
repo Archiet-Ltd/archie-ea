@@ -145,6 +145,7 @@ def get_enterprise_groups():
 
 @unified_duplicate_bp.route("/enterprise/runs")
 @login_required
+@platform_admin_required
 def get_enterprise_runs():
     """Get enterprise detection runs"""
     try:
@@ -1032,6 +1033,7 @@ def get_unified_groups():
 
 @unified_duplicate_bp.route("/unified/runs")
 @login_required
+@platform_admin_required
 def get_unified_runs():
     """Get all detection runs (both enterprise and simple)"""
     try:
@@ -2207,6 +2209,7 @@ def api_duplicate_groups():
 
 @unified_duplicate_bp.route("/api/detection-runs")
 @login_required
+@platform_admin_required
 def api_detection_runs():
     """Detection runs for the enterprise dashboard."""
     try:

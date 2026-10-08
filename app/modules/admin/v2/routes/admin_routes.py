@@ -638,6 +638,7 @@ def set_user_password(user_id):
 @admin_required
 def delete_user_request(user_id):
     """Request deletion of a user's account."""
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -3496,6 +3497,7 @@ def api_list_enterprise_roles():
 @admin_required
 def api_enterprise_role_users():
     """List all users with their enterprise role assignments."""
+    require_org_or_platform_admin(g.current_org_id)
     users = User.query.filter_by(organization_id=g.current_org_id).order_by(User.last_name, User.first_name).all()
     items = []
     for u in users:
@@ -5384,6 +5386,7 @@ def governance_gates_create():
 @audit_log("admin_governance_gate_update")
 def governance_gates_update(gate_id):
     """Update an existing governance gate."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     gate = GovernanceGate.query.get_or_404(gate_id)
@@ -5426,6 +5429,7 @@ def governance_gates_update(gate_id):
 @audit_log("admin_governance_gate_delete")
 def governance_gates_delete(gate_id):
     """Soft-delete a governance gate by disabling it."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     gate = GovernanceGate.query.get_or_404(gate_id)

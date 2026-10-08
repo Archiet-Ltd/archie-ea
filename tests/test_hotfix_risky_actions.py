@@ -209,3 +209,119 @@ class TestGroup4ActiveOrgUserManagement:
             login_as(client, pa)
             assert client.get("/admin/api/users").status_code == 200
             assert client.get("/admin/users").status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Round 2 (P437-1 .. P437-5)
+# ---------------------------------------------------------------------------
+
+RUNS_LISTINGS = [
+    "/duplicate-detection/enterprise/runs",
+    "/duplicate-detection/unified/runs",
+    "/duplicate-detection/api/detection-runs",
+]
+
+
+class TestRound2PlatformAdminOnly:
+    def _plain_user(self, db_session, org):
+        from app.models.user import Role
+
+        Role.insert_roles()
+        user = _make_user(db_session, org)
+        user.role = Role.query.filter_by(name="User").first()
+        user.is_org_admin = False
+        db_session.commit()
+        return user
+
+    def test_rationalization_run_detection_user_role_refused_groups_survive(
+        self, app, db_session, login_as, client, actors
+    ):
+        from app.models.unified_duplicate_detection import UnifiedDuplicateGroup
+
+        org_admin, _ = actors
+        group = UnifiedDuplicateGroup(name=f"global-{uuid.uuid4().hex[:6]}", similarity_score=0.9)
+        db_session.add(group)
+        db_session.commit()
+        gid = group.id
+        user = self._plain_user(db_session, org_admin.organization)
+        with app.app_context():
+            for actor in (user, org_admin):
+                login_as(client, actor)
+                resp = client.post("/applications/rationalization/api/run-detection", json={})
+                assert resp.status_code == 403
+            assert UnifiedDuplicateGroup.query.get(gid) is not None
+
+    def test_rationalization_run_detection_platform_admin_not_refused(
+        self, app, login_as, client, actors
+    ):
+        _, platform_admin = actors
+        with app.app_context():
+            login_as(client, platform_admin)
+            resp = client.post("/applications/rationalization/api/run-detection", json={"strategy": "bogus"})
+            assert resp.status_code == 400
+
+    @pytest.mark.parametrize("url", RUNS_LISTINGS)
+    def test_runs_listings_org_admin_refused(self, app, login_as, client, actors, url):
+        org_admin, _ = actors
+        with app.app_context():
+            login_as(client, org_admin)
+            assert client.get(url).status_code == 403
+
+    @pytest.mark.parametrize("url", RUNS_LISTINGS)
+    def test_runs_listings_platform_admin_not_refused(self, app, login_as, client, actors, url):
+        _, platform_admin = actors
+        with app.app_context():
+            login_as(client, platform_admin)
+            assert client.get(url).status_code != 403
+
+    def test_enterprise_run_detection_refused(self, app, login_as, client, actors):
+        org_admin, platform_admin = actors
+        with app.app_context():
+            login_as(client, org_admin)
+            assert client.post("/duplicate-detection/enterprise/run-detection", json={}).status_code == 403
+            login_as(client, platform_admin)
+            assert client.post("/duplicate-detection/enterprise/run-detection", json={}).status_code != 403
+
+    def test_anonymous_gets_401_or_redirect_not_500(self, client):
+        for method, url in (
+            ("post", "/applications/rationalization/api/run-detection"),
+            ("get", "/duplicate-detection/enterprise/runs"),
+            ("get", "/admin/api/enterprise-roles/users"),
+        ):
+            resp = getattr(client, method)(url)
+            assert resp.status_code in (401, 302), (url, resp.status_code)
+
+
+class TestRound2SwitchedOrgViewer(TestGroup4ActiveOrgUserManagement):
+    """Reuses the scene/_switch fixtures; the inherited tests run again."""
+
+    def test_round2_routes_refused_for_switched_org_viewer(self, app, login_as, client, scene):
+        from app.models.governance_gates import GovernanceGate
+
+        org_a, org_b, actor, target_a, target_b = scene
+        gate = GovernanceGate.query.first()
+        gate_id = gate.id if gate else 999999
+        with app.app_context():
+            login_as(client, actor)
+            self._switch(client, org_b)
+            checks = [
+                client.put(f"/admin/api/governance-gates/{gate_id}", json={"gate_name": "x"}),
+                client.delete(f"/admin/api/governance-gates/{gate_id}"),
+                client.get("/admin/api/enterprise-roles/users"),
+                client.get(f"/admin/user/{target_b.id}/delete"),
+                client.post(f"/admin/user/{target_b.id}/_delete"),
+                client.post(f"/admin/user/{target_b.id}/change-account-type", data={"account_type": 1}),
+            ]
+            assert [r.status_code for r in checks] == [403] * len(checks)
+
+    def test_switched_org_bulk_delete_and_account_type_refused(self, app, login_as, client, scene):
+        from app.models.user import User
+
+        org_a, org_b, actor, target_a, target_b = scene
+        tid = target_b.id
+        with app.app_context():
+            login_as(client, actor)
+            self._switch(client, org_b)
+            r = client.delete("/admin/api/users/bulk", json={"ids": [tid]})
+            assert r.status_code == 403
+            assert User.query.get(tid) is not None
