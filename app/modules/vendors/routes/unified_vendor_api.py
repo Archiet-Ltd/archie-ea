@@ -253,10 +253,20 @@ def search_vendors():
 @unified_vendors_api_bp.route("/", methods=["POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_create")
 @rate_limit(20, "1h")
 def create_vendor():
-    """Create new vendor organization with validation and duplicate prevention."""
+    """Create new vendor organization with validation and duplicate prevention.
+
+    Platform-admin-only (lead review of PR 430, D-2 follow-up): writes the
+    global, platform-wide ``VendorOrganization`` catalogue, not an
+    organisation-scoped resource. ``require_roles("admin", "architect")`` is
+    satisfied by any org's own admin/architect for their own brand-new,
+    self-registered organisation -- no invitation into anyone else's org
+    needed. ``require_roles`` is kept rather than removed;
+    ``platform_admin_required`` is the operative check.
+    """
     from datetime import datetime
     from sqlalchemy import func
 
@@ -339,10 +349,14 @@ def create_vendor():
 @unified_vendors_api_bp.route("/<int:vendor_id>", methods=["PUT", "PATCH"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_update")
 @rate_limit(30, "1h")
 def update_vendor(vendor_id):
-    """Update vendor organization with allowlist protection and audit logging. PROD-009"""
+    """Update vendor organization with allowlist protection and audit logging. PROD-009
+
+    Platform-admin-only -- see ``create_vendor``'s docstring above.
+    """
     from datetime import datetime
 
     data = request.get_json() or {}

@@ -367,8 +367,18 @@ def vendor_catalog():
 @unified_vendors_bp.route("/create", methods=["GET", "POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 def create_vendor():
-    """Create new vendor - renders simple create form."""
+    """Create new vendor - renders simple create form.
+
+    Platform-admin-only (lead review of PR 430, D-2 follow-up): the actual
+    create submission writes the global, platform-wide ``VendorOrganization``
+    catalogue (app/modules/applications/routes/vendor_display_routes.py's
+    ``vendors_create``, fixed the same way below). Gating this form the same
+    way keeps a tenant admin from even reaching a create UI for a resource
+    they cannot write. ``require_roles`` is kept rather than removed;
+    ``platform_admin_required`` is the operative check.
+    """
     return render_template(
         "vendors/create_simple.html",
     )
@@ -384,9 +394,13 @@ def vendor_detail(vendor_id):
 @unified_vendors_bp.route("/<int:vendor_id>/edit", methods=["GET", "PUT", "POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_edit")
 def edit_vendor(vendor_id):
-    """Edit vendor organization - real implementation."""
+    """Edit vendor organization - real implementation.
+
+    Platform-admin-only -- see ``create_vendor``'s docstring above.
+    """
     from app.modules.vendors.forms import CreateVendorForm
     from app.models.vendor.vendor_organization import VendorOrganization
 

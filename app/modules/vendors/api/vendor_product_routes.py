@@ -13,6 +13,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.extensions import db
+from app.middleware.tenant_decorators import platform_admin_required
 from app.modules.vendors.services.vendor_product_service import VendorProductService
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant_users import escape_like_literal
@@ -315,9 +316,16 @@ def get_product_categories():
 
 @vendor_product_bp.route("/<int:vendor_id>/products", methods=["POST"])
 @login_required
+@platform_admin_required
 @audit_log("vendor_product_create")
 def create_vendor_product(vendor_id):
-    """Create a new product for a vendor organisation."""
+    """Create a new product for a vendor organisation.
+
+    Platform-admin-only (lead review of PR 430, item 3): writes the global,
+    platform-wide ``VendorProduct`` table and was ``login_required`` only --
+    any signed-in user, not even an org admin, could create a product under
+    any vendor in the shared catalogue.
+    """
     from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
 
     vendor = VendorOrganization.query.get_or_404(vendor_id)
