@@ -21,15 +21,15 @@ months ago and never opened again.
 
 ## Your twin is also what your AI assistants have been missing
 
-A general assistant can guess at your architecture. It can't know it. Entelim's twin is built to be
-the context large language models actually need: through MCP, your team's own AI assistants can work
-directly over your twin, or you can ask Entelim itself.
+A general assistant can guess at your architecture. It can't know it. Entelim's own AI chat already
+works directly over your twin today. Connecting an external AI assistant to your twin through MCP is
+coming soon.
 
 Archiet Ltd, the company behind Entelim, is the first proof of that. We run our own operating model
-in Entelim, and when we need to know who to hire next, what to build, or what to stop — we ask
-Entelim, not a general chat assistant that knows nothing about our company. Every project we run
-traces back to the gap it closes and the stage it moves us toward, because that trace is built into
-the model, not bolted on afterward.
+in Entelim, and when we need to know what to build, or what to stop, we ask Entelim, not a general
+chat assistant that knows nothing about our company. Every project we run traces back to the gap it
+closes and the stage it moves us toward, because that trace is built into the model, not bolted on
+afterward.
 
 ## Built by the kind of user it's for
 

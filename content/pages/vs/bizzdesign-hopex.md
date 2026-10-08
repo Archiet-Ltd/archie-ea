@@ -54,8 +54,7 @@ governance — as one open-source product, self-hostable, built specifically on 
 
 ## Where Entelim is headed next
 
-Direct imports from major enterprise-architecture tools are on the roadmap for 2027. Today, ArchiMate
-Open Exchange and CSV bring an existing model across.
+ArchiMate Open Exchange and CSV are the working path to bring a model across.
 
 ## Frequently asked
 

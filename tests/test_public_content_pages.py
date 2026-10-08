@@ -66,6 +66,37 @@ BANNED_CLAIMS = [
         "self-hosting under AGPL is a separate, true fact, but it does not mean pricing is "
         "unpublished",
     ),
+    (
+        "every canvas",
+        "only the Business Model Canvas model exists (app/models/business_model.py); no other "
+        "canvas type is modelled, so no plan or page can honestly promise 'every canvas'",
+    ),
+    (
+        "who to hire next",
+        "no hiring or workforce-planning capability exists anywhere in the codebase; "
+        "content/pages/function-per-segment/uc-s3-12-who-do-we-need.md records this as a feature "
+        "with no surface built at all",
+    ),
+    (
+        "enter your website address",
+        "there is no website-URL-intake feature; no route builds a model or a canvas from a "
+        "submitted URL",
+    ),
+    (
+        "your team's own AI assistants can work directly over your twin",
+        "no MCP server exists in this codebase; only Entelim's own AI chat works over a tenant's "
+        "model today",
+    ),
+    (
+        "usage history",
+        "no customer-visible usage-history page is confirmed to exist; dropped from every plan "
+        "description rather than promised",
+    ),
+    (
+        "webhook feed",
+        "the real, shipped feature is Slack/Teams notifications and generic webhook subscriptions "
+        "to twelve events (admin.webhook_settings), not a branded 'webhook feed'",
+    ),
 ]
 
 # Front-matter keys that are metadata-only and must never appear as visible

@@ -62,9 +62,8 @@ can ask without learning the notation first.
 
 ## Where Entelim is headed next
 
-A direct LeanIX and Ardoq import — no export step required — is on the roadmap for 2027. Until then,
-ArchiMate Open Exchange and CSV are the working path across. A capability maturity heat map is
-close behind, in active development now.
+ArchiMate Open Exchange and CSV are the working path to bring a model across. A capability maturity
+heat map is close behind, in active development now.
 
 ## Frequently asked
 

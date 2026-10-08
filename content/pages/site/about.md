@@ -18,9 +18,9 @@ a startup founder building this company the same way Entelim asks every company 
 every project traces back to the gap it closes, because that trace is built into the model, not
 bolted on afterward.
 
-Archiet runs its own operating model in Entelim — hiring, roadmap and stop/go decisions all come
-from the same twin the product sells, not a spreadsheet kept alongside it. That practice is
-documented on [how Archiet runs on Entelim](/how-archiet-runs-on-entelim).
+Archiet runs its own operating model in Entelim — roadmap and stop/go decisions trace back to the
+same twin the product sells, not a spreadsheet kept alongside it. That practice is documented on
+[how Archiet runs on Entelim](/how-archiet-runs-on-entelim).
 
 ## Open source, so nobody's locked in
 

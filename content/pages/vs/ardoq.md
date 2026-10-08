@@ -54,8 +54,7 @@ Entelim alongside it — import what you have and compare the two directly.
 
 ## Where Entelim is headed next
 
-A direct Ardoq import — no export step required — is on the roadmap for 2027. Until then, ArchiMate
-Open Exchange and CSV are the working path across.
+ArchiMate Open Exchange and CSV are the working path to bring a model across.
 
 ## Frequently asked
 
