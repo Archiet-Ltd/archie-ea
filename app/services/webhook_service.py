@@ -42,6 +42,9 @@ MAX_RESPONSE_BYTES = 64 * 1024
 # A row is only treated as lost with its process after the longest a live worker
 # could legitimately take (see WebhookService._stale_after) plus this margin.
 STALE_MARGIN_SECONDS = 60
+# A "pending" row has no worker mid-flight on it (claiming it is atomic), so it
+# is recovered after this fixed, short time whatever the retry settings.
+PENDING_STALE_AFTER = timedelta(minutes=10)
 # Most rows one periodic sweep hands to the dispatcher for one organisation.
 SWEEP_BATCH_PER_ORG = 100
 
@@ -271,30 +274,86 @@ def _peer_is_public(address: str) -> bool:
     return _is_public_ip(address)
 
 
+def _bounded(fn, seconds):
+    """Run ``fn`` in a helper thread and wait at most ``seconds`` for it. Used
+    for name resolution, which cannot be interrupted: past the limit the helper
+    is abandoned (it is a daemon) and socket.timeout is raised."""
+    box = {}
+
+    def run():
+        try:
+            box["value"] = fn()
+        except BaseException as exc:  # handed back to the caller
+            box["error"] = exc
+
+    helper = threading.Thread(target=run, name="webhook-resolve", daemon=True)
+    helper.start()
+    helper.join(max(0.05, seconds))
+    if helper.is_alive():
+        raise socket.timeout("name resolution exceeded the delivery deadline")
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
+
+
+def _resolve_pinned(host, port, seconds):
+    """Resolve ``host`` once, under the remaining deadline, and return the first
+    address that passes the public-address rule as (family, sockaddr). Pinning
+    that address is what closes DNS rebinding at source."""
+    infos = _bounded(lambda: socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM), seconds)
+    first_refused = None
+    for family, _type, _proto, _canon, sockaddr in infos:
+        if _peer_is_public(sockaddr[0]):
+            return family, sockaddr
+        first_refused = first_refused or sockaddr[0]
+    raise BlockedPeerAddress(
+        f"resolved address {first_refused} is not a public address"
+        if first_refused
+        else f"host {host!r} did not resolve"
+    )
+
+
 class _TrackSocketMixin:
     def _new_conn(self):
         guard = getattr(_attempt_local, "guard", None)
-        if guard is not None:
-            # The connect phase runs under the same wall-clock deadline.
-            remaining = guard.remaining()
-            if remaining <= 0:
-                guard.expired = True
-                raise socket.timeout("delivery deadline reached before connect")
-            current = self.timeout if isinstance(self.timeout, (int, float)) else remaining
-            self.timeout = max(0.05, min(float(current), remaining))
-        sock = super()._new_conn()
-        if guard is not None:
-            # DNS may answer differently the second time (rebinding): judge the
-            # address actually connected to, before anything is sent.
-            try:
-                peer = sock.getpeername()[0]
-            except OSError:
-                peer = None
-            if peer is None or not _peer_is_public(peer):
+        if guard is None:
+            return super()._new_conn()
+        remaining = guard.remaining()
+        if remaining <= 0:
+            guard.expired = True
+            raise socket.timeout("delivery deadline reached before connect")
+        # One resolution, under the deadline; connect only to the pinned public
+        # address. The connection object still carries the hostname, so the TLS
+        # server name and the Host header are the hostname's.
+        try:
+            family, sockaddr = _resolve_pinned(
+                getattr(self, "_dns_host", self.host), self.port, remaining
+            )
+        except BlockedPeerAddress:
+            guard.blocked_peer = "resolved"
+            raise
+        remaining = guard.remaining()
+        if remaining <= 0:
+            guard.expired = True
+            raise socket.timeout("delivery deadline reached before connect")
+        current = self.timeout if isinstance(self.timeout, (int, float)) else remaining
+        sock = socket.socket(family, socket.SOCK_STREAM)
+        try:
+            for option in getattr(self, "socket_options", None) or []:
+                sock.setsockopt(*option)
+            sock.settimeout(max(0.05, min(float(current), remaining)))
+            if self.source_address:
+                sock.bind(self.source_address)
+            sock.connect(sockaddr)
+            # Belt and braces: judge the address actually connected to.
+            peer = sock.getpeername()[0]
+            if not _peer_is_public(peer):
                 guard.blocked_peer = peer
-                sock.close()
                 raise BlockedPeerAddress(f"connected peer {peer} is not a public address")
-            guard.track(sock)
+        except BaseException:
+            sock.close()
+            raise
+        guard.track(sock)
         return sock
 
 
@@ -342,6 +401,7 @@ def _post_with_deadline(url, payload, headers, timeout, deadline):
     started = time.monotonic()
     guard = _AttemptGuard(deadline)
     session = requests.Session()
+    session.trust_env = False  # no proxy, netrc or CA settings from the environment
     session.mount("http://", _DeadlineAdapter())
     session.mount("https://", _DeadlineAdapter())
     try:
@@ -383,9 +443,7 @@ def _post_with_deadline(url, payload, headers, timeout, deadline):
         raise
     except (requests.RequestException, OSError, http.client.HTTPException) as exc:
         if guard.blocked_peer is not None or _is_blocked_peer_error(exc):
-            raise BlockedPeerAddress(
-                f"connected peer {guard.blocked_peer} is not a public address"
-            ) from exc
+            raise BlockedPeerAddress("peer address is not a public address") from exc
         if guard.expired or time.monotonic() - started >= deadline:
             raise DeliveryDeadlineExceeded(
                 f"delivery exceeded the {deadline:g}s deadline"
@@ -740,7 +798,10 @@ class WebhookService:
 
         stale = now - self._stale_after()
         clauses = [
-            and_(WebhookDelivery.status == "pending", WebhookDelivery.created_at < stale),
+            and_(
+                WebhookDelivery.status == "pending",
+                WebhookDelivery.created_at < now - PENDING_STALE_AFTER,
+            ),
             and_(
                 WebhookDelivery.status == "retrying",
                 or_(
@@ -816,7 +877,7 @@ class WebhookService:
             raise
         return now if result.rowcount == 1 else None
 
-    def _fail_undeliverable(self, delivery_id, org_id) -> None:
+    def _fail_undeliverable(self, delivery_id, org_id, statuses=("pending",)) -> None:
         from sqlalchemy import update
 
         try:
@@ -825,7 +886,7 @@ class WebhookService:
                 .where(
                     WebhookDelivery.id == delivery_id,
                     WebhookDelivery.organization_id == org_id,
-                    WebhookDelivery.status == "pending",
+                    WebhookDelivery.status.in_(list(statuses)),
                 )
                 .values(
                     status="failed",
@@ -1038,112 +1099,180 @@ class WebhookService:
         return new_token if result.rowcount == 1 else None
 
     def _attempt_delivery(self, delivery_id: str, snap, headers: Dict, payload: Dict, *,
-                          org_id, token, max_attempts: Optional[int] = None):
-        """Send a claimed row, with retries. Holds no transaction or pooled
-        connection while the HTTP call is in flight; each outcome is a new short
-        transaction presented with the claim token. The row stays "retrying"
-        between this worker's own attempts and becomes "failed" only after the
-        last one. If the claim is lost (a newer claimant took the row) this
-        worker stops and writes nothing more.
+                          org_id, token, max_attempts: Optional[int] = None,
+                          attempt_number: int = 1):
+        """Make ONE send attempt of a claimed row and record it, presenting the
+        claim token. A failed attempt that will be retried is recorded (the row
+        stays "retrying", the new token is kept), then the next attempt is
+        handed back to the dispatcher after the backoff by a timer: no worker
+        sleeps and a delivery waiting out its backoff occupies no in-flight
+        slot. The row becomes "failed" only after the last attempt. If the claim
+        is lost (a newer claimant took the row) this worker stops and writes
+        nothing.
 
         A redirect is never followed: any 3xx is a failure recorded with its
-        status and no body. Each attempt has a wall-clock deadline and reads at
-        most 64 KB of the response.
+        status and no body. Each attempt has a wall-clock deadline (name
+        resolution included) and reads at most 64 KB of the response.
 
-        Returns (success, attempts). Logs the subscription id and URL host only:
-        the full URL is a bearer credential for Slack/Teams/Azure endpoints.
+        Returns (success, attempt_number). Logs the subscription id and URL host
+        only: the full URL is a bearer credential for Slack/Teams/Azure endpoints.
         """
         url = snap.url
         host = urlparse(url).hostname or "unknown-host"
         label = f"subscription {snap.id} (host {host})"
+        state = {"token": token}
 
         def record(**fields):
-            nonlocal token
-            token = self._record_attempt(delivery_id, org_id, token, **fields)
-            if token is None:
+            new_token = self._record_attempt(delivery_id, org_id, state["token"], **fields)
+            state["token"] = new_token
+            if new_token is None:
                 current_app.logger.warning(
                     f"Webhook delivery {delivery_id} to {label} was claimed by another "
-                    f"worker; this attempt's result is discarded"
+                    f"worker; this attempt result is discarded"
                 )
-            return token is not None
+            return new_token
+
+        attempts = attempt_number
+
+        def failed(message, outcome=None):
+            return self._after_failed_attempt(
+                record, delivery_id, snap, headers, payload, org_id, attempts,
+                max_attempts, label, message, outcome,
+            )
 
         try:
-            validate_outbound_url(url, require_https=False)
+            _bounded(
+                lambda: validate_outbound_url(url, require_https=False),
+                float(self.attempt_deadline),
+            )
         except BlockedOutboundURL as e:
             record(
                 status="failed",
-                attempt_count=1,
+                attempt_count=attempts,
                 error_message=f"Blocked outbound URL: {e}"[:500],
             )
             current_app.logger.error(f"Webhook to {label} blocked by outbound URL guard")
-            return False, 1
+            return False, attempts
+        except OSError as e:  # name resolution timed out or failed
+            return failed(str(e)[:500] or "name resolution failed")
 
+        try:
+            status_code, body = _post_with_deadline(
+                url, payload, headers, self.timeout, self.attempt_deadline
+            )
+        except BlockedPeerAddress as e:
+            # Deterministic and hostile: no retry.
+            record(
+                status="failed",
+                attempt_count=attempts,
+                error_message=f"Blocked outbound URL: {e}"[:500],
+            )
+            current_app.logger.error(f"Webhook to {label} blocked: peer address not public")
+            return False, attempts
+        except (requests.RequestException, DeliveryDeadlineExceeded, OSError,
+                http.client.HTTPException) as e:
+            return failed(str(e)[:500])
+
+        outcome = dict(
+            attempt_count=attempts,
+            response_status=status_code,
+            response_body=body[:1000] if body is not None else None,
+        )
+        if 200 <= status_code < 300:
+            if record(
+                status="success", delivered_at=datetime.utcnow(),
+                error_message=None, **outcome,
+            ):
+                current_app.logger.info(f"Delivered webhook to {label}")
+            return True, attempts
+        if 300 <= status_code < 400:
+            # Deterministic: retrying the same URL redirects again.
+            record(
+                status="failed",
+                error_message=f"HTTP {status_code}: redirect not followed",
+                **outcome,
+            )
+            current_app.logger.error(
+                f"Webhook to {label} answered a redirect ({status_code}); not followed"
+            )
+            return False, attempts
+        return failed(f"HTTP {status_code}: {(body or '')[:200]}", outcome)
+
+    def _total_attempts(self, max_attempts) -> int:
         total = max(1, int(self.max_retries))
         if max_attempts is not None:
             total = max(1, min(total, int(max_attempts)))
-        attempts = 0
-        for attempt in range(total):
-            attempts = attempt + 1
-            last = attempts >= total
-            fail_status = "failed" if last else "retrying"
-            try:
-                status_code, body = _post_with_deadline(
-                    url, payload, headers, self.timeout, self.attempt_deadline
-                )
-            except BlockedPeerAddress as e:
-                # Deterministic and hostile: no retry.
-                record(
-                    status="failed",
-                    attempt_count=attempts,
-                    error_message=f"Blocked outbound URL: {e}"[:500],
-                )
-                current_app.logger.error(f"Webhook to {label} blocked: peer address not public")
-                return False, attempts
-            except (requests.RequestException, DeliveryDeadlineExceeded, OSError,
-                    http.client.HTTPException) as e:
-                if not record(
-                    status=fail_status,
-                    attempt_count=attempts,
-                    error_message=str(e)[:500],
-                ):
-                    return False, attempts
-            else:
-                outcome = dict(
-                    attempt_count=attempts,
-                    response_status=status_code,
-                    response_body=body[:1000] if body is not None else None,
-                )
-                if 200 <= status_code < 300:
-                    if record(
-                        status="success", delivered_at=datetime.utcnow(),
-                        error_message=None, **outcome,
-                    ):
-                        current_app.logger.info(f"Delivered webhook to {label}")
-                    return True, attempts
-                if 300 <= status_code < 400:
-                    # Deterministic: retrying the same URL redirects again.
-                    record(
-                        status="failed",
-                        error_message=f"HTTP {status_code}: redirect not followed",
-                        **outcome,
-                    )
-                    current_app.logger.error(
-                        f"Webhook to {label} answered a redirect ({status_code}); not followed"
-                    )
-                    return False, attempts
-                if not record(
-                    status=fail_status,
-                    error_message=f"HTTP {status_code}: {(body or '')[:200]}",
-                    **outcome,
-                ):
-                    return False, attempts
-            if not last:
-                time.sleep(self.retry_delay * (attempt + 1))  # Exponential backoff
+        return total
 
-        current_app.logger.error(
-            f"Failed to deliver webhook to {label} after {total} attempts"
+    def _after_failed_attempt(self, record, delivery_id, snap, headers, payload, org_id,
+                              attempts, max_attempts, label, message, outcome=None):
+        """Record a failed attempt; if another is due, schedule it on a timer."""
+        total = self._total_attempts(max_attempts)
+        last = attempts >= total
+        fields = dict(outcome or {"attempt_count": attempts})
+        new_token = record(
+            status="failed" if last else "retrying", error_message=message, **fields
+        )
+        if new_token is None:
+            return False, attempts
+        if last:
+            current_app.logger.error(
+                f"Failed to deliver webhook to {label} after {total} attempts"
+            )
+            return False, attempts
+        self._schedule_next_attempt(
+            delivery_id, snap, headers, payload, org_id, new_token, attempts + 1,
+            max_attempts, delay=self.retry_delay * attempts,  # backoff grows each attempt
         )
         return False, attempts
+
+    def _schedule_next_attempt(self, delivery_id, snap, headers, payload, org_id, token,
+                               next_number, max_attempts, delay):
+        """After ``delay``, resubmit the delivery to the dispatcher. The timer
+        holds no worker. The retry carries this claim token, so if the row has
+        been claimed by someone else meanwhile its result is discarded; if the
+        queue is full the row stays "retrying" and the periodic sweep recovers
+        it."""
+        app = current_app._get_current_object()
+
+        def fire():
+            executor = _get_delivery_executor(self.max_workers, self.per_org_limit, self.queue_max)
+            future = executor.submit_for_org(
+                org_id, self._continue_delivery, app, delivery_id, snap, headers, payload,
+                org_id, token, next_number, max_attempts,
+            )
+            if future is None:
+                app.logger.warning(
+                    f"Webhook delivery queue full; retry {next_number} of {delivery_id} left to the sweep"
+                )
+
+        timer = threading.Timer(max(0.0, float(delay)), fire)
+        timer.daemon = True
+        timer.start()
+
+    def _continue_delivery(self, app, delivery_id, snap, headers, payload, org_id,
+                           token, attempt_number, max_attempts):
+        """Worker body for a retry attempt after its backoff."""
+        from app.jobs.tenant_safe_job import tenant_scope
+
+        with app.app_context():
+            try:
+                with tenant_scope(org_id):
+                    self._attempt_delivery(
+                        delivery_id, snap, headers, payload, org_id=org_id, token=token,
+                        max_attempts=max_attempts, attempt_number=attempt_number,
+                    )
+            except Exception as e:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                app.logger.error(f"Webhook retry attempt for {delivery_id} failed: {e}")
+            finally:
+                try:
+                    db.session.remove()
+                except Exception:
+                    pass
 
     def get_events(self, limit: int = 50, offset: int = 0) -> List[WebhookEvent]:
         """Get webhook events (admin function)"""
@@ -1215,6 +1344,12 @@ class WebhookService:
         return future
 
     def _run_retry_in_app_context(self, app, event_id, org_id, include_failed=True, limit=None):
+        """Retry/sweep body. Rows are selected by joining to deliverable
+        subscriptions (active, same organisation) BEFORE the limit, so rows on
+        dead subscriptions can never crowd out live ones; those dead rows are
+        marked failed instead of lingering."""
+        from sqlalchemy import or_
+
         from app.jobs.tenant_safe_job import tenant_scope
 
         if org_id is None:
@@ -1223,24 +1358,48 @@ class WebhookService:
         with app.app_context():
             try:
                 with tenant_scope(org_id):
-                    query = WebhookDelivery.query.filter(
-                        WebhookDelivery.organization_id == org_id,
-                        self._retryable_clause(datetime.utcnow(), include_failed=include_failed),
+                    now = datetime.utcnow()
+                    sub = WebhookSubscription
+                    live_query = (
+                        WebhookDelivery.query.join(sub, sub.id == WebhookDelivery.subscription_id)
+                        .filter(
+                            WebhookDelivery.organization_id == org_id,
+                            self._retryable_clause(now, include_failed=include_failed),
+                            sub.is_active.is_(True),
+                            sub.organization_id == org_id,
+                        )
+                    )
+                    dead_query = (
+                        WebhookDelivery.query.outerjoin(sub, sub.id == WebhookDelivery.subscription_id)
+                        .filter(
+                            WebhookDelivery.organization_id == org_id,
+                            self._retryable_clause(now, include_failed=False),
+                            or_(sub.id.is_(None), sub.is_active.isnot(True),
+                                sub.organization_id != org_id),
+                        )
                     )
                     if event_id is not None:
-                        query = query.filter(WebhookDelivery.event_id == event_id)
-                    query = query.order_by(WebhookDelivery.created_at)
+                        live_query = live_query.filter(WebhookDelivery.event_id == event_id)
+                        dead_query = dead_query.filter(WebhookDelivery.event_id == event_id)
+                    live_query = live_query.order_by(WebhookDelivery.created_at)
+                    dead_query = dead_query.order_by(WebhookDelivery.created_at)
                     if limit:
-                        query = query.limit(int(limit))
-                    rows = query.all()
+                        live_query = live_query.limit(int(limit))
+                        dead_query = dead_query.limit(int(limit))
+                    rows = live_query.all()
+                    dead_ids = [d.id for d in dead_query.all()]
                     work = []
                     for delivery in rows:
-                        sub = db.session.get(WebhookSubscription, delivery.subscription_id)
-                        if self._deliverable(sub, org_id):
-                            snap = self._snapshot_subscription(sub)
-                            work.append((delivery.id, snap, delivery.payload))
+                        sub_row = db.session.get(WebhookSubscription, delivery.subscription_id)
+                        if self._deliverable(sub_row, org_id):
+                            work.append((delivery.id, self._snapshot_subscription(sub_row),
+                                         delivery.payload))
+                        else:
+                            dead_ids.append(delivery.id)
                     db.session.rollback()
                     db.session.remove()
+                    for delivery_id in dead_ids:
+                        self._fail_undeliverable(delivery_id, org_id, ("pending", "retrying"))
                     for delivery_id, snap, payload in work:
                         self._claim_and_attempt(
                             delivery_id, org_id, snap, payload,

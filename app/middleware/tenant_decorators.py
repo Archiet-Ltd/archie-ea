@@ -74,3 +74,18 @@ def platform_admin_required(f):
             abort(403)
         return f(*args, **kwargs)
     return decorated
+
+
+def require_org_or_platform_admin(org_id):
+    """Abort 403 unless the current user administers ``org_id`` (the one
+    org-admin check, ``rbac_service.is_org_admin``) or is a platform admin.
+
+    Pass the organisation the user is acting in (``g.current_org_id``), not
+    their home organisation."""
+    from app.services.rbac_service import rbac_service
+
+    if is_platform_admin(current_user):
+        return
+    if org_id is not None and rbac_service.is_org_admin(current_user, org_id):
+        return
+    abort(403)

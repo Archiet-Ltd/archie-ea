@@ -35,7 +35,9 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.flask_email import mail_available
-from app.middleware.tenant_decorators import is_platform_admin
+from app.middleware.tenant_decorators import (
+    require_org_or_platform_admin as _require_org_or_platform_admin,
+)
 from app.models.user import ROLE_DISPLAY_NAMES, User
 from app.models.org_role import OrgRole, VALID_ORG_ROLES
 from app.services.rate_limiter import rate_limit
@@ -52,15 +54,6 @@ def _require_org_id():
     if org_id is None:
         abort(403)
     return org_id
-
-
-def _require_org_or_platform_admin(org_id):
-    """Abort 403 unless the current user is this org's admin or a platform admin."""
-    if is_platform_admin(current_user):
-        return
-    if rbac_service.is_org_admin(current_user, org_id):
-        return
-    abort(403)
 
 
 def _render_team(org_id, error=None, status=200):

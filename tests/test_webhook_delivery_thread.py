@@ -870,9 +870,8 @@ def test_n3_retry_during_the_workers_backoff_sends_no_duplicate(app, committed_o
         retry = _retry_with(app, org_a, event_id)
         retry.result(10)
         assert len(receiver.requests) == 1, "retry sent while the worker was between attempts"
-        future.result(15)
+        assert _wait_for(lambda: [r["status"] for r in _row(app, org_a, event_id)] == ["success"], 15)
         assert len(receiver.requests) == 2
-        assert [r["status"] for r in _row(app, org_a, event_id)] == ["success"]
     finally:
         receiver.close()
 
@@ -884,8 +883,12 @@ def test_n3_row_is_failed_only_after_the_last_attempt(app, committed_orgs):
     try:
         _subscribe(app, org_a, receiver.url)
         event_id, future = _publish_with(app, org_a, {"n": 1}, max_retries=3, retry_delay=0.4)
-        while not future.done():
-            seen.extend((r["status"], r["attempts"]) for r in _row(app, org_a, event_id))
+        deadline = time.time() + 20
+        while time.time() < deadline:
+            rows = _row(app, org_a, event_id)
+            seen.extend((r["status"], r["attempts"]) for r in rows)
+            if rows and rows[0]["status"] == "failed":
+                break
             time.sleep(0.05)
         # "failed" may only appear together with the last (third) attempt
         assert [s for s in seen if s[0] == "failed" and s[1] < 3] == [], seen
@@ -1118,7 +1121,9 @@ def tls_material(tmp_path_factory):
 
 @pytest.fixture
 def trust_tls(tls_material, monkeypatch):
-    monkeypatch.setenv("REQUESTS_CA_BUNDLE", tls_material[0])
+    # Deliveries ignore the environment (trust_env off), so trust the test
+    # certificate through requests' default bundle instead.
+    monkeypatch.setattr("requests.adapters.DEFAULT_CA_BUNDLE_PATH", tls_material[0])
     return tls_material
 
 
@@ -1213,33 +1218,41 @@ def test_r31_https_hanging_receiver_does_not_delay_another_organisation(
         fast.close()
 
 
-def test_r31_connect_phase_runs_under_the_attempt_deadline():
-    """The connection's own timeout is cut to what is left of the deadline."""
+def test_r31_connect_phase_runs_under_the_attempt_deadline(monkeypatch):
+    """The connect timeout is cut to what is left of the deadline, and no
+    connect is attempted once the deadline has passed."""
+    import socket as socket_module
+
     from app.services import webhook_service as ws
 
-    seen = {}
+    seen = []
+    real_connect = socket_module.socket.connect
 
-    class Base:
-        timeout = 30
+    def spy(self, address):
+        if address[0] == "192.0.2.7":
+            seen.append(self.gettimeout())
+            raise OSError("unreachable")
+        return real_connect(self, address)
 
-        def _new_conn(self):
-            seen["timeout"] = self.timeout
-            raise OSError("stop")
-
-    class Conn(ws._TrackSocketMixin, Base):
-        pass
-
+    monkeypatch.setattr(socket_module.socket, "connect", spy)
+    monkeypatch.setattr(ws, "_peer_is_public", lambda address: True)
+    real = socket_module.getaddrinfo
+    monkeypatch.setattr(
+        socket_module, "getaddrinfo",
+        lambda host, port, *a, **k: [(socket_module.AF_INET, socket_module.SOCK_STREAM, 6, "", ("192.0.2.7", port))]
+        if host == "pin.example" else real(host, port, *a, **k),
+    )
     with ws._AttemptGuard(1.0):
         with pytest.raises(OSError):
-            Conn()._new_conn()
-    assert seen["timeout"] <= 1.0
+            ws._TrackedHTTPConnection("pin.example", 80, timeout=30)._new_conn()
+    assert seen and seen[0] <= 1.0
     seen.clear()
     expired = ws._AttemptGuard(0.01)
     time.sleep(0.05)
     with expired:
         with pytest.raises(OSError):
-            Conn()._new_conn()
-    assert "timeout" not in seen, "a connect was attempted after the deadline had passed"
+            ws._TrackedHTTPConnection("pin.example", 80, timeout=30)._new_conn()
+    assert seen == [], "a connect was attempted after the deadline had passed"
 
 
 # ---- R3-2: claim tokens and the computed stale threshold -------------------
@@ -1439,8 +1452,9 @@ def test_r33_admin_of_the_home_org_is_not_admin_of_the_org_they_switched_into(
 ):
     from flask import g
     from flask_login import login_user
+    from werkzeug.exceptions import Forbidden
 
-    from app.routes.webhook import _is_webhook_admin
+    from app.middleware.tenant_decorators import require_org_or_platform_admin
 
     home, other = make_org("home"), make_org("other")
     admin = _hook_user(db_session, home)
@@ -1448,9 +1462,20 @@ def test_r33_admin_of_the_home_org_is_not_admin_of_the_org_they_switched_into(
     with app.test_request_context("/"):
         login_user(admin)
         g.current_org_id = home.id
-        assert _is_webhook_admin() is True
+        assert require_org_or_platform_admin(g.current_org_id) is None
         g.current_org_id = other.id
-        assert _is_webhook_admin() is False
+        with pytest.raises(Forbidden):
+            require_org_or_platform_admin(g.current_org_id)
+
+
+def test_r45_one_admin_predicate_shared_by_webhook_and_team_routes():
+    import app.routes.webhook as webhook_routes
+    from app.middleware.tenant_decorators import require_org_or_platform_admin
+    from app.modules.admin import team_routes
+
+    assert not hasattr(webhook_routes, "_is_webhook_admin")
+    assert webhook_routes.require_org_or_platform_admin is require_org_or_platform_admin
+    assert team_routes._require_org_or_platform_admin is require_org_or_platform_admin
 
 
 # ---- R3-4: the connected peer is judged by the ssrf_guard rule --------------
@@ -1509,3 +1534,280 @@ def test_l1_test_delivery_makes_one_attempt(app, committed_orgs):
         assert len(receiver.requests) == 1
     finally:
         receiver.close()
+
+
+# ===========================================================================
+# Round 5: no sleeping workers, sweep joins, pinned resolution, no proxy
+# ===========================================================================
+
+
+def _make_committed_org(app):
+    from app import db
+    from app.models.organization import Organization
+
+    with app.app_context():
+        suffix = uuid.uuid4().hex[:10]
+        org = Organization(name=f"Hook x {suffix}", slug=f"hook-x-{suffix}")
+        db.session.add(org)
+        db.session.commit()
+        return org.id
+
+
+def _drop_orgs(app, ids):
+    from sqlalchemy import bindparam, text
+
+    from app import db
+
+    with app.app_context():
+        for table in ("webhook_deliveries", "webhook_events", "webhook_subscriptions"):
+            db.session.execute(
+                text(f"DELETE FROM {table} WHERE organization_id IN :ids").bindparams(
+                    bindparam("ids", expanding=True)), {"ids": ids})
+        db.session.execute(
+            text("DELETE FROM organizations WHERE id IN :ids").bindparams(
+                bindparam("ids", expanding=True)), {"ids": ids})
+        db.session.commit()
+
+
+def test_r41_backoff_does_not_occupy_a_worker(app, committed_orgs):
+    """Four organisations whose receivers are down, each backing off 3s between
+    attempts, must not delay organisation B beyond one deadline plus a margin."""
+    from app.services import webhook_service as ws
+
+    org_b = committed_orgs[0][1]
+    extra = [_make_committed_org(app) for _ in range(3)]
+    down = _Scripted(statuses=(500,))
+    fast = _Scripted(200)
+    try:
+        for org in [committed_orgs[0][0]] + extra:
+            _subscribe(app, org, down.url)
+        _subscribe(app, org_b, fast.url)
+        for org in [committed_orgs[0][0]] + extra:
+            for i in range(2):
+                _publish_with(app, org, {"n": i}, max_retries=3, retry_delay=3.0,
+                              max_workers=8, per_org_limit=2)
+        assert _wait_for(lambda: len(down.requests) >= 8, 10)
+        started = time.time()
+        _, future_b = _publish_with(app, org_b, {"b": 1}, max_retries=3, retry_delay=3.0)
+        future_b.result(5)
+        assert time.time() - started < 1.5, "organisation B waited behind sleeping workers"
+        assert len(fast.requests) == 1
+        # the failed deliveries are still retried by timers, not abandoned
+        assert _wait_for(lambda: len(down.requests) >= 16, 12)
+    finally:
+        down.close()
+        fast.close()
+        ws.reset_delivery_executor()
+        _drop_orgs(app, extra)
+
+
+def test_r41_a_backing_off_delivery_holds_no_worker_slot(app, committed_orgs):
+    from app.services import webhook_service as ws
+
+    org_a = committed_orgs[0][0]
+    down = _Scripted(statuses=(500,))
+    try:
+        _subscribe(app, org_a, down.url)
+        _publish_with(app, org_a, {"n": 1}, max_retries=2, retry_delay=5.0)
+        assert _wait_for(lambda: len(down.requests) == 1)
+        time.sleep(0.5)
+        dispatcher = ws._executor
+        assert dispatcher is not None
+        with dispatcher._cond:
+            assert dict(dispatcher._inflight) == {}, "a delivery in backoff still counts as in flight"
+            assert dispatcher._queued == 0
+    finally:
+        down.close()
+
+
+def _failed_count(app, org_id):
+    from sqlalchemy import text
+
+    from app import db
+
+    with app.app_context():
+        return db.session.execute(text(
+            "SELECT count(*) FROM webhook_deliveries WHERE organization_id = :o AND status = 'failed'"),
+            {"o": org_id}).scalar()
+
+
+def test_r42_dead_rows_do_not_crowd_the_sweep_limit(app, committed_orgs, monkeypatch):
+    from datetime import datetime, timedelta
+
+    from app import db
+    from app.models.webhook import WebhookDelivery
+
+    org_a, _ = committed_orgs[0]
+    live = _Scripted(200)
+    try:
+        dead_sub = _subscribe(app, org_a, "http://dead.example/hook", is_active=False)
+        live_sub = _subscribe(app, org_a, live.url)
+        event_id = _new_event(app, org_a, {"a": 1})
+        old = datetime.utcnow() - timedelta(hours=2)
+        with app.app_context():
+            for i in range(100):
+                db.session.add(WebhookDelivery(
+                    id=str(uuid.uuid4()), event_id=event_id, subscription_id=dead_sub,
+                    organization_id=org_a, event_type="application.created",
+                    payload={"dead": i}, status="pending", attempt_count=0,
+                    created_at=old - timedelta(minutes=i)))
+            db.session.add(WebhookDelivery(
+                id=str(uuid.uuid4()), event_id=event_id, subscription_id=live_sub,
+                organization_id=org_a, event_type="application.created",
+                payload={"tag": "live"}, status="pending", attempt_count=0,
+                created_at=datetime.utcnow() - timedelta(minutes=30)))
+            db.session.commit()
+        _scheduler_job(app, monkeypatch, "webhook_delivery_sweep").func()
+        assert _wait_for(lambda: len(live.requests) == 1, 15), "the live row was crowded out by dead rows"
+        from sqlalchemy import text
+        with app.app_context():
+            counts = dict(db.session.execute(text(
+                "SELECT status, count(*) FROM webhook_deliveries WHERE organization_id = :o GROUP BY status"),
+                {"o": org_a}).all())
+        assert counts.get("failed", 0) <= 100
+        assert _wait_for(lambda: _failed_count(app, org_a) == 100, 15), _failed_count(app, org_a)
+    finally:
+        live.close()
+
+
+def test_r43_five_unreachable_addresses_are_bounded_by_one_deadline(app, committed_orgs, monkeypatch):
+    import socket as socket_module
+
+    org_a, _ = committed_orgs[0]
+    real_connect = socket_module.socket.connect
+    attempted = []
+
+    def blackhole(self, address):
+        if str(address[0]).startswith("192.0.2."):
+            attempted.append(address[0])
+            time.sleep(self.gettimeout() or 5)
+            raise socket_module.timeout("timed out")
+        return real_connect(self, address)
+
+    real = socket_module.getaddrinfo
+
+    def five(host, port, *args, **kwargs):
+        if host == "five.example":
+            return [(socket_module.AF_INET, socket_module.SOCK_STREAM, 6, "", (f"192.0.2.{i}", port))
+                    for i in range(1, 6)]
+        return real(host, port, *args, **kwargs)
+
+    monkeypatch.setattr(socket_module.socket, "connect", blackhole)
+    monkeypatch.setattr(socket_module, "getaddrinfo", five)
+    _subscribe(app, org_a, "http://five.example:81/hook")
+    started = time.time()
+    event_id, future = _publish_with(app, org_a, {"n": 1}, attempt_deadline=1.0, timeout=5)
+    future.result(15)
+    elapsed = time.time() - started
+    assert elapsed < 2.5, f"five unreachable addresses took {elapsed:.1f}s against a 1s deadline"
+    assert len(set(attempted)) == 1, f"connected to more than the one pinned address: {attempted}"
+    (row,) = _row(app, org_a, event_id)
+    assert row["status"] == "failed", row
+
+
+def test_r43_ssrf_slow_resolver_is_bounded_by_the_deadline(app, committed_orgs, monkeypatch):
+    import socket as socket_module
+
+    org_a, _ = committed_orgs[0]
+    real = socket_module.getaddrinfo
+
+    def slow(host, *args, **kwargs):
+        if host == "slow.example":
+            time.sleep(6)
+        return real(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket_module, "getaddrinfo", slow)
+    _subscribe(app, org_a, "http://slow.example:81/hook")
+    started = time.time()
+    event_id, future = _publish_with(app, org_a, {"n": 1}, attempt_deadline=1.0, timeout=5)
+    future.result(15)
+    elapsed = time.time() - started
+    assert elapsed < 2.5, f"a slow resolver held the attempt {elapsed:.1f}s against a 1s deadline"
+    (row,) = _row(app, org_a, event_id)
+    assert row["status"] == "failed", row
+
+
+def test_r43_pinned_connection_keeps_the_hostname_for_host_header_and_sni(app, committed_orgs, trust_tls, monkeypatch):
+    import socket as socket_module
+
+    org_a, _ = committed_orgs[0]
+    secure = _Scripted(200)
+    secure.server.socket = _wrap_scripted_in_tls(secure.server.socket, trust_tls)
+    port = secure.server.server_address[1]
+    real = socket_module.getaddrinfo
+    monkeypatch.setattr(
+        socket_module, "getaddrinfo",
+        lambda host, p, *a, **k: [(socket_module.AF_INET, socket_module.SOCK_STREAM, 6, "", ("127.0.0.1", p))]
+        if host == "localhost" else real(host, p, *a, **k))
+    try:
+        # "localhost" is on the certificate; the connection dials the pinned address
+        _subscribe(app, org_a, f"https://localhost:{port}/hook")
+        event_id, future = _publish_with(app, org_a, {"n": 1})
+        future.result(15)
+        (row,) = _row(app, org_a, event_id)
+        assert row["status"] == "success", row
+        assert secure.requests[0]["headers"]["Host"] == f"localhost:{port}"
+    finally:
+        secure.close()
+
+
+def test_r44_proxy_environment_is_ignored(app, committed_orgs, monkeypatch):
+    import socket as socket_module
+
+    org_a, _ = committed_orgs[0]
+    proxy = _Scripted(200)
+    target = _Scripted(200)
+    real = socket_module.getaddrinfo
+    monkeypatch.setattr(
+        socket_module, "getaddrinfo",
+        lambda host, p, *a, **k: [(socket_module.AF_INET, socket_module.SOCK_STREAM, 6, "", ("127.0.0.1", p))]
+        if host == "target.example" else real(host, p, *a, **k))
+    for name in ("HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy"):
+        monkeypatch.setenv(name, proxy.url.rsplit("/hook", 1)[0])
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    monkeypatch.delenv("no_proxy", raising=False)
+    try:
+        port = target.server.server_address[1]
+        _subscribe(app, org_a, f"http://target.example:{port}/hook")
+        event_id, future = _publish_with(app, org_a, {"n": 1})
+        future.result(15)
+        assert proxy.requests == [], "the delivery went through the environment's proxy"
+        assert len(target.requests) == 1
+    finally:
+        proxy.close()
+        target.close()
+
+
+def test_r46_pending_rows_use_a_ten_minute_threshold_whatever_the_retry_delay(app, committed_orgs):
+    from datetime import datetime, timedelta
+
+    from app import db
+    from app.models.webhook import WebhookDelivery
+
+    org_a, _ = committed_orgs[0]
+    receiver = _Scripted(200)
+    try:
+        sub = _subscribe(app, org_a, receiver.url)
+        event_id = _new_event(app, org_a, {"a": 1})
+        with app.app_context():
+            for tag, age in (("old", 11), ("fresh", 5)):
+                db.session.add(WebhookDelivery(
+                    id=str(uuid.uuid4()), event_id=event_id, subscription_id=sub,
+                    organization_id=org_a, event_type="application.created",
+                    payload={"tag": tag}, status="pending", attempt_count=0,
+                    created_at=datetime.utcnow() - timedelta(minutes=age)))
+            db.session.commit()
+        _retry_with(app, org_a, event_id, max_retries=3, retry_delay=3600).result(15)
+        assert [json.loads(r["body"])["tag"] for r in receiver.requests] == ["old"]
+    finally:
+        receiver.close()
+
+
+@pytest.mark.parametrize("address,public", [
+    ("100.64.0.1", False), ("100.127.255.254", False), ("100.63.255.255", True),
+    ("100.128.0.1", True), ("93.184.216.34", True), ("10.0.0.1", False),
+])
+def test_r46_cgnat_range_is_not_public(address, public):
+    from app.utils.ssrf_guard import _is_public_ip
+
+    assert _is_public_ip(address) is public
