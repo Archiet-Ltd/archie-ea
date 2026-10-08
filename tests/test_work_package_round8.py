@@ -163,6 +163,62 @@ def test_other_org_source_element_is_not_taken(db_session, make_org, client, log
                for r in caplog.records), [r.getMessage() for r in caplog.records]
 
 
+def _old_screen_create(client, app_id, name, plateau_id, **extra):
+    resp = client.post("/api/applications/%s/work-packages" % app_id, json=dict(
+        name=name, transformation_type="Migrate", start_date="2030-01-01", target_date="2030-06-01",
+        plateau_id=plateau_id, **extra))
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:400]
+    return resp.get_json()["work_package"]["id"]
+
+
+def test_other_org_element_not_taken_on_create(db_session, make_org, client, login_as, caplog):
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.models import ArchiMateRelationship
+    from app.services import work_package_service as svc
+
+    org, user = _org_with_user(db_session, make_org, "n703c")
+    other = make_org("n703d")
+    plateau = _plateau(db_session, org)
+    component = ApplicationComponent(name="Billing", organization_id=org.id)
+    db_session.add(component)
+    db_session.flush()
+    foreign_id, component_id, plateau_id = _element(db_session, other, "Their element").id, component.id, plateau.id
+    db_session.commit()
+    login_as(client, user)
+
+    with caplog.at_level(logging.WARNING):
+        legacy_id = _old_screen_create(client, component_id, "Created on the old screen", plateau_id,
+                                       archimate_element_id=foreign_id)
+    db_session.expire_all()
+    copy = _copy("work_packages", legacy_id, org)
+    assert copy.archimate_element_id != foreign_id
+    assert ArchiMateRelationship.query.filter_by(source_id=foreign_id).count() == 0
+    assert _links(db_session, org, copy)["plateau_ids"] == [plateau_id]
+    assert any("element not taken" in r.getMessage() for r in caplog.records), [
+        r.getMessage() for r in caplog.records]
+
+
+def test_shared_application_element_not_taken(db_session, make_org, client, login_as):
+    from app.models.application_portfolio import ApplicationComponent
+
+    org, user = _org_with_user(db_session, make_org, "n703e")
+    first_plateau, second_plateau = _plateau(db_session, org), _plateau(db_session, org)
+    component = ApplicationComponent(name="Billing", organization_id=org.id)
+    db_session.add(component)
+    db_session.flush()
+    _element(db_session, org, "Application element")  # the one the old screen falls back to
+    component_id, ids = component.id, (first_plateau.id, second_plateau.id)
+    db_session.commit()
+    login_as(client, user)
+
+    legacy_ids = [_old_screen_create(client, component_id, "Created %s" % i, p) for i, p in enumerate(ids)]
+    db_session.expire_all()
+    copies = [_copy("work_packages", i, org) for i in legacy_ids]
+    assert copies[0].archimate_element_id != copies[1].archimate_element_id
+    for copy, plateau_id in zip(copies, ids):
+        assert _links(db_session, org, copy)["plateau_ids"] == [plateau_id]
+
+
 # -- N7-04: the marker never moves backwards ---------------------------------------
 
 
