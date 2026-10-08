@@ -70,6 +70,11 @@
                class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors">
                 Clear
             </a>
+            <a href="{{ url_for('admin.audit_log_viewer', action='tool_refused') }}" data-testid="audit-refused-tool-calls"
+               {% if action_filter == 'tool_refused' %}aria-current="page"{% endif %}
+               class="inline-flex items-center justify-center rounded-md border border-input px-4 py-2 text-sm font-medium transition-colors {% if action_filter == 'tool_refused' %}bg-accent text-accent-foreground{% else %}bg-background hover:bg-accent{% endif %}">
+                <i data-lucide="shield-x" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Refused AI tool calls
+            </a>
             <a id="audit-export" href="{{ url_for('admin.audit_log_viewer', date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q, export='csv') }}"
                class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors ml-auto">
                 <i data-lucide="download" class="h-4 w-4 mr-1.5"></i> Export CSV
@@ -181,6 +186,27 @@
                     <tr x-show="expanded[{{ entry.id }}]" x-cloak class="bg-muted/20">
                         <td colspan="6" class="px-4 py-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                {% if entry.action == 'tool_refused' and entry.new_values is mapping %}
+                                {% set refusal = entry.new_values %}
+                                <dl class="col-span-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1" data-testid="refused-tool-call-{{ entry.id }}">
+                                    <dt class="text-muted-foreground">Tool</dt>
+                                    <dd class="font-medium">{{ refusal.get('tool') or '—' }}</dd>
+                                    <dt class="text-muted-foreground">Refused by</dt>
+                                    <dd>{{ refusal.get('rule_description') or '—' }}</dd>
+                                    <dt class="text-muted-foreground">Attempted through</dt>
+                                    <dd>{{ {'agent': 'The assistant running the tool', 'approval': 'Approving a queued tool call'}.get(refusal.get('via'), '—') }}</dd>
+                                    <dt class="text-muted-foreground">Asked for</dt>
+                                    <dd>
+                                        {% if refusal.get('arguments') %}
+                                        <ul class="space-y-0.5">
+                                            {% for key, value in refusal.get('arguments').items() %}
+                                            <li><span class="text-muted-foreground">{{ key }}:</span> {{ '—' if value is none else value }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% else %}—{% endif %}
+                                    </dd>
+                                </dl>
+                                {% endif %}
                                 {% if entry.old_values %}
                                 <div>
                                     <h4 class="font-medium text-muted-foreground mb-2">Previous Values</h4>

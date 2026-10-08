@@ -7,7 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 roadmap_citation: "roadmap-v2.md 'Next: December 2026 to February 2027' — named explicitly under Startup founders: 'canvas boxes linked to the model, so Entelim says which parts of your plan depend on things not yet built, hired or signed'"
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /startups/canvas-dependencies
+url_slug: /use-cases/canvas-dependencies
 ---
 
 # Which boxes on my canvas depend on things we have not built, hired or signed yet?
@@ -30,5 +30,5 @@ Coming December 2026 to February 2027. Join the waiting list and we'll tell you 
 
 ## Related
 
-- [Put our business model on one page](/startups/canvas-on-one-page)
-- [What must be true for our revenue stream?](/startups/revenue-stream-risk)
+- [Put our business model on one page](/use-cases/business-model-canvas-on-one-page)
+- [What must be true for our revenue stream?](/use-cases/revenue-stream-risk)

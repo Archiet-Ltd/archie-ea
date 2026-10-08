@@ -30400,6 +30400,10 @@
     "has_default": false,
     "nullable": false
    },
+   "organization_id": {
+    "has_default": true,
+    "nullable": false
+   },
    "organization_size": {
     "has_default": false,
     "nullable": true
@@ -42659,6 +42663,10 @@
    "is_complete": {
     "has_default": true,
     "nullable": true
+   },
+   "organization_id": {
+    "has_default": true,
+    "nullable": false
    },
    "preferred_vendor_id": {
     "has_default": false,

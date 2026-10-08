@@ -12,10 +12,17 @@ from datetime import datetime
 
 class GovernanceGate(TenantMixin, db.Model):
     __tablename__ = "governance_gates"
-    __table_args__ = {"extend_existing": True}
+    # A gate name is unique within one organisation, not across the platform:
+    # each organisation overrides the same system-default gate (for example
+    # "arb_submission") by name. Existing databases carried a platform-wide
+    # UNIQUE(gate_name); `flask reconcile-schema` replaces it.
+    __table_args__ = (
+        db.UniqueConstraint("organization_id", "gate_name", name="uq_governance_gates_org_gate_name"),
+        {"extend_existing": True},
+    )
 
     id = db.Column(db.Integer, primary_key=True)
-    gate_name = db.Column(db.String(100), unique=True, nullable=False)
+    gate_name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     required_sections = db.Column(db.JSON)  # ["vision_motivation", "business_process_view", ...]
     min_completeness = db.Column(db.Integer, default=80)

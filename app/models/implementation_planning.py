@@ -21,7 +21,18 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from flask import current_app
-from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import validates
 
@@ -93,6 +104,15 @@ class ImplementationWorkPackage(db.Model):
     application_component_id = Column(
         Integer,
         ForeignKey("application_components.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
+    # this store is retired into unified_work_packages (never dropped).
+    # NULL until `merge-work-package-stores` copies the row across.
+    retired_into_id = Column(
+        BigInteger,
+        ForeignKey("unified_work_packages.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -483,6 +503,11 @@ class ImplementationGap(db.Model):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = Column(String(255))
     resolved_date = Column(DateTime, nullable=True)
+
+    # Set once this row has been merged into the one gap register (app.models.
+    # implementation_migration.Gap) by app/commands/consolidate_gaps.py. NULL
+    # means not yet merged; the row itself is never dropped (CLAUDE.md).
+    retired_into_id = Column(Integer, ForeignKey("gaps.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Foreign Keys
     architecture_id = Column(Integer, ForeignKey("architecture_models.id"), nullable=True)

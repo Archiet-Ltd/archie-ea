@@ -13,6 +13,8 @@ Invariants enforced by get_viewpoint_data():
 
 import logging
 
+from app.models.constants import ArchiMateRelationshipType
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,12 +24,7 @@ def _normalize_rel_type(rel_type):
     DB has mixed formats: 'serving', 'ServingRelationship', 'Realization'.
     Viewpoint definitions use lowercase: 'serving', 'realization'.
     """
-    if not rel_type:
-        return 'association'
-    t = rel_type.lower()
-    if t.endswith('relationship'):
-        t = t[:-len('relationship')]
-    return t
+    return ArchiMateRelationshipType.normalize(rel_type) or 'association'
 
 
 STANDARD_VIEWPOINTS = {

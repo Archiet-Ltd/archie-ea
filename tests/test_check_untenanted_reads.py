@@ -236,3 +236,22 @@ def test_the_committed_table_list_is_current():
     actual = set(gate.unfenced_tables(classes, gate.unfenced_models(classes)))
 
     assert actual - gate.listed_tables() == set()
+
+def test_a_model_listed_as_global_with_a_reason_is_not_flagged(tmp_path, monkeypatch):
+    monkeypatch.setitem(gate.GLOBAL_MODELS, "NoColumn", "shared reference data (test)")
+    _, hits = _scan(tmp_path, """
+        def read():
+            return NoColumn.query.all()
+    """)
+
+    assert hits == []
+
+
+def test_the_vendor_catalogue_is_listed_as_global_with_its_decision():
+    assert "ADR-0003" in gate.GLOBAL_MODELS["VendorOrganization"]
+
+
+def test_every_global_model_carries_a_written_reason():
+    assert gate.GLOBAL_MODELS
+    for name, reason in gate.GLOBAL_MODELS.items():
+        assert len(reason) > 40, "%s needs a real reason" % name

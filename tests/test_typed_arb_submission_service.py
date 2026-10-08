@@ -12,6 +12,8 @@ import psycopg2
 from psycopg2 import sql
 from sqlalchemy.orm import configure_mappers
 
+from tests._raw_psycopg2 import raw_psycopg2_connection
+
 from app.models.architecture_review_board import ARBReviewItem
 from app.models.mixins import TenantMixin
 
@@ -237,7 +239,7 @@ def _install_typed_schema(app):
         assert "arb_review_cycles" not in missing
         assert "arb_subject_evidence_snapshots" not in missing
         assert not [item for item in blocking if item.startswith("arb_")]
-        return db.engine.raw_connection()
+        return raw_psycopg2_connection(db.engine)
 
 
 def _seed_org_user_model(cursor, label):
@@ -1543,8 +1545,8 @@ def test_parent_retenant_and_child_insert_share_subject_concurrency_fence(
         from app import db
 
         with app.app_context():
-            parent = db.engine.raw_connection()
-            child = db.engine.raw_connection()
+            parent = raw_psycopg2_connection(db.engine)
+            child = raw_psycopg2_connection(db.engine)
         parent_cursor = parent.cursor()
         child_cursor = child.cursor()
         table = {

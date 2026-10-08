@@ -829,18 +829,21 @@ class SolutionSessionVersion(db.Model):
 # ============================================================================
 
 
-class SolutionADRLink(db.Model):
+class SolutionADRLink(TenantMixin, db.Model):
     """
-    Links solution analysis sessions to Architecture Decision Records.
+    Links solution analysis sessions to architecture decisions.
 
-    Provides traceability from problem to decision.
+    Provides traceability from problem to decision. adr_id points at the
+    canonical architecture_decisions table, not the superseded
+    architecture_decision_records -- the latter takes no new writes and
+    nothing creating a link today has a row there to point at.
     """
 
     __tablename__ = "solution_adr_links"
 
     id = Column(Integer, primary_key=True)
     session_id = Column(Integer, ForeignKey("solution_analysis_sessions.id"), nullable=False)
-    adr_id = Column(Integer, ForeignKey("architecture_decision_records.id"), nullable=False)
+    adr_id = Column(Integer, ForeignKey("architecture_decisions.id"), nullable=False)
 
     # Relationship type
     relationship_type = Column(String(50), default="informs")  # informs, implements, traces_to
@@ -852,7 +855,7 @@ class SolutionADRLink(db.Model):
 
     # Relationships
     session = relationship("SolutionAnalysisSession", back_populates="adr_links")
-    adr = relationship("ArchitectureDecisionRecord")
+    adr = relationship("ArchitectureDecision")
     linked_by = relationship("User", foreign_keys=[linked_by_id])
 
     __table_args__ = (

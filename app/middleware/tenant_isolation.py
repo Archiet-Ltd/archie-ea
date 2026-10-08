@@ -119,7 +119,7 @@ def install_tenant_filter(app):
                 TenantMixin,
                 lambda cls: cls.organization_id == g.current_org_id,
                 include_aliases=True,
-            )
+            ),
         )
 
     @db.event.listens_for(db.session, "before_flush")
