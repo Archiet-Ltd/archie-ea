@@ -22,7 +22,7 @@ from __future__ import annotations
 import re
 from urllib.parse import urlparse
 
-from app.services.public_pages import CANONICAL_BASE_URL, load_all_pages
+from app.services.public_pages import CANONICAL_BASE_URL, load_all_pages, load_feed_pages
 
 _LOC_RE = re.compile(r"<loc>([^<]+)</loc>")
 _DESCRIPTION_RE = re.compile(r'<meta\s+name="description"\s+content="([^"]*)"')
@@ -53,12 +53,15 @@ def _expected_canonical(path: str, pages_by_url: dict) -> str:
 
 def test_every_sitemap_url_is_crawlable_and_tagged(app):
     """No sitemap URL 404s; every one has a description and its canonical."""
-    pages_by_url = {p.url: p for p in load_all_pages()}
+    # load_feed_pages(), not load_all_pages(): the sitemap itself is built
+    # from the feed set, which leaves out any page withdrawn from discovery
+    # (state: not_planned) -- see app/services/public_pages.py::load_feed_pages.
+    pages_by_url = {p.url: p for p in load_feed_pages()}
 
     with app.test_client() as client:
         paths = _sitemap_paths(client)
         # Same shape as test_sitemap_xml_lists_the_homepage_once_with_top_priority:
-        # +3 non-content URLs (home, /vs, /use-cases) over load_all_pages().
+        # +3 non-content URLs (home, /vs, /use-cases) over load_feed_pages().
         assert len(paths) == len(pages_by_url) + len(_NON_CONTENT_PAGE_PATHS)
 
         for path in paths:

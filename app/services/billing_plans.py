@@ -81,7 +81,10 @@ PLANS: Tuple[Plan, ...] = (
     Plan(
         key="startup",
         name="Startup",
-        summary="Ten people. Adds the webhook feed, export and share, and email support.",
+        summary=(
+            "Ten people. Adds Slack and Teams notifications, webhook subscriptions to "
+            "twelve platform events, audit export, and email support."
+        ),
         purchasable=True,
         user_limit=10,
         price_env={"month": "STRIPE_PRICE_STARTUP_MONTHLY", "year": "STRIPE_PRICE_STARTUP_ANNUAL"},
@@ -91,7 +94,10 @@ PLANS: Tuple[Plan, ...] = (
     Plan(
         key="team",
         name="Team",
-        summary="Priced per editor; people who only ask questions are free. Single sign-on and the review-board workflow.",
+        summary=(
+            "Priced per editor; people who only ask questions are free. Single "
+            "sign-on, the review-board workflow, and your own model key."
+        ),
         purchasable=True,
         user_limit=None,
         per_seat=True,

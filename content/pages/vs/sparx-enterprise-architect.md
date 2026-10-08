@@ -62,8 +62,7 @@ and its own [plans and pricing](/pricing) published directly.
 
 ## Where Entelim is headed next
 
-A direct Sparx EA import is on the roadmap for 2027. Until then, ArchiMate Open Exchange and CSV
-are the working path across.
+ArchiMate Open Exchange and CSV are the working path to bring a model across.
 
 ## Frequently asked
 

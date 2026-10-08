@@ -275,6 +275,24 @@ class PublicPage:
         return self.front_matter.get("cta")
 
     @property
+    def is_withdrawn(self) -> bool:
+        """True once this page is withdrawn from discovery: front matter
+        ``state: not_planned`` (a feature that shipped as a page, then had
+        its release item pulled, with nothing left to build towards).
+
+        A withdrawn page still renders at its own URL -- see load_page() /
+        load_all_pages(), neither of which filters on this -- so an existing
+        inbound link or bookmark does not 404. What it loses is active
+        advertisement: it is left out of load_feed_pages(), the one list
+        every "every page" surface (sitemap, llms.txt, llms-full.txt, the
+        /use-cases index) should build from instead of load_all_pages().
+
+        Keyed off this one front-matter value, not a hardcoded slug, so a
+        future withdrawn page gets the same treatment automatically.
+        """
+        return self.front_matter.get("state") == "not_planned"
+
+    @property
     def page_family(self) -> str:
         return self.front_matter.get("page_family", self.family)
 
@@ -535,6 +553,22 @@ def load_all_pages() -> list[PublicPage]:
             pages.append(_load_page(md_file, family, slug, url))
 
     return pages
+
+
+def load_feed_pages() -> list[PublicPage]:
+    """Every public page that belongs in a "lists every page" surface: the
+    sitemap, /llms.txt, /llms-full.txt, and any per-family "see every one of
+    these" index (e.g. the /use-cases index).
+
+    Same set as load_all_pages() minus pages withdrawn from discovery (see
+    PublicPage.is_withdrawn) -- those still render at their own URL via
+    load_page()/load_all_pages(), which this does not change; they are
+    simply not advertised as current. Callers that build one of the four
+    surfaces above should use this instead of load_all_pages() directly, so
+    a newly withdrawn page is left out everywhere at once rather than one
+    surface at a time.
+    """
+    return [page for page in load_all_pages() if not page.is_withdrawn]
 
 
 def load_page(family: str, slug: str | None = None) -> PublicPage | None:

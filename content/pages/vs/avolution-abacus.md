@@ -64,8 +64,7 @@ full ArchiMate 3.2 modelling — one version ahead of ABACUS's certified 3.0 —
 
 ## Where Entelim is headed next
 
-A direct import from the major enterprise-architecture tools, including ABACUS, is on the roadmap
-for 2027. Until then, ArchiMate Open Exchange and CSV are the working path across.
+ArchiMate Open Exchange and CSV are the working path to bring a model across.
 
 ## Frequently asked
 

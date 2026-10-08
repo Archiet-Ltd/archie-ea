@@ -396,10 +396,16 @@ def robots_txt():
 
 @main.route("/sitemap.xml")
 def sitemap_xml():
-    """Serve sitemap.xml for SEO — generated from public content pages."""
-    from app.services.public_pages import load_all_pages
+    """Serve sitemap.xml for SEO — generated from public content pages.
 
-    pages = load_all_pages()
+    Built from load_feed_pages(), not load_all_pages(): a page withdrawn
+    from discovery (front matter ``state: not_planned``) still renders at
+    its own URL but is left out of the sitemap -- see
+    app/services/public_pages.py::load_feed_pages.
+    """
+    from app.services.public_pages import load_feed_pages
+
+    pages = load_feed_pages()
     base_url = "https://entelim.org"
     urls = []
     # Homepage is not a content page but is the most important URL
@@ -444,10 +450,15 @@ def indexnow_key_file(key):
 
 @main.route("/llms.txt")
 def llms_txt():
-    """Serve llms.txt listing every public content page with a Capabilities section."""
-    from app.services.public_pages import load_all_pages
+    """Serve llms.txt listing every public content page with a Capabilities section.
 
-    pages = load_all_pages()
+    Built from load_feed_pages(): a page withdrawn from discovery (front
+    matter ``state: not_planned``) still renders at its own URL but is left
+    out of this feed -- see app/services/public_pages.py::load_feed_pages.
+    """
+    from app.services.public_pages import load_feed_pages
+
+    pages = load_feed_pages()
     base_url = "https://entelim.org"
     lines = ["# Entelim"]
     lines.append("")
@@ -480,10 +491,15 @@ def llms_txt():
 
 @main.route("/llms-full.txt")
 def llms_full_txt():
-    """Serve llms-full.txt with the full text of every public module, use-case and comparison page."""
-    from app.services.public_pages import load_all_pages
+    """Serve llms-full.txt with the full text of every public module, use-case and comparison page.
 
-    pages = load_all_pages()
+    Built from load_feed_pages(): a page withdrawn from discovery (front
+    matter ``state: not_planned``) still renders at its own URL but is left
+    out of this feed -- see app/services/public_pages.py::load_feed_pages.
+    """
+    from app.services.public_pages import load_feed_pages
+
+    pages = load_feed_pages()
     base_url = "https://entelim.org"
     lines = ["# Entelim — Full Content"]
     lines.append("")
@@ -643,10 +659,16 @@ _USE_CASE_SEGMENT_LABELS = {
 
 @main.route("/use-cases")
 def public_use_cases_index():
-    """The /use-cases index: every live use-case page, grouped by segment."""
-    from app.services.public_pages import load_all_pages
+    """The /use-cases index: every live use-case page, grouped by segment.
 
-    pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+    Built from load_feed_pages(): a use-case page withdrawn from discovery
+    (front matter ``state: not_planned``) still renders at its own URL but
+    is left out of this index -- see
+    app/services/public_pages.py::load_feed_pages.
+    """
+    from app.services.public_pages import load_feed_pages
+
+    pages = [p for p in load_feed_pages() if p.family == "function-per-segment"]
 
     groups: dict[str, list] = {}
     for page in pages:

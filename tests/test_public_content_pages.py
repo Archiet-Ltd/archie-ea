@@ -24,6 +24,7 @@ from app.services.public_pages import (
     _parse_front_matter,
     build_jsonld,
     load_all_pages,
+    load_feed_pages,
     load_page,
 )
 
@@ -96,6 +97,23 @@ BANNED_CLAIMS = [
         "webhook feed",
         "the real, shipped feature is Slack/Teams notifications and generic webhook subscriptions "
         "to twelve events (admin.webhook_settings), not a branded 'webhook feed'",
+    ),
+    (
+        "canvas drafted from your own site",
+        "no route or service reads a customer's website to draft a canvas; "
+        "uc-s1-09-website-full-profile.md (state: missing) records this as still "
+        "unbuilt, not a shipped feature",
+    ),
+    (
+        "ready for the diligence request",
+        "no diligence-pack or investor-readiness export feature exists anywhere in the "
+        "codebase",
+    ),
+    (
+        "every suggestion traced to its source",
+        "only a derived connection (computed from other data, see "
+        "app/modules/intelligence/services/derived_facts.py's provenance field) carries a "
+        "proof trail; a plain suggestion does not",
     ),
 ]
 
@@ -213,13 +231,19 @@ def _strip_tags(html: str, tags: list[str]) -> str:
 
 
 def test_llms_txt_lists_every_page(app):
-    """/llms.txt lists every page with its title and URL."""
+    """/llms.txt lists every page with its title and URL, except a page
+    withdrawn from discovery (state: not_planned), which it must not list."""
     pages = load_all_pages()
     with app.test_client() as client:
         rv = client.get("/llms.txt")
         assert rv.status_code == 200
         text = rv.data.decode()
         for page in pages:
+            if page.is_withdrawn:
+                assert page.url not in text, (
+                    f"llms.txt should not list withdrawn page {page.url}"
+                )
+                continue
             assert page.url in text, (
                 f"llms.txt missing URL {page.url}"
             )
@@ -230,7 +254,8 @@ def test_llms_txt_lists_every_page(app):
 
 
 def test_sitemap_xml_includes_every_page(app):
-    """/sitemap.xml includes every page."""
+    """/sitemap.xml includes every page, except a page withdrawn from
+    discovery (state: not_planned), which it must not include."""
     pages = load_all_pages()
     with app.test_client() as client:
         rv = client.get("/sitemap.xml")
@@ -239,6 +264,11 @@ def test_sitemap_xml_includes_every_page(app):
         assert xml.startswith('<?xml')
         assert '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' in xml
         for page in pages:
+            if page.is_withdrawn:
+                assert page.url not in xml, (
+                    f"sitemap.xml should not include withdrawn page {page.url}"
+                )
+                continue
             assert page.url in xml, (
                 f"sitemap.xml missing URL {page.url}"
             )
@@ -258,8 +288,56 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     assert "<priority>1.0</priority>" in homepage[0][1]
     # Listing it does not displace any content page. +3 non-content URLs:
     # the homepage, the /vs comparison hub and the /use-cases index (views,
-    # not load_all_pages() pages).
-    assert len(entries) == len(load_all_pages()) + 3
+    # not load_all_pages() pages). load_feed_pages(), not load_all_pages():
+    # the sitemap is built from the feed set, which leaves out any page
+    # withdrawn from discovery (state: not_planned).
+    assert len(entries) == len(load_feed_pages()) + 3
+
+
+def test_withdrawn_pages_200_but_excluded_from_every_feed(app):
+    """A page withdrawn from discovery (front matter ``state: not_planned``)
+    still renders at its own URL -- an existing inbound link or bookmark
+    must not 404 -- but its URL and title must not appear in /sitemap.xml,
+    /llms.txt or /llms-full.txt, and (for a use-case page) it must not be
+    linked from the /use-cases index either.
+
+    Found generically from load_all_pages()/PublicPage.is_withdrawn, not
+    hardcoded to one page's slug, so this keeps covering the mechanism if
+    another page is withdrawn the same way later.
+    """
+    withdrawn = [p for p in load_all_pages() if p.is_withdrawn]
+    assert len(withdrawn) > 0, (
+        "expected at least one withdrawn page (state: not_planned) to exist "
+        "on this branch to exercise the exclusion"
+    )
+
+    with app.test_client() as client:
+        for page in withdrawn:
+            rv = client.get(page.url)
+            assert rv.status_code == 200, (
+                f"withdrawn page {page.url} should still render, got {rv.status_code}"
+            )
+
+            sitemap = client.get("/sitemap.xml").data.decode()
+            assert page.url not in sitemap, (
+                f"sitemap.xml should not include withdrawn page {page.url}"
+            )
+
+            llms = client.get("/llms.txt").data.decode()
+            assert page.url not in llms, (
+                f"llms.txt should not include withdrawn page {page.url}"
+            )
+
+            llms_full = client.get("/llms-full.txt").data.decode()
+            assert page.title not in llms_full, (
+                f"llms-full.txt should not contain withdrawn page title '{page.title}'"
+            )
+
+            if page.family == "function-per-segment":
+                use_cases_html = client.get("/use-cases").data.decode()
+                assert f'href="{page.url}"' not in use_cases_html, (
+                    f"/use-cases should not link to withdrawn page {page.url}"
+                )
 
 
 def _strings_in(value):
@@ -364,11 +442,16 @@ def test_llms_full_txt_contains_all_module_titles(app):
 
 
 def test_llms_full_txt_contains_all_use_case_titles(app):
-    """/llms-full.txt contains the title of every use-case page."""
+    """/llms-full.txt contains the title of every use-case page, except a
+    page withdrawn from discovery (state: not_planned), which it must not
+    contain."""
     from app.services.public_pages import load_all_pages
 
     use_case_pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
     assert len(use_case_pages) > 0, "No use-case pages found"
+    assert any(p.is_withdrawn for p in use_case_pages), (
+        "expected at least one withdrawn use-case page to exercise the exclusion"
+    )
 
     with app.test_client() as client:
         rv = client.get("/llms-full.txt")
@@ -376,6 +459,11 @@ def test_llms_full_txt_contains_all_use_case_titles(app):
         text = rv.data.decode()
 
         for page in use_case_pages:
+            if page.is_withdrawn:
+                assert page.title not in text, (
+                    f"llms-full.txt should not contain withdrawn use-case title '{page.title}'"
+                )
+                continue
             assert page.title in text, f"llms-full.txt missing use-case title '{page.title}'"
 
 
@@ -396,7 +484,8 @@ def test_llms_full_txt_contains_all_comparison_titles(app):
 
 
 def test_llms_full_txt_includes_urls(app):
-    """/llms-full.txt includes the URL for each page."""
+    """/llms-full.txt includes the URL for each page, except a page withdrawn
+    from discovery (state: not_planned), which it must not include."""
     from app.services.public_pages import load_all_pages
 
     target_pages = [
@@ -411,6 +500,11 @@ def test_llms_full_txt_includes_urls(app):
         text = rv.data.decode()
 
         for page in target_pages:
+            if page.is_withdrawn:
+                assert page.url not in text, (
+                    f"llms-full.txt should not include withdrawn page URL {page.url}"
+                )
+                continue
             assert page.url in text, f"llms-full.txt missing URL {page.url}"
 
 
@@ -1172,7 +1266,8 @@ def test_sitemap_homepage_has_priority(app):
 
 
 def test_sitemap_still_includes_all_content_pages(app):
-    """/sitemap.xml still includes every content page after homepage addition."""
+    """/sitemap.xml still includes every content page after homepage addition,
+    except a page withdrawn from discovery (state: not_planned)."""
     from app.services.public_pages import load_all_pages
 
     pages = load_all_pages()
@@ -1180,6 +1275,11 @@ def test_sitemap_still_includes_all_content_pages(app):
         rv = client.get("/sitemap.xml")
         xml = rv.data.decode()
         for page in pages:
+            if page.is_withdrawn:
+                assert page.url not in xml, (
+                    f"sitemap.xml should not include withdrawn content page URL {page.url}"
+                )
+                continue
             assert page.url in xml, (
                 f"sitemap.xml missing content page URL {page.url}"
             )
@@ -1696,9 +1796,13 @@ def test_no_stale_internal_use_case_uc_slug_references():
 
 def test_use_cases_index_returns_200_and_lists_every_page(app):
     """/use-cases returns 200 and links every live use-case page by its
-    current (post-migration) URL and title."""
+    current (post-migration) URL and title, except a page withdrawn from
+    discovery (state: not_planned), which it must not link to or name."""
     pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
     assert len(pages) > 0
+    assert any(p.is_withdrawn for p in pages), (
+        "expected at least one withdrawn use-case page to exercise the exclusion"
+    )
 
     with app.test_client() as client:
         rv = client.get("/use-cases")
@@ -1711,6 +1815,14 @@ def test_use_cases_index_returns_200_and_lists_every_page(app):
 
         unescaped = _html_mod.unescape(html)
         for page in pages:
+            if page.is_withdrawn:
+                assert f'href="{page.url}"' not in html, (
+                    f"/use-cases should not link to withdrawn page {page.url}"
+                )
+                assert page.title not in unescaped, (
+                    f"/use-cases should not name withdrawn page title '{page.title}'"
+                )
+                continue
             assert f'href="{page.url}"' in html, f"/use-cases missing link to {page.url}"
             assert page.title in unescaped, f"/use-cases missing title for {page.url}"
 

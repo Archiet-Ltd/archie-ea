@@ -58,9 +58,8 @@ published directly for the organisations that want the commercial licence instea
 
 ## Where Entelim is headed next
 
-A direct Archi import — no export step required — is on the roadmap for 2027. Until then, ArchiMate
-Open Exchange is the working path across; since Archi's own format is ArchiMate-based already, that
-tends to be a more direct path than for tools built on a proprietary notation.
+ArchiMate Open Exchange is the working path across; since Archi's own format is ArchiMate-based
+already, that tends to be a more direct path than for tools built on a proprietary notation.
 
 ## Frequently asked
 

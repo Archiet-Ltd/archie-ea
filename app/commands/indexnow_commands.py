@@ -24,7 +24,7 @@ from flask.cli import with_appcontext
 def ping_indexnow_command(base_url):
     """Ping IndexNow with every current public page URL. No-op if unset."""
     from app.services.indexnow_service import is_enabled, ping_indexnow
-    from app.services.public_pages import load_all_pages
+    from app.services.public_pages import load_feed_pages
 
     if not is_enabled(current_app):
         click.echo(
@@ -32,8 +32,11 @@ def ping_indexnow_command(base_url):
         )
         return
 
+    # load_feed_pages(), not load_all_pages(): a page withdrawn from
+    # discovery (state: not_planned) still renders at its own URL but
+    # should not be actively submitted to a search engine either.
     urls = [base_url.rstrip("/") + "/"] + [
-        base_url.rstrip("/") + page.url for page in load_all_pages()
+        base_url.rstrip("/") + page.url for page in load_feed_pages()
     ]
     result = ping_indexnow(current_app, urls, base_url=base_url)
     click.echo(

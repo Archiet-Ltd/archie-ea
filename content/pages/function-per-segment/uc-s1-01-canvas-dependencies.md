@@ -26,7 +26,7 @@ Every block on your Business Model Canvas linked directly to what you actually r
 applications, roles, vendors — so you can ask what breaks or what's at risk straight from a canvas
 box, instead of translating it into the model by hand first.
 
-Coming December 2026 to February 2027. Join the waiting list and we'll tell you the day it ships.
+Coming in an upcoming release. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 
