@@ -18,8 +18,13 @@ from flask_login import current_user, login_required
 
 from app import db
 
+# D-5 (admin-rbac-active-org continuation): repointed from
+# app.core.auth.decorators.admin_required (one of three duplicate
+# admin_required implementations; that one never carried the active-org
+# fix at all) to the canonical, now-fixed implementation.
+from app.decorators import admin_required
+
 # Import capability framework blueprint
-from app.core.auth.decorators import admin_required
 from app.main.capability_framework_routes import capability_framework_bp
 from app.main.framework_management_routes import framework_management_bp
 from app.middleware.tenant_decorators import platform_admin_required
