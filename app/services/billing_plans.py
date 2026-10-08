@@ -82,8 +82,7 @@ PLANS: Tuple[Plan, ...] = (
         key="startup",
         name="Startup",
         summary=(
-            "Ten people. Adds webhook delivery for events you post, audit export, "
-            "and email support."
+            "Ten people. Everything in Community, plus audit export and email support."
         ),
         purchasable=True,
         user_limit=10,

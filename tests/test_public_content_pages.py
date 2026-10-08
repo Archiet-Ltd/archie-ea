@@ -99,6 +99,14 @@ BANNED_CLAIMS = [
         "not a branded 'webhook feed'",
     ),
     (
+        "webhook delivery for events you post",
+        "WebhookService.publish_event starts a bare threading.Thread with no Flask app "
+        "context; _deliver_webhook's db.session.add (and its own except-block's "
+        "error-logging call) both raise outside an app context, so the thread dies "
+        "silently -- nothing posted through the real customer-facing path "
+        "(POST /api/webhooks/public/events) is ever actually delivered",
+    ),
+    (
         "twelve platform events",
         "WebhookService.publish_event() is called from exactly one place in the app "
         "(POST /public/events) -- nothing internal to Entelim ever publishes any of the twelve "
