@@ -58,11 +58,18 @@ def make_org(db, label):
     return org.id
 
 
-def make_user(db, org_id, label, enterprise_role, role_name="Administrator"):
+def make_user(db, org_id, label, enterprise_role, role_name="Administrator", is_platform_admin=False):
     """A user pinned to *org_id* and carrying *enterprise_role*.
 
     enterprise_role is the field ENTERPRISE_ROLE_SECTION_MAP keys on, so it is
-    what actually determines the archetype's navigation.
+    what actually determines the archetype's navigation. It is a separate
+    vocabulary from the boolean is_platform_admin flag that
+    app.middleware.tenant_decorators.platform_admin_required actually checks
+    (see that module's own docstring on the two authz vocabularies) -- a user
+    with enterprise_role="platform_admin" is not, on its own, a platform admin
+    in the sense any platform_admin_required route cares about. Pass
+    is_platform_admin=True explicitly for a journey that needs to pass one of
+    those routes.
 
     organization_id is set explicitly: User has a before_insert listener that
     reassigns an unset organization_id to the shared default org, which would
@@ -83,6 +90,7 @@ def make_user(db, org_id, label, enterprise_role, role_name="Administrator"):
         organization_id=org_id,
         confirmed=True,
         enterprise_role=enterprise_role,
+        is_platform_admin=is_platform_admin,
     )
     db.session.add(user)
     db.session.flush()
