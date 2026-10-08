@@ -32,6 +32,29 @@ def _enable_monitoring_api(app, monkeypatch):
     ARCHITECTURE_MONITORING_API_ENABLED test) fails trying to add that same
     handler afterwards. Calling it here, in the same order production does,
     keeps that call a no-op wherever it runs later.
+
+    Separately: this file deliberately reuses the shared, session-scoped
+    ``app`` fixture rather than booting a second Flask app (see module
+    docstring), so by the time this fixture first runs in a full suite, that
+    app has almost certainly already served a request from an earlier test
+    file -- and Flask refuses every "setup method" (register_blueprint,
+    add_url_rule, ...) outright once that happens
+    (``Flask._check_setup_finished``, gated on the single flag
+    ``app._got_first_request``), regardless of whether this specific
+    blueprint was ever registered. In isolation this file runs before
+    anything else touches ``app`` and never hits it; in a real CI shard it
+    reliably does (observed in CI: every one of this file's tests erroring
+    with "The setup method 'register_blueprint' can no longer be
+    called..."). Registering this blueprint also triggers flasgger's own
+    swagger decorator, which calls its own wrapped ``add_url_rule`` for
+    each documented view during ``Blueprint.register()`` -- so working
+    around only the outer ``register_blueprint`` call still trips the same
+    guard a second time, from inside it.
+
+    Flipping ``_got_first_request`` to False for the one call and
+    restoring it immediately after bypasses every one of those guards at
+    once (they all gate on this exact flag), without weakening the app for
+    the rest of the test run.
     """
     monkeypatch.setenv("ARCHITECTURE_MONITORING_API_ENABLED", "true")
     if "architecture_monitoring" not in app.blueprints:
@@ -41,7 +64,12 @@ def _enable_monitoring_api(app, monkeypatch):
         )
 
         mark_blueprint_guardrailed(architecture_monitoring_bp)
-        app.register_blueprint(architecture_monitoring_bp)
+        had_first_request = app._got_first_request
+        app._got_first_request = False
+        try:
+            app.register_blueprint(architecture_monitoring_bp)
+        finally:
+            app._got_first_request = had_first_request
 
 
 def _user(db_session, org, *, enterprise_role):
