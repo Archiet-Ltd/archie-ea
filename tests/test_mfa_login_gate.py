@@ -256,19 +256,35 @@ def test_api_login_still_succeeds_for_a_plain_user_no_regression(app, db_session
 
 
 # ---------------------------------------------------------------------------
-# /account/sso/callback/<provider> (v1 account blueprint): the same MFA gate,
-# applied to the SSO callback -- hot-fix alongside the /api/auth/login bypass
-# above and the v2 SSO callback crash fix in
-# tests/test_account_v2_sso_callback_audit_fix.py. This route's own
-# sso_callback() called session_registry.login_and_register(user,
-# remember=True) unconditionally after resolving/creating the user, with no
-# check at all for whether the user needs to complete MFA first -- the same
-# bug class as the API-login bypass, for the IdP-driven sign-in path.
+# /account/sso/callback/<provider>: the same MFA gate, applied to the SSO
+# callback -- hot-fix alongside the /api/auth/login bypass above.
 #
-# _get_sso_oauth() is this file's own helper (app.modules.account.routes
-# .account_routes), separate from the v2 blueprint's helper of the same
-# name -- monkeypatched the same way the v2 crash-fix test does, the
-# smallest substitution that exercises the real route body.
+# Both the v1 (app.modules.account.routes.account_routes) and v2
+# (app.modules.account.v2.routes.account_routes) blueprints define a
+# sso_callback() of their own, and only one is ever registered on a given
+# running app -- chosen by USE_ACCOUNT_GUARDRAILS, which
+# app/_bootstrap/blueprints.py's _init_blueprints() defaults to "true"
+# (os.environ.setdefault) before _register_account() ever runs. That means
+# v2 is what a default clone -- and production -- actually serves, which is
+# exactly what this module's own ``app``/``client`` fixtures boot by
+# default. The tests below patch v2's own _get_sso_oauth() seam and drive
+# the shared ``app`` fixture's client, so they exercise the route that is
+# actually live rather than one that happens to share a URL.
+#
+# The v1 route carries the identical MFA gate (same code, same session
+# keys) and is kept under test too, forced via an explicit
+# USE_ACCOUNT_GUARDRAILS=false override on a second, independently-built
+# app instance (the ``_v1_forced_app`` helper below) -- the same
+# second-create_app("testing") pattern already used by
+# tests/test_platform_slos.py's early-failure test and
+# tests/smoke/test_remember_cookie_session_rejection.py's out-of-band
+# revoke. That second app gets its own SQLAlchemy engine/connection against
+# the same physical TEST_DATABASE_URL, so this module's db_session
+# savepoint-rollback fixture (scoped to the primary ``app``'s engine only)
+# does not wrap it -- data for these specific tests is seeded with a real,
+# directly-committed Organization/User via the forced app's own context,
+# matching the convention those two existing call sites already use for a
+# second app.
 # ---------------------------------------------------------------------------
 
 
@@ -309,11 +325,14 @@ class _FakeSSOOAuth:
 
 
 def _sso_callback(client, monkeypatch, db_session, userinfo):
-    from app.modules.account.routes import account_routes
+    """Drive the v2 (guardrail-enabled) sso_callback() -- the module that is
+    actually registered under this module's default ``app``/``client``
+    fixtures, same as a default clone and production."""
+    from app.modules.account.v2.routes import account_routes as account_routes_v2
 
     _enable_sso_flag(db_session)
     monkeypatch.setattr(
-        account_routes, "_get_sso_oauth", lambda: _FakeSSOOAuth(userinfo)
+        account_routes_v2, "_get_sso_oauth", lambda: _FakeSSOOAuth(userinfo)
     )
 
     with client.session_transaction() as sess:
@@ -372,3 +391,149 @@ def test_sso_callback_still_logs_in_a_plain_user_no_regression(
 
     with client.session_transaction() as sess:
         assert sess.get("_user_id") == str(user.id)
+
+
+# --- v1 (legacy, non-guardrail) sso_callback(): forced explicitly --------
+
+
+def _v1_forced_app(monkeypatch):
+    """Build a second, independent app instance with
+    USE_ACCOUNT_GUARDRAILS explicitly off, so app.modules.account.routes
+    .account_routes (v1) registers instead of v2. _is_flag() re-reads
+    os.environ on every call and _init_blueprints()'s own
+    os.environ.setdefault(..., "true") is a no-op once the variable is
+    already set, so this override holds for the app built inside this
+    monkeypatch's scope regardless of what the primary ``app`` fixture
+    already set process-wide."""
+    from app import create_app
+
+    monkeypatch.setenv("USE_ACCOUNT_GUARDRAILS", "false")
+    v1_app = create_app("testing")
+    v1_app.config["TESTING"] = True
+    v1_app.config["WTF_CSRF_ENABLED"] = False
+    return v1_app
+
+
+def _v1_seed_user(v1_app, label, *, mfa_enabled=False, mfa_secret=None, plain=False):
+    """Create an Organization + User directly against the forced v1 app's
+    own engine/connection and commit for real (see the module docstring
+    above on why this bypasses the db_session savepoint fixture)."""
+    from app import db
+    from app.models import Role
+    from app.models.organization import Organization
+    from app.models.user import User
+
+    with v1_app.app_context():
+        suffix = uuid.uuid4().hex[:10]
+        org = Organization(name=f"Test {label} {suffix}", slug=f"test-{label}-{suffix}")
+        db.session.add(org)
+        db.session.flush()
+
+        kwargs = dict(
+            email=f"{label}-{suffix}@example.com",
+            organization_id=org.id,
+            confirmed=True,
+        )
+        if not plain:
+            role = Role.query.filter_by(name="Administrator").first()
+            if role is None:
+                pytest.skip("no Administrator role seeded in this database")
+            kwargs["role"] = role
+        user = User(**kwargs)
+        user.password = _PASSWORD
+        if not plain:
+            user.mfa_enabled = mfa_enabled
+            user.mfa_secret = mfa_secret
+        db.session.add(user)
+        db.session.commit()
+        user_id, user_email = user.id, user.email
+        db.session.remove()
+    return user_id, user_email
+
+
+def _sso_callback_v1(v1_app, monkeypatch, userinfo):
+    """Drive v1's sso_callback() on the forced app. The SSO feature flag is
+    enabled with a real, directly-committed write (same engine as the rest
+    of this helper's seeding, see module docstring above) and always turned
+    back off afterwards -- left on, it would leak into any other test in
+    this session that asserts SSO-disabled behaviour against the shared
+    physical database (e.g. test_rbac_and_sso_posture.py's
+    test_oidc_sign_in_routes_404_when_disabled), since this real commit is
+    not covered by the db_session savepoint-rollback fixture."""
+    from app import db
+    from app.modules.account.routes import account_routes
+
+    with v1_app.app_context():
+        _enable_sso_flag(db.session)
+        db.session.remove()
+
+    monkeypatch.setattr(
+        account_routes, "_get_sso_oauth", lambda: _FakeSSOOAuth(userinfo)
+    )
+
+    client = v1_app.test_client()
+    with client.session_transaction() as sess:
+        sess["sso_state"] = "state-abc"
+
+    try:
+        resp = client.get(
+            "/account/sso/callback/azure?state=state-abc", follow_redirects=False
+        )
+    finally:
+        with v1_app.app_context():
+            from app.models.feature_flags import FeatureFlag
+
+            flag = FeatureFlag.query.filter_by(key="sso_authentication").first()
+            if flag is not None:
+                flag.enabled = False
+                db.session.commit()
+            db.session.remove()
+    return client, resp
+
+
+def test_v1_sso_callback_sends_an_mfa_enrolled_administrator_to_the_challenge(
+    monkeypatch,
+):
+    """Explicit USE_ACCOUNT_GUARDRAILS=false override: proves the legacy v1
+    sso_callback() carries the same MFA gate, for the rollback path where
+    v1 is what is actually registered."""
+    v1_app = _v1_forced_app(monkeypatch)
+    secret = pyotp.random_base32()
+    admin_id, admin_email = _v1_seed_user(
+        v1_app, "v1-sso-mfa-gate-enrolled", mfa_enabled=True, mfa_secret=secret
+    )
+
+    userinfo = {
+        "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "email": admin_email,
+        "given_name": "Ada",
+        "family_name": "Lovelace",
+    }
+    client, resp = _sso_callback_v1(v1_app, monkeypatch, userinfo)
+
+    assert resp.status_code in (302, 303), resp.get_data(as_text=True)
+    assert "/mfa-challenge" in resp.headers.get("Location", "")
+
+    with client.session_transaction() as sess:
+        assert sess.get("_mfa_pending_user_id") == admin_id
+        assert "_user_id" not in sess
+    dash = client.get("/dashboard/overview")
+    assert dash.status_code in (302, 401)
+
+
+def test_v1_sso_callback_still_logs_in_a_plain_user_no_regression(monkeypatch):
+    v1_app = _v1_forced_app(monkeypatch)
+    _, user_email = _v1_seed_user(v1_app, "v1-sso-mfa-gate-plain", plain=True)
+
+    userinfo = {
+        "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "email": user_email,
+        "given_name": "Grace",
+        "family_name": "Hopper",
+    }
+    client, resp = _sso_callback_v1(v1_app, monkeypatch, userinfo)
+
+    assert resp.status_code in (302, 303), resp.get_data(as_text=True)
+
+    with client.session_transaction() as sess:
+        assert sess.get("_user_id") is not None
