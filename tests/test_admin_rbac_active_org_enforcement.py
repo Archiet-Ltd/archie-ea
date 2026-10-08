@@ -114,19 +114,153 @@ def _placeholder_value(converter):
     return _PLACEHOLDER_STRING
 
 
-def _build_url(app, rule):
+def _build_url(app, rule, real_entities=None):
     """Reverse-build a concrete path for *rule*, filling any dynamic
-    segments with harmless placeholder values.
+    segments with harmless placeholder values, or a REAL row's id when one
+    is known for that argument name (see ``_seed_real_entities_for_sweep``).
 
-    The decorator stack runs before the view body resolves any of these
-    values against the database, so a placeholder that matches the
-    converter's syntax (an int for <int:...>, a real UUID for <uuid:...>,
-    ...) is enough to reach the decorator; it never needs to name a real row.
+    D-3: a placeholder id is enough to reach the DECORATOR (which runs
+    before the view body resolves anything against the database), but it is
+    NOT enough to prove the decorator's check actually ran, because a view
+    whose body does ``Model.query.get_or_404(id)`` (or an equivalent
+    org-scoped lookup) returns 404 for a placeholder id regardless of
+    whether authorization ever happened -- 21 route x method pairs passed
+    this sweep with the PR's own fix temporarily removed, for exactly this
+    reason (see the build report). Passing a real id that exists in the
+    victim organisation removes that ambiguity: once the row is real,
+    "404" can only mean the view's own org-scoped lookup correctly found
+    nothing (expected -- the attacker's active org differs from the row's
+    real resolution once the decorator refuses them, or the decorator
+    itself aborted first), while "not (403 or 404)" with a REAL row present
+    can only mean the decorator-level check was bypassed and the view body
+    ran to completion against a row that does exist.
     """
     converters = getattr(rule, "_converters", {}) or {}
-    values = {arg: _placeholder_value(converters.get(arg)) for arg in rule.arguments}
+    real_entities = real_entities or {}
+    values = {
+        arg: real_entities[arg] if arg in real_entities else _placeholder_value(converters.get(arg))
+        for arg in rule.arguments
+    }
     adapter = app.url_map.bind("sweep.test")
     return adapter.build(rule.endpoint, values=values)
+
+
+def _seed_real_entities_for_sweep(db_session, victim_org, attacker):
+    """Create one real row per URL-argument NAME used by an ID-parameterized
+    admin_required/org_admin_required route, scoped into *victim_org* so a
+    probe using these ids reaches each route's own org-scoped lookup instead
+    of bouncing off a placeholder-id 404 before authorization is even
+    exercised (D-3).
+
+    Keyed by argument name, not by route, because every route family here
+    uses that name for exactly one meaning across the whole sweep (every
+    ``user_id`` here is a ``User.id``, scoped the same way by every caller) --
+    confirmed by reading each call site in app/modules/admin/v2/routes/
+    admin_routes.py, app/modules/admin/routes/user_role_routes.py,
+    app/modules/architecture/routes/adr_routes.py,
+    app/modules/capabilities/routes/abacus_consolidation.py and
+    app/routes/connector_routes.py before writing this.
+
+    A handful of the routes this seeds for (the role-catalogue and
+    seed/solution-prompt endpoints) already carry ``platform_admin_required``
+    stacked above ``admin_required`` and are not part of the 21 the review
+    found -- they are seeded anyway so the sweep stays meaningful if that
+    separate decorator is ever removed later.
+    """
+    from app.models.architecture_decision import ArchitectureDecision
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.connector_config import ConnectorConfig
+    from app.models.governance_gates import GovernanceGate
+    from app.models.models import APISettings
+    from app.models.solution_models import Solution
+    from app.models.user import Role, User
+    from app.models.webhook import WebhookSubscription
+
+    suffix = uuid.uuid4().hex[:10]
+
+    # A distinct real user in the victim org -- NOT the attacker and NOT the
+    # inviter -- so routes that refuse to act on the caller's own account
+    # (change_account_type, delete_user both check current_user.id == user_id)
+    # exercise their normal path rather than that unrelated guard.
+    target_user = User(
+        email=f"active-org-sweep-target-{suffix}@example.test",
+        first_name="Sweep",
+        last_name="Target",
+        organization_id=victim_org.id,
+        confirmed=True,
+    )
+    target_user.password = uuid.uuid4().hex
+    db_session.add(target_user)
+
+    abacus_cap = BusinessCapability(name=f"Sweep Abacus Cap {suffix}", organization_id=victim_org.id)
+    manual_cap = BusinessCapability(name=f"Sweep Manual Cap {suffix}", organization_id=victim_org.id)
+    db_session.add_all([abacus_cap, manual_cap])
+
+    api_settings = APISettings(
+        provider="openai", key_label=f"sweep-{suffix}", organization_id=victim_org.id
+    )
+    db_session.add(api_settings)
+
+    gate = GovernanceGate(gate_name=f"sweep-gate-{suffix}", organization_id=victim_org.id)
+    db_session.add(gate)
+
+    solution = Solution(name=f"Sweep Solution {suffix}", organization_id=victim_org.id)
+    db_session.add(solution)
+
+    adr = ArchitectureDecision(
+        title=f"Sweep ADR {suffix}", organization_id=victim_org.id
+    )
+    db_session.add(adr)
+
+    connector = ConnectorConfig(
+        id=str(uuid.uuid4()),
+        connector_type="jira",
+        name=f"Sweep Connector {suffix}",
+        config={},
+        organization_id=victim_org.id,
+    )
+    db_session.add(connector)
+
+    webhook_sub = WebhookSubscription(
+        id=str(uuid.uuid4()),
+        user_id=str(attacker.id),
+        url="https://example.test/sweep-webhook",
+        events=["solution.updated"],
+        is_active=True,
+        organization_id=victim_org.id,
+    )
+    db_session.add(webhook_sub)
+
+    admin_role = Role.query.filter_by(name="Administrator").first()
+
+    db_session.flush()
+
+    prompt_key = None
+    try:
+        from app.modules.admin.v2.routes.admin_routes import _get_prompt_defaults
+
+        defaults = _get_prompt_defaults()
+        if defaults:
+            prompt_key = next(iter(defaults))
+    except Exception:  # noqa: BLE001 - falls back to the generic placeholder
+        prompt_key = None
+
+    real_entities = {
+        "user_id": target_user.id,
+        "abacus_id": abacus_cap.id,
+        "manual_id": manual_cap.id,
+        "settings_id": api_settings.id,
+        "gate_id": gate.id,
+        "solution_id": solution.id,
+        "adr_id": adr.id,
+        "connector_id": connector.id,
+        "subscription_id": webhook_sub.id,
+    }
+    if admin_role is not None:
+        real_entities["role_id"] = admin_role.id
+    if prompt_key is not None:
+        real_entities["prompt_key"] = prompt_key
+    return real_entities
 
 
 def _attacker_switched_into_victim_org(db_session, make_org, client, login_as):
@@ -211,6 +345,7 @@ def test_a_viewer_of_the_active_org_is_refused_by_every_admin_required_route(
     attacker, home_org, victim_org = _attacker_switched_into_victim_org(
         db_session, make_org, client, login_as
     )
+    real_entities = _seed_real_entities_for_sweep(db_session, victim_org, attacker)
 
     findings = []
     checked = 0
@@ -223,7 +358,7 @@ def test_a_viewer_of_the_active_org_is_refused_by_every_admin_required_route(
             continue
 
         try:
-            url = _build_url(app, rule)
+            url = _build_url(app, rule, real_entities)
         except Exception as exc:  # noqa: BLE001 - a build failure is itself a finding
             findings.append(
                 f"{rule.endpoint} [{gate}] ({rule.rule}): could not build a "
@@ -231,14 +366,24 @@ def test_a_viewer_of_the_active_org_is_refused_by_every_admin_required_route(
             )
             continue
 
+        # D-3: once every dynamic segment on this rule names a REAL row in
+        # the victim org, a 404 can no longer be explained by "the id didn't
+        # exist" -- only 403 (the decorator correctly refusing the attacker)
+        # should pass. A rule with an argument this fixture doesn't know how
+        # to seed falls back to the pre-existing, more permissive check so
+        # this stays additive rather than a wholesale rewrite.
+        fully_seeded = bool(rule.arguments) and set(rule.arguments) <= set(real_entities)
+        allowed_statuses = (403,) if fully_seeded else (403, 404)
+
         methods = sorted((rule.methods or set()) - {"HEAD", "OPTIONS"}) or ["GET"]
         for method in methods:
             checked += 1
             response = client.open(url, method=method)
-            if response.status_code not in (403, 404):
+            if response.status_code not in allowed_statuses:
                 findings.append(
                     f"{rule.endpoint} {method} {url} [{gate}] -> "
-                    f"{response.status_code} (expected 403 or 404)"
+                    f"{response.status_code} (expected "
+                    f"{' or '.join(str(s) for s in allowed_statuses)})"
                 )
 
     # A detector that never matches anything would make the assertion below
