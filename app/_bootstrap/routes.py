@@ -475,6 +475,14 @@ def _register_api_auth(app, csrf):
                 {"success": False, "error": "Invalid email or password"}
             ), 401
 
+        # Decide before anything touches the session: a deactivated account is
+        # answered exactly like a wrong password, with no cookie difference.
+        if not user.is_active:
+            app.logger.info("api login refused for deactivated user %s", user.id)
+            return jsonify(
+                {"success": False, "error": "Invalid email or password"}
+            ), 401
+
         # Fix Session Fixation: Regenerate session ID after successful authentication
         if not session_registry.login_and_register(user, remember=remember_me):
             # Deactivated: answered exactly like a wrong password, so the
