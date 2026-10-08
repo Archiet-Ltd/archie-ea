@@ -71,6 +71,19 @@ def create_share_link(solution_id):
 def public_share(token):
     """Public read-only share page — no login required.
 
+    The token is the credential and names the solution, so the page is rendered
+    in the platform scope: no one is signed in, and ``solutions`` is fenced by
+    row-level security.
+    """
+    from app.jobs.tenant_safe_job import platform_scope
+
+    with platform_scope("public share link: the token names the solution; no signed-in user"):
+        return _render_public_share(token)
+
+
+def _render_public_share(token):
+    """Render the share page for ``token`` (see ``public_share``).
+
     Resolves the token from gen.config["share_token"] and renders a lightweight
     read-only view: solution name, architecture summary, file tree, README,
     and a download button.

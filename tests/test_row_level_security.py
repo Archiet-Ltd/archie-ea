@@ -1,0 +1,948 @@
+"""Row-level security on the tenant and shared-catalogue tables (R1-B20 PR 3).
+
+The database itself must refuse a query that forgets the organisation: the role
+the application runs as sees and changes only the session organisation's rows,
+and shared catalogue rows read-only. Every assertion here runs as a role that is
+NOT the table owner, NOT a superuser and NOT ``BYPASSRLS``; a superuser skips
+row-level security, so the superuser the rest of the suite connects as proves
+nothing about it.
+
+Which role: the test-only role ``archie_rls_test_runtime``, created by the
+fixture below with exactly the attributes ``scripts/database/configure_roles.py``
+gives the production runtime role (``NOSUPERUSER NOCREATEDB NOCREATEROLE
+NOINHERIT NOREPLICATION NOBYPASSRLS``) plus data-manipulation grants in the test
+database only. The real ``archie_runtime`` needs the whole schema built by the
+role-separated deploy; ``test_real_configure_roles_*`` at the bottom runs that
+real function on a scratch database, and the production-shaped rehearsal
+(``deploy-schema.sh`` as the deploy role, then the app as ``archie_runtime``) is
+recorded in the pull request.
+
+The module makes its own policies present by calling the migration's
+``upgrade()`` through an Alembic ``Operations`` context (safe because it is
+idempotent), so it passes on a ``create_all`` database locally and on a database
+CI built through the migrations.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import importlib.util
+import os
+import re
+import uuid
+from pathlib import Path
+
+import pytest
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import NullPool
+
+REPO = Path(__file__).resolve().parents[1]
+MIGRATION_PATH = REPO / "migrations" / "versions" / "20261008_row_level_security.py"
+RUNTIME_ROLE = "archie_rls_test_runtime"
+RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run
+
+
+def _load_migration():
+    spec = importlib.util.spec_from_file_location("rls_migration_under_test", MIGRATION_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+MIGRATION = _load_migration()
+
+
+def _apply_policies(engine):
+    """Run the migration's own upgrade() on ``engine`` (idempotent)."""
+    with engine.begin() as connection:
+        context = MigrationContext.configure(connection)
+        with Operations.context(context):
+            MIGRATION.upgrade()
+
+
+class RlsEnv:
+    """Two engines on the test database: the owner/superuser and the runtime role."""
+
+    def __init__(self, owner, runtime):
+        self.owner = owner
+        self.runtime = runtime
+
+    @contextlib.contextmanager
+    def runtime_tx(self, org_id=None, *, platform=False, commit=False, app=None):
+        """A runtime-role transaction whose session organisation is ``org_id``.
+
+        Uses the same function the ORM listeners call. ``platform=True`` sets the
+        platform-scope flag the way ``platform_scope`` does.
+        """
+        from app.middleware.tenant_isolation import set_database_tenant_context
+
+        with self.runtime.connect() as connection:
+            transaction = connection.begin()
+            try:
+                set_database_tenant_context(connection, org_id)
+                if platform:
+                    connection.execute(text("SELECT set_config('archie.platform_scope', 'on', true)"))
+                yield connection
+                if commit:
+                    transaction.commit()
+                else:
+                    transaction.rollback()
+            except BaseException:
+                if transaction.is_active:
+                    transaction.rollback()
+                raise
+
+
+@pytest.fixture(scope="module")
+def rls(app, _schema):
+    from app import db
+
+    with app.app_context():
+        url = db.engine.url
+    owner = create_engine(url, poolclass=NullPool)
+    with owner.begin() as connection:
+        exists = connection.execute(
+            text("SELECT 1 FROM pg_roles WHERE rolname = :r"), {"r": RUNTIME_ROLE}
+        ).scalar()
+        if not exists:
+            connection.execute(text(f"CREATE ROLE {RUNTIME_ROLE}"))  # nosec B608 - module constant
+        connection.execute(
+            text(
+                f"ALTER ROLE {RUNTIME_ROLE} WITH LOGIN PASSWORD '{RUNTIME_PASSWORD}' "  # nosec B608 - test-only role, generated password
+                "NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS"
+            )
+        )
+        connection.execute(text(f"GRANT USAGE ON SCHEMA public TO {RUNTIME_ROLE}"))
+        connection.execute(
+            text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {RUNTIME_ROLE}")
+        )
+        connection.execute(
+            text(f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {RUNTIME_ROLE}")
+        )
+    _apply_policies(owner)
+    runtime = create_engine(
+        url.set(username=RUNTIME_ROLE, password=RUNTIME_PASSWORD), poolclass=NullPool
+    )
+    yield RlsEnv(owner, runtime)
+    runtime.dispose()
+    owner.dispose()
+
+
+# --------------------------------------------------------------------------- #
+# Seed data, committed as the owner, removed after each test
+# --------------------------------------------------------------------------- #
+
+
+class World:
+    def __init__(self, rls):
+        self.rls = rls
+        self.org_ids = []
+        self.user_ids = []
+        self.shared_codes = []
+        self.extra_deletes = []  # (table, column, [values])
+
+    def org(self, label):
+        suffix = uuid.uuid4().hex[:10]
+        with self.rls.owner.begin() as connection:
+            org_id = connection.execute(
+                text(
+                    "INSERT INTO organizations (name, slug) VALUES (:n, :s) RETURNING id"
+                ),
+                {"n": f"RLS {label} {suffix}", "s": f"rls-{label}-{suffix}"},
+            ).scalar_one()
+        self.org_ids.append(org_id)
+        return org_id
+
+    def application(self, org_id, name):
+        with self.rls.owner.begin() as connection:
+            return connection.execute(
+                text(
+                    "INSERT INTO application_components (name, organization_id) "
+                    "VALUES (:n, :o) RETURNING id"
+                ),
+                {"n": name, "o": org_id},
+            ).scalar_one()
+
+    def reference_model(self, org_id, name):
+        code = f"RLS-{uuid.uuid4().hex[:10]}"
+        with self.rls.owner.begin() as connection:
+            row_id = connection.execute(
+                text(
+                    "INSERT INTO reference_model (name, code, organization_id) "
+                    "VALUES (:n, :c, :o) RETURNING id"
+                ),
+                {"n": name, "c": code, "o": org_id},
+            ).scalar_one()
+        self.shared_codes.append(code)
+        return row_id
+
+    def cleanup(self):
+        with self.rls.owner.begin() as connection:
+            for table, column, values in self.extra_deletes:
+                connection.execute(
+                    text(f"DELETE FROM {table} WHERE {column} = ANY(:v)"),  # nosec B608 - fixed names in this module
+                    {"v": list(values)},
+                )
+            if self.user_ids:
+                connection.execute(text("DELETE FROM soc2_audit_log WHERE user_id = ANY(:u)"), {"u": self.user_ids})
+                connection.execute(text("DELETE FROM user_sessions WHERE user_id = ANY(:u)"), {"u": self.user_ids})
+                connection.execute(text("DELETE FROM account_tokens WHERE user_id = ANY(:u)"), {"u": self.user_ids})
+                connection.execute(text("DELETE FROM users WHERE id = ANY(:u)"), {"u": self.user_ids})
+            if self.shared_codes:
+                connection.execute(text("DELETE FROM reference_model WHERE code = ANY(:c)"), {"c": self.shared_codes})
+            if self.org_ids:
+                connection.execute(text("DELETE FROM event_log WHERE organization_id = ANY(:o)"), {"o": self.org_ids})
+                # The outbox is append-only by trigger; the test database owner lifts that here only.
+                connection.execute(text("ALTER TABLE transformation_outbox_events DISABLE TRIGGER USER"))
+                connection.execute(
+                    text("DELETE FROM transformation_outbox_events WHERE organization_id = ANY(:o)"),
+                    {"o": self.org_ids},
+                )
+                connection.execute(text("ALTER TABLE transformation_outbox_events ENABLE TRIGGER USER"))
+                connection.execute(text("DELETE FROM organizations WHERE id = ANY(:o)"), {"o": self.org_ids})
+
+
+@pytest.fixture
+def world(rls):
+    world = World(rls)
+    yield world
+    world.cleanup()
+
+
+def _count(connection, table):
+    return connection.execute(text(f"SELECT count(*) FROM {table}")).scalar_one()  # nosec B608 - fixed names in this module
+
+
+def _owner_value(rls, sql, **params):
+    with rls.owner.connect() as connection:
+        return connection.execute(text(sql), params).scalar()
+
+
+def _fenced(rls, tables):
+    """Subset of ``tables`` that exist in this database."""
+    with rls.owner.connect() as connection:
+        return [
+            t
+            for t in tables
+            if connection.execute(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": f"public.{t}"}).scalar()
+            and connection.execute(
+                text(
+                    "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+                    "AND table_name = :t AND column_name = 'organization_id')"
+                ),
+                {"t": t},
+            ).scalar()
+        ]
+
+
+# --------------------------------------------------------------------------- #
+# The role under test, and the shape of the migration
+# --------------------------------------------------------------------------- #
+
+
+def test_runtime_role_is_not_superuser_not_bypassrls_and_not_owner(rls):
+    with rls.runtime.connect() as connection:
+        user, is_super, bypass = connection.execute(
+            text(
+                "SELECT current_user, r.rolsuper, r.rolbypassrls FROM pg_roles r "
+                "WHERE r.rolname = current_user"
+            )
+        ).one()
+        owner = connection.execute(
+            text("SELECT pg_get_userbyid(relowner) FROM pg_class WHERE oid = 'public.application_components'::regclass")
+        ).scalar_one()
+        attrs = connection.execute(
+            text(
+                "SELECT rolcreatedb, rolcreaterole, rolinherit, rolreplication FROM pg_roles "
+                "WHERE rolname = current_user"
+            )
+        ).one()
+    assert user == RUNTIME_ROLE
+    assert is_super is False
+    assert bypass is False
+    assert owner != RUNTIME_ROLE
+    assert tuple(attrs) == (False, False, False, False)
+
+
+def test_migration_has_no_roles_grants_force_or_bypass_and_uses_null_safe_setting():
+    source = MIGRATION_PATH.read_text(encoding="utf-8")
+    code = "\n".join(line for line in source.splitlines() if not line.lstrip().startswith("#"))
+    code = re.sub(r'""".*?"""', "", code, count=1, flags=re.S)  # the module docstring explains, not executes
+    for forbidden in ("CREATE ROLE", "GRANT ", "REVOKE ", "BYPASSRLS", "FORCE ROW LEVEL", "archie_app", "archie_platform",
+                      "ALTER DEFAULT PRIVILEGES", "NO FORCE"):
+        assert forbidden not in code, forbidden
+    assert "NULLIF(current_setting('archie.organization_id', true), '')::integer" in source
+    assert "from app" not in source and "import app" not in source
+    assert MIGRATION.revision == "20261008_row_level_security"
+
+
+def test_every_tenant_and_hybrid_model_is_listed_or_excluded():
+    """The literal table lists cannot drift from the models unnoticed."""
+    import importlib
+    import pkgutil
+
+    import app.models as models_package
+    from app import db
+    from app.models.mixins.core import HybridTenantMixin, TenantMixin
+
+    for info in pkgutil.iter_modules(models_package.__path__):
+        with contextlib.suppress(Exception):
+            importlib.import_module(f"app.models.{info.name}")
+
+    def concrete(mixin):
+        found, stack = {}, list(mixin.__subclasses__())
+        while stack:
+            cls = stack.pop()
+            stack.extend(cls.__subclasses__())
+            table = getattr(cls, "__table__", None)
+            if table is not None and getattr(cls, "__tablename__", None):
+                found[table.name] = cls.__name__
+        return found
+
+    listed_tenant, listed_hybrid = set(MIGRATION.TENANT_TABLES), set(MIGRATION.HYBRID_TABLES)
+    missing = [
+        t for t in concrete(TenantMixin)
+        if t not in listed_tenant and t not in MIGRATION.EXCLUDED
+    ]
+    missing += [
+        t for t in concrete(HybridTenantMixin)
+        if t not in listed_hybrid and t not in MIGRATION.EXCLUDED
+    ]
+    assert not missing, f"models with an organisation fence but no row-level security: {missing}"
+    assert not (listed_tenant & listed_hybrid)
+    assert set(MIGRATION.EXCLUDED) == {"unified_capabilities"}
+    assert db is not None
+
+
+def test_every_present_table_has_four_policies_enabled_not_forced(rls):
+    tenant = _fenced(rls, MIGRATION.TENANT_TABLES)
+    hybrid = _fenced(rls, MIGRATION.HYBRID_TABLES)
+    assert len(tenant) > 200 and len(hybrid) >= 13
+    with rls.owner.connect() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity, "
+                "(SELECT array_agg(p.policyname ORDER BY p.policyname) FROM pg_policies p "
+                "  WHERE p.schemaname = 'public' AND p.tablename = c.relname) "
+                "FROM pg_class c WHERE c.relname = ANY(:t) AND c.relnamespace = 'public'::regnamespace"
+            ),
+            {"t": tenant + hybrid},
+        ).all()
+    by_name = {r[0]: r for r in rows}
+    for table in tenant:
+        _, enabled, forced, policies = by_name[table]
+        assert enabled and not forced, table
+        assert policies == sorted(MIGRATION.TENANT_POLICIES), table
+    for table in hybrid:
+        _, enabled, forced, policies = by_name[table]
+        assert enabled and not forced, table
+        assert policies == sorted(MIGRATION.HYBRID_POLICIES), table
+
+
+def test_upgrade_twice_converges_to_the_same_definitions(rls):
+    def snapshot():
+        with rls.owner.connect() as connection:
+            return connection.execute(
+                text(
+                    "SELECT tablename, policyname, cmd, qual, with_check FROM pg_policies "
+                    "WHERE schemaname = 'public' ORDER BY 1, 2"
+                )
+            ).all()
+
+    before = snapshot()
+    _apply_policies(rls.owner)
+    assert snapshot() == before
+
+
+# --------------------------------------------------------------------------- #
+# Raw SQL without an organisation predicate: only the session organisation's rows
+# --------------------------------------------------------------------------- #
+
+
+def test_raw_select_without_org_predicate_is_scoped(rls, world):
+    a, b = world.org("a"), world.org("b")
+    a_id, b_id = world.application(a, "App A"), world.application(b, "App B")
+    with rls.runtime_tx(a) as connection:
+        ids = {r[0] for r in connection.execute(text("SELECT id FROM application_components"))}
+    assert a_id in ids
+    assert b_id not in ids
+
+
+def test_raw_update_without_org_predicate_touches_only_session_org(rls, world):
+    a, b = world.org("a"), world.org("b")
+    a_id, b_id = world.application(a, "Original A"), world.application(b, "Original B")
+    with rls.runtime_tx(a, commit=True) as connection:
+        connection.execute(text("UPDATE application_components SET name = 'Updated by A'"))
+    assert _owner_value(rls, "SELECT name FROM application_components WHERE id = :i", i=b_id) == "Original B"
+    assert _owner_value(rls, "SELECT name FROM application_components WHERE id = :i", i=a_id) == "Updated by A"
+
+
+def test_raw_delete_without_org_predicate_touches_only_session_org(rls, world):
+    a, b = world.org("a"), world.org("b")
+    a_id, b_id = world.application(a, "App A"), world.application(b, "App B")
+    with rls.runtime_tx(a, commit=True) as connection:
+        connection.execute(text("DELETE FROM application_components"))
+    assert _owner_value(rls, "SELECT count(*) FROM application_components WHERE id = :i", i=b_id) == 1
+    assert _owner_value(rls, "SELECT count(*) FROM application_components WHERE id = :i", i=a_id) == 0
+
+
+def test_tenant_cannot_insert_a_row_for_another_organisation(rls, world):
+    a, b = world.org("a"), world.org("b")
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(a) as connection:
+            connection.execute(
+                text("INSERT INTO application_components (name, organization_id) VALUES ('Planted', :o)"),
+                {"o": b},
+            )
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(a) as connection:
+            connection.execute(
+                text("INSERT INTO application_components (name, organization_id) VALUES ('Planted', NULL)")
+            )
+
+
+def test_tenant_cannot_move_its_row_to_another_organisation(rls, world):
+    a, b = world.org("a"), world.org("b")
+    a_id = world.application(a, "Mine")
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(a) as connection:
+            connection.execute(
+                text("UPDATE application_components SET organization_id = :b WHERE id = :i"),
+                {"b": b, "i": a_id},
+            )
+
+
+def test_with_no_organisation_every_fenced_table_returns_zero_rows(rls, world):
+    """Tenant tables: zero rows. Shared tables: only the shared (NULL) rows."""
+    a = world.org("a")
+    world.application(a, "Present but invisible")
+    world.reference_model(a, "Override, invisible")
+    world.reference_model(None, "Shared, visible")
+    tenant = _fenced(rls, MIGRATION.TENANT_TABLES)
+    hybrid = _fenced(rls, MIGRATION.HYBRID_TABLES)
+    with rls.runtime_tx(None) as connection:
+        for table in tenant:
+            assert _count(connection, table) == 0, table
+        for table in hybrid:
+            shared = _owner_value(rls, f"SELECT count(*) FROM {table} WHERE organization_id IS NULL")  # nosec B608
+            assert _count(connection, table) == shared, table
+
+
+def test_a_transaction_with_an_organisation_then_one_without_returns_zero_rows_not_an_error(rls, world):
+    """On ONE connection: the first transaction sets the organisation and commits,
+    the second sets none. The setting then reads '' (not NULL); the policy must
+    treat that as no organisation, never raise on ''::integer."""
+    from app.middleware.tenant_isolation import set_database_tenant_context
+
+    a = world.org("a")
+    world.application(a, "Reused connection")
+    with rls.runtime.connect() as connection:
+        with connection.begin():
+            set_database_tenant_context(connection, a)
+            assert _count(connection, "application_components") >= 1
+        with connection.begin():
+            leftover = connection.execute(text("SELECT current_setting('archie.organization_id', true)")).scalar()
+            assert leftover in ("", None)
+            assert _count(connection, "application_components") == 0
+            assert _count(connection, "reference_model") >= 0  # a hybrid table does not raise either
+
+
+# --------------------------------------------------------------------------- #
+# Shared catalogue (hybrid) tables
+# --------------------------------------------------------------------------- #
+
+
+def test_hybrid_shared_rows_are_visible_to_every_organisation(rls, world):
+    a, b = world.org("a"), world.org("b")
+    shared = world.reference_model(None, "Shared")
+    for org in (a, b):
+        with rls.runtime_tx(org) as connection:
+            rows = connection.execute(text("SELECT id FROM reference_model WHERE id = :i"), {"i": shared}).all()
+        assert len(rows) == 1
+
+
+def test_hybrid_override_rows_are_private_to_their_organisation(rls, world):
+    a, b = world.org("a"), world.org("b")
+    a_override, b_override = world.reference_model(a, "A override"), world.reference_model(b, "B override")
+    with rls.runtime_tx(a) as connection:
+        ids = {r[0] for r in connection.execute(text("SELECT id FROM reference_model"))}
+    assert a_override in ids
+    assert b_override not in ids
+
+
+def test_hybrid_tenant_cannot_insert_update_or_delete_a_shared_row(rls, world):
+    org = world.org("a")
+    shared = world.reference_model(None, "Immutable shared")
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(org) as connection:
+            connection.execute(
+                text("INSERT INTO reference_model (name, code, organization_id) VALUES ('x', :c, NULL)"),
+                {"c": f"RLS-{uuid.uuid4().hex[:10]}"},
+            )
+    with rls.runtime_tx(org, commit=True) as connection:
+        updated = connection.execute(text("UPDATE reference_model SET name = 'Tampered' WHERE id = :i"), {"i": shared})
+        deleted = connection.execute(text("DELETE FROM reference_model WHERE id = :i"), {"i": shared})
+    assert updated.rowcount == 0
+    assert deleted.rowcount == 0
+    assert _owner_value(rls, "SELECT name FROM reference_model WHERE id = :i", i=shared) == "Immutable shared"
+
+
+def test_hybrid_tenant_can_write_its_own_override_and_not_another_organisations(rls, world):
+    a, b = world.org("a"), world.org("b")
+    code = f"RLS-{uuid.uuid4().hex[:10]}"
+    world.shared_codes.append(code)
+    with rls.runtime_tx(a, commit=True) as connection:
+        connection.execute(
+            text("INSERT INTO reference_model (name, code, organization_id) VALUES ('own', :c, :o)"),
+            {"c": code, "o": a},
+        )
+        assert connection.execute(text("UPDATE reference_model SET name = 'own2' WHERE code = :c"), {"c": code}).rowcount == 1
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(a) as connection:
+            connection.execute(
+                text("INSERT INTO reference_model (name, code, organization_id) VALUES ('theirs', :c, :o)"),
+                {"c": f"RLS-{uuid.uuid4().hex[:10]}", "o": b},
+            )
+    with rls.runtime_tx(b, commit=True) as connection:
+        assert connection.execute(text("DELETE FROM reference_model WHERE code = :c"), {"c": code}).rowcount == 0
+
+
+def test_framework_adoptions_shared_and_isolated(rls, world):
+    """A second hybrid table, added to the fence since the first version of this work."""
+    a, b = world.org("a"), world.org("b")
+    code = f"RLS-{uuid.uuid4().hex[:8]}"
+    with rls.owner.begin() as connection:
+        framework_id = connection.execute(
+            text("INSERT INTO regulatory_frameworks (code, name) VALUES (:c, 'RLS framework') RETURNING id"),
+            {"c": code},
+        ).scalar_one()
+        shared_id = connection.execute(
+            text(
+                "INSERT INTO framework_adoptions (framework_id, organization_id, scope) "
+                "VALUES (:f, NULL, 'reference') RETURNING id"
+            ),
+            {"f": framework_id},
+        ).scalar_one()
+        a_id = connection.execute(
+            text(
+                "INSERT INTO framework_adoptions (framework_id, organization_id, scope) "
+                "VALUES (:f, :o, 'tenant') RETURNING id"
+            ),
+            {"f": framework_id, "o": a},
+        ).scalar_one()
+    try:
+        with rls.runtime_tx(b) as connection:
+            ids = {r[0] for r in connection.execute(text("SELECT id FROM framework_adoptions"))}
+        assert shared_id in ids and a_id not in ids
+        with pytest.raises(DBAPIError, match="row-level security"):
+            with rls.runtime_tx(b) as connection:
+                connection.execute(
+                    text("INSERT INTO framework_adoptions (framework_id, organization_id, scope) VALUES (:f, NULL, 'reference')"),
+                    {"f": framework_id},
+                )
+        with rls.runtime_tx(b) as connection:
+            assert connection.execute(
+                text("UPDATE framework_adoptions SET tailoring_notes = 'tampered' WHERE id = :i"), {"i": shared_id}
+            ).rowcount == 0
+    finally:
+        with rls.owner.begin() as connection:
+            connection.execute(text("DELETE FROM framework_adoptions WHERE framework_id = :f"), {"f": framework_id})
+            connection.execute(text("DELETE FROM regulatory_frameworks WHERE id = :f"), {"f": framework_id})
+
+
+def test_newly_added_tenant_table_agent_registrations_is_scoped(rls, world):
+    a, b = world.org("a"), world.org("b")
+    with rls.owner.begin() as connection:
+        ids = [
+            connection.execute(
+                text("INSERT INTO agent_registrations (name, purpose, status, organization_id) VALUES (:n, 'rls test', 'active', :o) RETURNING id"),
+                {"n": f"Agent {o}", "o": o},
+            ).scalar_one()
+            for o in (a, b)
+        ]
+    with rls.runtime_tx(a) as connection:
+        seen = {r[0] for r in connection.execute(text("SELECT id FROM agent_registrations"))}
+    assert ids[0] in seen and ids[1] not in seen
+
+
+def test_event_log_partitioned_parent_is_filtered(rls, world):
+    """event_log is partitioned by month in production; the policies sit on the
+    parent only. Postgres applies a partitioned table's own policies when the
+    parent is queried, so a read through it is filtered whichever partition holds
+    the row. Where this database's event_log is a plain table the same assertion
+    holds; where it is partitioned, a child partition is created and used."""
+    a, b = world.org("a"), world.org("b")
+    with rls.owner.connect() as connection:
+        kind = connection.execute(text("SELECT relkind FROM pg_class WHERE oid = 'public.event_log'::regclass")).scalar_one()
+    with rls.owner.begin() as connection:
+        ids = [
+            connection.execute(
+                text(
+                    "INSERT INTO event_log (organization_id, event_type, event_id, payload_json, ordinal) "
+                    "VALUES (:o, 'test.event', :e, '{}', 1) RETURNING id"
+                ),
+                {"o": o, "e": str(uuid.uuid4())},
+            ).scalar_one()
+            for o in (a, b)
+        ]
+    assert kind in ("r", "p")
+    with rls.runtime_tx(a) as connection:
+        seen = {r[0] for r in connection.execute(text("SELECT id FROM event_log"))}
+    assert ids[0] in seen and ids[1] not in seen
+
+
+def test_partitioned_table_policies_apply_to_the_parent_when_queried_directly(rls):
+    """Prove the mechanism on a scratch partitioned table: policies declared on the
+    parent filter a read through it, with rows routed to child partitions."""
+    suffix = uuid.uuid4().hex[:8]
+    parent = f"rls_part_{suffix}"
+    child = f"{parent}_c"
+    default = f"{parent}_d"
+    with rls.owner.begin() as connection:
+        connection.execute(text(f"CREATE TABLE {parent} (id serial, organization_id integer NOT NULL) PARTITION BY LIST (organization_id)"))  # nosec B608
+        connection.execute(text(f"CREATE TABLE {child} PARTITION OF {parent} FOR VALUES IN (1)"))  # nosec B608
+        connection.execute(text(f"CREATE TABLE {default} PARTITION OF {parent} DEFAULT"))  # nosec B608
+        connection.execute(text(f"ALTER TABLE {parent} ENABLE ROW LEVEL SECURITY"))  # nosec B608
+        connection.execute(
+            text(
+                f"CREATE POLICY tenant_select ON {parent} FOR SELECT USING "  # nosec B608
+                f"(organization_id = {MIGRATION._ORG})"
+            )
+        )
+        connection.execute(text(f"GRANT SELECT ON {parent}, {child}, {default} TO {RUNTIME_ROLE}"))  # nosec B608
+        connection.execute(text(f"INSERT INTO {parent} (organization_id) VALUES (1), (2)"))  # nosec B608
+    try:
+        with rls.runtime_tx(2) as connection:
+            assert [r[0] for r in connection.execute(text(f"SELECT organization_id FROM {parent}"))] == [2]  # nosec B608
+        with rls.runtime_tx(None) as connection:
+            assert _count(connection, parent) == 0
+    finally:
+        with rls.owner.begin() as connection:
+            connection.execute(text(f"DROP TABLE {parent}"))  # nosec B608
+
+
+def test_table_owner_is_exempt_so_backfills_keep_working(rls, world):
+    """The deploy role owns the tables; with no organisation set, a backfill-shaped
+    UPDATE ... WHERE organization_id IS NULL as the owner must update the row."""
+    a = world.org("a")
+    code = f"RLS-{uuid.uuid4().hex[:10]}"
+    world.shared_codes.append(code)
+    with rls.owner.begin() as connection:
+        connection.execute(text("INSERT INTO reference_model (name, code, organization_id) VALUES ('legacy', :c, NULL)"), {"c": code})
+        updated = connection.execute(
+            text("UPDATE reference_model SET name = 'backfilled' WHERE organization_id IS NULL AND code = :c"), {"c": code}
+        )
+    assert updated.rowcount == 1
+    assert a is not None
+
+
+# --------------------------------------------------------------------------- #
+# platform_scope
+# --------------------------------------------------------------------------- #
+
+
+@contextlib.contextmanager
+def _app_runs_as(app, engine):
+    """Point the Flask app's database engine at ``engine`` for the block."""
+    from app import db
+
+    engines = db._app_engines[app]
+    original = engines[None]
+    engines[None] = engine
+    try:
+        yield
+    finally:
+        with app.app_context():
+            db.session.remove()
+        engines[None] = original
+
+
+def test_platform_scope_reads_both_organisations_and_is_gone_after_the_block(app, rls, world):
+    from app import db
+    from app.jobs.tenant_safe_job import platform_scope
+
+    a, b = world.org("a"), world.org("b")
+    a_id, b_id = world.application(a, "Platform A"), world.application(b, "Platform B")
+    sql = text("SELECT id FROM application_components WHERE id IN (:a, :b)")
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        assert db.session.execute(sql, {"a": a_id, "b": b_id}).all() == []
+        with platform_scope("test: read across organisations"):
+            seen = {r[0] for r in db.session.execute(sql, {"a": a_id, "b": b_id})}
+            db.session.commit()  # a new transaction inside the block still carries the scope
+            seen_again = {r[0] for r in db.session.execute(sql, {"a": a_id, "b": b_id})}
+        assert seen == seen_again == {a_id, b_id}
+        assert db.session.execute(text("SELECT current_setting('archie.platform_scope', true)")).scalar() in ("", None)
+        assert db.session.execute(sql, {"a": a_id, "b": b_id}).all() == []
+        db.session.rollback()
+        assert db.session.execute(sql, {"a": a_id, "b": b_id}).all() == []
+        db.session.rollback()
+
+
+def test_platform_scope_needs_a_reason(app):
+    from app.jobs.tenant_safe_job import platform_scope
+
+    with app.app_context():
+        for bad in ("", "  ", None):
+            with pytest.raises(ValueError):
+                with platform_scope(bad):
+                    pass
+
+
+def test_platform_scope_reaches_connections_opened_outside_the_session(app, rls, world):
+    """Core connections and plain Sessions on the engine (the capability projection,
+    the ARB waiver expiry) carry the scope too."""
+    from app import db
+    from app.jobs.tenant_safe_job import platform_scope
+
+    a = world.org("a")
+    a_id = world.application(a, "Engine path")
+    sql = text("SELECT id FROM application_components WHERE id = :a")
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        with db.engine.connect() as connection:
+            assert connection.execute(sql, {"a": a_id}).all() == []
+        with platform_scope("test: raw engine connection"):
+            with db.engine.connect() as connection:
+                assert connection.execute(sql, {"a": a_id}).all() != []
+            with Session(db.engine) as plain, plain.begin():
+                assert plain.execute(sql, {"a": a_id}).all() != []
+        with db.engine.connect() as connection:
+            assert connection.execute(sql, {"a": a_id}).all() == []
+
+
+# --------------------------------------------------------------------------- #
+# The application works with row-level security on
+# --------------------------------------------------------------------------- #
+
+PAGES = ["/", "/applications/", "/applications/api/list", "/capability-map/", "/risks/", "/archimate/composer", "/admin/team"]
+
+
+def _make_user(world, org_id, label, *, role, platform=False):
+    with world.rls.owner.begin() as connection:
+        role_id = connection.execute(text("SELECT id FROM roles WHERE name = :n"), {"n": role}).scalar_one()
+        user_id = connection.execute(
+            text(
+                "INSERT INTO users (email, organization_id, confirmed, role_id, is_platform_admin, first_name, last_name) "
+                "VALUES (:e, :o, true, :r, :p, :f, 'Tester') RETURNING id"
+            ),
+            {"e": f"rls-{label}-{uuid.uuid4().hex[:8]}@example.com", "o": org_id, "r": role_id, "p": platform, "f": label},
+        ).scalar_one()
+    world.user_ids.append(user_id)
+    return user_id
+
+
+def _walk(app, client, login_as, user_id, label):
+    from app import db
+
+    out = {}
+    for url in PAGES:
+        with app.app_context():
+            db.session.remove()
+        login_as(client, user_id)
+        response = client.get(url, follow_redirects=False)
+        out[url] = (response.status_code, response.get_data(as_text=True))
+    return out
+
+
+@pytest.mark.parametrize(
+    "persona",
+    ["org_a_architect", "org_a_administrator", "org_b_architect", "platform_administrator"],
+)
+def test_pages_render_under_the_runtime_role_like_they_do_without_it(app, rls, world, client, login_as, persona):
+    a, b = world.org("a"), world.org("b")
+    name_a, name_b = f"RLS Alpha {uuid.uuid4().hex[:6]}", f"RLS Bravo {uuid.uuid4().hex[:6]}"
+    world.application(a, name_a)
+    world.application(b, name_b)
+    users = {
+        "org_a_architect": _make_user(world, a, "aa", role="Architect"),
+        "org_a_administrator": _make_user(world, a, "aadm", role="Administrator"),
+        "org_b_architect": _make_user(world, b, "ba", role="Architect"),
+        "platform_administrator": _make_user(world, a, "plat", role="Administrator", platform=True),
+    }
+    user_id = users[persona]
+    own, other = (name_b, name_a) if persona == "org_b_architect" else (name_a, name_b)
+
+    baseline = _walk(app, client, login_as, user_id, "baseline")
+    with _app_runs_as(app, rls.runtime):
+        under_rls = _walk(app, client, login_as, user_id, "rls")
+
+    for url in PAGES:
+        assert under_rls[url][0] == baseline[url][0], f"{persona} {url}: {under_rls[url][0]} != baseline {baseline[url][0]}"
+        assert other not in under_rls[url][1], f"{persona} {url} shows the other organisation's application"
+    assert baseline["/applications/api/list"][0] == 200
+    assert own in baseline["/applications/api/list"][1]
+    assert own in under_rls["/applications/api/list"][1]
+
+
+def test_a_registered_tenant_job_processes_both_organisations_under_the_runtime_role(app, rls, world):
+    from app.jobs.tenant_safe_job import TENANT_JOBS, run_for_each_tenant
+    from app.services.event_log_service import relay_outbox_batch
+
+    assert "event_log_relay" in TENANT_JOBS
+    a, b = world.org("a"), world.org("b")
+    with rls.owner.begin() as connection:
+        for org_id in (a, b):
+            connection.execute(
+                text(
+                    "INSERT INTO transformation_outbox_events "
+                    "(organization_id, event_id, ordinal, event_type, payload_json, entity_type, entity_id) "
+                    "VALUES (:o, :e, 0, 'rls.test', '{}', 'application', 1)"
+                ),
+                {"o": org_id, "e": str(uuid.uuid4())},
+            )
+    with _app_runs_as(app, rls.runtime):
+        run = run_for_each_tenant(
+            app,
+            "rls-event-log-relay",
+            lambda _org: relay_outbox_batch(),
+            organization_ids=[a, b],
+            use_lock=False,
+        )
+    assert run.failed == 0 and run.succeeded == 2
+    assert [r.value for r in run.results] == [1, 1]
+    for org_id in (a, b):
+        assert _owner_value(rls, "SELECT count(*) FROM event_log WHERE organization_id = :o", o=org_id) == 1
+        assert _owner_value(
+            rls, "SELECT count(*) FROM transformation_outbox_events WHERE organization_id = :o AND published_at IS NOT NULL", o=org_id
+        ) == 1
+
+
+def test_password_reset_works_under_the_runtime_role(app, rls, world, client):
+    """AccountToken is fenced; a reset link is redeemed with no organisation set."""
+    from app import db
+    from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
+    from app.models.user import User
+    from app.modules.account.services.account_service import AccountService
+
+    a = world.org("a")
+    user_id = _make_user(world, a, "reset", role="Architect")
+    with rls.owner.begin() as connection:
+        connection.execute(
+            text("UPDATE users SET password_hash = 'x' WHERE id = :i"), {"i": user_id}
+        )
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        row, raw = AccountToken.issue(user, PURPOSE_PASSWORD_RESET)
+        db.session.commit()
+        db.session.remove()
+
+    with _app_runs_as(app, rls.runtime):
+        with app.test_request_context("/"):
+            assert AccountService.reset_link_usable(raw) is True
+            assert AccountService.reset_link_usable("not-a-real-token") is False
+            ok, message = AccountService.reset_password(raw, "A-new-Passw0rd!x")
+            assert ok, message
+            assert AccountService.reset_link_usable(raw) is False  # works once
+        response = client.get(f"/account/reset-password/{raw}")
+        assert response.status_code in (200, 302, 410)
+    assert _owner_value(rls, "SELECT used_at IS NOT NULL FROM account_tokens WHERE user_id = :u", u=user_id) is True
+
+
+# --------------------------------------------------------------------------- #
+# The real roles: configure_roles, deploy role owns the tables and is exempt
+# --------------------------------------------------------------------------- #
+
+
+def test_real_configure_roles_runtime_role_is_fenced_and_deploy_role_is_exempt():
+    """Run the real ``configure_roles`` on a scratch database, create a fenced table as the
+    deploy role, apply the migration as the deploy role, then read as the real runtime role."""
+    from scripts.database.configure_roles import configure_database_roles
+    from urllib.parse import urlsplit, urlunsplit
+
+    import psycopg2
+    from psycopg2 import sql as pg_sql
+
+    base = os.environ["TEST_DATABASE_URL"]
+    parts = urlsplit(base)
+    suffix = uuid.uuid4().hex[:10]
+    database, deploy_role, runtime_role = f"rls_roles_{suffix}", f"rls_deploy_{suffix}", f"rls_runtime_{suffix}"
+    deploy_password, runtime_password = uuid.uuid4().hex, uuid.uuid4().hex
+    admin_url = urlunsplit(parts._replace(scheme="postgresql", path="/postgres"))
+
+    def sqlalchemy_url(role, password):
+        return f"postgresql+psycopg2://{role}:{password}@{parts.hostname}:{parts.port or 5432}/{database}"
+
+    admin = psycopg2.connect(admin_url)
+    admin.autocommit = True
+    with admin.cursor() as cursor:
+        cursor.execute(pg_sql.SQL("CREATE DATABASE {}").format(pg_sql.Identifier(database)))
+    try:
+        configure_database_roles(
+            admin_url=admin_url,
+            database_names=(database,),
+            deploy_password=deploy_password,
+            runtime_password=runtime_password,
+            deploy_role=deploy_role,
+            runtime_role=runtime_role,
+        )
+        deploy = create_engine(sqlalchemy_url(deploy_role, deploy_password), poolclass=NullPool)
+        with deploy.begin() as connection:
+            connection.execute(text("CREATE TABLE organizations (id serial PRIMARY KEY, name text)"))
+            connection.execute(
+                text(
+                    "CREATE TABLE application_components (id serial PRIMARY KEY, name text, "
+                    "organization_id integer NOT NULL REFERENCES organizations(id))"
+                )
+            )
+            connection.execute(
+                text("CREATE TABLE reference_model (id serial PRIMARY KEY, name text, code text, organization_id integer)")
+            )
+            connection.execute(text("INSERT INTO organizations (name) VALUES ('A'), ('B')"))
+            connection.execute(
+                text("INSERT INTO application_components (name, organization_id) VALUES ('a-app', 1), ('b-app', 2)")
+            )
+            connection.execute(text("INSERT INTO reference_model (name, code, organization_id) VALUES ('shared', 'S', NULL)"))
+        # The migration, run as the deploy role (a plain role: not superuser, not CREATEROLE).
+        _apply_policies(deploy)
+        configure_database_roles(
+            admin_url=admin_url,
+            database_names=(database,),
+            deploy_password=deploy_password,
+            runtime_password=runtime_password,
+            deploy_role=deploy_role,
+            runtime_role=runtime_role,
+        )
+        with deploy.connect() as connection:
+            rows = connection.execute(
+                text(
+                    "SELECT relname, pg_get_userbyid(relowner), relrowsecurity, relforcerowsecurity FROM pg_class "
+                    "WHERE relname IN ('application_components', 'reference_model') ORDER BY 1"
+                )
+            ).all()
+            assert [tuple(r) for r in rows] == [
+                ("application_components", deploy_role, True, False),
+                ("reference_model", deploy_role, True, False),
+            ]
+            # Owner exempt: no organisation set, the backfill-shaped UPDATE still works.
+            assert connection.execute(text("SELECT count(*) FROM application_components")).scalar_one() == 2
+        runtime = create_engine(sqlalchemy_url(runtime_role, runtime_password), poolclass=NullPool)
+        with runtime.connect() as connection:
+            flags = connection.execute(
+                text("SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user")
+            ).one()
+            assert tuple(flags) == (False, False)
+            assert connection.execute(text("SELECT count(*) FROM application_components")).scalar_one() == 0
+            assert connection.execute(text("SELECT count(*) FROM reference_model")).scalar_one() == 1  # shared row
+            connection.rollback()
+            with connection.begin():
+                connection.execute(text("SELECT set_config('archie.organization_id', '2', true)"))
+                assert [r[0] for r in connection.execute(text("SELECT name FROM application_components"))] == ["b-app"]
+            with connection.begin():  # reused connection: '' not NULL, must not raise
+                assert connection.execute(text("SELECT count(*) FROM application_components")).scalar_one() == 0
+        runtime.dispose()
+        deploy.dispose()
+    finally:
+        with admin.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = %s AND pid <> pg_backend_pid()",
+                (database,),
+            )
+            cursor.execute(pg_sql.SQL("DROP DATABASE IF EXISTS {}").format(pg_sql.Identifier(database)))
+            for role in (runtime_role, deploy_role):
+                with contextlib.suppress(Exception):
+                    cursor.execute(pg_sql.SQL("DROP ROLE IF EXISTS {}").format(pg_sql.Identifier(role)))
+        admin.close()

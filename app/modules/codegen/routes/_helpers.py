@@ -5510,7 +5510,11 @@ def _enrich_background(app_ctx, solution_id):
                 except Exception:
                     logger.critical("[enrich_bg] all status persistence attempts failed for solution %d", solution_id)
 
-    with app_ctx:
+    from app.jobs.tenant_safe_job import organization_id_of, tenant_scope
+
+    # A new thread has no request and so no session organisation; do the work as
+    # the organisation that owns the solution.
+    with app_ctx, tenant_scope(organization_id_of(Solution, solution_id)):
         _run()
 
 

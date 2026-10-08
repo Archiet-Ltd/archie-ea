@@ -90,7 +90,12 @@ def _check_session_configuration(app, config_name):
                 from sqlalchemy.exc import OperationalError, ProgrammingError
                 from app.models.models import APISettings
 
-                enabled = APISettings.query.filter_by(enabled=True).all()
+                from app.jobs.tenant_safe_job import platform_scope
+
+                # A boot-time report across every organisation, so it needs the
+                # platform scope under row-level security; it only logs.
+                with platform_scope("LLM configuration report: any organisation's enabled providers"):
+                    enabled = APISettings.query.filter_by(enabled=True).all()
                 if not enabled:
                     app.logger.warning("[LLM CONFIG] No LLM providers enabled.")
                     return
@@ -181,7 +186,9 @@ def _check_session_configuration(app, config_name):
     try:
         from app.services.llm_health_check import validate_llm_config
 
-        with app.app_context():
+        from app.jobs.tenant_safe_job import platform_scope
+
+        with app.app_context(), platform_scope("boot-time LLM health check across every organisation"):
             llm_status = validate_llm_config()
         app.config["AI_FEATURES_ENABLED"] = llm_status["configured"]
         if llm_status["configured"]:

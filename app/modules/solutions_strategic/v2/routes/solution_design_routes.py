@@ -3932,10 +3932,6 @@ def runtime_health_report():
     """
     import hmac
 
-    from app.models.solution_models import Solution
-    from app.models.published_api_spec import PublishedAPISpec
-    from app.models.compliance_check import RuntimeComplianceCheck
-
     # Authenticate the reporter. Being CSRF-exempt removes the browser-origin
     # check, and there was nothing behind it: any caller could POST a report for
     # any solution_id, in any tenant, and have it written as a compliance record.
@@ -3961,6 +3957,21 @@ def runtime_health_report():
         return jsonify({"received": False, "error": "Unauthorized"}), 401
 
     body = request.get_json(silent=True) or {}
+
+    # The reporter is a deployed service holding the shared token, not a signed-in
+    # user; the solution id it names decides the organisation (row-level security
+    # fences these tables).
+    from app.jobs.tenant_safe_job import platform_scope
+
+    with platform_scope("runtime health report: token-authenticated service names the solution"):
+        return _runtime_health_report_apply(body)
+
+
+def _runtime_health_report_apply(body):
+    from app.models.solution_models import Solution
+    from app.models.published_api_spec import PublishedAPISpec
+    from app.models.compliance_check import RuntimeComplianceCheck
+
 
     solution_id = body.get("solution_id")
     if not solution_id or not isinstance(solution_id, int):

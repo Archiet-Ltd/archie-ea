@@ -558,12 +558,21 @@ class SolutionAIOrchestrator:
             # any DB access inside a task raised "Working outside of application
             # context" (the risk-suggestion step failed silently). Wrap each task
             # in the captured app context — same pattern as the Wave 9 specialists.
-            from flask import current_app
+            from contextlib import nullcontext
+
+            from flask import current_app, g
+
+            from app.jobs.tenant_safe_job import tenant_scope
             _app = current_app._get_current_object()
+            # A worker thread has its own context and so no session organisation;
+            # carry the caller's into it so row-level security shows it its rows.
+            _org_id = getattr(g, "current_org_id", None)
 
             def _with_app_context(fn):
                 def _wrapped():
-                    with _app.app_context():
+                    with _app.app_context(), (
+                        tenant_scope(_org_id) if _org_id is not None else nullcontext()
+                    ):
                         return fn()
                 return _wrapped
 
@@ -2646,12 +2655,25 @@ CRITICAL -- TRACEABILITY:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         # Wave 9: Get Flask app for thread context
-        from flask import current_app
+        from contextlib import nullcontext
+
+        from flask import current_app, g
+
+        from app.jobs.tenant_safe_job import tenant_scope
         _app = current_app._get_current_object()
+        # A worker thread has its own context and so no session organisation;
+        # carry the caller's into it so row-level security shows it its rows.
+        _org_id = getattr(g, "current_org_id", None)
+
+        def _worker_context():
+            return _app.app_context(), (
+                tenant_scope(_org_id) if _org_id is not None else nullcontext()
+            )
 
         def _run_business():
             """Business specialist -- runs in parallel with Technology."""
-            with _app.app_context():
+            app_context, scope = _worker_context()
+            with app_context, scope:
                 return _run_business_inner()
 
         def _run_business_inner():
@@ -2690,7 +2712,8 @@ CRITICAL -- TRACEABILITY:
 
         def _run_technology():
             """Technology specialist -- runs in parallel with Business."""
-            with _app.app_context():
+            app_context, scope = _worker_context()
+            with app_context, scope:
                 return _run_technology_inner()
 
         def _run_technology_inner():
