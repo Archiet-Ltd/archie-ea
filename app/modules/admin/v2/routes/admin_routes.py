@@ -852,8 +852,21 @@ def test_api_settings(settings_id):
 @timed_route
 @login_required
 @admin_required
+@platform_admin_required
 def preview_env_keys():
-    """Preview API keys found in environment variables but not yet in the database."""
+    """Preview which of the platform's own LLM provider keys are configured.
+
+    Platform-admin-only (lead's own review, finding S1): reads ``os.environ``
+    directly -- the platform's real ``OPENAI_API_KEY``, ``ANTHROPIC_API_KEY``,
+    ``OPENROUTER_API_KEY`` and the rest of ``env_key_map`` below -- and returned
+    the last four characters of each real key value, plus which providers are
+    configured, to any caller ``admin_required`` admits: every self-registered
+    organisation admin for their own brand-new org, no invitation into anyone
+    else's org needed. Same sweep, same root cause, as ``load_env_keys`` just
+    below. ``admin_required`` is kept rather than removed; ``platform_admin_required``
+    is the operative check, same pattern as ``jira_settings`` above and the
+    rest of this branch.
+    """
     import os
 
     env_key_map = {
@@ -942,9 +955,25 @@ def update_provider_model():
 @timed_route
 @login_required
 @admin_required
+@platform_admin_required
 @audit_log("load_env_keys")
 def load_env_keys():
-    """Import selected API keys from environment variables into the database."""
+    """Import the platform's own LLM provider API keys into the calling org's
+    ``APISettings`` rows.
+
+    Platform-admin-only (lead's own review, finding S1, CRITICAL, reproduced):
+    ``APISettings`` is tenant-scoped (``organization_id`` auto-set on INSERT by
+    the tenant-isolation ORM listener), but the values written here come
+    straight from ``os.environ`` -- the platform's real ``OPENAI_API_KEY``,
+    ``ANTHROPIC_API_KEY``, ``OPENROUTER_API_KEY`` and the rest of
+    ``env_key_map`` below. ``admin_required`` alone let any self-registered
+    organisation admin call this for their own brand-new org and walk away
+    with a working copy of the platform's real key, now stored and usable
+    from inside that org -- no invitation into anyone else's org needed.
+    ``admin_required`` is kept rather than removed; ``platform_admin_required``
+    is the operative check, same pattern as ``jira_settings`` above and the
+    rest of this branch.
+    """
     import os
 
     data = request.get_json()
