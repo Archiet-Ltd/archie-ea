@@ -444,3 +444,56 @@ def test_backfill_is_idempotent(db_session, two_orgs):
     db_session.refresh(conflict_rel)
     assert rel.organization_id == first_resolved, "idempotent re-run must not change an already-resolved row"
     assert conflict_rel.organization_id is None, "idempotent re-run must not resolve a conflicting row"
+
+
+# --------------------------------------------------------------------------
+# Writer: journey_v2_routes._sync_capability_realization_links
+# --------------------------------------------------------------------------
+
+
+def test_capability_realization_sync_sets_organization_id(db_session, two_orgs, tenant_ctx):
+    """The wizard's Goal/Driver -> Capability writer runs inside a request (not
+    a background thread), but ArchitectureInferenceRelationship's organization_id
+    override carries no request-context default -- so it must set the column
+    explicitly like every other writer, or every row it creates is NULL-org and
+    invisible to the tenant that just created it."""
+    from app.modules.solutions_strategic.v2.routes.journey_v2_routes import (
+        _sync_capability_realization_links,
+    )
+    from app.models.architecture_inference_relationship import ArchitectureInferenceRelationship
+    from app.models.solution_models import Solution, SolutionArchiMateElement
+
+    org_a, _org_b = two_orgs
+
+    solution = Solution(name="Realization sync test", organization_id=org_a.id)
+    db_session.add(solution)
+    db_session.flush()
+
+    goal = _archimate_element(db_session, org_a, "goal")
+    goal.type = "Goal"
+    driver = _archimate_element(db_session, org_a, "driver")
+    driver.type = "Driver"
+    capability = _archimate_element(db_session, org_a, "capability")
+    capability.type = "Capability"
+    db_session.flush()
+
+    for element, layer_type in (
+        (goal, "motivation"), (driver, "motivation"), (capability, "strategy"),
+    ):
+        db_session.add(SolutionArchiMateElement(
+            solution_id=solution.id, element_id=element.id,
+            element_table="archimate_elements", layer_type=layer_type,
+        ))
+    db_session.commit()
+
+    with tenant_ctx(org_a.id):
+        inserted = _sync_capability_realization_links(solution.id)
+        assert inserted == 2, f"expected one goal- and one driver-link, got {inserted}"
+
+        rows = ArchitectureInferenceRelationship.query.filter_by(architecture_id=solution.id).all()
+        assert len(rows) == 2
+        for row in rows:
+            assert row.organization_id == org_a.id, (
+                "a row this writer creates must carry the solution's organisation, "
+                f"not {row.organization_id!r}"
+            )
