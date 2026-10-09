@@ -48,6 +48,7 @@
         <div class="relative">
             <div class="flex items-center gap-3">
                 <img src="{{ url_for('static', filename='brand/entelim-logo.svg') }}" alt="Entelim" class="h-9">
+                <span class="sr-only">Entelim</span>
             </div>
         </div>
 
@@ -76,6 +77,7 @@
             {# mobile-only wordmark (brand panel is hidden < lg) #}
             <div class="mb-8 flex items-center gap-2.5 lg:hidden">
                 <img src="{{ url_for('static', filename='brand/entelim-logo.svg') }}" alt="Entelim" class="h-8">
+                <span class="sr-only">Entelim</span>
             </div>
 
             <div class="rounded-xl border bg-card text-card-foreground shadow-sm">
