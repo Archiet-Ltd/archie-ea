@@ -420,7 +420,7 @@ def test_two_org_save_link_and_not_addressed(db_session, make_org):
 
 
 def test_roadmap_api_and_gap_analysis_page_counts_agree(
-    db_session, app, client, login_as,
+    db_session, app, client, login_as, make_org,
 ):
     """The roadmap API and the gap analysis page return the same gap count
     for the same organisation, because both call count_gaps()."""
@@ -457,7 +457,7 @@ def test_roadmap_api_and_gap_analysis_page_counts_agree(
     roadmap_total = roadmap_data.get("statistics", {}).get("total_gaps", -1)
 
     # Gap analysis page — check the rendered HTML for the count
-    gap_analysis_resp = client.get("/implementation/gap-analysis")
+    gap_analysis_resp = client.get("/enterprise/implementation/gap-analysis")
     assert gap_analysis_resp.status_code == 200
     html = gap_analysis_resp.data.decode("utf-8")
 

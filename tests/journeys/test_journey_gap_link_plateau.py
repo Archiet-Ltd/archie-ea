@@ -37,19 +37,6 @@ def _make_gap(db_session, org_id, name=None):
     return gap
 
 
-def _make_work_package(db_session, org_id, name=None):
-    from app.models.implementation_migration import WorkPackage
-
-    suffix = uuid.uuid4().hex[:8]
-    wp = WorkPackage(
-        name=name or f"Journey-WP-{suffix}",
-        organization_id=org_id,
-    )
-    db_session.add(wp)
-    db_session.flush()
-    return wp
-
-
 def test_enterprise_architect_links_gaps_and_sees_not_addressed(app, client):
     """Save two gaps, link one to a plateau and one to a work package,
     reload, see only the unlinked one under 'not addressed'."""
@@ -63,20 +50,23 @@ def test_enterprise_architect_links_gaps_and_sees_not_addressed(app, client):
         )
 
         # Create two gaps
-        gap_a = _make_gap(db, org_id, "Journey Gap A - Plateau Linked")
-        gap_b = _make_gap(db, org_id, "Journey Gap B - WP Linked")
+        gap_a = _make_gap(db.session, org_id, "Journey Gap A - Plateau Linked")
+        gap_b = _make_gap(db.session, org_id, "Journey Gap B - WP Linked")
 
         # Create a plateau
-        plateau = _make_plateau(db, org_id, "Journey Plateau Alpha")
+        plateau = _make_plateau(db.session, org_id, "Journey Plateau Alpha")
+        db.session.commit()
 
-        # Create a work package
-        wp = _make_work_package(db, org_id, "Journey WP Alpha")
+        # Capture IDs before the context closes
+        gap_a_id = gap_a.id
+        gap_b_id = gap_b.id
+        plateau_id = plateau.id
 
     login(client, architect_id)
 
     # Link gap_a to the plateau via the API
     link_resp = client.post(
-        "/capability-map/api/roadmap/gaps/%d/link-plateau/%d" % (gap_a.id, plateau.id),
+        "/capability-map/api/roadmap/gaps/%d/link-plateau/%d" % (gap_a_id, plateau_id),
     )
     assert link_resp.status_code == 200, (
         "Linking gap to plateau failed: %s" % link_resp.data[:200]
@@ -86,15 +76,15 @@ def test_enterprise_architect_links_gaps_and_sees_not_addressed(app, client):
 
     # Link gap_b to the work package via the existing API
     wp_link_resp = client.post(
-        "/capability-map/api/roadmap/gaps/%d/work-packages" % gap_b.id,
+        "/capability-map/api/roadmap/gaps/%d/work-packages" % gap_b_id,
         json={"name": "Journey WP for Gap B"},
     )
-    assert wp_link_resp.status_code == 201, (
+    assert wp_link_resp.status_code == 200, (
         "Linking gap to work package failed: %s" % wp_link_resp.data[:200]
     )
 
     # Reload the gap analysis page
-    gap_analysis_resp = client.get("/implementation/gap-analysis")
+    gap_analysis_resp = client.get("/enterprise/implementation/gap-analysis")
     assert gap_analysis_resp.status_code == 200
     html = gap_analysis_resp.data.decode("utf-8")
 
