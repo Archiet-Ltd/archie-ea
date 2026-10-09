@@ -299,6 +299,13 @@
                  value="{{ current('renewal_date', contract.renewal_date.isoformat() if contract and contract.renewal_date else '') | trim }}"
                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
+        <div>
+          <label for="notice_period_days" class="block text-sm font-medium mb-1.5">Notice period (days)</label>
+          <input type="number" min="0" id="notice_period_days" name="notice_period_days"
+                 value="{{ current('notice_period_days', contract.notice_period_days if contract and contract.notice_period_days is not none else '') | trim }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+          <p class="text-xs text-muted-foreground mt-1">Leave blank if no notice period is recorded. Drives the last-day-to-cancel on the renewals dashboard.</p>
+        </div>
       </div>
       <div class="flex items-center gap-2">
         <input type="checkbox" id="auto_renewal" name="auto_renewal"
