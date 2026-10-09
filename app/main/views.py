@@ -495,9 +495,8 @@ def llms_txt():
     lines = ["# Entelim"]
     lines.append("")
     lines.append(
-        "> Entelim is the open-source Enterprise Intelligence Model: "
-        "build your company's architecture, applications, risks and gaps "
-        "as one model you can ask."
+        "> Enterprise Intelligence Management: one living, explainable model of your "
+        "enterprise, for every company that has a strategy, systems, suppliers and risks."
     )
     lines.append("")
 
@@ -534,9 +533,8 @@ def llms_full_txt():
     lines = ["# Entelim — Full Content"]
     lines.append("")
     lines.append(
-        "> Entelim is the open-source Enterprise Intelligence Model: "
-        "build your company's architecture, applications, risks and gaps "
-        "as one model you can ask."
+        "> Enterprise Intelligence Management: one living, explainable model of your "
+        "enterprise, for every company that has a strategy, systems, suppliers and risks."
     )
     lines.append("")
 
