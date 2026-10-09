@@ -755,8 +755,29 @@ class AIChatApprovalService:
             elif approval.operation_type == "delete":
                 # Hard delete — admin-only at execution time (double guard)
                 # tenant-scoping-ok: self.user_id is the acting user's own id.
+                #
+                # D-4 (admin-rbac-active-org continuation): ``actor.is_admin()``
+                # is a global ``Permission.ADMINISTER`` flag, independent of
+                # which organisation is active in the session
+                # (``g.current_org_id``). Since every self-registered user is
+                # Administrator of their own organisation, a user who merely
+                # accepted a Viewer invitation into another organisation and
+                # switched their session into it could hard-delete that
+                # organisation's capabilities/applications through this
+                # approval-execution path too -- the exact bug
+                # ``admin_required``/``org_admin_required`` already fix
+                # elsewhere in this PR.
                 actor = User.query.filter_by(id=self.user_id).first()
-                if not actor or not actor.is_admin():
+                from flask import g
+
+                from app.middleware.tenant_decorators import is_platform_admin
+                from app.services.rbac_service import rbac_service
+
+                active_org_id = getattr(g, "current_org_id", None)
+                if not actor or not (
+                    is_platform_admin(actor)
+                    or rbac_service.is_org_admin(actor, active_org_id)
+                ):
                     return {"success": False, "error": "Delete operations require administrator privileges"}
                 entity_id = approval.entity_id
                 if approval.entity_type == "capability":

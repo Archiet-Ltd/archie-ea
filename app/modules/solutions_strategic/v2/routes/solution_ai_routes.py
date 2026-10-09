@@ -21,6 +21,7 @@ from app.modules.solutions_strategic.v2.routes.traceability_helpers import (
     build_traceability,
     match_capability_names_to_prefixed_ids,
 )
+from app.middleware.tenant_decorators import is_active_org_admin
 
 logger = logging.getLogger(__name__)
 
@@ -1151,7 +1152,7 @@ def apply_architecture_variant_route(solution_id, recommendation_id):
 def recalculate_impact(solution_id: int):
     """Return updated maturity %, risk summary, entity counts, and next milestone."""
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not is_active_org_admin():
         return api_error("Forbidden", 403)
     try:
         from app.models.solution_lifecycle_models import SolutionRisk, SolutionMetric, SolutionPlateau

@@ -2941,6 +2941,12 @@ def jira_field_discovery():
 @admin_bp_v2.route("/seed-management")
 @timed_route
 @login_required
+# SeedManagementService seeds global reference/catalogue tables shared by
+# every tenant (vendor organisations/products, capability taxonomies, feature
+# flags, APQC processes, AI prompt templates, ...), none of them org-scoped.
+# admin_required alone let any tenant's own admin reach it
+# (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def seed_management():
     """Seed management dashboard."""
@@ -2957,6 +2963,7 @@ def seed_management():
 @admin_bp_v2.route("/api/seed-status")
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def seed_status():
     """API: Get current seed status."""
@@ -2973,6 +2980,7 @@ def seed_status():
 @admin_bp_v2.route("/api/seed/<key>", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 @audit_log("seed_data")
 def seed(key):
@@ -2990,6 +2998,7 @@ def seed(key):
 @admin_bp_v2.route("/api/seed-all", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 @audit_log("seed_all_data")
 def seed_all():
@@ -4844,6 +4853,13 @@ def _get_capability_suggestion_default():
 @admin_bp_v2.route("/solution-prompts")
 @timed_route
 @login_required
+# AIPromptTemplate (app/models/ai_service.py) is a GLOBAL table -- these are
+# the platform's own LLM system prompts, shared by every tenant, not tenant
+# data. admin_required alone let any tenant's own admin read every prompt,
+# its override history and diffs; the write routes on this same resource
+# (update/reset/rollback, below) already require platform_admin_required --
+# the reads were the gap (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def solution_prompts_page():
     """Render the solution AI prompt management page."""
@@ -4852,6 +4868,7 @@ def solution_prompts_page():
 
 @admin_bp_v2.route("/solution-prompts/data")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompts_data():
     """JSON API: return all solution prompt configs merged with DB overrides."""
@@ -4976,6 +4993,7 @@ def _version_content_v2(prompt_key, version, override_name):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/history")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompt_history(prompt_key):
     """A-05: version history for a prompt override, newest first."""
@@ -5016,6 +5034,7 @@ def solution_prompt_history(prompt_key):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/diff")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompt_diff(prompt_key):
     """A-05: unified diff between two versions (or a version and "current").
