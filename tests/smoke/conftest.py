@@ -445,22 +445,9 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
         out["ids"]["org"] = org.id
 
         # Enable the implementation_planning feature flag so /implementation/ routes work
-        from app.models.feature_flags import FeatureFlag, FeatureState
-        impl_flag = FeatureFlag.query.filter_by(key="architecture_implementation_planning").first()
-        if not impl_flag:
-            impl_flag = FeatureFlag(
-                key="architecture_implementation_planning",
-                name="Architecture Implementation Planning",
-                description="Enable the Implementation Planning module (gap discovery, work packages, plateaus)",
-                enabled=True,
-                state=FeatureState.STABLE,
-            )
-            db.session.add(impl_flag)
-            db.session.commit()
-        elif not impl_flag.enabled or impl_flag.state != FeatureState.STABLE:
-            impl_flag.enabled = True
-            impl_flag.state = FeatureState.STABLE
-            db.session.commit()
+        from tests.conftest import seed_implementation_planning_flag
+
+        seed_implementation_planning_flag()
 
         if ai_protocol_stub is not None:
             from tests.smoke.ai_protocol_stub import MODEL, TOKEN

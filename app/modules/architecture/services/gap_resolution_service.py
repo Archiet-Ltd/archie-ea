@@ -89,14 +89,16 @@ class GapResolutionService:
             sync_archimate_element(work_package)
             db.session.flush()  # Get ID
 
-            # Link WorkPackage to Gap via junction table
+            # Link WorkPackage to Gap through the relationship (not a Core insert), so
+            # the session bridge sees the link and makes the ArchiMate relationship.
+            work_package.gaps.append(gap)
+            db.session.flush()
+            # The association row also carries the gap's resolution role.
             db.session.execute(  # tenant-filtered: scoped via parent FK (gap_id, work_package_id)
-                gap_work_packages.insert().values(
-                    gap_id=gap.id,
-                    work_package_id=work_package.id,
-                    resolution_role=wp_data.get("resolution_role", "primary"),
-                    created_at=datetime.utcnow(),
-                )
+                gap_work_packages.update()
+                .where(gap_work_packages.c.gap_id == gap.id,
+                       gap_work_packages.c.work_package_id == work_package.id)
+                .values(resolution_role=wp_data.get("resolution_role", "primary"))
             )
 
             # Generate Deliverables for this WorkPackage
