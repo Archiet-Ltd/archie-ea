@@ -734,10 +734,25 @@ def browser(request):
     try:
         b = engine.launch(headless=True)
     except Exception as exc:                      # no browser binary in this env
-        message = "%s unavailable: %s" % (engine_name, str(exc)[:120])
-        if os.environ.get("SMOKE_REQUIRE_BROWSER") == "1":
-            pytest.fail(message)
-        pytest.skip(message)
+        # Some sandboxes pre-install a browser revision that doesn't match
+        # the pinned Playwright pip package (it then looks for a newer
+        # chromium_headless_shell revision that was never downloaded). Retry
+        # once against the generic pre-installed executable before giving up
+        # -- same fallback the environment's own docs recommend for the
+        # Node/@playwright/test side.
+        fallback = os.environ.get("SMOKE_CHROMIUM_EXECUTABLE") or "/opt/pw-browsers/chromium"
+        if engine_name == "chromium" and os.path.exists(fallback):
+            try:
+                b = engine.launch(headless=True, executable_path=fallback)
+            except Exception:
+                b = None
+        else:
+            b = None
+        if b is None:
+            message = "%s unavailable: %s" % (engine_name, str(exc)[:120])
+            if os.environ.get("SMOKE_REQUIRE_BROWSER") == "1":
+                pytest.fail(message)
+            pytest.skip(message)
     yield b
     b.close()
 
