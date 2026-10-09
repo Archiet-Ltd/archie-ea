@@ -963,13 +963,13 @@ def test_switched_active_organisation_sees_that_organisations_rows(app, rls, wor
     world.application(a, name_a)
     world.application(b, name_b)
     user_id = _make_user(world, a, "sw", role="Administrator", platform=platform)
-    if not platform:
-        with rls.owner.begin() as connection:
-            connection.execute(
-                text("INSERT INTO org_roles (organization_id, user_id, role) VALUES (:o, :u, 'org_admin')"),
-                {"o": b, "u": user_id},
-            )
-        world.extra_deletes.append(("org_roles", "user_id", [user_id]))
+    # Switching needs a membership row in the target organisation (PR 428 removed the platform-admin shortcut).
+    with rls.owner.begin() as connection:
+        connection.execute(
+            text("INSERT INTO org_roles (organization_id, user_id, role) VALUES (:o, :u, 'org_admin')"),
+            {"o": b, "u": user_id},
+        )
+    world.extra_deletes.append(("org_roles", "user_id", [user_id]))
 
     def walk():
         with app.app_context():
@@ -1017,7 +1017,13 @@ def test_per_organisation_connector_credential_keys_are_readable_by_their_own_or
             with tenant_scope(org_id):  # what a scheduled connector sync does
                 assert vault.retrieve(org_id, "jira", "api_key") == secret
         with tenant_scope(a):  # organisation A cannot read B's credential row, even by naming B
-            assert vault.retrieve(b, "jira", "api_key") is None
+            with pytest.raises(ValueError):  # the vault refuses an organisation other than the session's
+                vault.retrieve(b, "jira", "api_key")
+            db.session.rollback()
+            seen = db.session.execute(
+                text("SELECT count(*) FROM org_connector_credentials WHERE organization_id = :o"), {"o": b}
+            ).scalar_one()
+            assert seen == 0  # and the database itself hides B's row from A
             db.session.rollback()
         db.session.remove()
         assert vault.retrieve(a, "jira", "api_key") is None  # no organisation: nothing, no error
@@ -1049,8 +1055,8 @@ def test_unified_work_package_unique_element_and_conflict_inserts_are_not_hidden
     world.extra_deletes.append(("unified_work_packages", "organization_id", [a, b]))
     world.extra_deletes.append(("archimate_elements", "organization_id", [a, b]))
     insert = text(
-        "INSERT INTO unified_work_packages (name, organization_id, archimate_element_id, source_table, source_id) "
-        "VALUES (:n, :o, :e, :t, :s) ON CONFLICT DO NOTHING RETURNING id"
+        "INSERT INTO unified_work_packages (name, organization_id, archimate_element_id, source_table, source_id, context, scope) "
+        "VALUES (:n, :o, :e, :t, :s, 'architecture', 'enterprise') ON CONFLICT DO NOTHING RETURNING id"
     )
     with rls.runtime_tx(a, commit=True) as connection:
         first = connection.execute(insert, {"n": "wp1", "o": a, "e": element, "t": "rls_src", "s": 1}).scalar()
@@ -1080,12 +1086,12 @@ def test_unified_work_package_unique_element_and_conflict_inserts_are_not_hidden
             db.session.rollback()
         finally:
             g.pop("current_org_id", None)
-    with pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError, match="duplicate key"):
         with rls.runtime_tx(a) as connection:
             connection.execute(
                 text(
-                    "INSERT INTO unified_work_packages (name, organization_id, archimate_element_id, source_table, source_id) "
-                    "VALUES ('wp2', :o, :e, 'rls_src', 2)"
+                    "INSERT INTO unified_work_packages (name, organization_id, archimate_element_id, source_table, source_id, context, scope) "
+                    "VALUES ('wp2', :o, :e, 'rls_src', 2, 'architecture', 'enterprise')"
                 ),
                 {"o": a, "e": element},
             )
