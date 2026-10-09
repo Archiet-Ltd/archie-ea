@@ -150,8 +150,6 @@ def test_data_architect_classification_propagates_to_a_downstream_lineage_hop(ap
         db.session.commit()
         source_id = domain.id
         downstream_id = downstream.id
-        source_name = domain.name
-        downstream_name = downstream.name
 
         proposer_id = make_user(
             db, org_id, "prop", enterprise_role="data_architect",
