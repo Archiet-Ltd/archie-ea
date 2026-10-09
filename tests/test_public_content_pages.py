@@ -253,6 +253,20 @@ FORBIDDEN_FRONT_MATTER_PATTERNS = [
     "segment_id",
 ]
 
+# Front matter's own "source:" key (which working document or register a
+# page's claims were grounded against, e.g. "source:
+# docs/eim-category-positioning-v1.md section 2") can't go in
+# FORBIDDEN_FRONT_MATTER_PATTERNS above: "source" alone is an ordinary
+# English word several live pages' own prose legitimately uses ("open
+# source", "source of truth"), so a bare substring check there would fail
+# pages that said nothing wrong. Checked instead as the actual leak shape
+# -- the key followed by a path-like value -- which real prose does not
+# produce. Found missing in independent review, PR 451.
+FORBIDDEN_SOURCE_LEAK_PATTERNS = [
+    re.compile(r"source:\s*docs[/\\]"),
+    re.compile(r"source:\s*[A-Za-z]:\\"),
+]
+
 
 # ── AC1: Every file returns 200 with title in <title> and <h1> ────────────
 
@@ -379,6 +393,10 @@ def test_no_forbidden_strings_in_rendered_pages(app):
             for key in FORBIDDEN_FRONT_MATTER_PATTERNS:
                 assert key not in clean, (
                     f"{page.url}: front-matter key '{key}' found in rendered output"
+                )
+            for pattern in FORBIDDEN_SOURCE_LEAK_PATTERNS:
+                assert not pattern.search(clean), (
+                    f"{page.url}: front matter's 'source:' provenance path leaked into rendered output"
                 )
 
 
