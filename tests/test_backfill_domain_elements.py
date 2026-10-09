@@ -1,8 +1,8 @@
 """Tests for the per-organisation domain-element backfill command.
 
-R1-B18 PR 2 backfill command: creates missing ArchiMate elements for every
-domain record type in one organisation. Must be idempotent, respect tenant
-boundaries, report duplicates, and never silently remove elements.
+Creates missing ArchiMate elements for every domain record type in one
+organisation. Must be idempotent, respect tenant boundaries, report duplicates,
+and never silently remove elements.
 """
 
 import pytest

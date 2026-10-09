@@ -1,8 +1,8 @@
 """Every WorkPackage record must have exactly one ArchiMate element node.
 
-R1-B18 PR 2: every domain record of the nine types has exactly one element
-node in its organisation. WorkPackage now has a before_insert listener that
-mirrors it into a WorkPackage (Implementation layer) element.
+Every domain record of the nine types has exactly one element node in its
+organisation. WorkPackage now has a before_insert listener that mirrors it into
+a WorkPackage (Implementation layer) element.
 """
 
 import pytest

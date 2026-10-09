@@ -1,7 +1,7 @@
 """Every Risk record must have exactly one ArchiMate element node.
 
-R1-B18 PR 2: every domain record of the nine types has exactly one element
-node in its organisation. Risk is the first slice built in this PR.
+Every domain record of the nine types has exactly one element node in its
+organisation. Risk is the first slice built in this PR.
 
 Before this change, Risk had an archimate_element_id column but no automatic
 listener to populate it -- callers had to remember to call

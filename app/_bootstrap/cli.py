@@ -508,7 +508,7 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register demo company seed CLI: {e}")
 
-# Domain element backfill (R1-B18 PR 2)
+# Domain element backfill
     try:
         from app.commands.backfill_domain_elements import init_app as init_domain_elements
         init_domain_elements(app)

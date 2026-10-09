@@ -1,8 +1,8 @@
 """Every DataEntity record must have exactly one ArchiMate element node.
 
-R1-B18 PR 2: every domain record of the nine types has exactly one element
-node in its organisation. DataEntity already has an after_insert listener;
-these tests pin the invariant.
+Every domain record of the nine types has exactly one element node in its
+organisation. DataEntity already has an after_insert listener; these tests pin
+the invariant.
 """
 
 import uuid

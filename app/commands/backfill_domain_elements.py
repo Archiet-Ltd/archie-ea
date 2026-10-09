@@ -1,8 +1,8 @@
 """flask backfill-domain-elements -- per-organisation backfill of missing ArchiMate elements.
 
-R1-B18 PR 2: every domain record of the nine types must have exactly one
-ArchiMate element node in its organisation. This command creates the missing
-elements for a given organisation and reports duplicates.
+Every domain record of the nine types must have exactly one ArchiMate element
+node in its organisation. This command creates the missing elements for a given
+organisation and reports duplicates.
 
 Usage:
     flask --app manage backfill-domain-elements --org-id 7
