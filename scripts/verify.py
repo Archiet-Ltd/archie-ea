@@ -1747,6 +1747,15 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_evidence_contract.py; add a test or Evidence: "
                          "trailer, and add Proven-against: to every registered checker",
              tags=["static", "process", "evidence"]),
+        Gate("untyped-property-writes",
+             "no new direct ArchiMate element property writes bypass the typed writer",
+             "ratchet",
+             lambda: gate_count_checker(
+                 "untyped-property-writes", "scripts/check_untyped_property_writes.py",
+                 baseline.get("untyped_property_writes", 0),
+             ),
+             remediation="run scripts/check_untyped_property_writes.py; route the write through PropertyService.set_element_property()/merge_element_properties()",
+             tags=["static", "architecture", "correctness"]),
         Gate("role-gate-coverage",
              "every declared delivery role resolves to at least one verifier gate",
              "ratchet",
