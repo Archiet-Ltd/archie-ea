@@ -24,7 +24,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.decorators import requires_procurement
 from app.extensions import db
-from app.models.application_portfolio import VendorContract
+from app.models.application_portfolio import ApplicationComponent, VendorContract
+from app.models.contract_application import ContractApplication
 from app.models.license_entitlement import LicenseEntitlement
 from app.models.vendor.vendor_organization import VendorOrganization
 from app.services.feature_flag_service import FeatureFlagService
@@ -119,6 +120,13 @@ def _apply_contract_form(contract, form):
     contract.renewal_date = _parse_date(form.get("renewal_date"))
     contract.auto_renewal = form.get("auto_renewal") == "on"
     contract.contract_owner = (form.get("contract_owner") or "").strip()[:100] or None
+
+    # Notice period: blank/empty means "not recorded" (None)
+    raw_notice = form.get("notice_period_days")
+    if raw_notice is not None and str(raw_notice).strip() != "":
+        contract.notice_period_days = int(raw_notice)
+    else:
+        contract.notice_period_days = None
 
     if not contract.contract_name:
         raise ValueError("contract_name is required")
@@ -417,6 +425,76 @@ def license_delete(license_id):
     db.session.commit()
     flash("Licence deleted.", "success")
     return redirect(url_for("procurement.licenses_list"))
+
+
+@procurement_bp.route("/contracts/<int:contract_id>/link-application", methods=["POST"])
+@login_required
+@requires_procurement
+def contract_link_application(contract_id):
+    """Link an application to a contract.
+
+    Both the contract and the application must belong to the caller's
+    organisation. A cross-organisation link is refused with 404.
+    """
+    contract = _owned_contract_or_404(contract_id)
+    application_id = request.form.get("application_id")
+    if not application_id:
+        flash("Application id is required.", "danger")
+        return redirect(url_for("procurement.contract_detail", contract_id=contract.id))
+
+    application = ApplicationComponent.query.filter_by(
+        id=int(application_id),
+        organization_id=current_user.organization_id,
+    ).first()
+    if not application:
+        return "", 404
+
+    existing = ContractApplication.query.filter_by(
+        contract_id=contract.id,
+        application_id=application.id,
+        organization_id=current_user.organization_id,
+    ).first()
+    if existing:
+        flash("Application is already linked to this contract.", "info")
+        return redirect(url_for("procurement.contract_detail", contract_id=contract.id))
+
+    link = ContractApplication(
+        contract_id=contract.id,
+        application_id=application.id,
+        organization_id=current_user.organization_id,
+    )
+    db.session.add(link)
+    db.session.commit()
+    flash("Application linked to contract.", "success")
+    return redirect(url_for("procurement.contract_detail", contract_id=contract.id))
+
+
+@procurement_bp.route("/contracts/<int:contract_id>/unlink-application", methods=["POST"])
+@login_required
+@requires_procurement
+def contract_unlink_application(contract_id):
+    """Remove a link between an application and a contract.
+
+    Both the contract and the link must belong to the caller's organisation.
+    """
+    contract = _owned_contract_or_404(contract_id)
+    application_id = request.form.get("application_id")
+    if not application_id:
+        flash("Application id is required.", "danger")
+        return redirect(url_for("procurement.contract_detail", contract_id=contract.id))
+
+    link = ContractApplication.query.filter_by(
+        contract_id=contract.id,
+        application_id=int(application_id),
+        organization_id=current_user.organization_id,
+    ).first()
+    if not link:
+        return "", 404
+
+    db.session.delete(link)
+    db.session.commit()
+    flash("Application unlinked from contract.", "success")
+    return redirect(url_for("procurement.contract_detail", contract_id=contract.id))
 
 
 @procurement_bp.route("/")
