@@ -186,6 +186,7 @@ def test_every_record_type_has_a_handler():
         "ApplicationInterface",
         "DataEntity",
         "WorkPackage",
+        "ApplicationComplianceControl",
     }
     actual_types = {path.rsplit(".", 1)[1] for path, _, _, _, _ in _DOMAIN_TYPES}
     assert expected_types == actual_types, (
