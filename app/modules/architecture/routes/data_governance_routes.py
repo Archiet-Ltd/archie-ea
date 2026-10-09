@@ -4,11 +4,14 @@ System of record per data entity, entities held by several applications with no
 declared source, the master data domain register, and the standards check on a
 logical data model. Gated by the same ``data_integration`` section predicate the
 sidebar uses, so a sidebar link can never 403.
+
+R1-B81 slice 2: steward assignment, no-steward list, classification proposal.
 """
 
+import json
 import logging
 
-from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -37,6 +40,7 @@ def _tabs(active):
         ("Undeclared copies", url_for("data_governance.undeclared_copies"), active == "copies"),
         ("Master data domains", url_for("data_governance.domains"), active == "domains"),
         ("Standards check", url_for("data_governance.models"), active == "models"),
+        ("No steward", url_for("data_governance.no_steward"), active == "no_steward"),
         ("Retention breaches", url_for("data_governance.retention_breaches"), active == "retention"),
         ("Data issues", url_for("data_governance.data_issues"), active == "issues"),
         ("Glossary", url_for("data_governance.glossary"), active == "glossary"),
@@ -66,11 +70,29 @@ def entity_detail(entity_id):
     if entity is None:
         return render_template("errors/404.html"), 404
     declared = sor.get_application(g.current_org_id, entity.system_of_record_application_id)
+
+    from app.models.application_owner import ApplicationOwner
+
+    stewards = ApplicationOwner.get_display_rows_for_element(
+        "data_entity", entity_id, g.current_org_id,
+    )
+    steward_owners = [s for s in stewards if s["ownership_type"] == "steward"]
+
+    from app.models.user import User
+
+    org_users = (
+        User.query.filter_by(organization_id=g.current_org_id)
+        .order_by(User.first_name, User.last_name)
+        .all()
+    )
+
     return render_template(
         "data_governance/entity_detail.html",
         entity=entity,
         declared=declared,
         holders=sor.entity_holders(g.current_org_id, entity),
+        stewards=steward_owners,
+        org_users=org_users,
         tabs=_tabs("entities"),
     )
 
@@ -90,6 +112,109 @@ def declare_system_of_record(entity_id):
         )
         flash("System of record declared.", "success")
     except sor.DataSorError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    return redirect(url_for("data_governance.entity_detail", entity_id=entity_id))
+
+
+# ------------------------------------------------------------------ #
+# Steward assignment (R1-B81 slice 2)
+# ------------------------------------------------------------------ #
+
+
+@data_governance_bp.route("/entities/<int:entity_id>/steward", methods=["POST"])
+@login_required
+def assign_steward(entity_id):
+    """Assign a data steward to a critical data entity through the one
+    ownership writer (ApplicationOwner, element_type='data_entity',
+    ownership_type='steward')."""
+    guard = _guard()
+    if guard:
+        return guard
+    from app.modules.architecture.services.data_stewardship_service import DataStewardshipService
+
+    user_id = request.form.get("user_id", type=int)
+    if not user_id:
+        flash("A user must be selected.", "error")
+        return redirect(url_for("data_governance.entity_detail", entity_id=entity_id))
+    try:
+        DataStewardshipService.set_data_entity_steward(
+            entity_id=entity_id, user_id=user_id,
+            organization_id=g.current_org_id, assigned_by=current_user.id,
+        )
+        db.session.commit()
+        flash("Steward assigned.", "success")
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    return redirect(url_for("data_governance.entity_detail", entity_id=entity_id))
+
+
+@data_governance_bp.route("/entities/<int:entity_id>/steward/<int:owner_id>/remove", methods=["POST"])
+@login_required
+def remove_steward(entity_id, owner_id):
+    """Remove a steward from a data entity."""
+    guard = _guard()
+    if guard:
+        return guard
+    from app.modules.architecture.services.data_stewardship_service import DataStewardshipService
+
+    DataStewardshipService.remove_data_entity_steward(
+        owner_record_id=owner_id, organization_id=g.current_org_id,
+    )
+    db.session.commit()
+    flash("Steward removed.", "success")
+    return redirect(url_for("data_governance.entity_detail", entity_id=entity_id))
+
+
+@data_governance_bp.route("/no-steward")
+@login_required
+def no_steward():
+    """R1-B81 (PB-0317): critical data entities with no steward assigned."""
+    guard = _guard()
+    if guard:
+        return guard
+    from app.modules.architecture.services.data_stewardship_service import DataStewardshipService
+
+    entities = DataStewardshipService.list_critical_entities_with_no_steward(g.current_org_id)
+    return render_template(
+        "data_governance/no_steward.html", entities=entities, tabs=_tabs("no_steward"),
+    )
+
+
+# ------------------------------------------------------------------ #
+# Classification proposal (R1-B81 slice 2)
+# ------------------------------------------------------------------ #
+
+
+@data_governance_bp.route("/entities/<int:entity_id>/classify", methods=["POST"])
+@login_required
+def propose_classification(entity_id):
+    """Propose a classification label for a data entity. Creates an
+    approval row that another user can accept from the approval inbox."""
+    guard = _guard()
+    if guard:
+        return guard
+    from app.modules.architecture.services.data_stewardship_service import DataStewardshipService
+
+    label = (request.form.get("classification_label") or "").strip().lower()
+    if not label:
+        flash("A classification label is required.", "error")
+        return redirect(url_for("data_governance.entity_detail", entity_id=entity_id))
+    try:
+        result = DataStewardshipService.propose_classification(
+            entity_id=entity_id, classification_label=label,
+            organization_id=g.current_org_id, proposed_by=current_user.id,
+        )
+        if result.get("success"):
+            flash(
+                f"Classification proposal created (approval #{result['approval_id']}). "
+                f"Another user can accept it from the approval inbox.",
+                "success",
+            )
+        else:
+            flash(result.get("error", "Failed to create proposal."), "error")
+    except ValueError as exc:
         db.session.rollback()
         flash(str(exc), "error")
     return redirect(url_for("data_governance.entity_detail", entity_id=entity_id))
