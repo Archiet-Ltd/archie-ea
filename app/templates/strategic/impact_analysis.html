@@ -106,7 +106,7 @@
                             <option value="MODIFY">Minor Modification</option>
                         </select>
                     </div>
-                    <button type="button" @click="performAnalysis" :disabled="!selectedElement || loading"
+                    <button type="button" @click="performAnalysis(pagination.cursor, pagination.pageSize)" :disabled="!selectedElement || loading"
                         class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2" aria-label="Action">
                         {# x-show sits on a wrapper, not on the <i>: Lucide swaps each <i> for an <svg> and the binding is lost. #}
                         <span x-show="!loading" x-cloak class="mr-2 inline-flex"><i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i></span>
