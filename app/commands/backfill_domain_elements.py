@@ -160,7 +160,7 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
                     session.flush()
                     record.archimate_element_id = element.id
                     created += 1
-                except Exception as exc:
+                except Exception:
                     session.rollback()
                     errors += 1
 

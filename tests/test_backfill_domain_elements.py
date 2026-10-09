@@ -98,7 +98,7 @@ def test_backfill_respects_tenant_boundary(db_session, make_org, tenant_ctx):
     # Backfill only org A — run inside org A's tenant context so the
     # automatic tenant filter does not scope the query to org B
     with tenant_ctx(org_a.id):
-        stats = backfill_domain_elements(org_a.id, session=db_session)
+        backfill_domain_elements(org_a.id, session=db_session)
 
     # Check that only org A's records got elements
     db_session.expire_all()
