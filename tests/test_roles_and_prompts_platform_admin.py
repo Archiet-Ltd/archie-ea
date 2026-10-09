@@ -4,8 +4,9 @@
 override is one name-keyed row used for every organisation, so an organisation's own
 administrator could create, rename or delete roles other organisations' users hold, and
 rewrite the platform's AI system prompt for all tenants. The routes were guarded by
-``@admin_required`` (``Permission.ADMINISTER``); they now use ``@platform_admin_required``.
-Listing role names stays available to an organisation administrator (team management).
+``@admin_required`` (``Permission.ADMINISTER``); they now use ``@platform_admin_required``
+on every verb, including list -- no template calls this endpoint, so there is no
+team-management need to balance against the leak.
 """
 
 from __future__ import annotations
@@ -51,12 +52,16 @@ def test_a_tenant_administrator_cannot_create_rename_or_delete_a_role(app, db_se
     assert db_session.execute(text("select name from roles where id = :i"), {"i": role_id}).scalar() == role_name
 
 
-def test_a_tenant_administrator_can_still_list_roles(app, db_session, make_org, client, login_as):
+def test_a_tenant_administrator_cannot_list_roles(app, db_session, make_org, client, login_as):
+    """Matches tests/test_admin_org_member_idor.py's
+    TestRolesApiPlatformAdminOnly (pre-existing on main, independent of
+    this PR): list is platform_admin-only like every other /api/roles
+    verb -- no UI depends on an org admin reaching it."""
     tenant_id, *_ = _world(db_session, make_org)
 
     _login(db_session, client, login_as, tenant_id)
 
-    assert client.get("/admin/api/roles").status_code == 200
+    assert client.get("/admin/api/roles").status_code == 403
 
 
 @pytest.mark.parametrize("method,path", [

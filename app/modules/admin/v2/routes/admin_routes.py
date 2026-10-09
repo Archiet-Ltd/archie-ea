@@ -3335,18 +3335,20 @@ def api_bulk_delete_users():
 @admin_bp_v2.route("/api/roles", methods=["GET"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def api_list_roles():
     """List all roles with user counts and permission flags.
 
     Role is a GLOBAL table (app/models/user.py's Role carries no
-    organization_id), so the role catalogue itself (names, permission
-    bits) is visible to any org admin -- deliberately NOT locked to
-    platform_admin_required like the write verbs below (create/update/
-    delete): an org admin needs this list to assign roles to their own
-    team (team management), and the per-role user list this endpoint
-    also returns is already tenant-scoped (filtered by
-    g.current_org_id), so no other organisation's membership leaks."""
+    organization_id) -- reachable by any org admin of their own,
+    brand-new organisation, no invitation into anyone else's org
+    needed. platform_admin_required added alongside this route's own
+    admin_required for every /api/roles verb (list/create/update/
+    delete): tests/test_admin_org_member_idor.py's
+    TestRolesApiPlatformAdminOnly (pre-existing on main, independent
+    of this PR) already pins list to platform_admin-only, and no
+    template calls this endpoint -- team management does not need it."""
     roles = Role.query.order_by(Role.name).all()
     items = []
     for role in roles:
