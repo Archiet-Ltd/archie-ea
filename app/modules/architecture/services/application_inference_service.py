@@ -425,8 +425,19 @@ class ApplicationInferenceService:
         """
         inferred = []
 
-        # Query existing ProcessApplicationMapping records
-        mappings = ProcessApplicationMapping.query.filter_by(apqc_process_id=apqc_process.id).all()
+        # Query existing ProcessApplicationMapping records. Has no
+        # organization_id of its own; foreign rows are filtered out below
+        # (db.session.get on a TenantMixin model returns None for a
+        # tenant mismatch on a cache miss), but the unfenced query still
+        # loaded every organisation's rows into memory (pr310-v1 review,
+        # DEFECT-3).
+        from app.services.apqc_mapping_tenant_fence import (
+            fenced_application_mappings_query,
+        )
+
+        mappings = fenced_application_mappings_query().filter(
+            ProcessApplicationMapping.apqc_process_id == apqc_process.id
+        ).all()
 
         for mapping in mappings:
             # Fetch the application
@@ -582,9 +593,14 @@ class ApplicationInferenceService:
         """
         inferred = []
 
-        # Find capabilities that enable this process
-        capability_mappings = CapabilityProcessMapping.query.filter_by(
-            apqc_process_id=apqc_process.id
+        # Find capabilities that enable this process. CapabilityProcessMapping
+        # has no organization_id of its own (pr310-v1 review, DEFECT-4).
+        from app.services.apqc_mapping_tenant_fence import (
+            fenced_capability_mappings_query,
+        )
+
+        capability_mappings = fenced_capability_mappings_query().filter(
+            CapabilityProcessMapping.apqc_process_id == apqc_process.id
         ).all()
 
         for cap_mapping in capability_mappings:

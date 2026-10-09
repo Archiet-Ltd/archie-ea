@@ -12,13 +12,12 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-from flask import g, jsonify, render_template, request
+from flask import abort, g, jsonify, render_template, request
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from app import db
 from app.middleware.tenant_decorators import platform_admin_required
-from app.decorators import admin_required
 from app.models.ai_service import AIPromptTemplate
 from app.models.user import User
 from app.modules.ai_chat.services.multi_domain_chat_service import PERSONA_CONFIGS
@@ -26,6 +25,22 @@ from app.modules.ai_chat.services.multi_domain_chat_service import PERSONA_CONFI
 from . import unified_ai_chat_bp
 
 logger = logging.getLogger(__name__)
+
+
+def _require_admin():
+    """Abort 403 if current user is not an admin of the ACTIVE organisation.
+
+    R2-2 (PR 428 round 3): ``current_user.is_admin`` (no call) is a bound
+    method reference, always truthy, so this never refused anyone -- a
+    Viewer of the active organisation could read and write every persona
+    prompt override and read the organisation's AI-chat analytics. Judged
+    the same way ``org_admin_required``/``admin_required`` do elsewhere in
+    this PR, against ``g.current_org_id`` rather than a global flag.
+    """
+    from app.middleware.tenant_decorators import is_active_org_admin
+
+    if not is_active_org_admin():
+        abort(403)
 
 
 def _override_key(persona_key):
@@ -107,7 +122,18 @@ def admin_prompts_data():
 @login_required
 @platform_admin_required
 def admin_prompt_update(persona_key):
-    """Update (or create) a DB override for a persona's prompt config."""
+    """Update (or create) a DB override for a persona's prompt config.
+
+    R3-3 (PR 428 round 4, settling with review-pr430-v3.md's DEF-6/PR 430
+    ruling): ``_require_admin()`` (active-org) is not the right authority
+    for ``AIPromptTemplate`` -- a table with no organisation column, whose
+    rows are shown to every tenant. ``platform_admin_required`` is the
+    operative check here; ``_require_admin()`` is kept as well (a no-op
+    once platform_admin_required has already passed) so the function stays
+    safe to call on its own from any future caller that doesn't stack the
+    decorator.
+    """
+    _require_admin()
 
     if persona_key not in PERSONA_CONFIGS:
         return jsonify({"error": f"Unknown persona: {persona_key}"}), 404
@@ -162,7 +188,11 @@ def admin_prompt_update(persona_key):
 @login_required
 @platform_admin_required
 def admin_prompt_reset(persona_key):
-    """Remove the DB override for a persona, reverting to hardcoded defaults."""
+    """Remove the DB override for a persona, reverting to hardcoded defaults.
+
+    R3-3: same global-resource reasoning as ``admin_prompt_update`` above.
+    """
+    _require_admin()
 
     if persona_key not in PERSONA_CONFIGS:
         return jsonify({"error": f"Unknown persona: {persona_key}"}), 404
@@ -217,21 +247,21 @@ def _safe_import_analytics_models():
 
 @unified_ai_chat_bp.route("/admin/analytics")
 @login_required
-@admin_required
 def admin_analytics_dashboard():
     """Render the AI Chat feedback analytics dashboard."""
+    _require_admin()
     return render_template("ai_chat/analytics_dashboard.html")
 
 
 @unified_ai_chat_bp.route("/admin/analytics/data")
 @login_required
-@admin_required
 def admin_analytics_data():
     """Return aggregated AI Chat analytics as JSON.
 
     Query params:
         days (int): Look-back window in days (default 30, max 365).
     """
+    _require_admin()
 
     try:
         days = min(int(request.args.get("days", 30)), 365)

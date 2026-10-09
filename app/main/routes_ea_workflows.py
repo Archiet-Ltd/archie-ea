@@ -14,6 +14,7 @@ from flask import current_app, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
+from app.middleware.tenant_decorators import platform_admin_required
 from app.utils.pagination import safe_int_arg
 
 
@@ -920,13 +921,16 @@ def register_ea_workflow_routes(main_blueprint):
             return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
     @main_blueprint.route("/api/ea-workflows/seed-defaults", methods=["POST"])
-    @login_required
+    @platform_admin_required
     def api_seed_workflow_defaults():
-        """API: Seed default workflow definitions (admin only)."""
-        try:
-            if not current_user.is_admin():
-                return jsonify({"success": False, "error": "Admin access required"}), 403
+        """API: Seed default workflow definitions (platform admin only).
 
+        R2-3 (PR 428 round 3): ``EAWorkflowDefinition`` carries no
+        organisation column -- this writes global, platform-wide rows, so
+        "admin anywhere" (every self-registered org admin) was never the
+        right gate. Scoped to platform admins.
+        """
+        try:
             from app.services.ea_workflow_engine import EAWorkflowEngine
 
             engine = EAWorkflowEngine()
@@ -1789,13 +1793,16 @@ def register_ea_workflow_routes(main_blueprint):
             return jsonify({"phases": [], "error": "An internal error occurred"}), 500
 
     @main_blueprint.route("/api/ea-workflows/run-due-schedules", methods=["POST"])
-    @login_required
+    @platform_admin_required
     def api_run_due_schedules():
-        """API: Manually trigger execution of all due workflow schedules (admin only)."""
-        try:
-            if not current_user.is_admin():
-                return jsonify({"success": False, "error": "Admin access required"}), 403
+        """API: Manually trigger execution of all due workflow schedules (platform admin only).
 
+        R2-3 (PR 428 round 3): this executes every organisation's due
+        schedules in one batch -- "admin anywhere" let any self-registered
+        org admin trigger it for organisations they have no standing in.
+        Scoped to platform admins.
+        """
+        try:
             from app.services.ea_workflow_engine import EAWorkflowEngine
             engine = EAWorkflowEngine()
             result = engine.run_due_schedules()

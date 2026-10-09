@@ -17,7 +17,7 @@
   intro='Annual billing is selected; monthly is one click away. Any tax due is shown on the payment page before you pay.'
 ) %}
 {% set _billing = 'billing.billing_index' in flask.current_app.view_functions %}
-{% set _btn = 'inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 transition-colors' %}
+{% set _btn = 'public-btn transition-colors' %}
 <section aria-labelledby="{{ heading_id }}" class="mt-12 space-y-4" data-testid="{{ testid }}">
   <h2 id="{{ heading_id }}" class="text-2xl font-semibold text-foreground">{{ heading }}</h2>
   <p class="text-sm text-muted-foreground">{{ intro }}</p>

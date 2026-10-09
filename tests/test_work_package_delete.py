@@ -34,22 +34,22 @@ def client(app):
 
 
 def _make_wp(app, org_id, name):
+    """A work package in the one store: the screen's ids are that store's ids."""
     from app import db
-    from app.models.implementation_migration import WorkPackage
+    from app.services import work_package_service
 
     with app.app_context():
-        wp = WorkPackage(name=name, organization_id=org_id)
-        db.session.add(wp)
+        wp = work_package_service.create_work_package(organization_id=org_id, name=name)
         db.session.commit()
         return wp.id
 
 
 def _wp_exists(app, wp_id):
     from app import db
-    from app.models.implementation_migration import WorkPackage
+    from app.models.unified_work_package import UnifiedWorkPackage
 
     with app.app_context():
-        return db.session.get(WorkPackage, wp_id) is not None
+        return db.session.get(UnifiedWorkPackage, wp_id) is not None
 
 
 def test_owner_can_delete_own_work_package(client, app):
@@ -77,8 +77,8 @@ def test_owner_can_delete_own_work_package(client, app):
 def test_cannot_delete_another_tenants_work_package(client, app):
     """TenantMixin scopes the lookup: a foreign id must 404, and the row must survive."""
     from app import db
-    from app.models.implementation_migration import WorkPackage
     from app.models.organization import Organization
+    from app.models.unified_work_package import UnifiedWorkPackage
     from app.models.user import User
 
     with app.app_context():
@@ -94,6 +94,6 @@ def test_cannot_delete_another_tenants_work_package(client, app):
         assert _wp_exists(app, victim_wp)
     finally:
         with app.app_context():
-            _cleanup_ids(db, WorkPackage, [victim_wp])
+            _cleanup_ids(db, UnifiedWorkPackage, [victim_wp])
             _cleanup_ids(db, User, [attacker])
             _cleanup_ids(db, Organization, [org_a, org_b])

@@ -13,9 +13,9 @@ from flask import Blueprint, jsonify, render_template, request
 from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException
 
-from app.decorators import audit_log
-from app.middleware.tenant_decorators import platform_admin_required
+from app.decorators import admin_required, audit_log
 from app.extensions import db
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.ai_service import AIPromptTemplate, AIPromptTemplateVersion
 from app.services import solution_prompt_override_service
 
@@ -179,7 +179,15 @@ def _get_codegen_prompt(module_name, attr_name, key=None):
 
 @solution_prompt_admin_bp.route("/solution-prompts")
 @login_required
+# AIPromptTemplate carries no organization_id -- these are the platform's own
+# LLM system prompts, shared by every tenant. admin_required alone let any
+# tenant's own admin read every prompt, its override history and diffs; the
+# write routes on this same resource (update/reset/rollback, below) already
+# require platform_admin_required -- the reads were the gap
+# (R1 admin-rbac systemic fix; see also
+# test_solution_prompt_overrides_platform_admin.py, which covers the writes).
 @platform_admin_required
+@admin_required
 def solution_prompts_page():
     """Render the solution AI prompt management page."""
     return render_template("admin/solution_prompts.html")
@@ -188,6 +196,7 @@ def solution_prompts_page():
 @solution_prompt_admin_bp.route("/solution-prompts/data")
 @login_required
 @platform_admin_required
+@admin_required
 def solution_prompts_data():
     """JSON API: return all solution prompt configs merged with DB overrides."""
     defaults = _get_prompt_defaults()
@@ -300,6 +309,7 @@ def solution_prompt_reset(prompt_key):
 @solution_prompt_admin_bp.route("/solution-prompts/<prompt_key>/history")
 @login_required
 @platform_admin_required
+@admin_required
 def solution_prompt_history(prompt_key):
     """A-05: version history for a prompt override, newest first.
 
@@ -359,6 +369,7 @@ def _version_content(prompt_key, version, override_name):
 @solution_prompt_admin_bp.route("/solution-prompts/<prompt_key>/diff")
 @login_required
 @platform_admin_required
+@admin_required
 def solution_prompt_diff(prompt_key):
     """A-05: unified diff between two versions (or a version and "current").
 
