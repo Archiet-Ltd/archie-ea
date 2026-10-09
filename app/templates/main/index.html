@@ -52,8 +52,8 @@
       <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
         One living, explainable model of your enterprise: its strategy, systems, data, people, money, risk,
         suppliers and AI, kept current and turned into cited answers. Entelim is an open-source enterprise
-        architecture and intelligence platform built on ArchiMate 3.2: import your model and get a cited answer
-        to what breaks if a system fails, in minutes, free.
+        architecture and intelligence platform built on ArchiMate 3.2. Import your model and get a free, cited
+        answer to what breaks if a system fails, in minutes.
       </p>
 
       <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
@@ -116,9 +116,27 @@
         can see the model as it stood on any past date.
       </p>
     </div>
-    <div class="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground" data-testid="home-proof-placeholder">
-      <p>A live capture of Entelim answering "what breaks if this fails?", with the provenance of every row open.</p>
+    <div class="grid sm:grid-cols-2 gap-6 lg:gap-8">
+      <div class="rounded-lg border border-border bg-card p-6" data-testid="home-proof-what-breaks">
+        <h3 class="text-lg font-semibold text-foreground mb-2">What breaks if this fails?</h3>
+        <p class="text-muted-foreground text-sm">Everything that depends on it, across every layer, cited back to the record it came from.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6" data-testid="home-proof-strategy">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Which strategy does it serve?</h3>
+        <p class="text-muted-foreground text-sm">The goals and value streams this element carries, traced back to the motivation model.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6" data-testid="home-proof-programmes">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Which programmes touch it?</h3>
+        <p class="text-muted-foreground text-sm">Every gap, roadmap and work package that changes it, in the same model as the estate it changes.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6" data-testid="home-proof-risk">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Which risks reach it?</h3>
+        <p class="text-muted-foreground text-sm">Every recorded risk on the path to this element, not only the risk written directly on it.</p>
+      </div>
     </div>
+    <p class="text-center mt-8">
+      <a href="{{ url_for('account.register') }}" class="text-primary underline hover:no-underline">Start free and ask your own model</a>
+    </p>
   </div>
 </section>
 
