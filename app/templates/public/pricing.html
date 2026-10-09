@@ -1,0 +1,263 @@
+{# smoke-coverage-ok: covered by tests/smoke/test_pricing_page.py and tests/test_billing_plans_and_checkout.py::test_pricing_page_has_a_buy_button_per_plan
+   Template: public/pricing.html -- the plan-card pricing page (front-matter `template: pricing`
+   on content/pages/site/pricing.md, routed by main.public_site_page). Extends the same public
+   layout as public/page.html. The buy buttons keep the click-tracking redirect and the
+   plan-preserving registration link of macros/pricing_cta.html; prices come from the
+   page copy and match services/billing_plans.py (tests/test_public_jsonld.py pins that).
+   The monthly/annual toggle is two radios and sibling selectors in css/public_pricing.css, so it
+   needs no script. Every checklist line is something that works today. #}
+{% extends 'layouts/public_base.html' %}
+{% block title %}{{ page.title }}{% endblock %}
+
+{% block meta_description %}
+<meta name="description" content="{{ page.description }}">
+<link rel="canonical" href="{{ page.effective_canonical_url }}">
+{% endblock %}
+
+{% block header %}
+{% include 'components/public_navbar.html' %}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/public_pricing.css') }}">
+{% endblock %}
+
+{% block content %}
+{% set _billing = 'billing.billing_index' in flask.current_app.view_functions %}
+{% set _yes = '<span class="pp-yes" role="img" aria-label="Included"></span>'|safe %}
+{% set _no = '<span class="pp-no" aria-label="Not included">&mdash;</span>'|safe %}
+<div class="pricing-page">
+  {% if jsonld %}
+  <script type="application/ld+json">{{ jsonld }}</script>
+  {% endif %}
+
+  <div class="pp-wrap">
+    <header class="pp-lead">{{ page.body_html }}</header>
+
+    <section class="pp-section pp-section--first" aria-labelledby="plans-heading" data-testid="pricing-plans" >
+      <h2 id="plans-heading" class="sr-only">Plans</h2>
+      <input type="radio" class="pp-radio" name="pp-interval" id="pp-bill-year" checked>
+      <input type="radio" class="pp-radio" name="pp-interval" id="pp-bill-month">
+      <div class="pp-toggle" role="group" aria-label="Billing period" data-testid="pricing-toggle">
+        <label for="pp-bill-year">Annual <span class="pp-save">Two months free</span></label>
+        <label for="pp-bill-month">Monthly</label>
+      </div>
+
+      <div class="pp-plans">
+        {# Community #}
+        <article class="pp-card" data-testid="plan-card-community">
+          <h3>Community</h3>
+          <p class="pp-for">Evaluation, one-person companies and self-hosters.</p>
+          <p class="pp-price">Free</p>
+          <p class="pp-note">No trial clock. One organisation, up to three people.</p>
+          <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="pp-btn" data-testid="buy-community">Start free</a>
+          <div class="pp-alt"></div>
+          <ul class="pp-list">
+            <li>Ask what breaks, what is at risk and who is accountable</li>
+            <li>The twin map of your systems, suppliers and dependencies</li>
+            <li>The Business Model Canvas</li>
+            <li>Import from files: ArchiMate Open Exchange and spreadsheets</li>
+            <li>Community support</li>
+          </ul>
+        </article>
+
+        {# Startup and Team: price and buy button per interval #}
+        {% for key, name, for_whom, note_year, note_month, price_year, price_month, unit_year, unit_month, items in [
+          ('startup', 'Startup', 'Founders and small services firms, 5 to 50 people.',
+           '$490/year for a team of ten. $98 less than twelve months at $49/month.',
+           '$49/month for a team of ten, or $490/year and save $98.',
+           '$490', '$49', '/year', '/month',
+           ['Ten people', 'Webhook feed to Slack, Teams or any endpoint, with signed delivery', 'Email support']),
+          ('team', 'Team', 'Scale-ups and services companies, 50 to 500 people.',
+           '$290/editor/year. People who only ask questions are free.',
+           '$29/editor/month, or $290/editor/year and save $58 per editor. People who only ask questions are free.',
+           '$290', '$29', '/editor/year', '/editor/month',
+           ['Pay for editors only; everyone else asks for free', 'Single sign-on', 'The review-board workflow', 'Your own model key', 'Email support'])
+        ] %}
+        <article class="pp-card" data-testid="plan-card-{{ key }}">
+          <h3>{{ name }}</h3>
+          <p class="pp-for">{{ for_whom }}</p>
+          <p class="pp-price">
+            <span data-interval="year">{{ price_year }}<small>{{ unit_year }}</small></span>
+            <span data-interval="month">{{ price_month }}<small>{{ unit_month }}</small></span>
+          </p>
+          <p class="pp-note">
+            <span data-interval="year">{{ note_year }}</span>
+            <span data-interval="month">{{ note_month }}</span>
+          </p>
+          {% if _billing %}
+          <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
+             class="pp-btn pp-btn--primary" data-interval="year" data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
+          <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
+             class="pp-btn pp-btn--primary" data-interval="month" data-testid="buy-{{ key }}-monthly">Buy {{ name }}, billed monthly</a>
+          {% else %}
+          <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="pp-btn" data-testid="buy-{{ key }}">Contact us to buy {{ name }}</a>
+          {% endif %}
+          <div class="pp-alt"></div>
+          <ul class="pp-list">
+            <li class="pp-lead-in">Everything in Community, plus</li>
+            {% for item in items %}<li>{{ item }}</li>{% endfor %}
+          </ul>
+        </article>
+        {% endfor %}
+
+        {# Enterprise #}
+        <article class="pp-card" data-testid="plan-card-enterprise">
+          <h3>Enterprise</h3>
+          <p class="pp-for">Enterprise architecture teams.</p>
+          <p class="pp-price">From $24,000<small>/year</small></p>
+          <p class="pp-note">Annual contract from $24,000/year.</p>
+          <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="pp-btn" data-testid="buy-enterprise">Contact sales</a>
+          <div class="pp-alt"></div>
+          <ul class="pp-list">
+            <li class="pp-lead-in">Everything in Team, plus</li>
+            <li>Unlimited editors</li>
+            <li>SAML sign-in</li>
+            <li>Audit log export</li>
+            <li>Your own model key by default</li>
+            <li>Supported self-hosting and dedicated deployment</li>
+            <li>Custom service levels and a named support contact</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="pp-section" aria-labelledby="compare-heading" data-testid="pricing-compare">
+      <h2 id="compare-heading">Compare plans</h2>
+      <p class="pp-sub">Every plan is priced per company, not per application. The same capabilities are in the model whichever plan you are on; the plans differ in who can edit, how people sign in and how you are supported.</p>
+      <div class="pp-table-wrap">
+        <table class="pp-table">
+          <caption class="sr-only">What each plan includes</caption>
+          <thead>
+            <tr>
+              <th scope="col"><span class="sr-only">Feature</span></th>
+              <th scope="col">Community</th>
+              <th scope="col">Startup</th>
+              <th scope="col">Team</th>
+              <th scope="col">Enterprise</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set _rows = [
+              ('Modelling', [
+                ('People included', ['3', '10', 'Editors you buy; askers free', 'Unlimited editors']),
+                ('Business Model Canvas', [1, 1, 1, 1]),
+                ('Twin map of systems, suppliers and dependencies', [1, 1, 1, 1]),
+                ('Import from ArchiMate Open Exchange and spreadsheets', [1, 1, 1, 1]),
+              ]),
+              ('Questions and answers', [
+                ('Ask: what breaks, what is at risk, who is accountable', [1, 1, 1, 1]),
+                ('The model as of a date, and what changed between two dates', [1, 1, 1, 1]),
+              ]),
+              ('Governance', [
+                ('Architecture review board workflow', [0, 0, 1, 1]),
+                ('Webhook feed to Slack, Teams or any endpoint, signed', [0, 1, 1, 1]),
+                ('Audit log export', [0, 0, 0, 1]),
+              ]),
+              ('Security and access', [
+                ('Single sign-on', [0, 0, 1, 1]),
+                ('SAML sign-in', [0, 0, 0, 1]),
+                ('Your own model key', [0, 0, 1, 'By default']),
+                ('Supported self-hosting and dedicated deployment', [0, 0, 0, 1]),
+              ]),
+              ('Support', [
+                ('Community support', [1, 1, 1, 1]),
+                ('Email support', [0, 1, 1, 1]),
+                ('Custom service levels and a named support contact', [0, 0, 0, 1]),
+              ]),
+            ] %}
+            {% for group, rows in _rows %}
+            <tr><th scope="colgroup" colspan="5" class="pp-group">{{ group }}</th></tr>
+            {% for label, cells in rows %}
+            <tr>
+              <th scope="row">{{ label }}</th>
+              {% for c in cells %}
+              <td>{% if c == 1 %}{{ _yes }}{% elif c == 0 %}{{ _no }}{% else %}{{ c }}{% endif %}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="pp-section" aria-labelledby="grow-heading" data-testid="pricing-grow">
+      <h2 id="grow-heading">What every plan gains as the platform grows</h2>
+      <p class="pp-sub">Each new capability reaches Startup and Team as it ships, at no extra charge, and nothing is taken away from anyone already subscribed.</p>
+      <ol class="pp-grow">
+        <li><time>Q4 2026</time><span>Save, share and export an answer, as a spreadsheet or a PDF.</span></li>
+        <li><time>Q1 2027</time><span>Connections to the tools you already use, a replay and event catalogue for webhooks, and AI assistants that query your model through the Model Context Protocol.</span></li>
+        <li><time>Q2 2027</time><span>Cost in one currency across the model.</span></li>
+        <li><time>Q3 2027</time><span>Scenarios and what-if forecasts on top of the model.</span></li>
+      </ol>
+    </section>
+  </div>
+
+  <section class="pp-band" aria-labelledby="selfhost-heading" data-testid="pricing-selfhost">
+    <div class="pp-wrap">
+      <div>
+        <h2 id="selfhost-heading">Self-hosting is always free</h2>
+        <p>Entelim is open source under AGPL-3.0. Run it on your own infrastructure, at any size, for as long as you like. That path is the product, not a trial. A commercial licence exists for organisations that want Entelim run for them or need different terms.</p>
+      </div>
+      <a href="https://github.com/Archiet-Ltd/archie-ea" class="pp-btn pp-btn--primary" data-testid="selfhost-github">View on GitHub</a>
+    </div>
+  </section>
+
+  <div class="pp-wrap">
+    <section class="pp-section pp-section--first" aria-labelledby="services-heading" data-testid="pricing-services">
+      <h2 id="services-heading">Fixed-price services</h2>
+      <div class="pp-services">
+        <div class="pp-card">
+          <h3>Architecture health check</h3>
+          <p>We run Entelim over your own application data and deliver a written report within two weeks of kickoff.</p>
+          <p class="pp-price pp-price--sm">$4,500<small>one time</small></p>
+          <a href="/architecture-health-check" class="pp-btn">See what is included</a>
+        </div>
+        <div class="pp-card">
+          <h3>Team annual plan with onboarding</h3>
+          <p>The Team plan billed annually, plus working sessions to build your first model and import your data.</p>
+          <p class="pp-price pp-price--sm">$1,500<small>one-time onboarding</small></p>
+          <a href="/team-annual-onboarding" class="pp-btn">See what is included</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="pp-section" aria-labelledby="faq-heading" data-testid="pricing-faq">
+      <h2 id="faq-heading">Billing questions</h2>
+      <div class="pp-faq">
+        <details>
+          <summary>Can I cancel at any time?</summary>
+          <p>Yes. An organisation administrator cancels from the billing page, or by <a href="/contact">contacting us</a>. Cancelling stops the subscription from renewing. You keep your plan until the end of the period you have paid for, and you can withdraw a scheduled cancellation before then.</p>
+        </details>
+        <details>
+          <summary>What happens when I add or remove seats?</summary>
+          <p>On Team you pay for editors, and people who only ask questions are free. An organisation administrator changes the number of editor seats, or switches plan, from the billing page at any time.</p>
+        </details>
+        <details>
+          <summary>How are tax and VAT handled?</summary>
+          <p>Any tax due is shown on the payment page before you pay. Add your tax number in the billing portal and it is printed on every invoice issued from then on.</p>
+        </details>
+        <details>
+          <summary>Where do I find my invoices?</summary>
+          <p>Each payment produces an invoice, listed on your organisation's billing page. The invoice e-mail address and billing details are yours to set there.</p>
+        </details>
+        <details>
+          <summary>What happens to my data if I move to a smaller plan?</summary>
+          <p>If you have more people than the new plan admits, everyone keeps access, and no one new can be added until you are within the limit.</p>
+        </details>
+        <details>
+          <summary>Can I pay monthly instead of annually?</summary>
+          <p>Yes. Use the toggle above. Annual billing costs ten months for twelve: $490/year for Startup and $290/editor/year for Team.</p>
+        </details>
+        <details>
+          <summary>What if I already self-host Entelim?</summary>
+          <p>Move to a hosted plan whenever you want to stop running it yourself, and import your model from files. Keep self-hosting for as long as you like: it stays free. If you want Entelim run for you on dedicated infrastructure, talk to us about Enterprise.</p>
+        </details>
+      </div>
+    </section>
+  </div>
+
+  {% include 'components/public_footer.html' %}
+</div>
+{% endblock %}

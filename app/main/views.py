@@ -775,7 +775,12 @@ def public_site_page(slug):
     if page is None:
         from flask import abort
         abort(404)
-    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+    # A page may name its own layout in front-matter (`template: pricing`),
+    # for pages whose structure is not a single prose column.
+    template = "public/page.html"
+    if page.front_matter.get("template") == "pricing":
+        template = "public/pricing.html"
+    return render_template(template, page=page, jsonld=build_jsonld(page))
 
 
 @main.route(
