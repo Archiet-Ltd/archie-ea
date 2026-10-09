@@ -212,14 +212,13 @@ class VendorMDMService:
 
     def find_duplicates(self, name_type: str = "vendor", threshold: float = 0.9) -> List[Dict]:
         """
-        Find potential duplicates in vendor/product data.
+        RETIRED — delegates to MatcherService.
 
-        Args:
-            name_type: 'vendor' or 'product'
-            threshold: Minimum similarity score (0.0 - 1.0)
+        Callers:
+        - vendor_mdm_api.py:find_duplicates (line 76)
 
-        Returns:
-            List of duplicate groups with confidence scores
+        Instead of maintaining its own fuzzy-ratio algorithm, this now
+        delegates to the matcher for consistent matching across the platform.
         """
         if name_type == "vendor":
             model = VendorOrganization
@@ -233,8 +232,7 @@ class VendorMDMService:
             db.session.query(name_field)
             .filter(
                 and_(
-                    model.id.isnot(None),  # Ensure we have records
-                    # Add any other filters for active records
+                    model.id.isnot(None),
                 )
             )
             .all()

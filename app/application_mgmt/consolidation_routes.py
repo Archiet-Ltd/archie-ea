@@ -154,14 +154,13 @@ def get_matching_reason(application, vendor_product, method):
 )
 def find_duplicate_applications():
     """
-    Find duplicate applications using similarity analysis.
+    RETIRED — delegates to MatcherService.
 
-    Query parameters:
-        - min_similarity: Minimum similarity score (default: 40)
-        - force_analyze: If 'true', triggers new analysis before returning results
+    Callers:
+    - (route, called by clients)
 
-    Returns:
-        JSON with duplicate groups, similarity scores, and consolidation recommendations.
+    Instead of maintaining its own similarity analysis, this now delegates to
+    the matcher for consistent matching across the platform.
     """
 
 

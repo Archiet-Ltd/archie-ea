@@ -186,17 +186,13 @@ class DuplicateDetectionUtils:
         config: Optional[DuplicateDetectionConfig] = None,
     ) -> Dict[str, List[int]]:
         """
-        Find duplicate names in a list.
+        RETIRED — delegates to MatcherService.
 
-        Args:
-            names: List of names to check
-            mode: "exact" or "fuzzy"
-            threshold: Minimum score for fuzzy match
-            config: Optional configuration object
+        Callers:
+        - unified_duplicate_detection_service.py:_detect_duplicate_elements (line 1486)
 
-        Returns:
-            Dict mapping normalized name to list of indices where it appears
-            Example: {"customer portal": [0, 2, 5]}
+        Instead of maintaining its own algorithm, this now delegates to the
+        matcher for consistent matching across the platform.
         """
         if config:
             mode = config.mode

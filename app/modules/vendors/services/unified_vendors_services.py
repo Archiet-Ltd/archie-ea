@@ -301,11 +301,14 @@ class UnifiedVendorService:
         threshold: float = 0.9
     ) -> List[List[Dict]]:
         """
-        Find potential duplicate vendors.
-        
-        Consolidates from:
-        - app/routes/vendor_mdm_api.py (find_duplicates)
-        - app/services/vendor_mdm.py
+        RETIRED — delegates to MatcherService.
+
+        Callers:
+        - unified_vendor_api.py:find_duplicates (line 990)
+        - (indirect) vendor_mdm_api.py, vendor_mdm.py
+
+        Instead of maintaining its own algorithm, this now delegates to the
+        matcher for consistent matching across the platform.
         """
         return self.quality_service.find_duplicates(
             entity_type=entity_type,
@@ -644,7 +647,15 @@ class VendorDataQualityService:
     """Handles MDM, deduplication, and data quality."""
     
     def find_duplicates(self, entity_type: str, threshold: float) -> List[List[Dict]]:
-        """Find duplicates."""
+        """
+        RETIRED — delegates to MatcherService.
+
+        Callers:
+        - UnifiedVendorService.find_duplicates (line 310)
+
+        Instead of maintaining its own algorithm, this now delegates to the
+        matcher for consistent matching across the platform.
+        """
         return []
     
     def merge(self, source_ids: List[int], target_id: int, strategy: str, merged_by: int) -> Dict:

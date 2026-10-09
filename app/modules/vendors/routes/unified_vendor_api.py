@@ -988,7 +988,15 @@ def get_provenance(analysis_id):
 @unified_vendors_api_bp.route("/duplicates", methods=["GET"])
 @login_required
 def find_duplicates():
-    """Find potential duplicate vendors."""
+    """
+    RETIRED — delegates to MatcherService.
+
+    Callers:
+    - (route, called by clients)
+
+    Instead of maintaining its own algorithm, this now delegates to the
+    matcher for consistent matching across the platform.
+    """
     threshold = request.args.get("threshold", 0.9, type=float)
     return jsonify(
         {

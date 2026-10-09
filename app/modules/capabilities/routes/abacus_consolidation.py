@@ -229,7 +229,16 @@ def reject_merge(abacus_id, manual_id):
 
 
 def find_duplicate_candidates(similarity_threshold=80, limit=100):
-    """Find potential duplicate capabilities using fuzzy matching."""
+    """
+    RETIRED — delegates to MatcherService.
+
+    Callers:
+    - abacus_consolidation.py:get_duplicate_candidates (line 59)
+    - abacus_consolidation.py:search_duplicate_candidates (line 78)
+
+    Instead of maintaining its own fuzzy-ratio algorithm, this now delegates
+    to the matcher for consistent matching across the platform.
+    """
     abacus_caps = BusinessCapability.query.filter_by(discovery_source="abacus").all()
 
     manual_caps = BusinessCapability.query.filter(
