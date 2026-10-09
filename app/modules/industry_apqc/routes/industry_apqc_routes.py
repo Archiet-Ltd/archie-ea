@@ -10,6 +10,7 @@ from flask import Blueprint, current_app, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 
 from app.services.industry_apqc_service import IndustryAPQCService
 
@@ -265,15 +266,16 @@ def api_reject_recommendation(recommendation_id):
 
 
 @industry_apqc_bp.route("/api/seed-frameworks", methods=["POST"])
-@login_required
+@platform_admin_required
 @audit_log("apqc_frameworks_seed")
 def api_seed_frameworks():
-    """API: Seed default industry frameworks (admin only)."""
-    try:
-        # Check if user has admin role
-        if not current_user.is_admin():
-            return jsonify({"success": False, "error": "Admin access required"}), 403
+    """API: Seed default industry frameworks (platform admin only).
 
+    R2-3 (PR 428 round 3): this writes platform-wide rows -- "admin
+    anywhere" let any self-registered org admin seed them with no
+    invitation needed. Scoped to platform admins.
+    """
+    try:
         service = IndustryAPQCService()
         created = service.seed_default_frameworks()
 

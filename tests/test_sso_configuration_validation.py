@@ -51,6 +51,17 @@ def _configuration_app(monkeypatch, *, existing=True, csrf=False):
         commit=commit, rollback=lambda: None,
     ))
 
+    # admin_required resolves authority in the ACTIVE organisation through
+    # rbac_service.is_org_admin -> OrgRole.get_role. This isolated app has no
+    # database, so the OrgRole lookup is the storage boundary double: the
+    # signed-in user is an org_admin of organisation 7, which is also the
+    # active organisation (g.current_org_id, set in before_request below).
+    from app.models.org_role import OrgRole
+    monkeypatch.setattr(
+        OrgRole, "get_role",
+        classmethod(lambda cls, org_id, user_id: "org_admin" if org_id == 7 else None),
+    )
+
     class User(UserMixin):
         id = "sso-validation"
         organization_id = 7
@@ -58,10 +69,19 @@ def _configuration_app(monkeypatch, *, existing=True, csrf=False):
         def can(self, permission):
             return True
 
+        def is_admin(self):
+            return True
+
     application = Flask(__name__)
     application.config.update(SECRET_KEY="isolated-sso-validation", TESTING=True,
                               WTF_CSRF_ENABLED=csrf)
     CSRFProtect(application)
+
+    @application.before_request
+    def _active_organisation():
+        from flask import g
+        g.current_org_id = 7
+
     manager = LoginManager(application)
     manager.user_loader(lambda user_id: User())
     application.jinja_loader = ChoiceLoader([

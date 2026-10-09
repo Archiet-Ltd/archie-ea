@@ -29,9 +29,10 @@ Archi is a free, open source, cross-platform editor for creating and sketching A
 hand — confirmed directly on its own site and its GitHub repository. It is a modelling tool: you
 draw the model yourself, element by element. Entelim is also free and open source (AGPL) at its
 core, but it is a platform built on top of ArchiMate modelling that derives relationships from what
-you've modelled, runs governance workflows over it, and answers plain-language questions about the
-live model — rather than a canvas you edit by hand. Entelim's own [plans and pricing](/pricing) are
-published directly for the organisations that want the commercial licence instead of AGPL.
+you've modelled, runs governance workflows over it, and answers a fixed set of plain-language
+questions about any element you pick — rather than a canvas you edit by hand. Entelim's own
+[plans and pricing](/pricing) are published directly for the organisations that want the commercial
+licence instead of AGPL.
 
 ## What each product actually is
 
@@ -39,10 +40,10 @@ published directly for the organisations that want the commercial licence instea
 |---|---|---|
 | Vendor | Open source community project (archimatetool.com) | Archiet Ltd |
 | Licence | Free, open source | Open source, AGPL, plus a commercial licence |
-| What it is | A modelling editor — you create and sketch ArchiMate models and diagrams by hand | A platform — modelling, plus derivation, governance workflows and natural-language questions over the model |
+| What it is | A modelling editor — you create and sketch ArchiMate models and diagrams by hand | A platform — modelling, plus derivation, governance workflows and plain-language questions over any element you pick |
 | Self-hostable | Desktop application, runs locally | Yes, self-hosted or managed |
 | Derivation / impact analysis | Not part of the tool's own stated scope | Built in — shows its reasoning for every connection it works out |
-| Natural-language questions over the model | Not part of the tool's own stated scope | Built in |
+| Plain-language questions over an element | Not part of the tool's own stated scope | Built in — pick an element, get a fixed set of questions (what breaks and who gets called, what's at risk, what we're trying to achieve and more) answered directly |
 | Governance workflows | Not part of the tool's own stated scope | Built in |
 | Pricing | Free | Published at /pricing; free to self-host under AGPL |
 
@@ -52,15 +53,14 @@ published directly for the organisations that want the commercial licence instea
   browser across every layer — the same Open Group exchange format Archi itself produces.
 - **Derivation with provenance.** Entelim shows its reasoning for every connection it works out, in a
   proof drawer you can open, not a number you have to trust.
-- **Find what you're paying for twice.** Duplicate detection across your application list, answered
-  directly from a plain-language question.
+- **Find what you're paying for twice.** Run duplicate detection across your whole application list,
+  review the overlapping groups it finds, and add them to a consolidation plan.
 - **A business case built from your own figures**, never invented to fill a gap.
 
-## Where Entelim is headed next
+## Bringing your model across
 
-A direct Archi import — no export step required — is on the roadmap for 2027. Until then, ArchiMate
-Open Exchange is the working path across; since Archi's own format is ArchiMate-based already, that
-tends to be a more direct path than for tools built on a proprietary notation.
+ArchiMate Open Exchange is the working path across; since Archi's own format is ArchiMate-based
+already, that tends to be a more direct path than for tools built on a proprietary notation.
 
 ## Frequently asked
 

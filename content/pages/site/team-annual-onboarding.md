@@ -25,7 +25,7 @@ If you are not sure yet, start on the free Community plan, or buy the [architect
 
 ## What you get
 
-**The Team plan, committed annually.** Entelim's Team plan is priced per editor, and people who only ask questions are free. An editor is a member of your workspace who is not set to read-only. Team adds single sign-on, the architecture review board workflow, your own model key for the AI features, and usage history. Every plan includes every question Entelim answers, the twin map, the canvases and file import.
+**The Team plan, committed annually.** Entelim's Team plan is priced per editor, and people who only ask questions are free. An editor is a member of your workspace who is not set to read-only. Team adds single sign-on, the architecture review board workflow, and your own model key for the AI features. Every plan includes every question Entelim answers, the twin map, the Business Model Canvas and file import.
 
 **Onboarding, as working sessions.** Onboarding is working sessions with your people, not a generic webinar. It has three parts:
 
