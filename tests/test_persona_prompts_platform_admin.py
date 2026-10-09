@@ -1,12 +1,22 @@
 """AI chat persona-prompt overrides are platform-wide: only a platform administrator can change them.
 
 The persona override row (AIPromptTemplate, category='persona_override', no tenant column) is served
-to every organisation by app/modules/ai_chat/routes/chat_core.py's read. Four routes in
-chat_admin_routes.py wrote and read it behind _require_admin() (an org-level check equivalent to
-Permission.ADMINISTER), the same weaker guard the solution-prompt routes carried before PR 242. They
-now use platform_admin_required, matching the solution-prompt routes in the same PR. The unrelated
-feedback-analytics routes in this file are unaffected: they stay admin_required (organisation-scoped
-analytics, not a shared table) and are asserted reachable here as a regression guard.
+to every organisation by app/modules/ai_chat/routes/chat_core.py's read. The two write routes
+(update/reset) wrote behind _require_admin() (an org-level check equivalent to Permission.ADMINISTER),
+the same weaker guard the solution-prompt write routes carried before PR 242; they now use
+platform_admin_required, matching the solution-prompt write routes in the same PR.
+
+The two read routes (the page and /data) intentionally stay open to any active-org administrator via
+_require_admin() -- this PR's own title scopes the fix to who can *change* persona prompts, and main's
+tests/test_pr428_round4_r3_fixes.py::test_r3_3_prompt_writes_require_platform_admin_not_just_active_org_admin
+(R2-2/R3-3, settled by review-pr430-v3.md's DEF-6/PR 430 ruling) already asserts that an active-org
+admin must still read them successfully. An earlier version of this test asserted the read routes
+should 403 too, which contradicted that settled ruling; narrowed to the two write routes to match it,
+discovered and fixed while merging main into this branch on 2026-10-09.
+
+The unrelated feedback-analytics routes in this file are unaffected: they stay admin_required
+(organisation-scoped analytics, not a shared table) and are asserted reachable here as a regression
+guard.
 """
 
 from __future__ import annotations
@@ -25,12 +35,10 @@ def _world(db_session, make_org):
 
 
 @pytest.mark.parametrize("method,path", [
-    ("get", "/ai-chat/admin/prompts"),
-    ("get", "/ai-chat/admin/prompts/data"),
     ("post", "/ai-chat/admin/prompts/enterprise_architect/update"),
     ("post", "/ai-chat/admin/prompts/enterprise_architect/reset"),
 ])
-def test_a_tenant_administrator_is_refused_on_every_persona_prompt_route(
+def test_a_tenant_administrator_is_refused_on_every_persona_prompt_write_route(
     app, db_session, make_org, client, login_as, method, path
 ):
     tenant_id, _platform = _world(db_session, make_org)
@@ -39,6 +47,24 @@ def test_a_tenant_administrator_is_refused_on_every_persona_prompt_route(
     response = getattr(client, method)(path, json={"system_prompt": "x"})
 
     assert response.status_code == 403
+
+
+@pytest.mark.parametrize("method,path", [
+    ("get", "/ai-chat/admin/prompts"),
+    ("get", "/ai-chat/admin/prompts/data"),
+])
+def test_a_tenant_administrator_can_still_read_persona_prompts(
+    app, db_session, make_org, client, login_as, method, path
+):
+    """R2-2/R3-3 (settled, review-pr430-v3.md DEF-6/PR 430): the read routes are
+    not part of this PR's "who can change them" scope and must stay open to any
+    active-org administrator, matching tests/test_pr428_round4_r3_fixes.py."""
+    tenant_id, _platform = _world(db_session, make_org)
+
+    _login(db_session, client, login_as, tenant_id)
+    response = getattr(client, method)(path)
+
+    assert response.status_code == 200
 
 
 def test_a_refused_update_stores_no_override(app, db_session, make_org, client, login_as):

@@ -98,17 +98,17 @@ def _build_persona_data(persona_key, config, override=None):
 
 @unified_ai_chat_bp.route("/admin/prompts")
 @login_required
-@platform_admin_required
 def admin_prompts_page():
     """Render the admin persona prompt management page."""
+    _require_admin()
     return render_template("ai_chat/admin_prompts.html")
 
 
 @unified_ai_chat_bp.route("/admin/prompts/data")
 @login_required
-@platform_admin_required
 def admin_prompts_data():
     """JSON API: return all persona configs merged with DB overrides."""
+    _require_admin()
 
     personas = []
     for key, config in PERSONA_CONFIGS.items():
