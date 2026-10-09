@@ -619,23 +619,70 @@ def sso_callback(provider):
     from app.models import User
     from app.services import session_registry
 
+    # external_id is derived per-provider: Azure uses a tenant-qualified
+    # oid+tid composite rather than the raw `sub` claim (see
+    # app/auth/sso.py); Okta keeps using `sub`.
+    from app.auth.sso import (
+        external_id_for,
+        find_linked_user,
+        sso_email_claim_is_trusted_for,
+    )
+
     email = userinfo.get("email")
     if not email:
         flash("SSO provider did not return an email address.", "error")
         return redirect(url_for("account.login"))
 
+    external_id = external_id_for(provider, userinfo)
+
     # tenant-scoping-ok: pre-auth SSO callback, no org context yet --
     # User.email is globally unique.
-    user = User.query.filter_by(email=email).first()
+    #
+    # First try the immutable-subject path (added by the nOAuth fix): a
+    # user already linked to this (external_id, provider) pair signs in
+    # unaffected by the email-claim trust checks below, exactly like
+    # account_routes.py v1's sso_callback. Previously this route had no
+    # subject-based lookup at all and re-resolved by email on every login.
+    user = find_linked_user(provider, userinfo, User) if external_id else None
     if user is None:
-        user = User(
-            email=email,
-            first_name=userinfo.get("given_name", ""),
-            last_name=userinfo.get("family_name", ""),
-            confirmed=True,
-        )
-        db.session.add(user)
-        db.session.commit()
+        candidate = User.find_by_email(email)
+        if candidate is not None:
+            # No existing subject-based link. Falling back to the email
+            # claim is only safe when the provider's claims prove the
+            # signing-in party actually controls that mailbox -- otherwise
+            # an attacker who controls their own IdP tenant/account could
+            # claim any victim's email and be logged in as them (nOAuth).
+            if not sso_email_claim_is_trusted_for(provider, userinfo, candidate):
+                flash(
+                    "SSO sign-in could not be completed. If you already have "
+                    "an account under this email, sign in with your password "
+                    "and link SSO from your account settings instead.",
+                    "error",
+                )
+                try:
+                    audit_logger.log_authentication(success=False, method=f"sso:{provider}")
+                except Exception:
+                    _log.warning("Audit log failed on SSO refusal for %s", provider)
+                return redirect(url_for("account.login"))
+            if external_id:
+                candidate.external_id = external_id
+                candidate.sso_provider = provider
+            user = candidate
+        else:
+            user = User(
+                email=email,
+                first_name=userinfo.get("given_name", ""),
+                last_name=userinfo.get("family_name", ""),
+                external_id=external_id or None,
+                sso_provider=provider if external_id else None,
+                confirmed=True,
+            )
+            db.session.add(user)
+
+    # Commit unconditionally: find_linked_user may have migrated a
+    # pre-fix Azure link's external_id to the new oid+tid composite even
+    # when `user` was already resolved above.
+    db.session.commit()
 
     # R1-B12 PR 2 (TB-0144/PB-0100): the same MFA gate login() applies to a
     # password sign-in, applied here too -- an administrator must complete
@@ -665,5 +712,14 @@ def sso_callback(provider):
         return redirect(url_for("account.mfa_challenge"))
 
     session_registry.login_and_register(user)
-    audit_logger.log_authentication(success=True, method=f"sso:{provider}")
+    # Pre-existing bug, fixed here because it blocked verifying this file's
+    # own SSO success path: AuditLogger has no `log()` method (only
+    # log_event/log_authentication/...), so this line raised AttributeError
+    # on every successful SSO sign-in through this route, unconditionally,
+    # regardless of the nOAuth fix above. Matches the method= convention
+    # already used for the refusal path above and for v1's sso_callback.
+    try:
+        audit_logger.log_authentication(success=True, method=f"sso:{provider}")
+    except Exception:
+        _log.warning("Audit log failed on SSO success for %s", provider)
     return redirect(url_for("main.index"))
