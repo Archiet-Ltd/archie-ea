@@ -22,10 +22,14 @@ logger = logging.getLogger(__name__)
 
 # Thresholds for match certainty.
 # Certain = identifier hit, or identical normalised name and type with matching
-# key attributes. 0.95 is deliberately above the drift detector's 0.6
-# near-duplicate threshold so that only a near-exact name match is treated as
-# certain — anything less goes through the approval queue.
+# key attributes. 1.0 is required for certain name-based matching because
+# anything less is a near-duplicate that needs human review.
 CERTAIN_NAME_SIMILARITY = 1.0
+
+# Threshold for fuzzy near-duplicate detection (uncertain matches).
+# Matches the drift detector's NEAR_DUPLICATE_THRESHOLD (0.6) so the matcher
+# and the genome pipeline flag the same candidates.
+NEAR_DUPLICATE_THRESHOLD = 0.6
 
 # Expiry for a near-duplicate approval proposal (in minutes).
 PROPOSAL_EXPIRY_MINUTES = 60
@@ -174,6 +178,58 @@ class MatcherService:
         return matched
 
     @classmethod
+    def _find_near_duplicate_candidates(
+        cls,
+        name: str,
+        type_name: Optional[str],
+        *,
+        org_id: int,
+    ) -> List[ArchiMateElement]:
+        """Find near-duplicate candidates using fuzzy name matching.
+
+        Uses the same fuzzy path and threshold as the drift detector's
+        _detect_near_duplicates. Returns candidates ordered by similarity
+        descending.
+        """
+        from app.modules.duplicate_detection.services.duplicate_detection_utils import (
+            DuplicateDetectionUtils,
+        )
+
+        norm = _normalise_name(name)
+        if not norm:
+            return []
+
+        blocking_key = _compute_blocking_key(name)
+        if not blocking_key:
+            return []
+
+        candidates = (
+            db.session.query(ArchiMateElement)
+            .filter(
+                ArchiMateElement.organization_id == org_id,
+                ArchiMateElement.deleted_at.is_(None),
+                ArchiMateElement.name.ilike(f"{blocking_key}%"),
+            )
+            .all()
+        )
+
+        scored = []
+        for elem in candidates:
+            if _normalise_name(elem.name or "") == norm:
+                continue  # exact match handled elsewhere
+            if type_name and elem.type:
+                if _normalise_name(elem.type) != _normalise_name(type_name):
+                    continue
+            is_near, score = DuplicateDetectionUtils.is_duplicate(
+                name, elem.name, mode="fuzzy", threshold=NEAR_DUPLICATE_THRESHOLD,
+            )
+            if is_near:
+                scored.append((score, elem))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [elem for _, elem in scored]
+
+    @classmethod
     def match_by_name(
         cls,
         name: str,
@@ -183,44 +239,61 @@ class MatcherService:
     ) -> MatchResult:
         """Match an incoming record by its normalised name and type.
 
-        A certain match requires an identical normalised name AND the same type.
-        Everything else is uncertain and returned without creating an approval
-        row (the caller decides what to do with uncertain results).
+        Resolution:
+          1. Exact normalised name + type match → certain.
+          2. Fuzzy near-duplicate match → uncertain (with evidence).
+
+        Everything else is returned as no match.
         """
         org_id = cls._require_org_id(org_id)
+
+        # Step 1: Exact normalised name match (certain).
         candidates = cls._find_name_candidates(name, type_name, org_id=org_id)
-
-        if not candidates:
-            return MatchResult(certain=False, match_method="none")
-
-        # If exactly one candidate with the same normalised name and type,
-        # it is a certain match.
-        if len(candidates) == 1:
+        if candidates:
+            if len(candidates) == 1:
+                elem = candidates[0]
+                return MatchResult(
+                    certain=True,
+                    matched_element_id=elem.id,
+                    matched_name=elem.name,
+                    matched_type=elem.type,
+                    match_method="name",
+                )
+            # Multiple exact matches — uncertain.
             elem = candidates[0]
             return MatchResult(
-                certain=True,
+                certain=False,
                 matched_element_id=elem.id,
                 matched_name=elem.name,
                 matched_type=elem.type,
+                evidence={
+                    "match_method": "name",
+                    "candidate_count": len(candidates),
+                    "candidate_ids": [e.id for e in candidates],
+                    "candidate_names": [e.name for e in candidates],
+                },
                 match_method="name",
             )
 
-        # Multiple candidates with the same normalised name and type —
-        # uncertain, return the first as the best candidate.
-        elem = candidates[0]
-        return MatchResult(
-            certain=False,
-            matched_element_id=elem.id,
-            matched_name=elem.name,
-            matched_type=elem.type,
-            evidence={
-                "match_method": "name",
-                "candidate_count": len(candidates),
-                "candidate_ids": [e.id for e in candidates],
-                "candidate_names": [e.name for e in candidates],
-            },
-            match_method="name",
-        )
+        # Step 2: Fuzzy near-duplicate match (uncertain).
+        near_dups = cls._find_near_duplicate_candidates(name, type_name, org_id=org_id)
+        if near_dups:
+            elem = near_dups[0]
+            return MatchResult(
+                certain=False,
+                matched_element_id=elem.id,
+                matched_name=elem.name,
+                matched_type=elem.type,
+                evidence={
+                    "match_method": "fuzzy_name",
+                    "candidate_count": len(near_dups),
+                    "candidate_ids": [e.id for e in near_dups],
+                    "candidate_names": [e.name for e in near_dups],
+                },
+                match_method="fuzzy_name",
+            )
+
+        return MatchResult(certain=False, match_method="none")
 
     @classmethod
     def match(
