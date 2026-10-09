@@ -159,7 +159,7 @@ class ArchiMateImportService:
     # DOGFOOD-001: the parser checks these so preview reports what execute
     # will refuse, instead of one over-long name aborting the whole import
     # with a raw ``StringDataRightTruncation`` from the database.
-    MAX_NAME_LENGTH = 100
+    MAX_NAME_LENGTH = 255
     MAX_TYPE_LENGTH = 50
 
     # DOGFOOD-003 (relationship-validity authority audit): this class used to
@@ -743,13 +743,14 @@ class ArchiMateImportService:
         created_ids: List[int] = []
         element_results: List[Dict[str, Any]] = []
         relationship_results: List[Dict[str, Any]] = []
+        unrepresentable: List[Dict[str, Any]] = []
 
         # Snapshot for restore: opened before anything is written, on the
         # import's own session-log row; None outside a signed-in request.
         from app.services import import_snapshot_service
 
         snapshot = import_snapshot_service.begin(
-            strategy=strategy, model_name=(parsed_data.get("model_name") or "")[:100]
+            strategy=strategy, model_name=(parsed_data.get("model_name") or "")[:255]
         )
         model_id = self._record_model(ArchitectureModel, parsed_data)
         if snapshot is not None:
@@ -767,20 +768,42 @@ class ArchiMateImportService:
                 "status": status,
             })
 
-        def _write_properties(target_row, props: Dict[str, str], merge: bool) -> None:
+        def _write_properties(target_row, props: Dict[str, str], merge: bool) -> list:
             """Persist parsed <properties> onto custom_properties (DOGFOOD-004).
 
             Every property is a literal key, value as parsed — no renaming,
             no coercion. ``archie:imported_at`` is the one namespaced,
             reserved key, recording provenance for a future model-age
             measurement (ADR 0009 names no field of its own).
+
+            Returns a list of (key, value, reason) tuples for properties
+            that could not be represented as typed values.
             """
+            from app.modules.architecture_assistant.property_service import (
+                PropertyService,
+                PropertyValidationError,
+            )
+
+            unrepresentable: list = []
             if not props:
-                return
+                return unrepresentable
             base = dict(target_row.custom_properties or {}) if merge else {}
-            base.update(props)
+            psvc = PropertyService()
+            for key, value in props.items():
+                base[key] = value
+                try:
+                    psvc.set_element_property(
+                        target_row, key, value, source="import"
+                    )
+                except PropertyValidationError as exc:
+                    unrepresentable.append((key, value, str(exc)))
+                except Exception:
+                    unrepresentable.append(
+                        (key, value, "Could not store this property value.")
+                    )
             base["archie:imported_at"] = datetime.now(timezone.utc).isoformat()
             target_row.custom_properties = base
+            return unrepresentable
 
         for elem in elements:
             name = elem["name"].strip()
@@ -825,7 +848,14 @@ class ArchiMateImportService:
                             architecture_id=model_id,
                         )
                         db.session.add(new_elem)
-                        _write_properties(new_elem, props, merge=False)
+                        for key, val, reason in _write_properties(new_elem, props, merge=False):
+                            unrepresentable.append({
+                                "element": name,
+                                "identifier": identifier,
+                                "key": key,
+                                "value": val,
+                                "reason": reason,
+                            })
                         db.session.flush()
                         if identifier:
                             id_map[identifier] = {"db_id": new_elem.id, "type": elem_type}
@@ -840,7 +870,14 @@ class ArchiMateImportService:
                             snapshot.note_updated_element(existing)
                         if description is not None:
                             existing.description = description
-                        _write_properties(existing, props, merge=True)
+                        for key, val, reason in _write_properties(existing, props, merge=True):
+                            unrepresentable.append({
+                                "element": name,
+                                "identifier": identifier,
+                                "key": key,
+                                "value": val,
+                                "reason": reason,
+                            })
                         db.session.flush()
                         if identifier:
                             id_map[identifier] = {"db_id": existing.id, "type": existing.type}
@@ -992,6 +1029,7 @@ class ArchiMateImportService:
                 "model_id": None,
                 "element_results": [],
                 "relationship_results": [],
+                "unrepresentable": [],
             }
 
         logger.info(
@@ -1014,6 +1052,7 @@ class ArchiMateImportService:
             "model_id": model_id,
             "element_results": element_results,
             "relationship_results": relationship_results,
+            "unrepresentable": unrepresentable,
         }
 
     # ------------------------------------------------------------------
@@ -1034,7 +1073,7 @@ class ArchiMateImportService:
         try:
             with db.session.begin_nested():
                 record = model_cls(
-                    name=name[:100],
+                    name=name[:255],
                     version="1.0",
                     model_data=parsed_data.get("source_xml"),
                 )
