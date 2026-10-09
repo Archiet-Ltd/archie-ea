@@ -41,6 +41,12 @@ class VendorProductEmbedding(db.Model):
     """
     Vector embeddings for vendor products.
     Used for semantic similarity search and vendor discovery.
+
+    Deliberately global, not TenantMixin: vendor products are a shared
+    reference catalogue (see pgvector_embedding_service.py's
+    create_vendor_product_embedding, "shared reference data, no org"),
+    the same catalogue every organisation searches against. See
+    tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "vendor_product_embeddings"
@@ -75,6 +81,19 @@ class BusinessCapabilityEmbedding(db.Model):
     """
     Vector embeddings for business capabilities.
     Used for capability-based search and matching.
+
+    Tenant-scoped at the query layer, not via TenantMixin: organization_id
+    mirrors the parent BusinessCapability's own org (set explicitly in
+    pgvector_embedding_service.py's create_capability_embedding via
+    _parent_org_id_for_embedding) and matches
+    pgvector_embedding_service.py's own _TENANT_EMBEDDING_TABLES
+    classification (strict equality in scoped_embedding_query). Stays a
+    plain nullable column rather than TenantMixin: this PR's own
+    tests/test_embedding_org_scoping.py asserts the column is nullable
+    (TenantMixin's automatic organization_id auto-set/auto-filter would
+    also break create_capability_embedding's explicit cross-tenant-rewrite
+    refusal, which depends on setting a caller-independent org value).
+    See tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "business_capability_embeddings"
@@ -118,6 +137,12 @@ class ProcessEmbedding(db.Model):
     """
     Vector embeddings for APQC processes and industry processes.
     Used for process discovery and mapping.
+
+    Deliberately global, not TenantMixin: APQC/industry processes are a
+    shared reference catalogue every organisation searches against --
+    pgvector_embedding_service.py's own _SHARED_EMBEDDING_TABLES set
+    (nullable-or-org, same treatment as vendor product/organisation).
+    See tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "process_embeddings"
@@ -152,6 +177,15 @@ class ChatMessageEmbedding(db.Model):
     """
     Vector embeddings for chat messages.
     Used for semantic search, context retrieval, and conversation memory.
+
+    Tenant-scoped at the query layer, not via TenantMixin: always written
+    with an explicit organization_id (multi_domain_chat_service.py's
+    _persist_message uses require_current_org_id), matching
+    pgvector_embedding_service.py's own _TENANT_EMBEDDING_TABLES
+    classification (strict equality in scoped_embedding_query). Stays a
+    plain nullable column because this PR's own
+    tests/test_embedding_org_scoping.py asserts the column is nullable.
+    See tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "chat_message_embeddings"
@@ -183,6 +217,13 @@ class SolutionEmbedding(db.Model):
     """
     Vector embeddings for solutions.
     Used for solution discovery and recommendation.
+
+    Tenant-scoped at the query layer, not via TenantMixin: matches
+    pgvector_embedding_service.py's own _TENANT_EMBEDDING_TABLES
+    classification (strict equality in scoped_embedding_query). Stays a
+    plain nullable column because this PR's own
+    tests/test_embedding_org_scoping.py asserts the column is nullable.
+    See tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "solution_embeddings"
@@ -217,6 +258,12 @@ class VendorOrganizationEmbedding(db.Model):
     """
     Vector embeddings for vendor organizations.
     Used for vendor discovery and similarity matching.
+
+    Deliberately global, not TenantMixin: vendor organisations are a
+    shared reference catalogue (pgvector_embedding_service.py's own
+    mapping marks this "shared reference data, no org"), the same
+    catalogue every organisation searches against. See
+    tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "vendor_organization_embeddings"
@@ -253,6 +300,13 @@ class ApplicationComponentEmbedding(db.Model):
     """
     Vector embeddings for application components.
     Used for application discovery and matching.
+
+    Tenant-scoped at the query layer, not via TenantMixin: matches
+    pgvector_embedding_service.py's own _TENANT_EMBEDDING_TABLES
+    classification (strict equality in scoped_embedding_query). Stays a
+    plain nullable column because this PR's own
+    tests/test_embedding_org_scoping.py asserts the column is nullable.
+    See tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "application_component_embeddings"
