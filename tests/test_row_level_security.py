@@ -946,3 +946,146 @@ def test_real_configure_roles_runtime_role_is_fenced_and_deploy_role_is_exempt()
                 with contextlib.suppress(Exception):
                     cursor.execute(pg_sql.SQL("DROP ROLE IF EXISTS {}").format(pg_sql.Identifier(role)))
         admin.close()
+
+
+# --------------------------------------------------------------------------- #
+# Checks against the changes that landed on main while this PR was open
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("platform", [True, False], ids=["platform_admin", "org_admin_by_orgrole"])
+def test_switched_active_organisation_sees_that_organisations_rows(app, rls, world, client, login_as, platform):
+    """PR 428: authority is judged in the ACTIVE organisation. The database setting follows
+    ``g.current_org_id``, so an administrator who switched into organisation B reads B's rows
+    (and not A's, their home organisation's) under the runtime role."""
+    a, b = world.org("home"), world.org("switched")
+    name_a, name_b = f"RLS Home {uuid.uuid4().hex[:6]}", f"RLS Switched {uuid.uuid4().hex[:6]}"
+    world.application(a, name_a)
+    world.application(b, name_b)
+    user_id = _make_user(world, a, "sw", role="Administrator", platform=platform)
+    if not platform:
+        with rls.owner.begin() as connection:
+            connection.execute(
+                text("INSERT INTO org_roles (organization_id, user_id, role) VALUES (:o, :u, 'org_admin')"),
+                {"o": b, "u": user_id},
+            )
+        world.extra_deletes.append(("org_roles", "user_id", [user_id]))
+
+    def walk():
+        with app.app_context():
+            from app import db
+
+            db.session.remove()
+        login_as(client, user_id)
+        with client.session_transaction() as sess:
+            sess["current_org_id"] = b
+        listing = client.get("/applications/api/list")
+        team = client.get("/admin/team")
+        return listing.status_code, listing.get_data(as_text=True), team.status_code
+
+    base = walk()
+    with _app_runs_as(app, rls.runtime):
+        under = walk()
+    assert under[0] == base[0] == 200
+    assert under[2] == base[2], f"/admin/team {under[2]} != baseline {base[2]}"
+    assert name_b in base[1] and name_b in under[1]
+    assert name_a not in under[1]
+
+
+def test_per_organisation_connector_credential_keys_are_readable_by_their_own_organisation_only(app, rls, world):
+    """PR 275: the key row and the credential row are fenced. Inside a request or a
+    ``tenant_scope`` the vault reads and writes them under the runtime role; with no organisation
+    it finds nothing (and fails closed) rather than reading another organisation's key."""
+    from cryptography.fernet import Fernet
+
+    from app import db
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.modules.codegen.services.credential_encryption import CredentialUnreadable
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    a, b = world.org("a"), world.org("b")
+    world.extra_deletes.append(("org_connector_credentials", "organization_id", [a, b]))
+    world.extra_deletes.append(("organization_encryption_keys", "organization_id", [a, b]))
+    app.config["ORG_ENCRYPTION_MASTER_KEY"] = Fernet.generate_key().decode()
+    vault = OrgCredentialVault()
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        for org_id, secret in ((a, "secret-a"), (b, "secret-b")):
+            with tenant_scope(org_id):
+                vault.store(org_id, "jira", "api_key", secret)
+                db.session.commit()
+        for org_id, secret in ((a, "secret-a"), (b, "secret-b")):
+            with tenant_scope(org_id):  # what a scheduled connector sync does
+                assert vault.retrieve(org_id, "jira", "api_key") == secret
+        with tenant_scope(a):  # organisation A cannot read B's credential row, even by naming B
+            assert vault.retrieve(b, "jira", "api_key") is None
+            db.session.rollback()
+        db.session.remove()
+        assert vault.retrieve(a, "jira", "api_key") is None  # no organisation: nothing, no error
+        db.session.rollback()
+        with tenant_scope(a):
+            from app.modules.codegen.services.credential_encryption import _get_org_fernet
+
+            with pytest.raises(CredentialUnreadable):
+                _get_org_fernet(b)
+    assert _owner_value(rls, "SELECT count(*) FROM org_connector_credentials WHERE organization_id = ANY(:o)", o=[a, b]) == 2
+
+
+def test_unified_work_package_unique_element_and_conflict_inserts_are_not_hidden_by_the_fence(app, rls, world):
+    """PR 421: the partial unique index on archimate_element_id and the (source_table, source_id)
+    ON CONFLICT DO NOTHING key keep working for the session organisation under the runtime role."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.services.work_package_service import element_refusal
+
+    a, b = world.org("a"), world.org("b")
+    with rls.owner.begin() as connection:
+        element = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('RLS WP element', 'WorkPackage', 'implementation_migration', :o) RETURNING id"
+            ),
+            {"o": a},
+        ).scalar_one()
+    world.extra_deletes.append(("unified_work_packages", "organization_id", [a, b]))
+    world.extra_deletes.append(("archimate_elements", "organization_id", [a, b]))
+    insert = text(
+        "INSERT INTO unified_work_packages (name, organization_id, archimate_element_id, source_table, source_id) "
+        "VALUES (:n, :o, :e, :t, :s) ON CONFLICT DO NOTHING RETURNING id"
+    )
+    with rls.runtime_tx(a, commit=True) as connection:
+        first = connection.execute(insert, {"n": "wp1", "o": a, "e": element, "t": "rls_src", "s": 1}).scalar()
+        assert first is not None
+    with rls.runtime_tx(a, commit=True) as connection:
+        # Same source row again: conflict, skipped, no error. The first copy is visible to the
+        # session organisation, so a NOT EXISTS pre-check still sees it.
+        again = connection.execute(insert, {"n": "wp1", "o": a, "e": None, "t": "rls_src", "s": 1}).scalar()
+        assert again is None
+        assert connection.execute(
+            text("SELECT count(*) FROM unified_work_packages WHERE source_table = 'rls_src' AND source_id = 1")
+        ).scalar_one() == 1
+    with rls.runtime_tx(b) as connection:
+        assert connection.execute(
+            text("SELECT count(*) FROM unified_work_packages WHERE source_table = 'rls_src'")
+        ).scalar_one() == 0
+    # A second copy for the same element: the one element rule sees the holder, and the index
+    # itself refuses a bypass of the rule.
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        from flask import g
+
+        from app import db
+
+        g.current_org_id = a
+        try:
+            assert element_refusal(element, a, copy_id=None) == "shared"
+            db.session.rollback()
+        finally:
+            g.pop("current_org_id", None)
+    with pytest.raises(IntegrityError):
+        with rls.runtime_tx(a) as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO unified_work_packages (name, organization_id, archimate_element_id, source_table, source_id) "
+                    "VALUES ('wp2', :o, :e, 'rls_src', 2)"
+                ),
+                {"o": a, "e": element},
+            )

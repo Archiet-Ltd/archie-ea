@@ -34,14 +34,14 @@ Idempotent: every policy is dropped and recreated, so a re-run converges to
 exactly these definitions. The migration imports nothing from ``app``.
 
 Revision ID: 20261008_row_level_security
-Revises: 20261007_public_visitor_events
+Revises: 20261008_uwp_element_unique
 Create Date: 2026-10-08
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261008_row_level_security"
-down_revision = "20261007_public_visitor_events"
+down_revision = "20261008_uwp_element_unique"
 branch_labels = None
 depends_on = None
 
@@ -234,6 +234,8 @@ TENANT_TABLES = (
     "motivation_bridge_links",
     "operation_results",
     "options_analysis",
+    "org_connector_credentials",
+    "organization_encryption_keys",
     "organization_units",
     "outcome_measurements",
     "outcomes",
