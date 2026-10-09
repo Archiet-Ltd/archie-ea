@@ -185,7 +185,7 @@ def renewals_dashboard():
     # Sort by last day to cancel (ascending), then by days until renewal.
     # Contracts with no last day to cancel sort after those with one.
     items.sort(key=lambda i: (
-        i["last_day_to_cancel"] is not None,
+        i["last_day_to_cancel"] is None,
         i["last_day_to_cancel"] or date.max,
     ))
 

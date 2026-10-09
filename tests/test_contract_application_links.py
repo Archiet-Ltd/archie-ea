@@ -67,7 +67,7 @@ def setup(app, db_session, make_org):
         status="active",
         start_date=date.today() - timedelta(days=100),
         end_date=date.today() + timedelta(days=265),
-        renewal_date=date.today() + timedelta(days=90),
+        renewal_date=date.today() + timedelta(days=20),
         notice_period_days=30,
     )
     db_session.add(contract_a)
@@ -78,7 +78,7 @@ def setup(app, db_session, make_org):
         status="active",
         start_date=date.today() - timedelta(days=100),
         end_date=date.today() + timedelta(days=265),
-        renewal_date=date.today() + timedelta(days=90),
+        renewal_date=date.today() + timedelta(days=20),
         notice_period_days=30,
     )
     db_session.add(contract_b)
@@ -280,7 +280,8 @@ class TestRenewalsLastDayToCancel:
 
         # The last day to cancel = renewal_date - notice_period_days
         expected = contract.renewal_date - timedelta(days=contract.notice_period_days)
-        assert expected.strftime("%d %b %Y") in body or expected.isoformat() in body
+        # Check the page contains the date in some format
+        assert expected.strftime("%d %b %Y") in body or str(expected) in body
 
     def test_dash_for_no_notice_period(self, setup):
         """A contract with no notice period shows a dash."""
@@ -297,7 +298,7 @@ class TestRenewalsLastDayToCancel:
             status="active",
             start_date=date.today() - timedelta(days=50),
             end_date=date.today() + timedelta(days=315),
-            renewal_date=date.today() + timedelta(days=180),
+            renewal_date=date.today() + timedelta(days=15),
             notice_period_days=None,
         )
         db_session.add(no_notice)
@@ -324,8 +325,8 @@ class TestRenewalsLastDayToCancel:
             status="active",
             start_date=date.today() - timedelta(days=100),
             end_date=date.today() + timedelta(days=365),
-            renewal_date=date.today() + timedelta(days=200),
-            notice_period_days=30,
+            renewal_date=date.today() + timedelta(days=25),
+            notice_period_days=5,
         )
         db_session.add(later)
         earlier = VendorContract(
@@ -335,8 +336,8 @@ class TestRenewalsLastDayToCancel:
             status="active",
             start_date=date.today() - timedelta(days=100),
             end_date=date.today() + timedelta(days=265),
-            renewal_date=date.today() + timedelta(days=90),
-            notice_period_days=60,
+            renewal_date=date.today() + timedelta(days=20),
+            notice_period_days=15,
         )
         db_session.add(earlier)
         db_session.flush()
@@ -367,8 +368,8 @@ class TestRenewalsLastDayToCancel:
             status="active",
             start_date=date.today() - timedelta(days=100),
             end_date=date.today() + timedelta(days=265),
-            renewal_date=date.today() + timedelta(days=90),
-            notice_period_days=30,
+            renewal_date=date.today() + timedelta(days=20),
+            notice_period_days=5,
         )
         db_session.add(dated)
         undated = VendorContract(
@@ -378,7 +379,7 @@ class TestRenewalsLastDayToCancel:
             status="active",
             start_date=date.today() - timedelta(days=100),
             end_date=date.today() + timedelta(days=265),
-            renewal_date=date.today() + timedelta(days=90),
+            renewal_date=date.today() + timedelta(days=20),
             notice_period_days=None,
         )
         db_session.add(undated)
