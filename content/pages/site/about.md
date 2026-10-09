@@ -48,7 +48,8 @@ the source a sales assistant should read about customers. That positions Entelim
 other AI tools plug into, rather than another AI feature added to an architecture tool. Read access
 for external AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today,
 Entelim's own assistant already works this way: every action passes one permission check and every
-change waits for approval. See [the full story](/features#agentic-automation).
+change waits for approval. See [Agentic Automation](/features#agentic-automation) among the
+eighteen capabilities.
 
 ## What we believe
 

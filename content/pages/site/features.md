@@ -9,7 +9,8 @@ source: docs/eim-category-positioning-v1.md section 2; docs/artifacts/feature-st
 
 Enterprise Intelligence Management is one living, explainable model of your enterprise, turned into
 answers, insights, recommendations and simulations. Entelim delivers it through eighteen
-capabilities, grouped into five questions every enterprise asks.
+capabilities, grouped into five questions every enterprise asks: set direction, know what you run,
+stay in control, get answers before you need them, and connect and trust.
 
 ## Set direction
 
