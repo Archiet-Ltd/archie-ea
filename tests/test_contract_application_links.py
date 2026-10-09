@@ -170,7 +170,7 @@ class TestContractApplicationLinks:
             contract.id, org.id
         )
         assert len(links) == 2
-        linked_ids = {l.application_id for l in links}
+        linked_ids = {lnk.application_id for lnk in links}
         assert setup["app_a"].id in linked_ids
         assert app2.id in linked_ids
 
