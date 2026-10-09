@@ -8,6 +8,7 @@ docs/buckets/
 *.pyo
 env
 venv
+.venv
 *.env
 .env.*
 dist

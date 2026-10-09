@@ -2,6 +2,7 @@
 page_family: site
 title: "Contact"
 page_role: "Sales and support routes. Commercial questions use the same enquiry form as the offer pages; no invented email address."
+description: "Talk to Entelim about pricing, a hosted plan or a commercial licence, or report a bug, feature request or security issue."
 cta: inquiry
 offer: sales_enquiry
 offer_summary: "I'd like to talk to sales about Entelim."

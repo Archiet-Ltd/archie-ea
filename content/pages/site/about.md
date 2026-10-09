@@ -18,9 +18,15 @@ a startup founder building this company the same way Entelim asks every company 
 every project traces back to the gap it closes, because that trace is built into the model, not
 bolted on afterward.
 
-Archiet runs its own operating model in Entelim — hiring, roadmap and stop/go decisions all come
-from the same twin the product sells, not a spreadsheet kept alongside it. That practice is
-documented on [how Archiet runs on Entelim](/how-archiet-runs-on-entelim).
+Archiet runs its own operating model in Entelim — roadmap and stop/go decisions trace back to the
+same twin the product sells, not a spreadsheet kept alongside it. That practice is documented on
+[how Archiet runs on Entelim](/how-archiet-runs-on-entelim).
+
+## Built for your AI assistants too
+
+A general assistant can guess at your architecture. It can't know it. Entelim's own AI chat is
+backed directly by your model data: it reads your model's own records and shows which ones it
+cites, so you can check an answer rather than take it on faith.
 
 ## Open source, so nobody's locked in
 
@@ -33,8 +39,7 @@ format.
 
 ## What Entelim answers
 
-What breaks if this fails, and who gets called. What you're paying for twice. Which value streams
-are at risk and why. Who's accountable, and where that trail runs cold. Every answer carries its own
-reasoning, open to check, never just a number on a page.
+What breaks if this fails, and who gets called. Which value streams are at risk and why. Every
+answer carries its own reasoning, open to check, never just a number on a page.
 
 See [what Entelim covers](/features), [how it's priced](/pricing), or [get in touch](/contact).

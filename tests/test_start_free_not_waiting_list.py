@@ -200,11 +200,18 @@ def test_hold_pages_keep_their_waiting_list_framing(app, slug):
     assert "join the waiting list" in html.lower()
 
 
-def test_docs_page_held_for_unpublished_documentation_is_untouched(app):
+def test_docs_page_held_for_unpublished_documentation_has_no_dead_waitlist_link(app):
     """Separate spot check: /docs is held for a different reason (the
     documentation it describes is not published yet) and so has no
-    ``cta: waiting_list`` front matter, only its own inline waiting-list
-    link -- confirm that link is still there, untouched."""
+    ``cta: waiting_list`` front matter.
+
+    This page's own inline waiting-list link was dropped in a later,
+    independent round of SEO/GEO truth fixes (the link pointed at the
+    home page's own waiting-list section, already removed by "Start free,
+    not a waiting list" before that round even started, so the link was
+    dead regardless of how it got there) -- confirm the dead link stays
+    gone rather than asserting it must remain, which an earlier version
+    of this test did."""
     pages_by_slug = {p.slug: p for p in load_all_pages()}
     page = pages_by_slug["docs"]
     assert _is_held(page)
@@ -213,4 +220,5 @@ def test_docs_page_held_for_unpublished_documentation_is_untouched(app):
         rv = client.get(page.url)
         assert rv.status_code == 200
         html = rv.data.decode()
-    assert "join the waiting list" in html.lower()
+    assert "/#waitlist" not in html, "/docs still links to the removed home-page waitlist anchor"
+    assert "join the waiting list" not in html.lower()
