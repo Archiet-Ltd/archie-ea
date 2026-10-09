@@ -134,3 +134,33 @@ def test_long_work_package_name_is_truncated_not_fatal(db_session, make_org, ten
         element = db_session.get(ArchiMateElement, wp.archimate_element_id)
         assert element is not None
         assert len(element.name) <= 100
+
+
+def test_unified_work_package_writer_creates_exactly_one_element(db_session, make_org, tenant_ctx):
+    """Creating a work package through the unified store's writer must create
+    exactly one ArchiMate element node."""
+    from app.services import work_package_service
+
+    org = make_org("uwp-writer")
+    with tenant_ctx(org.id):
+        wp = work_package_service.create_work_package(
+            organization_id=org.id,
+            name="Unified store work package",
+        )
+
+        assert wp.archimate_element_id is not None, (
+            "UnifiedWorkPackage created through the writer must have an element"
+        )
+        element = db_session.get(ArchiMateElement, wp.archimate_element_id)
+        assert element is not None
+        assert element.type == "WorkPackage"
+        assert element.layer == "Implementation"
+        assert element.organization_id == org.id
+
+        # Exactly one element for this work package
+        count = db_session.query(ArchiMateElement).filter_by(
+            organization_id=org.id,
+        ).count()
+        assert count == 1, (
+            "Writer must create exactly one element, not %d" % count
+        )
