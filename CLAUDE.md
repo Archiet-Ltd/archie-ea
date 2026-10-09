@@ -512,6 +512,7 @@ to reconfirm the count before trusting it:**
 | `unfenced-tables` | a database table with no `TenantMixin` that is not listed in `scripts/unfenced_tables.txt` (a new one is a decision) | ratchet @ 0 |
 | `llm-boundary` | a codegen emitter calling an LLM directly | ratchet @ 0 |
 | `evidence-contract` | behavioural changes/checkers missing evidence or provenance | ratchet @ 29 |
+| `untyped-property-writes` | direct ArchiMate element property writes bypassing the typed writer | ratchet @ 1 |
 | `role-gate-coverage` | a declared delivery role resolving to no verifier gate | ratchet @ 7 |
 | `ai-evidence-rules` | an AI persona missing evidence/no-fabrication rules | must be 0 |
 | `ai-tool-guard` | an AI mutating tool bypassing permission/approval classification | must be 0 |
