@@ -278,10 +278,12 @@ def test_proposal_never_created_across_organisations(
 # Acceptance 4: Each finder delegates to the matcher                          #
 # --------------------------------------------------------------------------- #
 
-def test_duplicate_detection_utils_delegates_to_matcher(
+def test_duplicate_detection_utils_find_duplicates_groups_exact_matches(
     db_session, make_org, tenant_ctx
 ):
-    """duplicate_detection_utils.find_duplicates delegates to the matcher."""
+    """duplicate_detection_utils.find_duplicates groups exact-duplicate names
+    in a caller-supplied list (the pure grouping contract its caller relies
+    on; this finder is deliberately NOT delegated — see its docstring)."""
     from app.modules.duplicate_detection.services.duplicate_detection_utils import (
         DuplicateDetectionUtils,
     )
@@ -291,40 +293,86 @@ def test_duplicate_detection_utils_delegates_to_matcher(
     with tenant_ctx(org.id):
         _element(db_session, org.id, "Customer Portal")
 
-        # The utils' find_duplicates should call the matcher internally.
-        # For now, verify the utils module references the matcher.
-        assert hasattr(DuplicateDetectionUtils, "find_duplicates")
+        groups = DuplicateDetectionUtils.find_duplicates(
+            ["Customer Portal", "customer portal", "  CUSTOMER   PORTAL  ", "Billing"],
+            mode="exact",
+        )
+        # Normalised exact grouping: the three case/whitespace variants of the
+        # same name land in one group; the unrelated name stays out.
+        assert any(indices == [0, 1, 2] for indices in groups.values())
+        assert all(set(indices) != {3} for indices in groups.values())
 
 
 def test_vendor_mdm_find_duplicates_delegates_to_matcher(
     db_session, make_org, tenant_ctx
 ):
-    """vendor_mdm.find_duplicates delegates to the matcher."""
+    """vendor_mdm.find_duplicates really calls MatcherService.match_by_name
+    and returns the legacy pair shape; the weak isinstance-only placeholder
+    this replaces proved nothing on main."""
+    from app.modules.intelligence.services.matcher_service import MatcherService
     from app.modules.vendors.services.vendor_mdm import VendorMDMService
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    import unittest.mock as mock
 
     org = make_org("matcher-delegate-mdm")
 
     with tenant_ctx(org.id):
-        service = VendorMDMService()
-        result = service.find_duplicates(name_type="vendor", threshold=0.9)
-        # Should return a list (may be empty if no data).
+        _element(db_session, org.id, "Customer Portal")
+        vendor = VendorOrganization(name="Customer Portal")
+        db_session.add(vendor)
+        db_session.flush()
+
+        with mock.patch.object(
+            MatcherService, "match_by_name", wraps=MatcherService.match_by_name
+        ) as spy:
+            service = VendorMDMService()
+            result = service.find_duplicates(name_type="vendor", threshold=0.5)
+
+        # The matcher must have been called.
+        assert spy.call_count > 0, "matcher was never called"
         assert isinstance(result, list)
+        for entry in result:
+            assert "name1" in entry
+            assert "name2" in entry
+            assert "similarity" in entry
+            assert "method" in entry
 
 
 def test_unified_vendors_find_duplicates_delegates_to_matcher(
     db_session, make_org, tenant_ctx
 ):
-    """unified_vendors_services.find_duplicates delegates to the matcher."""
+    """unified_vendors_services.find_duplicates reaches the matcher through
+    the quality-service chain and returns the legacy group shape."""
+    from app.modules.intelligence.services.matcher_service import MatcherService
     from app.modules.vendors.services.unified_vendors_services import (
         UnifiedVendorService,
     )
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    import unittest.mock as mock
 
     org = make_org("matcher-delegate-uvs")
 
     with tenant_ctx(org.id):
-        service = UnifiedVendorService()
-        result = service.find_duplicates(entity_type="vendor", threshold=0.9)
+        _element(db_session, org.id, "Customer Portal")
+        vendor = VendorOrganization(name="Customer Portal")
+        db_session.add(vendor)
+        db_session.flush()
+
+        with mock.patch.object(
+            MatcherService, "match_by_name", wraps=MatcherService.match_by_name
+        ) as spy:
+            service = UnifiedVendorService()
+            result = service.find_duplicates(entity_type="vendor", threshold=0.5)
+
+        # The matcher was reached through the quality-service chain.
+        assert spy.call_count > 0, "matcher was never called"
         assert isinstance(result, list)
+        for group in result:
+            assert isinstance(group, list)
+            for entry in group:
+                assert isinstance(entry, dict)
 
 
 # --------------------------------------------------------------------------- #

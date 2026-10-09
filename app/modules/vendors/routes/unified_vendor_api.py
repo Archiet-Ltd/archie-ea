@@ -989,21 +989,34 @@ def get_provenance(analysis_id):
 @login_required
 def find_duplicates():
     """
-    RETIRED — delegates to MatcherService.
+    Find potential duplicate vendors.
+
+    Delegates to UnifiedVendorService.find_duplicates, which delegates the
+    duplicate decision to the matcher (MatcherService, org-scoped), returning
+    the legacy group shape this endpoint has always exposed.
 
     Callers:
     - (route, called by clients)
-
-    Instead of maintaining its own algorithm, this now delegates to the
-    matcher for consistent matching across the platform.
     """
+    entity_type = request.args.get("entity_type", "vendor")
     threshold = request.args.get("threshold", 0.9, type=float)
+
+    from app.modules.vendors.services.unified_vendors_services import (
+        UnifiedVendorService,
+    )
+
+    service = UnifiedVendorService()
+    duplicates = service.find_duplicates(entity_type=entity_type, threshold=threshold)
+
     return jsonify(
         {
             "success": True,
             "threshold": threshold,
-            "duplicates": [],
-            "summary": {"total_groups": 0, "total_pairs": 0},
+            "duplicates": duplicates,
+            "summary": {
+                "total_groups": len(duplicates),
+                "total_pairs": sum(len(group) for group in duplicates),
+            },
         }
     )
 

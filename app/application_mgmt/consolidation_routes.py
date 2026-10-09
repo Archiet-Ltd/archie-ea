@@ -13,6 +13,7 @@ Handles application portfolio consolidation:
 
 import json
 import logging
+from typing import Dict
 
 from flask import Response, current_app, jsonify, request, stream_with_context
 from flask_login import current_user, login_required
@@ -160,18 +161,23 @@ def find_duplicate_applications():
     - (route, called by clients)
 
     Instead of maintaining its own similarity analysis, this now delegates to
-    the matcher for consistent matching across the platform.
+    the matcher for consistent matching across the platform: every application
+    name is matched against the acting organisation's records, and confirmed
+    duplicates are returned in the legacy group shape callers expect.
+    The matcher's candidate set is limited to the acting organisation.
     """
 
-
-    from ..models.application_consolidation import ApplicationSimilarityAnalysis
+    from app.middleware.tenant_context import current_org_id
+    from app.modules.duplicate_detection.services.duplicate_detection_utils import (
+        DuplicateDetectionUtils,
+    )
+    from app.modules.intelligence.services.matcher_service import MatcherService
     from ..models.application_layer import ApplicationComponent
 
     try:
-        min_similarity = int(request.args.get("min_similarity", 40))
         force_analyze = request.args.get("force_analyze", "false").lower() == "true"
 
-        # Get all applications
+        # Get all applications (org-scoped via TenantMixin)
         applications = ApplicationComponent.query.limit(
             1000
         ).all()  # Limit to prevent OOM on large datasets
@@ -187,7 +193,7 @@ def find_duplicate_applications():
                 }
             )
 
-        # If force_analyze, trigger new analysis
+        # If force_analyze, trigger new analysis (side-effect for other screens)
         if force_analyze:
             from ..services.application_similarity_service import (
                 ApplicationSimilarityService,
@@ -225,29 +231,69 @@ def find_duplicate_applications():
                         current_app.logger.error(f"Error analyzing pair: {str(e)}")
                         continue
 
-        # Find existing similarity analyses
-        similarity_analyses = (
-            ApplicationSimilarityAnalysis.query.filter(
-                ApplicationSimilarityAnalysis.overall_similarity_score >= min_similarity
+        # Delegate duplicate detection to the matcher.
+        org_id = current_org_id()
+        if org_id is None:
+            return jsonify(
+                {
+                    "duplicates": [],
+                    "total_duplicate_groups": 0,
+                    "total_duplicate_applications": 0,
+                    "estimated_savings": 0,
+                    "analyses_count": 0,
+                    "message": "No organisation context",
+                }
             )
-            .order_by(ApplicationSimilarityAnalysis.overall_similarity_score.desc())
-            .all()
-        )
 
-        # Group applications by similarity (improved clustering)
+        # Group applications by normalised name, confirmed by the matcher.
+        # The matcher returns uncertain with multiple exact candidates when
+        # two or more elements share the same normalised name+type — that is
+        # the duplicate signal.
+        norm = DuplicateDetectionUtils.normalize_name
+        groups_by_norm: Dict[str, list] = {}
+        for app in applications:
+            result = MatcherService.match_by_name(
+                app.name,
+                type_name="ApplicationComponent",
+                org_id=org_id,
+            )
+            if result.matched_element_id is None:
+                continue
+            # A duplicate exists when the matcher finds multiple exact
+            # candidates (uncertain, candidate_count > 1) or a near-duplicate
+            # fuzzy match (uncertain with matched_element_id).
+            if result.certain:
+                # Single exact match — the app matched itself; not a duplicate.
+                continue
+            if result.evidence and result.evidence.get("candidate_count", 1) > 1:
+                # Multiple exact candidates → duplicate group.
+                key = norm(app.name)
+                groups_by_norm.setdefault(key, []).append(app)
+            elif result.matched_element_id is not None:
+                # Near-duplicate fuzzy match.
+                key = norm(app.name)
+                groups_by_norm.setdefault(key, []).append(app)
+
+        # Build the legacy JSON response shape.
         duplicate_groups = []
-        processed_app_ids = set()
-        app_to_group = {}  # Map app_id to group index
+        processed_app_ids: set = set()
+        total_savings = 0.0
 
-        for analysis in similarity_analyses:
-            app1_id = analysis.app_1_id
-            app2_id = analysis.app_2_id
-            similarity_score = analysis.overall_similarity_score
-
-            if similarity_score < min_similarity:
+        for norm_name, group_apps in groups_by_norm.items():
+            if len(group_apps) < 2:
                 continue
 
-            # Determine severity
+            # Deduplicate by id (same name may have been added from multiple
+            # matcher calls).
+            unique_apps = list({a.id: a for a in group_apps}.values())
+            if len(unique_apps) < 2:
+                continue
+
+            # Determine similarity and severity from the matcher verdict.
+            # For exact-name groups the matcher returned uncertain with
+            # multiple candidates → identical names → similarity 100.
+            similarity_score = 100.0
+
             if similarity_score >= 70:
                 severity = "high"
             elif similarity_score >= 50:
@@ -255,107 +301,45 @@ def find_duplicate_applications():
             else:
                 severity = "low"
 
-            # Get application details
-            app1 = ApplicationComponent.query.get(app1_id)
-            app2 = ApplicationComponent.query.get(app2_id)
+            group = {
+                "reason": f"Duplicate application name: {norm_name}",
+                "avg_similarity": int(similarity_score),
+                "severity": severity,
+                "consolidation_opportunity": "true" if severity == "high" else "false",
+                "recommended_action": "Review and merge"
+                if severity == "high"
+                else "Review",
+                "estimated_savings": 0.0,
+                "consolidation_complexity": "low"
+                if severity == "high"
+                else "medium",
+                "applications": [
+                    {
+                        "id": a.id,
+                        "name": a.name,
+                        "description": a.description,
+                        "owner_team": a.development_team,
+                        "application_type": a.application_type or "Application",
+                    }
+                    for a in unique_apps
+                ],
+            }
+            duplicate_groups.append(group)
+            processed_app_ids.update(a.id for a in unique_apps)
 
-            if not app1 or not app2:
-                continue
-
-            # Check if either app is already in a group
-            group_index = None
-            if app1_id in app_to_group:
-                group_index = app_to_group[app1_id]
-            elif app2_id in app_to_group:
-                group_index = app_to_group[app2_id]
-
-            if group_index is not None:
-                # Add to existing group
-                if app1_id not in processed_app_ids:
-                    duplicate_groups[group_index]["applications"].append(
-                        {
-                            "id": app1.id,
-                            "name": app1.name,
-                            "description": app1.description,
-                            "owner_team": app1.development_team,  # owner_team column doesn't exist, using development_team
-                            "application_type": app1.application_type or "Application",
-                        }
-                    )
-                    processed_app_ids.add(app1_id)
-                    app_to_group[app1_id] = group_index
-
-                if app2_id not in processed_app_ids:
-                    duplicate_groups[group_index]["applications"].append(
-                        {
-                            "id": app2.id,
-                            "name": app2.name,
-                            "description": app2.description,
-                            "owner_team": app2.development_team,  # owner_team column doesn't exist, using development_team
-                            "application_type": app2.application_type or "Application",
-                        }
-                    )
-                    processed_app_ids.add(app2_id)
-                    app_to_group[app2_id] = group_index
-
-                # Update group similarity (average)
-                group = duplicate_groups[group_index]
-                current_avg = group["avg_similarity"]
-                group_size = len(group["applications"])
-                group["avg_similarity"] = int(
-                    (current_avg * (group_size - 1) + similarity_score) / group_size
-                )
-            else:
-                # Create new group
-                group = {
-                    "reason": analysis.reasoning or "Similar functionality detected",
-                    "avg_similarity": similarity_score,
-                    "severity": severity,
-                    "consolidation_opportunity": analysis.consolidation_opportunity,
-                    "recommended_action": analysis.recommended_action,
-                    "estimated_savings": float(analysis.estimated_cost_savings)
-                    if analysis.estimated_cost_savings
-                    else 0,
-                    "consolidation_complexity": analysis.consolidation_complexity,
-                    "applications": [
-                        {
-                            "id": app1.id,
-                            "name": app1.name,
-                            "description": app1.description,
-                            "owner_team": app1.development_team,  # owner_team column doesn't exist, using development_team
-                            "application_type": app1.application_type or "Application",
-                        },
-                        {
-                            "id": app2.id,
-                            "name": app2.name,
-                            "description": app2.description,
-                            "owner_team": app2.development_team,  # owner_team column doesn't exist, using development_team
-                            "application_type": app2.application_type or "Application",
-                        },
-                    ],
-                }
-
-                group_index = len(duplicate_groups)
-                duplicate_groups.append(group)
-                processed_app_ids.add(app1_id)
-                processed_app_ids.add(app2_id)
-                app_to_group[app1_id] = group_index
-                app_to_group[app2_id] = group_index
-
-        # Calculate estimated savings from real cost data only
-        total_savings = sum(
-            group.get("estimated_savings", 0) for group in duplicate_groups
-        )
+        # Build response envelope matching the legacy shape.
+        total_duplicate_applications = len(processed_app_ids)
+        total_duplicate_groups = len(duplicate_groups)
 
         return jsonify(
             {
                 "duplicates": duplicate_groups,
-                "total_duplicate_groups": len(duplicate_groups),
-                "total_duplicate_applications": len(processed_app_ids),
+                "total_duplicate_groups": total_duplicate_groups,
+                "total_duplicate_applications": total_duplicate_applications,
                 "estimated_savings": f"{int(total_savings):,}",
-                "analyses_count": len(similarity_analyses),
-                "message": f"Found {len(duplicate_groups)} duplicate groups"
-                if duplicate_groups
-                else "No duplicates found",
+                "analyses_count": total_duplicate_groups,
+                "message": f"Found {total_duplicate_groups} duplicate group(s) "
+                f"involving {total_duplicate_applications} application(s)",
             }
         )
 

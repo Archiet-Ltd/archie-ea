@@ -645,7 +645,7 @@ class VendorAnalysisService:
 
 class VendorDataQualityService:
     """Handles MDM, deduplication, and data quality."""
-    
+
     def find_duplicates(self, entity_type: str, threshold: float) -> List[List[Dict]]:
         """
         RETIRED — delegates to MatcherService.
@@ -654,9 +654,70 @@ class VendorDataQualityService:
         - UnifiedVendorService.find_duplicates (line 310)
 
         Instead of maintaining its own algorithm, this now delegates to the
-        matcher for consistent matching across the platform.
+        matcher for consistent matching across the platform: every vendor name
+        is matched against the acting organisation's records, and confirmed
+        duplicates are returned in the legacy group shape callers expect.
+        The matcher's candidate set is limited to the acting organisation.
         """
-        return []
+        from app.middleware.tenant_context import current_org_id
+        from app.modules.intelligence.services.matcher_service import MatcherService
+
+        org_id = current_org_id()
+        if org_id is None:
+            return []
+
+        # Candidate names come from the vendor catalogue; the duplicate
+        # decision is the matcher's, scoped to the acting organisation.
+        names = (
+            db.session.query(VendorOrganization.name)
+            .filter(VendorOrganization.id.isnot(None))
+            .all()
+        )
+        names = [n[0] for n in names if n[0]]
+
+        groups: List[List[Dict]] = []
+        seen_groups = set()
+
+        for name in names:
+            result = MatcherService.match_by_name(name, org_id=org_id)
+            if result.matched_name is None:
+                continue
+
+            matched = result.matched_name
+            if matched.casefold() == name.casefold():
+                continue  # the record matched itself, not a duplicate pair
+
+            key = tuple(sorted((name.casefold(), matched.casefold())))
+            if key in seen_groups:
+                continue
+            seen_groups.add(key)
+
+            if result.certain:
+                similarity = 1.0
+            else:
+                from app.modules.duplicate_detection.services.duplicate_detection_utils import (
+                    DuplicateDetectionUtils,
+                )
+
+                _, similarity = DuplicateDetectionUtils.is_duplicate(
+                    name, matched, mode="fuzzy"
+                )
+
+            if similarity < threshold:
+                continue
+
+            groups.append(
+                [
+                    {
+                        "name1": name,
+                        "name2": matched,
+                        "similarity": round(similarity, 3),
+                        "method": result.match_method or "name",
+                    }
+                ]
+            )
+
+        return groups
     
     def merge(self, source_ids: List[int], target_id: int, strategy: str, merged_by: int) -> Dict:
         """Merge vendors."""

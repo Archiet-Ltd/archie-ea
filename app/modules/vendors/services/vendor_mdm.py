@@ -212,14 +212,29 @@ class VendorMDMService:
 
     def find_duplicates(self, name_type: str = "vendor", threshold: float = 0.9) -> List[Dict]:
         """
+        Find potential duplicates in vendor/product data.
+
         RETIRED — delegates to MatcherService.
 
         Callers:
         - vendor_mdm_api.py:find_duplicates (line 76)
 
         Instead of maintaining its own fuzzy-ratio algorithm, this now
-        delegates to the matcher for consistent matching across the platform.
+        delegates to the matcher for consistent matching across the platform:
+        each candidate name is matched by normalised name against the acting
+        organisation's records (MatcherService.match_by_name), and every
+        confirmed duplicate or near-duplicate is reported in the legacy pair
+        shape callers expect. The matcher's candidate set is limited to the
+        acting organisation.
+
+        Returns:
+            List of duplicate groups with confidence scores, in the legacy
+            shape [{"name1": str, "name2": str, "similarity": float,
+                    "method": str}, ...]
         """
+        from app.middleware.tenant_context import current_org_id
+        from app.modules.intelligence.services.matcher_service import MatcherService
+
         if name_type == "vendor":
             model = VendorOrganization
             name_field = VendorOrganization.name
@@ -240,27 +255,53 @@ class VendorMDMService:
 
         names = [n[0] for n in names if n[0]]
 
-        # Find similar pairs
+        # Delegate each candidate name to the matcher. The matcher's candidate
+        # set is limited to the acting organisation (org_id is resolved from
+        # the tenant context), so another organisation's records can never be
+        # matched or named here.
+        org_id = current_org_id()
+        if org_id is None:
+            return []
+
         duplicates = []
         checked = set()
 
-        for i, name1 in enumerate(names):
-            for j, name2 in enumerate(names):
-                if i >= j or (name1, name2) in checked:
-                    continue
+        for name in names:
+            result = MatcherService.match_by_name(name, org_id=org_id)
+            if result.matched_name is None:
+                continue
 
-                checked.add((name1, name2))
+            matched = result.matched_name
+            if matched.casefold() == name.casefold():
+                continue  # the record matched itself, not a duplicate pair
 
-                similarity = round(fuzz.ratio(name1.lower(), name2.lower()))
-                if similarity >= (threshold * 100):
-                    duplicates.append(
-                        {
-                            "name1": name1,
-                            "name2": name2,
-                            "similarity": similarity / 100.0,
-                            "method": "fuzzy_ratio",
-                        }
-                    )
+            key = tuple(sorted((name.casefold(), matched.casefold())))
+            if key in checked:
+                continue
+            checked.add(key)
+
+            if result.certain:
+                similarity = 1.0
+            else:
+                from app.modules.duplicate_detection.services.duplicate_detection_utils import (
+                    DuplicateDetectionUtils,
+                )
+
+                _, similarity = DuplicateDetectionUtils.is_duplicate(
+                    name, matched, mode="fuzzy"
+                )
+
+            if similarity < threshold:
+                continue
+
+            duplicates.append(
+                {
+                    "name1": name,
+                    "name2": matched,
+                    "similarity": round(similarity, 3),
+                    "method": result.match_method or "name",
+                }
+            )
 
         return duplicates
 
