@@ -244,6 +244,13 @@ def tenant_scope(organization_id: int) -> Iterator[int]:
         raise ValueError("tenant_scope requires a concrete organization_id")
 
     _reset_session()                      # nothing inherited from the previous tenant
+    # A tenant block never runs with the fence open: park any enclosing
+    # platform scope for the block and restore it afterwards. The reset above
+    # already rolled back the transaction that carried the database setting
+    # (it is transaction-local), and with the flag cleared a transaction begun
+    # inside the block does not set it again.
+    previous_platform_scope = getattr(g, "_platform_scope", None)
+    g.pop("_platform_scope", None)
     previous = getattr(g, "current_org_id", None)
     previous_scope_org = getattr(g, "_tenant_scope_organization_id", None)
     g.current_org_id = organization_id
@@ -253,6 +260,8 @@ def tenant_scope(organization_id: int) -> Iterator[int]:
         yield organization_id
     finally:
         _reset_session()                  # nothing leaks forward to the next tenant
+        if previous_platform_scope is not None:
+            g._platform_scope = previous_platform_scope
         g.current_org_id = previous
         if previous_scope_org is None:
             g.pop("_tenant_scope_organization_id", None)

@@ -714,6 +714,110 @@ def test_platform_scope_reaches_connections_opened_outside_the_session(app, rls,
             assert connection.execute(sql, {"a": a_id}).all() == []
 
 
+def test_tenant_scope_nested_in_platform_scope_sees_only_its_organisation(app, rls, world):
+    """D3: the fence is closed inside ``tenant_scope`` even when a platform scope encloses it,
+    and the platform scope is active again (flag and database setting) after the inner block."""
+    from flask import g
+
+    from app import db
+    from app.jobs.tenant_safe_job import platform_scope, tenant_scope
+
+    a, b = world.org("a"), world.org("b")
+    a_id, b_id = world.application(a, "Nested A"), world.application(b, "Nested B")
+    sql = text("SELECT id FROM application_components WHERE id IN (:a, :b)")
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        with platform_scope("test: nested scopes"):
+            assert {r[0] for r in db.session.execute(sql, {"a": a_id, "b": b_id})} == {a_id, b_id}
+            with tenant_scope(a):
+                assert getattr(g, "_platform_scope", None) is None
+                assert {r[0] for r in db.session.execute(sql, {"a": a_id, "b": b_id})} == {a_id}
+                with tenant_scope(b):
+                    assert {r[0] for r in db.session.execute(sql, {"a": a_id, "b": b_id})} == {b_id}
+                assert {r[0] for r in db.session.execute(sql, {"a": a_id, "b": b_id})} == {a_id}
+            assert g._platform_scope == "test: nested scopes"
+            assert {r[0] for r in db.session.execute(sql, {"a": a_id, "b": b_id})} == {a_id, b_id}
+            assert db.session.execute(text("SELECT current_setting('archie.platform_scope', true)")).scalar() == "on"
+        assert getattr(g, "_platform_scope", None) is None
+        db.session.rollback()
+
+
+_STREAMING_ROUTES = [
+    ("fix-dimension", {"dimension": "test_coverage"}),
+    ("fix-recommendation", {"recommendation": "add a model for the orders table"}),
+    ("chat-edit", {"instruction": "rename the model", "context": {"current_file": "app/models/order.py"}}),
+]
+
+
+@pytest.mark.parametrize("route,body", _STREAMING_ROUTES, ids=[r for r, _ in _STREAMING_ROUTES])
+def test_streaming_code_edit_generators_read_their_own_organisations_api_settings(
+    app, rls, world, client, login_as, monkeypatch, route, body
+):
+    """D2: the three streaming generators run lazily in a fresh app context. Under the runtime
+    role they must carry the caller's organisation into it, or ``api_settings`` reads 0 rows and
+    the stored LLM key is lost. Never another organisation's row."""
+    import json
+
+    a, b = world.org("a"), world.org("b")
+    user_id = _make_user(world, a, "gen", role="Administrator")
+    with rls.owner.begin() as connection:
+        setting_ids = {}
+        for label, org_id in (("a", a), ("b", b)):
+            setting_ids[label] = connection.execute(
+                text(
+                    "INSERT INTO api_settings (provider, key_label, organization_id, enabled) "
+                    "VALUES ('openai', :l, :o, true) RETURNING id"
+                ),
+                {"l": f"rls-{label}-{uuid.uuid4().hex[:6]}", "o": org_id},
+            ).scalar_one()
+        solution_id = connection.execute(
+            text(
+                "INSERT INTO solutions (name, organization_id, created_by_id) "
+                "VALUES (:n, :o, :u) RETURNING id"
+            ),
+            {"n": f"RLS gen {uuid.uuid4().hex[:6]}", "o": a, "u": user_id},
+        ).scalar_one()
+        connection.execute(
+            text(
+                "INSERT INTO codegen_generations (solution_id, version, download_count, generated_files) "
+                "VALUES (:s, 1, 0, CAST(:f AS json))"
+            ),
+            {"s": solution_id, "f": json.dumps({"app/models/order.py": "class Order: pass\n"})},
+        )
+    world.extra_deletes.append(("codegen_generations", "solution_id", [solution_id]))
+    world.extra_deletes.append(("solutions", "id", [solution_id]))
+    world.extra_deletes.append(("api_settings", "id", list(setting_ids.values())))
+
+    seen = {}
+
+    def fake_stream_chat_edit(**_kwargs):
+        from app import db
+
+        rows = db.session.execute(text("SELECT id FROM api_settings")).scalars().all()
+        seen["ids"] = set(rows)
+        yield "event: complete\ndata: {}\n\n"
+
+    monkeypatch.setattr(
+        "app.modules.codegen.services.nl_code_editor.stream_chat_edit", fake_stream_chat_edit
+    )
+    monkeypatch.setattr("app.utils.csrf_helper.validate_csrf", lambda token: None)
+
+    with _app_runs_as(app, rls.runtime):
+        with app.app_context():
+            from app import db
+
+            db.session.remove()
+        login_as(client, user_id)
+        response = client.post(
+            f"/solutions/{solution_id}/codegen/{route}",
+            json=body,
+            headers={"X-CSRFToken": "test"},
+        )
+        assert response.status_code == 200, response.get_data(as_text=True)
+        assert "event: complete" in response.get_data(as_text=True)
+    assert seen["ids"] == {setting_ids["a"]}
+
+
 # --------------------------------------------------------------------------- #
 # The application works with row-level security on
 # --------------------------------------------------------------------------- #
