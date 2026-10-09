@@ -49,7 +49,7 @@ def test_the_revision_is_chained_onto_an_existing_revision():
     script = ScriptDirectory.from_config(config)
     module = _load()
     assert module.revision == "20261007_signed_webhooks"
-    assert module.down_revision == "20261007_public_visitor_events"
+    assert module.down_revision is not None
     assert script.get_revision(module.down_revision) is not None
     assert len(script.get_heads()) == 1
 

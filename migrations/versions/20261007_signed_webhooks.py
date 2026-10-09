@@ -7,14 +7,14 @@ statement is idempotent, so running the revision twice (or after ``flask
 init-db`` already created the columns from the models) is a no-op.
 
 Revision ID: 20261007_signed_webhooks
-Revises: 20261007_public_visitor_events
+Revises: 20261008_uwp_element_unique
 Create Date: 2026-10-07
 """
 
 from alembic import op
 
 revision = "20261007_signed_webhooks"
-down_revision = "20261007_public_visitor_events"
+down_revision = "20261008_uwp_element_unique"
 branch_labels = None
 depends_on = None
 
