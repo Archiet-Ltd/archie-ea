@@ -12,6 +12,7 @@
       tabs=tabs
   ) }}
   <form method="post" action="{{ url_for('data_governance.new_sharing_agreement') }}" class="max-w-xl space-y-4 rounded-lg border border-border bg-card p-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
       <label for="name" class="block text-sm font-medium text-foreground">Name</label>
       <input type="text" id="name" name="name" required
