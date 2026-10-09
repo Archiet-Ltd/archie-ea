@@ -9,6 +9,7 @@ import pytest
 
 from app.models.archimate_core import ArchiMateElement
 from app.models.application_compliance import ApplicationComplianceControl
+from app.models.application_portfolio import ApplicationComponent
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 
 
@@ -33,8 +34,16 @@ def test_creating_compliance_creates_archimate_element(db_session, make_org, ten
         db_session.add(control)
         db_session.flush()
 
+        app = ApplicationComponent(
+            name="Test Application",
+            organization_id=org.id,
+        )
+        db_session.add(app)
+        db_session.flush()
+
         app_compliance = ApplicationComplianceControl(
             organization_id=org.id,
+            application_id=app.id,
             control_id=control.id,
         )
         db_session.add(app_compliance)
@@ -69,8 +78,16 @@ def test_compliance_archimate_element_is_idempotent(db_session, make_org, tenant
         db_session.add(control)
         db_session.flush()
 
+        app = ApplicationComponent(
+            name="Test Application 2",
+            organization_id=org.id,
+        )
+        db_session.add(app)
+        db_session.flush()
+
         app_compliance = ApplicationComplianceControl(
             organization_id=org.id,
+            application_id=app.id,
             control_id=control.id,
         )
         db_session.add(app_compliance)
@@ -79,7 +96,7 @@ def test_compliance_archimate_element_is_idempotent(db_session, make_org, tenant
         assert app_compliance.archimate_element_id is not None
         assert db_session.query(ArchiMateElement).filter_by(
             organization_id=org.id,
-        ).count() == 1
+        ).count() == 2
 
 
 def test_compliance_archimate_element_isolation(db_session, make_org, tenant_ctx):
@@ -102,9 +119,17 @@ def test_compliance_archimate_element_isolation(db_session, make_org, tenant_ctx
     db_session.add(control)
     db_session.flush()
 
+    app = ApplicationComponent(
+        name="Test Application A",
+        organization_id=org_a.id,
+    )
+    db_session.add(app)
+    db_session.flush()
+
     with tenant_ctx(org_a.id):
         app_compliance = ApplicationComplianceControl(
             organization_id=org_a.id,
+            application_id=app.id,
             control_id=control.id,
         )
         db_session.add(app_compliance)
@@ -140,8 +165,16 @@ def test_deleting_compliance_leaves_no_orphan_element(db_session, make_org, tena
         db_session.add(control)
         db_session.flush()
 
+        app = ApplicationComponent(
+            name="Test Application 4",
+            organization_id=org.id,
+        )
+        db_session.add(app)
+        db_session.flush()
+
         app_compliance = ApplicationComplianceControl(
             organization_id=org.id,
+            application_id=app.id,
             control_id=control.id,
         )
         db_session.add(app_compliance)
@@ -188,8 +221,16 @@ def test_compliance_with_preset_element_is_not_overwritten(db_session, make_org,
         db_session.add(control)
         db_session.flush()
 
+        app = ApplicationComponent(
+            name="Test Application 5",
+            organization_id=org.id,
+        )
+        db_session.add(app)
+        db_session.flush()
+
         app_compliance = ApplicationComplianceControl(
             organization_id=org.id,
+            application_id=app.id,
             control_id=control.id,
             archimate_element_id=preset.id,
         )
