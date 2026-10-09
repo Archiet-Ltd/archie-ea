@@ -72,7 +72,7 @@
                         placeholder="Leave blank to keep existing token"
                         class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                     >
-                    {% if cfg.get('api_token_encrypted') %}
+                    {% if has_secret %}
                     <p class="text-xs text-muted-foreground mt-1">✓ Token stored (encrypted). Enter a new value to replace it.</p>
                     {% endif %}
                 </div>
