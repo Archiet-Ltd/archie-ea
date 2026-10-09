@@ -312,7 +312,6 @@ def test_bridge_advances_marker_so_deploy_does_not_re_add(app, db_session, make_
     gap = _gap(db_session, org)
     legacy = _legacy(db_session, org, "Old row")
     copy = _copy("work_packages", legacy.id, org)
-    before = _marker(db_session, copy.id)
     legacy.gaps.append(gap)  # the bridge makes the relationship and advances the marker
     db_session.flush()
     assert _links(db_session, org, copy)["gap_ids"] == [gap.id]
