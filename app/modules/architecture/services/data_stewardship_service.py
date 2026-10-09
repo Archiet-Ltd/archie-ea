@@ -1,19 +1,360 @@
 """R1-B81 (policy/issue/glossary slice): retention-policy breach check,
 data issue raise/route/resolve, and the one-definition-per-term glossary.
 
-Classification and the steward-picker writer are a different slice of
-this same brief, blocked on R1-B03 PR 2 and R1-B07 PR 2 -- not owned here.
+R1-B81 slice 2: steward assignment through the one ownership writer,
+no-steward list for critical entities, and classification proposal,
+acceptance and propagation along DataLineage.
+
+Classification: a proposed label is an approval row (AIChatCRUDApproval);
+accepting it stores the label on the entity and propagates it downstream
+along DataLineage edges, flagging conflicts where a downstream entity
+already carries a different label. Propagation never crosses an
+organisation and stops on a cycle.
+
+Critical: a data entity whose domain's criticality is 'mission_critical'
+or 'business_critical' (the existing DataDomain.criticality values).
 """
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 
 class DataStewardshipService:
+    ELEMENT_TYPE_DATA_ENTITY = "data_entity"
+    OWNERSHIP_TYPE_STEWARD = "steward"
+
+    # Criticality values that define a "critical" data entity.
+    CRITICAL_VALUES = {"mission_critical", "business_critical"}
+
     @staticmethod
     def _tenant_predicate(model, organization_id: int):
         return model.organization_id == organization_id
+
+    # ------------------------------------------------------------------ #
+    # Steward assignment (PB-0063)
+    # ------------------------------------------------------------------ #
+
+    @classmethod
+    def set_data_entity_steward(
+        cls, *, entity_id: int, user_id: int, organization_id: int,
+        assigned_by: Optional[int] = None,
+    ) -> Any:
+        """Assign a steward to a data entity through the one ownership
+        writer (ApplicationOwner, element_type='data_entity',
+        ownership_type='steward'). Refuses a user from another
+        organisation (CrossOrganisationDataEntityOwner).
+
+        Returns the ApplicationOwner record (existing if already assigned).
+        """
+        from app import db
+        from app.models.application_owner import ApplicationOwner
+        from app.models.process_data import DataEntity
+        from app.models.user import User
+
+        entity = db.session.execute(
+            db.select(DataEntity)
+            .where(DataEntity.id == entity_id)
+            .where(cls._tenant_predicate(DataEntity, organization_id))
+        ).scalar_one_or_none()
+        if entity is None:
+            raise ValueError(f"no data entity {entity_id!r} in this organisation")
+
+        owner = db.session.execute(
+            db.select(User)
+            .where(User.id == user_id)
+            .where(User.organization_id == organization_id)
+        ).scalar_one_or_none()
+        if owner is None:
+            raise ValueError("That user does not belong to this organisation.")
+
+        existing = ApplicationOwner.query.filter_by(
+            element_type=cls.ELEMENT_TYPE_DATA_ENTITY,
+            element_id=entity_id,
+            user_id=user_id,
+            ownership_type=cls.OWNERSHIP_TYPE_STEWARD,
+            organization_id=organization_id,
+        ).first()
+        if existing is not None:
+            return existing
+
+        record = ApplicationOwner(
+            element_type=cls.ELEMENT_TYPE_DATA_ENTITY,
+            element_id=entity_id,
+            user_id=user_id,
+            ownership_type=cls.OWNERSHIP_TYPE_STEWARD,
+            assigned_by=assigned_by,
+            organization_id=organization_id,
+        )
+        db.session.add(record)
+        db.session.flush()
+        return record
+
+    @classmethod
+    def remove_data_entity_steward(
+        cls, *, owner_record_id: int, organization_id: int,
+    ) -> bool:
+        """Remove one steward row for a data entity. Returns False (no-op)
+        rather than raise when the row is already gone or belongs to
+        another organisation."""
+        from app import db
+        from app.models.application_owner import ApplicationOwner
+
+        record = ApplicationOwner.query.filter_by(
+            id=owner_record_id,
+            element_type=cls.ELEMENT_TYPE_DATA_ENTITY,
+            ownership_type=cls.OWNERSHIP_TYPE_STEWARD,
+            organization_id=organization_id,
+        ).first()
+        if record is None:
+            return False
+        db.session.delete(record)
+        db.session.flush()
+        return True
+
+    @classmethod
+    def list_critical_entities_with_no_steward(
+        cls, organization_id: int,
+    ) -> List[Dict[str, Any]]:
+        """Every critical data entity (domain criticality is
+        'mission_critical' or 'business_critical') in this organisation
+        with zero steward rows in the one ownership record.
+
+        Returns dicts with entity id, name, domain name, criticality.
+        """
+        from app import db
+        from app.models.application_owner import ApplicationOwner
+        from app.models.process_data import DataDomain, DataEntity
+
+        stewarded_entity_ids = {
+            row.element_id
+            for row in ApplicationOwner.query.filter_by(
+                element_type=cls.ELEMENT_TYPE_DATA_ENTITY,
+                ownership_type=cls.OWNERSHIP_TYPE_STEWARD,
+                organization_id=organization_id,
+            ).all()
+            if row.element_id is not None
+        }
+
+        entities = (
+            db.session.execute(
+                db.select(DataEntity, DataDomain)
+                .join(DataDomain, DataDomain.id == DataEntity.domain_id)
+                .where(cls._tenant_predicate(DataEntity, organization_id))
+                .where(DataDomain.criticality.in_(cls.CRITICAL_VALUES))
+                .order_by(DataEntity.name)
+            )
+            .all()
+        )
+
+        result = []
+        for entity, domain in entities:
+            if entity.id not in stewarded_entity_ids:
+                result.append({
+                    "entity_id": entity.id,
+                    "entity_name": entity.name,
+                    "domain_name": domain.name,
+                    "criticality": domain.criticality,
+                })
+        return result
+
+    # ------------------------------------------------------------------ #
+    # Classification proposal and acceptance (PB-0111)
+    # ------------------------------------------------------------------ #
+
+    @classmethod
+    def propose_classification(
+        cls, *, entity_id: int, classification_label: str,
+        organization_id: int, proposed_by: int,
+    ) -> Dict[str, Any]:
+        """Propose a classification label for a data entity. Creates an
+        approval row (AIChatCRUDApproval) that, once accepted, stores the
+        label on the entity and propagates it along DataLineage.
+
+        Returns the approval dict with id and status.
+        """
+        from app import db
+        from app.models.process_data import DataEntity
+        from app.modules.ai_chat.services.ai_chat_approval_service import (
+            create_approval_record,
+        )
+
+        entity = db.session.execute(
+            db.select(DataEntity)
+            .where(DataEntity.id == entity_id)
+            .where(cls._tenant_predicate(DataEntity, organization_id))
+        ).scalar_one_or_none()
+        if entity is None:
+            raise ValueError(f"no data entity {entity_id!r} in this organisation")
+
+        valid_labels = {"public", "internal", "confidential", "restricted"}
+        if classification_label.lower() not in valid_labels:
+            raise ValueError(
+                f"Invalid classification label {classification_label!r}. "
+                f"Must be one of: {', '.join(sorted(valid_labels))}"
+            )
+
+        approval = create_approval_record(
+            organization_id=organization_id,
+            operation_type="update",
+            entity_type="data_entity_classification",
+            entity_id=entity_id,
+            summary=f"Set classification of '{entity.name}' to {classification_label}",
+            operation_payload={
+                "entity_id": entity_id,
+                "classification_label": classification_label.lower(),
+            },
+            user_id=proposed_by,
+            original_command=f"system: propose classification {entity.name}",
+        )
+        db.session.commit()
+        return {
+            "success": True,
+            "approval_id": approval.id,
+            "status": "pending_approval",
+        }
+
+    @classmethod
+    def accept_classification(
+        cls, *, approval_id: int, organization_id: int, accepted_by: int,
+    ) -> Dict[str, Any]:
+        """Accept a proposed classification. Stores the label on the
+        entity and propagates it downstream along DataLineage edges.
+
+        A downstream entity with a different label is flagged as a
+        conflict and left unchanged. Propagation never crosses an
+        organisation and stops on a cycle.
+        """
+        from app import db
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+        approval = db.session.execute(
+            db.select(AIChatCRUDApproval)
+            .where(AIChatCRUDApproval.id == approval_id)
+            .where(AIChatCRUDApproval.organization_id == organization_id)
+        ).scalar_one_or_none()
+        if approval is None:
+            return {"success": False, "error": f"Approval {approval_id} not found"}
+
+        if approval.status != ApprovalStatus.PENDING:
+            return {
+                "success": False,
+                "error": f"Approval is already {approval.status.value}",
+            }
+
+        import json
+        payload = json.loads(approval.operation_payload)
+        entity_id = payload["entity_id"]
+        classification_label = payload["classification_label"]
+
+        # Store the label on the entity
+        from app.models.process_data import DataEntity
+
+        entity = db.session.execute(
+            db.select(DataEntity)
+            .where(DataEntity.id == entity_id)
+            .where(cls._tenant_predicate(DataEntity, organization_id))
+        ).scalar_one_or_none()
+        if entity is None:
+            return {"success": False, "error": "Entity not found"}
+
+        entity.data_classification = classification_label
+
+        # Propagate downstream
+        conflicts = cls._propagate_classification(
+            entity_id, classification_label, organization_id, set()
+        )
+
+        # Mark approval as executed
+        approval.status = ApprovalStatus.APPROVED
+        approval.executed_at = datetime.utcnow()
+        db.session.commit()
+
+        return {
+            "success": True,
+            "entity_id": entity_id,
+            "classification_label": classification_label,
+            "conflicts": conflicts,
+        }
+
+    @classmethod
+    def _propagate_classification(
+        cls, entity_id: int, classification_label: str,
+        organization_id: int, visited: Set[int],
+    ) -> List[Dict[str, Any]]:
+        """Walk DataLineage edges downstream from *entity_id* and set the
+        classification label on every downstream entity that does not
+        already carry a different label.
+
+        Stops on a cycle (visited set). Never crosses an organisation.
+        Returns a list of conflict dicts for downstream entities that
+        already carry a different label and were left unchanged.
+        """
+        from app import db
+        from app.models.all_missing_models import data_lineage_entities
+        from app.models.process_data import DataEntity
+
+        if entity_id in visited:
+            return []
+        visited.add(entity_id)
+
+        conflicts = []
+
+        # Find lineage rows where this entity participates as source
+        lineage_rows = db.session.execute(
+            db.select(data_lineage_entities.c.data_lineage_id)
+            .where(data_lineage_entities.c.data_entity_id == entity_id)
+            .where(data_lineage_entities.c.participation_type == "source")
+        ).all()
+
+        lineage_ids = [row[0] for row in lineage_rows]
+        if not lineage_ids:
+            return []
+
+        # Find target entities in those lineage rows
+        target_rows = db.session.execute(
+            db.select(data_lineage_entities.c.data_entity_id)
+            .where(
+                data_lineage_entities.c.data_lineage_id.in_(lineage_ids),
+                data_lineage_entities.c.participation_type == "target",
+            )
+        ).all()
+
+        downstream_ids = list({row[0] for row in target_rows})
+        if not downstream_ids:
+            return []
+
+        for d_id in downstream_ids:
+            downstream = db.session.execute(
+                db.select(DataEntity)
+                .where(DataEntity.id == d_id)
+                .where(cls._tenant_predicate(DataEntity, organization_id))
+            ).scalar_one_or_none()
+
+            if downstream is None:
+                # Entity belongs to another organisation or does not exist
+                continue
+
+            if downstream.data_classification and downstream.data_classification != classification_label:
+                # Conflict: downstream entity already has a different label
+                conflicts.append({
+                    "entity_id": downstream.id,
+                    "entity_name": downstream.name,
+                    "existing_label": downstream.data_classification,
+                    "proposed_label": classification_label,
+                })
+                continue
+
+            if not downstream.data_classification:
+                downstream.data_classification = classification_label
+
+            # Recurse downstream
+            child_conflicts = cls._propagate_classification(
+                downstream.id, classification_label, organization_id, visited
+            )
+            conflicts.extend(child_conflicts)
+
+        return conflicts
 
     # ------------------------------------------------------------------ #
     # Retention policy breaches (PB-0236)
