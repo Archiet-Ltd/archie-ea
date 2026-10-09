@@ -42,9 +42,16 @@
         {% block header %}{% endblock %}
 
         <!-- Main Content Area. Public pages scroll the document (no inner scroll container);
-             the fixed-height shell is for the authenticated product (admin_base.html). -->
+             the fixed-height shell is for the authenticated product (admin_base.html).
+             overflow-y-visible is required, not cosmetic: the CSS overflow spec computes
+             overflow-y as 'auto' whenever overflow-x is non-visible and overflow-y is left
+             unset, which silently makes this element its own scroll/sticky containing block
+             even though nothing inside it actually overflows -- that broke position:sticky
+             for any descendant expecting to stick to the document (found via /pricing's
+             comparison-table header, which stuck to this element's own top instead of the
+             viewport's). -->
         <main id="main-content"
-              class="flex-1 overflow-x-hidden bg-background"
+              class="flex-1 overflow-x-hidden overflow-y-visible bg-background"
               role="main">
             {# Flash messages surface as toasts only (components/toast-container.html,
                included below) — this used to also render partials/_flashes.html as an
