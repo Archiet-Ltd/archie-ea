@@ -19,7 +19,7 @@ Idempotent: guards the column add, the backfill and the NOT NULL step
 so a second run is a no-op.
 
 Revision ID: 20261008_cr_organization_id
-Revises: 20261007_public_visitor_events
+Revises: 20261008_uwp_element_unique
 Create Date: 2026-10-08
 """
 from alembic import op
@@ -27,7 +27,7 @@ import sqlalchemy as sa
 from sqlalchemy import text
 
 revision = "20261008_cr_organization_id"
-down_revision = "20261007_public_visitor_events"
+down_revision = "20261008_uwp_element_unique"
 branch_labels = None
 depends_on = None
 
