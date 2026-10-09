@@ -164,3 +164,86 @@ def test_the_renewals_view_and_the_contract_agree_on_expiry(app, client):
         assert "active" not in window or "expir" in window, (
             "the renewals view shows an ended contract as active"
         )
+
+
+def test_notice_period_form_drives_renewals_last_day_to_cancel(app, client):
+    """Add a notice period on the contract form, reload, and the renewals
+    view shows the correct date.
+
+    Journey: a contract created without a notice period shows a dash on
+    the renewals page. The procurement lead edits the contract to record
+    a notice period, and the renewals page now shows the computed last
+    day to cancel.
+    """
+    from datetime import date, timedelta
+
+    from app import db
+    from app.models.application_portfolio import VendorContract
+
+    with app.app_context():
+        org_id = make_org(db, "ProcNtc")
+        buyer_id = make_user(db, org_id, "ntcuser", enterprise_role="procurement",
+                             role_name="Architect")
+
+    login(client, buyer_id)
+    name = "Notice Test %s" % uuid.uuid4().hex[:8]
+
+    # Create a contract with a renewal date soon enough for the default
+    # 30-day window, but without a notice period.
+    soon = (date.today() + timedelta(days=20)).isoformat()
+    end = (date.today() + timedelta(days=365)).isoformat()
+    resp = client.post(
+        "/procurement/contracts/new",
+        data={
+            "contract_name": name,
+            "start_date": "2026-01-01",
+            "end_date": end,
+            "renewal_date": soon,
+        },
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+
+    with app.app_context():
+        db.session.expunge_all()
+        contract = db.session.execute(
+            db.select(VendorContract).filter_by(contract_name=name)
+        ).scalar_one()
+        assert contract.notice_period_days is None
+        contract_id = contract.id
+
+    # On the renewals page, the last day to cancel should show a dash.
+    renewals = client.get("/procurement/renewals")
+    assert renewals.status_code == 200
+    body = renewals.get_data(as_text=True)
+    assert name in body
+
+    # Edit the contract to add a notice period of 15 days.
+    resp = client.post(
+        "/procurement/contracts/%d/edit" % contract_id,
+        data={
+            "contract_name": name,
+            "start_date": "2026-01-01",
+            "end_date": end,
+            "renewal_date": soon,
+            "notice_period_days": "15",
+        },
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+
+    with app.app_context():
+        db.session.expunge_all()
+        contract = db.session.execute(
+            db.select(VendorContract).filter_by(contract_name=name)
+        ).scalar_one()
+        assert contract.notice_period_days == 15
+
+    # The renewals page now shows the computed last day to cancel.
+    cancel_date = date.today() + timedelta(days=20) - timedelta(days=15)
+    renewals = client.get("/procurement/renewals")
+    assert renewals.status_code == 200
+    body = renewals.get_data(as_text=True)
+    assert cancel_date.strftime("%d %b %Y") in body, (
+        "renewals page missing last day to cancel %s" % cancel_date
+    )
