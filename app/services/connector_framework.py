@@ -284,12 +284,12 @@ CONNECTOR_ACTION_SYNC = "sync"
 # Connector types surfaced by the connectors page. A type is only offered
 # from a per-organisation configuration row already in the system; this is
 # the display order, not an allowlist -- the permit gate is
-# ``assert_connector_permitted``.
+# ``assert_connector_permitted``, so only types on that allowlist are
+# offered in the add form.
 CONNECTOR_TYPE_LABELS = {
     "servicenow": "ServiceNow",
     "jira": "Jira",
     "m365": "Microsoft 365",
-    "abacus": "Abacus",
     "ea_tool": "Enterprise Architecture tool",
     "devops": "GitHub / Azure DevOps",
     "lucidchart": "Lucidchart",
@@ -390,6 +390,21 @@ def _load_org_connector(org_id: int, connector_id=None, connector_type=None):
     return query.first()
 
 
+def _connector_credential_mask(org_id: int, connector_type: str):
+    """Masked proof that this organisation stores a credential for the
+    connector type, across every credential type the change paths use."""
+    if not connector_type:
+        return None
+    from app.models.connector_config import OrgConnectorCredential
+
+    row = (
+        OrgConnectorCredential.query.filter_by(
+            organization_id=org_id, connector_type=connector_type
+        ).first()
+    )
+    return "******" if row is not None else None
+
+
 def _connector_view(cfg: ConnectorConfig, org_id: int) -> dict:
     """One connector as the connectors page and API render it.
 
@@ -415,25 +430,84 @@ def _connector_view(cfg: ConnectorConfig, org_id: int) -> dict:
         "sync_schedule": cfg.sync_schedule,
         "config": cfg.public_config(),
         "credential_ref": f"vault:{org_id}:{cfg.connector_type}",
-        "credential_masked": OrgCredentialVault().get_masked(
-            org_id, cfg.connector_type, "credentials"
-        ),
+        "credential_masked": _connector_credential_mask(org_id, cfg.connector_type),
         "last_sync": cfg.last_sync,
         "last_sync_status": latest_sync.status if latest_sync else None,
         "description": cfg.description,
+        "is_proposal": False,
         "created_at": cfg.created_at,
         "updated_at": cfg.updated_at,
     }
 
 
-def list_org_connectors(org_id: int) -> list[dict]:
-    """Every connector of *org_id* with health and last synchronisation.
+def _proposal_connector_view(approval, org_id: int) -> dict:
+    """A queued connector change as a pending row on the connectors page.
 
-    The one reader the connectors page uses. Only rows the organisation
-    owns are ever returned.
+    Shown until its proposal is decided so the page is the one place that
+    lists every connector of the organisation — configured ones with health
+    and last synchronisation, and proposed ones with their (masked)
+    credential state and the approval waiting in the inbox.
     """
+    try:
+        payload = json.loads(approval.operation_payload or "{}")
+    except (json.JSONDecodeError, TypeError):
+        payload = {}
+    connector_type = payload.get("connector_type") or ""
+    return {
+        "id": f"proposal-{approval.id}",
+        "name": (payload.get("name") or connector_type or "Proposed connector"),
+        "connector_type": connector_type,
+        "connector_type_label": CONNECTOR_TYPE_LABELS.get(
+            connector_type, connector_type or "connector"
+        ),
+        "status": "pending_review",
+        "health": "pending_review",
+        "sync_mode": None,
+        "sync_schedule": None,
+        "config": payload.get("config") or {},
+        "credential_ref": f"vault:{org_id}:{connector_type}" if connector_type else None,
+        "credential_masked": _connector_credential_mask(org_id, connector_type),
+        "last_sync": None,
+        "last_sync_status": None,
+        "description": approval.summary,
+        "is_proposal": True,
+        "proposal_id": approval.id,
+        "operation_type": approval.operation_type,
+        "created_at": approval.created_at,
+        "updated_at": None,
+    }
+
+
+def list_org_connectors(org_id: int) -> list[dict]:
+    """Every connector of *org_id* with health and last synchronisation,
+    followed by the organisation's queued connector creations as pending rows.
+
+    The one reader the connectors page uses. Only rows — and only approval
+    proposals — the organisation owns are ever returned.
+    """
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
     rows = ConnectorConfig.query.filter_by(organization_id=org_id).all()
-    return [_connector_view(row, org_id) for row in rows]
+    connectors = [_connector_view(row, org_id) for row in rows]
+
+    # A queued create has no row yet, but the page must still show it (with
+    # its masked credential) so the organisation's one connectors page lists
+    # every connector that has been proposed, not only those already applied.
+    # Update and delete proposals act on an existing row, which is already
+    # listed above with its current state.
+    create_proposals = (
+        AIChatCRUDApproval.query.filter_by(
+            organization_id=org_id,
+            entity_type=CONNECTOR_APPROVAL_ENTITY_TYPE,
+            operation_type=CONNECTOR_ACTION_CREATE,
+            status=ApprovalStatus.PENDING,
+        )
+        .order_by(AIChatCRUDApproval.created_at.asc())
+        .all()
+    )
+    for proposal in create_proposals:
+        connectors.append(_proposal_connector_view(proposal, org_id))
+    return connectors
 
 
 def propose_connector_change(
@@ -562,9 +636,14 @@ def apply_connector_change(
                 f"Connector {payload.get('connector_id') or connector_type} "
                 f"is not configured in this organisation."
             )
-        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+        from app.models.connector_config import OrgConnectorCredential
 
-        OrgCredentialVault().delete(resolved, connector_type)
+        # Remove every credential of the deleted connector (all credential
+        # types — the ''credentials'' blob, legacy ''client_secret'' rows,
+        # whatever else the connector used) from the per-organisation vault.
+        OrgConnectorCredential.query.filter_by(
+            organization_id=resolved, connector_type=connector_type
+        ).delete()
         db.session.delete(cfg)
         db.session.flush()
         return cfg

@@ -1,0 +1,7 @@
+{
+  "records": [
+    {"id": "JIRA-1001", "key": "JIRA-1001", "summary": "Recorded issue one"},
+    {"id": "JIRA-1002", "key": "JIRA-1002", "summary": "Recorded issue two"},
+    {"id": "JIRA-1003", "key": "JIRA-1003", "summary": "Recorded issue three"}
+  ]
+}

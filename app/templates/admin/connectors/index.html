@@ -123,13 +123,19 @@
                             {% for connector in connectors %}
                                 <tr>
                                     <td class="px-4 py-3">
-                                        <div class="text-sm font-medium text-foreground">{{ connector.name }}</div>
+                                        <div class="text-sm font-medium text-foreground">
+                                            {{ connector.name }}
+                                            {% if connector.is_proposal %}
+                                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent text-muted-foreground">queued</span>
+                                            {% endif %}
+                                        </div>
                                         <div class="text-xs text-muted-foreground">{{ connector.connector_type_label }}</div>
                                     </td>
                                     <td class="px-4 py-3">
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                                             {% if connector.health == 'active' %}bg-success/10 text-success-emphasis
                                             {% elif connector.health == 'error' %}bg-destructive/10 text-destructive-emphasis
+                                            {% elif connector.health == 'pending_review' %}bg-warning/10 text-warning-emphasis
                                             {% else %}bg-muted text-muted-foreground{% endif %}">
                                             {{ connector.health }}
                                         </span>
@@ -142,7 +148,9 @@
                                         {% endif %}
                                     </td>
                                     <td class="px-4 py-3 text-sm text-foreground">
-                                        {% if connector.last_sync %}
+                                        {% if connector.is_proposal %}
+                                            <span class="text-xs text-muted-foreground">Awaiting approval</span>
+                                        {% elif connector.last_sync %}
                                             {{ connector.last_sync.strftime('%Y-%m-%d %H:%M') }} UTC
                                             {% if connector.last_sync_status %}
                                                 <span class="text-xs text-muted-foreground">({{ connector.last_sync_status }})</span>
@@ -155,6 +163,11 @@
                                         {{ connector.sync_schedule or 'Not scheduled' }}
                                     </td>
                                     <td class="px-4 py-3">
+                                        {% if connector.is_proposal %}
+                                            <a href="{{ inbox_url }}" class="inline-flex items-center rounded-md border border-input bg-background px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-accent transition-colors">
+                                                In approval queue
+                                            </a>
+                                        {% else %}
                                         <div class="flex gap-2">
                                             <form method="POST" action="{{ url_for('m365_connector.connectors_sync', connector_id=connector.id) }}">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -172,6 +185,7 @@
                                                 </button>
                                             </form>
                                         </div>
+                                        {% endif %}
                                     </td>
                                 </tr>
                             {% else %}
