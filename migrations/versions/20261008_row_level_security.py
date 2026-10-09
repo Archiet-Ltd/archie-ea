@@ -15,7 +15,7 @@ R1-B20 PR 3 brief:
 * ``ENABLE`` row-level security, not ``FORCE``. The deploy role
   (``archie_deploy``) owns the tables, so it is exempt and ``schema-upgrade``
   and every ``backfill-*`` command in ``deploy-schema.sh`` keep working.
-  ``archie_runtime`` is not the owner and is ``NOBYPASSRLS``, so every policy
+  ``archie_runtime`` is not the owner and does not bypass row security, so every policy
   applies to it.
 * The policies compare against ``NULLIF(current_setting(..., true), '')``:
   a connection that previously ran a transaction with the setting returns
