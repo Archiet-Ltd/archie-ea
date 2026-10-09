@@ -667,8 +667,9 @@ def api_roadmap_gaps():
             gaps = [g for g in gaps if gap_type_filter in g["gap_types"]]
 
         # Calculate statistics
+        from app.services.gap_register_service import count_gaps
         stats = {
-            "total_gaps": len(gaps),
+            "total_gaps": count_gaps(current_user.organization_id),
             "coverage_gaps": len([g for g in gaps if "coverage" in g["gap_types"]]),
             "quality_gaps": len([g for g in gaps if "quality" in g["gap_types"]]),
             "retirement_gaps": len([g for g in gaps if "retirement" in g["gap_types"]]),
@@ -885,7 +886,8 @@ def api_roadmap_archimate_gaps():
             ]
             gaps_data.append(gap_dict)
 
-        return jsonify({"success": True, "gaps": gaps_data, "total_count": len(gaps)})
+        from app.services.gap_register_service import count_gaps
+        return jsonify({"success": True, "gaps": gaps_data, "total_count": count_gaps(current_user.organization_id)})
 
     except Exception as e:
         current_app.logger.error(f"Error getting ArchiMate gaps: {e}", exc_info=True)
