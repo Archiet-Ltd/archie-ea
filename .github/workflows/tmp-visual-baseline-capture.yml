@@ -4,8 +4,10 @@ name: TEMP visual baseline capture
 # PNGs using the SAME Chromium build CI itself installs, so the result is pixel-correct
 # against real CI rendering (unlike a locally-captured baseline, which can mismatch when
 # the local sandbox's Chromium build differs from the one `playwright install` fetches in
-# CI). Dispatch manually, download the uploaded artifact, commit the PNGs, then delete
-# this file -- it is not part of the permanent gate set and intentionally does not run
+# CI). Dispatch manually; it base64-encodes the PNGs and prints them to the job log
+# (read back via the GitHub API, not an artifact download) so no extra permissions are
+# needed beyond the default read-only token. Delete this file once the baselines are
+# committed -- it is not part of the permanent gate set and intentionally does not run
 # on push or pull_request.
 on:
   workflow_dispatch:
@@ -58,11 +60,13 @@ jobs:
           python -m flask --app manage reconcile-schema
       - name: Capture baselines (writes tests/smoke/visual_baselines/*.png)
         run: pytest tests/smoke/test_visual_regression.py -q -p no:randomly --timeout=900 -W ignore::DeprecationWarning
-      - name: Upload captured baselines
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: visual-baselines-${{ github.sha }}
-          path: tests/smoke/visual_baselines/
-          if-no-files-found: error
-          retention-days: 7
+        continue-on-error: true
+      - name: Print captured baselines as base64 (read back from the job log)
+        run: |
+          for f in tests/smoke/visual_baselines/*.png; do
+            name=$(basename "$f")
+            echo "===BASELINE-BEGIN:${name}==="
+            base64 -w0 "$f"
+            echo ""
+            echo "===BASELINE-END:${name}==="
+          done
