@@ -486,7 +486,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 67 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 68 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
