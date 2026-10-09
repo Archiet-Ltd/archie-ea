@@ -412,8 +412,6 @@ def _connector_view(cfg: ConnectorConfig, org_id: int) -> dict:
     schedule, health (status) and last synchronisation, so the page has a
     single source per connector from the framework.
     """
-    from app.modules.codegen.services.credential_vault import OrgCredentialVault
-
     latest_sync = (
         SyncLog.query.filter_by(connector_id=cfg.id)
         .order_by(SyncLog.started_at.desc())
@@ -776,7 +774,6 @@ def run_connector_sync(
     """
     import asyncio
 
-    from app.modules.codegen.services.credential_vault import OrgCredentialVault
     from app.modules.intelligence.services.connector_allowlist import (
         assert_connector_permitted,
     )

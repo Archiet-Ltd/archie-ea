@@ -544,7 +544,6 @@ class TestConnectorsPageJourney:
         # Two real organisations: A syncs, B must never see or receive it.
         a_cfg = _connector(db_session, org_a.id, "jira", "Fixture Jira A")
         a_element = _element(db_session, org_a.id, "A's Ticket System")
-        b_element = _element(db_session, org_b.id, "B's Ticket System")
         db_session.commit()
 
         # Syncing is not delegated: the sync must be proposed first.
