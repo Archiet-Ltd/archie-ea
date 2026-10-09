@@ -7,7 +7,7 @@ url_slug: /
 capture_status: not_applicable_vision_page
 ---
 
-# Enter your website address. See your company.
+# Build your company as one model. Ask it anything.
 
 Every organisation, large or small, needs architecture — and the intelligence that architecture
 provides. Until now, that's been priced and built for the largest companies in the world. Entelim

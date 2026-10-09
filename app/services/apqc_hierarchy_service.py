@@ -746,9 +746,16 @@ class APQCHierarchyService:
         if not process:
             return {"error": "Process not found"}
 
-        # Get application mappings
-        mappings = ProcessApplicationMapping.query.filter_by(
-            apqc_process_id=process_id
+        # Get application mappings. ProcessApplicationMapping has no
+        # organization_id of its own (pr310-v1 review, DEFECT-5) --
+        # unfenced, total_applications below counted every organisation's
+        # mappings for this process.
+        from app.services.apqc_mapping_tenant_fence import (
+            fenced_application_mappings_query,
+        )
+
+        mappings = fenced_application_mappings_query().filter(
+            ProcessApplicationMapping.apqc_process_id == process_id
         ).all()
 
         # Calculate metrics
@@ -886,7 +893,7 @@ class APQCHierarchyService:
         Returns:
             Dictionary with aggregate process statistics
         """
-        from app.models.apqc_process import APQCProcess, CapabilityProcessMapping
+        from app.models.apqc_process import APQCProcess
 
         all_processes = APQCProcess.query.all()
         total = len(all_processes)
@@ -896,7 +903,14 @@ class APQCHierarchyService:
             level_key = f"level_{p.apqc_level}"
             processes_by_level[level_key] = processes_by_level.get(level_key, 0) + 1
 
-        total_mappings = CapabilityProcessMapping.query.count()
+        # CapabilityProcessMapping has no organization_id of its own;
+        # unfenced, this counted every organisation's mappings, leaking an
+        # aggregate cross-organisation figure (pr310-v1 review, DEFECT-6).
+        from app.services.apqc_mapping_tenant_fence import (
+            fenced_capability_mappings_query,
+        )
+
+        total_mappings = fenced_capability_mappings_query().count()
 
         return {
             "total_processes": total,
