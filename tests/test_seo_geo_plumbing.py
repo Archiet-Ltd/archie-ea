@@ -105,16 +105,6 @@ def test_no_page_links_to_cross_page_waitlist_anchor(app):
             assert "/#waitlist" not in html, f"{url}: still links to /#waitlist"
 
 
-def test_home_page_still_has_its_own_same_page_waitlist_anchor(app):
-    """Documents the deliberate exclusion above: the home page's own
-    waiting-list section still exists on main (PR414, which removes it,
-    has not merged yet) and still uses a same-page anchor, not a dead
-    cross-page link."""
-    with app.test_client() as client:
-        html = client.get("/").data.decode()
-    assert 'id="waitlist"' in html
-
-
 # ── FAQPage JSON-LD generalised beyond comparison pages ───────────────────
 
 
