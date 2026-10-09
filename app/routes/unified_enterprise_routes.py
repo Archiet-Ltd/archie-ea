@@ -892,7 +892,7 @@ def gap_analysis():
     column = _GAP_SORT_COLUMNS.get(sort_key, Gap.name)
     order = column.desc() if direction == "desc" else column.asc()
     try:
-        from app.services.gap_register_service import count_gaps
+        from app.services.gap_register_service import count_gaps, get_gaps_not_addressed
 
         gaps = (
             Gap.query.filter(Gap.gap_kind != "plateau_transition")
@@ -901,10 +901,12 @@ def gap_analysis():
             .all()
         )
         total_gap_count = count_gaps(current_user.organization_id)
+        not_addressed_gaps = get_gaps_not_addressed(current_user.organization_id)
 
         return render_template(
             "enterprise/gap_analysis.html", gaps=gaps,
             total_gap_count=total_gap_count,
+            not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",
             current_dir=direction if direction in ("asc", "desc") else "asc",
         )

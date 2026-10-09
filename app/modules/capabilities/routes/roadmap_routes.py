@@ -2174,3 +2174,100 @@ def api_capability_traceability(capability_id):
     except Exception as e:
         current_app.logger.error(f"Error fetching traceability for capability {capability_id}: {e}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
+
+
+# =============================================================================
+# Gap-to-Plateau link / unlink and "not addressed" list
+# =============================================================================
+
+
+@capability_map.route("/api/roadmap/gaps/<int:gap_id>/link-plateau/<int:plateau_id>", methods=["POST"])
+@login_required
+@rate_limit(30, "1m")
+@audit_log("roadmap_gap_link_plateau")
+def api_roadmap_gap_link_plateau(gap_id: int, plateau_id: int):
+    """Link a gap to a plateau within the active organisation.
+
+    Request body: none.
+
+    Response 200::
+        {"success": true, "gap_id": int, "plateau_id": int}
+    Response 403/404::
+        {"success": false, "error": str}
+    """
+    try:
+        from app.services.gap_register_service import link_gap_to_plateau
+
+        org_id = current_user.organization_id
+        link_gap_to_plateau(gap_id, plateau_id, org_id)
+        db.session.commit()
+        return jsonify({"success": True, "gap_id": gap_id, "plateau_id": plateau_id})
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(exc)}), 404
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.error("Error linking gap to plateau: %s", exc, exc_info=True)
+        return jsonify({"success": False, "error": "An internal error occurred"}), 500
+
+
+@capability_map.route("/api/roadmap/gaps/<int:gap_id>/unlink-plateau/<int:plateau_id>", methods=["POST"])
+@login_required
+@rate_limit(30, "1m")
+@audit_log("roadmap_gap_unlink_plateau")
+def api_roadmap_gap_unlink_plateau(gap_id: int, plateau_id: int):
+    """Unlink a gap from a plateau within the active organisation.
+
+    Request body: none.
+
+    Response 200::
+        {"success": true, "gap_id": int, "plateau_id": int}
+    Response 404::
+        {"success": false, "error": str}
+    """
+    try:
+        from app.services.gap_register_service import unlink_gap_from_plateau
+
+        org_id = current_user.organization_id
+        unlink_gap_from_plateau(gap_id, plateau_id, org_id)
+        db.session.commit()
+        return jsonify({"success": True, "gap_id": gap_id, "plateau_id": plateau_id})
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(exc)}), 404
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.error("Error unlinking gap from plateau: %s", exc, exc_info=True)
+        return jsonify({"success": False, "error": "An internal error occurred"}), 500
+
+
+@capability_map.route("/api/roadmap/gaps/not-addressed")
+@login_required
+@rate_limit(60, "1m")
+def api_roadmap_gaps_not_addressed():
+    """Return gaps that have no work package addressing them.
+
+    Response 200::
+        {"success": true, "gaps": [...], "count": int}
+    """
+    try:
+        from app.services.gap_register_service import get_gaps_not_addressed
+
+        org_id = current_user.organization_id
+        gaps = get_gaps_not_addressed(org_id)
+        gaps_data = [
+            {
+                "id": g.id,
+                "name": g.name,
+                "description": g.description,
+                "severity": g.severity,
+                "priority": g.priority,
+                "resolution_status": g.resolution_status,
+                "gap_type": g.gap_type,
+            }
+            for g in gaps
+        ]
+        return jsonify({"success": True, "gaps": gaps_data, "count": len(gaps_data)})
+    except Exception as exc:
+        current_app.logger.error("Error listing gaps not addressed: %s", exc, exc_info=True)
+        return jsonify({"success": False, "error": "An internal error occurred"}), 500
