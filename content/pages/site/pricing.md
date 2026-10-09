@@ -8,29 +8,33 @@ cta: plans
 
 # Priced per company, never per application
 
-Every tier includes every question Entelim answers, every canvas, and the twin map. What changes is
+Every tier includes every question Entelim answers, the Business Model Canvas, and the twin map. What changes is
 who can edit, and what your organisation needs on top.
 
 ## Community — Free
 
 No trial clock. For evaluation, one-person companies and self-hosters: one organisation, three
-people. Every question, every canvas, the twin map, file import, and community support.
+people. Every question, the Business Model Canvas, the twin map, file import, and community support.
 
 ## Startup — $49/month ($490/year)
 
-Ten people. For founders and small services firms, 5 to 50 people. Everything in Community, plus a
-webhook feed, export and share, and email support.
+For founders and small services firms, 5 to 50 people. Ten people and email support, everything in
+Community included.
 
 ## Team — $29/editor/month ($290/editor/year)
 
 People who only ask questions are free. For scale-ups and
-services companies, 50 to 500 people. Single sign-on, the review-board workflow, your own model
-key, and usage history.
+services companies, 50 to 500 people. Single sign-on, the review-board workflow, and your own model
+key.
 
 ## Enterprise — from $24,000/year
 
 Annual contract. For enterprise architecture teams: unlimited editors, SAML, audit export, your own
 key by default, supported self-hosting, and a named contact.
+
+## On the way
+
+Export any answer as a spreadsheet or PDF, and share it with a link.
 
 ## Self-hosting is always free
 

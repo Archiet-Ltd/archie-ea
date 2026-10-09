@@ -24,7 +24,7 @@ enough to be confusing and different enough that nothing links them automaticall
 An identifier crosswalk, with low-confidence matches routed to a review queue instead of merged
 blind, so ServiceNow and your model agree on what's the same thing without anyone guessing.
 
-Coming December 2026 to February 2027. Join the waiting list and we'll tell you the day it ships.
+Coming in an upcoming release. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 

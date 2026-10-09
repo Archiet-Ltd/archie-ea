@@ -11,8 +11,7 @@ source: README.md (Quick start, Guides sections), docs/*.md, read 2026-09-25; th
 
 Entelim's setup guide and its vendor-neutral enterprise architecture guides live alongside the
 code, so they can't drift from what's actually shipped. The repository isn't public yet, so there's
-no working link to it here — [get in touch](/contact) if you want the setup guide ahead of that, or
-[join the waiting list](/#waitlist) to hear when it opens up.
+no working link to it here — [get in touch](/contact) if you want the setup guide ahead of that.
 
 ## What Entelim covers
 

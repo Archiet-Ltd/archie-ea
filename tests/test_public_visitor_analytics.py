@@ -138,7 +138,7 @@ class TestPageViewLogging:
         monkeypatch.setattr(
             "app.services.visitor_hash.current_utc_day", lambda: date(2026, 10, 7)
         )
-        client.get("/vision", **same_client_kwargs)
+        client.get("/about", **same_client_kwargs)
         day1 = (
             PublicVisitorEvent.query.filter_by(event_type="page_view")
             .order_by(PublicVisitorEvent.id.desc()).first()
@@ -147,7 +147,7 @@ class TestPageViewLogging:
         monkeypatch.setattr(
             "app.services.visitor_hash.current_utc_day", lambda: date(2026, 10, 8)
         )
-        client.get("/vision", **same_client_kwargs)
+        client.get("/about", **same_client_kwargs)
         day2 = (
             PublicVisitorEvent.query.filter_by(event_type="page_view")
             .order_by(PublicVisitorEvent.id.desc()).first()
