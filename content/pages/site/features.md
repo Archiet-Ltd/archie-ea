@@ -28,7 +28,7 @@ on one canvas.
 and key results with measured results arrive in Q2 2027.
 
 Delivered today by: [Business Model Canvas](/modules/business-model-canvas),
-[Value Streams](/modules/value-streams).
+[Value Streams at Risk](/use-cases/value-streams-at-risk).
 
 <h3 id="portfolio-management">Portfolio Management</h3>
 
@@ -42,8 +42,7 @@ a radar, score applications for rationalisation and work from one consolidation 
 Q4 2026.
 
 Delivered today by: [Applications](/modules/applications), [Portfolio](/modules/portfolio),
-[Rationalization](/modules/rationalization), [My Applications](/modules/my-applications),
-[Duplicate Detection](/modules/duplicate-detection).
+[Rationalization](/modules/rationalization), [What I Own](/use-cases/what-i-own).
 
 <h3 id="transformation-management">Transformation Management</h3>
 
@@ -56,8 +55,7 @@ change, and ask what any programme touches.
 **Next:** stage evidence and gate conformance in Q1 2027; benefits tracked to measured outcomes in
 Q2 2027.
 
-Delivered today by: [Gap Analysis](/modules/gap-analysis), [Roadmaps](/modules/roadmaps),
-[Projects](/modules/projects).
+Delivered today by: [Roadmaps](/modules/roadmaps), [Programme Tracking](/use-cases/programme-tracking).
 
 <h3 id="investment-and-financial-management">Investment and Financial Management</h3>
 
@@ -70,8 +68,7 @@ affects.
 **Next:** one home for every cost, totalled in your reporting currency, arrives in Q2 2027; financial
 what-if in Q3 2027; budget-constrained portfolio optimisation in Q4 2027.
 
-Delivered today by: [Business Case](/modules/business-case),
-[Investment Analysis](/modules/investment-analysis).
+Delivered today by: [Business Case](/modules/business-case).
 
 ## Know what you run
 
@@ -90,8 +87,7 @@ architecture decisions.
 findings and design-to-delivery traceability through 2027.
 
 Delivered today by: [Architecture Model](/modules/architecture-model),
-[Diagrams and Composer](/modules/diagrams), [Solutions](/modules/solutions),
-[Industry Reference Frameworks](/modules/industry-apqc).
+[Diagrams and Composer](/modules/diagrams).
 
 <h3 id="data-management">Data Management</h3>
 
@@ -242,7 +238,7 @@ notifications to Slack, Microsoft Teams or any webhook.
 **Next:** a token-secured public API with developer kits in Q4 2026; connectors that write through
 one approval queue, starting with ServiceNow and your identity provider, in Q1 2027.
 
-Delivered today by: [Batch Import](/modules/batch-import), [Integrations](/modules/integrations).
+Delivered today by: [Architecture Model](/modules/architecture-model) (file import).
 
 <h3 id="administration-and-trust">Administration and Trust</h3>
 
