@@ -819,6 +819,342 @@ def test_streaming_code_edit_generators_read_their_own_organisations_api_setting
 
 
 # --------------------------------------------------------------------------- #
+# D1: platform administrators manage the shared catalogue under the runtime role
+# --------------------------------------------------------------------------- #
+
+
+def _owner_row(rls, sql, **params):
+    with rls.owner.connect() as connection:
+        return connection.execute(text(sql), params).mappings().first()
+
+
+def _shared_configuration(world, name=None):
+    """A shared (organization_id NULL) framework configuration, inserted as the owner."""
+    code = f"RLS-CFG-{uuid.uuid4().hex[:8]}"
+    with world.rls.owner.begin() as connection:
+        config_id = connection.execute(
+            text(
+                "INSERT INTO capability_framework_configuration "
+                "(configuration_name, configuration_code, base_framework, status) "
+                "VALUES (:n, :c, 'Unified_Manufacturing_Excellence', 'draft') RETURNING id"
+            ),
+            {"n": name or f"Shared {code}", "c": code},
+        ).scalar_one()
+    world.extra_deletes.append(("capability_framework_configuration", "id", [config_id]))
+    return config_id, code
+
+
+def _shared_template(world):
+    code = f"RLS-TPL-{uuid.uuid4().hex[:8]}"
+    config = {
+        "configuration_name": f"From template {code}",
+        "configuration_code": f"RLS-FROM-{code}",
+        "enabled_domains": [],
+        "enabled_extensions": [],
+    }
+    import json
+
+    with world.rls.owner.begin() as connection:
+        template_id = connection.execute(
+            text(
+                "INSERT INTO framework_configuration_templates "
+                "(template_name, template_code, template_category, template_configuration, usage_count) "
+                "VALUES (:n, :c, 'manufacturing', :cfg, 0) RETURNING id"
+            ),
+            {"n": f"Template {code}", "c": code, "cfg": json.dumps(config)},
+        ).scalar_one()
+    world.extra_deletes.append(("capability_framework_configuration", "configuration_code", [config["configuration_code"]]))
+    world.extra_deletes.append(("framework_configuration_templates", "id", [template_id]))
+    return template_id, config
+
+
+def _logged_in_post(app, client, login_as, user_id, method, url, body=None):
+    from app import db
+
+    with app.app_context():
+        db.session.remove()
+    login_as(client, user_id)
+    return getattr(client, method)(url, json=body if body is not None else {})
+
+
+def test_platform_admin_creates_edits_and_deletes_a_shared_configuration_as_the_runtime_role(
+    app, rls, world, client, login_as
+):
+    home = world.org("home")
+    admin_id = _make_user(world, home, "padm", role="Administrator", platform=True)
+    code = f"RLS-NEW-{uuid.uuid4().hex[:8]}"
+    world.extra_deletes.append(("capability_framework_configuration", "configuration_code", [code]))
+    base = "/api/framework-config/configurations"
+    with _app_runs_as(app, rls.runtime):
+        created = _logged_in_post(
+            app, client, login_as, admin_id, "post", base,
+            {"configuration_name": "RLS created", "configuration_code": code},
+        )
+        assert created.status_code == 201, created.get_data(as_text=True)
+        row = _owner_row(rls, "SELECT id, configuration_name, organization_id FROM capability_framework_configuration WHERE configuration_code = :c", c=code)
+        assert row is not None and row["organization_id"] is None
+        config_id = row["id"]
+
+        edited = _logged_in_post(
+            app, client, login_as, admin_id, "put", f"{base}/{config_id}", {"configuration_name": "RLS edited"}
+        )
+        assert edited.status_code == 200, edited.get_data(as_text=True)
+        assert _owner_row(rls, "SELECT configuration_name FROM capability_framework_configuration WHERE id = :i", i=config_id)["configuration_name"] == "RLS edited"
+
+        deleted = _logged_in_post(app, client, login_as, admin_id, "delete", f"{base}/{config_id}")
+        assert deleted.status_code == 200, deleted.get_data(as_text=True)
+        assert _owner_row(rls, "SELECT 1 AS x FROM capability_framework_configuration WHERE id = :i", i=config_id) is None
+
+
+@pytest.mark.parametrize("persona", ["Architect", "Administrator"])
+def test_organisation_level_users_cannot_write_the_shared_catalogue(app, rls, world, client, login_as, persona):
+    home = world.org("home")
+    user_id = _make_user(world, home, "orguser", role=persona)
+    config_id, code = _shared_configuration(world, name="Untouched")
+    template_id, _ = _shared_template(world)
+    with rls.owner.begin() as connection:
+        usage_before = connection.execute(
+            text("SELECT usage_count FROM framework_configuration_templates WHERE id = :i"), {"i": template_id}
+        ).scalar_one()
+        count_before = connection.execute(text("SELECT count(*) FROM capability_framework_configuration")).scalar_one()
+    attempts = [
+        ("post", "/api/framework-config/configurations", {"configuration_name": "x", "configuration_code": f"RLS-NO-{uuid.uuid4().hex[:6]}"}),
+        ("put", f"/api/framework-config/configurations/{config_id}", {"configuration_name": "Hijacked"}),
+        ("delete", f"/api/framework-config/configurations/{config_id}", None),
+        ("post", f"/api/framework-config/templates/{template_id}/deploy", {"configuration_code": f"RLS-NO-{uuid.uuid4().hex[:6]}"}),
+        ("post", "/api/framework-config/migrations", {"migration_name": "m", "migration_code": f"RLS-NO-{uuid.uuid4().hex[:6]}", "source_framework_name": "s", "target_configuration_id": config_id}),
+        ("post", "/framework-management/api/apply-template", {"template_id": template_id, "configuration_name": "x"}),
+        ("post", "/industry-apqc/api/seed-frameworks", {}),
+    ]
+    with _app_runs_as(app, rls.runtime):
+        for method, url, body in attempts:
+            response = _logged_in_post(app, client, login_as, user_id, method, url, body)
+            assert not 200 <= response.status_code < 300, f"{method} {url} -> {response.status_code}"
+    after = _owner_row(rls, "SELECT configuration_name FROM capability_framework_configuration WHERE id = :i", i=config_id)
+    assert after["configuration_name"] == "Untouched"
+    with rls.owner.begin() as connection:
+        assert connection.execute(text("SELECT count(*) FROM capability_framework_configuration")).scalar_one() == count_before
+        assert connection.execute(
+            text("SELECT usage_count FROM framework_configuration_templates WHERE id = :i"), {"i": template_id}
+        ).scalar_one() == usage_before
+
+
+def test_platform_admin_deploys_a_template_and_counts_the_use_as_the_runtime_role(app, rls, world, client, login_as):
+    home = world.org("home")
+    admin_id = _make_user(world, home, "padm", role="Administrator", platform=True)
+    template_id, config = _shared_template(world)
+    with _app_runs_as(app, rls.runtime):
+        response = _logged_in_post(
+            app, client, login_as, admin_id, "post",
+            f"/api/framework-config/templates/{template_id}/deploy",
+            {"configuration_code": config["configuration_code"]},
+        )
+        assert response.status_code == 200, response.get_data(as_text=True)
+    row = _owner_row(rls, "SELECT organization_id FROM capability_framework_configuration WHERE configuration_code = :c", c=config["configuration_code"])
+    assert row is not None and row["organization_id"] is None
+    assert _owner_row(rls, "SELECT usage_count FROM framework_configuration_templates WHERE id = :i", i=template_id)["usage_count"] == 1
+
+
+def test_platform_admin_applies_a_template_as_the_runtime_role(app, rls, world, client, login_as):
+    """``apply_template`` calls ``template.template_configuration.get(...)`` on a text column,
+    so on main (and without row-level security) it answers 500 for every template. That is not
+    this PR's to fix; the test hands the route a text value that also answers ``.get`` so the
+    catalogue writes behind it (the new configuration and the template's usage count) run."""
+    import json
+
+    from sqlalchemy import event
+
+    from app.models.framework_configuration import FrameworkConfigurationTemplate
+
+    class JsonText(str):
+        def get(self, key, default=None):
+            return json.loads(self).get(key, default)
+
+    def wrap(target, *_args):
+        value = target.__dict__.get("template_configuration")
+        if isinstance(value, str) and not isinstance(value, JsonText):
+            target.__dict__["template_configuration"] = JsonText(value)
+
+    home = world.org("home")
+    admin_id = _make_user(world, home, "padm", role="Administrator", platform=True)
+    template_id, template_config = _shared_template(world)
+    # The template's own settings override the generated code, so the row carries this one.
+    auto_code = template_config["configuration_code"]
+    event.listen(FrameworkConfigurationTemplate, "load", wrap)
+    event.listen(FrameworkConfigurationTemplate, "refresh", wrap)
+    try:
+        with _app_runs_as(app, rls.runtime):
+            response = _logged_in_post(
+                app, client, login_as, admin_id, "post", "/framework-management/api/apply-template",
+                {"template_id": template_id, "configuration_name": "RLS applied"},
+            )
+            assert response.status_code == 200, response.get_data(as_text=True)
+    finally:
+        event.remove(FrameworkConfigurationTemplate, "load", wrap)
+        event.remove(FrameworkConfigurationTemplate, "refresh", wrap)
+    row = _owner_row(rls, "SELECT organization_id FROM capability_framework_configuration WHERE configuration_code = :c", c=auto_code)
+    assert row is not None and row["organization_id"] is None
+    assert _owner_row(rls, "SELECT usage_count FROM framework_configuration_templates WHERE id = :i", i=template_id)["usage_count"] == 1
+
+
+def test_platform_admin_installs_an_extension_and_runs_a_migration_as_the_runtime_role(
+    app, rls, world, client, login_as
+):
+    import json
+
+    home = world.org("home")
+    admin_id = _make_user(world, home, "padm", role="Administrator", platform=True)
+    config_id, _ = _shared_configuration(world)
+    ext_code = f"RLS-EXT-{uuid.uuid4().hex[:8]}"
+    with rls.owner.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO framework_extensions (extension_name, extension_code, target_framework) "
+                "VALUES (:n, :c, 'Unified_Manufacturing_Excellence')"
+            ),
+            {"n": f"Extension {ext_code}", "c": ext_code},
+        )
+    world.extra_deletes.append(("framework_extensions", "extension_code", [ext_code]))
+    migration_code = f"RLS-MIG-{uuid.uuid4().hex[:8]}"
+    world.extra_deletes.append(("framework_migration_mappings", "migration_code", [migration_code]))
+    world.extra_deletes.insert(0, ("framework_migration_mappings", "target_configuration_id", [config_id]))
+    with _app_runs_as(app, rls.runtime):
+        installed = _logged_in_post(
+            app, client, login_as, admin_id, "post",
+            f"/api/framework-config/configurations/{config_id}/extensions/{ext_code}/install",
+        )
+        assert installed.status_code == 200, installed.get_data(as_text=True)
+        created = _logged_in_post(
+            app, client, login_as, admin_id, "post", "/api/framework-config/migrations",
+            {
+                "migration_name": "RLS migration",
+                "migration_code": migration_code,
+                "source_framework_name": "Legacy",
+                "target_configuration_id": config_id,
+                "domain_mappings": {"a": "b"},
+            },
+        )
+        assert created.status_code == 201, created.get_data(as_text=True)
+        migration_id = created.get_json()["data"]["id"]
+        ran = _logged_in_post(
+            app, client, login_as, admin_id, "post", f"/api/framework-config/migrations/{migration_id}/execute"
+        )
+        assert ran.status_code == 200 and ran.get_json()["success"] is True, ran.get_data(as_text=True)
+    enabled = _owner_row(rls, "SELECT enabled_extensions FROM capability_framework_configuration WHERE id = :i", i=config_id)
+    assert ext_code in json.loads(enabled["enabled_extensions"])
+    assert _owner_row(rls, "SELECT status FROM framework_migration_mappings WHERE id = :i", i=migration_id)["status"] == "completed"
+
+
+def test_platform_admin_seeds_the_shared_industry_frameworks_as_the_runtime_role(app, rls, world, client, login_as):
+    home = world.org("home")
+    admin_id = _make_user(world, home, "padm", role="Administrator", platform=True)
+    with rls.owner.begin() as connection:
+        # Remove the default frameworks that carry no processes so the route has rows to write.
+        removed = connection.execute(
+            text(
+                "DELETE FROM industry_apqc_framework f WHERE NOT EXISTS "
+                "(SELECT 1 FROM industry_apqc_process p WHERE p.industry_framework_id = f.id) "
+                "RETURNING industry_code"
+            )
+        ).scalars().all()
+    with _app_runs_as(app, rls.runtime):
+        response = _logged_in_post(app, client, login_as, admin_id, "post", "/industry-apqc/api/seed-frameworks")
+        assert response.status_code == 200, response.get_data(as_text=True)
+    body = response.get_json()
+    created = [row["industry_code"] for row in body["created_frameworks"]]
+    world.extra_deletes.append(("industry_apqc_framework", "industry_code", created))
+    assert body["total_created"] == len(created) > 0
+    assert set(removed) <= set(created)
+    with rls.owner.connect() as connection:
+        present = set(connection.execute(text("SELECT industry_code FROM industry_apqc_framework")).scalars())
+    assert set(created) <= present
+
+
+def _service_calls(world):
+    """The write functions of the two services, each with the shared row it leaves behind."""
+    from app.services.framework_configuration_service import (
+        FrameworkConfigurationService,
+        FrameworkMigrationService,
+    )
+    from app.services.industry_apqc_service import IndustryAPQCService
+
+    config_id, _ = _shared_configuration(world)
+    cfg_code = f"RLS-SVC-{uuid.uuid4().hex[:8]}"
+    mig_code = f"RLS-SMG-{uuid.uuid4().hex[:8]}"
+    ind_code = f"Z{uuid.uuid4().hex[:6]}".upper()
+    with world.rls.owner.begin() as connection:
+        base_id = connection.execute(
+            text(
+                "INSERT INTO apqc_process (process_code, process_name, category_level_1) "
+                "VALUES (:c, 'RLS base', 'RLS') RETURNING id"
+            ),
+            {"c": f"RLS-{uuid.uuid4().hex[:8]}"},
+        ).scalar_one()
+    world.extra_deletes.append(("industry_apqc_process", "base_process_id", [base_id]))
+    world.extra_deletes.append(("apqc_process", "id", [base_id]))
+    world.extra_deletes.append(("capability_framework_configuration", "configuration_code", [cfg_code]))
+    world.extra_deletes.insert(0, ("framework_migration_mappings", "target_configuration_id", [config_id]))
+    world.extra_deletes.append(("industry_apqc_framework", "industry_code", [ind_code]))
+
+    def create_configuration():
+        FrameworkConfigurationService.create_configuration(
+            {"configuration_name": "RLS svc", "configuration_code": cfg_code}
+        )
+
+    def create_migration():
+        FrameworkMigrationService.create_migration_mapping(
+            {
+                "migration_name": "RLS svc",
+                "migration_code": mig_code,
+                "source_framework_name": "Legacy",
+                "target_configuration_id": config_id,
+            }
+        )
+
+    def create_framework():
+        IndustryAPQCService().create_framework(ind_code, "RLS industry")
+
+    def map_process():
+        service = IndustryAPQCService()
+        service.create_framework(ind_code, "RLS industry")
+        service.map_base_process_to_industry(base_id, ind_code)
+
+    return {
+        "create_configuration": (create_configuration, "capability_framework_configuration", "configuration_code", cfg_code),
+        "create_migration_mapping": (create_migration, "framework_migration_mappings", "migration_code", mig_code),
+        "create_framework": (create_framework, "industry_apqc_framework", "industry_code", ind_code),
+        "map_base_process_to_industry": (map_process, "industry_apqc_process", "base_process_id", base_id),
+    }
+
+
+@pytest.mark.parametrize(
+    "name", ["create_configuration", "create_migration_mapping", "create_framework", "map_base_process_to_industry"]
+)
+def test_service_write_functions_need_the_platform_scope_and_work_inside_it(app, rls, world, name):
+    """Each shared-catalogue write function: refused for an organisation (``tenant_scope`` alone,
+    which is where an organisation-level caller runs), and a shared row once a platform
+    administrator's route holds ``platform_scope`` around it."""
+    from app import db
+    from app.jobs.tenant_safe_job import platform_scope, tenant_scope
+
+    home = world.org("home")
+    call, table, column, value = _service_calls(world)[name]
+    count_sql = f"SELECT count(*) FROM {table} WHERE {column} = :v"  # nosec B608 - fixed names in this module
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        with tenant_scope(home):
+            with pytest.raises(DBAPIError):
+                call()
+            db.session.rollback()
+        assert _owner_row(rls, count_sql.replace("count(*)", "count(*) AS n"), v=value)["n"] == 0
+        with tenant_scope(home), platform_scope("test: platform administrator writes the shared catalogue"):
+            call()
+            db.session.commit()
+        assert _owner_row(rls, count_sql.replace("count(*)", "count(*) AS n"), v=value)["n"] == 1
+        db.session.remove()
+
+
+# --------------------------------------------------------------------------- #
 # The application works with row-level security on
 # --------------------------------------------------------------------------- #
 
