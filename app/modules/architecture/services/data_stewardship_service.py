@@ -237,7 +237,12 @@ class DataStewardshipService:
         if approval is None:
             return {"success": False, "error": f"Approval {approval_id} not found"}
 
-        if approval.status != ApprovalStatus.PENDING:
+        # A classification is accepted either directly (the caller passes a
+        # PENDING approval, as the slice tests do) or as the executor of an
+        # approval-inbox decision (the approval was claimed and its status set
+        # to APPROVED by approve_and_execute before this runs). Both are the
+        # same real acceptance; only a REJECTED or EXPIRED approval is refused.
+        if approval.status in (ApprovalStatus.REJECTED, ApprovalStatus.EXPIRED):
             return {
                 "success": False,
                 "error": f"Approval is already {approval.status.value}",
