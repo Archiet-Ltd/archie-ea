@@ -766,6 +766,7 @@ def run_connector_sync(
 
     db.session.flush()
     logger.info("Connector sync completed for %s org %s: %s", cfg.id, resolved, result)
+    result["success"] = True
     return result
 
 
