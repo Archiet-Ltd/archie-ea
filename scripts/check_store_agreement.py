@@ -445,6 +445,14 @@ CONCEPTS = {
         Surface("GET /api/v1/vendors/", "http",
                 "/api/v1/vendors/?per_page=1", extract="data.pagination.total"),
     ],
+    "interfaces": [
+        Surface("orm:ApplicationInterface", "orm",
+                "app.models.application_layer.ApplicationInterface"),
+    ],
+    "data entities": [
+        Surface("orm:DataEntity", "orm",
+                "app.models.process_data.DataEntity"),
+    ],
 }
 
 # Concepts and surfaces deliberately NOT registered, and why -- naming the

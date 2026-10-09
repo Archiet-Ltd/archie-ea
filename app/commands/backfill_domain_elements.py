@@ -105,42 +105,23 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
             model.archimate_element_id.is_(None),
         ).all()
 
-        # Check for duplicates: records that have multiple elements
-        # (This shouldn't happen normally, but the backfill must report it)
-        dup_query = (
-            session.query(
-                model.id,
-                model.archimate_element_id,
-            )
-            .filter(
-                model.organization_id == org_id,
-                model.archimate_element_id.isnot(None),
-            )
-            .all()
-        )
+        # Collect all linked element ids for this type in this org
+        all_records = session.query(model).filter(
+            model.organization_id == org_id,
+        ).all()
+        linked_ids = {r.archimate_element_id for r in all_records if r.archimate_element_id}
 
         duplicates = []
         if not dry_run:
-            # Check for duplicate elements (same name, type, org) that are
-            # NOT linked to any record of this type
-            linked_ids = {r.archimate_element_id for r in records if r.archimate_element_id}
-            # Actually, we need to check ALL records, not just unlinked ones
-            all_records = session.query(model).filter(
-                model.organization_id == org_id,
-            ).all()
-            linked_ids = {r.archimate_element_id for r in all_records if r.archimate_element_id}
-
             # Find elements of this type that are NOT linked to any record
-            # (orphans that should have been linked)
-            orphan_elements = (
-                session.query(ArchiMateElement)
-                .filter(
-                    ArchiMateElement.organization_id == org_id,
-                    ArchiMateElement.type == element_type,
-                    ~ArchiMateElement.id.in_(linked_ids) if linked_ids else True,
-                )
-                .all()
+            # (orphans that may be duplicates of each other)
+            orphan_query = session.query(ArchiMateElement).filter(
+                ArchiMateElement.organization_id == org_id,
+                ArchiMateElement.type == element_type,
             )
+            if linked_ids:
+                orphan_query = orphan_query.filter(~ArchiMateElement.id.in_(linked_ids))
+            orphan_elements = orphan_query.all()
 
             # Group by name to find duplicates
             by_name = {}

@@ -193,3 +193,77 @@ def test_every_record_type_has_a_handler():
         f"Missing: {expected_types - actual_types}. "
         f"Extra: {actual_types - expected_types}."
     )
+
+
+def test_backfill_reports_duplicates(db_session, make_org, tenant_ctx):
+    """Orphan ArchiMateElement records with the same name are reported as duplicates."""
+    from app.commands.backfill_domain_elements import backfill_domain_elements
+
+    org = make_org("bf-dup")
+    with tenant_ctx(org.id):
+        app = ApplicationComponent(
+            name="Dup App", organization_id=org.id
+        )
+        db_session.add(app)
+        db_session.flush()
+        _clear_element(db_session, app)
+
+        # Create orphan elements (same name, type, org, not linked to any record)
+        el1 = ArchiMateElement(
+            name="Orphan Duplicate", type="ApplicationComponent",
+            layer="Application", organization_id=org.id,
+        )
+        db_session.add(el1)
+        db_session.flush()
+        el2 = ArchiMateElement(
+            name="Orphan Duplicate", type="ApplicationComponent",
+            layer="Application", organization_id=org.id,
+        )
+        db_session.add(el2)
+        db_session.flush()
+
+        stats = backfill_domain_elements(org.id, session=db_session)
+        app_stats = stats.get("ApplicationComponent", {})
+        dups = app_stats.get("duplicates", [])
+        assert len(dups) >= 1, "should report duplicate orphan elements"
+        dup = dups[0]
+        assert dup["name"] == "Orphan Duplicate"
+        assert dup["kept_id"] in (el1.id, el2.id)
+        assert len(dup["removed_ids"]) == 1
+        assert dup["kept_id"] == min(el1.id, el2.id)
+        assert dup["removed_ids"] == [max(el1.id, el2.id)]
+
+
+def test_backfill_reports_duplicates_with_kept_and_removed_ids(
+    db_session, make_org, tenant_ctx,
+):
+    """Duplicate report includes kept_id and removed_ids for each group."""
+    from app.commands.backfill_domain_elements import backfill_domain_elements
+
+    org = make_org("bf-dup2")
+    with tenant_ctx(org.id):
+        app = ApplicationComponent(
+            name="Dup App 2", organization_id=org.id
+        )
+        db_session.add(app)
+        db_session.flush()
+        _clear_element(db_session, app)
+
+        # Three orphans with the same name
+        ids = []
+        for _ in range(3):
+            el = ArchiMateElement(
+                name="Triple Orphan", type="ApplicationComponent",
+                layer="Application", organization_id=org.id,
+            )
+            db_session.add(el)
+            db_session.flush()
+            ids.append(el.id)
+
+        stats = backfill_domain_elements(org.id, session=db_session)
+        app_stats = stats.get("ApplicationComponent", {})
+        dups = app_stats.get("duplicates", [])
+        assert len(dups) >= 1
+        dup = dups[0]
+        assert dup["kept_id"] == min(ids)
+        assert sorted(dup["removed_ids"]) == sorted(ids[1:])
