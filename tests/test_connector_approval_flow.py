@@ -419,16 +419,26 @@ class TestTwoOrganisationIsolation:
         )
 
     def test_credentials_cannot_be_decrypted_with_the_other_orgs_key(
-        self, db_session, org_a, org_b
+        self, db_session, org_a, org_b, admin_a, client, login_as, tenant_ctx
     ):
         from app.modules.codegen.services.credential_encryption import _get_org_fernet
         from app.models.connector_config import OrgConnectorCredential
 
-        from app.modules.codegen.services.credential_vault import OrgCredentialVault
-
-        vault = OrgCredentialVault()
-        vault.store(org_a.id, "servicenow", "client_secret", "org-a-secret")
-        vault.store(org_b.id, "servicenow", "client_secret", "org-b-secret")
+        secret_a = "org-a-secret"
+        # Store the credential through the one connectors page: the vault is
+        # written at proposal time, encrypted with the organisation's own key.
+        login_as(client, admin_a)
+        resp = client.post(
+            "/admin/connectors",
+            data={
+                "connector_type": "servicenow",
+                "name": "Keyed ServiceNow",
+                "config_json": "{}",
+                "credential": secret_a,
+                "enabled": "1",
+            },
+        )
+        assert resp.status_code == 302
 
         a_row = OrgConnectorCredential.query.filter_by(
             organization_id=org_a.id, connector_type="servicenow"
@@ -436,7 +446,17 @@ class TestTwoOrganisationIsolation:
         assert a_row is not None
 
         a_key = _get_org_fernet(org_a.id)
-        assert a_key.decrypt(a_row.encrypted_value) == b"org-a-secret"
+        decrypted = json.loads(a_key.decrypt(a_row.encrypted_value))
+        assert decrypted == {"credential": "org-a-secret"}
+
+        # Organisation B must have its own key before the cross-key check:
+        # giving B a credential of its own is what creates B's key row.
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        with tenant_ctx(org_b.id):
+            OrgCredentialVault().store(
+                org_b.id, "servicenow", "client_secret", "org-b-secret"
+            )
 
         # Decrypting org A's row with org B's key must fail: every
         # organisation's credentials are wrapped in its own key.
