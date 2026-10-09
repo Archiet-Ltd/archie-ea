@@ -155,16 +155,30 @@ def get_matching_reason(application, vendor_product, method):
 )
 def find_duplicate_applications():
     """
-    RETIRED — delegates to MatcherService.
+    Find duplicate applications by delegating to the matcher, reporting the
+    real similarity score and the real estimated savings.
 
-    Callers:
-    - (route, called by clients)
+    Query parameters:
+        - min_similarity: Minimum similarity score (default: 40)
+        - force_analyze: If 'true', triggers new analysis before returning results
 
-    Instead of maintaining its own similarity analysis, this now delegates to
-    the matcher for consistent matching across the platform: every application
-    name is matched against the acting organisation's records, and confirmed
-    duplicates are returned in the legacy group shape callers expect.
-    The matcher's candidate set is limited to the acting organisation.
+    Detection delegates to MatcherService for consistent matching across the
+    platform: every application name is matched against the acting
+    organisation's records. The matcher's candidate set is limited to the
+    acting organisation, so another organisation's applications can never be
+    matched, named, or returned here.
+
+    Each group reports the real values:
+      * similarity — 100 for an exact-name group; otherwise the real fuzzy
+        similarity recomputed with the shared duplicate-detection utility
+        (the vendor_mdm pattern), never a fabricated score;
+      * estimated_savings — read from the ApplicationSimilarityAnalysis rows
+        for the pairs inside the group;
+    and the caller's min_similarity threshold decides what counts as a
+    duplicate group.
+
+    Returns:
+        JSON with duplicate groups, similarity scores, and consolidation recommendations.
     """
 
     from app.middleware.tenant_context import current_org_id
@@ -172,9 +186,11 @@ def find_duplicate_applications():
         DuplicateDetectionUtils,
     )
     from app.modules.intelligence.services.matcher_service import MatcherService
+    from ..models.application_consolidation import ApplicationSimilarityAnalysis
     from ..models.application_layer import ApplicationComponent
 
     try:
+        min_similarity = int(request.args.get("min_similarity", 40))
         force_analyze = request.args.get("force_analyze", "false").lower() == "true"
 
         # Get all applications (org-scoped via TenantMixin)
@@ -245,12 +261,13 @@ def find_duplicate_applications():
                 }
             )
 
-        # Group applications by normalised name, confirmed by the matcher.
-        # The matcher returns uncertain with multiple exact candidates when
-        # two or more elements share the same normalised name+type — that is
-        # the duplicate signal.
+        # Delegate duplicate detection to the matcher. An uncertain verdict
+        # with multiple exact candidates (candidate_count > 1) means several
+        # applications share the same normalised name — an exact-name
+        # duplicate group. A certain single-exact verdict is the application
+        # matching itself, not a duplicate pair.
         norm = DuplicateDetectionUtils.normalize_name
-        groups_by_norm: Dict[str, list] = {}
+        exact_by_norm: Dict[str, list] = {}
         for app in applications:
             result = MatcherService.match_by_name(
                 app.name,
@@ -259,40 +276,89 @@ def find_duplicate_applications():
             )
             if result.matched_element_id is None:
                 continue
-            # A duplicate exists when the matcher finds multiple exact
-            # candidates (uncertain, candidate_count > 1) or a near-duplicate
-            # fuzzy match (uncertain with matched_element_id).
             if result.certain:
-                # Single exact match — the app matched itself; not a duplicate.
+                # A certain single-exact match is the application matching
+                # its own element, not a duplicate pair.
                 continue
             if result.evidence and result.evidence.get("candidate_count", 1) > 1:
-                # Multiple exact candidates → duplicate group.
-                key = norm(app.name)
-                groups_by_norm.setdefault(key, []).append(app)
-            elif result.matched_element_id is not None:
-                # Near-duplicate fuzzy match.
-                key = norm(app.name)
-                groups_by_norm.setdefault(key, []).append(app)
+                exact_by_norm.setdefault(norm(app.name), []).append(app)
+
+        # The persisted similarity analyses main read — the platform's real
+        # score and savings data. Restricted to this organisation's own
+        # application ids, so another organisation's rows are never touched.
+        org_app_ids = {a.id for a in applications}
+        analyses = ApplicationSimilarityAnalysis.query.filter(
+            ApplicationSimilarityAnalysis.app_1_id.in_(org_app_ids),
+            ApplicationSimilarityAnalysis.app_2_id.in_(org_app_ids),
+        ).all()
+
+        # Build groups from both signals, keyed by the set of application ids.
+        #   * Exact-name groups from the matcher's multi-candidate verdicts
+        #     score 100 — identical normalised names are a certain exact match.
+        #   * Analysis pairs whose names are not identical are the
+        #     near-duplicate groups; their real similarity is recomputed with
+        #     the shared duplicate-detection utility (the vendor_mdm pattern),
+        #     never a fabricated value.
+        groups: Dict[frozenset, dict] = {}
+
+        for norm_name, matched_apps in exact_by_norm.items():
+            # Applications with the same normalised name join the group.
+            group_apps = list(
+                {
+                    a.id: a
+                    for a in matched_apps
+                    + [a for a in applications if norm(a.name) == norm_name]
+                }.values()
+            )
+            if len(group_apps) < 2:
+                continue
+            groups[frozenset(a.id for a in group_apps)] = {
+                "apps": group_apps,
+                "score": 100.0,
+            }
+
+        for analysis in analyses:
+            app_1 = next(
+                (a for a in applications if a.id == analysis.app_1_id), None
+            )
+            app_2 = next(
+                (a for a in applications if a.id == analysis.app_2_id), None
+            )
+            if app_1 is None or app_2 is None or app_1.id == app_2.id:
+                continue
+            pair = frozenset((app_1.id, app_2.id))
+
+            # An exact-name pair already lives in its matcher group — the row
+            # only contributes its savings. A near-duplicate pair becomes its
+            # own group with the real recomputed fuzzy similarity.
+            if any(pair <= key for key in groups):
+                continue
+            is_exact, _ = DuplicateDetectionUtils.is_duplicate(
+                app_1.name, app_2.name, mode="exact"
+            )
+            if is_exact:
+                groups[pair] = {"apps": [app_1, app_2], "score": 100.0}
+            else:
+                _, fuzzy_score = DuplicateDetectionUtils.is_duplicate(
+                    app_1.name, app_2.name, mode="fuzzy"
+                )
+                groups[pair] = {
+                    "apps": [app_1, app_2],
+                    "score": int(round(fuzzy_score * 100)),
+                }
 
         # Build the legacy JSON response shape.
         duplicate_groups = []
         processed_app_ids: set = set()
         total_savings = 0.0
 
-        for norm_name, group_apps in groups_by_norm.items():
-            if len(group_apps) < 2:
-                continue
+        for group_ids, group_info in groups.items():
+            group_apps = group_info["apps"]
+            similarity_score = group_info["score"]
 
-            # Deduplicate by id (same name may have been added from multiple
-            # matcher calls).
-            unique_apps = list({a.id: a for a in group_apps}.values())
-            if len(unique_apps) < 2:
+            # The caller's threshold decides what counts as a duplicate.
+            if similarity_score < min_similarity:
                 continue
-
-            # Determine similarity and severity from the matcher verdict.
-            # For exact-name groups the matcher returned uncertain with
-            # multiple candidates → identical names → similarity 100.
-            similarity_score = 100.0
 
             if similarity_score >= 70:
                 severity = "high"
@@ -301,15 +367,32 @@ def find_duplicate_applications():
             else:
                 severity = "low"
 
+            # Estimated savings from the analysis rows for the pairs inside
+            # this group (the same ApplicationSimilarityAnalysis column main
+            # read: estimated_cost_savings).
+            pair_savings: Dict[frozenset, float] = {}
+            for analysis in analyses:
+                if analysis.app_1_id == analysis.app_2_id:
+                    continue
+                pair = frozenset((analysis.app_1_id, analysis.app_2_id))
+                if pair <= group_ids and pair not in pair_savings:
+                    pair_savings[pair] = float(analysis.estimated_cost_savings or 0)
+            estimated_savings = sum(pair_savings.values())
+            total_savings += estimated_savings
+
+            # Report the group under a real application name (original case),
+            # not a normalised key, so templates display a real name.
+            display_name = group_apps[0].name
+
             group = {
-                "reason": f"Duplicate application name: {norm_name}",
+                "reason": f"Duplicate application name: {display_name}",
                 "avg_similarity": int(similarity_score),
                 "severity": severity,
                 "consolidation_opportunity": "true" if severity == "high" else "false",
                 "recommended_action": "Review and merge"
                 if severity == "high"
                 else "Review",
-                "estimated_savings": 0.0,
+                "estimated_savings": estimated_savings,
                 "consolidation_complexity": "low"
                 if severity == "high"
                 else "medium",
@@ -321,11 +404,11 @@ def find_duplicate_applications():
                         "owner_team": a.development_team,
                         "application_type": a.application_type or "Application",
                     }
-                    for a in unique_apps
+                    for a in group_apps
                 ],
             }
             duplicate_groups.append(group)
-            processed_app_ids.update(a.id for a in unique_apps)
+            processed_app_ids.update(group_ids)
 
         # Build response envelope matching the legacy shape.
         total_duplicate_applications = len(processed_app_ids)

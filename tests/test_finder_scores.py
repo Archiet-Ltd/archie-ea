@@ -154,21 +154,19 @@ def test_fuzzy_group_has_real_similarity_and_savings(
     assert fuzzy_group["estimated_savings"] == 25000.0, msg_fuzzy_savings
 
     # ── Isolation: org B's app must never appear ──────────────────────────
-    all_app_ids = [
+    # Every returned application must belong to org A; org B's "Order API"
+    # app must never be returned, named or counted.
+    org_a_app_ids = {
+        a.id for a in (app_exact_1, app_exact_2, app_fuzzy_1, app_fuzzy_2)
+    }
+    all_returned_ids = [
         entry["id"]
         for group in groups
         for entry in group.get("applications", [])
     ]
-    # app_b was created in org_b under tenant_ctx(org_b.id)
-    # app_exact_1 and app_exact_2 are in org A.
-    # The only app from the route scope is within org A.
-    for group in groups:
-        for app_entry in group.get("applications", []):
-            entry_name = app_entry.get("name", "")
-            assert "Order API" not in entry_name or any(
-                app_entry["id"] in (a.id for a in [app_exact_1, app_exact_2])
-                for _ in [1]
-            ), "org B's app leaked into result"
+    assert all_returned_ids, "route returned no duplicate groups at all"
+    for entry_id in all_returned_ids:
+        assert entry_id in org_a_app_ids, "org B's app leaked into result"
 
 
 # --------------------------------------------------------------------------- #
