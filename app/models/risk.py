@@ -2,6 +2,8 @@
 import enum
 from datetime import datetime
 
+from sqlalchemy import event
+
 from app import db
 from app.models.mixins import TenantMixin
 
@@ -96,3 +98,34 @@ class Risk(TenantMixin, db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+# ============================================================================
+# SQLAlchemy Event Listeners - Auto-create ArchiMateElements
+# ============================================================================
+
+
+@event.listens_for(Risk, "before_insert")
+def create_risk_archimate_element(mapper, connection, target):
+    """Automatically create ArchiMateElement when Risk is created.
+
+    Mirrors as an Assessment (Motivation layer), matching the mapping in
+    app/services/archimate_backbone.py. Idempotent: skips rows that already
+    carry an archimate_element_id.
+    """
+    if target.archimate_element_id is not None:
+        return
+    from sqlalchemy import insert
+
+    from .archimate_core import ArchiMateElement
+
+    result = connection.execute(
+        insert(ArchiMateElement.__table__).values(
+            name=target.title,
+            type="Assessment",
+            layer="Motivation",
+            description=target.description or f"Risk: {target.title}",
+            organization_id=target.organization_id,
+        )
+    )
+    target.archimate_element_id = result.inserted_primary_key[0]
