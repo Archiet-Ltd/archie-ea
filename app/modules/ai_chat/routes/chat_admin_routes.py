@@ -17,7 +17,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from app import db
-from app.middleware.tenant_decorators import is_platform_admin
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.ai_service import AIPromptTemplate
 from app.modules.ai_chat.services.multi_domain_chat_service import PERSONA_CONFIGS
 
@@ -26,27 +26,20 @@ from . import unified_ai_chat_bp
 logger = logging.getLogger(__name__)
 
 
-def _require_platform_admin():
-    """Abort 403 if current user is not a platform admin.
-
-    AIPromptTemplate carries no tenant column -- a persona override saved
-    here replaces that persona's system prompt for every organisation's AI
-    chat, the same platform-wide shape as the solution-prompt overrides
-    fixed in PR #307 (app/modules/admin/routes/solution_prompt_admin.py).
-    _require_admin() (below) checks org-level ADMINISTER, which any
-    organisation's own admin holds -- wrong for a platform-wide write.
-    Found by scripts/check_platform_admin_coverage.py.
-    """
-    if not is_platform_admin(current_user):
-        abort(403)
-
-
 def _require_admin():
-    """Abort 403 if current user is not an admin."""
-    if not (hasattr(current_user, "is_admin") and current_user.is_admin):
-        # Fallback: check role attribute
-        if not (hasattr(current_user, "role") and current_user.role == "admin"):
-            abort(403)
+    """Abort 403 if current user is not an admin of the ACTIVE organisation.
+
+    R2-2 (PR 428 round 3): ``current_user.is_admin`` (no call) is a bound
+    method reference, always truthy, so this never refused anyone -- a
+    Viewer of the active organisation could read and write every persona
+    prompt override and read the organisation's AI-chat analytics. Judged
+    the same way ``org_admin_required``/``admin_required`` do elsewhere in
+    this PR, against ``g.current_org_id`` rather than a global flag.
+    """
+    from app.middleware.tenant_decorators import is_active_org_admin
+
+    if not is_active_org_admin():
+        abort(403)
 
 
 def _override_key(persona_key):
@@ -126,12 +119,20 @@ def admin_prompts_data():
 
 @unified_ai_chat_bp.route("/admin/prompts/<persona_key>/update", methods=["POST"])
 @login_required
-# platform-admin-ok: guarded by an in-body call to _require_platform_admin()
-# above, not a decorator -- check_platform_admin_coverage.py only recognises
-# the decorator form.
+@platform_admin_required
 def admin_prompt_update(persona_key):
-    """Update (or create) a DB override for a persona's prompt config."""
-    _require_platform_admin()
+    """Update (or create) a DB override for a persona's prompt config.
+
+    R3-3 (PR 428 round 4, settling with review-pr430-v3.md's DEF-6/PR 430
+    ruling): ``_require_admin()`` (active-org) is not the right authority
+    for ``AIPromptTemplate`` -- a table with no organisation column, whose
+    rows are shown to every tenant. ``platform_admin_required`` is the
+    operative check here; ``_require_admin()`` is kept as well (a no-op
+    once platform_admin_required has already passed) so the function stays
+    safe to call on its own from any future caller that doesn't stack the
+    decorator.
+    """
+    _require_admin()
 
     if persona_key not in PERSONA_CONFIGS:
         return jsonify({"error": f"Unknown persona: {persona_key}"}), 404
@@ -184,12 +185,13 @@ def admin_prompt_update(persona_key):
 
 @unified_ai_chat_bp.route("/admin/prompts/<persona_key>/reset", methods=["POST"])
 @login_required
-# platform-admin-ok: guarded by an in-body call to _require_platform_admin()
-# below, not a decorator -- check_platform_admin_coverage.py only recognises
-# the decorator form.
+@platform_admin_required
 def admin_prompt_reset(persona_key):
-    """Remove the DB override for a persona, reverting to hardcoded defaults."""
-    _require_platform_admin()
+    """Remove the DB override for a persona, reverting to hardcoded defaults.
+
+    R3-3: same global-resource reasoning as ``admin_prompt_update`` above.
+    """
+    _require_admin()
 
     if persona_key not in PERSONA_CONFIGS:
         return jsonify({"error": f"Unknown persona: {persona_key}"}), 404

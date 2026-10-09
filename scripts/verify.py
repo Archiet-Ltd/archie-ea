@@ -515,6 +515,29 @@ def gate_error_signalling() -> Result:
     return Result("error-signalling", PASS if count == 0 else FAIL, detail, count, 0)
 
 
+def gate_is_admin_called() -> Result:
+    """R2-1 (PR 428 round 3): ``*user.is_admin`` referenced without calling
+    it. MUST BE ZERO.
+
+    ``User.is_admin`` is a bound method, not a property -- an unparenthesized
+    ``not current_user.is_admin`` tests the method object itself, which is
+    always truthy, so the guard admits every signed-in user including a
+    plain Viewer. 37 such sites were found by the PR 428 round 2 cloud
+    review across solution_design_routes.py, the AI-chat admin routes, the
+    ADM kanban routes, import history/sophisticated-import, the enterprise
+    capabilities API and the ADM permissions helper; every one of them was
+    an "owner or admin" / "admin only" guard that enforced nothing.
+    """
+    proc = _run([sys.executable, "scripts/check_is_admin_called.py", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("is-admin-called", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count == 0 else "run scripts/check_is_admin_called.py to list them"
+    return Result("is-admin-called", PASS if count == 0 else FAIL, detail, count, 0)
+
+
 def gate_silent_data() -> Result:
     """A server-side failure returned to the caller as data. MUST BE ZERO.
 
@@ -1802,6 +1825,15 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_evidence_contract.py; add a test or Evidence: "
                          "trailer, and add Proven-against: to every registered checker",
              tags=["static", "process", "evidence"]),
+        Gate("untyped-property-writes",
+             "no new direct ArchiMate element property writes bypass the typed writer",
+             "ratchet",
+             lambda: gate_count_checker(
+                 "untyped-property-writes", "scripts/check_untyped_property_writes.py",
+                 baseline.get("untyped_property_writes", 0),
+             ),
+             remediation="run scripts/check_untyped_property_writes.py; route the write through PropertyService.set_element_property()/merge_element_properties()",
+             tags=["static", "architecture", "correctness"]),
         Gate("role-gate-coverage",
              "every declared delivery role resolves to at least one verifier gate",
              "ratchet",
@@ -1918,6 +1950,12 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_error_signalling.py; return an explicit "
                          "4xx/5xx so the client's !response.ok can see the failure",
              tags=["static", "correctness"]),
+        Gate("is-admin-called", "no *.is_admin reference used without calling it", "zero",
+             gate_is_admin_called,
+             remediation="run scripts/check_is_admin_called.py; call it -- "
+                         "current_user.is_admin() -- or mark "
+                         "'is-admin-called-ok: <reason>' on the line",
+             tags=["static", "security"]),
         Gate("silent-data", "no server failure returned to the caller as data", "zero",
              gate_silent_data,
              remediation="run scripts/check_silent_data.py; let it propagate, or log "

@@ -8,6 +8,7 @@ docs/buckets/
 *.pyo
 env
 venv
+.venv
 *.env
 .env.*
 dist
@@ -243,6 +244,7 @@ scripts/check_*.py
 !scripts/check_composer_url_params.py
 !scripts/check_crosswalk_writer_gated.py
 !scripts/check_platform_admin_coverage.py
+!scripts/check_is_admin_called.py
 scripts/patch_*.py
 scripts/find_*.py
 scripts/delete_*.py

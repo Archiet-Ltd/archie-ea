@@ -118,6 +118,9 @@ class RoadmapWorkPackage(db.Model):
         nullable=True,
         index=True,
     )
+    # Set when the row is copied across (merge or bridge); survives the unified
+    # copy's deletion so the row is never merged again.
+    retired_at = Column(DateTime, nullable=True)
 
     # Relationships
     deliverables = relationship(
@@ -259,6 +262,13 @@ class RoadmapDeliverable(TenantMixin, db.Model):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = Column(Integer, nullable=True)
     updated_by = Column(Integer, nullable=True)
+
+    # This store is retired into ``deliverables`` (never dropped): the row copied
+    # there is ``retired_into_id``; ``retired_at`` survives that copy's deletion.
+    retired_into_id = Column(
+        Integer, ForeignKey("deliverables.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    retired_at = Column(DateTime, nullable=True)
 
     # Relationships
     work_package = relationship("RoadmapWorkPackage", back_populates="deliverables")

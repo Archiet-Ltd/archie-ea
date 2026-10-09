@@ -26,6 +26,7 @@ from flask import Blueprint, current_app, jsonify, render_template, request
 from flask_login import login_required
 
 from app.decorators import admin_required
+from app.middleware.tenant_decorators import platform_admin_required
 from app.services.security_hardening import SecurityMiddleware
 
 admin_security_bp = Blueprint("admin_security", __name__)
@@ -72,6 +73,10 @@ def _rate_limiter_installed():
 
 @admin_security_bp.route("/admin/security", methods=["GET"])
 @login_required
+# Deployment-wide security posture (response headers, rate-limit store), not
+# tenant data -- genuinely platform-wide. admin_required alone let any
+# tenant's own admin reach it (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def security_dashboard():
     """Show the response headers and rate-limit state this deployment really has."""
@@ -88,6 +93,7 @@ def security_dashboard():
 
 @admin_security_bp.route("/api/admin/security/rotate-secret", methods=["POST"])
 @login_required
+@platform_admin_required
 @admin_required
 def rotate_secret():
     """Generate a candidate SECRET_KEY. Nothing is rotated by this call."""

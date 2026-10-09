@@ -2039,11 +2039,23 @@ def api_health_scorecard():
         # ------------------------------------------------------------------ #
         # Fetch raw counts (union of legacy + inference relationship tables)  #
         # ------------------------------------------------------------------ #
-        # Scope every count to the signed-in tenant explicitly. These are COLUMN
-        # queries (func.count(...)), and this codebase's isolation is
-        # with_loader_criteria, which only applies to ENTITY queries — so an
-        # unscoped func.count() silently reports every organisation's rows. The
-        # same defect put another tenant's totals in the sidebar.
+        # Corrected 2026-10-08 (hotfix round 2): the previous version of this
+        # comment claimed with_loader_criteria "only applies to ENTITY queries",
+        # so a column query like func.count(Model.id) would leak every
+        # organisation's rows unless wrapped in _scope(). Tested directly
+        # against this app's own do_orm_execute listener: that's not the real
+        # line. with_loader_criteria fires for any ORM-aware query through a
+        # mapped attribute on a TenantMixin model -- func.count(ArchiMateElement.id)
+        # included -- whether it selects the full entity or just a column, so
+        # total_elements/legacy_rels below are already scoped without _scope();
+        # it's kept anyway for explicitness, not because it's load-bearing. What
+        # with_loader_criteria genuinely does not reach is (a) a model that isn't
+        # a TenantMixin in the first place -- InfRel carries no organization_id,
+        # which is why its counts below join through the (scoped) source
+        # ArchiMateElement instead -- and (b) raw SQL / text(), which bypasses the
+        # ORM layer entirely regardless of column-vs-entity shape -- see the
+        # has_plateau and cross-layer-fallback raw queries further down, which
+        # both need their own explicit organization_id predicate for that reason.
         from flask import g
 
         _org = getattr(g, "current_org_id", None)
@@ -2057,7 +2069,17 @@ def api_health_scorecard():
         legacy_rels = _scope(
             db.session.query(func.count(ArchiMateRelationship.id)), ArchiMateRelationship
         ).scalar() or 0
-        inference_rels = db.session.query(func.count(InfRel.id)).scalar() or 0
+        # InfRel carries no organization_id (see architecture_inference_relationship.py);
+        # scope it by joining to the source element, which does. source_id/target_id are
+        # expected to agree on organisation for any row where both elements still exist and
+        # belong to one org -- this join does not verify that agreement, it is a read-side
+        # count fix only.
+        inference_rels = _scope(
+            db.session.query(func.count(InfRel.id)).join(
+                ArchiMateElement, ArchiMateElement.id == InfRel.source_id
+            ),
+            ArchiMateElement,
+        ).scalar() or 0
         total_rels = legacy_rels + inference_rels
 
         # Elements per layer
@@ -2082,13 +2104,30 @@ def api_health_scorecard():
 
         # Elements that have any relationship (source or target) — check both tables
         legacy_ids = set()
-        for row in db.session.query(ArchiMateRelationship.source_id).all():
+        for row in _scope(
+            db.session.query(ArchiMateRelationship.source_id), ArchiMateRelationship
+        ).all():
             legacy_ids.add(row[0])
-        for row in db.session.query(ArchiMateRelationship.target_id).all():
+        for row in _scope(
+            db.session.query(ArchiMateRelationship.target_id), ArchiMateRelationship
+        ).all():
             legacy_ids.add(row[0])
-        for row in db.session.query(InfRel.source_id).all():
+        # InfRel carries no organization_id -- scope via the same join-through-
+        # source-element pattern as inference_rels above (source_id and target_id
+        # are expected to agree on organisation; this does not verify that).
+        for row in _scope(
+            db.session.query(InfRel.source_id).join(
+                ArchiMateElement, ArchiMateElement.id == InfRel.source_id
+            ),
+            ArchiMateElement,
+        ).all():
             legacy_ids.add(row[0])
-        for row in db.session.query(InfRel.target_id).all():
+        for row in _scope(
+            db.session.query(InfRel.target_id).join(
+                ArchiMateElement, ArchiMateElement.id == InfRel.source_id
+            ),
+            ArchiMateElement,
+        ).all():
             legacy_ids.add(row[0])
         connected_count = (
             db.session.query(func.count(ArchiMateElement.id))
@@ -2102,8 +2141,15 @@ def api_health_scorecard():
             .group_by(ArchiMateRelationship.type)
             .all()
         )
+        # Same join-through-ArchiMateElement-plus-_scope() pattern as inference_rels
+        # above: InfRel carries no organization_id of its own.
         inf_type_rows = (
-            db.session.query(InfRel.rel_type, func.count(InfRel.id))
+            _scope(
+                db.session.query(InfRel.rel_type, func.count(InfRel.id)).join(
+                    ArchiMateElement, ArchiMateElement.id == InfRel.source_id
+                ),
+                ArchiMateElement,
+            )
             .group_by(InfRel.rel_type)
             .all()
         )
@@ -2133,6 +2179,14 @@ def api_health_scorecard():
             .all())
         # Fallback: count relationships crossing layers via raw SQL for reliability
         try:
+            # Both union halves must carry the same org predicate as every other
+            # count in this function -- raw SQL is not reached by with_loader_criteria
+            # at all, scoped or not, so leaving either half unfiltered leaks every
+            # organisation's cross-layer pairs to whoever is signed in. The predicate
+            # is a static part of the query text (never built from the org id, which
+            # is only ever bound as :org) so this isn't the string-built-SQL shape
+            # bandit's B608 flags -- `:org IS NULL` makes the clause a no-op the same
+            # way the old conditional-fragment version did, without an f-string.
             _cross_sql = """
                 SELECT src_layer, tgt_layer, SUM(cnt) AS cnt FROM (
                     SELECT LOWER(COALESCE(src.layer,'?')) AS src_layer,
@@ -2143,6 +2197,7 @@ def api_health_scorecard():
                     JOIN archimate_elements tgt ON r.target_id = tgt.id
                     WHERE LOWER(COALESCE(src.layer,'?')) <> LOWER(COALESCE(tgt.layer,'?'))
                       AND LOWER(COALESCE(r.type,'')) NOT IN ('composition','aggregation')
+                      AND (:org IS NULL OR src.organization_id = :org)
                     GROUP BY 1, 2
                     UNION ALL
                     SELECT LOWER(COALESCE(src.layer,'?')) AS src_layer,
@@ -2153,12 +2208,13 @@ def api_health_scorecard():
                     JOIN archimate_elements tgt ON r.target_id = tgt.id
                     WHERE LOWER(COALESCE(src.layer,'?')) <> LOWER(COALESCE(tgt.layer,'?'))
                       AND LOWER(COALESCE(r.rel_type,'')) NOT IN ('composition','aggregation')
+                      AND (:org IS NULL OR src.organization_id = :org)
                     GROUP BY 1, 2
                 ) combined
                 GROUP BY src_layer, tgt_layer
                 ORDER BY cnt DESC
             """
-            cross_pairs_rows = db.session.execute(text(_cross_sql)).fetchall()
+            cross_pairs_rows = db.session.execute(text(_cross_sql), {"org": _org}).fetchall()
             cross_pairs = [{"from": row[0] or "?", "to": row[1] or "?", "count": row[2]} for row in cross_pairs_rows]
         except Exception:
             db.session.rollback()
@@ -2265,13 +2321,18 @@ def api_health_scorecard():
 
         has_plateau = 0
         try:
+            # Raw SQL, same as the cross-layer fallback below -- never reached by
+            # with_loader_criteria, so the org predicate has to be added here by hand.
+            _plateau_sql = (
+                "SELECT COUNT(*) FROM archimate_elements "
+                "WHERE plateau IS NOT NULL AND plateau != ''"
+            )
+            _plateau_params = {}
+            if _org is not None:
+                _plateau_sql += " AND organization_id = :org"
+                _plateau_params["org"] = _org
             has_plateau = (
-                db.session.execute(
-                    _sa_text(
-                        "SELECT COUNT(*) FROM archimate_elements "
-                        "WHERE plateau IS NOT NULL AND plateau != ''"
-                    )
-                ).scalar()
+                db.session.execute(_sa_text(_plateau_sql), _plateau_params).scalar()
                 or 0
             )
         except Exception as exc:

@@ -69,10 +69,18 @@ class AuthService:
 
     @staticmethod
     def is_admin(user=None) -> bool:
-        """Check if *user* (default: current_user) is an admin."""
+        """Check if *user* (default: current_user) is an admin of the
+        ACTIVE organisation.
+
+        R3-1 (PR 428 round 4): ``getattr(user, "is_admin", False)`` with no
+        call returns the bound method, always truthy for every signed-in
+        user -- the same bug class this round fixes elsewhere. No current
+        caller uses this method (confirmed: grepped the whole tree), but a
+        static source check cannot distinguish dead code from the next
+        caller, so it is fixed the same way rather than left as a landmine.
+        ``is_superuser`` does not exist on ``User`` at all.
+        """
+        from app.middleware.tenant_decorators import is_active_org_admin
+
         user = user or current_user
-        return (
-            getattr(user, "is_admin", False)
-            or getattr(user, "is_superuser", False)
-            or AuthService.user_has_role(user, "admin")
-        )
+        return is_active_org_admin(user) or AuthService.user_has_role(user, "admin")

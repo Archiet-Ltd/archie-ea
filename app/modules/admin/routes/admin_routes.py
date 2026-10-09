@@ -1870,6 +1870,12 @@ def abacus_dashboard():
 
 @admin_bp.route("/seed-management")
 @login_required
+# SeedManagementService seeds global reference/catalogue tables shared by
+# every tenant (vendor organisations/products, capability taxonomies, feature
+# flags, APQC processes, AI prompt templates, ...), none of them org-scoped.
+# admin_required alone let any tenant's own admin reach it
+# (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def seed_management():
     """Seed management dashboard."""
@@ -1883,6 +1889,7 @@ def seed_management():
 
 @admin_bp.route("/api/seed-status")
 @login_required
+@platform_admin_required
 @admin_required
 def seed_status():
     """API: Get current seed status."""
@@ -1896,6 +1903,7 @@ def seed_status():
 
 @admin_bp.route("/api/seed/<key>", methods=["POST"])
 @login_required
+@platform_admin_required
 @admin_required
 @audit_log("admin_seed_run")
 def seed(key):
@@ -1910,6 +1918,7 @@ def seed(key):
 
 @admin_bp.route("/api/seed-all", methods=["POST"])
 @login_required
+@platform_admin_required
 @admin_required
 @audit_log("admin_seed_all")
 def seed_all():
