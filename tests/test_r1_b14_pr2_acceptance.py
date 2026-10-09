@@ -170,6 +170,7 @@ def test_numeric_property_imports_as_number_with_unit(app, db_session, make_org,
         svc = ArchiMateImportService()
         parsed = svc.parse_oef_xml(OEF_TYPED_PROPERTIES)
         result = svc.execute_import(parsed, strategy="skip_duplicates")
+        assert result["created"] >= 1
 
         e1 = ArchiMateElement.query.filter_by(name="API Gateway").first()
         assert e1 is not None
