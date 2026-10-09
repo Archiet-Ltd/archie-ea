@@ -508,8 +508,8 @@ def llms_txt():
     lines.append("")
     lines.append(
         "> Entelim is the open-source Enterprise Intelligence Model: "
-        "one ArchiMate model of what you run, what depends on it and who "
-        "owns it, that you can ask plain questions."
+        "build your company's architecture, applications, risks and gaps "
+        "as one model you can ask."
     )
     lines.append("")
 
@@ -544,8 +544,8 @@ def llms_full_txt():
     lines.append("")
     lines.append(
         "> Entelim is the open-source Enterprise Intelligence Model: "
-        "one ArchiMate model of what you run, what depends on it and who "
-        "owns it, that you can ask plain questions."
+        "build your company's architecture, applications, risks and gaps "
+        "as one model you can ask."
     )
     lines.append("")
 
