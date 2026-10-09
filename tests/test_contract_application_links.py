@@ -3,10 +3,9 @@
 Also covers the renewals view's last-day-to-cancel column and the dash
 for contracts with no notice period recorded.
 
-Pins the R1-B10 PR 2 implementation: ContractApplication had no writer,
-notice_period_days defaulted to 90 (so "not recorded" was impossible),
-and the renewals view sorted by days_until_renewal without showing the
-last day to cancel.
+ContractApplication had no writer, notice_period_days defaulted to 90
+(so "not recorded" was impossible), and the renewals view sorted by
+days_until_renewal without showing the last day to cancel.
 """
 
 import uuid
