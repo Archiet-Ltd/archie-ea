@@ -1,21 +1,17 @@
 /* Pricing page: plan cards, billing toggle, comparison table, bands, FAQ.
-   Loaded by public/pricing.html only. Values follow the public-site spec set by the
-   template craft fixes: H1 48/36, H2 30, 96px section spacing, 44px / 8px buttons,
-   1152px container with a 680px prose measure. Colours are the shadcn tokens. */
+   Loaded by public/pricing.html only. The lead (H1 + answer block) and the page's
+   outer width now reuse .public-container/.public-page-content from public_site.css
+   (the template craft fixes' shared system) instead of a parallel set of rules;
+   only the pricing-specific pieces below (cards, table, toggle, bands, FAQ) stay here.
+   Colours are the shadcn tokens. */
 
 .pricing-page { --pp-border: hsl(var(--border)); --pp-muted: hsl(var(--muted-foreground)); --pp-fg: hsl(var(--foreground)); --pp-primary: hsl(var(--primary)); }
-.pricing-page .pp-wrap { max-width: 72rem; margin-inline: auto; padding: 4rem 1rem; }
-@media (min-width: 640px) { .pricing-page .pp-wrap { padding-inline: 1.5rem; } }
-@media (min-width: 768px) { .pricing-page .pp-wrap { padding-block: 6rem; } }
 .pricing-page .pp-section { margin-top: 4rem; }
 .pricing-page .pp-section--first { margin-top: 3rem; }
 @media (min-width: 768px) { .pricing-page .pp-section { margin-top: 6rem; } .pricing-page .pp-section--first { margin-top: 3rem; } }
 
-/* Lead: H1 + answer block (prose measure 680px) */
-.pricing-page .pp-lead { max-width: 42.5rem; }
-.pricing-page .pp-lead h1 { font-size: 2.25rem; line-height: 1.15; font-weight: 700; margin: 0 0 1rem; }
-@media (min-width: 768px) { .pricing-page .pp-lead h1 { font-size: 3rem; } }
-.pricing-page .pp-lead p { font-size: 1.125rem; line-height: 1.7; margin: 0 0 1rem; color: var(--pp-muted); }
+/* Lead paragraphs: first reads as normal text, the rest as supporting detail. */
+.pricing-page .pp-lead p { margin: 0 0 1rem; color: var(--pp-muted); }
 .pricing-page .pp-lead p:first-of-type { color: var(--pp-fg); }
 .pricing-page h2 { font-size: 1.5rem; line-height: 1.25; font-weight: 600; margin: 0 0 1rem; }
 @media (min-width: 768px) { .pricing-page h2 { font-size: 1.875rem; } }
