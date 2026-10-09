@@ -10,8 +10,10 @@
 {% block title %}{{ page.title }}{% endblock %}
 
 {% block meta_description %}
-<meta name="description" content="{{ page.description }}">
-<link rel="canonical" href="{{ page.effective_canonical_url }}">
+{% from 'partials/_seo_meta.html' import seo_meta %}
+{{ seo_meta(page.self_canonical_url, page.description, page.is_held) }}
+<meta property="og:title" content="{{ page.title }}">
+<meta name="twitter:title" content="{{ page.title }}">
 {% endblock %}
 
 {% block header %}
