@@ -90,7 +90,7 @@ def _attribute_org(conn, dry_run=False, unified_ids=None, emit=True):
     for label, parent_table, fk_column in _BACKFILL_STEPS:
         eligible = _count(
             conn,
-            f'SELECT count(*) FROM unified_work_packages t '
+            f'SELECT count(*) FROM unified_work_packages t '  # nosec B608 -- parent_table/fk_column come from the constant _BACKFILL_STEPS; `only` is '' or a fixed fragment; values are bound
             f'JOIN "{parent_table}" p ON p.id = t.{fk_column} '
             f'WHERE t.organization_id IS NULL AND p.organization_id IS NOT NULL{only}',
             **params,
@@ -103,7 +103,7 @@ def _attribute_org(conn, dry_run=False, unified_ids=None, emit=True):
             continue
         conn.execute(
             text(
-                f'UPDATE unified_work_packages AS t SET organization_id = p.organization_id '
+                f'UPDATE unified_work_packages AS t SET organization_id = p.organization_id '  # nosec B608 -- parent_table/fk_column come from the constant _BACKFILL_STEPS; `only` is '' or a fixed fragment; values are bound
                 f'FROM "{parent_table}" AS p '
                 f'WHERE p.id = t.{fk_column} AND t.organization_id IS NULL '
                 f'AND p.organization_id IS NOT NULL{only}'
@@ -116,7 +116,7 @@ def _attribute_org(conn, dry_run=False, unified_ids=None, emit=True):
 
     eligible_creator = _count(
         conn,
-        "SELECT count(*) FROM unified_work_packages t "
+        "SELECT count(*) FROM unified_work_packages t "  # nosec B608 -- `only` is '' or a fixed fragment; the rest is literal; uids are bound
         "JOIN users u ON u.id = t.created_by "
         f"WHERE t.organization_id IS NULL AND u.organization_id IS NOT NULL{only}",
         **params,
@@ -128,7 +128,7 @@ def _attribute_org(conn, dry_run=False, unified_ids=None, emit=True):
         else:
             conn.execute(
                 text(
-                    "UPDATE unified_work_packages AS t SET organization_id = u.organization_id "
+                    "UPDATE unified_work_packages AS t SET organization_id = u.organization_id "  # nosec B608 -- `only` is '' or a fixed fragment; the rest is literal; uids are bound
                     "FROM users AS u "
                     "WHERE u.id = t.created_by AND t.organization_id IS NULL "
                     f"AND u.organization_id IS NOT NULL{only}"
@@ -336,7 +336,7 @@ def _insert_missing(conn, spec, ids, stats, fallback_org_id=None):
            f"'{table}'", "s.id"]
     )
     sql = (
-        "WITH inserted AS ("
+        "WITH inserted AS ("  # nosec B608 -- table, columns and expressions come from the constant _MERGE_SOURCES (table also gated by _SPEC_BY_TABLE); ids are bound; org_expr/org_joins/fills are literals in _MERGE_SOURCES
         f"INSERT INTO unified_work_packages ({', '.join(insert_columns)}) "
         f"SELECT {', '.join(select_columns)} "
         f'FROM "{table}" s {spec["org_joins"]} '
@@ -362,7 +362,7 @@ def _insert_missing(conn, spec, ids, stats, fallback_org_id=None):
     # A unified copy that already exists but whose source row was never marked
     # (an interrupted run): link it, do not copy again.
     relink = (
-        f'UPDATE "{table}" AS s SET retired_into_id = uwp.id, retired_at = CURRENT_TIMESTAMP '
+        f'UPDATE "{table}" AS s SET retired_into_id = uwp.id, retired_at = CURRENT_TIMESTAMP '  # nosec B608 -- table, columns and expressions come from the constant _MERGE_SOURCES (table also gated by _SPEC_BY_TABLE); ids are bound
         "FROM unified_work_packages uwp "
         "WHERE uwp.source_table = :source_table AND uwp.source_id = s.id "
         f"AND s.retired_into_id IS NULL AND s.retired_at IS NULL{_only_ids(ids)}"
@@ -457,7 +457,7 @@ def _move_links_with_element(conn, table, source_ids, stats):
     from app.services import work_package_service as svc
 
     rows = conn.execute(text(
-        "SELECT u.id, u.organization_id, u.archimate_element_id, s.id, s.archimate_element_id, "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+        "SELECT u.id, u.organization_id, u.archimate_element_id, s.id, s.archimate_element_id, "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store  # nosec B608 -- table is the constant spec table (via _write_group/_move_links_with_element); the refusal SQL is built from literal column names
         "(SELECT ae.organization_id FROM archimate_elements ae WHERE ae.id = s.archimate_element_id), "
         f"{svc.element_refusal_sql('s.archimate_element_id', 'u.organization_id', 'u.id')} "
         "FROM unified_work_packages u "  # tenancy-ok: same
@@ -520,7 +520,7 @@ def _write_group(conn, table, targets, columns, ids, stats, moved):
             continue
         assigns = [f"{t} = {e}" for c in cols for t, e in targets[c]]
         sql = (
-            f"UPDATE unified_work_packages AS u SET {', '.join(assigns)} "
+            f"UPDATE unified_work_packages AS u SET {', '.join(assigns)} "  # nosec B608 -- assigned columns are allow-listed by `c in targets` (built from constant _MERGE_SOURCES); table is the constant spec table; ids are bound
             f'FROM "{table}" s '
             "WHERE u.source_table = :source_table AND u.source_id = s.id AND s.id = ANY(:ids) "
             "AND s.retired_into_id IS NOT NULL"
@@ -558,7 +558,7 @@ def _write_element_group(conn, table, targets, columns, ids, stats, moved):
         if attempt(columns, [source_id]):
             continue
         row = conn.execute(text(
-            "SELECT u.id, u.organization_id, s.archimate_element_id FROM unified_work_packages u "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+            "SELECT u.id, u.organization_id, s.archimate_element_id FROM unified_work_packages u "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store  # nosec B608 -- table is the constant spec table; ids are bound
             f'JOIN "{table}" s ON s.id = u.source_id WHERE u.source_table = :t AND s.id = :i'),
             {"t": table, "i": source_id}).first()
         if row is not None:
@@ -658,7 +658,7 @@ def _fill_missing(conn, spec, ids, stats):
         params["ids"] = list(ids)
     for target, expr in spec["fills"]:
         sql = (
-            f"UPDATE unified_work_packages AS u SET {target} = {expr} "
+            f"UPDATE unified_work_packages AS u SET {target} = {expr} "  # nosec B608 -- table, columns and expressions come from the constant _MERGE_SOURCES (table also gated by _SPEC_BY_TABLE); ids are bound; target/expr come from the constant fills
             f'FROM "{table}" s '
             "WHERE u.source_table = :source_table AND u.source_id = s.id "
             f"AND (u.{target} IS NULL OR u.{target}::text = '') "
@@ -668,7 +668,7 @@ def _fill_missing(conn, spec, ids, stats):
 
     if table == "work_packages":
         sql = (
-            "UPDATE unified_work_packages AS u SET parent_id = pu.id "
+            "UPDATE unified_work_packages AS u SET parent_id = pu.id "  # nosec B608 -- `_only_ids` returns '' or a fixed fragment; the rest is literal; ids are bound
             "FROM work_packages s "
             "JOIN unified_work_packages pu ON pu.source_table = 'work_packages' AND pu.source_id = s.parent_id "
             "WHERE u.source_table = 'work_packages' AND u.source_id = s.id "
@@ -685,7 +685,7 @@ def _fill_roadmap_source_data(conn, ids, stats):
     it as origin_source_id (the unified source_id keeps meaning the retired
     row's id). Written only where the target is empty."""
     sql = (
-        "SELECT u.id, s.source_data, s.source_id FROM unified_work_packages u "
+        "SELECT u.id, s.source_data, s.source_id FROM unified_work_packages u "  # nosec B608 -- `_only_ids` returns '' or a fixed fragment; the rest is literal; ids are bound
         "JOIN roadmap_work_packages s ON s.id = u.source_id "
         "WHERE u.source_table = 'roadmap_work_packages' "
         "AND (u.source_data IS NULL OR u.source_data = '')"
@@ -739,7 +739,7 @@ def _remap_dependencies(conn, table, ids, stats):
         params["ids"] = list(ids)
     rows = conn.execute(
         text(  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
-            "SELECT id, work_dependencies FROM unified_work_packages "
+            "SELECT id, work_dependencies FROM unified_work_packages "  # nosec B608 -- `only` is '' or a fixed fragment; the rest is literal; ids and table are bound
             f"WHERE source_table = :t AND dependencies_remapped_at IS NULL{only}"
         ),
         params,
@@ -790,7 +790,7 @@ def _union_roadmap_links(conn, ids, stats):
         params["ids"] = list(ids)
     rows = conn.execute(
         text(  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
-            "SELECT id, source_id, work_dependencies, capability_ids FROM unified_work_packages "
+            "SELECT id, source_id, work_dependencies, capability_ids FROM unified_work_packages "  # nosec B608 -- `only` is '' or a fixed fragment; the rest is literal; ids and table are bound
             f"WHERE source_table = :t AND dependencies_remapped_at IS NULL{only}"
         ),
         params,
@@ -837,7 +837,7 @@ def _union_roadmap_links(conn, ids, stats):
             sets.append("capability_ids = CAST(:caps AS json)")
             values["caps"] = json.dumps(new_caps)
             stats.add(f"{t}: capability links added", len(new_caps) - len(cap_ids))
-        conn.execute(text(f"UPDATE unified_work_packages SET {', '.join(sets)} WHERE id = :id"), values)  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+        conn.execute(text(f"UPDATE unified_work_packages SET {', '.join(sets)} WHERE id = :id"), values)  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store  # nosec B608 -- SET clauses are fixed literals; values are bound parameters
 
 
 def sync_source_rows(conn, table, ids=None, *, update_existing=False, fallback_org_id=None,
@@ -941,7 +941,7 @@ def _rows_with_associations(conn, source_ids):
     found = set()
     for assoc_table, _key in _ASSOCIATIONS.values():
         found.update(r[0] for r in conn.execute(
-            text(f"SELECT DISTINCT work_package_id FROM {assoc_table} "  # tenancy-ok: keyed by the work package's own id
+            text(f"SELECT DISTINCT work_package_id FROM {assoc_table} "  # tenancy-ok: keyed by the work package's own id  # nosec B608 -- assoc_table comes from the constant _ASSOCIATIONS; ids are bound
                  "WHERE work_package_id = ANY(:ids)"), {"ids": list(source_ids)}))
     return found
 
@@ -971,7 +971,7 @@ def _links_to_apply(conn, table, inserted, link_changes, relation_changes=None):
     if inserted:
         by_source = {old: new for new, old in inserted}
         for row in conn.execute(
-            text(f'SELECT id, {", ".join(columns)} FROM "{table}" WHERE id = ANY(:ids)'),
+            text(f'SELECT id, {", ".join(columns)} FROM "{table}" WHERE id = ANY(:ids)'),  # nosec B608 -- table is the constant spec table; columns come from the constant _LINK_SOURCE_COLUMNS; ids are bound
             {"ids": sorted(by_source)},
         ):
             values = {c: v for c, v in zip(columns, row[1:]) if v is not None}
@@ -1011,12 +1011,12 @@ def _links_to_apply(conn, table, inserted, link_changes, relation_changes=None):
 
 def _backfill_retired_at(conn, dry_run, stats):
     for table in RETIRED_TABLES:
-        n = _count(conn, f'SELECT count(*) FROM "{table}" WHERE retired_into_id IS NOT NULL AND retired_at IS NULL')
+        n = _count(conn, f'SELECT count(*) FROM "{table}" WHERE retired_into_id IS NOT NULL AND retired_at IS NULL')  # nosec B608 -- table iterates the constant RETIRED_TABLES
         if not n:
             continue
         if not dry_run:
             conn.execute(text(
-                f'UPDATE "{table}" SET retired_at = CURRENT_TIMESTAMP '
+                f'UPDATE "{table}" SET retired_at = CURRENT_TIMESTAMP '  # nosec B608 -- table iterates the constant RETIRED_TABLES
                 "WHERE retired_into_id IS NOT NULL AND retired_at IS NULL"))
         stats.add(f"{table}: retired_at set", n)
 
@@ -1041,7 +1041,7 @@ DELIVERABLE_TABLE = "roadmap_deliverables"
 def unmerged_counts(conn):
     tables = RETIRED_TABLES + ((DELIVERABLE_TABLE,) if _table_exists(conn, DELIVERABLE_TABLE) else ())
     return {
-        table: _count(conn, f'SELECT count(*) FROM "{table}" WHERE {_UNMERGED}')
+        table: _count(conn, f'SELECT count(*) FROM "{table}" WHERE {_UNMERGED}')  # nosec B608 -- table is from the constant RETIRED_TABLES plus the constant DELIVERABLE_TABLE
         for table in tables
     }
 
@@ -1050,12 +1050,12 @@ def _attributable_null_copies(conn):
     """Copied rows (source_table set) with no organisation although the chain of
     backfill-work-package-org would place them."""
     chain = " OR ".join(
-        f'EXISTS (SELECT 1 FROM "{parent}" p WHERE p.id = t.{column} AND p.organization_id IS NOT NULL)'
+        f'EXISTS (SELECT 1 FROM "{parent}" p WHERE p.id = t.{column} AND p.organization_id IS NOT NULL)'  # nosec B608 -- parent and column come from the constant _BACKFILL_STEPS
         for _label, parent, column in _BACKFILL_STEPS
-    ) + " OR EXISTS (SELECT 1 FROM users u WHERE u.id = t.created_by AND u.organization_id IS NOT NULL)"
+    ) + " OR EXISTS (SELECT 1 FROM users u WHERE u.id = t.created_by AND u.organization_id IS NOT NULL)"  # nosec B608 -- concatenates the constant-derived chain with a literal
     return _count(
         conn,
-        "SELECT count(*) FROM unified_work_packages t "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+        "SELECT count(*) FROM unified_work_packages t "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store  # nosec B608 -- chain is built only from the constant _BACKFILL_STEPS and literals
         f"WHERE t.source_table IS NOT NULL AND t.organization_id IS NULL AND ({chain})",
     )
 
@@ -1170,7 +1170,7 @@ def _ensure_foreign_keys(conn, stats, dry_run=False):
             continue
         orphans = _count(
             conn,
-            f'SELECT count(*) FROM "{table}" t WHERE t."{column}" IS NOT NULL '
+            f'SELECT count(*) FROM "{table}" t WHERE t."{column}" IS NOT NULL '  # nosec B608 -- table, column and target come from the constant _FOREIGN_KEYS (existence checked against the catalogue)
             f'AND NOT EXISTS (SELECT 1 FROM "{target}" p WHERE p.id = t."{column}")',
         )
         stats.add(f"{table}.{column}: orphan values set to NULL", orphans)
@@ -1179,7 +1179,7 @@ def _ensure_foreign_keys(conn, stats, dry_run=False):
             continue
         if orphans:
             conn.execute(text(
-                f'UPDATE "{table}" t SET "{column}" = NULL WHERE t."{column}" IS NOT NULL '  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
+                f'UPDATE "{table}" t SET "{column}" = NULL WHERE t."{column}" IS NOT NULL '  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store  # nosec B608 -- table, column and target come from the constant _FOREIGN_KEYS
                 f'AND NOT EXISTS (SELECT 1 FROM "{target}" p WHERE p.id = t."{column}")'
             ))
         conn.execute(text(
@@ -1231,7 +1231,7 @@ def _merge_roadmap_deliverables(conn, stats, dry_run=False):
             if _column_exists(conn, "deliverables", c)
         }
         new_id = conn.execute(text(
-            "INSERT INTO deliverables (name, description, unified_work_package_id, delivery_status, "
+            "INSERT INTO deliverables (name, description, unified_work_package_id, delivery_status, "  # nosec B608 -- extra columns are fixed names filtered by a catalogue check; values are bound
             "deliverable_type, target_date, delivered_date, review_date, approval_criteria, "
             "quality_score, approval_status, related_task_ids, application_component_id, "
             "created_at, updated_at" + "".join(", " + c for c in provenance) + ") "
@@ -1374,7 +1374,7 @@ def _association_ids(source_id, key, since=None):
             later = " AND created_at > :since" if since is not None else ""
             params = {"i": source_id, **({"since": since} if since is not None else {})}
             return [r[0] for r in db.session.execute(text(
-                f"SELECT {key} FROM {assoc_table} WHERE work_package_id = :i{later} ORDER BY id"),  # tenancy-ok: keyed by the work package's own id
+                f"SELECT {key} FROM {assoc_table} WHERE work_package_id = :i{later} ORDER BY id"),  # tenancy-ok: keyed by the work package's own id  # nosec B608 -- assoc_table and key come from the constant _ASSOCIATIONS (key is matched against it); ids are bound
                 params)]
     return []
 
@@ -1384,7 +1384,7 @@ def _column_ids(source_id, key):
     if key not in _LINK_SOURCE_COLUMNS.get(_ASSOCIATION_SOURCE, ()):
         return set()
     value = db.session.execute(text(
-        f'SELECT "{key}" FROM "{_ASSOCIATION_SOURCE}" WHERE id = :i'), {"i": source_id}).scalar()  # tenancy-ok: keyed by the work package's own id
+        f'SELECT "{key}" FROM "{_ASSOCIATION_SOURCE}" WHERE id = :i'), {"i": source_id}).scalar()  # tenancy-ok: keyed by the work package's own id  # nosec B608 -- key is checked against the constant _LINK_SOURCE_COLUMNS; table is the constant _ASSOCIATION_SOURCE; id is bound
     return {value} if value is not None else set()
 
 
@@ -1452,7 +1452,7 @@ def clear_untaken_elements(executor, stats=None, dry_run=False):
 
     def clear(conditions, earlier):
         sql = (
-            "WITH c AS (SELECT u.id, u.archimate_element_id AS element, "
+            "WITH c AS (SELECT u.id, u.archimate_element_id AS element, "  # nosec B608 -- conditions are literal strings passed by the two calls in this function; the refusal SQL is built from literal column names
             f"{svc.element_refusal_sql('u.archimate_element_id', 'u.organization_id', 'u.id', earlier)} AS why "
             "FROM unified_work_packages u WHERE u.archimate_element_id IS NOT NULL "
             "AND u.organization_id IS NOT NULL) "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
@@ -1498,13 +1498,13 @@ def _link_columns_to_relationships(stats, dry_run=False, unified_ids=None):
     # A marked row with an association row written after its marker (by a writer the bridge
     # did not see) is migrated again, adding only those rows.
     later = " OR ".join(
-        f"EXISTS (SELECT 1 FROM {table} a WHERE a.work_package_id = source_id "
+        f"EXISTS (SELECT 1 FROM {table} a WHERE a.work_package_id = source_id "  # nosec B608 -- table comes from the constant _ASSOCIATIONS
         "AND a.created_at > association_links_migrated_at)"
         for table, _key in _ASSOCIATIONS.values())
     has_later = (f"(source_table = :src AND association_links_migrated_at IS NOT NULL "
                  f"AND source_id IS NOT NULL AND ({later}))")
     rows = db.session.execute(text(
-        "SELECT id, plateau_id, gap_id, source_table, source_id, association_links_migrated_at, "
+        "SELECT id, plateau_id, gap_id, source_table, source_id, association_links_migrated_at, "  # nosec B608 -- has_later is built from the constant _ASSOCIATIONS and literals; scope is a fixed fragment; values are bound
         f"{has_later} "
         "FROM unified_work_packages "  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; rows are addressed by their own key or copied wholesale between the retired stores and the one store
         "WHERE organization_id IS NOT NULL AND (plateau_id IS NOT NULL OR gap_id IS NOT NULL "
@@ -1555,7 +1555,7 @@ def _merge_one(conn, spec, dry_run):
     """Merge every eligible row of one store (the deploy command's step)."""
     table = spec["table"]
     if dry_run:
-        eligible = _count(conn, f'SELECT count(*) FROM "{table}" WHERE {_UNMERGED}')
+        eligible = _count(conn, f'SELECT count(*) FROM "{table}" WHERE {_UNMERGED}')  # nosec B608 -- table is the constant spec table; _UNMERGED is a constant
         if eligible:
             click.echo(f"  - {table}: would merge {eligible} row(s) into unified_work_packages")
         else:

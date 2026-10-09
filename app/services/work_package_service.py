@@ -154,7 +154,7 @@ def element_refusal_sql(element: str, org: str, copy: str = "NULL", earlier: boo
     'shared' (another copy holds it; with `earlier`, one with a smaller id)."""
     other = f"ow.id < {copy}" if earlier else f"ow.id IS DISTINCT FROM {copy}"
     return (
-        "(CASE "
+        "(CASE "  # nosec B608 -- element, org and copy are SQL column references passed as literals by the three callers (no caller passes request data); `other` is built from them
         f"WHEN NOT EXISTS (SELECT 1 FROM archimate_elements ae WHERE ae.id = {element} "  # tenancy-ok: the organisation test is this expression
         f"AND ae.organization_id = {org}) THEN 'organisation' "
         f"WHEN NOT EXISTS (SELECT 1 FROM archimate_elements ae WHERE ae.id = {element} "  # tenancy-ok: same

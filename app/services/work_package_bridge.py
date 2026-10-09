@@ -297,7 +297,7 @@ def _after_flush(session, flush_context):
         )
         marks = {
             row[0]: row[1:] for row in conn.execute(
-                text(f'SELECT id, retired_into_id, retired_at FROM "{table}" WHERE id = ANY(:ids)'),
+                text(f'SELECT id, retired_into_id, retired_at FROM "{table}" WHERE id = ANY(:ids)'),  # nosec B608 -- table is a mapped table name of the four retired stores and was already gated by _SPEC_BY_TABLE in sync_source_rows; ids are bound
                 {"ids": list(objs)},
             )
         }
