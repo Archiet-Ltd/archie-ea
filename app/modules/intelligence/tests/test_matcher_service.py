@@ -6,7 +6,7 @@ Every new test fails on main and passes here.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, UTC
 
 
 def _element(db_session, org_id: int, name: str, type_name: str = "ApplicationComponent", layer: str = "Application"):
@@ -23,6 +23,7 @@ def _element(db_session, org_id: int, name: str, type_name: str = "ApplicationCo
     return row
 
 
+# crosswalk-gate-ok: test helper for setting up crosswalk rows
 def _crosswalk(db_session, org_id: int, source_system: str, external_id: str, element_id: int):
     from app.models.external_identity_crosswalk import ExternalIdentityCrosswalk
 
@@ -60,7 +61,7 @@ def test_reimport_after_rename_updates_in_place_via_crosswalk(
         CrosswalkService.write_link("jira", "APP-456", original.id)
 
         # Second import: element renamed, same external id.
-        renamed = _element(db_session, org.id, "Revenue Hub")
+        _element(db_session, org.id, "Revenue Hub")
 
         # The matcher should find the crosswalk match and return the renamed element.
         result = MatcherService.match(
@@ -247,7 +248,6 @@ def test_proposal_never_created_across_organisations(
     """A proposal is never created across organisations; the matcher's
     candidate set never contains B's records for A."""
     from app.modules.intelligence.services.matcher_service import MatcherService
-    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
 
     org_a = make_org("matcher-prop-a")
     org_b = make_org("matcher-prop-b")
@@ -285,7 +285,6 @@ def test_duplicate_detection_utils_delegates_to_matcher(
     from app.modules.duplicate_detection.services.duplicate_detection_utils import (
         DuplicateDetectionUtils,
     )
-    from app.modules.intelligence.services.matcher_service import MatcherService
 
     org = make_org("matcher-delegate-utils")
 
@@ -362,7 +361,6 @@ def test_crosswalk_match_updates_crosswalk_on_reimport(
     """Re-importing with a renamed element updates the crosswalk link."""
     from app.modules.intelligence.services.crosswalk_service import CrosswalkService
     from app.modules.intelligence.services.matcher_service import MatcherService
-    from app.models.external_identity_crosswalk import ExternalIdentityCrosswalk
 
     org = make_org("matcher-reimport")
 
