@@ -486,7 +486,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 66 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 67 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -512,6 +512,7 @@ to reconfirm the count before trusting it:**
 | `unfenced-tables` | a database table with no `TenantMixin` that is not listed in `scripts/unfenced_tables.txt` (a new one is a decision) | ratchet @ 0 |
 | `llm-boundary` | a codegen emitter calling an LLM directly | ratchet @ 0 |
 | `evidence-contract` | behavioural changes/checkers missing evidence or provenance | ratchet @ 29 |
+| `untyped-property-writes` | direct ArchiMate element property writes bypassing the typed writer | ratchet @ 1 |
 | `role-gate-coverage` | a declared delivery role resolving to no verifier gate | ratchet @ 7 |
 | `ai-evidence-rules` | an AI persona missing evidence/no-fabrication rules | must be 0 |
 | `ai-tool-guard` | an AI mutating tool bypassing permission/approval classification | must be 0 |

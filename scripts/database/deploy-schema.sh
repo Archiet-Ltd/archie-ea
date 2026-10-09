@@ -12,6 +12,7 @@ set -eu
 flask --app manage init-db
 flask --app manage schema-upgrade
 flask --app manage reconcile-schema
+flask --app manage migrate-connector-credentials || echo 'WARN connector credential migration skipped - ServiceNow/Lucidchart secrets saved before this fix remain only in the retired encrypted columns; ServiceNowConnectorService and LucidchartConnectorService read the new OrgCredentialVault store and will treat those organisations as unconfigured until it runs'
 flask --app manage reconcile-admin-flags || echo 'WARN reconcile-admin-flags skipped - stale is_org_admin flags may disagree with is_admin() until it runs'
 flask --app manage backfill-ai-chat-approval-org || echo 'WARN AI chat approval tenancy backfill skipped - legacy approvals remain unavailable for review until requester organization ownership is restored'
 flask --app manage backfill-archimate-layer-casing || echo 'WARN archimate layer casing backfill skipped - ArchiMate elements stored with a capitalised layer will not match any query until it runs'
