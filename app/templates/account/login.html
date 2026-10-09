@@ -47,15 +47,13 @@
 
         <div class="relative">
             <div class="flex items-center gap-3">
-                <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                    <i data-lucide="layout-grid" class="h-5 w-5"></i>
-                </span>
-                <span class="login-brand__wordmark text-lg font-bold tracking-[0.18em]">Entelim</span>
+                <img src="{{ url_for('static', filename='brand/entelim-logo.svg') }}" alt="Entelim" class="h-9">
+                <span class="sr-only">Entelim</span>
             </div>
         </div>
 
         <div class="relative max-w-md">
-            <p class="login-brand__kicker text-xs font-semibold uppercase tracking-[0.32em]">Enterprise Architecture Platform</p>
+            <p class="login-brand__kicker text-xs font-semibold uppercase tracking-[0.32em]">Enterprise Intelligence Management</p>
             <h2 class="login-brand__headline mt-5 text-[2rem] font-bold leading-tight">
                 Architecture, governed<br>from strategy to code.
             </h2>
@@ -78,16 +76,14 @@
         <div class="w-full max-w-md">
             {# mobile-only wordmark (brand panel is hidden < lg) #}
             <div class="mb-8 flex items-center gap-2.5 lg:hidden">
-                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                    <i data-lucide="layout-grid" class="h-4 w-4"></i>
-                </span>
-                <span class="text-base font-bold tracking-[0.18em] text-foreground">Entelim</span>
+                <img src="{{ url_for('static', filename='brand/entelim-logo.svg') }}" alt="Entelim" class="h-8">
+                <span class="sr-only">Entelim</span>
             </div>
 
             <div class="rounded-xl border bg-card text-card-foreground shadow-sm">
                 <div class="flex flex-col space-y-1.5 p-6 pb-2">
                     <h1 id="login-title" class="text-2xl font-semibold leading-none tracking-tight">Welcome back</h1>
-                    <p class="text-sm text-muted-foreground">Sign in to your enterprise architecture workspace</p>
+                    <p class="text-sm text-muted-foreground">Sign in to your enterprise intelligence workspace</p>
                 </div>
                 <div class="p-6 pt-4"
                      x-data="{ 

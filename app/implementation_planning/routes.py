@@ -16,10 +16,10 @@ Complies with:
 
 from datetime import datetime  # dead-code-ok
 
-from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
+from werkzeug.exceptions import HTTPException
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
-from sqlalchemy import or_, text  # dead-code-ok
-from sqlalchemy.orm import joinedload  # dead-code-ok
+from sqlalchemy import or_
 
 from .. import db  # dead-code-ok
 from ..models.implementation_migration import (
@@ -27,12 +27,39 @@ from ..models.implementation_migration import (
     ImplementationEvent,
     Gap as ImplementationGap,
     Plateau as ImplementationPlateau,
-    WorkPackage as ImplementationWorkPackage,
 )
+from ..models.unified_work_package import UnifiedWorkPackage as ImplementationWorkPackage
+from ..services import work_package_service
 from ..models.unified_capability import UnifiedCapability
 from ..services.gap_discovery_service import GapDiscoveryService
 from . import implementation_planning
 from app.utils.pagination import safe_int_arg
+
+
+def _org_id():
+    from app.utils.tenant import current_organization_id
+
+    return current_organization_id()
+
+
+def _fields_from(data, partial=False):
+    """The writer's field names from a form or JSON body. A partial body
+    (edit) carries only the keys that were sent."""
+    out = {}
+    for key in (
+        "name", "description", "status", "priority", "assigned_to", "business_capability",
+        "progress_percentage", "estimated_cost", "start_date", "end_date",
+    ):
+        if key not in data:
+            continue
+        if key in ("status", "priority") and data[key] in ("", None):
+            continue  # the form's "Select Status" placeholder: keep the default
+        if partial and key == "name" and data[key] in ("", None):
+            continue
+        out[key] = data[key]
+    if "programme_id" in data or "enterprise_initiative_id" in data:
+        out["enterprise_initiative_id"] = data.get("programme_id", data.get("enterprise_initiative_id"))
+    return out
 
 
 def _to_iso(value):
@@ -57,7 +84,7 @@ def implementation_dashboard():
         # Get statistics
         stats = {
             "work_packages": ImplementationWorkPackage.query.count(),
-            "deliverables": Deliverable.query.count(),
+            "deliverables": work_package_service.deliverables_query(_org_id()).count(),
             "gaps": ImplementationGap.query.count(),
             "plateaus": ImplementationPlateau.query.count(),
             "in_progress": ImplementationWorkPackage.query.filter_by(
@@ -157,14 +184,13 @@ def work_packages_list():
     List all work packages with filtering and search.
     """
     try:
-        # Get query parameters
+        org_id = _org_id()
         page = safe_int_arg('page', 1, minimum=1)
         search = request.args.get("search", "")
         status = request.args.get("status", "")
         priority = request.args.get("priority", "")
 
-        # Build query
-        query = ImplementationWorkPackage.query
+        query = work_package_service.query_for(org_id)
 
         if search:
             query = query.filter(
@@ -181,7 +207,6 @@ def work_packages_list():
         if priority:
             query = query.filter(ImplementationWorkPackage.priority == priority)
 
-        # Paginate
         work_packages = query.order_by(
             ImplementationWorkPackage.created_at.desc()
         ).paginate(page=page, per_page=20, error_out=False)
@@ -199,6 +224,23 @@ def work_packages_list():
         return redirect(url_for("implementation_planning.implementation_dashboard"))
 
 
+@implementation_planning.route("/work-packages/blocked")
+@login_required
+def work_packages_blocked():
+    """Work packages blocked by a dependency in another programme (PB-0104)."""
+    org_id = _org_id()
+    blocked = work_package_service.blocked_by_another_programme(org_id)
+    ids = set()
+    for item in blocked:
+        ids.add(item["work_package"].enterprise_initiative_id)
+        ids.update(b.enterprise_initiative_id for b in item["blocked_by"])
+    return render_template(
+        "implementation_planning/work_packages_blocked.html",
+        blocked=blocked,
+        programme_names=work_package_service.programme_names(ids, org_id),
+    )
+
+
 @implementation_planning.route("/work-packages/<int:work_package_id>")
 @login_required
 def work_package_detail(work_package_id):
@@ -206,17 +248,21 @@ def work_package_detail(work_package_id):
     Show detailed view of a work package.
     """
     try:
-        work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
+        work_package = work_package_service.get_work_package(work_package_id, _org_id())
+        if work_package is None:
+            abort(404)
 
-        # Get related deliverables
+        # Events still key on the retired work_packages table; a row merged
+        # from it carries that id in source_id. Deliverables key on the one store.
+        legacy_id = work_package_service.legacy_id(work_package, "work_packages")
         deliverables = Deliverable.query.filter_by(
-            work_package_id=work_package_id
+            unified_work_package_id=work_package.id
         ).all()
-
-        # Get related implementation events
-        events = ImplementationEvent.query.filter_by(
-            work_package_id=work_package_id
-        ).all()
+        events = (
+            ImplementationEvent.query.filter_by(work_package_id=legacy_id).all()
+            if legacy_id
+            else []
+        )
 
         return render_template(
             "implementation_planning/dashboard.html",
@@ -225,49 +271,75 @@ def work_package_detail(work_package_id):
             events=events,
         )
 
+    except HTTPException:
+        raise
     except Exception:
         flash("Error loading work package. Please try again.", "error")
         return redirect(url_for("implementation_planning.work_packages_list"))
+
+
+# The dependency picker offers the first matches of a name filter, not a
+# silent cap on everything: type to narrow the list.
+_PICKER_LIMIT = 50
+
+
+def _picker_options(work_package, org_id, q):
+    query = work_package_service.query_for(org_id).order_by(ImplementationWorkPackage.name)
+    if work_package is not None:
+        query = query.filter(ImplementationWorkPackage.id != work_package.id)
+    q = (q or "").strip()
+    if q:
+        query = query.filter(ImplementationWorkPackage.name.ilike("%" + q + "%"))
+    return query.limit(_PICKER_LIMIT).all()
+
+
+def _form_context(work_package, action):
+    org_id = _org_id()
+    others = _picker_options(work_package, org_id, request.args.get("q"))
+    names = {w.id: w.name for w in others}
+    # A dependency already chosen is always shown, even beyond the filtered list.
+    chosen = work_package_service.dependency_ids(work_package) if work_package else []
+    missing = [d for d in chosen if d not in names]
+    if missing:
+        for row in work_package_service.query_for(org_id).filter(
+            ImplementationWorkPackage.id.in_(missing)
+        ):
+            names[row.id] = row.name
+    return dict(
+        work_package=work_package,
+        action=action,
+        programmes=work_package_service.list_programmes(org_id),
+        other_work_packages=others,
+        dependencies=[
+            (d, names.get(d))
+            for d in (work_package_service.dependency_ids(work_package) if work_package else [])
+        ],
+    )
 
 
 @implementation_planning.route("/work-packages/create", methods=["GET", "POST"])
 @login_required
 def create_work_package():
     """
-    Create a new work package.
+    Create a new work package (the one writer: work_package_service).
     """
     if request.method == "POST":
         try:
             data = request.get_json() if request.is_json else request.form.to_dict()
+            if not (data.get("name") or "").strip():
+                if request.is_json:
+                    return jsonify({"success": False, "errors": {"name": "Name is required"}}), 400
+                flash("Name is required.", "error")
+                return render_template(
+                    "implementation_planning/work_package_form.html",
+                    **_form_context(None, "Create"),
+                ), 400
 
-            # Validate required fields
-            if not data.get("name"):
-                return jsonify({"success": False, "errors": {"name": "Name is required"}}), 400
-
-            # Create work package
-            work_package = ImplementationWorkPackage(
-                name=data["name"],
-                description=data.get("description", ""),
-                assigned_to=data.get("assigned_to", ""),
-                priority=data.get("priority", "medium"),
-                status=data.get("status", "planned"),
-                start_date=datetime.strptime(data["start_date"], "%Y-%m-%d")
-                if data.get("start_date")
-                else None,
-                end_date=datetime.strptime(data["end_date"], "%Y-%m-%d")
-                if data.get("end_date")
-                else None,
-                estimated_cost=float(data.get("estimated_cost", 0)),
-                progress_percentage=float(data.get("progress_percentage", 0)),
-                properties=data.get("properties", {}),
-                created_by=current_user.username,
+            work_package = work_package_service.create_work_package(
+                organization_id=_org_id(),
+                user_id=current_user.id,
+                **_fields_from(data),
             )
-
-            # Calculate duration if dates are provided
-            if work_package.start_date and work_package.end_date:
-                work_package.calculate_duration()
-
-            db.session.add(work_package)
             db.session.commit()
 
             if request.is_json:
@@ -276,19 +348,29 @@ def create_work_package():
             flash("Work package created successfully!", "success")
             return redirect(
                 url_for(
-                    "implementation_planning.work_package_detail",
+                    "implementation_planning.edit_work_package",
                     work_package_id=work_package.id,
                 )
             )
 
-        except Exception as e:
+        except work_package_service.WorkPackageError as e:
             db.session.rollback()
             if request.is_json:
-                return jsonify({"success": False, "errors": {"general": str(e)}}), 500
+                return jsonify({"success": False, "errors": {"general": str(e)}}), 400
+            flash(str(e), "error")
+            return render_template(
+                "implementation_planning/work_package_form.html",
+                **_form_context(None, "Create"),
+            ), 400
+        except Exception:
+            db.session.rollback()
+            if request.is_json:
+                return jsonify({"success": False, "errors": {"general": "An internal error occurred"}}), 500
             flash("Error creating work package. Please try again.", "error")
 
-    # GET — redirect to dashboard (modal handles creation inline)
-    return redirect(url_for("implementation_planning.implementation_dashboard"))
+    return render_template(
+        "implementation_planning/work_package_form.html", **_form_context(None, "Create")
+    )
 
 
 @implementation_planning.route(
@@ -297,41 +379,21 @@ def create_work_package():
 @login_required
 def edit_work_package(work_package_id):
     """
-    Edit an existing work package.
+    Edit an existing work package (the one writer: work_package_service).
     """
-    work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
+    work_package = work_package_service.get_work_package(work_package_id, _org_id())
+    if work_package is None:
+        abort(404)
 
     if request.method == "POST":
         try:
             data = request.get_json() if request.is_json else request.form.to_dict()
-
-            # Update work package
-            work_package.name = data.get("name", work_package.name)
-            work_package.description = data.get("description", work_package.description)
-            work_package.assigned_to = data.get("assigned_to", work_package.assigned_to)
-            work_package.priority = data.get("priority", work_package.priority)
-            work_package.status = data.get("status", work_package.status)
-            work_package.progress_percentage = float(
-                data.get("progress_percentage", work_package.progress_percentage)
+            work_package_service.update_work_package(
+                work_package_id,
+                organization_id=_org_id(),
+                user_id=current_user.id,
+                **_fields_from(data, partial=True),
             )
-            work_package.estimated_cost = float(
-                data.get("estimated_cost", work_package.estimated_cost)
-            )
-            work_package.properties = data.get("properties", work_package.properties)
-
-            # Update dates if provided
-            if data.get("start_date"):
-                work_package.start_date = datetime.strptime(
-                    data["start_date"], "%Y-%m-%d"
-                )
-
-            if data.get("end_date"):
-                work_package.end_date = datetime.strptime(data["end_date"], "%Y-%m-%d")
-
-            # Recalculate duration
-            if work_package.start_date and work_package.end_date:
-                work_package.calculate_duration()
-
             db.session.commit()
 
             if request.is_json:
@@ -340,22 +402,84 @@ def edit_work_package(work_package_id):
             flash("Work package updated successfully!", "success")
             return redirect(
                 url_for(
-                    "implementation_planning.work_package_detail",
-                    work_package_id=work_package.id,
+                    "implementation_planning.edit_work_package",
+                    work_package_id=work_package_id,
                 )
             )
 
+        except work_package_service.WorkPackageError as e:
+            db.session.rollback()
+            if request.is_json:
+                return jsonify({"error": str(e)}), 400
+            flash(str(e), "error")
         except Exception:
             db.session.rollback()
             if request.is_json:
                 return jsonify({"error": "An internal error occurred"}), 500
             flash("Error updating work package. Please try again.", "error")
+        work_package = work_package_service.get_work_package(work_package_id, _org_id())
 
-    # GET request - show form
     return render_template(
         "implementation_planning/work_package_form.html",
-        work_package=work_package,
-        action="Edit",
+        **_form_context(work_package, "Edit"),
+    )
+
+
+@implementation_planning.route(
+    "/work-packages/<int:work_package_id>/dependencies", methods=["POST"]
+)
+@login_required
+def add_work_package_dependency(work_package_id):
+    """Record that this work package depends on another (form or JSON)."""
+    data = request.get_json(silent=True) if request.is_json else request.form.to_dict()
+    data = data or {}
+    try:
+        work_package_service.add_dependency(
+            work_package_id,
+            data.get("dependency_id"),
+            organization_id=_org_id(),
+        )
+        db.session.commit()
+    except work_package_service.WorkPackageNotFound:
+        db.session.rollback()
+        if request.is_json:
+            return jsonify({"error": "Work package not found"}), 404
+        abort(404)
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        if request.is_json:
+            return jsonify({"error": str(e)}), 400
+        flash(str(e), "error")
+        return redirect(
+            url_for("implementation_planning.edit_work_package", work_package_id=work_package_id)
+        )
+    if request.is_json:
+        return jsonify({"success": True})
+    flash("Dependency added.", "success")
+    return redirect(
+        url_for("implementation_planning.edit_work_package", work_package_id=work_package_id)
+    )
+
+
+@implementation_planning.route(
+    "/work-packages/<int:work_package_id>/dependencies/<int:dependency_id>/remove",
+    methods=["POST"],
+)
+@login_required
+def remove_work_package_dependency(work_package_id, dependency_id):
+    try:
+        work_package_service.remove_dependency(
+            work_package_id, dependency_id, organization_id=_org_id()
+        )
+        db.session.commit()
+    except work_package_service.WorkPackageNotFound:
+        db.session.rollback()
+        abort(404)
+    if request.is_json:
+        return jsonify({"success": True})
+    flash("Dependency removed.", "success")
+    return redirect(
+        url_for("implementation_planning.edit_work_package", work_package_id=work_package_id)
     )
 
 
@@ -368,31 +492,7 @@ def delete_work_package(work_package_id):
     Delete a work package.
     """
     try:
-        work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
-
-        # Check for dependencies
-        if work_package.child_work_packages:
-            return (
-                jsonify(
-                    {"error": "Cannot delete work package with dependent work packages"}
-                ),
-                400,
-            )
-
-        # Delete NO-ACTION FK children with raw SQL before ORM delete to avoid
-        # FK constraint violations (planning_deliverables has NO ACTION on delete)
-        sp = db.session.begin_nested()
-        try:
-            db.session.execute(
-                text("DELETE FROM planning_deliverables WHERE work_package_id = :wp_id"),
-                {"wp_id": work_package_id},
-            )
-            sp.commit()
-        except Exception:
-            sp.rollback()
-            raise
-
-        db.session.delete(work_package)
+        work_package_service.delete_work_package(work_package_id, organization_id=_org_id())
         db.session.commit()
 
         if request.is_json:
@@ -401,6 +501,11 @@ def delete_work_package(work_package_id):
         flash("Work package deleted successfully!", "success")
         return redirect(url_for("implementation_planning.work_packages_list"))
 
+    except work_package_service.WorkPackageNotFound:
+        db.session.rollback()
+        if request.is_json:
+            return jsonify({"error": "Work package not found"}), 404
+        abort(404)
     except Exception:
         db.session.rollback()
         if request.is_json:
@@ -419,7 +524,7 @@ def api_dashboard_stats():
     try:
         stats = {
             "work_packages": ImplementationWorkPackage.query.count(),
-            "deliverables": Deliverable.query.count(),
+            "deliverables": work_package_service.deliverables_query(_org_id()).count(),
             "gaps": ImplementationGap.query.count(),
             "plateaus": ImplementationPlateau.query.count(),
             "in_progress": ImplementationWorkPackage.query.filter_by(
@@ -446,7 +551,7 @@ def api_work_packages():
     Supports query parameters: limit, sort (field name), order (asc/desc).
     """
     try:
-        query = ImplementationWorkPackage.query
+        query = work_package_service.query_for(_org_id())
         sort_field = request.args.get("sort", "created_at")
         order = request.args.get("order", "desc")
         # ISS-022: Whitelist sortable columns
@@ -455,16 +560,47 @@ def api_work_packages():
             sort_field = "created_at"
         if order not in ("asc", "desc"):
             order = "desc"
-        if hasattr(ImplementationWorkPackage, sort_field):
-            col = getattr(ImplementationWorkPackage, sort_field)
-            query = query.order_by(col.desc() if order == "desc" else col.asc())
+        col = getattr(ImplementationWorkPackage, sort_field)
+        query = query.order_by(col.desc() if order == "desc" else col.asc())
         limit = safe_int_arg('limit', None, minimum=1, maximum=500)
         if limit:
             query = query.limit(limit)
         work_packages = query.all()
-        return jsonify({"work_packages": [_serialize_entity(wp) for wp in work_packages]})
+        return jsonify({"work_packages": work_package_service.to_dicts(work_packages)})
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
+
+
+@implementation_planning.route("/api/work-packages/blocked", methods=["GET"])
+@login_required
+def api_work_packages_blocked():
+    """Work packages blocked by a dependency in another programme (PB-0104)."""
+    org_id = _org_id()
+    blocked = work_package_service.blocked_by_another_programme(org_id)
+    ids = set()
+    for item in blocked:
+        ids.add(item["work_package"].enterprise_initiative_id)
+        ids.update(b.enterprise_initiative_id for b in item["blocked_by"])
+    names = work_package_service.programme_names(ids, org_id)
+    return jsonify(
+        {
+            "blocked": [
+                {
+                    **work_package_service.to_dict(item["work_package"]),
+                    "programme": names.get(item["work_package"].enterprise_initiative_id),
+                    "blocked_by": [
+                        {
+                            **work_package_service.to_dict(b),
+                            "programme": names.get(b.enterprise_initiative_id),
+                        }
+                        for b in item["blocked_by"]
+                    ],
+                }
+                for item in blocked
+            ],
+            "total": len(blocked),
+        }
+    )
 
 
 @implementation_planning.route(
@@ -475,11 +611,10 @@ def api_work_package_detail(work_package_id):
     """
     API endpoint to get work package details.
     """
-    try:
-        work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
-        return jsonify(_serialize_entity(work_package))
-    except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
+    work_package = work_package_service.get_work_package(work_package_id, _org_id())
+    if work_package is None:
+        return jsonify({"error": "Work package not found"}), 404
+    return jsonify(work_package_service.to_dict(work_package))
 
 
 @implementation_planning.route("/api/work-packages", methods=["POST"])
@@ -489,46 +624,28 @@ def api_create_work_package():
     API endpoint to create a new work package.
     """
     try:
-        data = request.get_json()
-
-        # Validate required fields
-        if not data.get("name"):
+        data = request.get_json(silent=True) or {}
+        if not (data.get("name") or "").strip():
             return jsonify({"error": "Name is required"}), 400
 
-        # Create work package
-        work_package = ImplementationWorkPackage(
-            name=data["name"],
-            description=data.get("description", ""),
-            assigned_to=data.get("assigned_to", ""),
-            priority=data.get("priority", "medium"),
-            status=data.get("status", "planned"),
-            start_date=datetime.strptime(data["start_date"], "%Y-%m-%d")
-            if data.get("start_date")
-            else None,
-            end_date=datetime.strptime(data["end_date"], "%Y-%m-%d")
-            if data.get("end_date")
-            else None,
-            estimated_cost=float(data.get("estimated_cost", 0)),
-            progress_percentage=float(data.get("progress_percentage", 0)),
-            properties=data.get("properties", {}),
-            created_by=current_user.username,
+        work_package = work_package_service.create_work_package(
+            organization_id=_org_id(),
+            user_id=current_user.id,
+            **_fields_from(data),
         )
-
-        # Calculate duration if dates are provided
-        if work_package.start_date and work_package.end_date:
-            work_package.calculate_duration()
-
-        db.session.add(work_package)
         db.session.commit()
 
         return jsonify(
             {
                 "success": True,
                 "work_package_id": work_package.id,
-                "work_package": _serialize_entity(work_package),
+                "work_package": work_package_service.to_dict(work_package),
             }
         )
 
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
     except Exception:
         db.session.rollback()
         return jsonify({"error": "An internal error occurred"}), 500
@@ -543,38 +660,22 @@ def api_update_work_package(work_package_id):
     API endpoint to update a work package.
     """
     try:
-        work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
-        data = request.get_json()
-
-        # Update work package
-        work_package.name = data.get("name", work_package.name)
-        work_package.description = data.get("description", work_package.description)
-        work_package.assigned_to = data.get("assigned_to", work_package.assigned_to)
-        work_package.priority = data.get("priority", work_package.priority)
-        work_package.status = data.get("status", work_package.status)
-        work_package.progress_percentage = float(
-            data.get("progress_percentage", work_package.progress_percentage)
+        data = request.get_json(silent=True) or {}
+        work_package = work_package_service.update_work_package(
+            work_package_id,
+            organization_id=_org_id(),
+            user_id=current_user.id,
+            **_fields_from(data, partial=True),
         )
-        work_package.estimated_cost = float(
-            data.get("estimated_cost", work_package.estimated_cost)
-        )
-        work_package.properties = data.get("properties", work_package.properties)
-
-        # Update dates if provided
-        if data.get("start_date"):
-            work_package.start_date = datetime.strptime(data["start_date"], "%Y-%m-%d")
-
-        if data.get("end_date"):
-            work_package.end_date = datetime.strptime(data["end_date"], "%Y-%m-%d")
-
-        # Recalculate duration
-        if work_package.start_date and work_package.end_date:
-            work_package.calculate_duration()
-
         db.session.commit()
+        return jsonify({"success": True, "work_package": work_package_service.to_dict(work_package)})
 
-        return jsonify({"success": True, "work_package": _serialize_entity(work_package)})
-
+    except work_package_service.WorkPackageNotFound:
+        db.session.rollback()
+        return jsonify({"error": "Work package not found"}), 404
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
     except Exception:
         db.session.rollback()
         return jsonify({"error": "An internal error occurred"}), 500
@@ -589,35 +690,13 @@ def api_delete_work_package(work_package_id):
     API endpoint to delete a work package.
     """
     try:
-        work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
-
-        # Check for dependencies
-        if work_package.child_work_packages:
-            return (
-                jsonify(
-                    {"error": "Cannot delete work package with dependent work packages"}
-                ),
-                400,
-            )
-
-        # Delete NO-ACTION FK children with raw SQL before ORM delete to avoid
-        # FK constraint violations (planning_deliverables has NO ACTION on delete)
-        sp = db.session.begin_nested()
-        try:
-            db.session.execute(
-                text("DELETE FROM planning_deliverables WHERE work_package_id = :wp_id"),
-                {"wp_id": work_package_id},
-            )
-            sp.commit()
-        except Exception:
-            sp.rollback()
-            raise
-
-        db.session.delete(work_package)
+        work_package_service.delete_work_package(work_package_id, organization_id=_org_id())
         db.session.commit()
-
         return jsonify({"success": True})
 
+    except work_package_service.WorkPackageNotFound:
+        db.session.rollback()
+        return jsonify({"error": "Work package not found"}), 404
     except Exception:
         db.session.rollback()
         return jsonify({"error": "An internal error occurred"}), 500
@@ -822,8 +901,10 @@ def deliverables_list():
         status = request.args.get("status", "")
         work_package_id = request.args.get("work_package_id", type=int)
 
-        # Build query
-        query = Deliverable.query
+        # Build query (this organisation's work packages' deliverables)
+        if work_package_id:
+            work_package_service.require_work_package(work_package_id, _org_id())
+        query = work_package_service.deliverables_query(_org_id(), work_package_id)
 
         if search:
             query = query.filter(
@@ -834,10 +915,7 @@ def deliverables_list():
             )
 
         if status:
-            query = query.filter(Deliverable.status == status)
-
-        if work_package_id:
-            query = query.filter(Deliverable.work_package_id == work_package_id)
+            query = query.filter(Deliverable.delivery_status == status)
 
         # Paginate
         deliverables = query.order_by(Deliverable.created_at.desc()).paginate(
@@ -852,6 +930,8 @@ def deliverables_list():
             work_package_id=work_package_id,
         )
 
+    except work_package_service.WorkPackageNotFound:
+        abort(404)
     except Exception:
         flash("Error loading deliverables. Please try again.", "error")
         return redirect(url_for("implementation_planning.implementation_dashboard"))
@@ -865,7 +945,7 @@ def api_deliverables():
     API endpoint to get all deliverables.
     """
     try:
-        deliverables = Deliverable.query.all()
+        deliverables = work_package_service.deliverables_query(_org_id()).all()
         return jsonify(
             {"deliverables": [deliverable.to_dict() for deliverable in deliverables]}
         )
@@ -886,22 +966,30 @@ def api_create_deliverable():
         if not data.get("name"):
             return jsonify({"error": "Name is required"}), 400
 
-        # Create deliverable
-        deliverable = Deliverable(
-            name=data["name"],
-            description=data.get("description", ""),
-            deliverable_type=data.get("deliverable_type", ""),
-            format=data.get("format", ""),
-            status=data.get("status", "planned"),
-            due_date=datetime.strptime(data["due_date"], "%Y-%m-%d")
-            if data.get("due_date")
-            else None,
-            work_package_id=data.get("work_package_id"),
-            properties=data.get("properties", {}),
-            created_by=current_user.username,
-        )
+        if not data.get("work_package_id"):
+            return jsonify({"error": "work_package_id is required"}), 400
 
-        db.session.add(deliverable)
+        # Create deliverable on a work package of this organisation (the same
+        # path the roadmap API uses); another organisation's id is a 404.
+        try:
+            deliverable = work_package_service.create_deliverable(
+                data["work_package_id"],
+                organization_id=_org_id(),
+                name=data["name"],
+                description=data.get("description", ""),
+                deliverable_type=data.get("deliverable_type") or None,
+                delivery_status=data.get("status", "planned"),
+                target_date=datetime.strptime(data["due_date"], "%Y-%m-%d").date()
+                if data.get("due_date")
+                else None,
+            )
+        except work_package_service.WorkPackageNotFound:
+            db.session.rollback()
+            return jsonify({"error": "Work package not found"}), 404
+        except (work_package_service.WorkPackageError, ValueError) as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
+
         db.session.commit()
 
         return jsonify(
@@ -962,7 +1050,6 @@ def api_roadmap_data():
     try:
         # Get all work packages with their related data
         work_packages = ImplementationWorkPackage.query.options(
-            joinedload(ImplementationWorkPackage.application_component),
         ).all()
 
         # Get all gaps
@@ -995,9 +1082,11 @@ def api_roadmap_data():
                 "priority": wp.priority or "medium",
                 "progress": wp_progress or 0,
                 "assigned_to": wp_owner or "Unassigned",
-                "domain_name": wp.application_component.domain
-                if wp.application_component
-                else "Architecture",
+                "domain_name": (
+                    getattr(wp, "business_capability", None)
+                    or (getattr(wp, "layer", None) or "").capitalize()
+                    or "Unassigned"
+                ),
                 "level": 1,
                 "parent_id": getattr(wp, "parent_id", None)
                 or getattr(wp, "parent_work_package_id", None),
@@ -1078,7 +1167,7 @@ def generate_report():
         gaps = ImplementationGap.query.all()
 
         # Get deliverables
-        deliverables = Deliverable.query.all()
+        deliverables = work_package_service.deliverables_query(_org_id()).all()
 
         # Generate report data
         report_data = {
@@ -1094,7 +1183,7 @@ def generate_report():
                 "work_packages_by_priority": {},
                 "gaps_by_priority": {},
             },
-            "work_packages": [wp.to_dict() for wp in work_packages],
+            "work_packages": work_package_service.to_dicts(work_packages),
             "gaps": [g.to_dict() for g in gaps],
             "deliverables": [d.to_dict() for d in deliverables],
         }
