@@ -280,42 +280,107 @@ def test_migration_has_no_roles_grants_force_or_bypass_and_uses_null_safe_settin
     assert MIGRATION.revision == "20261008_row_level_security"
 
 
-def test_every_tenant_and_hybrid_model_is_listed_or_excluded():
-    """The literal table lists cannot drift from the models unnoticed."""
+FENCING_PATTERN = re.compile(r"^(TENANT_TABLES|HYBRID_TABLES)\s*=", re.MULTILINE)
+
+
+def _fencing_revisions():
+    """Every revision in ``migrations/versions`` that carries table lists, loaded by path.
+
+    Found by scanning for ``TENANT_TABLES`` / ``HYBRID_TABLES`` constants, so a future fencing
+    revision is picked up without a code change here. Loaded without importing ``app``.
+    """
+    found = {}
+    for path in sorted((REPO / "migrations" / "versions").glob("*.py")):
+        if not FENCING_PATTERN.search(path.read_text(encoding="utf-8")):
+            continue
+        spec = importlib.util.spec_from_file_location(f"fencing_revision_{path.stem}", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        found[path.name] = {
+            "tenant": set(getattr(module, "TENANT_TABLES", ())),
+            "hybrid": set(getattr(module, "HYBRID_TABLES", ())),
+            "excluded": set(getattr(module, "EXCLUDED", ())),
+        }
+    return found
+
+
+def _assert_every_model_is_fenced(tenant_models, hybrid_models, revisions):
+    """Fail, naming the tables, when a mixin table is in no fencing revision."""
+    fenced_tenant = set().union(*(r["tenant"] for r in revisions.values())) if revisions else set()
+    fenced_hybrid = set().union(*(r["hybrid"] for r in revisions.values())) if revisions else set()
+    excluded = set().union(*(r["excluded"] for r in revisions.values())) if revisions else set()
+    unfenced = sorted(
+        {t for t in tenant_models if t not in fenced_tenant and t not in excluded}
+        | {t for t in hybrid_models if t not in fenced_hybrid and t not in excluded}
+    )
+    assert not unfenced, (
+        f"tables with an organisation fence but no row-level security: {unfenced}. "
+        "Alembic runs a revision once, so add a new fencing revision for them "
+        "(copy 20261008_row_level_security, list only the new tables); do not edit an applied one."
+    )
+
+
+def _concrete_mixin_tables(mixin):
+    found, stack = {}, list(mixin.__subclasses__())
+    while stack:
+        cls = stack.pop()
+        stack.extend(cls.__subclasses__())
+        table = getattr(cls, "__table__", None)
+        if table is not None and getattr(cls, "__tablename__", None):
+            found[table.name] = cls.__name__
+    return found
+
+
+def _load_all_model_modules():
     import importlib
     import pkgutil
 
     import app.models as models_package
-    from app import db
-    from app.models.mixins.core import HybridTenantMixin, TenantMixin
 
     for info in pkgutil.iter_modules(models_package.__path__):
         with contextlib.suppress(Exception):
             importlib.import_module(f"app.models.{info.name}")
 
-    def concrete(mixin):
-        found, stack = {}, list(mixin.__subclasses__())
-        while stack:
-            cls = stack.pop()
-            stack.extend(cls.__subclasses__())
-            table = getattr(cls, "__table__", None)
-            if table is not None and getattr(cls, "__tablename__", None):
-                found[table.name] = cls.__name__
-        return found
 
+def test_every_tenant_and_hybrid_model_is_listed_or_excluded():
+    """The literal table lists cannot drift from the models unnoticed: the union of every
+    fencing revision must cover every ``TenantMixin`` / ``HybridTenantMixin`` table."""
+    from app import db
+    from app.models.mixins.core import HybridTenantMixin, TenantMixin
+
+    _load_all_model_modules()
+    revisions = _fencing_revisions()
+    assert "20261008_row_level_security.py" in revisions
+    _assert_every_model_is_fenced(
+        _concrete_mixin_tables(TenantMixin), _concrete_mixin_tables(HybridTenantMixin), revisions
+    )
     listed_tenant, listed_hybrid = set(MIGRATION.TENANT_TABLES), set(MIGRATION.HYBRID_TABLES)
-    missing = [
-        t for t in concrete(TenantMixin)
-        if t not in listed_tenant and t not in MIGRATION.EXCLUDED
-    ]
-    missing += [
-        t for t in concrete(HybridTenantMixin)
-        if t not in listed_hybrid and t not in MIGRATION.EXCLUDED
-    ]
-    assert not missing, f"models with an organisation fence but no row-level security: {missing}"
     assert not (listed_tenant & listed_hybrid)
     assert set(MIGRATION.EXCLUDED) == {"unified_capabilities"}
     assert db is not None
+
+
+def test_a_mixin_table_missing_from_every_fencing_revision_fails_the_guard():
+    revisions = _fencing_revisions()
+    tenant = {"application_components", "brand_new_tenant_table"}
+    hybrid = {"reference_model", "brand_new_hybrid_table"}
+    with pytest.raises(AssertionError) as failure:
+        _assert_every_model_is_fenced(tenant, hybrid, revisions)
+    message = str(failure.value)
+    assert "add a new fencing revision" in message
+    assert "brand_new_tenant_table" in message and "brand_new_hybrid_table" in message
+    assert "application_components" not in message and "reference_model" not in message
+
+
+def test_a_later_fencing_revision_covers_a_table_the_first_one_does_not():
+    """The guard reads the union: a second revision's lists count."""
+    revisions = _fencing_revisions()
+    revisions["99999999_second_fencing.py"] = {
+        "tenant": {"brand_new_tenant_table"},
+        "hybrid": set(),
+        "excluded": set(),
+    }
+    _assert_every_model_is_fenced({"application_components", "brand_new_tenant_table"}, set(), revisions)
 
 
 def test_every_present_table_has_four_policies_enabled_not_forced(rls):

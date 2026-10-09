@@ -24,8 +24,11 @@ R1-B20 PR 3 brief:
 * Each table is checked before it is touched (table present, ``organization_id``
   present, migration role may alter it). A table that fails a check is skipped
   with a printed reason and listed in the summary line; the deploy never fails
-  on it. A column added later by ``reconcile-schema`` is picked up the next
-  time this revision runs, because it is idempotent.
+  on it. Alembic runs a revision once, so a table (or a late ``organization_id``
+  column) that is not there when this revision runs is NOT picked up later: it
+  needs its own new fencing revision, and the guard test in
+  ``tests/test_row_level_security.py`` fails with "add a new fencing revision"
+  when a ``TenantMixin`` / ``HybridTenantMixin`` table is in none of them.
 * ``archie.platform_scope = 'on'`` is admitted by every policy. It is set only
   by ``app.jobs.tenant_safe_job.platform_scope`` for the few runtime paths that
   must read across organisations or resolve the organisation themselves.
