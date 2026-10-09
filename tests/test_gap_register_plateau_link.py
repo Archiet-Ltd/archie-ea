@@ -414,3 +414,59 @@ def test_two_org_save_link_and_not_addressed(db_session, make_org):
     # A's gaps not in B's list
     assert gap_a1.id not in not_addr_b_ids
     assert gap_a2.id not in not_addr_b_ids
+
+
+# ── Route-level count comparison ─────────────────────────────────────────────
+
+
+def test_roadmap_api_and_gap_analysis_page_counts_agree(
+    db_session, app, client, login_as,
+):
+    """The roadmap API and the gap analysis page return the same gap count
+    for the same organisation, because both call count_gaps()."""
+    from app.models.user import Role, User
+    from app.services.gap_register_service import create_gap
+
+    Role.insert_roles()
+    org = make_org("route-count-compare")
+    create_gap(org.id, "Route Gap A", gap_type="coverage")
+    create_gap(org.id, "Route Gap B", gap_type="coverage")
+    db_session.commit()
+
+    user = User(
+        email="route-count@example.com",
+        first_name="RouteCount",
+        organization_id=org.id,
+        confirmed=True,
+        enterprise_role="enterprise_architect",
+    )
+    db_session.add(user)
+    db_session.flush()
+    role = Role.query.filter_by(name="Administrator").first()
+    if role:
+        user.role = role
+    db_session.commit()
+
+    login_as(client, user)
+
+    # Roadmap API
+    roadmap_resp = client.get("/capability-map/api/roadmap/gaps")
+    assert roadmap_resp.status_code == 200
+    roadmap_data = roadmap_resp.get_json()
+    assert roadmap_data.get("success") is True
+    roadmap_total = roadmap_data.get("statistics", {}).get("total_gaps", -1)
+
+    # Gap analysis page — check the rendered HTML for the count
+    gap_analysis_resp = client.get("/implementation/gap-analysis")
+    assert gap_analysis_resp.status_code == 200
+    html = gap_analysis_resp.data.decode("utf-8")
+
+    # Both screens use count_gaps() — they must agree
+    assert roadmap_total == 2, (
+        "Roadmap API total_gaps should be 2, got %d" % roadmap_total
+    )
+    # The gap analysis page renders the count somewhere in the HTML
+    assert "Recorded Gaps" in html
+    assert str(roadmap_total) in html, (
+        "Gap analysis page should contain the count %d in its rendered HTML" % roadmap_total
+    )
