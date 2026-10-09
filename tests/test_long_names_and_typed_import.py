@@ -1,4 +1,4 @@
-"""R1-B14 PR 2 acceptance tests: long names, typed properties, two-org isolation, round-trip.
+"""Acceptance tests: long names, typed properties, two-org isolation, round-trip.
 
 Every test here fails on main (where MAX_NAME_LENGTH=100 and properties are
 stored raw) and passes on this branch.
