@@ -266,6 +266,14 @@ class Config:
             'python -c "from cryptography.fernet import Fernet; '
             'print(Fernet.generate_key().decode())"'
         )
+    ORG_ENCRYPTION_MASTER_KEY = os.environ.get("ORG_ENCRYPTION_MASTER_KEY", "")
+    if not ORG_ENCRYPTION_MASTER_KEY:
+        print(
+            "WARNING: ORG_ENCRYPTION_MASTER_KEY env var not set. Per-organisation "
+            "credential storage will refuse to store secrets. Generate one: "
+            'python -c "from cryptography.fernet import Fernet; '
+            'print(Fernet.generate_key().decode())"'
+        )
     COOLIFY_API_URL = os.environ.get("COOLIFY_API_URL", "http://localhost:8000")
     COOLIFY_API_TOKEN = os.environ.get("COOLIFY_API_TOKEN", "")
     COOLIFY_DOMAIN_SUFFIX = os.environ.get("COOLIFY_DOMAIN_SUFFIX", "archie.example.com")
@@ -523,6 +531,7 @@ class TestingConfig(Config):
     # at import time rather than a literal, so nothing here reads as a real key.
     from cryptography.fernet import Fernet as _Fernet
     CREDENTIAL_ENCRYPTION_KEY = _Fernet.generate_key().decode()
+    ORG_ENCRYPTION_MASTER_KEY = _Fernet.generate_key().decode()
 
     # Brute-force protection is a production control; under test it throttles the
     # suite instead of an attacker. /account/login is capped at 10 POSTs per

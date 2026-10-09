@@ -59,8 +59,10 @@ class _Nesting(HTMLParser):
 
 
 def _user(db_session, org_id, role):
-    from app.models.user import User
+    from app.models.user import Role, User
 
+    if Role.query.filter_by(name="Administrator").first() is None:
+        Role.insert_roles()
     user = User(
         email=f"footer-{role}-{uuid.uuid4().hex[:8]}@example.com",
         first_name="Footer",
@@ -69,6 +71,9 @@ def _user(db_session, org_id, role):
         confirmed=True,
         enterprise_role=role,
         is_platform_admin=(role == "platform_admin"),
+        # Genuine platform authority is the flag AND the Administrator role;
+        # the persona string alone no longer stands in for it.
+        role=Role.query.filter_by(name="Administrator").first() if role == "platform_admin" else None,
     )
     db_session.add(user)
     db_session.flush()

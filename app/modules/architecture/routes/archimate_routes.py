@@ -76,7 +76,24 @@ def _check_solution_access(solution_id):
         return  # Model not available — skip check gracefully
     if not sol:
         return  # Solution doesn't exist — let downstream handle
-    if hasattr(current_user, "is_admin") and current_user.is_admin():
+    # D-4 (admin-rbac-active-org continuation): this used to be
+    # ``hasattr(current_user, "is_admin") and current_user.is_admin()`` -- a
+    # global Permission.ADMINISTER flag, independent of which organisation
+    # is active in the session. Since every self-registered user is
+    # Administrator of their own organisation, a user who merely accepted a
+    # Viewer invitation into another organisation and switched their session
+    # into it could edit any solution's diagrams there too, not just their
+    # own -- the exact bug admin_required/org_admin_required already fix
+    # elsewhere in this PR.
+    from flask import g
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    _active_org_id = getattr(g, "current_org_id", None)
+    if is_platform_admin(current_user) or rbac_service.is_org_admin(
+        current_user, _active_org_id
+    ):
         return
     if getattr(sol, "owner_id", None) and sol.owner_id == current_user.id:
         return

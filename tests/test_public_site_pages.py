@@ -163,7 +163,7 @@ def test_contact_page_has_no_invented_email(app):
         assert "mailto:" not in html, "/contact invents an email address; no support mailbox exists"
         assert "support@example.com" not in html
         assert "https://reqarchitect.com" in html
-        assert "https://archiet.com" in html
+        assert "https://archiet.dev" in html
 
 
 def test_contact_page_has_no_waiting_list_or_launch_framing(app):

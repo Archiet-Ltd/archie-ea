@@ -605,22 +605,21 @@ def technology_lifecycle():
 @login_required
 def update_lifecycle(element_id):
     """Update the lifecycle phase of a Technology element."""
-    import json as _json
-
     from app.models.archimate_core import ArchiMateElement
+    from app.modules.architecture_assistant.property_service import PropertyService, PropertyValidationError
 
-    element = ArchiMateElement.query.get_or_404(element_id)
+    element = ArchiMateElement.query.filter_by(
+        id=element_id,
+        organization_id=current_user.organization_id,
+    ).first_or_404()
     phase = request.json.get("lifecycle")
-    props = element.properties or {}
-    if isinstance(props, str):
-        try:
-            props = _json.loads(props)
-        except Exception:
-            props = {}
-    props["lifecycle"] = phase
-    element.properties = _json.dumps(props)
-    db.session.commit()
-    return jsonify({"success": True})
+    try:
+        PropertyService().set_element_property(element, "lifecycle", phase)
+        db.session.commit()
+        return jsonify({"success": True})
+    except PropertyValidationError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
 
 
 # =============================================================================

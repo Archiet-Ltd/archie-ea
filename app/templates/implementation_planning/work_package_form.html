@@ -44,6 +44,16 @@
                 </div>
 
                 <div class="space-y-2">
+                    {% call label(for='programme_id') %}Programme{% endcall %}
+                    <select id="programme_id" name="programme_id" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select programme">
+                        <option value="">No programme</option>
+                        {% for programme in programmes %}
+                        <option value="{{ programme.id }}" {% if work_package and work_package.enterprise_initiative_id == programme.id %}selected{% endif %}>{{ programme.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="space-y-2">
                     {% call label(for='description') %}Description{% endcall %}
                     <textarea id="description" name="description" rows="3"
                               class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -75,5 +85,38 @@
             </form>
         {% endcall %}
     {% endcall %}
+    {% if work_package %}
+    {% call card() %}
+        {% call card_content() %}
+            <h2 class="text-lg font-semibold mb-3">Depends on</h2>
+            <ul id="dependency-list" class="space-y-2 mb-4">
+                {% for dep_id, dep_name in dependencies %}
+                <li class="flex items-center justify-between text-sm" data-dependency-id="{{ dep_id }}">
+                    <span>{{ dep_name or ('Work package #' ~ dep_id) }}</span>
+                    <form method="POST" action="{{ url_for('implementation_planning.remove_work_package_dependency', work_package_id=work_package.id, dependency_id=dep_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="text-sm underline">Remove</button>
+                    </form>
+                </li>
+                {% else %}
+                <li class="text-sm text-muted-foreground">This work package does not depend on another.</li>
+                {% endfor %}
+            </ul>
+            <form method="POST" action="{{ url_for('implementation_planning.add_work_package_dependency', work_package_id=work_package.id) }}" class="flex gap-3 items-end">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="space-y-2 flex-1">
+                    {% call label(for='dependency_id') %}Add a dependency{% endcall %}
+                    <select id="dependency_id" name="dependency_id" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select the work package this depends on">
+                        {% for other in other_work_packages %}
+                        <option value="{{ other.id }}">{{ other.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {{ button('Add dependency', variant='outline', type='submit') }}
+            </form>
+            <p class="mt-4 text-sm"><a href="{{ url_for('implementation_planning.work_packages_blocked') }}" class="underline">See work packages blocked by another programme</a></p>
+        {% endcall %}
+    {% endcall %}
+    {% endif %}
 </div>
 {% endblock %}
