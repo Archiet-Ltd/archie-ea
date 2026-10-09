@@ -108,13 +108,19 @@ def test_the_application_name_cannot_be_saved_empty(app, client):
     app-name is the platform's own branding, rendered in the header of every
     page. There was no validation on either side, so it went blank
     platform-wide.
+
+    /api/system-settings/save writes a genuinely global, platform-wide
+    setting and is now platform_admin_required (PR 430 route-fixes split,
+    v1 defect 4) -- the fixture needs the actual is_platform_admin flag, not
+    just the enterprise_role="platform_admin" persona string, to reach the
+    validation this test exists to prove.
     """
     with app.app_context():
         from app import db
 
         org_id = make_org(db, "SettingsVal")
         admin_id = make_user(db, org_id, "admin", enterprise_role="platform_admin",
-                             role_name="Administrator")
+                             role_name="Administrator", is_platform_admin=True)
 
     login(client, admin_id)
 

@@ -54,7 +54,11 @@ from ..forms.admin_forms import (
 )
 from app.modules.account.forms.account_forms import CreatePasswordForm
 from app.decorators import admin_required, audit_log, governance_gate_reader_required
-from app.middleware.tenant_decorators import platform_admin_required
+from app.middleware.tenant_decorators import (
+    is_platform_admin,
+    platform_admin_required,
+    require_org_or_platform_admin,
+)
 from app.models import APISettings, EditableHTML, Permission, Role, User
 from app.models.organization import Organization
 from app.models.feature_flags import FeatureFlag, FeatureState, FeatureType
@@ -87,6 +91,10 @@ def index():
 @admin_required
 def dashboard_test():
     """Admin dashboard test page for dropdown testing."""
+    # tenant-scoping-ok: same session-switch IDOR class as change_user_email
+    # below -- get_paginated_users() scopes its listing to g.current_org_id,
+    # but admin_required alone is not (PR 430 route-fixes split).
+    require_org_or_platform_admin(g.current_org_id)
     page = safe_int_arg('page', 1, minimum=1)
     per_page = safe_int_arg('per_page', 10, minimum=1, maximum=500)
     search_query = request.args.get("search", "")
@@ -108,7 +116,16 @@ def dashboard_test():
 @login_required
 @admin_required
 def dashboard():
-    """Admin dashboard with stats and overview."""
+    """Admin dashboard with stats and overview.
+
+    D-05 sweep (PR 430 route-fixes split): same shape as the user-management
+    routes below -- AdminUserService.get_paginated_users() scopes its listing
+    to g.current_org_id, so the authority check guarding it must be scoped to
+    that same organisation too, or a user admin only of their own home org
+    could view another org's user roster after switching their active
+    session to it.
+    """
+    require_org_or_platform_admin(g.current_org_id)
     page = safe_int_arg('page', 1, minimum=1)
     per_page = safe_int_arg('per_page', 10, minimum=1, maximum=500)
     search_query = request.args.get("search", "")
@@ -229,6 +246,10 @@ def registered_users():
     """View all registered users."""
     # admin_required is org-scoped admin, not platform_admin — restrict to the
     # current org (tenant-scoping-ok: cross-org user-listing IDOR fix).
+    # Also same session-switch IDOR class as change_user_email below:
+    # admin_required alone does not prove authority over g.current_org_id
+    # specifically (PR 430 route-fixes split).
+    require_org_or_platform_admin(g.current_org_id)
     users = (
         User.query.filter_by(organization_id=g.current_org_id)
         .options(joinedload(User.role))
@@ -244,8 +265,19 @@ def registered_users():
     # figure viewed at two different scopes with neither one saying so. Name
     # the scope explicitly and surface the platform-wide total for
     # reconciliation rather than leaving the admin to discover the gap.
+    #
+    # D-04 (PR 430 round 3, lead review v2): a bare User.query.count() here
+    # would itself be exactly the cross-tenant leak check_tenant_scoping.py
+    # exists to catch — it is safe only because it is computed solely for a
+    # genuine platform admin (tenant-scoping-ok below); a non-platform-admin
+    # gets None, and the template omits the reconciliation line entirely
+    # rather than showing a bare "None" or a wrong number.
     current_org = Organization.query.get(g.current_org_id)
-    platform_total_users = User.query.count()
+    platform_total_users = (
+        User.query.count()  # tenant-scoping-ok: gated by is_platform_admin(current_user) above; the platform-wide total is intentional, computed only for a genuine platform admin
+        if is_platform_admin(current_user)
+        else None
+    )
     return render_template(
         "admin/registered_users.html",
         users=users,
@@ -261,6 +293,7 @@ def registered_users():
 @admin_required
 def user_info(user_id):
     """View a user's profile."""
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -271,6 +304,11 @@ def user_info(user_id):
 @audit_log("admin_user_email_change")
 def change_user_email(user_id):
     """Change a user's email."""
+    # tenant-scoping-ok: same session-switch IDOR class as the v2 admin
+    # blueprint's change_user_email (commit 7ae1b168) -- get_user_or_404
+    # below is correctly scoped to g.current_org_id, but admin_required
+    # alone is not (PR 430 route-fixes split, review-pr430-v3.md DEF-1).
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     form = ChangeUserEmailForm()
     if form.validate_on_submit():
@@ -290,6 +328,7 @@ def change_user_email(user_id):
 @audit_log("admin_user_role_change")
 def change_account_type(user_id):
     """Change a user's account type."""
+    require_org_or_platform_admin(g.current_org_id)
     if current_user.id == user_id:
         flash(
             "You cannot change the type of your own account. Please ask "
@@ -318,6 +357,7 @@ def change_account_type(user_id):
 @audit_log("admin_user_password_set")
 def set_user_password(user_id):
     """Set or reset a user's password."""
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     form = CreatePasswordForm()
     if form.validate_on_submit():
@@ -337,6 +377,7 @@ def set_user_password(user_id):
 @admin_required
 def delete_user_request(user_id):
     """Request deletion of a user's account."""
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -346,6 +387,7 @@ def delete_user_request(user_id):
 @admin_required
 def delete_user(user_id):
     """Delete a user's account."""
+    require_org_or_platform_admin(g.current_org_id)
     if current_user.id == user_id:
         flash(
             "You cannot delete your own account. Please ask another "
@@ -2218,6 +2260,7 @@ def _auto_discover_features(app):
 @admin_required
 def api_list_users():
     """Paginated user list API for data table."""
+    require_org_or_platform_admin(g.current_org_id)
     page = safe_int_arg('page', 1, minimum=1)
     per_page = min(safe_int_arg('per_page', 25, minimum=1, maximum=500), 100)
     search = request.args.get("q") or request.args.get("search", "")
@@ -2283,13 +2326,34 @@ def api_bulk_delete_users():
 
     Uses per-user savepoints so a failure on one user rolls back only that user.
     """
+    require_org_or_platform_admin(g.current_org_id)
     data = request.get_json() or {}
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
         return jsonify({"error": "ids list required"}), 400
 
     from flask_login import current_user as cu
-    safe_ids = [int(i) for i in ids if int(i) != cu.id]
+    requested_ids = [int(i) for i in ids if int(i) != cu.id]
+    if not requested_ids:
+        return jsonify({"deleted": 0})
+
+    # D-03 sweep (PR 430 round 3, lead review v2, 2026-10-08): the DELETE
+    # statements below are raw SQL (`DELETE FROM users WHERE id = :uid`) with
+    # no organisation predicate of their own, and previously ran for any id
+    # the caller supplied -- an org admin of org A could bulk-delete org B's
+    # users by id, platform-wide, with no cross-org check at all. Every
+    # other route in this blueprint scopes the target user to
+    # g.current_org_id (AdminUserService.get_user_or_404); this one must
+    # too. A genuine platform admin may still act across organisations.
+    if is_platform_admin(current_user):
+        safe_ids = requested_ids
+    else:
+        safe_ids = [
+            row.id for row in User.query.filter(
+                User.id.in_(requested_ids),
+                User.organization_id == g.current_org_id,
+            ).all()
+        ]
     if not safe_ids:
         return jsonify({"deleted": 0})
 

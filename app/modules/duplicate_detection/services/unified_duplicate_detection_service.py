@@ -15,7 +15,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from flask import g, has_request_context
+from flask_login import current_user
+
 from app import db
+from app.middleware.tenant_decorators import is_platform_admin
 from app.models.application_duplicate_detection import (
     DuplicateAnalysis,
     DuplicateDetectionRun,
@@ -75,6 +79,46 @@ class UnifiedDuplicateDetectionService:
         self.weights = weights or SimilarityWeights()
         self.logger = logging.getLogger(__name__)
         self.fuzzy_matcher = FuzzyMatcher(use_synonyms=True, use_preprocessing=True)
+
+    def _cleanup_stale_groups_for_caller_org(self):
+        """Clean up stale simple/hybrid detection groups before a fresh run.
+
+        DEF-2 (review-pr430-v3.md, 2026-10-08): this used to run
+        ``DELETE FROM unified_group_members`` with no predicate at all, plus
+        an unconditional ``UnifiedDuplicateGroup.query.delete()`` -- an
+        ordinary user in org A running detection wiped every organisation's
+        detection groups and members, not just their own. Neither table
+        carries an ``organization_id`` column, so scoping goes through each
+        member's ``ApplicationComponent`` (TenantMixin): only group
+        memberships whose application belongs to the caller's active
+        organisation are removed, then only groups left with zero members
+        are dropped -- a group with a remaining member from another
+        organisation is left untouched rather than guessed at.
+
+        Outside a request context (CLI/scheduler -- no ``g.current_org_id``
+        to scope to) or for a genuine platform admin, falls back to the
+        original unscoped cleanup, since there is no single caller
+        organisation to scope to either way.
+        """
+        if has_request_context() and not is_platform_admin(current_user):
+            current_org_id = getattr(g, "current_org_id", None)
+            if current_org_id is not None:
+                db.session.execute(
+                    db.text(
+                        "DELETE FROM unified_group_members WHERE application_id IN "
+                        "(SELECT id FROM application_components WHERE organization_id = :org_id)"
+                    ),
+                    {"org_id": current_org_id},
+                )
+                db.session.execute(
+                    db.text(
+                        "DELETE FROM unified_duplicate_groups WHERE id NOT IN "
+                        "(SELECT DISTINCT group_id FROM unified_group_members)"
+                    )
+                )
+                return
+        db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: system table (detection engine cleanup); no request-scoped caller to narrow to
+        UnifiedDuplicateGroup.query.delete()
 
     # === ENTERPRISE-GRADE METHODS (from DuplicateDetectionService) ===
 
@@ -548,8 +592,7 @@ class UnifiedDuplicateDetectionService:
             # Use a SAVEPOINT so failure doesn't poison the outer transaction
             try:
                 with db.session.begin_nested():
-                    db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: system table (detection engine cleanup)
-                    UnifiedDuplicateGroup.query.delete()
+                    self._cleanup_stale_groups_for_caller_org()
                 self.logger.info("Cleaned up previous detection groups")
             except Exception as cleanup_err:
                 self.logger.warning(f"Stale group cleanup failed (will create alongside old): {cleanup_err}")
@@ -713,8 +756,7 @@ class UnifiedDuplicateDetectionService:
             # Use a SAVEPOINT so failure doesn't poison the outer transaction
             try:
                 with db.session.begin_nested():
-                    db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: system table (detection engine cleanup)
-                    UnifiedDuplicateGroup.query.delete()
+                    self._cleanup_stale_groups_for_caller_org()
                 self.logger.info("Cleaned up previous detection groups")
             except Exception as cleanup_err:
                 self.logger.warning(f"Stale group cleanup failed (will create alongside old): {cleanup_err}")
@@ -1207,6 +1249,30 @@ class UnifiedDuplicateDetectionService:
                     "success": False,
                     "error": f"Application {keep_app_id} is not a member of group {group_id}",
                 }
+
+            # D-03 sweep (PR 430 round 3, lead review v2, 2026-10-08):
+            # UnifiedDuplicateGroup carries no organization_id at all, so
+            # group_id alone does not prove the group's applications belong
+            # to the caller's own organisation. Without this check, an
+            # ordinary authenticated user in any organisation could pass any
+            # group_id here and have this method delete another
+            # organisation's real ApplicationComponent rows. Require every
+            # member application to belong to the caller's active
+            # organisation, unless the caller is a genuine platform admin.
+            if has_request_context() and getattr(current_user, "is_authenticated", False) \
+                    and not is_platform_admin(current_user):
+                current_org_id = getattr(g, "current_org_id", None)
+                foreign = [
+                    app for app in group.applications
+                    if app.organization_id != current_org_id
+                ]
+                if foreign:
+                    group.status = "pending"
+                    db.session.flush()
+                    return {
+                        "success": False,
+                        "error": "Group contains applications outside your organisation",
+                    }
 
             keep_app = ApplicationComponent.query.get(keep_app_id)
             kept_app_name = keep_app.name if keep_app else "Unknown"

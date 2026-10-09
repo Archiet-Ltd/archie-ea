@@ -490,6 +490,16 @@ def manage_users_redirect():
 @admin_required
 def registered_users():
     """View all registered users."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while get_all_users()
+    # below correctly scopes its listing to g.current_org_id. Without this
+    # guard, a caller who is an Administrator in org A but holds only a
+    # Viewer OrgRole in org B can switch the active session to org B and
+    # reach that organisation's user directory -- same session-switch IDOR
+    # class as change_user_email (commit 7ae1b168) and set_user_password;
+    # same tenant_decorators.require_org_or_platform_admin guard
+    # (PR 430 route-fixes split, review-pr430-v3.md DEF-1).
+    require_org_or_platform_admin(g.current_org_id)
     users = _svc.get_all_users()
     roles = _svc.get_all_roles()
     # A-02: get_all_users() is (correctly) org-scoped — see the
@@ -517,6 +527,11 @@ def registered_users():
 @admin_required
 def user_info(user_id):
     """View a user's profile."""
+    # tenant-scoping-ok: same session-switch IDOR class as change_user_email
+    # (commit 7ae1b168) -- get_user_or_404 below is correctly scoped to
+    # g.current_org_id, but admin_required alone is not (PR 430 route-fixes
+    # split, review-pr430-v3.md DEF-1).
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -636,6 +651,11 @@ def set_user_password(user_id):
 @admin_required
 def delete_user_request(user_id):
     """Request deletion of a user's account."""
+    # tenant-scoping-ok: same session-switch IDOR class as change_user_email
+    # (commit 7ae1b168) -- this is a confirmation page, but it is still only
+    # reachable for a user the caller may act on (PR 430 route-fixes split,
+    # review-pr430-v3.md DEF-1).
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -3252,6 +3272,11 @@ def _auto_discover_features(app):
 @admin_required
 def api_list_users():
     """Paginated user list API for canonical data table."""
+    # tenant-scoping-ok: same session-switch IDOR class as change_user_email
+    # (commit 7ae1b168) -- the query below correctly scopes to
+    # g.current_org_id, but admin_required alone is not (PR 430 route-fixes
+    # split, review-pr430-v3.md DEF-1).
+    require_org_or_platform_admin(g.current_org_id)
     from sqlalchemy.orm import joinedload
 
     page = safe_int_arg('page', 1, minimum=1)
@@ -5344,6 +5369,14 @@ def governance_gates_list():
 @audit_log("admin_governance_gate_create")
 def governance_gates_create():
     """Create a new governance gate."""
+    # tenant-scoping-ok: GovernanceGate is TenantMixin, so the write below is
+    # already scoped to g.current_org_id -- but admin_required alone proves
+    # only "administers some organisation", not this one. Same session-switch
+    # IDOR class as change_user_email (commit 7ae1b168): an Administrator in
+    # org A with only a Viewer OrgRole in org B could switch into org B and
+    # plant a governance gate there (PR 430 route-fixes split,
+    # review-pr430-v3.md DEF-1).
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     data = request.get_json()

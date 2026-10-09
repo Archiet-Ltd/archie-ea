@@ -17,11 +17,12 @@ Endpoints:
 import logging
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import is_platform_admin
 from app.security.audit import audit_logger
 from app.security.data_protection import data_protector
 from app.security.rbac import Permission, ResourceDomain, check_permission, rbac_manager
@@ -182,6 +183,17 @@ def get_audit_events():
             except ValueError:
                 return jsonify({"error": "Invalid end_date format"}), 400
 
+        # DEF-5 (review-pr430-v3.md, 2026-10-08): AuditEvent carries no
+        # organization_id of its own, so an org B admin with AUDIT/READ could
+        # read org A's audit trail (another organisation's user emails, IP
+        # addresses and user agents) in full. Scope to the caller's own
+        # organisation unless they are a genuine platform admin.
+        organization_id = (
+            None
+            if is_platform_admin(current_user)
+            else getattr(g, "current_org_id", None)
+        )
+
         # Query audit events
         events = audit_logger.get_audit_trail(
             user_id=user_id,
@@ -190,6 +202,7 @@ def get_audit_events():
             start_date=start_date,
             end_date=end_date,
             limit=min(limit, 1000),  # Cap at 1000
+            organization_id=organization_id,
         )
 
         # Convert to dict format

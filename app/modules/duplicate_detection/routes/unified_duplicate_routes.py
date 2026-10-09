@@ -33,6 +33,8 @@ from flask import (  # dead-code-ok
 )
 from flask_login import login_required
 
+from app.middleware.tenant_decorators import platform_admin_required
+
 from .. import db
 from ..models.application_duplicate_detection import (  # dead-code-ok
     DuplicateDetectionRun,
@@ -289,8 +291,22 @@ def get_simple_runs():
 
 @unified_duplicate_bp.route("/simple/cleanup", methods=["POST"])
 @login_required
+@platform_admin_required
 def cleanup_stale_data():
-    """Clean up stale duplicate detection data (POST only)"""
+    """Clean up stale duplicate detection data (POST only).
+
+    D-03 (PR 430 round 3, lead review v2, 2026-10-08): the service call this
+    makes is an unconditional, unscoped ``DELETE`` of every organisation's
+    duplicate-detection data (unified_group_members, unified_duplicate_groups,
+    unified_detection_runs -- no WHERE clause at all; see
+    UnifiedDuplicateDetectionService.cleanup_stale_data). It was
+    ``login_required`` only, so any signed-in user in any organisation could
+    wipe every other organisation's detection results. None of the
+    underlying tables carry an organization_id column, so "scope to the
+    caller's organisation" is not mechanically possible without a schema
+    migration (a separate, later piece of work) -- restricting the route to
+    a genuine platform admin is the fix available now.
+    """
     try:
         result = unified_service.cleanup_stale_data()
 
