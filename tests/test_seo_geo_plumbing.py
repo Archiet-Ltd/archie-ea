@@ -211,7 +211,7 @@ def test_page_with_no_faq_section_gets_no_faq_node():
     does not invent one."""
     from app.services.public_pages import build_jsonld
 
-    page = load_page("module", slug="applications")
+    page = load_page("module", slug="batch-import")
     assert page is not None
     ld = json.loads(build_jsonld(page))
     assert _faq_node(ld) is None
