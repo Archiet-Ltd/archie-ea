@@ -224,6 +224,9 @@ class DataStewardshipService:
         A downstream entity with a different label is flagged as a
         conflict and left unchanged. Propagation never crosses an
         organisation and stops on a cycle.
+
+        Does NOT commit or change the approval status -- the caller
+        (approve_and_execute) handles that.
         """
         from app import db
         from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
@@ -265,11 +268,7 @@ class DataStewardshipService:
             entity_id, classification_label, organization_id, set()
         )
 
-        # Mark approval as executed
-        approval.status = ApprovalStatus.APPROVED
-        approval.executed_at = datetime.utcnow()
-        db.session.commit()
-
+        # Do NOT commit or change approval status -- the caller does that.
         return {
             "success": True,
             "entity_id": entity_id,
