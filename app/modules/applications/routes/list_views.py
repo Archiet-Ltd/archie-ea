@@ -208,8 +208,27 @@ def application_list():
         show_all_override = False
         _user_bu_id = getattr(current_user, "business_unit_id", None)  # model-safety-ok
         _bu_all_requested = request.args.get("bu", "").strip().lower() == "all"
-        if _bu_all_requested and hasattr(current_user, "is_admin") and current_user.is_admin():
-            show_all_override = True
+        # D-4 (admin-rbac-active-org continuation): this used to be
+        # ``hasattr(current_user, "is_admin") and current_user.is_admin()`` --
+        # a global Permission.ADMINISTER flag, independent of which
+        # organisation is active in the session. Since every self-registered
+        # user is Administrator of their own organisation, a user who merely
+        # accepted a Viewer invitation into another organisation and switched
+        # their session into it could use ?bu=all to see every business
+        # unit's applications there too, not just their own BU's -- the exact
+        # bug admin_required/org_admin_required already fix elsewhere in this
+        # PR.
+        if _bu_all_requested:
+            from flask import g
+
+            from app.middleware.tenant_decorators import is_platform_admin
+            from app.services.rbac_service import rbac_service
+
+            _active_org_id = getattr(g, "current_org_id", None)
+            if is_platform_admin(current_user) or rbac_service.is_org_admin(
+                current_user, _active_org_id
+            ):
+                show_all_override = True
         elif _user_bu_id:
             # Resolve the BU actor name for the indicator label
             try:
