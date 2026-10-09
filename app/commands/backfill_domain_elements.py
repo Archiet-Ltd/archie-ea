@@ -54,6 +54,10 @@ _DOMAIN_TYPES = [
     ("app.models.implementation_migration.WorkPackage",
      "name", "WorkPackage", "Implementation",
      "Work package: {name}"),
+    # compliance control
+    ("app.models.application_compliance.ApplicationComplianceControl",
+     "id", "BusinessObject", "Business",
+     "Compliance control mapping: app={application_id}, control={control_id}"),
 ]
 
 
