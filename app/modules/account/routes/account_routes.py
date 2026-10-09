@@ -655,8 +655,17 @@ def sso_callback(provider):
         flash("SSO authentication failed. Please try again.", "error")
         return redirect(url_for("account.login"))
 
-    # Extract user identity from OIDC claims
-    external_id = userinfo.get("sub", "")
+    # Extract user identity from OIDC claims. external_id is derived
+    # per-provider: Azure uses a tenant-qualified oid+tid composite rather
+    # than the raw `sub` claim, because `sub` is not guaranteed stable
+    # across apps for the same Azure user (see app/auth/sso.py).
+    from app.auth.sso import (
+        external_id_for,
+        find_linked_user,
+        sso_email_claim_is_trusted_for,
+    )
+
+    external_id = external_id_for(provider, userinfo)
     email = userinfo.get("email", "")
     first_name = userinfo.get("given_name", "")
     last_name = userinfo.get("family_name", "")
@@ -665,27 +674,58 @@ def sso_callback(provider):
         flash("SSO provider did not return required user information.", "error")
         return redirect(url_for("account.login"))
 
-    # Find, link or create the user through the one provisioning service.
-    from app.services import mfa_service, provisioning_service, session_registry
+    # Find or create user by external_id
+    from app import db
+    from app.models.user import User
+    from app.services import mfa_service, session_registry
 
-    try:
-        user, _created, _changed = provisioning_service.create_or_update_user(
-            None,
-            {
-                "email": email,
-                "first_name": first_name,
-                "last_name": last_name,
-                "external_id": external_id or None,
-                "sso_provider": provider,
-            },
-            source=provisioning_service.SOURCE_SSO,
-            link_only=True,
-        )
-    except provisioning_service.ProvisioningError as exc:
-        current_app.logger.error("SSO provisioning refused for %s: %s", provider, exc.detail)
-        flash("SSO authentication failed. Please try again.", "error")
-        return redirect(url_for("account.login"))
+    # tenant-scoping-ok: pre-auth SSO callback, no org context yet -- scoped
+    # by the (external_id, sso_provider) pair, which is unique per IdP.
+    user = find_linked_user(provider, userinfo, User)
+    if user is None:
+        # No existing subject-based link. Falling back to matching by email
+        # is only safe when the provider's claims prove the signing-in
+        # party actually controls that mailbox (nOAuth fix) -- otherwise an
+        # attacker who controls their own IdP tenant/account could claim
+        # any victim's email and be linked onto their existing account.
+        candidate = User.find_by_email(email)
+        if candidate is not None:
+            if not sso_email_claim_is_trusted_for(provider, userinfo, candidate):
+                flash(
+                    "SSO sign-in could not be completed. If you already have "
+                    "an account under this email, sign in with your password "
+                    "and link SSO from your account settings instead.",
+                    "error",
+                )
+                try:
+                    audit_logger.log_authentication(success=False, method=f"sso:{provider}")
+                except Exception as _exc:
+                    _log.warning("Audit log failed on SSO refusal: %s", _exc)
+                return redirect(url_for("account.login"))
+            candidate.external_id = external_id
+            candidate.sso_provider = provider
+            user = candidate
+        else:
+            # Create new user
+            user = User(
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                external_id=external_id,
+                sso_provider=provider,
+                confirmed=True,
+            )
+            db.session.add(user)
 
+    # Commit unconditionally: find_linked_user may have migrated a
+    # pre-fix Azure link's external_id to the new oid+tid composite even
+    # when `user` was already resolved above.
+    db.session.commit()
+
+    # R1-B26 PR 1: a leaver deactivated through the identity-provider
+    # lifecycle must not still be able to sign in via SSO. Checked after
+    # the nOAuth-protected identity resolution above (never skips that
+    # check), before anything else mints a session.
     if not user.is_active:
         flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
         return redirect(url_for("account.login"))

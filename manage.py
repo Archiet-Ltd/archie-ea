@@ -2,6 +2,7 @@
 import os
 import subprocess
 import sys
+import logging
 
 # Force UTF-8 on stdout/stderr before anything prints.
 #
@@ -366,6 +367,17 @@ def register_cli_commands(app):
                 db.session.rollback()
         print("  \u2713 PLT-017: users.notification_preferences column ensured")
 
+        # Add encryption key versioning columns for org credential store
+        if db.engine.dialect.name == "postgresql":
+            db.session.execute(text(
+                "ALTER TABLE organization_encryption_keys "
+                "ADD COLUMN IF NOT EXISTS previous_encrypted_key BYTEA"
+            ))
+            db.session.execute(text(
+                "ALTER TABLE org_connector_credentials "
+                "ADD COLUMN IF NOT EXISTS key_version INTEGER NOT NULL DEFAULT 1"
+            ))
+
         db.session.commit()
         _seed_requirement_templates()
         print("Database tables created (or already exist).")
@@ -435,6 +447,194 @@ def register_cli_commands(app):
         print("ArchiMate enterprise architecture commands registered")
     except ImportError as e:
         print(f"Warning: Could not register ArchiMate commands: {e}")
+
+    # Register Credential Management Commands
+    @app.cli.command()
+    @click.option("--dry-run", is_flag=True, help="Show counts without making changes")
+    def migrate_connector_credentials(dry_run):
+        """Migrate credentials from retired stores into ``OrgConnectorCredential``.
+
+        Copies every row from ``OrgConnectorConfig`` and
+        ``LucidchartConnectorConfig`` into the new per-organisation store,
+        under the same discrete ``credential_type`` keys the live readers
+        use -- not a combined JSON blob, which those readers never look for:
+
+        * ServiceNow (``OrgConnectorConfig``): ``client_secret``, read by
+          ``ServiceNowConnectorService._get_token``.
+        * Lucidchart (``LucidchartConnectorConfig``): ``client_secret``,
+          ``access_token`` and ``refresh_token``, read by
+          ``LucidchartConnectorService.get_access_token`` /
+          ``get_refresh_token`` / ``_require_client_credentials``.
+
+        ``DevOpsConnectorConfig`` has no live writer or vault-based reader
+        yet (see app/services/devops_push_service.py), so its token is still
+        copied as a JSON blob under credential_type="credentials" -- nothing
+        reads it that way today, but this preserves it for whenever a reader
+        is added, rather than dropping it.
+
+        Reports counts before and after; never logs a credential value.
+        Idempotent: a (organisation, connector_type, credential_type) already
+        present in the vault is skipped, so re-running after a partial
+        migration only fills in what is still missing.
+
+        Use ``--dry-run`` to preview what would be migrated.
+        """
+        from app.models.connector_config import (
+            OrgConnectorConfig, DevOpsConnectorConfig,
+            LucidchartConnectorConfig, OrgConnectorCredential,
+        )
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+        import json
+
+        vault = OrgCredentialVault()
+        migrations = []
+        total_before = 0
+
+        # Scan OrgConnectorConfig -- one discrete client_secret entry per row.
+        for row in OrgConnectorConfig.query.all():
+            secret = row.client_secret
+            if secret:
+                migrations.append({
+                    "source_table": "org_connector_configs",
+                    "source_id": row.id,
+                    "org_id": row.organization_id,
+                    "connector_type": row.connector_type,
+                    "credential_type": "client_secret",
+                    "value": secret,
+                })
+            total_before += 1
+
+        # Scan DevOpsConnectorConfig -- no live reader yet; kept as a single
+        # blob entry under credential_type="credentials" (unchanged shape).
+        for row in DevOpsConnectorConfig.query.all():
+            token = row.access_token
+            if token:
+                migrations.append({
+                    "source_table": "devops_connector_configs",
+                    "source_id": row.id,
+                    "org_id": row.organization_id,
+                    "connector_type": "devops",
+                    "credential_type": "credentials",
+                    "value": json.dumps({"access_token": token, "provider": row.provider}),
+                })
+            total_before += 1
+
+        # Scan LucidchartConnectorConfig -- one discrete entry per secret
+        # field actually stored on the row.
+        for row in LucidchartConnectorConfig.query.all():
+            for credential_type, value in (
+                ("client_secret", row.client_secret),
+                ("access_token", row.access_token),
+                ("refresh_token", row.refresh_token),
+            ):
+                if value:
+                    migrations.append({
+                        "source_table": "lucidchart_connector_configs",
+                        "source_id": row.id,
+                        "org_id": row.organization_id,
+                        "connector_type": "lucidchart",
+                        "credential_type": credential_type,
+                        "value": value,
+                    })
+            total_before += 1
+
+        print(f"Found {total_before} rows across retired stores, "
+              f"{len(migrations)} credential value(s) to migrate.")
+
+        if dry_run:
+            for m in migrations:
+                print(f"  would migrate: {m['source_table']}[{m['source_id']}] "
+                      f"org={m['org_id']} type={m['connector_type']}/{m['credential_type']}")
+            print(f"Dry run: {len(migrations)} credentials would be migrated.")
+            return
+
+        migrated = 0
+        skipped = 0
+        errors = 0
+        for m in migrations:
+            try:
+                # Check if already migrated
+                existing = OrgConnectorCredential.query.filter_by(
+                    organization_id=m["org_id"],
+                    connector_type=m["connector_type"],
+                    credential_type=m["credential_type"],
+                ).first()
+                if existing:
+                    skipped += 1
+                    continue
+                vault.store(m["org_id"], m["connector_type"], m["credential_type"], m["value"])
+                migrated += 1
+            except Exception as exc:
+                logger = logging.getLogger(__name__)
+                logger.error("Failed to migrate %s[%s] credential_type=%s: %s",
+                             m["source_table"], m["source_id"], m["credential_type"], exc)
+                errors += 1
+
+        from app.extensions import db
+        db.session.commit()
+
+        total_after = OrgConnectorCredential.query.count()
+        print(f"Migrated: {migrated}, skipped (already present): {skipped}, "
+              f"errors: {errors}")
+        print(f"OrgConnectorCredential rows before: {total_before} source rows | "
+              f"after: {total_after}")
+
+    @app.cli.command()
+    @click.option("--org", "org_id", type=int, required=True, help="Organisation id")
+    def rotate_credential_key(org_id):
+        """Rotate the encryption key for one organisation.
+
+        Generates a new Fernet key, stores it encrypted under the master key,
+        and re-encrypts every credential row. All operations are atomic.
+        """
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        vault = OrgCredentialVault()
+        try:
+            new_version = vault.rotate_all_credentials(org_id)
+            print(f"Key rotated for org {org_id}: new version {new_version}")
+        except Exception as exc:
+            print(f"Error rotating key for org {org_id}: {exc}")
+            raise
+
+    @app.cli.command()
+    @click.option("--dry-run", is_flag=True, help="Show what would change without making changes")
+    def rewrap_org_keys(dry_run):
+        """Re-wrap every organisation's Fernet key under the current master key.
+
+        Idempotent: organisations already encrypted with the current master key
+        are unchanged. Use after ``ORG_ENCRYPTION_MASTER_KEY`` is changed.
+        """
+        from app.models.connector_config import OrganizationEncryptionKey
+        from app.modules.codegen.services.credential_encryption import _get_master_fernet
+        from app.extensions import db
+
+        master = _get_master_fernet()
+        rows = OrganizationEncryptionKey.query.all()
+        rewrapped = 0
+
+        for row in rows:
+            if dry_run:
+                print(f"  would rewrap org {row.organization_id} key version {row.key_version}")
+                continue
+            # Decrypt with old master, re-encrypt with current master
+            try:
+                raw_key = master.decrypt(row.encrypted_key)
+                row.encrypted_key = master.encrypt(raw_key)
+                rewrapped += 1
+            except Exception as exc:
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    "Could not rewrap key for org %s: %s. "
+                    "The key may already use the current master key.",
+                    row.organization_id, exc,
+                )
+
+        db.session.commit()
+        if dry_run:
+            print(f"Dry run: {len(rows)} org keys would be checked.")
+        else:
+            print(f"Rewrapped: {rewrapped} of {len(rows)} org keys.")
 
     @app.cli.command()
     def setup_dev():

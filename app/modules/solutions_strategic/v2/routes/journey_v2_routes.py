@@ -1586,8 +1586,8 @@ def update_element(solution_id, element_id):
         data = request.get_json() or {}
         orch = JourneyOrchestrator(solution_id)
         result = orch.update_element(element_id, data)
-        if isinstance(result, dict) and result.get("property_errors"):
-            return api_error(result["error"], 400)
+        if result.get("error"):
+            return api_error(result["error"], result.get("status_code", 400))
         return api_success(data=result)
     except Exception as e:
         logger.error("Element update failed: %s", e, exc_info=True)
@@ -2140,8 +2140,8 @@ def update_proposal_properties(solution_id, proposal_id):
         data = request.get_json() or {}
         orch = JourneyOrchestrator(solution_id)
         result = orch.update_proposal_properties(proposal_id, data.get("properties", {}))
-        if isinstance(result, dict) and result.get("property_errors"):
-            return api_error(result["error"], 400)
+        if result.get("error"):
+            return api_error(result["error"], result.get("status_code", 400))
         return api_success(data=result)
     except Exception as e:
         logger.error("Property update failed: %s", e, exc_info=True)
