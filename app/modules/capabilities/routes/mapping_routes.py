@@ -1716,7 +1716,7 @@ def api_apqc_suggestions():
     and an appropriate child level (L3-L5).
     """
     try:
-        from app.models.apqc_process import APQCProcess, CapabilityProcessMapping
+        from app.models.apqc_process import APQCProcess
         from app.models.business_capabilities import BusinessCapability
 
         apqc_processes = APQCProcess.query.all()
@@ -1728,10 +1728,19 @@ def api_apqc_suggestions():
             tokens = _tokenize(cap.name) | _tokenize(cap.business_domain) | _tokenize(cap.category)
             cap_tokens.append((cap, tokens))
 
-        # Find APQC processes that are already linked
+        # Find APQC processes that are already linked. Column-only selects
+        # are not covered by the ambient tenant listener (unlike the
+        # `BusinessCapability.query.all()` above, which is), and
+        # CapabilityProcessMapping has no organization_id of its own --
+        # another organisation's linked processes would otherwise be
+        # excluded from this organisation's suggestions (pr306-v2 review,
+        # DEFECT D5).
+        from app.services.apqc_mapping_tenant_fence import (
+            fenced_capability_mappings_query,
+        )
+
         existing_links = {
-            m.apqc_process_id
-            for m in db.session.query(CapabilityProcessMapping.apqc_process_id).all()
+            m.apqc_process_id for m in fenced_capability_mappings_query().all()
         }
 
         suggestions = []
@@ -1911,8 +1920,19 @@ def api_apqc_link():
         if not parent_cap:
             return jsonify({"error": f"Capability {capability_id} not found"}), 404
 
-        # Check for existing mapping
-        existing = CapabilityProcessMapping.query.filter_by(apqc_process_id=apqc_id).first()
+        # Check for existing mapping. CapabilityProcessMapping has no
+        # organization_id of its own; unfenced, this returned another
+        # organisation's existing_capability_id in the 409 body (pr306-v2
+        # review, DEFECT-1). apqc_process_id is a shared reference id, so
+        # scope the duplicate check to the caller's own organisation's
+        # capabilities the same way the other routes in this file do.
+        from app.services.apqc_mapping_tenant_fence import (
+            fenced_capability_mappings_query,
+        )
+
+        existing = fenced_capability_mappings_query().filter(
+            CapabilityProcessMapping.apqc_process_id == apqc_id
+        ).first()
         if existing:
             return (
                 jsonify(

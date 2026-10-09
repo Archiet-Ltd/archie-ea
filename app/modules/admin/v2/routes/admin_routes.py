@@ -66,7 +66,11 @@ from ...forms.admin_forms import (
 )
 from app.modules.account.forms.account_forms import CreatePasswordForm
 from app.decorators import admin_required, audit_log, governance_gate_reader_required
-from app.middleware.tenant_decorators import org_admin_required, platform_admin_required
+from app.middleware.tenant_decorators import (
+    org_admin_required,
+    platform_admin_required,
+    require_org_or_platform_admin,
+)
 from app.models import APISettings, EditableHTML, Permission, Role, User
 from app.models.organization import Organization
 from app.models.org_role import OrgRole
@@ -486,6 +490,7 @@ def manage_users_redirect():
 @admin_required
 def registered_users():
     """View all registered users."""
+    require_org_or_platform_admin(g.current_org_id)
     users = _svc.get_all_users()
     roles = _svc.get_all_roles()
     # A-02: get_all_users() is (correctly) org-scoped — see the
@@ -513,6 +518,7 @@ def registered_users():
 @admin_required
 def user_info(user_id):
     """View a user's profile."""
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -524,6 +530,17 @@ def user_info(user_id):
 @audit_log("change_user_email")
 def change_user_email(user_id):
     """Change a user's email."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and change
+    # org B's own administrator's email out from under them. Same
+    # tenant_decorators.require_org_or_platform_admin guard used by every
+    # other fixed route on this branch (set_user_password,
+    # api_bulk_delete_users, webhook_settings, the D4-D6 routes).
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     form = ChangeUserEmailForm()
     if form.validate_on_submit():
@@ -544,6 +561,17 @@ def change_user_email(user_id):
 @audit_log("change_account_type")
 def change_account_type(user_id):
     """Change a user's account type."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and demote
+    # org B's own administrator, or promote any of that org's users --
+    # same session-switch IDOR class as change_user_email (commit 7ae1b168)
+    # and set_user_password; same tenant_decorators
+    # .require_org_or_platform_admin guard, reproduced by the refuter.
+    require_org_or_platform_admin(g.current_org_id)
     if current_user.id == user_id:
         flash(
             "You cannot change the type of your own account. Please ask "
@@ -579,6 +607,17 @@ def change_account_type(user_id):
 @audit_log("set_user_password")
 def set_user_password(user_id):
     """Set or reset a user's password."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and set a new
+    # password for org B's own administrator -- full account takeover, no
+    # reset-flow step needed. Found by the sweep that found change_user_email's
+    # identical gap (commit 7ae1b168); same tenant_decorators
+    # .require_org_or_platform_admin guard.
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     form = CreatePasswordForm()
     if form.validate_on_submit():
@@ -599,6 +638,7 @@ def set_user_password(user_id):
 @admin_required
 def delete_user_request(user_id):
     """Request deletion of a user's account."""
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -609,6 +649,17 @@ def delete_user_request(user_id):
 @admin_required
 def delete_user(user_id):
     """Delete a user's account."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and delete
+    # org B's own administrator -- same session-switch IDOR class as
+    # change_user_email (commit 7ae1b168) and set_user_password; same
+    # tenant_decorators.require_org_or_platform_admin guard, reproduced by
+    # the refuter.
+    require_org_or_platform_admin(g.current_org_id)
     if current_user.id == user_id:
         flash(
             "You cannot delete your own account. Please ask another "
@@ -2375,7 +2426,7 @@ def sso_settings():
 @admin_bp_v2.route("/jira-settings", methods=["GET", "POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_settings():
     """Manage Jira push integration configuration."""
     from flask_wtf import FlaskForm
@@ -2529,7 +2580,7 @@ def jira_settings():
 @admin_bp_v2.route("/jira-settings/test-connection", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_test_connection():
     """Test Jira API connectivity."""
     import asyncio
@@ -2651,7 +2702,7 @@ def jira_webhook():
 
 @admin_bp_v2.route("/jira-settings/save-env-config", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def save_env_jira_config():
     """Save .env Jira credentials to database."""
     import os
@@ -2694,7 +2745,7 @@ def save_env_jira_config():
 @admin_bp_v2.route("/jira-settings/trigger-push", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_trigger_push():
     """Create a Job and start pushing applications to Jira."""
     from app.models.job import Job, JobStatus
@@ -2734,7 +2785,7 @@ def jira_trigger_push():
 @admin_bp_v2.route("/jira-settings/push-status", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_push_status():
     """Return JSON push status for polling."""
     from app.models.job import Job
@@ -2761,7 +2812,7 @@ def jira_push_status():
 @admin_bp_v2.route("/jira-settings/kanban-push-status", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_kanban_push_status():
     """Return JSON kanban push status for polling."""
     try:
@@ -2777,7 +2828,7 @@ def jira_kanban_push_status():
 @admin_bp_v2.route("/jira-settings/trigger-kanban-push", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_trigger_kanban_push():
     """Push all unpushed KanbanCard rows to Jira."""
     try:
@@ -2793,7 +2844,7 @@ def jira_trigger_kanban_push():
 @admin_bp_v2.route("/jira-settings/push-epics", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_push_epics():
     """Create one Jira Epic per ADM phase as an ArchiMate Plateau."""
     try:
@@ -2808,7 +2859,7 @@ def jira_push_epics():
 @admin_bp_v2.route("/jira-settings/push-applications", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_push_applications():
     """Push ApplicationComponents (ArchiMate Application Layer, Phase C/D) to Jira."""
     try:
@@ -2823,7 +2874,7 @@ def jira_push_applications():
 @admin_bp_v2.route("/jira-settings/push-dependencies", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_push_dependencies():
     """Create Jira Subtasks from KanbanCard.depends_on (ArchiMate TriggeringRelationship).
 
@@ -2841,7 +2892,7 @@ def jira_push_dependencies():
 @admin_bp_v2.route("/jira-settings/field-discovery", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_field_discovery():
     """Trigger discover_fields and return available Jira fields."""
     import asyncio
@@ -2890,6 +2941,12 @@ def jira_field_discovery():
 @admin_bp_v2.route("/seed-management")
 @timed_route
 @login_required
+# SeedManagementService seeds global reference/catalogue tables shared by
+# every tenant (vendor organisations/products, capability taxonomies, feature
+# flags, APQC processes, AI prompt templates, ...), none of them org-scoped.
+# admin_required alone let any tenant's own admin reach it
+# (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def seed_management():
     """Seed management dashboard."""
@@ -2906,6 +2963,7 @@ def seed_management():
 @admin_bp_v2.route("/api/seed-status")
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def seed_status():
     """API: Get current seed status."""
@@ -2922,6 +2980,7 @@ def seed_status():
 @admin_bp_v2.route("/api/seed/<key>", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 @audit_log("seed_data")
 def seed(key):
@@ -2939,6 +2998,7 @@ def seed(key):
 @admin_bp_v2.route("/api/seed-all", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 @audit_log("seed_all_data")
 def seed_all():
@@ -3204,6 +3264,7 @@ def _auto_discover_features(app):
 @admin_required
 def api_list_users():
     """Paginated user list API for canonical data table."""
+    require_org_or_platform_admin(g.current_org_id)
     from sqlalchemy.orm import joinedload
 
     page = safe_int_arg('page', 1, minimum=1)
@@ -3261,6 +3322,15 @@ def api_list_users():
 @admin_required
 def api_bulk_delete_users():
     """Bulk delete users by IDs (cannot delete yourself)."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while the delete
+    # query below correctly scopes to g.current_org_id. Without this guard,
+    # a caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and delete
+    # org B's users outright. Found by the sweep that found
+    # change_user_email's identical gap (commit 7ae1b168); same
+    # tenant_decorators.require_org_or_platform_admin guard.
+    require_org_or_platform_admin(g.current_org_id)
     data = request.get_json() or {}
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
@@ -3278,9 +3348,17 @@ def api_bulk_delete_users():
 @admin_bp_v2.route("/api/roles", methods=["GET"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def api_list_roles():
-    """List all roles with user counts and permission flags."""
+    """List all roles with user counts and permission flags.
+
+    Role is a GLOBAL table (app/models/user.py's Role carries no
+    organization_id) -- reachable by any org admin of their own,
+    brand-new organisation, no invitation into anyone else's org needed.
+    platform_admin_required added alongside this route's own
+    admin_required for every /api/roles verb (list/get/create/update/
+    delete), same as the enterprise-roles sibling finding."""
     roles = Role.query.order_by(Role.name).all()
     items = []
     for role in roles:
@@ -3306,9 +3384,11 @@ def api_list_roles():
 @admin_bp_v2.route("/api/roles/<int:role_id>", methods=["GET"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def api_get_role(role_id):
-    """Get a single role by ID."""
+    """Get a single role by ID. See api_list_roles's docstring: Role is a
+    global table, platform_admin_required required."""
     role = Role.query.get_or_404(role_id)
     users = User.query.filter_by(role_id=role.id, organization_id=g.current_org_id).all()
     return jsonify({
@@ -3329,9 +3409,11 @@ def api_get_role(role_id):
 @admin_bp_v2.route("/api/roles", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def api_create_role():
-    """Create a new custom role."""
+    """Create a new custom role. See api_list_roles's docstring: Role is a
+    global table, platform_admin_required required."""
     data = request.get_json() or {}
     name = (data.get("name") or "").strip()
     if not name:
@@ -3349,9 +3431,11 @@ def api_create_role():
 @admin_bp_v2.route("/api/roles/<int:role_id>", methods=["PUT"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def api_update_role(role_id):
-    """Update a role name or permissions."""
+    """Update a role name or permissions. See api_list_roles's docstring:
+    Role is a global table, platform_admin_required required."""
     role = Role.query.get_or_404(role_id)
     if role.name in ("Administrator", "User"):
         return jsonify({"success": False, "error": "System roles cannot be modified"}), 403
@@ -3368,9 +3452,12 @@ def api_update_role(role_id):
 @admin_bp_v2.route("/api/roles/<int:role_id>", methods=["DELETE"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def api_delete_role(role_id):
-    """Delete a custom role. Reassigns users to the default User role."""
+    """Delete a custom role. Reassigns users to the default User role. See
+    api_list_roles's docstring: Role is a global table,
+    platform_admin_required required."""
     role = Role.query.get_or_404(role_id)
     if role.name in ("Administrator", "User"):
         return jsonify({"success": False, "error": "System roles cannot be deleted"}), 403
@@ -3419,6 +3506,7 @@ def api_list_enterprise_roles():
 @admin_required
 def api_enterprise_role_users():
     """List all users with their enterprise role assignments."""
+    require_org_or_platform_admin(g.current_org_id)
     users = User.query.filter_by(organization_id=g.current_org_id).order_by(User.last_name, User.first_name).all()
     items = []
     for u in users:
@@ -3438,6 +3526,16 @@ def api_enterprise_role_users():
 @admin_required
 def api_assign_enterprise_role():
     """Assign an enterprise role to a user."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while the lookup
+    # below correctly scopes to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and assign
+    # any enterprise role to that org's users -- the JSON API twin of
+    # change_account_type's session-switch IDOR (commit 7ae1b168 class);
+    # same tenant_decorators.require_org_or_platform_admin guard,
+    # reproduced by the refuter.
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.user import VALID_ROLES
     data = request.get_json() or {}
     user_id = data.get("user_id")
@@ -3834,6 +3932,17 @@ def report_builder():
 @audit_log("update_webhook_settings")
 def webhook_settings():
     """PLT-015: Manage Slack/Teams webhook subscriptions and notification settings."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while
+    # WebhookSubscription's TenantMixin scopes the query/create below to
+    # g.current_org_id. Without this guard, a caller who is an
+    # Administrator in org A but holds only a Viewer OrgRole in org B can
+    # switch the active session to org B and plant a webhook URL they
+    # control into org B, which then streams org B's events out to them.
+    # Found by the sweep that found change_user_email's identical gap
+    # (commit 7ae1b168); same tenant_decorators.require_org_or_platform_admin
+    # guard.
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.webhook import WebhookSubscription
 
     VALID_EVENTS = [
@@ -4744,6 +4853,13 @@ def _get_capability_suggestion_default():
 @admin_bp_v2.route("/solution-prompts")
 @timed_route
 @login_required
+# AIPromptTemplate (app/models/ai_service.py) is a GLOBAL table -- these are
+# the platform's own LLM system prompts, shared by every tenant, not tenant
+# data. admin_required alone let any tenant's own admin read every prompt,
+# its override history and diffs; the write routes on this same resource
+# (update/reset/rollback, below) already require platform_admin_required --
+# the reads were the gap (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def solution_prompts_page():
     """Render the solution AI prompt management page."""
@@ -4752,6 +4868,7 @@ def solution_prompts_page():
 
 @admin_bp_v2.route("/solution-prompts/data")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompts_data():
     """JSON API: return all solution prompt configs merged with DB overrides."""
@@ -4876,6 +4993,7 @@ def _version_content_v2(prompt_key, version, override_name):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/history")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompt_history(prompt_key):
     """A-05: version history for a prompt override, newest first."""
@@ -4916,6 +5034,7 @@ def solution_prompt_history(prompt_key):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/diff")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompt_diff(prompt_key):
     """A-05: unified diff between two versions (or a version and "current").
@@ -5249,6 +5368,7 @@ def governance_gates_list():
 @audit_log("admin_governance_gate_create")
 def governance_gates_create():
     """Create a new governance gate."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     data = request.get_json()
@@ -5285,6 +5405,7 @@ def governance_gates_create():
 @audit_log("admin_governance_gate_update")
 def governance_gates_update(gate_id):
     """Update an existing governance gate."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     gate = GovernanceGate.query.get_or_404(gate_id)
@@ -5327,6 +5448,7 @@ def governance_gates_update(gate_id):
 @audit_log("admin_governance_gate_delete")
 def governance_gates_delete(gate_id):
     """Soft-delete a governance gate by disabling it."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     gate = GovernanceGate.query.get_or_404(gate_id)

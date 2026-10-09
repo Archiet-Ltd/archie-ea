@@ -1295,8 +1295,9 @@ class IntelligenceQueryService:
         positive number; otherwise the row carries the honest
         ``not_costed`` reason.
 
-        Plateau and gap: ``UnifiedWorkPackage.plateau_id``/``gap_id`` are
-        resolved against the ``Plateau``/``Gap`` tables (each carrying its
+        Plateau and gap: the work package's plateau and gap are its ArchiMate
+        relationships (read through ``work_package_service.plateau_and_gap_links``),
+        then resolved against the ``Plateau``/``Gap`` tables (each carrying its
         own ``TenantMixin``) in two selects, tenant-scoped explicitly, in
         addition to the ORM listener -- a foreign-tenant row a work package
         happens to point at (the FK itself is not tenant-checked) simply
@@ -1406,8 +1407,18 @@ class IntelligenceQueryService:
             # this IN list either, so a foreign element's classification
             # is never even asked for, not merely filtered out of the
             # answer.
-            plateau_ids = {wp.plateau_id for wp in seed_packages if wp.plateau_id is not None}
-            gap_ids = {wp.gap_id for wp in seed_packages if wp.gap_id is not None}
+            # The plateau and gap a work package is linked to are its ArchiMate
+            # relationships; the one reader gives them (first linked id of each).
+            from app.services import work_package_service
+
+            wp_links = work_package_service.plateau_and_gap_links(seed_packages, org_id)
+
+            def _first_link(wp, key):
+                ids = wp_links.get(wp.id, {}).get(key) or []
+                return ids[0] if ids else None
+
+            plateau_ids = {i for i in (_first_link(w, "plateau_ids") for w in seed_packages) if i is not None}
+            gap_ids = {i for i in (_first_link(w, "gap_ids") for w in seed_packages) if i is not None}
             plateau_element_ids = {int(eid) for eid in all_elements}
 
             plateaus_by_id: Dict[int, Any] = {}
@@ -1475,7 +1486,7 @@ class IntelligenceQueryService:
                     cost_variance_pct = None
                     cost_reason = NOT_COSTED_REASON
 
-                plateau_row = plateaus_by_id.get(wp.plateau_id)
+                plateau_row = plateaus_by_id.get(_first_link(wp, "plateau_ids"))
                 if plateau_row is None:
                     plateau_block: Dict[str, Any] = {
                         "plateau_id": None,
@@ -1497,7 +1508,7 @@ class IntelligenceQueryService:
                         "reason": None,
                     }
 
-                gap_row = gaps_by_id.get(wp.gap_id)
+                gap_row = gaps_by_id.get(_first_link(wp, "gap_ids"))
                 if gap_row is None:
                     gap_block: Dict[str, Any] = {
                         "gap_id": None,

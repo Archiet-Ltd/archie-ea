@@ -600,7 +600,13 @@ class RouteDiscoveryService:
         """Check if user can access a route"""
         # Admin routes require admin role
         if route.is_admin:
-            return getattr(user, "is_admin", False) or getattr(user, "role", None) == "admin"
+            # R3-1 (PR 428 round 4): ``getattr(user, "is_admin", False)``
+            # with no call returned the bound method, always truthy -- every
+            # user was shown every admin route in navigation. Judged against
+            # the active organisation, same as the rest of this PR.
+            from app.middleware.tenant_decorators import is_active_org_admin
+
+            return is_active_org_admin(user)
 
         # Other routes just need to be logged in
         return True
