@@ -14,6 +14,7 @@ from typing import List, Union
 from flask import abort, current_app, request
 from flask_login import current_user
 
+from app.middleware.tenant_decorators import is_platform_admin
 from app.models.user import ROLE_PLATFORM_ADMIN
 from app.utils.role_access import get_user_role
 
@@ -23,11 +24,32 @@ from app.utils.role_access import get_user_role
 DATA_SUBJECT_REQUEST_ROLES = ["security_architect"]
 
 
+def holds_administrator_authority(user):
+    """True for a real administrator: an organisation administrator or a
+    platform administrator (the one ``is_platform_admin`` predicate).
+
+    The stored ``enterprise_role`` of ``platform_admin`` is a persona, and it is
+    the column default for every user who never picked one, so it is never
+    treated as authority here: a title decides what a person sees, authority
+    decides what they may do."""
+    return bool(getattr(user, "is_org_admin", False) or is_platform_admin(user))
+
+
+def role_admitted(user, allowed_roles):
+    """The one admission rule for ``requires_role``: a listed persona (other than
+    platform_admin, which stands for administrator authority), or real
+    administrator authority, which is always admitted."""
+    persona = get_user_role(user)
+    if persona != ROLE_PLATFORM_ADMIN and persona in allowed_roles:
+        return True
+    return holds_administrator_authority(user)
+
+
 def may_handle_data_subject_requests(user):
     """True when ``user`` may open the data-subject request pages: the roles in
-    DATA_SUBJECT_REQUEST_ROLES, and platform_admin as ``requires_role`` always
-    admits it."""
-    return get_user_role(user) in DATA_SUBJECT_REQUEST_ROLES + [ROLE_PLATFORM_ADMIN]
+    DATA_SUBJECT_REQUEST_ROLES, or an administrator (as ``requires_role``
+    always admits administrators)."""
+    return role_admitted(user, DATA_SUBJECT_REQUEST_ROLES)
 
 
 def requires_role(allowed_roles: Union[str, List[str]]):
@@ -61,9 +83,8 @@ def requires_role(allowed_roles: Union[str, List[str]]):
     if isinstance(allowed_roles, str):
         allowed_roles = [allowed_roles]
 
-    # Always allow platform_admin
-    if ROLE_PLATFORM_ADMIN not in allowed_roles:
-        allowed_roles = list(allowed_roles) + [ROLE_PLATFORM_ADMIN]
+    # Administrators (real authority, not the platform_admin title) always pass.
+    allowed_roles = list(allowed_roles)
 
     def decorator(f):
         @wraps(f)
@@ -79,7 +100,7 @@ def requires_role(allowed_roles: Union[str, List[str]]):
             user_role = get_user_role(current_user)
 
             # Check if user has required role
-            if user_role not in allowed_roles:
+            if not role_admitted(current_user, allowed_roles):
                 current_app.logger.warning(
                     f"Access denied: user {current_user.id} (role={user_role}) "
                     f"attempted to access {request.path} (requires {allowed_roles})"
