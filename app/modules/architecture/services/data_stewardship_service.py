@@ -1,9 +1,7 @@
-"""R1-B81 (policy/issue/glossary slice): retention-policy breach check,
-data issue raise/route/resolve, and the one-definition-per-term glossary.
-
-R1-B81 slice 2: steward assignment through the one ownership writer,
-no-steward list for critical entities, and classification proposal,
-acceptance and propagation along DataLineage.
+"""Retention-policy breach check, data issue raise/route/resolve,
+one-definition-per-term glossary, steward assignment through the one
+ownership writer, no-steward list for critical entities, and
+classification proposal, acceptance and propagation along DataLineage.
 
 Classification: a proposed label is an approval row (AIChatCRUDApproval);
 accepting it stores the label on the entity and propagates it downstream
@@ -32,7 +30,7 @@ class DataStewardshipService:
         return model.organization_id == organization_id
 
     # ------------------------------------------------------------------ #
-    # Steward assignment (PB-0063)
+    # Steward assignment
     # ------------------------------------------------------------------ #
 
     @classmethod
@@ -159,7 +157,7 @@ class DataStewardshipService:
         return result
 
     # ------------------------------------------------------------------ #
-    # Classification proposal and acceptance (PB-0111)
+    # Classification proposal and acceptance
     # ------------------------------------------------------------------ #
 
     @classmethod

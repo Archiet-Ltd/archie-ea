@@ -700,7 +700,7 @@ class AIChatApprovalService:
                 elif approval.entity_type == "vendor":
                     result = data_service.update_vendor(entity_id, payload)
                 elif approval.entity_type == "data_entity_classification":
-                    # R1-B81 slice 2: accept a proposed classification label.
+                    # Accept a proposed classification label.
                     # The label is stored on the entity and propagated
                     # downstream along DataLineage; conflicts are flagged.
                     from app.modules.architecture.services.data_stewardship_service import (

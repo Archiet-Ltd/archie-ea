@@ -5,13 +5,12 @@ declared source, the master data domain register, and the standards check on a
 logical data model. Gated by the same ``data_integration`` section predicate the
 sidebar uses, so a sidebar link can never 403.
 
-R1-B81 slice 2: steward assignment, no-steward list, classification proposal.
+Slice 2: steward assignment, no-steward list, classification proposal.
 """
 
-import json
 import logging
 
-from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -118,7 +117,7 @@ def declare_system_of_record(entity_id):
 
 
 # ------------------------------------------------------------------ #
-# Steward assignment (R1-B81 slice 2)
+# Steward assignment
 # ------------------------------------------------------------------ #
 
 
@@ -170,7 +169,7 @@ def remove_steward(entity_id, owner_id):
 @data_governance_bp.route("/no-steward")
 @login_required
 def no_steward():
-    """R1-B81 (PB-0317): critical data entities with no steward assigned."""
+    """Critical data entities with no steward assigned."""
     guard = _guard()
     if guard:
         return guard
@@ -183,7 +182,7 @@ def no_steward():
 
 
 # ------------------------------------------------------------------ #
-# Classification proposal (R1-B81 slice 2)
+# Classification proposal
 # ------------------------------------------------------------------ #
 
 
