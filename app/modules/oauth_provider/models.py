@@ -20,7 +20,7 @@ import time
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.models.mixins.core import TenantMixin, _default_org_id
+from app.models.mixins.core import _default_org_id
 
 
 def _new_client_id(prefix: str = "cl") -> str:
@@ -33,7 +33,7 @@ def hash_secret(value: str) -> str:
     return hashlib.sha256(value.encode("ascii")).hexdigest()
 
 
-class OAuthAuthorizationCode(TenantMixin, db.Model):
+class OAuthAuthorizationCode(db.Model):
     """A single-use authorization code, stored in the database so every
     worker process in a multi-worker deployment can redeem codes issued by
     any other worker.
@@ -41,6 +41,10 @@ class OAuthAuthorizationCode(TenantMixin, db.Model):
     ``code`` holds ``hash_secret(<plaintext code>)``, not the plaintext —
     the plaintext is returned to the caller once, by :meth:`issue`, and
     never persisted.
+
+    Not a TenantMixin model: a code is redeemed at the token endpoint before
+    any organisation is known, by its hash. The organisation is recorded at
+    issue time and carried onto the token, which every /mcp call checks.
     """
 
     __tablename__ = "oauth_authorization_codes"
@@ -56,7 +60,7 @@ class OAuthAuthorizationCode(TenantMixin, db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
-    # TenantMixin's column is non-nullable by default; this table is an
+    # This table is an
     # ADD-only rollout onto an already-existing table (reconcile-schema can
     # only add nullable columns), so the organization is recorded from the
     # user at issue time but earlier/legacy rows are tolerated NULL.

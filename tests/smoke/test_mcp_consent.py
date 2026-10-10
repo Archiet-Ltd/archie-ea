@@ -37,7 +37,10 @@ class _CallbackCapture(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):  # noqa: N802 - BaseHTTPRequestHandler's naming
         parsed = urllib.parse.urlparse(self.path)
-        _CallbackCapture.captured = dict(urllib.parse.parse_qsl(parsed.query))
+        # Only the redirect target counts: a browser also asks for /favicon.ico,
+        # and that request must not overwrite the captured redirect.
+        if parsed.path == "/callback":
+            _CallbackCapture.captured = dict(urllib.parse.parse_qsl(parsed.query))
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
         self.end_headers()
