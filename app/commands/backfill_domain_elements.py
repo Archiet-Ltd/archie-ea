@@ -89,10 +89,15 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
     ``session`` is optional; defaults to ``db.session``. Pass an explicit
     session in tests that wrap ``db.session`` in a rollback transaction.
 
+    Uses ``sync_archimate_element`` from the backbone for types that are
+    mapped in ``ELEMENT_TYPES`` (Risk, WorkPackage, ApplicationComplianceControl),
+    falling back to direct creation for other domain types.
+
     Returns a dict with per-type stats:
         {type_name: {"created": int, "scanned": int, "duplicates": [...], "errors": int}}
     """
     from app.models.archimate_core import ArchiMateElement
+    from app.services.archimate_backbone import ELEMENT_TYPES, sync_archimate_element
 
     if session is None:
         session = db.session
@@ -149,21 +154,29 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
         if not dry_run:
             for record in records:
                 try:
-                    name = _resolve_name(record, name_field)
-                    element = ArchiMateElement(
-                        name=_truncate_name(name),
-                        type=element_type,
-                        layer=element_layer,
-                        description=desc_template.format(
-                            **{k: getattr(record, k, "") for k in
-                               ["name", "title", "contract_name", "interface_type"]}
-                        ) if desc_template else None,
-                        organization_id=org_id,
-                    )
-                    session.add(element)
-                    session.flush()
-                    record.archimate_element_id = element.id
-                    created += 1
+                    # Use sync_archimate_element for types mapped in the
+                    # backbone (creates with provenance, name rules, org check).
+                    if type_key in ELEMENT_TYPES:
+                        element = sync_archimate_element(record, session=session)
+                        if element is not None:
+                            created += 1
+                    else:
+                        # Fallback for unmapped types: create directly.
+                        name = _resolve_name(record, name_field)
+                        element = ArchiMateElement(
+                            name=_truncate_name(name),
+                            type=element_type,
+                            layer=element_layer,
+                            description=desc_template.format(
+                                **{k: getattr(record, k, "") for k in
+                                   ["name", "title", "contract_name", "interface_type"]}
+                            ) if desc_template else None,
+                            organization_id=org_id,
+                        )
+                        session.add(element)
+                        session.flush()
+                        record.archimate_element_id = element.id
+                        created += 1
                 except Exception:
                     session.rollback()
                     errors += 1

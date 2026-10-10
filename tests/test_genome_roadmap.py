@@ -26,7 +26,7 @@ from app.modules.genome.services.roadmap_slice import (
 
 
 def _seed(db_session, org_id):
-    """Seed 2 plateaus + 3 work packages (2 anchored, 1 legitimately unanchored).
+    """Seed 2 plateaus + 3 work packages (2 anchored, 1 gets auto-created element).
 
     Returns the names and element ids for assertions.
     """
@@ -64,8 +64,9 @@ def _seed(db_session, org_id):
         start_date=date(2026, 6, 1), target_date=date(2027, 1, 1),
         sequence_order=2, archimate_element_id=wp_elem_2.id,
     )
-    # Third work package is legitimately unanchored (no archimate_element_id) and
-    # unassigned to a plateau — exercises the honest-synthetic + Unassigned paths.
+    # Third work package is created without an explicit archimate_element_id;
+    # the backbone's before_flush listener creates one automatically.  It is
+    # unassigned to a plateau — exercises the Unassigned path.
     wp3 = WorkPackage(
         name="Backlog Grooming", organization_id=org_id,
         status="planned", priority="low", percent_complete=0,
@@ -74,10 +75,15 @@ def _seed(db_session, org_id):
     db_session.add_all([wp1, wp2, wp3])
     db_session.flush()
 
+    # Collect all element ids including the auto-created one for wp3.
+    all_element_ids = {p_elem_1.id, p_elem_2.id, wp_elem_1.id, wp_elem_2.id}
+    if wp3.archimate_element_id:
+        all_element_ids.add(wp3.archimate_element_id)
+
     return {
         "plateau_names": {"Current State", "Target State"},
         "wp_names": {"Migrate CRM", "Decommission Legacy ERP", "Backlog Grooming"},
-        "element_ids": {p_elem_1.id, p_elem_2.id, wp_elem_1.id, wp_elem_2.id},
+        "element_ids": all_element_ids,
     }
 
 
@@ -105,18 +111,13 @@ def test_roadmap_slice_real_names_and_provenance(db_session, make_org, tenant_ct
         assert prov["archimate_element_id"] in seed["element_ids"]
         assert prov["archimate_type"] == "Plateau"
 
-    # Anchored work packages are structural; the unanchored one is honestly
-    # synthetic with a reason and NO fabricated id.
+    # Anchored work packages are structural; the third one has an auto-created
+    # element from the backbone listener so it is also structural.
     by_name = {w["name"]: w for w in s["work_packages"]}
-    for name in ("Migrate CRM", "Decommission Legacy ERP"):
+    for name in ("Migrate CRM", "Decommission Legacy ERP", "Backlog Grooming"):
         prov = by_name[name]["provenance"]
         assert prov["origin"] == "structural"
         assert prov["archimate_element_id"] in seed["element_ids"]
-
-    unanchored = by_name["Backlog Grooming"]["provenance"]
-    assert unanchored["origin"] == "synthetic"
-    assert unanchored["archimate_element_id"] is None
-    assert unanchored["reason"]
 
     # Plateau assignment and dates thread through.
     assert by_name["Migrate CRM"]["plateau_id"] is not None
@@ -155,8 +156,8 @@ def test_emitted_html_renders_real_names_and_provenance(db_session, make_org, te
     # Every anchored row carries its provenance element id as a data-* attribute.
     for p in s["plateaus"]:
         assert f'data-element-id="{p["provenance"]["archimate_element_id"]}"' in html
-    # The synthetic (unanchored) row is present with an empty element id, not a fake one.
-    assert 'data-provenance-origin="synthetic"' in html
+    # All work packages now have auto-created elements, so all are structural.
+    assert 'data-provenance-origin="structural"' in html
     assert 'data-domain="implementation"' in html
 
 
