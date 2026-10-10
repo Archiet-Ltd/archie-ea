@@ -247,7 +247,6 @@ ${data.gaps.slice(0, 10).map(g => `
   ${g.description}
   *Recommendation:* ${g.recommendation}
   ${g.capability_id ? `<a href="/capability_map/capabilities?id=${g.capability_id}">→ View Capability</a>` : ''}
-  ${g.process_id ? `<a href="/archimate/composer">→ Open in Composer</a>` : ''}
   ${g.vendor_name ? `<a href="/applications?filter_vendor=${encodeURIComponent(g.vendor_name)}">→ Find Vendors</a>` : ''}
 `).join('\n')}
 

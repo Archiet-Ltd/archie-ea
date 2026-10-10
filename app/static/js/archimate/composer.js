@@ -2549,14 +2549,21 @@ function composerApp() {
             /* ── Check for initial viewpoint from URL ── */
             let initialVp = (window.__COMPOSER_CONFIG__ || {}).initialViewpoint;
             let initialLayer = (window.__COMPOSER_CONFIG__ || {}).initialLayer;
+            let initialElement = (window.__COMPOSER_CONFIG__ || {}).initialElement;
             /* A composer link can legitimately pass `layer` with no `viewpoint`
              * (e.g. traceability_chain.html's "+ Add" buttons, which only know
              * which layer to seed). Without a fallback here that layer was
              * silently dropped and the composer opened generically — default
              * to the 'layered' viewpoint so a layer-only link still does
              * something sensible, matching the `?viewpoint=layered&layer=X`
-             * convention used everywhere else in this codebase. */
-            if (!initialVp && initialLayer) {
+             * convention used everywhere else in this codebase. Same
+             * reasoning for `element` with no `viewpoint`: the enterprise-wide
+             * 'layered' viewpoint is the one place a single element id can
+             * reliably be found without also knowing which solution it lives
+             * in (several "Open in Composer" links across the app know an
+             * element id but not a solution id -- see the audit that led to
+             * this parameter). */
+            if (!initialVp && (initialLayer || initialElement)) {
                 initialVp = 'layered';
             }
             if (initialVp) {
@@ -3181,6 +3188,7 @@ function composerApp() {
                 self.graph.getLinks().forEach(function(link) {
                     self._updateAnnotationCard(link);
                 });
+                self._selectInitialElement();
             })
             .catch(function(err) {
                 _toast('error', 'Failed to load diagram: ' + ((err && err.message) || err));
@@ -4071,6 +4079,87 @@ function composerApp() {
                 body.removeAttribute('data-orig-stroke');
                 body.removeAttribute('data-orig-stroke-width');
             }
+        },
+
+        /* Deep-link select: composer_page's `element` query param, threaded through as
+         * __COMPOSER_CONFIG__.initialElement. Called once, after the graph's first
+         * viewpoint/solution data load finishes (both selectViewpoint in
+         * composer_search.js and loadSolutionData above call this at the end of their
+         * success path). Runs at most once per page load -- a later viewpoint switch
+         * must not keep re-selecting the original element out from under the user.
+         *
+         * Deliberately not a refactor of the click handler's own selection logic
+         * (around "Detail panel" above): that handler is one large pointer-event
+         * branch (shift-click, alt-click, relationship picker) this only needs a
+         * small, independent slice of -- set the same selectedNode shape, fetch the
+         * same detail endpoint, and reuse the existing _highlightCell/paper.translate
+         * primitives the click handler and canvas search already use. */
+        _selectInitialElement: function() {
+            let self = this;
+            if (self._initialElementHandled) return;
+            self._initialElementHandled = true;
+            let elId = (window.__COMPOSER_CONFIG__ || {}).initialElement;
+            if (!elId) return;
+
+            let cell = self.graph.getElements().find(function(c) {
+                return c.get('elementId') == elId; // eslint-disable-line eqeqeq
+            });
+            if (!cell) {
+                /* Honest, not silent: the id may be stale, may belong to a
+                 * viewpoint/layer this one filters out, or (tenant-scoped at the
+                 * data-fetch API) may not be this caller's to see. Any of those
+                 * reads the same to the user -- "not shown here" -- without
+                 * distinguishing which, which the data available client-side
+                 * cannot honestly do anyway. */
+                _toast('info', 'That element is not shown in the current view.');
+                return;
+            }
+
+            let cellView = self.paper.findViewByModel(cell);
+            self._clearSelection();
+            self._selectedCells = [cell];
+            self._highlightCell(cellView);
+
+            self.selectedEdge = null;
+            self.componentsPanelOpen = false;
+            self.selectedNode = {
+                elementId: elId,
+                label: cell.get('elName') || '(unnamed)',
+                elType: cell.get('elType') || '',
+                layer: cell.get('elLayer') || '',
+                description: cell.get('localDescription') || '',
+                status: cell.get('localStatus') || '',
+                relationshipCount: 0,
+                viewpointCount: 0,
+                solutionCount: 0,
+                _zoneType: cell.get('zoneType') || 'default',
+            };
+            self._currentSelectedCell = cell;
+
+            /* Same endpoint the click handler's own "Fetch rich detail" step calls;
+             * see there for why elId > 0 guards against __builtin__ template ids. */
+            if (elId && parseInt(elId, 10) > 0) {
+                Platform.fetch('/archimate/api/elements/' + elId + '/detail', { silent: true })
+                .then(function(data) {
+                    if (self.selectedNode && self.selectedNode.elementId === elId) {
+                        self.selectedNode.description = data.description || '';
+                        self.selectedNode.relationshipCount = data.relationship_count || 0;
+                        self.selectedNode.viewpointCount = data.viewpoint_count || 0;
+                        self.selectedNode.solutionCount = data.solution_count || 0;
+                    }
+                })
+                .catch(function() { /* swallow-ok: the node is already selected and centred from graph data already in hand; enrichment is a bonus the drawer degrades without, same as the click handler's own catch-free fetch above */ });
+            }
+
+            /* Centre the viewport on it -- same pattern composer_search.js's
+             * _srScrollToMatch uses to jump to a search-and-replace match. */
+            let pos = cell.position();
+            let size = cell.size();
+            let paperRect = self.paper.el.getBoundingClientRect();
+            self.paper.translate(
+                -pos.x - size.width / 2 + paperRect.width / 2,
+                -pos.y - size.height / 2 + paperRect.height / 2
+            );
         },
 
         _clearSelection: function() {

@@ -1191,12 +1191,25 @@ def composer_page():
             reaching this page-render route just means selectViewpoint's
             fetch will come back with that 400 and the composer will show the
             resulting error state rather than a silently unfiltered canvas.
+        element (int): Optional. Select and centre this element once its
+            viewpoint data has loaded. Passed through unvalidated as
+            `initial_element`, same reasoning as `layer` above: the
+            client-side selection simply finds no matching cell and shows an
+            honest "not in this view" notice if the id is wrong, stale or
+            belongs to another tenant -- the viewpoint-data fetch it searches
+            within is already tenant-scoped, so a bad value here cannot leak
+            another tenant's element, only fail to find one. When no
+            `viewpoint` is also given, the composer defaults to 'layered'
+            (enterprise-wide) so an element-only link actually loads data to
+            search, mirroring the existing layer-only-implies-layered
+            fallback in composer.js.
     """
     from app.services.archimate_viewpoint_service import get_available_viewpoints, get_viewpoint_counts
 
     solution_id = request.args.get("solution_id", type=int)
     viewpoint = request.args.get("viewpoint", "")
     initial_layer = request.args.get("layer", "")
+    initial_element = request.args.get("element", type=int)
     solution_name = None
     if solution_id:
         # solution_id is an unvalidated query parameter, so the raw lookup must
@@ -1227,6 +1240,7 @@ def composer_page():
         viewpoint_counts=vp_counts,
         initial_viewpoint=viewpoint,
         initial_layer=initial_layer,
+        initial_element=initial_element,
     )
 
 

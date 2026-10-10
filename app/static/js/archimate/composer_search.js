@@ -144,6 +144,7 @@ let ComposerSearch = (function() {
                     if (self.intelligenceEnabled) self.fetchIntelligence();
                     /* GAP-CMP-002/003: Update validation badge + orphan highlights */
                     if (self._diagramChanged) self._diagramChanged();
+                    self._selectInitialElement();
                 });
             })
             .catch(function(err) {

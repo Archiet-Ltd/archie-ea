@@ -284,7 +284,7 @@ def test_composer_js_defaults_to_layered_viewpoint_when_only_layer_given():
 
     js = Path("app/static/js/archimate/composer.js").read_text(encoding="utf-8")
     match = re.search(
-        r"Check for initial viewpoint from URL[\s\S]{0,900}",
+        r"Check for initial viewpoint from URL[\s\S]{0,1600}",
         js,
     )
     assert match, "initial viewpoint init block not found in composer.js"
@@ -325,22 +325,49 @@ def test_blueprint_js_uses_solution_id_param_not_solution():
 @pytest.mark.parametrize(
     "path,dead_needle",
     [
-        ("app/templates/architecture/elements.html", "?element=' + selectedElement.id"),
         ("app/templates/archimate/traceability_chain.html", "?element_id=' + editElement.id"),
-        ("app/static/js/ai_chat/commands.js", "?process=${g.process_id}"),
     ],
 )
 def test_fix3_sites_no_longer_build_unread_params(path, dead_needle):
-    """FIX 3: element/element_id/process query params the composer never
-    reads must not appear on these links any more -- either routed through
+    """FIX 3 (original round): element_id/process query params the composer
+    never read must not appear on these links -- either routed through
     create_diagram() for a real viewpoint_id, or made honestly generic.
-    These three sites had no cheap route to a real per-element SavedDiagram
-    from client-only state, so they were made honest instead."""
+
+    architecture/elements.html was in this list too, until the composer
+    gained a real `element` parameter (2026-09-21, see
+    composer_page()'s and composer.js's _selectInitialElement's own
+    docstrings/comments): `?element=` moved from "dead, must not appear" to
+    "correct, must appear" for that site and two traceability_chain.html
+    sites -- see test_element_param_sites_use_the_now-live_param below,
+    which is that test's mirror image, not this one's contradiction.
+    ai_chat/commands.js's process gap link was removed outright in the same
+    round: process_id is an APQCProcess.id, not an ArchiMateElement.id, so
+    there was no element param honest or otherwise to give it."""
     from pathlib import Path
 
     src = Path(path).read_text(encoding="utf-8")
     assert dead_needle not in src, f"{path} still builds the unread param: {dead_needle!r}"
     assert "/archimate/composer" in src, f"{path} should still link to the composer generically"
+
+
+@pytest.mark.parametrize(
+    "path,live_needle",
+    [
+        ("app/templates/architecture/elements.html", "?element=' + selectedElement.id"),
+        ("app/templates/archimate/traceability_chain.html", "?element=' + editElement.id"),
+    ],
+)
+def test_element_param_sites_use_the_now_live_param(path, live_needle):
+    """2026-09-21: the composer gained a real `element` query parameter
+    (composer_page() + composer.js's _selectInitialElement -- selects and
+    centres that element once its viewpoint data has loaded). These two
+    sites previously linked generically because `element` was unread; they
+    now use it, which is what makes their "Open/Edit in Composer" links
+    actually open the element clicked, not just the composer in general."""
+    from pathlib import Path
+
+    src = Path(path).read_text(encoding="utf-8")
+    assert live_needle in src, f"{path} should use the now-live element param: {live_needle!r}"
 
 
 def test_fix4_composer_url_helper_uses_create_diagram_not_elements_param():
