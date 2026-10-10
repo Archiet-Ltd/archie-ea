@@ -198,6 +198,33 @@ def save_block(canvas_id):
     return success_response(canvas.to_dict())
 
 
+@business_model_bp.route("/api/list")
+@login_required
+def api_list():
+    """JSON list of all Business Model Canvases for the current tenant."""
+    canvases = service.list_canvases()
+    return success_response([
+        {
+            "id": c.id,
+            "name": c.name or "",
+            "description": c.description or "",
+            "operating_model_type": c.operating_model_type,
+            "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+        }
+        for c in canvases
+    ])
+
+
+@business_model_bp.route("/api/<int:canvas_id>")
+@login_required
+def api_detail(canvas_id):
+    """JSON detail of one Business Model Canvas."""
+    canvas = service.get_canvas_or_none(canvas_id)
+    if canvas is None:
+        return not_found_response("Business Model Canvas")
+    return success_response(canvas.to_dict())
+
+
 # Import AI block-draft route — adds POST /api/<id>/ai-draft-block to this
 # blueprint (side-effect import), matching the
 # app/modules/architecture/routes/arb_review_ai_routes.py pattern.

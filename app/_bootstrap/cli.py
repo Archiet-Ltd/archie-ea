@@ -275,6 +275,13 @@ def init_cli(app):
         app.logger.warning(f"\u26a0\ufe0f  Failed to register dedupe entities CLI: {e}")
 
     try:
+        from app.commands.prune_oauth_clients import init_app as init_prune_oauth_clients
+        init_prune_oauth_clients(app)
+        app.logger.info("OAuth client pruning CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register OAuth client pruning CLI: {e}")
+
+    try:
         from app.commands.clean_test_artefacts import init_app as init_clean_test_artefacts
         init_clean_test_artefacts(app)
         app.logger.info("\u2705 Clean test artefacts CLI command registered")

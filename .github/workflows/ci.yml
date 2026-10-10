@@ -322,6 +322,14 @@ jobs:
             --cov=app --cov-report= \
             -o xfail_strict=true --junitxml=backend-tests-${{ matrix.shard }}.xml \
             -p scripts.route_verification_audit -p scripts.ci.test_sharding
+      - name: Run the assistant connector tests (connector switched on)
+        # These need MCP_ENABLED and PUBLIC_BASE_URL at app creation, which the
+        # sharded run leaves off; one shard runs them in their own pytest session.
+        if: matrix.shard == 0
+        env:
+          MCP_ENABLED: "true"
+          PUBLIC_BASE_URL: https://mcp-test.example
+        run: pytest -q app/modules/mcp app/modules/oauth_provider
       # if: always() -- a failing shard (real test failures) must still upload
       # its junit/coverage/route evidence, so the combine job can report which
       # tests failed rather than only "a shard's artifact never arrived".

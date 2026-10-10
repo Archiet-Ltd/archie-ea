@@ -1,0 +1,69 @@
+{# smoke-coverage-ok: covered by the connected-assistants browser journey in tests/smoke #}
+{% extends 'layouts/admin_base.html' %}
+{% block title %}Connected assistants{% endblock %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+  {% if admin_view %}
+    {% set header_crumbs = [{'label': 'Home', 'href': '/'}, {'label': 'Users', 'href': url_for('admin.registered_users')}, {'label': subject.full_name()}] %}
+    {% set header_text = 'AI assistants that can currently act as ' ~ subject.full_name() ~ '.' %}
+  {% else %}
+    {% set header_crumbs = [{'label': 'Home', 'href': '/'}, {'label': 'Account Settings', 'href': url_for('account.manage')}, {'label': 'Connected assistants'}] %}
+    {% set header_text = 'AI assistants you have allowed to read your workspace. Disconnect one and it stops working immediately.' %}
+  {% endif %}
+  {{ page_header(title='Connected assistants', breadcrumbs=header_crumbs, description=header_text) }}
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="mb-4 rounded-md border border-border bg-muted/50 px-4 py-3 text-sm" role="status">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+    {% if grants %}
+    <table class="w-full text-sm" data-testid="connected-assistants-table">
+      <thead>
+        <tr class="border-b text-left text-muted-foreground">
+          <th class="px-6 py-3 font-medium" scope="col">Assistant</th>
+          <th class="px-6 py-3 font-medium" scope="col">Access</th>
+          <th class="px-6 py-3 font-medium" scope="col">Connected</th>
+          <th class="px-6 py-3 font-medium" scope="col">Last used</th>
+          {% if not admin_view %}<th class="px-6 py-3 font-medium" scope="col"><span class="sr-only">Actions</span></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for grant in grants %}
+        <tr class="border-b last:border-0" data-testid="connected-assistant-row">
+          <td class="px-6 py-4 font-medium">{{ grant.client_name|truncate(60, True, '…') }}</td>
+          <td class="px-6 py-4 text-muted-foreground">{{ 'Read your architecture data' if 'mcp:read' in (grant.scope or '') else (grant.scope or '—') }}</td>
+          <td class="px-6 py-4 text-muted-foreground">{{ grant.connected_at.strftime('%d %b %Y') if grant.connected_at else '—' }}</td>
+          <td class="px-6 py-4 text-muted-foreground">{{ grant.last_used_at.strftime('%d %b %Y %H:%M') if grant.last_used_at else '—' }}</td>
+          {% if not admin_view %}
+          <td class="px-6 py-4 text-right">
+            <form method="post" action="{% if 'connected_assistants.revoke' in flask.current_app.view_functions %}{{ url_for('connected_assistants.revoke', grant_id=grant.grant_id) }}{% endif %}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground">Disconnect</button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="p-6 text-sm text-muted-foreground" data-testid="connected-assistants-empty">No assistants are connected.</p>
+    {% endif %}
+  </div>
+
+  {% if grants %}
+  <form method="post" class="mt-6 flex justify-end"
+        action="{% if admin_view %}{% if 'connected_assistants.admin_revoke' in flask.current_app.view_functions %}{{ url_for('connected_assistants.admin_revoke', user_id=subject.id) }}{% endif %}{% else %}{% if 'connected_assistants.revoke_all' in flask.current_app.view_functions %}{{ url_for('connected_assistants.revoke_all') }}{% endif %}{% endif %}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+      {% if admin_view %}Disconnect every assistant{% else %}Disconnect all{% endif %}
+    </button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

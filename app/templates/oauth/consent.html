@@ -1,0 +1,72 @@
+{% extends 'layouts/public_base.html' %}
+{% block title %}Authorize access{% endblock %}
+
+{% block content %}
+<div class="flex min-h-full items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+  <div class="w-full max-w-md">
+    <div class="mb-8 flex items-center gap-2.5">
+      <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+        <i data-lucide="layout-grid" class="h-4 w-4" aria-hidden="true"></i>
+      </span>
+      <span class="text-base font-bold tracking-[0.18em] text-foreground">{{ config.APP_NAME }}</span>
+    </div>
+
+    <div class="rounded-xl border bg-card text-card-foreground shadow-sm">
+      <div class="flex flex-col space-y-1.5 p-6 pb-2">
+        <h1 class="text-2xl font-semibold leading-none tracking-tight">Authorize access</h1>
+        <p class="text-sm text-muted-foreground">
+          <span class="font-medium text-foreground">{{ client_name|truncate(100, True, "")|e }}</span>
+          wants to connect to your workspace
+          {% if organization_name %}<span class="font-medium text-foreground">{{ organization_name }}</span>{% endif %}.
+        </p>
+        {% if redirect_host %}
+        <p class="text-xs text-muted-foreground">
+          It will redirect back to <span class="font-mono">{{ redirect_host|e }}</span> when you finish.
+        </p>
+        {% endif %}
+      </div>
+
+      <div class="p-6 pt-4">
+        <p class="mb-2 text-sm font-medium text-foreground">This will let it:</p>
+        <ul class="mb-6 space-y-2">
+          {% for scope in scopes %}
+          <li class="flex items-start gap-2 text-sm text-muted-foreground">
+            <i data-lucide="check" class="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" aria-hidden="true"></i>
+            {% if scope == "mcp:read" %}
+              <span>Read your architecture data — elements, canvases and intelligence lenses</span>
+            {% else %}
+              <span>{{ scope|e }}</span>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+
+        <form method="post" action="{% if 'oauth_provider.authorize' in flask.current_app.view_functions %}{{ url_for('oauth_provider.authorize') }}{% endif %}" class="space-y-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="client_id" value="{{ client_id }}">
+          <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
+          <input type="hidden" name="code_challenge" value="{{ code_challenge }}">
+          <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}">
+          <input type="hidden" name="state" value="{{ state or '' }}">
+          <input type="hidden" name="scope" value="{{ scope }}">
+          <input type="hidden" name="resource" value="{{ resource }}">
+
+          <button type="submit" name="decision" value="allow"
+                  class="inline-flex w-full items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
+            Allow
+          </button>
+          <button type="submit" name="decision" value="deny"
+                  class="inline-flex w-full items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+            Deny
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <p class="mt-6 text-center text-xs text-muted-foreground">
+      You can revoke this access at any time from
+      {% if 'connected_assistants.index' in flask.current_app.view_functions %}<a class="underline" href="{{ url_for('connected_assistants.index') }}">your account settings</a>{% else %}your account settings{% endif %}.
+    </p>
+  </div>
+</div>
+{% endblock %}
