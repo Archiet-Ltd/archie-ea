@@ -101,7 +101,7 @@ except ImportError:
 
 # Import analysis services
 try:
-    from .impact_analysis_service import ImpactAnalysisService
+    from app.modules.solutions_strategic.v2.services.impact_analysis_service import ImpactAnalysisService
 
     IMPACT_ANALYSIS_AVAILABLE = True
 except ImportError:
@@ -807,4 +807,3 @@ GapAnalysisServiceProxy = UnifiedMediumPriorityService
 ApplicationCapabilityCatalogServiceProxy = UnifiedMediumPriorityService
 ArchiMateValidationServiceProxy = UnifiedMediumPriorityService
 TemplateInstantiationServiceProxy = UnifiedMediumPriorityService
-ImpactAnalysisServiceProxy = UnifiedMediumPriorityService
