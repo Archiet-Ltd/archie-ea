@@ -126,11 +126,20 @@ def _run_archimate_llm_generation(requirements, context, target_layer="complete"
     """Run ArchiMate generation with an application-context timeout guard."""
     from app.modules.architecture.services.archimate_llm_service import ArchiMateLLMService
 
+    from contextlib import nullcontext
+
+    from flask import g
+
+    from app.jobs.tenant_safe_job import tenant_scope
+
     svc = ArchiMateLLMService()
     app_obj = current_app._get_current_object()
+    # The worker thread has its own context and so no session organisation;
+    # carry the caller's into it so row-level security shows it its rows.
+    org_id = getattr(g, "current_org_id", None)
 
     def _call_llm():
-        with app_obj.app_context():
+        with app_obj.app_context(), (tenant_scope(org_id) if org_id is not None else nullcontext()):
             try:
                 model_data, _ = svc.generate_archimate_from_requirements(
                     requirements=requirements,
