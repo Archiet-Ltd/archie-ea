@@ -442,8 +442,14 @@ def contract_link_application(contract_id):
         flash("Application id is required.", "danger")
         return redirect(url_for("procurement.contract_detail", contract_id=contract.id))
 
+    try:
+        application_id = int(application_id)
+    except ValueError:
+        flash("Application id must be a number.", "danger")
+        return redirect(url_for("procurement.contract_detail", contract_id=contract.id))
+
     application = ApplicationComponent.query.filter_by(
-        id=int(application_id),
+        id=application_id,
         organization_id=current_user.organization_id,
     ).first()
     if not application:
@@ -483,9 +489,15 @@ def contract_unlink_application(contract_id):
         flash("Application id is required.", "danger")
         return redirect(url_for("procurement.contract_detail", contract_id=contract.id))
 
+    try:
+        application_id = int(application_id)
+    except ValueError:
+        flash("Application id must be a number.", "danger")
+        return redirect(url_for("procurement.contract_detail", contract_id=contract.id))
+
     link = ContractApplication.query.filter_by(
         contract_id=contract.id,
-        application_id=int(application_id),
+        application_id=application_id,
         organization_id=current_user.organization_id,
     ).first()
     if not link:

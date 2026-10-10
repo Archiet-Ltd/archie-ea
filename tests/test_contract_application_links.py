@@ -240,6 +240,29 @@ class TestContractApplicationLinks:
         )
         assert resp.status_code == 404
 
+    def test_non_numeric_application_id_flashes_and_redirects(self, setup):
+        """A non-numeric application_id on link or unlink flashes and redirects (302), not 500."""
+        client = setup["client"]
+        contract = setup["contract_a"]
+
+        resp = client.post(
+            "/procurement/contracts/%d/link-application" % contract.id,
+            data={"application_id": "not-a-number"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302, (
+            "Link with non-numeric id should redirect, got %d" % resp.status_code
+        )
+
+        resp = client.post(
+            "/procurement/contracts/%d/unlink-application" % contract.id,
+            data={"application_id": "not-a-number"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302, (
+            "Unlink with non-numeric id should redirect, got %d" % resp.status_code
+        )
+
     def test_links_appear_on_contract_detail_page(self, setup):
         """Linked applications appear on the contract detail page."""
         from app.models.contract_application import ContractApplication
