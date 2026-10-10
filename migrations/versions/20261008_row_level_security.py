@@ -44,7 +44,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261008_row_level_security"
-down_revision = "20261008_uwp_element_unique"
+down_revision = "20261008_cr_organization_id"
 branch_labels = None
 depends_on = None
 
