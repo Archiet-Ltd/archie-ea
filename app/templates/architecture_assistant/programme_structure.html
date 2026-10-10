@@ -1,0 +1,258 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block title %}Programme structure — {{ journey.title }}{% endblock %}
+
+{% macro person_field(field_name, label, search_url, testid, hint='') %}
+<div class="relative" x-data="personPicker('{{ search_url }}')" @click.outside="close" data-testid="{{ testid }}">
+  <label for="{{ testid }}-input" class="block text-sm font-medium text-foreground">{{ label }}</label>
+  {% if hint %}<p class="mt-0.5 text-xs text-muted-foreground">{{ hint }}</p>{% endif %}
+  <input id="{{ testid }}-input" type="search" x-model="query" @input.debounce.300ms="search"
+    @keydown.escape="close" autocomplete="off" placeholder="Search by name (2+ characters)"
+    role="combobox" aria-autocomplete="list" aria-controls="{{ testid }}-results" :aria-expanded="open.toString()"
+    class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+  <input type="hidden" name="{{ field_name }}" :value="selectedId">
+  <div id="{{ testid }}-results" x-show="open" x-cloak role="listbox"
+       class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg">
+    <template x-for="person in results" :key="person.id">
+      <button type="button" role="option" @click="choose(person)"
+        class="flex w-full rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        <span class="truncate" x-text="person.display_name"></span>
+      </button>
+    </template>
+    <p x-show="searching" x-cloak class="px-3 py-2 text-sm text-muted-foreground" role="status">Searching&hellip;</p>
+    <p x-show="!searching && message" x-cloak class="px-3 py-2 text-sm text-muted-foreground" x-text="message"></p>
+  </div>
+</div>
+{% endmacro %}
+
+{% from 'architecture_assistant/partials/_archimate_switch.html' import archimate_switch %}
+
+{% block content %}
+<div class="flex-1 overflow-auto" x-data="archimateSwitch()" data-detail="{{ '1' if archimate_detail else '0' }}">
+  {{ page_header(
+    title='Programme structure',
+    description=(programme_type_name or 'Programme type') ~ ' — the stages, workstreams and deliverables this journey will create.',
+    breadcrumbs=[
+      {'label': 'Home', 'href': url_for('main.index')},
+      {'label': 'Architecture Journey', 'href': url_for('architecture_journey.index')},
+      {'label': journey.title, 'href': url_for('architecture_journey.architecture_journey_workspace', journey_id=journey.id)},
+      {'label': 'Programme structure'}
+    ]
+  ) }}
+
+  <div class="p-4 sm:p-6 space-y-6">
+    <div class="flex justify-end">{{ archimate_switch() }}</div>
+    {% if error %}
+    <p class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-emphasis" role="alert" data-testid="structure-error">{{ error }}</p>
+    {% endif %}
+
+    {% if created %}
+      {% if not read_allowed %}
+      <section class="rounded-xl border border-border bg-card p-5" data-testid="structure-no-access">
+        <p class="text-sm text-foreground">You do not have access to this programme's details.</p>
+      </section>
+      {% else %}
+      <section class="rounded-xl border border-border bg-card p-5 sm:p-6" data-testid="structure-created">
+        <h2 class="text-lg font-semibold text-foreground">{{ created.programme_name }}</h2>
+        <p class="mt-1 text-sm text-muted-foreground">Created from the {{ programme_type_name }} type.
+          <a class="text-primary hover:underline" href="/solutions/programmes/{{ created.programme_id }}/overview">Open the programme</a></p>
+        <h3 class="mt-5 text-sm font-semibold text-foreground">Workstreams</h3>
+        <ul class="mt-2 divide-y divide-border rounded-lg border border-border" data-testid="structure-workstreams">
+          {% for ws in created.workstreams %}
+          <li class="flex items-center justify-between gap-3 p-3 text-sm">
+            <span class="font-medium text-foreground">{{ ws.name or '—' }}</span>
+            <span class="text-xs text-muted-foreground">{{ ws.type_label }}<span x-show="detail" x-cloak> &middot; {{ ws.type_raw }}</span></span>
+          </li>
+          {% endfor %}
+        </ul>
+        <h3 class="mt-5 text-sm font-semibold text-foreground">Deliverables by stage</h3>
+        <div class="mt-2 space-y-3" data-testid="structure-deliverables">
+          {% for stage in created.stages %}
+          <div class="rounded-lg border border-border p-3">
+            <p class="text-sm font-medium text-foreground">{{ stage.label }}
+              {% if stage.gate %}<span class="ml-2 text-xs text-muted-foreground">Gate: {{ stage.gate }}</span>{% endif %}</p>
+            {% if stage.deliverables %}
+            <ul class="mt-2 space-y-3">
+              {% for d in stage.deliverables %}
+              <li class="rounded-md border border-border p-3" data-testid="deliverable-{{ d.id }}"
+                  x-data="deliverableCredit()" data-config='{{ {"journey_id": journey.id, "deliverable_id": d.id, "declared": d.declared_options}|tojson }}'>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <p class="text-sm font-medium text-foreground">{{ d.name }}</p>
+                  <p class="text-xs text-muted-foreground" data-testid="deliverable-count-{{ d.id }}">
+                    {% if d.n %}{{ d.n }} of {{ d.m }} in the model{% elif d.elements %}None of the {{ d.m }} declared types yet{% else %}None yet{% endif %}
+                    {% if d.completed %}&middot; Completed{% endif %}
+                  </p>
+                </div>
+                {% if d.elements %}
+                <ul class="mt-2 space-y-1">
+                  {% for e in d.elements %}
+                  <li class="flex items-center justify-between gap-2 text-sm text-foreground">
+                    <span>{{ e.name }} <span class="text-xs text-muted-foreground">{{ e.type_label }}<span x-show="detail" x-cloak> &middot; {{ e.type }} ({{ e.layer }})</span></span></span>
+                    {% if not d.completed and can_credit %}
+                    <button type="button" @click="removeElement({{ e.id }})" :disabled="busy" aria-label="Remove {{ e.name }} from this deliverable"
+                      class="text-xs text-muted-foreground hover:text-destructive">Remove</button>
+                    {% endif %}
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+                {% if d.completion_reason %}<p class="mt-2 text-xs text-muted-foreground">Completed with no model content: {{ d.completion_reason }}</p>{% endif %}
+                {% if not d.completed and can_credit %}
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <button type="button" @click="showExisting" data-testid="add-existing-{{ d.id }}"
+                    class="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium text-foreground hover:bg-accent">Add existing element</button>
+                  <button type="button" @click="showNew" data-testid="add-new-{{ d.id }}"
+                    class="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium text-foreground hover:bg-accent">Create new element</button>
+                </div>
+                <div x-show="mode === 'existing'" x-cloak class="relative mt-3">
+                  <label for="ex-{{ d.id }}" class="text-xs font-medium text-foreground">Element</label>
+                  <input id="ex-{{ d.id }}" type="search" x-model="query" @input.debounce.300ms="search" autocomplete="off" placeholder="Search by name (2+ characters)"
+                    class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                  <div x-show="results.length" x-cloak role="listbox" class="mt-1 max-h-48 overflow-y-auto rounded-md border border-border bg-popover p-1">
+                    <template x-for="element in results" :key="element.id">
+                      <button type="button" role="option" @click="choose(element)" class="flex w-full justify-between rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-accent">
+                        <span x-text="element.name"></span><span class="text-xs text-muted-foreground" x-text="element.type_label"></span>
+                      </button>
+                    </template>
+                  </div>
+                  <button type="button" @click="addExisting" :disabled="busy" data-testid="credit-existing-{{ d.id }}"
+                    class="mt-2 inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">Add to this deliverable</button>
+                </div>
+                <div x-show="mode === 'new'" x-cloak class="mt-3 grid gap-2 sm:grid-cols-3">
+                  <label class="grid gap-1 text-xs font-medium text-foreground">Type
+                    <select x-model="newType" data-testid="new-type-{{ d.id }}" class="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                      {% for o in d.declared_options %}<option value="{{ o.key }}">{{ o.label }}</option>{% endfor %}
+                    </select></label>
+                  <label class="grid gap-1 text-xs font-medium text-foreground sm:col-span-2">Name
+                    <input x-model="newName" maxlength="100" data-testid="new-name-{{ d.id }}" class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
+                  <button type="button" @click="addNew" :disabled="busy" data-testid="create-new-{{ d.id }}"
+                    class="inline-flex h-8 w-fit items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">Create and add</button>
+                </div>
+                <div class="mt-3 flex flex-wrap items-end gap-2">
+                  <label class="grid gap-1 text-xs font-medium text-foreground">Reason (required when nothing is in the model)
+                    <input x-model="reason" data-testid="complete-reason-{{ d.id }}" class="h-8 w-72 max-w-full rounded-md border border-input bg-background px-3 text-sm"></label>
+                  <button type="button" @click="complete" :disabled="busy" data-testid="complete-{{ d.id }}"
+                    class="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50">Complete</button>
+                </div>
+                {% endif %}
+                <p x-show="error" x-cloak class="mt-2 text-xs text-destructive-emphasis" role="alert" data-testid="deliverable-error-{{ d.id }}" x-text="error"></p>
+              </li>
+              {% endfor %}
+            </ul>
+            {% else %}<p class="mt-2 text-sm text-muted-foreground">None yet</p>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+    {% else %}
+      <section class="rounded-xl border border-border bg-card p-5 sm:p-6" data-testid="structure-preview">
+        <h2 class="text-lg font-semibold text-foreground">Preview</h2>
+        <p class="mt-1 text-sm text-muted-foreground">{{ template.summary }}</p>
+        {% if template.arb_required_at_decide %}
+        <p class="mt-2 text-sm text-foreground">An ARB review is required at the Decide stage for this programme type.</p>
+        {% else %}
+        <p class="mt-2 text-sm text-muted-foreground">An ARB review is optional at the Decide stage for this programme type.</p>
+        {% endif %}
+        <h3 class="mt-5 text-sm font-semibold text-foreground">Workstreams</h3>
+        <ul class="mt-2 divide-y divide-border rounded-lg border border-border">
+          {% for ws in template_workstreams %}
+          <li class="p-3 text-sm"><span class="font-medium text-foreground">{{ ws.name }}</span>
+            <span class="ml-2 text-xs text-muted-foreground">{{ ws.type_label }}<span x-show="detail" x-cloak> &middot; {{ ws.type_raw }}</span></span></li>
+          {% endfor %}
+        </ul>
+        <h3 class="mt-5 text-sm font-semibold text-foreground">Deliverables by stage</h3>
+        <div class="mt-2 space-y-3">
+          {% for stage in template_stages %}
+          <div class="rounded-lg border border-border p-3">
+            <p class="text-sm font-medium text-foreground">{{ stage.label }}<span class="ml-2 text-xs text-muted-foreground">Gate: {{ stage.gate }}</span></p>
+            <ul class="mt-2 space-y-1">
+              {% for d in stage.deliverables %}
+              <li class="text-sm text-foreground">{{ d.name }}
+                <span class="text-xs text-muted-foreground">— creates {{ d.element_labels|join(', ') }}<span x-show="detail" x-cloak> ({{ d.element_types_raw|join(', ') }})</span></span></li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      {% if can_create %}
+      <form method="post" class="space-y-6 rounded-xl border border-border bg-card p-5 sm:p-6" data-testid="structure-form"
+            x-data="{ submitting: false }" @submit="submitting = true" :aria-busy="submitting">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="command_key" value="{{ command_key }}">
+        <h2 class="text-lg font-semibold text-foreground">Create programme structure</h2>
+        <p class="text-sm text-muted-foreground">Confirming creates a programme with the workstreams, deliverables and gates above. The template supplies no numbers: type the outcome you are committing to.</p>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="grid gap-1 text-sm font-medium text-foreground">Programme name
+            <input name="name" required maxlength="255" value="{{ form.get('name', '') }}" class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
+          {{ person_field('owner_id', 'Programme owner', lead_search_url, 'owner-picker') }}
+        </div>
+        <label class="grid gap-1 text-sm font-medium text-foreground">Objective
+          <textarea name="objective" rows="3" required class="rounded-md border border-input bg-background px-3 py-2 text-sm">{{ form.get('objective', '') }}</textarea></label>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="grid gap-1 text-sm font-medium text-foreground">Target date
+            <input type="date" name="target_date" value="{{ form.get('target_date', '') }}" class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
+          <label class="grid gap-1 text-sm font-medium text-foreground">Or why there is no target date yet
+            <input name="target_date_unavailable_reason" value="{{ form.get('target_date_unavailable_reason', '') }}" class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
+        </div>
+
+        <fieldset class="space-y-4">
+          <legend class="text-sm font-semibold text-foreground">Outcome this programme commits to</legend>
+          <label class="grid gap-1 text-sm font-medium text-foreground">Outcome statement
+            <input name="outcome_statement" required value="{{ form.get('outcome_statement', '') }}" class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
+          <div class="grid gap-4 sm:grid-cols-3">
+            <label class="grid gap-1 text-sm font-medium text-foreground">Direction
+              <select name="outcome_direction" class="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                {% for d in directions %}<option value="{{ d }}">{{ d|title }}</option>{% endfor %}
+              </select></label>
+            <label class="grid gap-1 text-sm font-medium text-foreground">Metric
+              <input name="metric_name" required value="{{ form.get('metric_name', '') }}" class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
+            <label class="grid gap-1 text-sm font-medium text-foreground">Unit
+              <input name="unit" required value="{{ form.get('unit', '') }}" class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-4">
+            <label class="grid gap-1 text-sm font-medium text-foreground">Aggregation
+              <select name="aggregation" class="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                {% for a in aggregations %}<option value="{{ a }}">{{ a|title }}</option>{% endfor %}
+              </select></label>
+            <label class="grid gap-1 text-sm font-medium text-foreground">Target value
+              <input name="target_value" required inputmode="decimal" value="{{ form.get('target_value', '') }}" class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
+            <label class="grid gap-1 text-sm font-medium text-foreground">Baseline value
+              <input name="baseline_value" inputmode="decimal" value="{{ form.get('baseline_value', '') }}" class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
+            <label class="grid gap-1 text-sm font-medium text-foreground">Or why no baseline
+              <input name="unavailable_reason" value="{{ form.get('unavailable_reason', '') }}" class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="space-y-4">
+          <legend class="text-sm font-semibold text-foreground">Lead for each workstream</legend>
+          <p class="text-xs text-muted-foreground">Every workstream needs a lead. None is chosen for you.</p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            {% for ws in template_workstreams %}
+            {{ person_field('lead__' ~ ws.key, ws.name, lead_search_url, 'lead-picker-' ~ ws.key) }}
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <button type="submit" :disabled="submitting" data-testid="structure-confirm"
+          class="inline-flex h-10 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50">
+          <span x-show="!submitting">Create programme structure</span><span x-show="submitting" x-cloak role="status">Creating&hellip;</span>
+        </button>
+      </form>
+      {% else %}
+      <p class="text-sm text-muted-foreground" data-testid="structure-no-create">Only an enterprise architect, chief architect or CTO can create the programme structure. You can review the plan above.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/architecture_assistant/archimate_switch.js') }}"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/architecture_assistant/programme_structure.js') }}"></script>
+{% endblock %}

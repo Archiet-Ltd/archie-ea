@@ -103,3 +103,121 @@ def test_journey_home_never_renders_a_bare_zero_for_unknown_counts(
         assert any(ch.isdigit() for ch in text) or "—" in text, (
             f"{testid} shows neither a measured count nor an em dash: {text!r}"
         )
+
+
+# --------------------------------------------------------------------- #
+# R1-02 / SDD 13 R1 test 9: journey decision links read the live         #
+# decision register, and a deleted target renders honestly rather than   #
+# vanishing.                                                             #
+# --------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def decision_linked_journey(seeded):
+    import uuid as _uuid
+
+    from app import create_app, db
+    from app.models.architecture_decision import ArchitectureDecision
+    from app.models.architecture_journey import ArchitectureJourney
+    from app.models.architecture_journey_link import ArchitectureJourneyLink
+    from app.models.user import User
+
+    app = create_app("testing")
+    suffix = _uuid.uuid4().hex[:8]
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        owner = User.query.filter_by(email=seeded["emails"]["business_architect"]).one()
+
+        journey = ArchitectureJourney(
+            owner_id=owner.id,
+            organization_id=org_id,
+            title="Decision link smoke %s" % suffix,
+            intent="operating_model",
+            selected_layers=["motivation"],
+            current_stage="frame",
+            status="active",
+        )
+        db.session.add(journey)
+        db.session.flush()
+
+        decision = ArchitectureDecision(
+            organization_id=org_id,
+            title="Adopt the reference template family %s" % suffix,
+            status="accepted",
+            created_by_id=owner.id,
+        )
+        db.session.add(decision)
+        db.session.flush()
+
+        link = ArchitectureJourneyLink(
+            organization_id=org_id,
+            journey_id=journey.id,
+            entity_type="decision",
+            entity_id=decision.id,
+            relation="produces",
+            created_by_id=owner.id,
+        )
+        db.session.add(link)
+        db.session.commit()
+        ids = {"journey_id": journey.id, "decision_id": decision.id, "link_id": link.id}
+
+    yield ids
+
+    with app.app_context():
+        db.session.execute(
+            db.text('DELETE FROM "architecture_journey_links" WHERE id = :id'),
+            {"id": ids["link_id"]},
+        )
+        db.session.execute(
+            db.text('DELETE FROM "architecture_decisions" WHERE id = :id'),
+            {"id": ids["decision_id"]},
+        )
+        db.session.execute(
+            db.text('DELETE FROM "architecture_journeys" WHERE id = :id'),
+            {"id": ids["journey_id"]},
+        )
+        db.session.commit()
+
+
+def test_journey_decision_link_resolves_the_live_register(
+    page, live_server, seeded, decision_linked_journey
+):
+    """A decision link renders the register's title and status after reload."""
+    _login(page, live_server, seeded["emails"]["business_architect"])
+    _visit(
+        page, live_server,
+        "/architecture-journey/work/%s" % decision_linked_journey["journey_id"],
+    )
+    page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+    panel = page.locator('[data-testid="journey-linked-records"]')
+    assert panel.count() == 1
+    text = panel.inner_text()
+    assert "Adopt the reference template family" in text
+    assert "Accepted" in text
+
+
+def test_journey_decision_link_renders_honestly_when_the_target_is_gone(
+    page, live_server, seeded, decision_linked_journey
+):
+    """Deleting the decision must not make the link silently vanish (US-15 AC2)."""
+    from app import create_app, db
+
+    app = create_app("testing")
+    with app.app_context():
+        db.session.execute(
+            db.text('DELETE FROM "architecture_decisions" WHERE id = :id'),
+            {"id": decision_linked_journey["decision_id"]},
+        )
+        db.session.commit()
+
+    _login(page, live_server, seeded["emails"]["business_architect"])
+    _visit(
+        page, live_server,
+        "/architecture-journey/work/%s" % decision_linked_journey["journey_id"],
+    )
+    page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+    panel = page.locator('[data-testid="journey-linked-records"]')
+    text = panel.inner_text()
+    assert "Record no longer available (link %s)" % decision_linked_journey["link_id"] in text

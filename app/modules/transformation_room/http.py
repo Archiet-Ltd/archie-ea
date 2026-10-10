@@ -113,15 +113,6 @@ def resolve_enterprise_roles(
         roles.add("organization_admin")
     if getattr(user, "is_platform_admin", False):
         roles.add("platform_admin")
-    try:
-        role_name = getattr(getattr(user, "role", None), "name", None)
-        if role_name:
-            roles.add(role_name.strip().lower())
-    except Exception:
-        # Domain services reload the persisted actor and fail closed.  A stale
-        # optional legacy Role relationship must not make API authentication a
-        # 500 before that authoritative check can run.
-        pass
 
     if programme_id is not None:
         today = date.today()

@@ -125,6 +125,13 @@ class Config:
     TRANSFORMATION_COMMAND_CAPABILITY_PREVIOUS_SECRETS = os.environ.get(
         "TRANSFORMATION_COMMAND_CAPABILITY_PREVIOUS_SECRETS", ""
     )
+    # R1-03 (programme-journey-templates): the only way R1-R3 browser tests can
+    # exercise a programme type before its expert-role review exists, without
+    # fabricating a review record. Read from config only -- never a request,
+    # header or org setting (security.md 7.6). Default off; TestingConfig turns
+    # it on; ProductionConfig hard-codes it off and boot raises if it is ever
+    # true under the production config (see ProductionConfig.init_app below).
+    PROGRAMME_TYPES_INCLUDE_UNREVIEWED = False
     # Typed ARB waiver expiry is disabled until tenants, one service principal
     # per tenant, and a scheduler capability are explicitly configured.
     ARB_CONDITION_EXPIRY_CAPABILITY = os.environ.get(
@@ -525,6 +532,9 @@ class TestingConfig(Config):
     MAIL_SUPPRESS_SEND = _env_bool("MAIL_SUPPRESS_SEND", True)
     TRANSFORMATION_COMMAND_CAPABILITY_SECRET = "74" * 32
     TRANSFORMATION_COMMAND_CAPABILITY_PREVIOUS_SECRETS = ""
+    # Lets R1-R3 browser tests exercise a programme type before its expert-role
+    # review exists (security.md 7.6); ProductionConfig below refuses this.
+    PROGRAMME_TYPES_INCLUDE_UNREVIEWED = True
 
     # credential_encryption.py raises RuntimeError when this is unset, by
     # design (it must not silently store a credential in plaintext). Generated
@@ -654,6 +664,10 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SAMESITE = "Lax"
     REMEMBER_COOKIE_SECURE = _env_bool("REMEMBER_COOKIE_SECURE", True)
     REMEMBER_COOKIE_HTTPONLY = True
+    # Hard-coded, not env-derived: an unreviewed programme type must never be
+    # offered to a real customer (security.md 7.6). init_app below raises if
+    # this is ever true under the production config.
+    PROGRAMME_TYPES_INCLUDE_UNREVIEWED = False
     # Was unset, so the remember-me cookie had no SameSite protection at all
     # while the session cookie did.
     REMEMBER_COOKIE_SAMESITE = "Lax"
@@ -688,6 +702,13 @@ class ProductionConfig(Config):
         if not app.config.get("SQLALCHEMY_DATABASE_URI"):
             raise ValueError(
                 "DATABASE_URL environment variable is required. PostgreSQL must be configured for production."
+            )
+
+        if app.config.get("PROGRAMME_TYPES_INCLUDE_UNREVIEWED"):
+            raise ValueError(
+                "PROGRAMME_TYPES_INCLUDE_UNREVIEWED must not be true in production "
+                "(security.md 7.6): an unreviewed programme type must never be "
+                "offered to a real customer."
             )
 
         Config.init_app(app)

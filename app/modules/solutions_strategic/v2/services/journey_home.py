@@ -33,8 +33,8 @@ from app.models.architecture_journey_link import (
     ArchitectureJourneyLink,
     ArchitectureJourneyMember,
 )
-from app.models.adr import ArchitectureDecisionRecord
 from app.models.ai_chat_document import AIChatDocumentUpload
+from app.models.architecture_decision import ArchitectureDecision
 from app.models.application_portfolio import ApplicationComponent
 from app.models.archimate_core import ArchiMateElement, ArchitectureModel
 from app.models.architecture_review_board import ARBReviewItem
@@ -74,7 +74,12 @@ def _resolver(model, *, label_attr, status_attr=None):
 
 # Closed by construction and asserted against JOURNEY_LINK_ENTITY_TYPES in tests.
 JOURNEY_LINK_RESOLVERS = {
-    "decision": _resolver(ArchitectureDecisionRecord, label_attr="title", status_attr="status"),
+    # Repointed to the register ArchitectureDecision ARB already uses (R1-02,
+    # security.md 5.4). Existing links that still name an
+    # ArchitectureDecisionRecord id are remapped by
+    # `flask repoint-journey-decision-links` before this change ships;
+    # see app/commands/repoint_journey_decision_links.py.
+    "decision": _resolver(ArchitectureDecision, label_attr="title", status_attr="status"),
     "decision_brief": _resolver(DecisionBrief, label_attr="title", status_attr="status"),
     "risk": _resolver(Risk, label_attr="title", status_attr="status"),
     "document": _resolver(AIChatDocumentUpload, label_attr="original_filename", status_attr="status"),
@@ -311,7 +316,19 @@ def journey_home_view(*, journey_id, actor_user):
                 "journey %s: ignoring unresolved %s:%s link %s",
                 journey.id, link.entity_type, link.entity_id, link.id,
             )
-            continue
+            if link.entity_type != "decision":
+                # Unchanged for every other link kind (out of R1-02's scope;
+                # sdd.md 9.2 is decision-only).
+                continue
+            # US-15 AC2: a decision link whose target is gone is shown, not
+            # silently dropped, so a deleted decision does not read as "this
+            # journey never had one".
+            resolved = {
+                "entity_id": link.entity_id,
+                "label": f"Record no longer available (link {link.id})",
+                "status": None,
+                "unresolved": True,
+            }
         resolved.update({
             "id": link.id,
             "entity_type": link.entity_type,

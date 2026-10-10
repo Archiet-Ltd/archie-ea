@@ -39,7 +39,7 @@
 
   {{ page_shell(
       title=journey.title,
-      subtitle=home.purpose.label,
+      subtitle=(home.purpose.label ~ ' · ' ~ programme_type_name) if programme_type_name else home.purpose.label,
       breadcrumb=[
         ('Home', url_for('main.index')),
         ('Architecture Journey', url_for('architecture_journey.index')),
@@ -65,6 +65,22 @@
 
     {# ── purpose, stage, next action ─────────────────────────────────────── #}
     <section class="rounded-xl border border-border bg-card p-5 sm:p-6" aria-labelledby="journey-progress-title">
+      {% if programme_type_name %}
+      <p data-testid="journey-programme-type" class="mb-3 inline-flex items-center rounded-md border border-border bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+        {{ programme_type_name }}
+      </p>
+      {% endif %}
+      {% if programme_type_name %}
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3" data-testid="journey-programme-structure-panel">
+        <p class="text-sm text-foreground">
+          {% if journey.programme_id %}Programme structure created from this type.{% else %}Programme structure not created yet.{% endif %}
+        </p>
+        <a href="{{ url_for('architecture_journey.programme_structure', journey_id=journey.id) }}" data-testid="journey-programme-structure-link"
+           class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground">
+          {% if journey.programme_id %}View programme structure{% else %}Preview and create structure{% endif %}
+        </a>
+      </div>
+      {% endif %}
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="min-w-0">
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current stage</p>

@@ -239,6 +239,8 @@ class TransformationRoomReadModel:
                         "target_date",
                         "target_date_unavailable_reason",
                         "revision",
+                        "name",
+                        "archimate_element_id",
                     ),
                 ),
                 **loaded,
@@ -665,6 +667,8 @@ class TransformationRoomReadModel:
                     "target_date",
                     "target_date_unavailable_reason",
                     "revision",
+                    "name",
+                    "archimate_element_id",
                 )
                 if selected
                 else None

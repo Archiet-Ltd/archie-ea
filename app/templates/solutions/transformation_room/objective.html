@@ -1,6 +1,7 @@
 {% extends "solutions/transformation_room/layout.html" %}
+{% from 'architecture_assistant/partials/_archimate_switch.html' import archimate_switch %}
 {% block room_content %}
-<div class="grid gap-6 lg:grid-cols-3">
+<div class="grid gap-6 lg:grid-cols-3" x-data="archimateSwitch()" data-detail="{{ '1' if request.cookies.get('archimate_detail') == '1' else '0' }}">
   <section class="rounded-lg border border-border bg-card p-5 lg:col-span-2" aria-labelledby="objective-heading">
     <h2 id="objective-heading" class="text-lg font-semibold text-foreground">Objective and scope</h2>
     <p class="mt-1 text-sm text-muted-foreground">Keep the accountable business change explicit before discovery begins.</p>
@@ -20,5 +21,29 @@
     <ul class="mt-4 space-y-3">{% for outcome in room.stage_view.resources.outcomes %}<li class="text-sm text-foreground">{{ outcome.statement }}</li>{% endfor %}</ul>
     {% else %}<p class="mt-4 text-sm text-muted-foreground">{{ room.stage_view.unavailable_reasons.outcomes }}</p>{% endif %}
   </aside>
+
+  <section class="rounded-lg border border-border bg-card p-5 lg:col-span-3" aria-labelledby="objective-model-heading" data-testid="workstream-archimate-status">
+    <div class="flex items-center justify-between gap-3">
+      <h2 id="objective-model-heading" class="text-sm font-semibold text-foreground">Architecture model</h2>
+      {{ archimate_switch() }}
+    </div>
+    {% if room.workstream.archimate_element_id %}
+    <p class="mt-2 text-sm text-foreground">In the model as a Handover.<span x-show="detail" x-cloak> WorkPackage (Implementation).</span></p>
+    {% else %}
+    <p class="mt-2 text-sm text-muted-foreground" data-testid="workstream-not-in-model">Not yet in the model</p>
+    <form method="post" action="/solutions/programmes/{{ room.programme.id }}/workstreams/{{ room.workstream.id }}/archimate-element" class="mt-3" x-data="{ submitting: false }" @submit="submitting = true" @pageshow.window="submitting = false" :aria-busy="submitting">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="command_key" value="{{ room.command_key }}">
+      <button type="submit" :disabled="submitting" class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50">
+        <span x-show="!submitting">Add to model</span><span x-show="submitting" x-cloak role="status" aria-live="polite">Adding…</span>
+      </button>
+    </form>
+    {% endif %}
+  </section>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/architecture_assistant/archimate_switch.js') }}"></script>
 {% endblock %}

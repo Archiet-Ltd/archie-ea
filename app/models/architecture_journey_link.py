@@ -35,7 +35,7 @@ from app.models.mixins import TenantMixin
 # reports it -- the link simply resolves to nothing at read time and the reader sees
 # a shorter list than the truth.
 JOURNEY_LINK_ENTITY_TYPES = (
-    "decision",            # ArchitectureDecisionRecord
+    "decision",            # ArchitectureDecision (the register; R1-02 repoint)
     "decision_brief",      # DecisionBrief
     "risk",                # Risk
     "document",            # a registered document / evidence record

@@ -1,0 +1,89 @@
+schema_version: 1
+key: operating_model
+name: Operating-model change
+summary: Change how the organisation is structured, funded and run, and support the people through the
+  change.
+vendor_specific: false
+arb_required_at_decide: false
+workstreams:
+- key: structure_and_roles
+  name: Structure and roles
+  workstream_type: organisation_skills
+  objective: Own the structure and roles work this programme depends on.
+- key: funding_and_governance
+  name: Funding and governance
+  workstream_type: policy_control
+  objective: Own the funding and governance work this programme depends on.
+- key: ways_of_working
+  name: Ways of working
+  workstream_type: process
+  objective: Own the ways of working work this programme depends on.
+- key: people_and_change
+  name: People and change
+  workstream_type: organisation_skills
+  objective: Own the people and change work this programme depends on.
+- key: tooling_and_metrics
+  name: Tooling and metrics
+  workstream_type: technology
+  objective: Own the tooling and metrics work this programme depends on.
+- key: programme_office
+  name: Programme office
+  workstream_type: other
+  objective: 'Run the programme: business case, governance and the deliverables no single workstream owns.'
+stages:
+  frame:
+    gate: Business case approved
+    deliverables:
+    - code: operating_model.frame.business_case_and_value_drivers
+      name: Business case and value drivers
+      adm_phase: A
+      workstream: programme_office
+      element_types:
+      - Driver
+      - Goal
+      - Assessment
+      purpose: State why this programme is needed and how success will be judged.
+  discover:
+    gate: Current state understood
+    deliverables:
+    - code: operating_model.discover.current_state_and_requirements
+      name: Current state and requirements
+      adm_phase: B
+      workstream: structure_and_roles
+      element_types:
+      - Requirement
+      - Capability
+      purpose: Capture what exists today and what the programme must satisfy.
+  shape:
+    gate: Target design agreed
+    deliverables:
+    - code: operating_model.shape.target_design_and_delivery_plan
+      name: Target design and delivery plan
+      adm_phase: D
+      workstream: structure_and_roles
+      element_types:
+      - WorkPackage
+      - Plateau
+      purpose: Describe the target state and the work packages that will reach it.
+  decide:
+    gate: Governance sign-off
+    deliverables:
+    - code: operating_model.decide.decision_readiness
+      name: Decision readiness
+      adm_phase: E
+      workstream: programme_office
+      element_types:
+      - Requirement
+      - Assessment
+      purpose: Confirm the chosen option is ready for governance sign-off.
+  deliver:
+    gate: Change landed
+    deliverables:
+    - code: operating_model.deliver.delivery_and_cutover
+      name: Delivery and cutover
+      adm_phase: F
+      workstream: structure_and_roles
+      element_types:
+      - WorkPackage
+      - ImplementationEvent
+      purpose: Deliver the change and confirm it has landed.

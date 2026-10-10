@@ -1,0 +1,89 @@
+schema_version: 1
+key: app_modernisation
+name: Application modernisation
+summary: Replace or re-platform an ageing application, retiring the parts of it that no longer earn their
+  keep.
+vendor_specific: false
+arb_required_at_decide: false
+workstreams:
+- key: assessment_and_strangler_plan
+  name: Assessment and strangler plan
+  workstream_type: application_rationalisation
+  objective: Own the assessment and strangler plan work this programme depends on.
+- key: re_platform_and_refactor
+  name: Re-platform and refactor
+  workstream_type: technology
+  objective: Own the re-platform and refactor work this programme depends on.
+- key: data_and_interfaces
+  name: Data and interfaces
+  workstream_type: data
+  objective: Own the data and interfaces work this programme depends on.
+- key: testing_and_parallel_run
+  name: Testing and parallel run
+  workstream_type: technology
+  objective: Own the testing and parallel run work this programme depends on.
+- key: decommissioning
+  name: Decommissioning
+  workstream_type: application_rationalisation
+  objective: Own the decommissioning work this programme depends on.
+- key: programme_office
+  name: Programme office
+  workstream_type: other
+  objective: 'Run the programme: business case, governance and the deliverables no single workstream owns.'
+stages:
+  frame:
+    gate: Business case approved
+    deliverables:
+    - code: app_modernisation.frame.business_case_and_value_drivers
+      name: Business case and value drivers
+      adm_phase: A
+      workstream: programme_office
+      element_types:
+      - Driver
+      - Goal
+      - Assessment
+      purpose: State why this programme is needed and how success will be judged.
+  discover:
+    gate: Current state understood
+    deliverables:
+    - code: app_modernisation.discover.current_state_and_requirements
+      name: Current state and requirements
+      adm_phase: B
+      workstream: assessment_and_strangler_plan
+      element_types:
+      - Requirement
+      - Capability
+      purpose: Capture what exists today and what the programme must satisfy.
+  shape:
+    gate: Target design agreed
+    deliverables:
+    - code: app_modernisation.shape.target_design_and_delivery_plan
+      name: Target design and delivery plan
+      adm_phase: D
+      workstream: assessment_and_strangler_plan
+      element_types:
+      - WorkPackage
+      - Plateau
+      purpose: Describe the target state and the work packages that will reach it.
+  decide:
+    gate: Governance sign-off
+    deliverables:
+    - code: app_modernisation.decide.decision_readiness
+      name: Decision readiness
+      adm_phase: E
+      workstream: programme_office
+      element_types:
+      - Requirement
+      - Assessment
+      purpose: Confirm the chosen option is ready for governance sign-off.
+  deliver:
+    gate: Change landed
+    deliverables:
+    - code: app_modernisation.deliver.delivery_and_cutover
+      name: Delivery and cutover
+      adm_phase: F
+      workstream: assessment_and_strangler_plan
+      element_types:
+      - WorkPackage
+      - ImplementationEvent
+      purpose: Deliver the change and confirm it has landed.

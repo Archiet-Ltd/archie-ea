@@ -58,11 +58,20 @@ ELEMENT_TYPES: Dict[str, tuple] = {
     "SolutionConstraint": ("Constraint", "Motivation"),
     "SolutionRequirement": ("Requirement", "Motivation"),
     "SolutionRisk": ("Assessment", "Motivation"),
+    # R1-05/R1-07 (programme-journey-templates). ProgrammeWorkstream is
+    # behaviour with a defined result and time box (ADR 0012 decision 5);
+    # Deliverable and ImplementationEvent are the other two Implementation
+    # entities the programme aggregate creates.
+    "ProgrammeWorkstream": ("WorkPackage", "Implementation"),
+    "Deliverable": ("Deliverable", "Implementation"),
+    "ImplementationEvent": ("ImplementationEvent", "Implementation"),
 }
 
-# Where each model keeps its display name. Checked in order.
+# Where each model keeps its display name. Checked in order. `objective` is
+# last: ProgrammeWorkstream rows created before R1-05's `name` column existed
+# have only free-text `objective` to mirror.
 NAME_FIELDS = ("name", "title", "risk_name", "goal_name", "driver_name",
-               "constraint_name", "requirement_text", "description")
+               "constraint_name", "requirement_text", "description", "objective")
 
 # ArchiMateElement.name is String(100).
 MAX_NAME = 100
@@ -76,17 +85,21 @@ def _first_attr(obj: Any, fields) -> Optional[str]:
     return None
 
 
-def _resolve_org_id(obj: Any) -> Optional[int]:
+def _resolve_org_id(obj: Any, *, explicit: Optional[int] = None) -> Optional[int]:
     """The element belongs to the same tenant as the row it mirrors.
 
-    Driver, Goal and Requirement are not TenantMixin models and carry no
-    organization_id, so they fall back to the request's tenant. Outside a
-    request there is none, and TenantMixin will not fill one in either -- see
-    CLAUDE.md on unfiltered CLI/scheduler paths.
+    Driver, Goal, Requirement and Deliverable are not TenantMixin models and
+    carry no organization_id, so they fall back to *explicit* (a caller-
+    supplied org, R1-05) and then to the request's tenant. Outside a request
+    there is no g.current_org_id either -- see CLAUDE.md on unfiltered
+    CLI/scheduler paths -- which is exactly why a fenced-session caller
+    (CommandService handlers) must pass *explicit* rather than relying on g.
     """
     org_id = getattr(obj, "organization_id", None)
     if org_id:
         return org_id
+    if explicit:
+        return explicit
     try:
         from flask import g
 
@@ -139,11 +152,19 @@ def create_backbone_element(*, element_type, layer, name, description=None, orga
     return element
 
 
-def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict] = None):
+def sync_archimate_element(
+    obj: Any, *, session=None, provenance: Optional[Dict] = None, organization_id: Optional[int] = None
+):
     """Create and attach the ArchiMate mirror of a motivation row.
 
     Idempotent: a row that already carries archimate_element_id is left alone,
     so this is safe to call on an update path or twice on the same object.
+
+    *organization_id* is an explicit org for a caller that cannot rely on
+    Flask's `g` -- a fenced CommandService handler (R1-05/R1-06), or an
+    untenanted model like Deliverable. It is used before g.current_org_id,
+    but after the row's own organization_id when the row is TenantMixin and
+    already carries one (never override a row's real tenant).
 
     Returns the ArchiMateElement, or None when the object's type is not a
     motivation entity. Raises ValueError when it IS one but cannot be
@@ -169,12 +190,13 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
             "the backbone" % type_name
         )
 
-    org_id = _resolve_org_id(obj)
+    org_id = _resolve_org_id(obj, explicit=organization_id)
     if org_id is None:
         raise ValueError(
             "%s(%r) has no organization to attach its ArchiMate element to. "
             "Inside a request this comes from the row or g.current_org_id; in "
-            "a CLI/scheduler path it must be passed explicitly."
+            "a CLI/scheduler path it must be passed explicitly via the "
+            "organization_id keyword -- no silent default."
             % (type_name, name[:60])
         )
 

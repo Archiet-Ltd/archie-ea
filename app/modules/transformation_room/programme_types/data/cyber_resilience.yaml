@@ -1,0 +1,93 @@
+schema_version: 1
+key: cyber_resilience
+name: Cyber and resilience
+summary: Raise identity, network and recovery controls, and prove the organisation can detect and respond
+  to an incident.
+vendor_specific: false
+arb_required_at_decide: false
+workstreams:
+- key: identity_and_access
+  name: Identity and access
+  workstream_type: technology
+  objective: Own the identity and access work this programme depends on.
+- key: network_and_workload_protection
+  name: Network and workload protection
+  workstream_type: technology
+  objective: Own the network and workload protection work this programme depends on.
+- key: detection_and_response
+  name: Detection and response
+  workstream_type: process
+  objective: Own the detection and response work this programme depends on.
+- key: backup_and_recovery
+  name: Backup and recovery
+  workstream_type: technology
+  objective: Own the backup and recovery work this programme depends on.
+- key: third_party_and_supply_chain
+  name: Third-party and supply chain
+  workstream_type: supplier
+  objective: Own the third-party and supply chain work this programme depends on.
+- key: awareness_and_governance
+  name: Awareness and governance
+  workstream_type: policy_control
+  objective: Own the awareness and governance work this programme depends on.
+- key: programme_office
+  name: Programme office
+  workstream_type: other
+  objective: 'Run the programme: business case, governance and the deliverables no single workstream owns.'
+stages:
+  frame:
+    gate: Business case approved
+    deliverables:
+    - code: cyber_resilience.frame.business_case_and_value_drivers
+      name: Business case and value drivers
+      adm_phase: A
+      workstream: programme_office
+      element_types:
+      - Driver
+      - Goal
+      - Assessment
+      purpose: State why this programme is needed and how success will be judged.
+  discover:
+    gate: Current state understood
+    deliverables:
+    - code: cyber_resilience.discover.current_state_and_requirements
+      name: Current state and requirements
+      adm_phase: B
+      workstream: identity_and_access
+      element_types:
+      - Requirement
+      - Capability
+      purpose: Capture what exists today and what the programme must satisfy.
+  shape:
+    gate: Target design agreed
+    deliverables:
+    - code: cyber_resilience.shape.target_design_and_delivery_plan
+      name: Target design and delivery plan
+      adm_phase: D
+      workstream: identity_and_access
+      element_types:
+      - WorkPackage
+      - Plateau
+      purpose: Describe the target state and the work packages that will reach it.
+  decide:
+    gate: Governance sign-off
+    deliverables:
+    - code: cyber_resilience.decide.decision_readiness
+      name: Decision readiness
+      adm_phase: E
+      workstream: programme_office
+      element_types:
+      - Requirement
+      - Assessment
+      purpose: Confirm the chosen option is ready for governance sign-off.
+  deliver:
+    gate: Change landed
+    deliverables:
+    - code: cyber_resilience.deliver.delivery_and_cutover
+      name: Delivery and cutover
+      adm_phase: F
+      workstream: identity_and_access
+      element_types:
+      - WorkPackage
+      - ImplementationEvent
+      purpose: Deliver the change and confirm it has landed.

@@ -324,6 +324,13 @@ def init_cli(app):
         app.logger.warning(f"⚠️  Failed to register outcome tenancy backfill CLI: {e}")
 
     try:
+        from app.commands.backfill_workstream_elements import init_app as init_backfill_workstream_elements
+        init_backfill_workstream_elements(app)
+        app.logger.info("Workstream ArchiMate element backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register workstream element backfill CLI: {e}")
+
+    try:
         from app.commands.backfill_architect_role import init_app as init_backfill_architect
         init_backfill_architect(app)
         app.logger.info("\u2705 Architect-role backfill CLI command registered")
@@ -350,6 +357,22 @@ def init_cli(app):
         app.logger.info("Capability projection CLI command registered")
     except Exception as e:
         app.logger.warning(f"Failed to register capability projection CLI: {e}")
+
+    try:
+        from app.commands.programme_types_status import init_app as init_programme_types_status
+        init_programme_types_status(app)
+        app.logger.info("Programme types status CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register programme-types status CLI: {e}")
+
+    try:
+        from app.commands.repoint_journey_decision_links import (
+            init_app as init_repoint_journey_decision_links,
+        )
+        init_repoint_journey_decision_links(app)
+        app.logger.info("Journey decision-link repoint CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register journey decision-link repoint CLI: {e}")
 
     try:
         from app.commands.apply_unified_capability_provenance_migration import (

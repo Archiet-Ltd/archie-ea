@@ -1,0 +1,88 @@
+schema_version: 1
+key: mna_integration
+name: M&A integration
+summary: Bring an acquired or merging organisation's applications, data and people onto the parent's architecture.
+vendor_specific: false
+arb_required_at_decide: true
+workstreams:
+- key: day_one_readiness
+  name: Day-one readiness
+  workstream_type: other
+  objective: Own the day-one readiness work this programme depends on.
+- key: applications_and_data
+  name: Applications and data
+  workstream_type: application_rationalisation
+  objective: Own the applications and data work this programme depends on.
+- key: people_and_organisation
+  name: People and organisation
+  workstream_type: organisation_skills
+  objective: Own the people and organisation work this programme depends on.
+- key: finance_and_legal
+  name: Finance and legal
+  workstream_type: process
+  objective: Own the finance and legal work this programme depends on.
+- key: synergies
+  name: Synergies
+  workstream_type: other
+  objective: Own the synergies work this programme depends on.
+- key: programme_office
+  name: Programme office
+  workstream_type: other
+  objective: 'Run the programme: business case, governance and the deliverables no single workstream owns.'
+stages:
+  frame:
+    gate: Business case approved
+    deliverables:
+    - code: mna_integration.frame.business_case_and_value_drivers
+      name: Business case and value drivers
+      adm_phase: A
+      workstream: programme_office
+      element_types:
+      - Driver
+      - Goal
+      - Assessment
+      purpose: State why this programme is needed and how success will be judged.
+  discover:
+    gate: Current state understood
+    deliverables:
+    - code: mna_integration.discover.current_state_and_requirements
+      name: Current state and requirements
+      adm_phase: B
+      workstream: day_one_readiness
+      element_types:
+      - Requirement
+      - Capability
+      purpose: Capture what exists today and what the programme must satisfy.
+  shape:
+    gate: Target design agreed
+    deliverables:
+    - code: mna_integration.shape.target_design_and_delivery_plan
+      name: Target design and delivery plan
+      adm_phase: D
+      workstream: day_one_readiness
+      element_types:
+      - WorkPackage
+      - Plateau
+      purpose: Describe the target state and the work packages that will reach it.
+  decide:
+    gate: Governance sign-off
+    deliverables:
+    - code: mna_integration.decide.decision_readiness
+      name: Decision readiness
+      adm_phase: E
+      workstream: programme_office
+      element_types:
+      - Requirement
+      - Assessment
+      purpose: Confirm the chosen option is ready for governance sign-off.
+  deliver:
+    gate: Change landed
+    deliverables:
+    - code: mna_integration.deliver.delivery_and_cutover
+      name: Delivery and cutover
+      adm_phase: F
+      workstream: day_one_readiness
+      element_types:
+      - WorkPackage
+      - ImplementationEvent
+      purpose: Deliver the change and confirm it has landed.

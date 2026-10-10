@@ -20,6 +20,9 @@ unauthenticated /api/gdpr/delete that turned out never to be registered. Only
 driving it settles either question.
 """
 
+import json as _json
+import uuid as _uuid
+
 import pytest
 
 from .conftest import ARCHETYPES, PAGE_TIMEOUT, PASSWORD
@@ -227,6 +230,10 @@ TRANSFORMATION_API_PERMITTED = {
     "arb_member",
     "portfolio_manager",
     "cto",
+    # R1-01 (security.md 3.2): platform_admin is admitted here by
+    # organization_admin READ (READ_ROLES), not by any write authority --
+    # CREATE_ROLES no longer contains platform_admin at all. See
+    # test_transformation_api_create_authorisation below for the write case.
     "platform_admin",
 }
 
@@ -407,6 +414,80 @@ def test_transformation_api_authorisation_matrix(
     assert actual == expected, (
         f"{archetype} reached {TRANSFORMATION_API_PATH}: expected {expected}, got {actual}"
     )
+
+
+# R1-01 (security.md 3.2, S1/S2): programme WRITE authority, distinct from the
+# READ matrix above. Only enterprise_architect and cto may create -- not
+# platform_admin (this is the exact gap security.md found: the existing
+# matrix only ever probed GET).
+TRANSFORMATION_API_CREATE_PERMITTED = {"enterprise_architect", "cto"}
+
+
+def _csrf_token(page):
+    return page.evaluate(
+        "() => (document.querySelector('meta[name=csrf-token]') || {}).content || ''"
+    )
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_transformation_api_create_authorisation(
+    archetype, page, live_server, seeded, transformation_users
+):
+    """POST /api/v1/transformation-programmes: permitted = {enterprise_architect,
+    cto}; every other archetype, including platform_admin, is refused.
+
+    A well-formed body is required: validate_intake resolves owner_id before
+    authorise_create_programme ever runs, so an empty/invalid body 400s for
+    every archetype alike and never reaches the authorisation check this
+    test exists to prove (security.md 3.2's own gap: the pre-R1-01 matrix
+    only ever probed GET). owner_id is the seeded business_architect -- any
+    real same-org user works, ownership need not be the actor.
+    """
+    _login(page, live_server, transformation_users[archetype])
+    page.goto(live_server + "/architecture-journey/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    token = _csrf_token(page)
+    owner_id = seeded["ids"]["business_architect_user"]
+    body = {
+        "name": f"Auth probe {archetype}",
+        "objective": "Prove the create authority boundary.",
+        "owner_id": owner_id,
+        "workstream_type": "process",
+        "target_date_unavailable_reason": "Probe only",
+        "scope_expression": {"business_units": ["Retail"]},
+        "outcome": {
+            "statement": "Prove the boundary",
+            "owner_id": owner_id,
+            "direction": "decrease",
+            "measure": {
+                "metric_name": "Probe metric",
+                "unit": "count",
+                "aggregation": "sum",
+                "baseline_value": None,
+                "unavailable_reason": "Not measured",
+                "target_value": 1,
+            },
+        },
+    }
+    response = page.request.post(
+        live_server + TRANSFORMATION_API_PATH,
+        headers={
+            "X-CSRFToken": token,
+            "Content-Type": "application/json",
+            "Idempotency-Key": f"auth-probe-{archetype}-{_uuid.uuid4().hex[:12]}",
+        },
+        data=_json.dumps(body),
+    )
+    expected_allowed = archetype in TRANSFORMATION_API_CREATE_PERMITTED
+    if expected_allowed:
+        assert response.status not in (401, 403), (
+            f"{archetype} should be authorised to create a programme, got {response.status}: "
+            f"{response.text()[:300]}"
+        )
+    else:
+        assert response.status in (401, 403), (
+            f"{archetype} reached programme create: expected 401/403, got {response.status}: "
+            f"{response.text()[:300]}"
+        )
 
 
 INTERFACE_REGISTER_PERMITTED = {
