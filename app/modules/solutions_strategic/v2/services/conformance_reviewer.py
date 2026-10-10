@@ -13,10 +13,20 @@ current state. Each section is fault-tolerant. Findings never fabricate.
 
 Severity: 'critical' | 'high' | 'info'. A conformance score starts at 100
 and is debited per finding by severity, floored at 0.
+
+Interface-level checks (``check_interfaces`` / ``interface_breaches``): each
+integration interface of a solution is checked against the catalogue pattern
+it names, for protocol, security (authentication, encryption) and the data it
+carries (format, personal data). Every breach names the rule it violates. A
+value the interface does not record is reported as not recorded, with the
+reason, never guessed. The last check is stored on the interface so it is
+still there after a reload, and it clears when a fixed interface is checked
+again.
 """
 
 import logging
-from typing import Any, Callable, Dict, List
+from datetime import datetime
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from sqlalchemy import func
 
@@ -96,6 +106,7 @@ class ConformanceReviewer:
         findings: List[Dict[str, Any]] = []
         checks_run: List[Dict[str, Any]] = []
         findings += _safe("integration", lambda: cls._integration_findings(solution_id), checks_run)
+        findings += _safe("interfaces", lambda: cls._interface_findings(solution_id), checks_run)
         findings += _safe("clean_core", lambda: cls._clean_core_findings(solution_id), checks_run)
         findings += _safe("business", lambda: cls._business_findings(solution_id), checks_run)
         findings += _safe("data", lambda: cls._data_findings(solution_id), checks_run)
@@ -194,6 +205,241 @@ class ConformanceReviewer:
                     "recommendation": ("Migrate to an approved pattern." if st == "deprecated"
                                        else "Document the conditional-use justification for the ARB."),
                 })
+        return out
+
+    # ------------------------------------------------------------------ #
+    # Interface-level checks against the pattern catalogue                #
+    # ------------------------------------------------------------------ #
+
+    # Rule names, as a person reads them. The key is the stable rule code
+    # carried on each breach.
+    INTERFACE_RULES = {
+        "pattern-named": "Every interface follows a pattern from the catalogue",
+        "pattern-approved": "An interface may not use a blocked or deprecated pattern",
+        "pattern-protocol": "The interface uses the protocol its pattern specifies",
+        "pattern-data-format": "The interface carries data in the format its pattern specifies",
+        "pattern-security-auth": "The interface authenticates with a method its pattern allows",
+        "pattern-security-encryption": "The interface encrypts data in transit where its pattern requires it",
+        "pattern-data-personal": "Personal data travels only over a pattern that allows it",
+    }
+
+    @classmethod
+    def _breach(cls, rule: str, detail: str) -> Dict[str, str]:
+        return {"rule": rule, "rule_name": cls.INTERFACE_RULES[rule], "detail": detail}
+
+    @staticmethod
+    def _norm(value: Optional[str]) -> str:
+        return (value or "").strip().lower()
+
+    @classmethod
+    def interface_breaches(cls, flow, pattern) -> Dict[str, Any]:
+        """Check one interface (SolutionIntegrationFlow) against its pattern.
+
+        Returns ``{"pattern_id", "pattern_name", "breaches": [...],
+        "not_recorded": [...]}``; each breach is ``{"rule", "rule_name",
+        "detail"}`` and each not-recorded entry ``{"fact", "reason"}``.
+        """
+        breaches: List[Dict[str, str]] = []
+        not_recorded: List[Dict[str, str]] = []
+
+        if pattern is None:
+            breaches.append(cls._breach(
+                "pattern-named",
+                "No catalogue pattern is named for this interface, so it is a "
+                "point-to-point integration outside the approved patterns. Link it "
+                "to an approved pattern.",
+            ))
+            return {"pattern_id": None, "pattern_name": None,
+                    "breaches": breaches, "not_recorded": not_recorded}
+
+        status = cls._norm(pattern.approval_status)
+        if status in ("blocked", "deprecated"):
+            breaches.append(cls._breach(
+                "pattern-approved",
+                f"'{pattern.name}' is {status} in the catalogue. Move this interface "
+                "to an approved pattern.",
+            ))
+
+        if pattern.protocol:
+            if not flow.protocol:
+                not_recorded.append({
+                    "fact": "Protocol",
+                    "reason": "The interface records no protocol, so the protocol rule cannot be checked.",
+                })
+            elif cls._norm(flow.protocol) != cls._norm(pattern.protocol):
+                breaches.append(cls._breach(
+                    "pattern-protocol",
+                    f"The interface uses {flow.protocol}; '{pattern.name}' specifies {pattern.protocol}.",
+                ))
+
+        if pattern.data_format:
+            carried = flow.data_format or flow.message_format
+            if not carried:
+                not_recorded.append({
+                    "fact": "Data format",
+                    "reason": "The interface records no data format, so the format rule cannot be checked.",
+                })
+            elif cls._norm(carried) != cls._norm(pattern.data_format):
+                breaches.append(cls._breach(
+                    "pattern-data-format",
+                    f"The interface carries {carried}; '{pattern.name}' specifies {pattern.data_format}.",
+                ))
+
+        allowed_auth = [cls._norm(a) for a in (pattern.allowed_auth_methods or []) if a]
+        if allowed_auth:
+            if not flow.auth_method:
+                not_recorded.append({
+                    "fact": "Authentication",
+                    "reason": "The interface records no authentication method, so the security rule cannot be checked.",
+                })
+            elif cls._norm(flow.auth_method) not in allowed_auth:
+                breaches.append(cls._breach(
+                    "pattern-security-auth",
+                    f"The interface authenticates with {flow.auth_method}; '{pattern.name}' "
+                    f"allows {', '.join(pattern.allowed_auth_methods)}.",
+                ))
+
+        if pattern.requires_encryption:
+            if flow.encryption_required is None:
+                not_recorded.append({
+                    "fact": "Encryption",
+                    "reason": "The interface does not record whether it is encrypted.",
+                })
+            elif flow.encryption_required is False:
+                breaches.append(cls._breach(
+                    "pattern-security-encryption",
+                    f"The interface is not encrypted; '{pattern.name}' requires encryption in transit.",
+                ))
+
+        if pattern.allows_personal_data is False and flow.contains_pii:
+            breaches.append(cls._breach(
+                "pattern-data-personal",
+                f"The interface carries personal data; '{pattern.name}' does not allow it.",
+            ))
+
+        return {"pattern_id": pattern.id, "pattern_name": pattern.name,
+                "breaches": breaches, "not_recorded": not_recorded}
+
+    @staticmethod
+    def _solution_in_tenant(solution_id: int):
+        """The solution if it belongs to the caller's organisation. filter(),
+        never .get(): an identity-map hit would skip the tenant predicate."""
+        from app.models.solution_models import Solution
+
+        return Solution.query.filter(Solution.id == solution_id).first()
+
+    @staticmethod
+    def _flows_with_patterns(solution_id: int, flow_ids: Optional[Iterable[int]] = None):
+        from app.models.integration_pattern import IntegrationPattern
+        from app.models.solution_sad_models import SolutionIntegrationFlow
+
+        # tenant-scoping-ok: solution_id was checked against the caller's organisation by _solution_in_tenant first; flows are reached only through it
+        query = SolutionIntegrationFlow.query.filter(SolutionIntegrationFlow.solution_id == solution_id)
+        if flow_ids is not None:
+            ids = [int(i) for i in flow_ids]
+            query = query.filter(SolutionIntegrationFlow.id.in_(ids or [-1]))
+        flows = query.order_by(SolutionIntegrationFlow.flow_name, SolutionIntegrationFlow.id).all()
+        pattern_ids = sorted({f.pattern_id for f in flows if f.pattern_id})
+        patterns = {}
+        if pattern_ids:
+            # tenant-scoping-ok: the pattern catalogue is shared reference data with no organisation column
+            patterns = {p.id: p for p in IntegrationPattern.query.filter(IntegrationPattern.id.in_(pattern_ids)).all()}
+        return flows, patterns
+
+    @staticmethod
+    def _flow_row(flow, result: Optional[Dict[str, Any]], checked_at) -> Dict[str, Any]:
+        return {
+            "id": flow.id,
+            "name": flow.flow_name,
+            "protocol": flow.protocol,
+            "data_format": flow.data_format or flow.message_format,
+            "auth_method": flow.auth_method,
+            "contains_pii": flow.contains_pii,
+            "checked_at": checked_at,
+            "pattern_name": (result or {}).get("pattern_name"),
+            "breaches": (result or {}).get("breaches") or [],
+            "not_recorded": (result or {}).get("not_recorded") or [],
+            "conforms": bool(result) and not (result or {}).get("breaches"),
+        }
+
+    @classmethod
+    def check_interfaces(cls, solution_id: int, flow_ids: Optional[Iterable[int]] = None) -> Dict[str, Any]:
+        """Check the chosen interfaces of a solution against the catalogue and
+        store each result on the interface. ``flow_ids`` None checks them all.
+
+        Returns ``{"success", "checked": [rows], "breaching", "conforming"}``
+        or ``{"success": False, "error"}``.
+        """
+        if cls._solution_in_tenant(solution_id) is None:
+            return {"success": False, "error": "Solution not found."}
+        flows, patterns = cls._flows_with_patterns(solution_id, flow_ids)
+        if not flows:
+            return {"success": False, "error": "Choose at least one interface of this solution to check."}
+
+        now = datetime.utcnow()
+        rows = []
+        for flow in flows:
+            result = cls.interface_breaches(flow, patterns.get(flow.pattern_id))
+            flow.conformance_checked_at = now
+            flow.conformance_breaches = result
+            rows.append(cls._flow_row(flow, result, now))
+        db.session.commit()
+        breaching = sum(1 for r in rows if r["breaches"])
+        return {"success": True, "checked": rows, "breaching": breaching,
+                "conforming": len(rows) - breaching}
+
+    @classmethod
+    def interface_results(cls, solution_id: int) -> Dict[str, Any]:
+        """Every interface of a solution with its last stored check (read only).
+        An interface never checked has ``checked_at`` None."""
+        if cls._solution_in_tenant(solution_id) is None:
+            return {"success": False, "error": "Solution not found.", "interfaces": []}
+        flows, _patterns = cls._flows_with_patterns(solution_id)
+        return {
+            "success": True,
+            "interfaces": [
+                cls._flow_row(f, f.conformance_breaches if f.conformance_checked_at else None,
+                              f.conformance_checked_at)
+                for f in flows
+            ],
+        }
+
+    @classmethod
+    def _interface_findings(cls, sid: int) -> List[Dict]:
+        """Live interface rules for the whole-solution review. Blocked and
+        deprecated patterns are already reported by _integration_findings, so
+        that rule is left out here rather than counted twice."""
+        flows, patterns = cls._flows_with_patterns(sid)
+        unpatterned = []
+        out = []
+        for flow in flows:
+            result = cls.interface_breaches(flow, patterns.get(flow.pattern_id))
+            rules = [b for b in result["breaches"] if b["rule"] != "pattern-approved"]
+            if any(b["rule"] == "pattern-named" for b in rules):
+                unpatterned.append(flow.flow_name)
+                continue
+            if rules:
+                out.append({
+                    "category": "integration",
+                    "severity": "high",
+                    "title": f"Interface '{flow.flow_name}' breaches its pattern",
+                    "detail": " ".join(f"{b['rule_name']}: {b['detail']}" for b in rules),
+                    "evidence": f"Integration-pattern catalogue · {result['pattern_name']}",
+                    "recommendation": "Change the interface to meet the pattern, or request a waiver.",
+                })
+        if unpatterned:
+            n = len(unpatterned)
+            out.insert(0, {
+                "category": "integration",
+                "severity": "high",
+                "title": f"{_n(n, 'interface')} follow{'s' if n == 1 else ''} no catalogue pattern",
+                "detail": (
+                    "Point-to-point integrations outside the approved patterns: "
+                    + ", ".join(unpatterned[:10]) + ("…" if n > 10 else "") + "."
+                ),
+                "evidence": "Integration interfaces · no pattern named",
+                "recommendation": "Link each interface to an approved pattern from the catalogue.",
+            })
         return out
 
     @staticmethod

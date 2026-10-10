@@ -904,6 +904,37 @@ def test_transformation_api_rejects_anonymous_browser_session(page, live_server)
     assert body["errors"][0]["code"] == "not_authenticated"
 
 
+# Standards and patterns: the reference-architecture page of a solution and the
+# conformance page that carries the interface check. Both carry @login_required
+# and no role gate (every persona that can open a solution can see which
+# reference architecture fits it and check its interfaces), so every archetype
+# is expected to reach them; the data is fenced per organisation by the
+# solution lookup, which 404s another organisation's id.
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_standards_and_patterns_routes_authorisation(archetype, page, live_server, seeded):
+    _login(page, live_server, seeded["emails"][archetype])
+    solution_id = seeded["ids"]["solution"]
+    for path in (
+        "/solutions/%d/reference-architecture" % solution_id,
+        "/solutions/%d/conformance" % solution_id,
+        "/technology/radar/",
+    ):
+        assert _observe(page, live_server, path) == ALLOWED, (
+            f"{archetype} could not reach {path}: expected ALLOWED (login_required only)"
+        )
+
+
+def test_standards_and_patterns_routes_reject_anonymous(page, live_server, seeded):
+    solution_id = seeded["ids"]["solution"]
+    for path in (
+        "/solutions/%d/reference-architecture" % solution_id,
+        "/technology/radar/",
+    ):
+        response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        served = response and response.status < 400 and "/account/login" not in page.url
+        assert not served, "%s is reachable without signing in" % path
+
+
 # The application technology panel (nodes and system software an application
 # runs on). Reading the links carries @login_required only, so every archetype
 # reaches it. Writing carries require_roles("admin", "architect"): every seeded

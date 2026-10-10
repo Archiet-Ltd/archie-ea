@@ -21,6 +21,11 @@
         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
             <i data-lucide="shield-check" class="h-3.5 w-3.5"></i> AI Technical Architect · policy-as-data · live
         </span>
+        <a href="{{ url_for('solution_design.solution_reference_architecture', solution_id=solution.id) }}"
+           data-testid="conformance-reference-architecture-link"
+           class="inline-flex items-center gap-1 rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">
+            <i data-lucide="layout-template" class="h-3.5 w-3.5"></i> Reference architecture
+        </a>
     </div>
 
     {% if not review.success %}
@@ -85,5 +90,61 @@
     </div>
     {% endif %}
     {% endif %}
+
+    {# ── Interfaces against the pattern catalogue ──────────────────── #}
+    <section id="interfaces" class="border border-border rounded-xl bg-card" data-testid="interface-check">
+        <div class="px-4 py-3 border-b border-border">
+            <h2 class="text-sm font-semibold text-foreground">Interfaces against the pattern catalogue</h2>
+            <p class="text-xs text-muted-foreground mt-0.5">Choose interfaces and check each against its pattern for protocol, security and the data it carries. Every breach names the rule it violates; the last check is kept on the interface.</p>
+        </div>
+        {% if not interfaces.interfaces %}
+        <p class="px-4 py-6 text-sm text-muted-foreground" data-testid="interface-check-empty">This solution has no integration interfaces recorded, so there is nothing to check.</p>
+        {% else %}
+        <form method="POST" action="{{ url_for('solution_design.solution_conformance_check_interfaces', solution_id=solution.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <ul class="divide-y divide-border">
+                {% for itf in interfaces.interfaces %}
+                <li class="px-4 py-3 flex items-start gap-3" data-testid="interface-row-{{ itf.id }}">
+                    <input type="checkbox" name="interface_ids" value="{{ itf.id }}" checked
+                        id="interface-{{ itf.id }}" data-testid="interface-select-{{ itf.id }}"
+                        class="mt-1 h-4 w-4 rounded border-input">
+                    <div class="min-w-0 flex-1">
+                        <label for="interface-{{ itf.id }}" class="text-sm font-medium text-foreground">{{ itf.name }}</label>
+                        <p class="text-xs text-muted-foreground">
+                            Pattern: {{ itf.pattern_name or '—' }} · Protocol: {{ itf.protocol or '—' }} · Format: {{ itf.data_format or '—' }} · Authentication: {{ itf.auth_method or '—' }}
+                        </p>
+                        {% if not itf.checked_at %}
+                        <p class="text-xs text-muted-foreground mt-1" data-testid="interface-status-{{ itf.id }}">Not checked yet.</p>
+                        {% elif itf.breaches %}
+                        <ul class="mt-1 space-y-1" data-testid="interface-status-{{ itf.id }}">
+                            {% for b in itf.breaches %}
+                            <li class="text-xs" data-testid="interface-breach-{{ itf.id }}-{{ b.rule }}">
+                                <span class="font-semibold text-destructive">Breaks: {{ b.rule_name }}.</span>
+                                <span class="text-muted-foreground">{{ b.detail }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-xs text-success mt-1" data-testid="interface-status-{{ itf.id }}">Conforms to {{ itf.pattern_name }}.</p>
+                        {% endif %}
+                        {% for nr in itf.not_recorded %}
+                        <p class="text-xs text-muted-foreground mt-1">{{ nr.fact }} not recorded. {{ nr.reason }}</p>
+                        {% endfor %}
+                        {% if itf.checked_at %}
+                        <p class="text-2xs text-muted-foreground/80 mt-1">Checked {{ itf.checked_at.strftime('%d %b %Y %H:%M') }} UTC</p>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            <div class="px-4 py-3 border-t border-border">
+                <button type="submit" data-testid="interface-check-submit"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                    Check selected interfaces
+                </button>
+            </div>
+        </form>
+        {% endif %}
+    </section>
 </div>
 {% endblock %}

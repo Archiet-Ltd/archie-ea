@@ -1,5 +1,6 @@
 """
-flask seed-integration-patterns — seed 18 ARB-approved/conditional/blocked integration patterns.
+flask seed-integration-patterns — seed the ARB-approved/conditional/blocked integration
+patterns and the reference architectures of the pattern catalogue.
 
 Idempotent: skips patterns that already exist by name. Safe to run multiple times.
 Run after deploying to a new environment to populate the integration pattern catalogue.
@@ -261,14 +262,99 @@ INTEGRATION_PATTERNS = [
         ),
         "codegen_target": None,
     },
+    # ------------------------------------------------------------------
+    # Reference architectures (whole-solution patterns)
+    # ------------------------------------------------------------------
+    {
+        "name": "Event-driven service reference architecture",
+        "vendor_key": "GENERIC",
+        "pattern_type": "event_driven",
+        "middleware": "Event broker",
+        "protocol": "event",
+        "data_format": "json",
+        "approval_status": "approved",
+        "description": (
+            "Services publish and consume business events through a managed broker, "
+            "with an event store and a dead-letter queue. Suits order and shipment "
+            "tracking and other near-real-time flows."
+        ),
+        "allowed_auth_methods": ["oauth2", "mtls", "sasl_ssl"],
+        "requires_encryption": True,
+        "allows_personal_data": True,
+        "is_reference_architecture": True,
+        "fit_context": {
+            "data": ["internal", "confidential", "personal"],
+            "latency": ["real_time", "near_real_time"],
+            "hosting": ["cloud", "hybrid"],
+        },
+        "components": [
+            {"name": "Event Broker", "type": "TechnologyService", "layer": "technology"},
+            {"name": "Event Producer", "type": "ApplicationComponent", "layer": "application"},
+            {"name": "Event Consumer", "type": "ApplicationComponent", "layer": "application"},
+            {"name": "Event Store", "type": "DataObject", "layer": "application"},
+            {"name": "Dead-Letter Queue", "type": "TechnologyService", "layer": "technology"},
+        ],
+        "applies_to_controls": [
+            {"name": "Encryption in transit", "description": "Broker connections use TLS."},
+            {"name": "Authenticated producers and consumers", "description": "OAuth 2.0, mutual TLS or SASL over TLS."},
+            {"name": "No lost events", "description": "Failed deliveries go to the dead-letter queue for replay."},
+            {"name": "Event audit trail", "description": "The event store keeps every published event."},
+        ],
+    },
+    {
+        "name": "Batch analytics reference architecture",
+        "vendor_key": "GENERIC",
+        "pattern_type": "batch",
+        "middleware": "Scheduled pipeline",
+        "protocol": "file",
+        "data_format": "csv",
+        "approval_status": "approved",
+        "description": (
+            "Scheduled extraction into a governed analytics store, transformed in "
+            "batch and served to reporting. Suits overnight reporting and "
+            "reconciliation."
+        ),
+        "allowed_auth_methods": ["oauth2", "mtls"],
+        "requires_encryption": True,
+        "allows_personal_data": False,
+        "is_reference_architecture": True,
+        "fit_context": {
+            "data": ["public", "internal", "confidential"],
+            "latency": ["batch"],
+            "hosting": ["cloud", "on_premise", "hybrid"],
+        },
+        "components": [
+            {"name": "Extraction Job", "type": "ApplicationProcess", "layer": "application"},
+            {"name": "Analytics Store", "type": "DataObject", "layer": "application"},
+            {"name": "Transformation Pipeline", "type": "ApplicationComponent", "layer": "application"},
+            {"name": "Reporting Service", "type": "ApplicationService", "layer": "application"},
+            {"name": "Batch Scheduler", "type": "SystemSoftware", "layer": "technology"},
+        ],
+        "applies_to_controls": [
+            {"name": "Encryption at rest and in transit", "description": "Files and the analytics store are encrypted."},
+            {"name": "No personal data", "description": "Personal data is excluded or masked before loading."},
+            {"name": "Reconciled loads", "description": "Each run records row counts in and out."},
+        ],
+    },
 ]
+
+# Columns copied from a spec when present (the rest are named explicitly below).
+_OPTIONAL_FIELDS = (
+    "allowed_auth_methods",
+    "requires_encryption",
+    "allows_personal_data",
+    "is_reference_architecture",
+    "components",
+    "applies_to_controls",
+    "fit_context",
+)
 
 
 @click.command("seed-integration-patterns")
 @click.option("--dry-run", is_flag=True, help="Print what would be inserted without writing.")
 @with_appcontext
 def seed_integration_patterns(dry_run):
-    """Seed 18 ARB integration patterns into integration_patterns table (idempotent)."""
+    """Seed the ARB integration patterns and reference architectures (idempotent)."""
     from app.models.integration_pattern import IntegrationPattern
 
     inserted = 0
@@ -302,6 +388,7 @@ def seed_integration_patterns(dry_run):
             codegen_target=spec.get("codegen_target"),
             description=spec.get("description"),
             documentation_url=spec.get("documentation_url"),
+            **{field: spec[field] for field in _OPTIONAL_FIELDS if field in spec},
         )
         db.session.add(pattern)
         inserted += 1
