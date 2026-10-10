@@ -20,6 +20,7 @@ from flask import Blueprint, jsonify, request
 from app.middleware.tenant_decorators import platform_admin_required
 
 from app import db
+from app.jobs.tenant_safe_job import platform_scope
 from app.decorators import audit_log
 from app.models.framework_configuration import (
     CapabilityFrameworkConfiguration,
@@ -167,7 +168,8 @@ def create_configuration():
             return jsonify({"success": False, "error": "Configuration code already exists"}), 400
 
         # Create configuration
-        configuration = FrameworkConfigurationService.create_configuration(data)
+        with platform_scope("platform administrator creates a shared framework configuration"):
+            configuration = FrameworkConfigurationService.create_configuration(data)
 
         return (
             jsonify(
@@ -266,7 +268,8 @@ def update_configuration(config_id):
     try:
         data = request.get_json()
 
-        configuration = FrameworkConfigurationService.update_configuration(config_id, data)
+        with platform_scope("platform administrator edits a shared framework configuration"):
+            configuration = FrameworkConfigurationService.update_configuration(config_id, data)
 
         if not configuration:
             return jsonify({"success": False, "error": "Configuration not found"}), 404
@@ -313,7 +316,8 @@ def delete_configuration(config_id):
         description: Server error
     """
     try:
-        success = FrameworkConfigurationService.delete_configuration(config_id)
+        with platform_scope("platform administrator deletes a shared framework configuration"):
+            success = FrameworkConfigurationService.delete_configuration(config_id)
 
         if not success:
             return (
@@ -568,7 +572,8 @@ def install_extension(config_id, extension_code):
         description: Server error
     """
     try:
-        success = FrameworkExtensionService.install_extension(config_id, extension_code)
+        with platform_scope("platform administrator installs an extension on a shared framework configuration"):
+            success = FrameworkExtensionService.install_extension(config_id, extension_code)
 
         if not success:
             return (
@@ -744,12 +749,14 @@ def deploy_template(template_id):
         if "organization_name" in data:
             template_config["organization_name"] = data["organization_name"]
 
-        # Create configuration from template
-        configuration = FrameworkConfigurationService.create_configuration(template_config)
+        # Create configuration from template, and count the use on the shared
+        # template: both rows are platform-wide catalogue rows.
+        with platform_scope("platform administrator deploys a shared framework template"):
+            configuration = FrameworkConfigurationService.create_configuration(template_config)
 
-        # Update template usage count
-        template.usage_count += 1
-        db.session.commit()
+            # Update template usage count
+            template.usage_count += 1
+            db.session.commit()
 
         return jsonify(
             {
@@ -820,7 +827,8 @@ def create_migration_mapping():
             if field not in data:
                 return jsonify({"success": False, "error": f"Missing required field: {field}"}), 400
 
-        migration = FrameworkMigrationService.create_migration_mapping(data)
+        with platform_scope("platform administrator creates a shared framework migration mapping"):
+            migration = FrameworkMigrationService.create_migration_mapping(data)
 
         return (
             jsonify(
@@ -876,7 +884,8 @@ def execute_migration(migration_id):
         description: Server error
     """
     try:
-        result = FrameworkMigrationService.execute_migration(migration_id)
+        with platform_scope("platform administrator runs a shared framework migration mapping"):
+            result = FrameworkMigrationService.execute_migration(migration_id)
 
         return jsonify(
             {

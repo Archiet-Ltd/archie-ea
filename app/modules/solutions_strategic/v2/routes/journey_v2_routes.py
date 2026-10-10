@@ -1139,9 +1139,14 @@ def _ingest_text_background(app_ctx, solution_id, text, filename):
     def _run():
         with app_ctx:
             try:
+                from app.jobs.tenant_safe_job import organization_id_of, tenant_scope
                 from app.modules.architecture_assistant.journey_orchestrator import JourneyOrchestrator
-                orch = JourneyOrchestrator(solution_id)
-                orch.ingest_text(text, source_name=filename)
+
+                # A new thread has no request and so no session organisation; do
+                # the work as the organisation that owns the solution.
+                with tenant_scope(organization_id_of(Solution, solution_id)):
+                    orch = JourneyOrchestrator(solution_id)
+                    orch.ingest_text(text, source_name=filename)
             except Exception as e:
                 logger.error("Background ingestion failed for solution %s / %s: %s", solution_id, filename, e)
 
@@ -2828,7 +2833,11 @@ def _generate_architecture_background(app_ctx, solution_id, capabilities, proble
             logger.error("_set_status failed for solution %d: %s", solution_id, exc)
 
     def _run():
-        with app_ctx:
+        from app.jobs.tenant_safe_job import organization_id_of, tenant_scope
+
+        # A new thread has no request and so no session organisation; do the
+        # work as the organisation that owns the solution.
+        with app_ctx, tenant_scope(organization_id_of(Solution, solution_id)):
             _set_status("running")
             try:
                 from app.modules.architecture_assistant.journey_orchestrator import JourneyOrchestrator
