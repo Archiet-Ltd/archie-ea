@@ -42,7 +42,7 @@ def test_vs_hub_returns_200_and_lists_all_comparison_pages(app):
         assert rv.status_code == 200
         html = rv.data.decode()
         for page in comparison_pages:
-            real_url = page.canonical_url or f"https://entelim.org{page.url}"
+            real_url = page.external_url or f"https://entelim.org{page.url}"
             assert real_url in html, (
                 f"/vs hub missing link to {real_url} ({page.slug})"
             )
@@ -80,6 +80,14 @@ def test_new_vs_pages_return_200_with_one_h1(app):
             assert len(h1s) == 1, f"/vs/{slug}: expected exactly one h1, found {len(h1s)}"
 
 
+def _faq_node(ld: dict) -> dict | None:
+    """The FAQPage node in one page's JSON-LD, whether or not it's wrapped
+    in an @graph alongside a BreadcrumbList (every comparison page gets
+    one now -- see app/services/public_pages.py build_jsonld)."""
+    nodes = ld["@graph"] if "@graph" in ld else [ld]
+    return next((n for n in nodes if n.get("@type") == "FAQPage"), None)
+
+
 def test_new_vs_pages_have_faq_jsonld_with_entries(app):
     """Each new comparison page has valid FAQPage JSON-LD with at least one entry."""
     import re
@@ -94,9 +102,10 @@ def test_new_vs_pages_have_faq_jsonld_with_entries(app):
             )
             assert ld_match is not None, f"/vs/{slug}: no JSON-LD script found"
             ld = json.loads(ld_match.group(1))
-            assert ld["@type"] == "FAQPage", f"/vs/{slug}: expected FAQPage, got {ld.get('@type')}"
-            assert len(ld.get("mainEntity", [])) > 0, f"/vs/{slug}: FAQPage mainEntity is empty"
-            for item in ld["mainEntity"]:
+            faq = _faq_node(ld)
+            assert faq is not None, f"/vs/{slug}: expected a FAQPage node"
+            assert len(faq.get("mainEntity", [])) > 0, f"/vs/{slug}: FAQPage mainEntity is empty"
+            for item in faq["mainEntity"]:
                 assert item["@type"] == "Question"
                 assert len(item["name"]) > 0
                 assert len(item["acceptedAnswer"]["text"]) > 0
@@ -122,16 +131,21 @@ def test_new_vs_pages_have_sourced_front_matter(app):
             assert source.get("read_date"), f"{slug}: a source is missing read_date"
 
 
-def test_new_vs_pages_have_canonical_archiet_ai_link(app):
-    """Each new comparison page carries a canonical link to its archiet.ai address."""
+def test_new_vs_pages_have_archiet_ai_external_url_for_cross_linking(app):
+    """Each new comparison page carries its archiet.ai address as
+    external_url (for the /vs hub's cross-link), but its own <link
+    rel="canonical"> in <head> is self -- entelim.org, not archiet.ai
+    (SEO/GEO audit item 1/2: these are two different products' content
+    now, not one page with two addresses)."""
     with app.test_client() as client:
         for slug in NEW_VS_SLUGS:
             page = load_page("comparison", slug=slug)
-            assert page.canonical_url == f"https://archiet.ai/vs/{slug}", (
-                f"{slug}: expected canonical https://archiet.ai/vs/{slug}, got {page.canonical_url}"
+            assert page.external_url == f"https://archiet.ai/vs/{slug}", (
+                f"{slug}: expected external_url https://archiet.ai/vs/{slug}, got {page.external_url}"
             )
             html = client.get(f"/vs/{slug}").data.decode()
-            assert f'rel="canonical" href="{page.canonical_url}"' in html
+            assert f'rel="canonical" href="https://entelim.org/vs/{slug}"' in html
+            assert f'rel="canonical" href="{page.external_url}"' not in html
 
 
 def test_new_vs_pages_no_invented_price_without_a_source_marker(app):
@@ -145,6 +159,50 @@ def test_new_vs_pages_no_invented_price_without_a_source_marker(app):
             assert "third-party" in html.lower(), (
                 f"/vs/{slug}: a price figure is present but not flagged as third-party-reported"
             )
+
+
+def test_vs_hub_excludes_a_withdrawn_comparison_page(app):
+    """app/main/views.py::public_comparison_hub builds its list from
+    load_feed_pages(), not load_all_pages() -- a comparison page withdrawn
+    from discovery (state: not_planned) must drop out of /vs automatically,
+    the same as it already drops out of the sitemap, llms.txt and the
+    /use-cases index. No comparison page is withdrawn today, so this proves
+    the mechanism with a temporary fixture page rather than trusting the
+    loader switch by inspection alone.
+    """
+    vs_dir = CONTENT_ROOT / "vs"
+    test_file = vs_dir / "zzz-test-withdrawn-comparison.md"
+    test_content = """---
+page_family: comparison
+competitor: Zzz Test Competitor
+url_slug: archiet.ai/vs/zzz-test-withdrawn-comparison
+state: not_planned
+---
+
+# Entelim vs Zzz Test Competitor
+
+Temporary fixture page for a test.
+"""
+    try:
+        test_file.write_text(test_content, encoding="utf-8")
+        with app.test_client() as client:
+            # Still renders at its own URL -- withdrawn means "not actively
+            # advertised", not "404".
+            rv = client.get("/vs/zzz-test-withdrawn-comparison")
+            assert rv.status_code == 200, (
+                f"withdrawn comparison page should still render, got {rv.status_code}"
+            )
+
+            html = client.get("/vs").data.decode()
+            assert "archiet.ai/vs/zzz-test-withdrawn-comparison" not in html, (
+                "/vs hub should not link to a withdrawn comparison page"
+            )
+            assert "Zzz Test Competitor" not in html, (
+                "/vs hub should not list a withdrawn comparison page's competitor name"
+            )
+    finally:
+        if test_file.exists():
+            test_file.unlink()
 
 
 def test_sitemap_includes_vs_hub(app):

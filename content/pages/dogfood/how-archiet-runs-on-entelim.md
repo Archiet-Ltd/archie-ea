@@ -19,9 +19,9 @@ to real gaps.
 
 ## What we actually ask it
 
-When we need to know who to hire next, what to build, or what to stop, we ask Entelim — not a
-general assistant with no knowledge of our company. Every answer comes from our own twin, reasoned
-over our own data, not a guess dressed up as advice.
+When we need to know what to build, or what to stop, we ask Entelim — not a general assistant with
+no knowledge of our company. Every answer comes from our own twin, reasoned over our own data, not a
+guess dressed up as advice.
 
 ## Every project traces to a gap and a stage
 

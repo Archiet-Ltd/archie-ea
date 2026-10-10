@@ -14,7 +14,7 @@ Key Features:
 - Integration with existing capability roadmap
 
 Reuses:
-- ImplementationWorkPackage model
+- UnifiedWorkPackage (through work_package_service)
 - ImplementationPlateau model
 - technology_roadmap_service.py patterns
 - capability_roadmap_dashboard_service.py patterns
@@ -31,13 +31,19 @@ from sqlalchemy import or_  # dead-code-ok
 from app import db
 from app.models.implementation_migration import (  # dead-code-ok
     Gap as ImplementationGap,
-    WorkPackage as ImplementationWorkPackage,
 )
 from app.models.implementation_planning import (
     ImplementationPlateau,
 )
+from app.services import work_package_service
+from app.utils.tenant import current_organization_id
 
 logger = logging.getLogger(__name__)
+
+
+def _as_date(value):
+    """A stored date-time as a plain date, so dates and date-times never mix."""
+    return value.date() if isinstance(value, datetime) else value
 
 
 # =============================================================================
@@ -102,7 +108,7 @@ class RoadmapBuilderService:
         created_by: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Create a new work package.
+        Create a new work package in the one work package store.
 
         Args:
             name: Name of the work package
@@ -115,36 +121,37 @@ class RoadmapBuilderService:
             estimated_cost: Estimated cost
             dependencies: List of work package IDs this depends on
             capability_id: Optional linked capability
-            created_by: Creator identifier
+            created_by: Unused; the signed-in user is recorded
 
         Returns:
             Dict with created work package details
         """
+        org_id = current_organization_id()
         try:
-            # WorkPackage columns are target_date/dependencies/owner_id — the old
-            # kwargs end_date/work_dependencies/created_by don't exist, and
-            # assigned_to (a free-text name) can't map to the integer owner_id FK,
-            # so it's dropped rather than mis-typed.
-            work_package = ImplementationWorkPackage(
+            from flask_login import current_user
+
+            work_package = work_package_service.create_work_package(
+                organization_id=org_id,
+                user_id=current_user.id if current_user.is_authenticated else None,
                 name=name,
                 description=description,
                 start_date=start_date,
-                target_date=end_date,
+                end_date=end_date,
                 priority=priority,
                 status=status,
+                assigned_to=assigned_to,
                 estimated_cost=estimated_cost,
-                dependencies=dependencies or [],
-                created_at=datetime.utcnow(),
+                capability_id=capability_id,
             )
-
-            # duration_days is a read-only computed property (derived from
-            # start_date/target_date) — do not assign it.
-            db.session.add(work_package)
+            for dependency_id in dependencies or []:
+                work_package_service.add_dependency(
+                    work_package.id, dependency_id, organization_id=org_id
+                )
             db.session.commit()
 
             return {
                 "success": True,
-                "work_package": work_package.to_dict(),
+                "work_package": work_package_service.to_dict(work_package),
                 "message": f"Work package '{name}' created successfully",
             }
 
@@ -164,8 +171,11 @@ class RoadmapBuilderService:
         Returns:
             Dict with updated work package
         """
+        org_id = current_organization_id()
         try:
-            work_package = db.session.get(ImplementationWorkPackage, work_package_id)
+            from flask_login import current_user
+
+            work_package = work_package_service.get_work_package(work_package_id, org_id)
             if not work_package:
                 return {"success": False, "error": "Work package not found"}
 
@@ -183,24 +193,31 @@ class RoadmapBuilderService:
                 "progress_percentage",
                 "risk_level",
                 "risk_mitigation",
-                "work_dependencies",
                 "prerequisites",
             ]
-
-            for field_name, value in updates.items():
-                if field_name in allowed_fields:
-                    setattr(work_package, field_name, value)
-
-            # Recalculate duration if dates changed
-            if "start_date" in updates or "end_date" in updates:
-                work_package.calculate_duration()
-
-            work_package.updated_at = datetime.utcnow()
+            fields = {k: v for k, v in updates.items() if k in allowed_fields}
+            work_package_service.update_work_package(
+                work_package_id,
+                organization_id=org_id,
+                user_id=current_user.id if current_user.is_authenticated else None,
+                **fields,
+            )
+            if "work_dependencies" in updates:
+                wanted = [int(d) for d in updates["work_dependencies"] or []]
+                for current in work_package_service.dependency_ids(work_package):
+                    if current not in wanted:
+                        work_package_service.remove_dependency(
+                            work_package_id, current, organization_id=org_id
+                        )
+                for dependency_id in wanted:
+                    work_package_service.add_dependency(
+                        work_package_id, dependency_id, organization_id=org_id
+                    )
             db.session.commit()
 
             return {
                 "success": True,
-                "work_package": work_package.to_dict(),
+                "work_package": work_package_service.to_dict(work_package),
                 "message": "Work package updated successfully",
             }
 
@@ -219,36 +236,22 @@ class RoadmapBuilderService:
         Returns:
             Dict with deletion result
         """
+        org_id = current_organization_id()
         try:
-            work_package = db.session.get(ImplementationWorkPackage, work_package_id)
+            work_package = work_package_service.get_work_package(work_package_id, org_id)
             if not work_package:
                 return {"success": False, "error": "Work package not found"}
 
-            # Remove this work package from dependencies of other work packages.
-            # dependencies is a db.JSON column; .contains() compiles to a SQL LIKE
-            # that Postgres rejects on json ("operator does not exist: json ~~ text"),
-            # so filter membership in Python.
-            dependent_packages = [
-                p
-                for p in ImplementationWorkPackage.query.filter(
-                    ImplementationWorkPackage.dependencies.isnot(None)
-                ).all()
-                if isinstance(p.dependencies, (list, tuple)) and work_package_id in p.dependencies
-            ]
-
-            for dep_pkg in dependent_packages:
-                if dep_pkg.dependencies:
-                    dep_pkg.dependencies = [
-                        d for d in dep_pkg.dependencies if d != work_package_id
-                    ]
-
-            db.session.delete(work_package)
+            # delete_work_package removes this id from the dependencies of the
+            # work packages that listed it.
+            dependents = work_package_service.dependents_of(work_package_id, org_id)
+            work_package_service.delete_work_package(work_package_id, organization_id=org_id)
             db.session.commit()
 
             return {
                 "success": True,
                 "message": f"Work package {work_package_id} deleted",
-                "affected_dependents": len(dependent_packages),
+                "affected_dependents": len(dependents),
             }
 
         except Exception as e:
@@ -266,31 +269,29 @@ class RoadmapBuilderService:
         Returns:
             Dict with work package details
         """
-        work_package = db.session.get(ImplementationWorkPackage, work_package_id)
+        org_id = current_organization_id()
+        work_package = work_package_service.get_work_package(work_package_id, org_id)
         if not work_package:
             return {"success": False, "error": "Work package not found"}
 
         # Get dependency details
         dependencies = []
-        if work_package.dependencies:
-            for dep_id in work_package.dependencies:
-                dep = db.session.get(ImplementationWorkPackage, dep_id)
-                if dep:
-                    dependencies.append(
-                        {
-                            "id": dep.id,
-                            "name": dep.name,
-                            "status": dep.status,
-                            "end_date": dep.end_date.isoformat() if dep.end_date else None,
-                        }
-                    )
+        for dep_id in work_package_service.dependency_ids(work_package):
+            dep = work_package_service.get_work_package(dep_id, org_id)
+            if dep:
+                dependencies.append(
+                    {
+                        "id": dep.id,
+                        "name": dep.name,
+                        "status": dep.status,
+                        "end_date": dep.end_date.isoformat() if dep.end_date else None,
+                    }
+                )
 
         # Get dependents (packages that depend on this one)
-        dependents = ImplementationWorkPackage.query.filter(
-            ImplementationWorkPackage.dependencies.contains([work_package_id])
-        ).all()
+        dependents = work_package_service.dependents_of(work_package_id, org_id)
 
-        result = work_package.to_dict()
+        result = work_package_service.to_dict(work_package)
         result["dependencies_detail"] = dependencies
         result["dependents"] = [
             {"id": d.id, "name": d.name, "status": d.status} for d in dependents
@@ -306,7 +307,7 @@ class RoadmapBuilderService:
         offset: int = 0,
     ) -> Dict[str, Any]:
         """
-        List work packages with optional filters.
+        List this organisation's work packages with optional filters.
 
         Args:
             status_filter: Filter by status
@@ -317,16 +318,18 @@ class RoadmapBuilderService:
         Returns:
             Dict with list of work packages
         """
-        query = ImplementationWorkPackage.query
+        from app.models.unified_work_package import UnifiedWorkPackage as UWP
+
+        query = work_package_service.query_for(current_organization_id())
 
         if status_filter:
-            query = query.filter_by(status=status_filter)
+            query = query.filter(UWP.status == status_filter)
         if priority_filter:
-            query = query.filter_by(priority=priority_filter)
+            query = query.filter(UWP.priority == priority_filter)
 
         total = query.count()
         work_packages = (
-            query.order_by(ImplementationWorkPackage.start_date.asc().nullsfirst())
+            query.order_by(UWP.start_date.asc().nullsfirst(), UWP.id.asc())
             .offset(offset)
             .limit(limit)
             .all()
@@ -334,7 +337,7 @@ class RoadmapBuilderService:
 
         return {
             "success": True,
-            "work_packages": [wp.to_dict() for wp in work_packages],
+            "work_packages": work_package_service.to_dicts(work_packages),
             "total": total,
             "limit": limit,
             "offset": offset,
@@ -354,29 +357,28 @@ class RoadmapBuilderService:
         if work_package_id == depends_on_id:
             return {"success": False, "error": "Cannot depend on itself"}
 
-        work_package = db.session.get(ImplementationWorkPackage, work_package_id)
-        depends_on = db.session.get(ImplementationWorkPackage, depends_on_id)
+        org_id = current_organization_id()
+        work_package = work_package_service.get_work_package(work_package_id, org_id)
+        depends_on = work_package_service.get_work_package(depends_on_id, org_id)
 
         if not work_package:
             return {"success": False, "error": "Work package not found"}
         if not depends_on:
             return {"success": False, "error": "Dependency work package not found"}
 
-        # Check for circular dependency
-        if self._would_create_cycle(work_package_id, depends_on_id):
-            return {"success": False, "error": "Would create circular dependency"}
-
-        # Add dependency
-        current_deps = work_package.dependencies or []
-        if depends_on_id not in current_deps:
-            current_deps.append(depends_on_id)
-            work_package.dependencies = current_deps
+        try:
+            work_package_service.add_dependency(
+                work_package_id, depends_on_id, organization_id=org_id
+            )
             db.session.commit()
+        except work_package_service.WorkPackageError:
+            db.session.rollback()
+            return {"success": False, "error": "Would create circular dependency"}
 
         return {
             "success": True,
             "message": f"Dependency added: {work_package.name} depends on {depends_on.name}",
-            "dependencies": work_package.dependencies,
+            "dependencies": work_package_service.dependency_ids(work_package),
         }
 
     def remove_dependency(self, work_package_id: int, depends_on_id: int) -> Dict[str, Any]:
@@ -390,44 +392,21 @@ class RoadmapBuilderService:
         Returns:
             Dict with result
         """
-        work_package = db.session.get(ImplementationWorkPackage, work_package_id)
+        org_id = current_organization_id()
+        work_package = work_package_service.get_work_package(work_package_id, org_id)
         if not work_package:
             return {"success": False, "error": "Work package not found"}
 
-        current_deps = work_package.dependencies or []
-        if depends_on_id in current_deps:
-            current_deps.remove(depends_on_id)
-            work_package.dependencies = current_deps
-            db.session.commit()
+        work_package_service.remove_dependency(
+            work_package_id, depends_on_id, organization_id=org_id
+        )
+        db.session.commit()
 
         return {
             "success": True,
             "message": "Dependency removed",
-            "dependencies": work_package.dependencies,
+            "dependencies": work_package_service.dependency_ids(work_package),
         }
-
-    def _would_create_cycle(self, work_package_id: int, depends_on_id: int) -> bool:
-        """Check if adding dependency would create a cycle."""
-        visited = set()
-
-        def has_path(from_id: int, to_id: int) -> bool:
-            if from_id == to_id:
-                return True
-            if from_id in visited:
-                return False
-            visited.add(from_id)
-
-            wp = db.session.get(ImplementationWorkPackage, from_id)
-            if not wp or not wp.dependencies:
-                return False
-
-            for dep_id in wp.dependencies:
-                if has_path(dep_id, to_id):
-                    return True
-            return False
-
-        # Check if depends_on can reach work_package (would create cycle)
-        return has_path(depends_on_id, work_package_id)
 
     # =========================================================================
     # Dependency Graph Generation (ReactFlow Compatible)
@@ -454,11 +433,14 @@ class RoadmapBuilderService:
         edges = []
 
         # Get work packages
-        query = ImplementationWorkPackage.query
-        if status_filter:
-            query = query.filter(ImplementationWorkPackage.status.in_(status_filter))
+        from app.models.unified_work_package import UnifiedWorkPackage as UWP
 
-        work_packages = query.order_by(ImplementationWorkPackage.start_date.asc()).all()
+        org_id = current_organization_id()
+        query = work_package_service.query_for(org_id)
+        if status_filter:
+            query = query.filter(UWP.status.in_(status_filter))
+
+        work_packages = query.order_by(UWP.start_date.asc().nullsfirst(), UWP.id.asc()).all()
 
         # Calculate layout positions using topological sort levels
         levels = self._calculate_topological_levels(work_packages)
@@ -473,7 +455,7 @@ class RoadmapBuilderService:
             # its fields (percent_complete, target_date, owner) to roadmap
             # names; reuse it here instead of reading attribute names the
             # model does not have.
-            row = wp.to_roadmap_dict()
+            row = work_package_service.to_roadmap_dict(wp, org_id)
             node_data = {
                 "label": wp.name,
                 "status": wp.status,
@@ -499,8 +481,9 @@ class RoadmapBuilderService:
             level_counts[level] += 1
 
             # Create edges for dependencies
-            if wp.dependencies:
-                for dep_id in wp.dependencies:
+            wp_deps = work_package_service.dependency_ids(wp)
+            if wp_deps:
+                for dep_id in wp_deps:
                     edges.append(
                         {
                             "id": f"e-{dep_id}-{wp.id}",
@@ -538,7 +521,7 @@ class RoadmapBuilderService:
         }
 
     def _calculate_topological_levels(
-        self, work_packages: List[ImplementationWorkPackage]
+        self, work_packages: List[Any]
     ) -> Dict[int, int]:
         """Calculate topological levels for layout."""
         levels = {}
@@ -554,7 +537,7 @@ class RoadmapBuilderService:
 
             visited.add(wp_id)
             wp = wp_map[wp_id]
-            deps = wp.dependencies or []
+            deps = work_package_service.dependency_ids(wp)
 
             if not deps:
                 level = 0
@@ -784,9 +767,13 @@ class RoadmapBuilderService:
         Returns:
             Dict with critical path analysis
         """
-        work_packages = ImplementationWorkPackage.query.filter(
-            ImplementationWorkPackage.status.notin_(["completed", "cancelled"])
-        ).all()
+        from app.models.unified_work_package import UnifiedWorkPackage as UWP
+
+        work_packages = (
+            work_package_service.query_for(current_organization_id())
+            .filter(UWP.status.notin_(["completed", "cancelled"]))
+            .all()
+        )
 
         if not work_packages:
             return {"success": True, "critical_path": [], "total_duration": 0}
@@ -808,15 +795,15 @@ class RoadmapBuilderService:
                 today = date.today()
                 return today, today
 
-            deps = wp.dependencies or []
+            deps = work_package_service.dependency_ids(wp)
             if not deps:
-                es = wp.start_date or date.today()
+                es = _as_date(wp.start_date) or date.today()
             else:
                 dep_finishes = []
                 for dep_id in deps:
                     _, ef = calc_earliest(dep_id)
                     dep_finishes.append(ef)
-                es = max(dep_finishes) if dep_finishes else (wp.start_date or date.today())
+                es = max(dep_finishes) if dep_finishes else (_as_date(wp.start_date) or date.today())
 
             duration = wp.duration_days or 30
             ef = es + timedelta(days=duration)
@@ -831,8 +818,7 @@ class RoadmapBuilderService:
         # Find end nodes (no dependents)
         all_deps = set()
         for wp in work_packages:
-            if wp.dependencies:
-                all_deps.update(wp.dependencies)
+            all_deps.update(work_package_service.dependency_ids(wp))
 
         end_nodes = [wp for wp in work_packages if wp.id not in all_deps]
 
@@ -853,7 +839,9 @@ class RoadmapBuilderService:
 
             # Find dependents
             dependents = [
-                w for w in work_packages if w.dependencies and wp_id in w.dependencies
+                w
+                for w in work_packages
+                if wp_id in work_package_service.dependency_ids(w)
             ]
 
             if not dependents:
@@ -938,24 +926,23 @@ class RoadmapBuilderService:
         Returns:
             Dict with timeline data
         """
-        query = ImplementationWorkPackage.query
+        from app.models.unified_work_package import UnifiedWorkPackage as UWP
+
+        org_id = current_organization_id()
+        query = work_package_service.query_for(org_id)
 
         if start_date:
             query = query.filter(
-                or_(
-                    ImplementationWorkPackage.start_date >= start_date,
-                    ImplementationWorkPackage.target_date >= start_date,
-                )
+                or_(UWP.start_date >= start_date, UWP.end_date >= start_date)
             )
         if end_date:
+            # A day-only end date includes that whole day.
+            end_bound = end_date + timedelta(days=1) if type(end_date) is date else end_date
             query = query.filter(
-                or_(
-                    ImplementationWorkPackage.start_date <= end_date,
-                    ImplementationWorkPackage.target_date <= end_date,
-                )
+                or_(UWP.start_date < end_bound, UWP.end_date < end_bound)
             )
 
-        work_packages = query.order_by(ImplementationWorkPackage.start_date.asc()).all()
+        work_packages = query.order_by(UWP.start_date.asc().nullsfirst(), UWP.id.asc()).all()
 
         # A fixed set rather than getattr on a query-string attribute name:
         # an unrecognised value (or a bound method like "to_dict") falls back
@@ -970,7 +957,7 @@ class RoadmapBuilderService:
             # its fields (percent_complete, target_date, owner, dependencies)
             # to roadmap names; reuse it here instead of reading attribute
             # names the model does not have.
-            row = wp.to_roadmap_dict()
+            row = work_package_service.to_roadmap_dict(wp, org_id)
             if effective_group_by == "assigned_to":
                 group_key = row["owner_name"] or "unassigned"
             elif effective_group_by == "priority":
@@ -1018,10 +1005,10 @@ class RoadmapBuilderService:
             "plateau_markers": plateau_markers,
             "date_range": {
                 "start": min(
-                    (wp.start_date for wp in work_packages if wp.start_date), default=None
+                    (_as_date(wp.start_date) for wp in work_packages if wp.start_date), default=None
                 ),
                 "end": max(
-                    (wp.target_date for wp in work_packages if wp.target_date), default=None
+                    (_as_date(wp.end_date) for wp in work_packages if wp.end_date), default=None
                 ),
             },
         }
@@ -1037,7 +1024,7 @@ class RoadmapBuilderService:
         Returns:
             Dict with summary statistics
         """
-        work_packages = ImplementationWorkPackage.query.all()
+        work_packages = work_package_service.query_for(current_organization_id()).all()
 
         status_counts = defaultdict(int)
         priority_counts = defaultdict(int)

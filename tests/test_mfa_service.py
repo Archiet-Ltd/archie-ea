@@ -21,8 +21,44 @@ class _FakeUser:
         self.mfa_enabled = False
 
 
-def test_required_for_is_false_for_an_ordinary_user():
-    assert mfa_service.required_for(_FakeUser()) is False
+def _make_plain_user(db_session, org):
+    """A real user with the default role and no OrgRole grant anywhere."""
+    from app.models.user import User
+
+    user = User(
+        email=f"plain-{uuid.uuid4().hex[:8]}@example.test",
+        organization_id=org.id,
+        confirmed=True,
+    )
+    user.password = uuid.uuid4().hex
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+def test_required_for_is_false_for_an_ordinary_user(app, db_session, make_org):
+    # required_for consults the database (is_org_admin_anywhere), so an
+    # ordinary user must be a real row inside an application context.
+    user = _make_plain_user(db_session, make_org("mfa-ordinary"))
+
+    assert mfa_service.required_for(user) is False
+
+
+def test_required_for_is_true_for_an_org_admin_of_only_a_non_active_org(
+    app, db_session, make_org
+):
+    """Fail-closed: no is_active filter on org-admin authority."""
+    from app.models.org_role import OrgRole
+
+    home_org = make_org("mfa-req-home")
+    deactivated_org = make_org("mfa-req-deactivated")
+    deactivated_org.is_active = False
+    db_session.commit()
+    user = _make_plain_user(db_session, home_org)
+    OrgRole.set_role(deactivated_org.id, user.id, "org_admin", granted_by_id=user.id)
+    db_session.commit()
+
+    assert mfa_service.required_for(user) is True
 
 
 def test_required_for_is_true_for_an_org_admin():

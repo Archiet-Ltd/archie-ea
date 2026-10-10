@@ -48,16 +48,60 @@ def _snake(name):
 
 
 def _check_access(solution, user=None):
-    """Verify current user can access this solution's workbench."""
+    """Verify current user can access this solution's workbench.
+
+    D-4 (admin-rbac-active-org continuation): the admin branch used to be
+    the bare ``user.is_admin()`` callable -- a global Permission.ADMINISTER
+    flag, independent of which organisation is active in the session. Since
+    every self-registered user is Administrator of their own organisation,
+    a user who merely accepted a Viewer invitation into another
+    organisation and switched their session into it could reach any
+    solution's codegen workbench there too, not just their own -- the exact
+    bug admin_required/org_admin_required already fix elsewhere in this PR.
+
+    Re-derived against ``solution.organization_id`` (the solution this call
+    is actually about) rather than ``g.current_org_id``, both because this
+    function (like solution_design_routes.py's own ``_check_solution_access``)
+    must also work with no request context at all, and because
+    tests/test_solution_codegen_access_agreement.py exercises it with a bare
+    duck-typed user object (no ``.role``/``.can()``/``.organization_id``).
+
+    R2-6 (PR 428 round 3): the richer check used to DEGRADE TO THE LEGACY
+    GLOBAL ``is_admin()`` ANSWER (``return True``) whenever it could not be
+    made -- the solution has no ``organization_id``, the user object has
+    none either, or ``rbac_service.is_org_admin`` raised. That is fail
+    OPEN: any holder of the global ADMINISTER flag was admitted to a
+    solution's codegen workbench the active organisation had no
+    relationship to at all, the moment either input was missing or the
+    lookup errored. Fails closed instead (mirrors the matching fix in
+    solution_design_routes.py's ``_check_solution_access``): when the
+    richer check cannot be made, this branch grants nothing and falls
+    through to the ``is_platform_admin``/stakeholder-email checks below.
+    """
     user = user if user is not None else current_user
     if not user.is_authenticated:
         return False
-    is_admin = getattr(user, "is_admin", False)
-    if (is_admin() if callable(is_admin) else bool(is_admin)):
-        return True
-    if getattr(user, "is_platform_admin", False):
-        return True
     if getattr(solution, "created_by_id", None) == user.id:
+        return True
+    is_admin_attr = getattr(user, "is_admin", False)  # is-admin-called-ok: called via callable() just below, not left bare
+    is_admin = is_admin_attr() if callable(is_admin_attr) else bool(is_admin_attr)
+    if is_admin:
+        try:
+            from app.services.rbac_service import rbac_service
+
+            org_id = getattr(solution, "organization_id", None)
+            if (
+                org_id is not None
+                and hasattr(user, "organization_id")
+                and rbac_service.is_org_admin(user, org_id)
+            ):
+                return True
+        except Exception:  # noqa: BLE001 - fail closed; fall through below
+            logger.exception(
+                "is_org_admin check failed in codegen._check_access; "
+                "denying the admin-branch grant rather than degrading to it"
+            )
+    if getattr(user, "is_platform_admin", False):
         return True
     stakeholder_emails = (
         getattr(solution, "solution_owner", None),
@@ -5510,7 +5554,11 @@ def _enrich_background(app_ctx, solution_id):
                 except Exception:
                     logger.critical("[enrich_bg] all status persistence attempts failed for solution %d", solution_id)
 
-    with app_ctx:
+    from app.jobs.tenant_safe_job import organization_id_of, tenant_scope
+
+    # A new thread has no request and so no session organisation; do the work as
+    # the organisation that owns the solution.
+    with app_ctx, tenant_scope(organization_id_of(Solution, solution_id)):
         _run()
 
 
