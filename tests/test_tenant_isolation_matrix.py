@@ -413,9 +413,6 @@ KNOWN_LEAKS = {
     "DELETE /api/v1/mappings/unified-to-application/<int:mapping_id>": "capability store brief",
     "DELETE /api/v1/mappings/unified-to-vendor-org/<int:mapping_id>": "capability store brief",
     "DELETE /capability-map/api/archimate-mappings/<int:mapping_id>": "capability store brief",
-    "DELETE /consolidation-list/api/entry/<int:entry_id>": _PR258,
-    "PUT /consolidation-list/api/entry/<int:entry_id>": _PR258,
-    "GET /consolidation-list/api/entry/<int:entry_id>/detail": _PR258,
     # PR 220 and PR 218 landed (verified: test_known_leak_is_still_open was
     # XPASS(strict) on every one of these 14 routes) -- all proven, not
     # leaking, so their entries come out rather than mask a real regression.
