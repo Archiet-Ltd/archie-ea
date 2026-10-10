@@ -694,11 +694,13 @@ class IntelligenceQueryService:
         direction: str = "downstream",
         layer: Optional[str] = None,
         with_owner: bool = True,
+        cursor: Optional[int] = None,
+        page_size: Optional[int] = None,
     ) -> Dict[str, Any]:
         if direction not in VALID_DIRECTIONS:
             raise ValueError(f"direction must be one of {sorted(VALID_DIRECTIONS)}")
-        if not (1 <= max_depth <= 5):
-            raise ValueError("max_depth must be between 1 and 5")
+        if not (1 <= max_depth <= 10):
+            raise ValueError("max_depth must be between 1 and 10")
 
         org_id = current_org_id()
 
@@ -840,6 +842,9 @@ class IntelligenceQueryService:
                         # this block (the block carries its own reason).
                         if elements.get(str(row["element_id"]), {}).get("type") == "Capability":
                             row["maturity"] = maturity_by_element[row["element_id"]]
+                            row["health"] = maturity_by_element[row["element_id"]]
+                        else:
+                            row["health"] = None
                         # NEW-5: keep element_id on every row -- this task's
                         # whole point is "what stops", so a row that cannot
                         # name what element it is about is not answering the
@@ -872,12 +877,28 @@ class IntelligenceQueryService:
                     maturity_flags = _maturity_flags(NO_CAPABILITY_IN_CHAIN_REASON, maturity_by_element)
 
         summary["latency_ms"] = scope.latency_ms
+
+        # Stable pagination: preserve canonical walk order (explicit rows
+        # first in BFS order, then derived rows).  The cursor is a 0-based
+        # index into the full unpaginated list; next_cursor is the index of
+        # the first row that would appear on the next page.
+        total = len(rows)
+        next_cursor = None
+        if page_size is not None and page_size > 0:
+            slice_start = cursor if cursor is not None else 0
+            page = rows[slice_start : slice_start + page_size]
+            if slice_start + page_size < total:
+                next_cursor = slice_start + page_size
+            rows = page
+
         return {
             "rows": rows,
             "summary": summary,
             "reasons": reasons,
             "elements": elements,
             "maturity_flags": maturity_flags,
+            "total": total,
+            "next_cursor": next_cursor,
         }
 
     @staticmethod
