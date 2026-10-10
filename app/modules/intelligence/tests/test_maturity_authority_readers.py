@@ -341,11 +341,10 @@ class TestEngineMaturityReadsGoThroughTheHelper:
 
     # The only files allowed to call the strict, capability-id-keyed
     # accessor directly. This list can only shrink: query_service.py's
-    # value_streams_at_risk is repointed onto the batched helper by a later
-    # task, at which point only capability_heatmap_service.py remains.
+    # value_streams_at_risk was repointed onto the batched helper, so only
+    # capability_heatmap_service.py remains.
     ACCESSOR_CALLERS = {
         "app/modules/capabilities/services/capability_heatmap_service.py",
-        "app/modules/intelligence/services/query_service.py",
     }
 
     def test_no_engine_reads_the_authority_columns_or_the_source_accessors_directly(self):
@@ -389,6 +388,26 @@ class TestEngineMaturityReadsGoThroughTheHelper:
             f"CapabilityHeatmapService.maturity_for_elements / "
             f".maturity_for_capability_ids instead: {hits}"
         )
+
+    def test_accessor_callers_list_names_no_stale_entry(self):
+        """ACCESSOR_CALLERS is an allow-list, not a record of history -- an
+        entry that no longer calls the strict accessor (because a later
+        change repointed it onto the batched helper, as query_service.py's
+        value_streams_at_risk was) silently widens what the test above
+        actually enforces without anyone noticing. Pins that every listed
+        caller still earns its place."""
+        pattern = re.compile(r"UnifiedCapability\.maturity_for_capability_ids\(")
+        for rel in self.ACCESSOR_CALLERS:
+            path = REPO_ROOT / rel
+            text = path.read_text(encoding="utf-8")
+            calls = [
+                line for line in text.splitlines()
+                if not line.strip().startswith("#") and pattern.search(line)
+            ]
+            assert calls, (
+                f"{rel} is listed in ACCESSOR_CALLERS but no longer calls "
+                "the strict accessor -- drop it from the list"
+            )
 
 
 class TestCapabilityMaturityAssessmentHistorySurvives:

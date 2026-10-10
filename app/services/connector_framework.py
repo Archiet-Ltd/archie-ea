@@ -1,14 +1,19 @@
 """
 Connector Framework
 
-Templated adapter framework for enterprise system integration with:
-- Field mapping DSL for API transformations
-- Event-driven sync (Kafka bus)
-- Batch ETL for historical data + webhook incremental sync
-- Reconciliation workflows with canonical IDs and fuzzy matching
-- Sub - 24h batch sync, <1min event updates
+Scaffolding for mapping records from an external system into this
+platform's shape:
+- FieldMapping: a DSL for per-field API-response transformations
+- BaseConnector: the interface each connector implements (test_connection,
+  batch_sync, incremental_sync)
+- ConnectorManager: registers connector instances and runs their sync
+  methods
 
-Priority Connectors: ServiceNow CMDB, Jira ALM, Datadog APM
+Not implemented: no connector in app/connectors/ is ever registered with
+ConnectorManager, and none of them persist a fetched/mapped record anywhere.
+There is no Kafka bus, no webhook-driven incremental sync, and no
+reconciliation or fuzzy-matching layer -- this module provides only the
+field-mapping scaffolding those would sit on.
 """
 
 import logging

@@ -17,17 +17,21 @@ All 40 routes preserved exactly from v1 dashboard_pages_routes.py.
 
 import logging
 
+from werkzeug.exceptions import HTTPException
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 from app.modules.dashboard.v2.services import (
     ApplicationConsolidationService,
     CapabilityHeatmapService,
     RationalizationScoringService,
 )
+from app.services import scoring_configuration_service
+from app.services.application_cost_accessor import set_annual_cost
 from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
@@ -702,59 +706,36 @@ def get_scoring_configuration(config_id):
 @dashboard_pages_bp_v2.route("/api/scoring-configurations", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @audit_log("scoring_configuration_create")
 def create_scoring_configuration():
-    """Create a new scoring configuration."""
+    """Create a new scoring configuration.
+
+    ScoringConfiguration carries no organization_id of its own -- it is a
+    platform-wide table (scope_type/scope_entity_id exist as a business-unit
+    label, not a tenant fence) -- and creating one with is_default=True
+    unsets every other configuration's is_default flag, changing the
+    fallback weights every organisation's application-rationalization view
+    uses. Platform-admin-only, matching the write-gating already applied to
+    the other shared, tenant-less config tables (feature flags, persona
+    prompts, sidebar/editor content, vendor pricing)."""
     try:
-        from app.models.application_rationalization import ScoringConfiguration
         from app.extensions import db
 
         data = request.get_json()
         if not data:
             return jsonify({"success": False, "error": "No data provided"}), 400
 
-        total_weight = (
-            data.get("technical_health_weight", 30)
-            + data.get("business_value_weight", 35)
-            + data.get("cost_efficiency_weight", 25)
-            + data.get("vendor_risk_weight", 10)
-        )
-        if total_weight != 100:
-            return jsonify(
-                {
-                    "success": False,
-                    "error": f"Weights must sum to 100, got {total_weight}",
-                }
-            ), 400
-
-        config = ScoringConfiguration(
-            name=data.get("name"),
-            description=data.get("description"),
-            scope_type=data.get("scope_type", "business_unit"),
-            scope_entity_id=data.get("scope_entity_id"),
-            scope_entity_type=data.get("scope_entity_type"),
-            technical_health_weight=data.get("technical_health_weight", 30),
-            business_value_weight=data.get("business_value_weight", 35),
-            cost_efficiency_weight=data.get("cost_efficiency_weight", 25),
-            vendor_risk_weight=data.get("vendor_risk_weight", 10),
-            eliminate_threshold=data.get("eliminate_threshold", 40),
-            migrate_technical_threshold=data.get("migrate_technical_threshold", 40),
-            migrate_business_threshold=data.get("migrate_business_threshold", 50),
-            invest_business_threshold=data.get("invest_business_threshold", 70),
-            invest_technical_threshold=data.get("invest_technical_threshold", 50),
-            tolerate_min_threshold=data.get("tolerate_min_threshold", 40),
-            is_default=data.get("is_default", False),
-        )
-
-        if config.is_default:
-            ScoringConfiguration.query.filter_by(is_default=True).update(
-                {"is_default": False}
-            )
-
-        db.session.add(config)
-        db.session.commit()
-
+        config = scoring_configuration_service.create_scoring_configuration(data)
         return jsonify({"success": True, "data": config.to_dict()}), 201
+    except scoring_configuration_service.ScoringConfigurationError as e:
+        return jsonify({"success": False, "error": e.message}), e.status_code
+    except HTTPException:
+        # The service's defence-in-depth guard raises Forbidden (HTTPException)
+        # when a caller somehow reaches it without the route's own decorator
+        # refusing them first -- let it answer 403, not fall into the bare
+        # except below and become a logged 500 with a rollback (pr324-review-v1 nit 1).
+        raise
     except Exception as e:
         logger.error(f"Error creating scoring configuration: {e}", exc_info=True)
         from app.extensions import db
@@ -768,68 +749,26 @@ def create_scoring_configuration():
 )
 @timed_route
 @login_required
+@platform_admin_required
 @audit_log("scoring_configuration_update")
 def update_scoring_configuration(config_id):
-    """Update an existing scoring configuration."""
+    """Update an existing scoring configuration. Platform-admin-only -- see
+    create_scoring_configuration's docstring."""
     try:
-        from app.models.application_rationalization import ScoringConfiguration
-        from app.extensions import db
-
-        config = ScoringConfiguration.query.get(config_id)
-        if not config:
-            return jsonify({"success": False, "error": "Configuration not found"}), 404
-
         data = request.get_json()
         if not data:
             return jsonify({"success": False, "error": "No data provided"}), 400
 
-        if "name" in data:
-            config.name = data["name"]
-        if "description" in data:
-            config.description = data["description"]
-        if "technical_health_weight" in data:
-            config.technical_health_weight = data["technical_health_weight"]
-        if "business_value_weight" in data:
-            config.business_value_weight = data["business_value_weight"]
-        if "cost_efficiency_weight" in data:
-            config.cost_efficiency_weight = data["cost_efficiency_weight"]
-        if "vendor_risk_weight" in data:
-            config.vendor_risk_weight = data["vendor_risk_weight"]
-
-        if any(
-            k in data
-            for k in [
-                "technical_health_weight",
-                "business_value_weight",
-                "cost_efficiency_weight",
-                "vendor_risk_weight",
-            ]
-        ):
-            is_valid, error = config.validate_weights()
-            if not is_valid:
-                return jsonify({"success": False, "error": error}), 400
-
-        for threshold in [
-            "eliminate_threshold",
-            "migrate_technical_threshold",
-            "migrate_business_threshold",
-            "invest_business_threshold",
-            "invest_technical_threshold",
-            "tolerate_min_threshold",
-        ]:
-            if threshold in data:
-                setattr(config, threshold, data[threshold])
-
-        if data.get("is_default") and not config.is_default:
-            ScoringConfiguration.query.filter_by(is_default=True).update(
-                {"is_default": False}
-            )
-            config.is_default = True
-
-        config.configuration_version += 1
-        db.session.commit()
-
+        config = scoring_configuration_service.update_scoring_configuration(config_id, data)
         return jsonify({"success": True, "data": config.to_dict()})
+    except scoring_configuration_service.ScoringConfigurationError as e:
+        return jsonify({"success": False, "error": e.message}), e.status_code
+    except HTTPException:
+        # The service's defence-in-depth guard raises Forbidden (HTTPException)
+        # when a caller somehow reaches it without the route's own decorator
+        # refusing them first -- let it answer 403, not fall into the bare
+        # except below and become a logged 500 with a rollback (pr324-review-v1 nit 1).
+        raise
     except Exception as e:
         logger.error(f"Error updating scoring configuration: {e}", exc_info=True)
         from app.extensions import db
@@ -843,26 +782,22 @@ def update_scoring_configuration(config_id):
 )
 @timed_route
 @login_required
+@platform_admin_required
 @audit_log("scoring_configuration_delete")
 def delete_scoring_configuration(config_id):
-    """Soft delete a scoring configuration."""
+    """Soft delete a scoring configuration. Platform-admin-only -- see
+    create_scoring_configuration's docstring."""
     try:
-        from app.models.application_rationalization import ScoringConfiguration
-        from app.extensions import db
-
-        config = ScoringConfiguration.query.get(config_id)
-        if not config:
-            return jsonify({"success": False, "error": "Configuration not found"}), 404
-
-        if config.is_default:
-            return jsonify(
-                {"success": False, "error": "Cannot delete default configuration"}
-            ), 400
-
-        config.is_active = False
-        db.session.commit()
-
+        scoring_configuration_service.delete_scoring_configuration(config_id)
         return jsonify({"success": True, "message": "Configuration deleted"})
+    except scoring_configuration_service.ScoringConfigurationError as e:
+        return jsonify({"success": False, "error": e.message}), e.status_code
+    except HTTPException:
+        # The service's defence-in-depth guard raises Forbidden (HTTPException)
+        # when a caller somehow reaches it without the route's own decorator
+        # refusing them first -- let it answer 403, not fall into the bare
+        # except below and become a logged 500 with a rollback (pr324-review-v1 nit 1).
+        raise
     except Exception as e:
         logger.error(f"Error deleting scoring configuration: {e}", exc_info=True)
         from app.extensions import db
@@ -1096,8 +1031,8 @@ def api_rationalization_onboard():
             description=data.get("description"),
             application_type=data.get("type"),
             lifecycle_status=data.get("lifecycle_status", "planning"),
-            total_cost_of_ownership=data.get("annual_cost"),
         )
+        set_annual_cost(app, data.get("annual_cost"))
         db.session.add(app)
         db.session.flush()
 

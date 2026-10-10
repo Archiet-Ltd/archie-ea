@@ -29,6 +29,7 @@ from app.models.unified_capability import UnifiedCapability
 from app.modules.my_applications.services import has_assigned_owner
 from app.security.import_decorators import with_import_security
 from app.utils.pagination import safe_int_arg
+from app.utils.tenant_users import escape_like_literal
 
 # Import performance utilities (conditionally available)  # dead-code-ok
 try:
@@ -69,11 +70,6 @@ _LIFECYCLE_ABACUS_CODES = (
     "4.4 STOPPED",
     "5. DECOMMISSIONED",
 )
-
-
-def _escape_like(value):
-    """Escape SQL LIKE wildcards (%, _) to prevent data enumeration."""
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 @unified_applications_bp.route("/roadmap")
@@ -212,8 +208,27 @@ def application_list():
         show_all_override = False
         _user_bu_id = getattr(current_user, "business_unit_id", None)  # model-safety-ok
         _bu_all_requested = request.args.get("bu", "").strip().lower() == "all"
-        if _bu_all_requested and hasattr(current_user, "is_admin") and current_user.is_admin():
-            show_all_override = True
+        # D-4 (admin-rbac-active-org continuation): this used to be
+        # ``hasattr(current_user, "is_admin") and current_user.is_admin()`` --
+        # a global Permission.ADMINISTER flag, independent of which
+        # organisation is active in the session. Since every self-registered
+        # user is Administrator of their own organisation, a user who merely
+        # accepted a Viewer invitation into another organisation and switched
+        # their session into it could use ?bu=all to see every business
+        # unit's applications there too, not just their own BU's -- the exact
+        # bug admin_required/org_admin_required already fix elsewhere in this
+        # PR.
+        if _bu_all_requested:
+            from flask import g
+
+            from app.middleware.tenant_decorators import is_platform_admin
+            from app.services.rbac_service import rbac_service
+
+            _active_org_id = getattr(g, "current_org_id", None)
+            if is_platform_admin(current_user) or rbac_service.is_org_admin(
+                current_user, _active_org_id
+            ):
+                show_all_override = True
         elif _user_bu_id:
             # Resolve the BU actor name for the indicator label
             try:
@@ -260,7 +275,7 @@ def application_list():
             ).filter(ApplicationBusinessActorMapping.business_actor_id == _user_bu_id)
 
         if search:
-            safe_search = f"%{_escape_like(search)}%"
+            safe_search = f"%{escape_like_literal(search)}%"
             query = query.filter(
                 ApplicationComponent.name.ilike(safe_search, escape="\\")
                 | ApplicationComponent.description.ilike(safe_search, escape="\\")
@@ -568,7 +583,7 @@ def api_list():
         # Base query — exclude decommissioned when searching for picker use
         query = ApplicationComponent.query
         if search:
-            safe_search = f"%{_escape_like(search)}%"
+            safe_search = f"%{escape_like_literal(search)}%"
             query = query.filter(ApplicationComponent.name.ilike(safe_search, escape="\\"))
 
         if status_filter:
@@ -684,7 +699,7 @@ def api_table_data():
 
         # Apply filters
         if search:
-            safe_search = f"%{_escape_like(search)}%"
+            safe_search = f"%{escape_like_literal(search)}%"
             query = query.filter(
                 ApplicationComponent.name.ilike(safe_search, escape="\\")
                 | ApplicationComponent.description.ilike(safe_search, escape="\\")
@@ -711,7 +726,7 @@ def api_table_data():
             fallback_query = ApplicationComponent.query
 
             if search:
-                safe_search = f"%{_escape_like(search)}%"
+                safe_search = f"%{escape_like_literal(search)}%"
                 fallback_query = fallback_query.filter(
                     ApplicationComponent.name.ilike(safe_search, escape="\\")
                     | ApplicationComponent.description.ilike(safe_search, escape="\\")

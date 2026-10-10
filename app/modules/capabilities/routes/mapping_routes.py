@@ -132,9 +132,9 @@ def api_applications():
 def api_capabilities():
     """Capabilities summary with statistics for the network view."""
     try:
-        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.limit(500).all()
+        capabilities = UnifiedCapability.query.limit(500).all()
 
         # Group by L1 capabilities as domain proxies
         domain_stats = []
@@ -162,8 +162,8 @@ def api_capabilities():
                 "name": c.name,
                 "code": getattr(c, 'code', '') or '',
                 "level": getattr(c, 'level', 1),
-                "domain_id": None,
-                "category": getattr(c, 'category', '') or getattr(c, 'business_domain', '') or '',
+                "domain_id": c.domain_id,
+                "category": getattr(c, 'category', '') or (c.domain.name if c.domain else '') or '',
                 "description": getattr(c, 'description', '') or "",
                 "parent_id": getattr(c, 'parent_capability_id', None),
             }
@@ -191,10 +191,10 @@ def api_capabilities_tree():
     """Hierarchical capability tree with gap coverage indicators."""
     try:
         import re as _re
-        from app.models.business_capability import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.order_by(
-            BusinessCapability.level, BusinessCapability.name
+        capabilities = UnifiedCapability.query.order_by(
+            UnifiedCapability.level, UnifiedCapability.name
         ).all()
         if not capabilities:
             return jsonify({"tree": [], "total": 0})
@@ -354,27 +354,43 @@ def api_capabilities_semantic_search():
 @capability_map.route("/api/capabilities/create-missing", methods=["POST"])
 @login_required
 def api_capabilities_create_missing():
-    """Create a capability not in the catalog."""
+    """Create a capability not in the catalog.
+
+    Writes through ensure_capability_record (the single creator for
+    UnifiedCapability) so the map's add/edit controls never write to
+    BusinessCapability directly.
+    """
     try:
-        from app.models.business_capability import BusinessCapability
+        from app.modules.capabilities.services.capability_service import (
+            ensure_capability_record,
+        )
         data = request.get_json(silent=True) or {}
         name = (data.get("name") or "").strip()
         if not name:
             return jsonify({"error": "Name is required"}), 400
 
-        existing = BusinessCapability.query.filter(
-            db.func.lower(BusinessCapability.name) == name.lower()
-        ).first()
-        if existing:
-            return jsonify({"capability": {"id": existing.id, "name": existing.name,
-                                           "level": existing.level}, "created": False})
-
-        cap = BusinessCapability(name=name, level=data.get("level", 2),
-                                 description=data.get("description", ""))
-        db.session.add(cap)
+        cap, created = ensure_capability_record(
+            name=name,
+            level=data.get("level", 2),
+            description=data.get("description", ""),
+            code=data.get("code"),
+            domain_id=data.get("domain_id"),
+            category=data.get("category"),
+            capability_type=data.get("capability_type"),
+            parent_capability_id=data.get("parent_capability_id"),
+            specialization_type=data.get("specialization_type", "BUSINESS"),
+        )
         db.session.commit()
-        return jsonify({"capability": {"id": cap.id, "name": cap.name,
-                                       "level": cap.level}, "created": True})
+        return jsonify(
+            {
+                "capability": {
+                    "id": cap.id,
+                    "name": cap.name,
+                    "level": cap.level,
+                },
+                "created": created,
+            }
+        )
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -1700,7 +1716,7 @@ def api_apqc_suggestions():
     and an appropriate child level (L3-L5).
     """
     try:
-        from app.models.apqc_process import APQCProcess, CapabilityProcessMapping
+        from app.models.apqc_process import APQCProcess
         from app.models.business_capabilities import BusinessCapability
 
         apqc_processes = APQCProcess.query.all()
@@ -1712,10 +1728,19 @@ def api_apqc_suggestions():
             tokens = _tokenize(cap.name) | _tokenize(cap.business_domain) | _tokenize(cap.category)
             cap_tokens.append((cap, tokens))
 
-        # Find APQC processes that are already linked
+        # Find APQC processes that are already linked. Column-only selects
+        # are not covered by the ambient tenant listener (unlike the
+        # `BusinessCapability.query.all()` above, which is), and
+        # CapabilityProcessMapping has no organization_id of its own --
+        # another organisation's linked processes would otherwise be
+        # excluded from this organisation's suggestions (pr306-v2 review,
+        # DEFECT D5).
+        from app.services.apqc_mapping_tenant_fence import (
+            fenced_capability_mappings_query,
+        )
+
         existing_links = {
-            m.apqc_process_id
-            for m in db.session.query(CapabilityProcessMapping.apqc_process_id).all()
+            m.apqc_process_id for m in fenced_capability_mappings_query().all()
         }
 
         suggestions = []
@@ -1895,8 +1920,19 @@ def api_apqc_link():
         if not parent_cap:
             return jsonify({"error": f"Capability {capability_id} not found"}), 404
 
-        # Check for existing mapping
-        existing = CapabilityProcessMapping.query.filter_by(apqc_process_id=apqc_id).first()
+        # Check for existing mapping. CapabilityProcessMapping has no
+        # organization_id of its own; unfenced, this returned another
+        # organisation's existing_capability_id in the 409 body (pr306-v2
+        # review, DEFECT-1). apqc_process_id is a shared reference id, so
+        # scope the duplicate check to the caller's own organisation's
+        # capabilities the same way the other routes in this file do.
+        from app.services.apqc_mapping_tenant_fence import (
+            fenced_capability_mappings_query,
+        )
+
+        existing = fenced_capability_mappings_query().filter(
+            CapabilityProcessMapping.apqc_process_id == apqc_id
+        ).first()
         if existing:
             return (
                 jsonify(

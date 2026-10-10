@@ -4,8 +4,8 @@
 audit_log_viewer) queries only AuditLog. ARBAuditService recorded governance
 decisions into ARBAuditLog, a table that page never reads, so "who approved
 this change" was unanswerable there for ARB decisions even though the data
-existed. ARBAuditService.log_action now mirrors DECISION and
-EXCEPTION_DECISION actions onto AuditLog.
+existed. Every ARBAuditLog row is now copied onto AuditLog (the model's
+insert hook), decisions included.
 
 Uses the shared fixtures (tests/conftest.py) per CLAUDE.md's convention.
 """
@@ -101,9 +101,14 @@ def test_arb_decision_mirrors_into_compliance_audit_log(db_session, tenant_ctx):
         assert mirrored[0].new_value["new_value"]["decision"] == "approved_with_conditions"
 
 
-def test_arb_non_decision_action_is_not_mirrored(db_session, tenant_ctx):
-    """Only decision-recording actions mirror — routine field updates stay
-    in ARBAuditLog only, per the task's instruction not to widen scope."""
+def test_arb_routine_action_is_copied_with_provenance(db_session, tenant_ctx):
+    """Every ARB action reaches the one audit store, not only decisions.
+
+    This used to assert the opposite (routine updates stayed in ARBAuditLog
+    only). The audit trail must be complete, so every ARBAuditLog row is now
+    copied into AuditLog with source_table/source_id, and the source row
+    points at its copy through retired_into_id.
+    """
     from app.services.arb_audit_service import ARBAuditService
     from app.models.audit_log import AuditLog
 
@@ -114,7 +119,7 @@ def test_arb_non_decision_action_is_not_mirrored(db_session, tenant_ctx):
         item = _make_review_item(db_session, org.id, reviewer.id)
 
         service = ARBAuditService()
-        service.log_action(
+        source = service.log_action(
             entity_type="review_item",
             entity_id=item.id,
             action="update",
@@ -129,4 +134,10 @@ def test_arb_non_decision_action_is_not_mirrored(db_session, tenant_ctx):
         mirrored = AuditLog.query.filter_by(
             organization_id=org.id, user_id=reviewer.id, action="update"
         ).filter(AuditLog.table_name == "arb:review_item", AuditLog.record_id == item.id).all()
-        assert mirrored == []
+        assert len(mirrored) == 1
+        copy = mirrored[0]
+        assert copy.source_table == "arb_audit_logs"
+        assert copy.source_id == source.id
+        assert copy.old_value == {"title": "old"}
+        assert copy.row_hash is not None
+        assert source.retired_into_id == copy.id

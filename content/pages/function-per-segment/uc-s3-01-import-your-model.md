@@ -5,7 +5,7 @@ segment_id: S3
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /enterprise-architecture/import
+url_slug: /use-cases/import-archimate-model
 ---
 
 # Import our existing Archi or Open Exchange model and keep working
@@ -27,4 +27,3 @@ and when. Everything lands in one element browser, across every ArchiMate layer,
 ## Related
 
 - [Architecture Model](/modules/architecture-model)
-- [Bring our LeanIX or Ardoq fact sheets across](/enterprise-architecture/leanix-ardoq-import)

@@ -35,6 +35,14 @@ from app.modules.intelligence.services.reason_codes import validate_reason_code
 
 VALID_DIRECTIONS = {"downstream", "upstream", "both"}
 
+VALUE_STREAM_RISK_REASONS = frozenset(
+    {
+        "capability_below_threshold",
+        "capability_under_target",
+        "capability_unassessed",
+    }
+)
+
 NO_OWNERSHIP_REASON = validate_reason_code("no_ownership_recorded")
 NO_TENANT_CONTEXT_REASON = validate_reason_code("no_tenant_context")
 ELEMENT_NOT_FOUND_REASON = validate_reason_code("element_not_found")
@@ -58,6 +66,12 @@ CAPACITY_NOT_AVAILABLE_REASON = validate_reason_code("capacity_not_available")
 # Distinct from a "decision pending" state -- the ownership data source IS
 # decided; what doesn't exist yet is a shared, tenant-safe reader for it.
 OWNERSHIP_READER_NOT_BUILT_REASON = validate_reason_code("ownership_reader_not_built")
+NO_DATA_RECORDED_REASON = validate_reason_code("no_data_recorded")
+NO_STEWARD_RECORDED_REASON = validate_reason_code("no_steward_recorded")
+NO_LINEAGE_RECORDED_REASON = validate_reason_code("no_lineage_recorded")
+NO_COMPLIANCE_CONTROLS_RECORDED_REASON = validate_reason_code("no_compliance_controls_recorded")
+NO_CONTROL_EVIDENCE_REASON = validate_reason_code("no_control_evidence")
+NO_POLICY_SCAN_RECORDED_REASON = validate_reason_code("no_policy_scan_recorded")
 # The programme lens's own plateau/gap block: a work package's stored
 # plateau_id/gap_id may be unset (a nullable FK) or point at a record
 # outside the caller's tenant (the FK itself carries no tenant check, so the
@@ -66,6 +80,18 @@ OWNERSHIP_READER_NOT_BUILT_REASON = validate_reason_code("ownership_reader_not_b
 NO_PLATEAU_RECORDED_REASON = validate_reason_code("no_plateau_recorded")
 NO_GAP_RECORDED_REASON = validate_reason_code("no_gap_recorded")
 NO_CAPABILITY_IN_CHAIN_REASON = validate_reason_code("no_capability_in_chain")
+# The component block's three independent absence conditions -- no cost
+# figures entered, no owner-recorded health status, no licence entitlement
+# rows -- each distinct from NO_APPLICATION_COMPONENT_REASON above (which
+# means no component was resolved at all).
+NO_COST_RECORDED_REASON = validate_reason_code("no_cost_recorded")
+NO_HEALTH_RECORDED_REASON = validate_reason_code("no_health_recorded")
+NO_LICENCE_RECORDED_REASON = validate_reason_code("no_licence_recorded")
+# A licence whose usage has never been synced from the source system carries
+# quantity_used at its column default of zero -- comparing that default
+# against quantity_entitled would report an invented under-use finding, not
+# a measurement, so under_used is withheld with this reason instead.
+LICENCE_USAGE_NOT_SYNCED_REASON = validate_reason_code("licence_usage_not_synced")
 
 # T-005 (D1): the NFR-5 measurement point is this exact, PINNED series --
 # never widened, never aggregated across label values.
@@ -99,6 +125,24 @@ def _sec09_tenant_check(component_org_id: Optional[int], org_id: int) -> bool:
     source under test.
     """
     return component_org_id == org_id
+
+
+def _licence_tenant_predicate(org_id: int):
+    """The explicit ``LicenseEntitlement.organization_id ==`` predicate on
+    the portfolio component block's licence read, isolated as its own seam
+    -- the same pattern as ``_sec09_tenant_check`` above -- so a mutation
+    test can replace it and watch the cross-tenant licence test go red.
+
+    ``LicenseEntitlement`` carries ``TenantMixin`` so the ORM listener
+    already fences a normal request; the FK from ``license_entitlements``
+    to ``application_components`` carries no tenant check of its own,
+    though, so this predicate is what keeps the read correct when called
+    with no ambient request context (a job, a CLI command, a test looping
+    tenants in one session), where the listener would otherwise no-op.
+    """
+    from app.models.license_entitlement import LicenseEntitlement
+
+    return LicenseEntitlement.organization_id == org_id
 
 
 def _resolve_owners_batch(
@@ -650,11 +694,13 @@ class IntelligenceQueryService:
         direction: str = "downstream",
         layer: Optional[str] = None,
         with_owner: bool = True,
+        cursor: Optional[int] = None,
+        page_size: Optional[int] = None,
     ) -> Dict[str, Any]:
         if direction not in VALID_DIRECTIONS:
             raise ValueError(f"direction must be one of {sorted(VALID_DIRECTIONS)}")
-        if not (1 <= max_depth <= 5):
-            raise ValueError("max_depth must be between 1 and 5")
+        if not (1 <= max_depth <= 10):
+            raise ValueError("max_depth must be between 1 and 10")
 
         org_id = current_org_id()
 
@@ -796,6 +842,9 @@ class IntelligenceQueryService:
                         # this block (the block carries its own reason).
                         if elements.get(str(row["element_id"]), {}).get("type") == "Capability":
                             row["maturity"] = maturity_by_element[row["element_id"]]
+                            row["health"] = maturity_by_element[row["element_id"]]
+                        else:
+                            row["health"] = None
                         # NEW-5: keep element_id on every row -- this task's
                         # whole point is "what stops", so a row that cannot
                         # name what element it is about is not answering the
@@ -828,12 +877,28 @@ class IntelligenceQueryService:
                     maturity_flags = _maturity_flags(NO_CAPABILITY_IN_CHAIN_REASON, maturity_by_element)
 
         summary["latency_ms"] = scope.latency_ms
+
+        # Stable pagination: preserve canonical walk order (explicit rows
+        # first in BFS order, then derived rows).  The cursor is a 0-based
+        # index into the full unpaginated list; next_cursor is the index of
+        # the first row that would appear on the next page.
+        total = len(rows)
+        next_cursor = None
+        if page_size is not None and page_size > 0:
+            slice_start = cursor if cursor is not None else 0
+            page = rows[slice_start : slice_start + page_size]
+            if slice_start + page_size < total:
+                next_cursor = slice_start + page_size
+            rows = page
+
         return {
             "rows": rows,
             "summary": summary,
             "reasons": reasons,
             "elements": elements,
             "maturity_flags": maturity_flags,
+            "total": total,
+            "next_cursor": next_cursor,
         }
 
     @staticmethod
@@ -958,19 +1023,197 @@ class IntelligenceQueryService:
         element/app id) -- so this method, deliberately, resolves only what
         the one real page needs. Linking to a JSON response would not be a
         deep link a person can read; not built.
+
+        Beside ``application_component_id``, the answer carries a
+        ``component`` block: the resolved component's name, its
+        owner-recorded health, its entered cost figures, its latest
+        fiscal-period cost row and its licence entitlements -- built below
+        off the SAME ``component`` object resolved above (no second
+        component select), in exactly two more selects of its own. Every
+        early branch below returns ``component: None`` -- nothing was
+        resolved, and the branch's own reason already says why.
         """
         from app.models import ArchiMateElement
         from app.models.application_portfolio import ApplicationComponent
 
+        def _health_block(component) -> Dict[str, Any]:
+            """The ``health`` key: the owner-recorded ``health_status``
+            column carried exactly as recorded -- a recorded word, not a
+            computed health score (the reuse register's health-score
+            concept is a different, unrelated reader). ``None`` means not
+            assessed, per the model's own comment on the column; no default
+            status is ever invented.
+            """
+            status = component.health_status
+            return {
+                "status": status,
+                "reason": None if status is not None else NO_HEALTH_RECORDED_REASON,
+                "truth_class": "authoritative_fact",
+            }
+
+        def _cost_block(component) -> Dict[str, Any]:
+            """The ``cost`` key: the seven entered cost figures, read off
+            *component* -- the object the caller already holds, no select
+            of its own. ``total_cost_of_ownership`` is the entered annual
+            TCO figure exactly as recorded; nothing here sums, averages or
+            derives it from the other six. ``license_cost`` is not read
+            (superseded by ``license_cost_annual``, per the model's own
+            comment) and neither is ``roi_score`` (a self-rated column, not
+            an intelligence fact). ``implementation_cost`` is the one
+            one-time figure among the six annual ones; it is carried
+            through unmixed, never summed with the rest.
+            """
+            figures = {
+                "total_cost_of_ownership": component.total_cost_of_ownership,
+                "license_cost_annual": component.license_cost_annual,
+                "maintenance_cost": component.maintenance_cost,
+                "infrastructure_cost": component.infrastructure_cost,
+                "support_cost": component.support_cost,
+                "implementation_cost": component.implementation_cost,
+                "development_cost_annual": component.development_cost_annual,
+            }
+            all_absent = all(value is None for value in figures.values())
+            return {
+                **figures,
+                "basis": "annual_as_entered",
+                "reason": NO_COST_RECORDED_REASON if all_absent else None,
+                "access_reason": None,
+                "truth_class": "authoritative_fact",
+            }
+
+        def _cost_by_period_block(component, org_id: int) -> Dict[str, Any]:
+            """The ``cost_by_period`` key: the single latest
+            ``ApplicationCost`` row for *component* -- the first of this
+            method's two remaining selects, ordered newest fiscal
+            year/quarter first, one row only regardless of how many
+            periods exist. ``variance`` is the stored column, disclosed
+            only when both ``total_cost`` and ``total_budget`` on that same
+            row are themselves recorded -- nothing here recomputes it from
+            the two; a stored ``variance`` is withheld, not recalculated,
+            when either input is absent. Joins through ``ApplicationComponent``
+            for an explicit ``organization_id ==`` predicate (same rationale
+            as ``_licence_entries``'s ``_licence_tenant_predicate`` -- the FK
+            from ``application_costs`` to ``application_components`` carries
+            no tenant check of its own, so this is what keeps the read
+            correct when called with no ambient request context).
+            """
+            from app.models.enterprise_intelligence import ApplicationCost
+
+            row = (
+                db.session.execute(
+                    db.select(ApplicationCost)
+                    .join(ApplicationComponent, ApplicationCost.application_id == ApplicationComponent.id)
+                    .where(
+                        ApplicationCost.application_id == component.id,
+                        ApplicationComponent.organization_id == org_id,
+                    )
+                    .order_by(
+                        ApplicationCost.fiscal_year.desc(),
+                        ApplicationCost.fiscal_quarter.desc().nulls_last(),
+                        ApplicationCost.id.desc(),
+                    )
+                )
+                .scalars()
+                .first()
+            )
+
+            if row is None:
+                return {
+                    "fiscal_year": None,
+                    "fiscal_quarter": None,
+                    "total_cost": None,
+                    "total_budget": None,
+                    "variance": None,
+                    "reason": NO_COST_RECORDED_REASON,
+                    "access_reason": None,
+                }
+
+            total_cost = float(row.total_cost) if row.total_cost is not None else None
+            total_budget = float(row.total_budget) if row.total_budget is not None else None
+            variance = (
+                float(row.variance)
+                if row.variance is not None and total_cost is not None and total_budget is not None
+                else None
+            )
+            return {
+                "fiscal_year": row.fiscal_year,
+                "fiscal_quarter": row.fiscal_quarter,
+                "total_cost": total_cost,
+                "total_budget": total_budget,
+                "variance": variance,
+                "reason": None,
+                "access_reason": None,
+            }
+
+        def _licence_entries(component, org_id: int) -> List[Dict[str, Any]]:
+            """The ``licences`` key: every ``LicenseEntitlement`` row for
+            *component* -- this method's second remaining select, with its
+            own tenant predicate isolated in ``_licence_tenant_predicate``
+            (the FK to ``application_components`` carries no tenant check
+            of its own, so that predicate is load-bearing here, not
+            decorative). ``under_used`` compares two recorded integers --
+            never a difference, never a dollar figure for what is not
+            deployed or not used -- and only once the licence's usage has
+            actually been synced; see ``LICENCE_USAGE_NOT_SYNCED_REASON``
+            for the honest absence reported when it has not.
+            """
+            from app.models.license_entitlement import LicenseEntitlement
+
+            rows = (
+                db.session.execute(
+                    db.select(LicenseEntitlement)
+                    .where(
+                        LicenseEntitlement.application_id == component.id,
+                        _licence_tenant_predicate(org_id),
+                    )
+                    .order_by(LicenseEntitlement.id)
+                )
+                .scalars()
+                .all()
+            )
+
+            entries: List[Dict[str, Any]] = []
+            for row in rows:
+                if row.last_usage_sync is None:
+                    under_used = None
+                    under_used_reason = LICENCE_USAGE_NOT_SYNCED_REASON
+                else:
+                    under_used = row.quantity_used < row.quantity_entitled
+                    under_used_reason = None
+                entries.append(
+                    {
+                        "entitlement_id": row.id,
+                        "product_name": row.product_name,
+                        "license_metric": row.license_metric,
+                        "quantity_entitled": row.quantity_entitled,
+                        "quantity_deployed": row.quantity_deployed,
+                        "quantity_used": row.quantity_used,
+                        "under_used": under_used,
+                        "under_used_reason": under_used_reason,
+                        "unit_cost": float(row.unit_cost) if row.unit_cost is not None else None,
+                        "compliance_status": row.compliance_status,
+                        "access_reason": None,
+                    }
+                )
+            return entries
+
         org_id = current_org_id()
         if org_id is None:
-            return {"application_component_id": None, "reasons": [NO_TENANT_CONTEXT_REASON]}
+            return {
+                "application_component_id": None,
+                "reasons": [NO_TENANT_CONTEXT_REASON],
+                "component": None,
+            }
 
         element = db.session.execute(
             db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
         ).scalar_one_or_none()
         if element is None:
-            return {"application_component_id": None, "reasons": [ELEMENT_NOT_FOUND_REASON]}
+            return {
+                "application_component_id": None,
+                "reasons": [ELEMENT_NOT_FOUND_REASON],
+                "component": None,
+            }
 
         component = None
         if getattr(element, "application_component_id", None):
@@ -979,9 +1222,27 @@ class IntelligenceQueryService:
             component = ApplicationComponent.query.filter_by(archimate_element_id=element.id).first()
 
         if component is None:
-            return {"application_component_id": None, "reasons": [NO_APPLICATION_COMPONENT_REASON]}
+            return {
+                "application_component_id": None,
+                "reasons": [NO_APPLICATION_COMPONENT_REASON],
+                "component": None,
+            }
 
-        return {"application_component_id": component.id, "reasons": []}
+        licence_entries = _licence_entries(component, org_id)
+        component_block = {
+            "name": component.name,
+            "health": _health_block(component),
+            "cost": _cost_block(component),
+            "cost_by_period": _cost_by_period_block(component, org_id),
+            "licences": licence_entries if licence_entries else None,
+            "licences_reason": None if licence_entries else NO_LICENCE_RECORDED_REASON,
+        }
+
+        return {
+            "application_component_id": component.id,
+            "reasons": [],
+            "component": component_block,
+        }
 
     @staticmethod
     def _owner_user_tenant_predicate(org_id):
@@ -1034,8 +1295,9 @@ class IntelligenceQueryService:
         positive number; otherwise the row carries the honest
         ``not_costed`` reason.
 
-        Plateau and gap: ``UnifiedWorkPackage.plateau_id``/``gap_id`` are
-        resolved against the ``Plateau``/``Gap`` tables (each carrying its
+        Plateau and gap: the work package's plateau and gap are its ArchiMate
+        relationships (read through ``work_package_service.plateau_and_gap_links``),
+        then resolved against the ``Plateau``/``Gap`` tables (each carrying its
         own ``TenantMixin``) in two selects, tenant-scoped explicitly, in
         addition to the ORM listener -- a foreign-tenant row a work package
         happens to point at (the FK itself is not tenant-checked) simply
@@ -1145,8 +1407,18 @@ class IntelligenceQueryService:
             # this IN list either, so a foreign element's classification
             # is never even asked for, not merely filtered out of the
             # answer.
-            plateau_ids = {wp.plateau_id for wp in seed_packages if wp.plateau_id is not None}
-            gap_ids = {wp.gap_id for wp in seed_packages if wp.gap_id is not None}
+            # The plateau and gap a work package is linked to are its ArchiMate
+            # relationships; the one reader gives them (first linked id of each).
+            from app.services import work_package_service
+
+            wp_links = work_package_service.plateau_and_gap_links(seed_packages, org_id)
+
+            def _first_link(wp, key):
+                ids = wp_links.get(wp.id, {}).get(key) or []
+                return ids[0] if ids else None
+
+            plateau_ids = {i for i in (_first_link(w, "plateau_ids") for w in seed_packages) if i is not None}
+            gap_ids = {i for i in (_first_link(w, "gap_ids") for w in seed_packages) if i is not None}
             plateau_element_ids = {int(eid) for eid in all_elements}
 
             plateaus_by_id: Dict[int, Any] = {}
@@ -1214,7 +1486,7 @@ class IntelligenceQueryService:
                     cost_variance_pct = None
                     cost_reason = NOT_COSTED_REASON
 
-                plateau_row = plateaus_by_id.get(wp.plateau_id)
+                plateau_row = plateaus_by_id.get(_first_link(wp, "plateau_ids"))
                 if plateau_row is None:
                     plateau_block: Dict[str, Any] = {
                         "plateau_id": None,
@@ -1236,7 +1508,7 @@ class IntelligenceQueryService:
                         "reason": None,
                     }
 
-                gap_row = gaps_by_id.get(wp.gap_id)
+                gap_row = gaps_by_id.get(_first_link(wp, "gap_ids"))
                 if gap_row is None:
                     gap_block: Dict[str, Any] = {
                         "gap_id": None,
@@ -1295,145 +1567,6 @@ class IntelligenceQueryService:
         return {"work_packages": wp_payloads, "reasons": [], "elements": all_elements}
 
     @staticmethod
-    def strategy_for_element(
-        element_id: int,
-        *,
-        max_depth: int = 3,
-        include_derived: bool = True,
-    ) -> Dict[str, Any]:
-        """L2, "what are we trying to achieve, and how's it tracking?": every
-        ``PortfolioInitiative`` seeded directly on the picked element
-        (``archimate_element_id`` FK), each with the SAME blast-radius
-        traversal L1/L5/L6 already run -- no second traversal algorithm.
-
-        Tenant-safety note, verified not assumed: ``PortfolioInitiative``
-        carries no ``TenantMixin``/``organization_id`` of its own, the same
-        gap ``UnifiedWorkPackage`` has (L5 brief). This method never lists
-        initiatives independently of an element -- every row it returns is
-        filtered by ``archimate_element_id == element_id``, and
-        ``element_id`` is only ever reached here after the element itself
-        was confirmed to belong to the caller's tenant (below). A
-        cross-tenant initiative cannot share a seed element id with the
-        wrong org's element, since ``archimate_elements.id`` is a real
-        primary key each row of which belongs to exactly one tenant. This
-        does not make ``PortfolioInitiative`` itself tenant-safe for any
-        OTHER read path against it -- a separate, pre-existing gap, not
-        fixed here (same category already flagged once for
-        ``UnifiedWorkPackage`` in the L5 brief).
-
-        Budget variance is read from the model's own ``total_budget``/
-        ``spent_to_date`` fields directly -- ``PortfolioInitiative`` has no
-        wrapping helper method to avoid, unlike L5's
-        ``calculate_budget_variance()``, but the same not-computed-vs-
-        measured-zero discipline still applies: variance is only reported
-        when ``total_budget`` is a real positive number, else the row
-        carries the honest ``no_budget_recorded`` reason.
-        """
-        from app.models import ArchiMateElement
-        from app.models.enterprise_intelligence import PortfolioInitiative
-
-        org_id = current_org_id()
-
-        with record_query_latency("strategy_for_element") as scope:
-            scope.organization_id = org_id
-
-            if org_id is None:
-                return {
-                    "initiatives": [],
-                    "reasons": [NO_TENANT_CONTEXT_REASON],
-                    "elements": {},
-                }
-
-            element = db.session.execute(
-                db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
-            ).scalar_one_or_none()
-            if element is None:
-                return {
-                    "initiatives": [],
-                    "reasons": [ELEMENT_NOT_FOUND_REASON],
-                    "elements": {},
-                }
-
-            seed_initiatives = (
-                db.session.execute(
-                    db.select(PortfolioInitiative).where(
-                        PortfolioInitiative.archimate_element_id == element_id
-                    )
-                )
-                .scalars()
-                .all()
-            )
-
-            if not seed_initiatives:
-                return {
-                    "initiatives": [],
-                    "reasons": [NO_INITIATIVE_LINKED_REASON],
-                    "elements": {},
-                }
-
-            all_elements: Dict[str, Dict[str, Any]] = {}
-            initiative_payloads: List[Dict[str, Any]] = []
-            for initiative in seed_initiatives:
-                blast = IntelligenceQueryService.cross_layer_impact(
-                    element_id,
-                    include_derived=include_derived,
-                    max_depth=max_depth,
-                    with_owner=True,
-                )
-                all_elements.update(blast.get("elements") or {})
-
-                if initiative.total_budget and initiative.total_budget > 0:
-                    # total_budget/spent_to_date are Numeric (Decimal) columns,
-                    # unlike UnifiedWorkPackage's Float cost fields -- cast to
-                    # float before arithmetic so the response carries a plain
-                    # JSON number, not a string (Flask's JSON provider
-                    # serialises Decimal as str, which would silently break
-                    # every numeric consumer of this field, front end
-                    # included).
-                    total_budget = float(initiative.total_budget)
-                    spent_to_date = float(initiative.spent_to_date or 0.0)
-                    budget_variance_pct = (spent_to_date - total_budget) / total_budget * 100
-                    budget_reason = None
-                else:
-                    budget_variance_pct = None
-                    budget_reason = NO_BUDGET_RECORDED_REASON
-
-                initiative_payloads.append(
-                    {
-                        "initiative_id": initiative.id,
-                        "name": initiative.name,
-                        "status": initiative.status,
-                        "priority": initiative.priority,
-                        "health_status": initiative.health_status,
-                        "completion_percentage": initiative.completion_percentage,
-                        "start_date": initiative.start_date.isoformat()
-                        if initiative.start_date
-                        else None,
-                        "target_end_date": initiative.target_end_date.isoformat()
-                        if initiative.target_end_date
-                        else None,
-                        "executive_sponsor": initiative.executive_sponsor,
-                        "program_manager": initiative.program_manager,
-                        "budget_variance_pct": budget_variance_pct,
-                        "budget_reason": budget_reason,
-                        "success_metrics": [
-                            {
-                                "metric_name": m.metric_name,
-                                "metric_type": m.metric_type,
-                                "target_value": m.target_value,
-                                "actual_value": m.actual_value,
-                                "status": m.status,
-                            }
-                            for m in initiative.success_metrics
-                        ],
-                        "affected_rows": blast.get("rows", []),
-                        "affected_summary": blast.get("summary", {}),
-                    }
-                )
-
-        return {"initiatives": initiative_payloads, "reasons": [], "elements": all_elements}
-
-    @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:
         """L4, "who's accountable for ___, and can they take on more?":
         WITHDRAWN -- the ownership data source is decided, but no shared,
@@ -1475,6 +1608,329 @@ class IntelligenceQueryService:
             "owners": [],
             "capacity_not_available": True,
             "reasons": [OWNERSHIP_READER_NOT_BUILT_REASON, CAPACITY_NOT_AVAILABLE_REASON],
+        }
+
+    # ------------------------------------------------------------------ #
+    # L7: the Data lens.
+    # ------------------------------------------------------------------ #
+
+    _DATA_OBJECT_LIMIT = 200
+
+    @staticmethod
+    def _data_tenant_predicate(model, organization_id: int):
+        """The explicit ``organization_id ==`` predicate on every read of the Data lens,
+        isolated as its own seam so a mutation test can replace it and watch the
+        cross-tenant tests go red. ``DataObject``, ``DataLineage`` and
+        ``ArchiMateElement`` all carry ``TenantMixin``, so this is defence in depth in a
+        request and what keeps a caller correct with no ambient request context."""
+        return model.organization_id == organization_id
+
+    @staticmethod
+    def _lineage_other_end_visible(other_ids, organization_id: int) -> Dict[int, str]:
+        """id -> name for the lineage endpoints that are elements of THIS organisation.
+
+        The ORM filter fences the lineage row, not the element ids it names: a row can
+        point at another organisation's element. An endpoint missing from the result is
+        dropped by the caller and never named. Isolated as its own seam for the mutation
+        proof, like the ownership seams."""
+        from app.models import ArchiMateElement
+
+        ids = {i for i in other_ids if i is not None}
+        if not ids:
+            return {}
+        rows = db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.name)
+            .where(ArchiMateElement.id.in_(ids))
+            .where(IntelligenceQueryService._data_tenant_predicate(ArchiMateElement, organization_id))
+        ).all()
+        return {row[0]: row[1] for row in rows}
+
+    @staticmethod
+    def data_for_element(element_id: int) -> Dict[str, Any]:
+        """L7, "what data does this hold or produce, who stewards it, and where does it
+        flow?": the ``DataObject`` rows linked to the element (directly, or through its
+        application component) and the lineage edges in and out of it.
+
+        Absence is stated, never filled: no data object is ``no_data_recorded``; objects
+        with neither a steward nor an owner recorded add ``no_steward_recorded``; no
+        lineage edge adds ``no_lineage_recorded``. A missing figure stays ``None``.
+
+        Steward and owner are FREE TEXT on the model, not users: they are returned as
+        recorded, flagged ``recorded_as_text``, and never joined to ``User``. Sensitive or
+        operational detail nobody asked for (``pii_fields``, ``storage_location``, schema
+        and table names, access roles) is not returned. A lineage edge whose other end is
+        not an element of this organisation is dropped, not named.
+        """
+        from datetime import datetime, timezone
+
+        from app.models import ArchiMateElement
+        from app.models.all_missing_models import DataLineage
+        from app.models.application_layer import DataObject
+        from app.models.application_portfolio import ApplicationComponent
+
+        predicate = IntelligenceQueryService._data_tenant_predicate
+        as_of = datetime.now(timezone.utc).isoformat()
+        empty = {"data_objects": [], "flows": [], "as_of": as_of}
+
+        org_id = current_org_id()
+        if org_id is None:
+            return {**empty, "reasons": [NO_TENANT_CONTEXT_REASON]}
+
+        element = db.session.execute(
+            db.select(ArchiMateElement)
+            .where(ArchiMateElement.id == element_id)
+            .where(predicate(ArchiMateElement, org_id))
+        ).scalar_one_or_none()
+        if element is None:
+            return {**empty, "reasons": [ELEMENT_NOT_FOUND_REASON]}
+
+        component_ids = list(db.session.execute(
+            db.select(ApplicationComponent.id)
+            .where(ApplicationComponent.archimate_element_id == element_id)
+            .where(predicate(ApplicationComponent, org_id))
+        ).scalars())
+        if getattr(element, "application_component_id", None):
+            component_ids.append(element.application_component_id)
+
+        object_filter = DataObject.archimate_element_id == element_id
+        if component_ids:
+            object_filter = db.or_(object_filter, DataObject.application_component_id.in_(component_ids))
+        objects = db.session.execute(
+            db.select(DataObject)
+            .where(object_filter)
+            .where(predicate(DataObject, org_id))
+            .order_by(DataObject.name, DataObject.id)
+            .limit(IntelligenceQueryService._DATA_OBJECT_LIMIT)
+        ).scalars().all()
+
+        data_objects = []
+        for obj in objects:
+            steward = (obj.data_steward or "").strip() or None
+            owner = (obj.data_owner or "").strip() or None
+            data_objects.append({
+                "id": obj.id,
+                "name": obj.name,
+                "data_type": obj.data_type,
+                "data_classification": obj.data_classification,
+                "is_master_data": bool(obj.is_master_data),
+                "contains_pii": bool(obj.contains_pii),
+                "gdpr_scope": bool(obj.gdpr_scope),
+                "retention_period_days": obj.retention_period_days,
+                "steward": steward,
+                "owner": owner,
+                "recorded_as_text": True,
+            })
+
+        edges = db.session.execute(
+            db.select(DataLineage)
+            .where(db.or_(
+                DataLineage.archimate_element_id == element_id,
+                DataLineage.target_archimate_element_id == element_id,
+            ))
+            .where(predicate(DataLineage, org_id))
+            .order_by(DataLineage.id)
+        ).scalars().all()
+        others = {
+            (e.target_archimate_element_id if e.archimate_element_id == element_id else e.archimate_element_id)
+            for e in edges
+        }
+        visible = IntelligenceQueryService._lineage_other_end_visible(others, org_id)
+
+        # Build elements map for all referenced elements (center + flow endpoints)
+        elements = {}
+        # Add center element
+        elements[str(element_id)] = {
+            "id": element.id,
+            "name": element.name,
+            "type": element.type,
+            "layer": element.layer,
+        }
+        # Add other elements from flows
+        for other_id, other_name in visible.items():
+            other_element = db.session.execute(
+                db.select(ArchiMateElement)
+                .where(ArchiMateElement.id == other_id)
+                .where(predicate(ArchiMateElement, org_id))
+            ).scalar_one_or_none()
+            if other_element:
+                elements[str(other_id)] = {
+                    "id": other_element.id,
+                    "name": other_element.name,
+                    "type": other_element.type,
+                    "layer": other_element.layer,
+                }
+
+        flows = []
+        for edge in edges:
+            outgoing = edge.archimate_element_id == element_id
+            other_id = edge.target_archimate_element_id if outgoing else edge.archimate_element_id
+            if other_id not in visible:
+                continue
+            flows.append({
+                "direction": "out" if outgoing else "in",
+                "other_element_id": other_id,
+                "other_element_name": visible[other_id],
+                "lineage_type": edge.lineage_type,
+                "frequency": edge.frequency,
+            })
+
+        reasons = []
+        if not data_objects:
+            reasons.append(NO_DATA_RECORDED_REASON)
+        elif all(o["steward"] is None and o["owner"] is None for o in data_objects):
+            reasons.append(NO_STEWARD_RECORDED_REASON)
+        if not flows:
+            reasons.append(NO_LINEAGE_RECORDED_REASON)
+        return {"data_objects": data_objects, "flows": flows, "elements": elements, "as_of": as_of, "reasons": reasons}
+
+    # ------------------------------------------------------------------ #
+    # Compliance (under L6): the controls an application is mapped to.
+    # ------------------------------------------------------------------ #
+
+    _COMPLIANCE_LIMIT = 200
+    # A control in one of these states is reported as recorded; it is not flagged as missing evidence.
+    _EVIDENCE_NOT_REQUIRED = frozenset({"not_applicable", "waived"})
+
+    @staticmethod
+    def _compliance_tenant_predicate(model, organization_id: int):
+        """The explicit ``organization_id ==`` predicate on every tenant read of the Compliance
+        question, isolated as its own seam for the mutation proof. ``ApplicationComponent``,
+        ``ApplicationComplianceControl``, ``PolicyViolation`` and ``ComplianceStatus`` all
+        carry ``TenantMixin``; this is defence in depth in a request and what keeps a caller
+        correct with no ambient request context. The global ``ComplianceControl`` and
+        ``RegulatoryFramework`` rows have no tenant column and are never read with it."""
+        return model.organization_id == organization_id
+
+    @staticmethod
+    def compliance_for_element(element_id: int) -> Dict[str, Any]:
+        """"Which regulations and controls apply to this, and which controls have no evidence
+        of being met?": the controls the element's application is mapped to
+        (``ApplicationComplianceControl``, the tenant bridge), their global control and
+        framework names reached ONLY by the ids on those rows, the open policy violations
+        against the application, and when it was last scanned.
+
+        Nothing is inferred and no stored aggregate is shown: ``ComplianceStatus`` percentages
+        and counts default to zero on a row that was never scanned, so only its last-scan time
+        is returned. No mapped control is ``no_compliance_controls_recorded``, never "0%
+        compliant". A control with neither ``evidence_url`` nor ``verified_date`` (and not
+        ``not_applicable``/``waived``) adds ``no_control_evidence``. The evidence URL and the
+        verifier are user-authored or personal and are not returned; only whether an URL is
+        recorded is.
+        """
+        from datetime import datetime, timezone
+
+        from app.models import ArchiMateElement
+        from app.models.application_compliance import ApplicationComplianceControl
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+        from app.models.policy_monitoring import ArchitecturePolicy, ComplianceStatus, PolicyViolation
+
+        predicate = IntelligenceQueryService._compliance_tenant_predicate
+        as_of = datetime.now(timezone.utc).isoformat()
+        empty = {"controls": [], "open_violations": [], "last_scan_at": None, "as_of": as_of}
+
+        org_id = current_org_id()
+        if org_id is None:
+            return {**empty, "reasons": [NO_TENANT_CONTEXT_REASON]}
+
+        element = db.session.execute(
+            db.select(ArchiMateElement)
+            .where(ArchiMateElement.id == element_id)
+            .where(predicate(ArchiMateElement, org_id))
+        ).scalar_one_or_none()
+        if element is None:
+            return {**empty, "reasons": [ELEMENT_NOT_FOUND_REASON]}
+
+        component_id = None
+        if getattr(element, "application_component_id", None):
+            component_id = db.session.execute(
+                db.select(ApplicationComponent.id)
+                .where(ApplicationComponent.id == element.application_component_id)
+                .where(predicate(ApplicationComponent, org_id))
+            ).scalar_one_or_none()
+        if component_id is None:
+            component_id = db.session.execute(
+                db.select(ApplicationComponent.id)
+                .where(ApplicationComponent.archimate_element_id == element_id)
+                .where(predicate(ApplicationComponent, org_id))
+            ).scalars().first()
+        if component_id is None:
+            return {**empty, "reasons": [NO_APPLICATION_COMPONENT_REASON]}
+
+        rows = db.session.execute(
+            db.select(ApplicationComplianceControl, ComplianceControl, RegulatoryFramework)
+            .outerjoin(ComplianceControl, ComplianceControl.id == ApplicationComplianceControl.control_id)
+            .outerjoin(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
+            .where(ApplicationComplianceControl.application_id == component_id)
+            .where(predicate(ApplicationComplianceControl, org_id))
+            .order_by(RegulatoryFramework.code, ComplianceControl.control_code, ApplicationComplianceControl.id)
+            .limit(IntelligenceQueryService._COMPLIANCE_LIMIT)
+        ).all()
+
+        controls = []
+        any_missing_evidence = False
+        for mapping, control, framework in rows:
+            status = mapping.implementation_status
+            has_url = bool((mapping.evidence_url or "").strip())
+            verified = mapping.verified_date is not None
+            missing = (
+                not has_url and not verified
+                and status not in IntelligenceQueryService._EVIDENCE_NOT_REQUIRED
+            )
+            any_missing_evidence = any_missing_evidence or missing
+            controls.append({
+                "control_id": mapping.control_id,
+                "code": control.control_code if control else None,
+                "name": control.title if control else "Unknown control",
+                "framework_code": framework.code if framework else None,
+                "framework_name": framework.name if framework else None,
+                "implementation_status": status,
+                "evidence_url_recorded": has_url,
+                "verified": verified,
+                "verified_date": mapping.verified_date.isoformat() if mapping.verified_date else None,
+                "no_evidence": missing,
+            })
+
+        violations = db.session.execute(
+            db.select(PolicyViolation, ArchitecturePolicy.name)
+            .outerjoin(ArchitecturePolicy, ArchitecturePolicy.id == PolicyViolation.policy_id)
+            .where(PolicyViolation.entity_type == "application")
+            .where(PolicyViolation.entity_id == component_id)
+            .where(PolicyViolation.status == "open")
+            .where(predicate(PolicyViolation, org_id))
+            .order_by(PolicyViolation.detected_at.desc(), PolicyViolation.id)
+            .limit(IntelligenceQueryService._COMPLIANCE_LIMIT)
+        ).all()
+        open_violations = [
+            {
+                "policy_name": name,
+                "severity": violation.severity,
+                "status": violation.status,
+                "detected_at": violation.detected_at.isoformat() if violation.detected_at else None,
+            }
+            for violation, name in violations
+        ]
+
+        last_scan = db.session.execute(
+            db.select(db.func.max(ComplianceStatus.last_scan_at))
+            .where(ComplianceStatus.entity_type == "application")
+            .where(ComplianceStatus.entity_id == component_id)
+            .where(predicate(ComplianceStatus, org_id))
+        ).scalar_one_or_none()
+
+        reasons = []
+        if not controls:
+            reasons.append(NO_COMPLIANCE_CONTROLS_RECORDED_REASON)
+        elif any_missing_evidence:
+            reasons.append(NO_CONTROL_EVIDENCE_REASON)
+        if last_scan is None:
+            reasons.append(NO_POLICY_SCAN_RECORDED_REASON)
+        return {
+            "controls": controls,
+            "open_violations": open_violations,
+            "last_scan_at": last_scan.isoformat() if last_scan else None,
+            "as_of": as_of,
+            "reasons": reasons,
         }
 
     # ------------------------------------------------------------------ #
@@ -1543,13 +1999,13 @@ class IntelligenceQueryService:
         explicit-relationship walk) and no ``include_derived`` /
         ``include_stale`` / ``max_depth`` parameter -- those belong to T-S3.
 
-        Four batched selects regardless of row count, in this order,
+        Five batched selects regardless of row count, in this order,
         following ``_resolve_owners_batch``'s own collect-then-resolve shape:
         value streams for the tenant (narrowed by ``value_stream_id`` when
         given); mapping rows for those value-stream ids, joined to
         ``ValueStreamStage`` for the stage id and name; capability identity
-        for the distinct capability ids; maturity through the accessor.
-        Never one select per row.
+        for the distinct capability ids; maturity through the accessor;
+        the helper's own owner/element map select. Never one select per row.
 
         Tenancy (design § 3.2, § 9): ``ValueStream`` and
         ``CapabilityValueStreamMapping`` carry the strict, explicit predicate
@@ -1692,10 +2148,10 @@ class IntelligenceQueryService:
                     for cap_id, name, code in db.session.execute(identity_stmt).all():
                         identity_by_id[cap_id] = {"id": cap_id, "name": name, "code": code}
 
-                # Maturity through the accessor -- never off the columns.
+                # Maturity through the helper -- never off the columns.
                 # Strict predicate, required kwarg: a shared catalogue row's
                 # maturity is never read as this tenant's own.
-                maturity_by_id = UnifiedCapability.maturity_for_capability_ids(
+                maturity_by_id = CapabilityHeatmapService().maturity_for_capability_ids(
                     capability_ids, organization_id=organization_id
                 )
 
@@ -1738,18 +2194,22 @@ class IntelligenceQueryService:
                         capabilities_considered.add(mapping.capability_id)
 
                         maturity = maturity_by_id.get(mapping.capability_id) or {
-                            "current_maturity_level": None,
-                            "target_maturity_level": None,
-                            "reason_code": validate_reason_code("no_maturity_recorded"),
+                            "current": None,
+                            "target": None,
+                            "under_target": None,
+                            "target_gap": None,
+                            "reason": validate_reason_code("no_maturity_recorded"),
                         }
-                        current = maturity["current_maturity_level"]
-                        target = maturity["target_maturity_level"]
+                        current = maturity["current"]
+                        target = maturity["target"]
+                        under_target = maturity["under_target"]
+                        target_gap = maturity["target_gap"]
                         at_risk = IntelligenceQueryService._at_risk_for_maturity(
                             current, threshold
                         )
                         if current is None:
                             capabilities_with_no_maturity_ids.add(mapping.capability_id)
-                            cap_reason = maturity["reason_code"]
+                            cap_reason = maturity["reason"]
                         else:
                             cap_reason = None
                             if at_risk:
@@ -1763,6 +2223,8 @@ class IntelligenceQueryService:
                                 "code": identity["code"],
                                 "current_maturity": current,
                                 "target_maturity": target,
+                                "under_target": under_target,
+                                "target_gap": target_gap,
                                 "maturity_source": "unified_capabilities",
                                 "at_risk": at_risk,
                                 "dependency": {
@@ -1793,6 +2255,15 @@ class IntelligenceQueryService:
                         else None
                     )
 
+                    risk_reasons = []
+                    if at_risk_ids_in_row:
+                        risk_reasons.append("capability_below_threshold")
+                    if any(cr.get("under_target") is True for cr in capability_rows):
+                        risk_reasons.append("capability_under_target")
+                    if any(cr.get("current_maturity") is None for cr in capability_rows):
+                        risk_reasons.append("capability_unassessed")
+                    risk_reasons.sort()
+
                     at_risk_count = len(at_risk_ids_in_row)
                     rows.append(
                         {
@@ -1803,6 +2274,7 @@ class IntelligenceQueryService:
                                 "archimate_element_id": vs.archimate_element_id,
                             },
                             "at_risk_capability_count": at_risk_count,
+                            "risk_reasons": risk_reasons,
                             "capabilities": capability_rows,
                             "reason": row_reason,
                         }
@@ -1829,5 +2301,146 @@ class IntelligenceQueryService:
             "reasons": reasons,
         }
 
+    @staticmethod
+    def strategy_for_element(
+        element_id: int,
+        *,
+        max_depth: int = 3,
+        include_derived: bool = True,
+    ) -> Dict[str, Any]:
+        """L2, "what are we trying to achieve, and how's it tracking?": every
+        ``PortfolioInitiative`` seeded directly on the picked element
+        (``archimate_element_id`` FK), each with the SAME blast-radius
+        traversal L1/L5/L6 already run -- no second traversal algorithm.
+
+        Tenant-safety note, verified not assumed: ``PortfolioInitiative``
+        carries no ``TenantMixin``/``organization_id`` of its own, the same
+        gap ``UnifiedWorkPackage`` has (L5 brief). This method never lists
+        initiatives independently of an element -- every row it returns is
+        filtered by ``archimate_element_id == element_id``, and
+        ``element_id`` is only ever reached here after the element itself
+        was confirmed to belong to the caller's tenant (below). A
+        cross-tenant initiative cannot share a seed element id with the
+        wrong org's element, since ``archimate_elements.id`` is a real
+        primary key each row of which belongs to exactly one tenant.
+
+        Budget variance is read from the model's own ``total_budget``/
+        ``spent_to_date`` fields directly -- ``PortfolioInitiative`` has no
+        wrapping helper method to avoid, but the same not-computed-vs-
+        measured-zero discipline still applies: variance is only reported
+        when ``total_budget`` is a real positive number, else the row
+        carries the honest ``no_budget_recorded`` reason.
+
+        When the picked element is a Capability, each initiative row carries
+        the capability's maturity block from the T-MAT-1 helper.
+        """
+        from app.models import ArchiMateElement
+        from app.models.enterprise_intelligence import PortfolioInitiative
+
+        org_id = current_org_id()
+
+        with record_query_latency("strategy_for_element") as scope:
+            scope.organization_id = org_id
+
+            if org_id is None:
+                return {
+                    "initiatives": [],
+                    "reasons": [NO_TENANT_CONTEXT_REASON],
+                    "elements": {},
+                }
+
+            element = db.session.execute(
+                db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
+            ).scalar_one_or_none()
+            if element is None:
+                return {
+                    "initiatives": [],
+                    "reasons": [ELEMENT_NOT_FOUND_REASON],
+                    "elements": {},
+                }
+
+            seed_initiatives = (
+                db.session.execute(
+                    db.select(PortfolioInitiative).where(
+                        PortfolioInitiative.archimate_element_id == element_id
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            if not seed_initiatives:
+                return {
+                    "initiatives": [],
+                    "reasons": [NO_INITIATIVE_LINKED_REASON],
+                    "elements": {},
+                }
+
+            # Capability maturity block: one call when the element is a Capability.
+            capability_maturity = None
+            if (element.type or "") == "Capability":
+                capability_maturity = CapabilityHeatmapService().maturity_for_elements(
+                    [element_id], organization_id=org_id
+                ).get(element_id)
+
+            all_elements: Dict[str, Dict[str, Any]] = {}
+            initiative_payloads: List[Dict[str, Any]] = []
+            for initiative in seed_initiatives:
+                blast = IntelligenceQueryService.cross_layer_impact(
+                    element_id,
+                    include_derived=include_derived,
+                    max_depth=max_depth,
+                    with_owner=True,
+                )
+                all_elements.update(blast.get("elements") or {})
+
+                if initiative.total_budget and initiative.total_budget > 0:
+                    total_budget = float(initiative.total_budget)
+                    spent_to_date = float(initiative.spent_to_date or 0.0)
+                    budget_variance_pct = (spent_to_date - total_budget) / total_budget * 100
+                    budget_reason = None
+                else:
+                    budget_variance_pct = None
+                    budget_reason = NO_BUDGET_RECORDED_REASON
+
+                payload = {
+                    "initiative_id": initiative.id,
+                    "name": initiative.name,
+                    "status": initiative.status,
+                    "priority": initiative.priority,
+                    "health_status": initiative.health_status,
+                    "completion_percentage": initiative.completion_percentage,
+                    "start_date": initiative.start_date.isoformat()
+                    if initiative.start_date
+                    else None,
+                    "target_end_date": initiative.target_end_date.isoformat()
+                    if initiative.target_end_date
+                    else None,
+                    "executive_sponsor": initiative.executive_sponsor,
+                    "program_manager": initiative.program_manager,
+                    "budget_variance_pct": budget_variance_pct,
+                    "budget_reason": budget_reason,
+                    "success_metrics": [
+                        {
+                            "metric_name": m.metric_name,
+                            "metric_type": m.metric_type,
+                            "target_value": m.target_value,
+                            "actual_value": m.actual_value,
+                            "status": m.status,
+                        }
+                        for m in initiative.success_metrics
+                    ],
+                    "affected_rows": blast.get("rows", []),
+                    "affected_summary": blast.get("summary", {}),
+                }
+                if capability_maturity is not None:
+                    payload["capability_maturity"] = capability_maturity
+                initiative_payloads.append(payload)
+
+        return {
+            "initiatives": initiative_payloads,
+            "reasons": [],
+            "elements": all_elements,
+        }
 
 __all__ = ["IntelligenceQueryService"]

@@ -37,7 +37,7 @@ Entelim alongside it — import what you have and compare the two directly.
 |---|---|---|
 | Licence | Proprietary | Open source, AGPL, plus a commercial licence |
 | Self-hostable | No — SaaS only | Yes |
-| Pricing | Not published; priced per application, tiered, unlimited users included; available on request | Not published; free to self-host under AGPL |
+| Pricing | Not published; priced per application, tiered, unlimited users included; available on request | Published at /pricing; free to self-host under AGPL |
 | Structure | Three outcome-based modules: Visibility, Transformation, Oversight | One product across modelling, application portfolio, business case, and governance |
 | Modelling approach | Flexible metamodel, aligned to TOGAF, BIZBOK, NIST or your own methodology | ArchiMate 3.2, specifically |
 | Add-ons | Sandbox, AI process modelling, sold separately | Included |
@@ -46,16 +46,15 @@ Entelim alongside it — import what you have and compare the two directly.
 
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
   browser across every layer.
-- **Duplicate-spend detection and rationalisation**, deep-linked directly from a plain-language
-  question.
+- **Find what you're paying for twice.** Run duplicate detection across your whole application list,
+  review the overlapping groups it finds, and add them to a consolidation plan.
 - **A business case built from your own figures** — capex, opex, three-year TCO, ROI and payback,
   never invented to fill a gap.
 - **Full ArchiMate 3.2 modelling**, where Ardoq's own metamodel is deliberately notation-agnostic.
 
-## Where Entelim is headed next
+## Bringing your model across
 
-A direct Ardoq import — no export step required — is on the roadmap for 2027. Until then, ArchiMate
-Open Exchange and CSV are the working path across.
+ArchiMate Open Exchange and CSV are the working path to bring a model across.
 
 ## Frequently asked
 

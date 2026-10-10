@@ -759,6 +759,53 @@ class ConfidenceReviewService:
             )
 
             db.session.add(review_item)
+            db.session.flush()
+
+            # Consolidation: repointed to the approval creator so this item also
+            # surfaces in the one organisation-wide approval inbox, alongside
+            # assistant-raised and blueprint proposals. ReviewQueueItem stays
+            # the system of record for the review-specific fields (confidence
+            # factors, quality ratings) and its own dedicated review UI; this
+            # is additive, not a replacement (dual-write during the wave-1
+            # consolidation — see docs/adr note recorded in the PR). Skipped
+            # when no organisation could be resolved: an unattributed item is
+            # already unreachable in the review queue itself today, so a
+            # paired approval row would be equally unreachable.
+            if resolved_org_id is not None:
+                from app.modules.ai_chat.services.ai_chat_approval_service import (
+                    create_approval_record,
+                )
+
+                approval = create_approval_record(
+                    organization_id=resolved_org_id,
+                    operation_type="review",
+                    entity_type=item_data.item_type,
+                    entity_id=item_data.item_id,
+                    summary=f"Confidence review: {item_data.item_name}",
+                    operation_payload={
+                        "review_queue_item_id": review_item.id,
+                        "item_type": item_data.item_type,
+                        "item_name": item_data.item_name,
+                        "confidence_score": float(item_data.confidence_score)
+                        if item_data.confidence_score is not None else None,
+                    },
+                    source_table="review_queue_items",
+                    source_id=review_item.id,
+                    # A confidence-review item's own deadline (hours, not the
+                    # chat-approval default of 15 minutes) is its overdue
+                    # marker here too, so escalation timing matches what the
+                    # review queue already promised the reviewer.
+                    expiry_minutes=max(
+                        1, int((review_deadline - datetime.utcnow()).total_seconds() // 60)
+                    ),
+                )
+                # Mark superseded immediately (consolidation pattern step 5):
+                # without this the backfill's idempotency check (`WHERE
+                # retired_into_id IS NULL`) would re-copy this row and create
+                # a second approval for it the next time it runs.
+                review_item.retired_into_id = approval.id
+                db.session.flush()
+
             db.session.commit()
 
             return {

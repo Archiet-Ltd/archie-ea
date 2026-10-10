@@ -6,7 +6,7 @@ state: missing
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /startups/website-first-look
+url_slug: /use-cases/website-first-look
 also_serves: [S4]
 ---
 
@@ -29,5 +29,5 @@ Coming soon. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 
-- [Read our site and propose our segments, problems and competitors](/startups/website-full-profile)
-- [Pick the products you use and see what breaks](/startups/reference-packs)
+- [Read our site and propose our segments, problems and competitors](/use-cases/website-full-profile)
+- [Pick the products you use and see what breaks](/use-cases/reference-packs)

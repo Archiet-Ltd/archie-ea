@@ -10,6 +10,9 @@
  * and no vocabulary term. It only sends what was typed.
  *
  * A page factory takes this object with Object.assign and supplies onSelect(option).
+ * It may also supply searchOptions(term), returning a promise of options, when
+ * the page offers only some kinds of element; the person is still asked only
+ * for what they type.
  */
 (function (global) {
     'use strict';
@@ -60,7 +63,9 @@
                 var seq = this._searchSeq;
                 var found;
                 try {
-                    found = await global.Intelligence.searchElements(typed);
+                    found = await (this.searchOptions
+                        ? this.searchOptions(typed)
+                        : global.Intelligence.searchElements(typed));
                 } catch (err) {
                     if (seq !== this._searchSeq) return;
                     this.options = [];

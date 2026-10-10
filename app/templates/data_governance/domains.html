@@ -1,0 +1,57 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% from 'data_governance/_app_picker.html' import app_picker, app_picker_script with context %}
+
+{% block title %}Master data domains — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6">
+  {{ page_shell(
+      title='Master data domains',
+      subtitle='Each master data domain with its golden source, entities and their declared consumer applications.',
+      breadcrumb=[('Home', url_for('main.index')), ('Data governance', url_for('data_governance.entities')), ('Master data domains', None)],
+      tabs=tabs
+  ) }}
+  {% if rows %}
+  <div class="space-y-4">
+    {% for row in rows %}
+    <section class="rounded-lg border border-border bg-card p-4" data-testid="domain-{{ row.domain.id }}">
+      <div class="flex items-start justify-between gap-4 mb-3">
+        <div class="min-w-0">
+          <h2 class="text-base font-semibold text-foreground truncate">{{ row.domain.name }}</h2>
+          <p class="text-sm text-muted-foreground" data-testid="golden-source-{{ row.domain.id }}">
+            Golden source:
+            {% if row.golden_source_name %}<span class="font-medium text-foreground">{{ row.golden_source_name }}</span>
+            {% else %}not declared{% endif %}
+          </p>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('data_governance.set_golden_source', domain_id=row.domain.id) }}" class="mb-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ app_picker('golden-source-' ~ row.domain.id, row.golden_source_name) }}
+      </form>
+      {% if row.entities %}
+      <ul class="divide-y divide-border border-t border-border">
+        {% for item in row.entities %}
+        <li class="py-2.5">
+          <p class="text-sm font-medium">{{ item.entity.name }}</p>
+          <p class="text-xs text-muted-foreground">
+            Consumers: {% if item.consumers %}{{ item.consumers | join(', ') }}{% else %}none recorded{% endif %}
+          </p>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-sm text-muted-foreground border-t border-border pt-3">No entities in this domain yet.</p>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+  {% else %}
+  {{ empty_state(icon='layers', headline='No master data domains',
+      body='A data domain appears here once its type is set to master.') }}
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}{{ app_picker_script() }}{% endblock %}
