@@ -11,7 +11,6 @@ import hashlib
 import secrets
 import urllib.parse
 
-import pytest
 
 
 def _pkce_pair() -> tuple[str, str]:
