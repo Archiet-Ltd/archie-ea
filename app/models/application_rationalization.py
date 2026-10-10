@@ -16,8 +16,12 @@ import enum
 import logging
 from datetime import date, datetime
 
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import or_
+
 from .. import db
 from .mixins import TenantMixin
+from .unified_capability import HybridCapabilityTenantMixin
 
 
 # ============================================================================
@@ -603,14 +607,6 @@ class ApplicationRationalizationScore(TenantMixin, db.Model):
     # ==== OVERALL RATIONALIZATION ASSESSMENT ====
     overall_health_score = db.Column(db.Integer, nullable=False)  # Weighted average 0 - 100
 
-    # R1-B34 (TB-0135): the FormulaRegister version this score was computed
-    # with, so a reader can trace the number to the exact reviewed weights
-    # rather than trust an unversioned constant. Nullable -- a score
-    # computed before this column existed, or with no formula registered
-    # for this organisation yet, carries no version rather than a fabricated
-    # one.
-    formula_version = db.Column(db.Integer, nullable=True)
-
     # TIME framework recommendation (legacy scoring output — do NOT remove)
     rationalization_action = db.Column(db.String(20), nullable=False, index=True)
     # TOLERATE, INVEST, MIGRATE, ELIMINATE
@@ -714,6 +710,14 @@ class ApplicationRationalizationScore(TenantMixin, db.Model):
     )
     policy_name = db.Column(db.String(100), nullable=True)
 
+    # Formula register: the scoring configuration and the formula version that
+    # produced this score. Nullable so scores written before the register
+    # existed remain valid; written by calculate_app_score on every scoring run.
+    scoring_configuration_id = db.Column(
+        db.Integer, db.ForeignKey("scoring_configurations.id"), nullable=True, index=True
+    )
+    formula_version = db.Column(db.Integer, nullable=True)
+
     # Relationships
     application = db.relationship("ApplicationComponent", backref="rationalization_score")
     policy = db.relationship("RationalizationPolicy", back_populates="scores")
@@ -756,15 +760,16 @@ class ApplicationRationalizationScore(TenantMixin, db.Model):
                 return self.override_disposition
         return self.disposition_action
 
-    def calculate_overall_score(self):
+    def calculate_overall_score(self, scoring_config=None):
         """
-        Calculate weighted overall health score.
+        Calculate the weighted overall health score.
 
-        Weights (must sum to 100):
-        - Technical Health: 30%
-        - Business Value: 35%
-        - Cost Efficiency: 25%
-        - Vendor Risk: 10%
+        The weights come from the scoring configuration that produced this
+        score (``scoring_configuration_id``), or from ``scoring_config`` when
+        the caller has already resolved one, overlaid by the recorded policy's
+        dimension weights. When no configuration resolves, or a dimension
+        score is missing, there is no overall score: ``None``, never a default
+        weighting.
         """
         if any(
             score is None
@@ -777,11 +782,25 @@ class ApplicationRationalizationScore(TenantMixin, db.Model):
         ):
             return None
 
+        config = scoring_config
+        if config is None and self.scoring_configuration_id is not None:
+            config = ScoringConfiguration.query.filter(
+                ScoringConfiguration.id == self.scoring_configuration_id,
+                ScoringConfiguration.visibility_predicate(self.organization_id),
+            ).first()
+        if config is None:
+            return None
+
+        if self.policy is not None:
+            weights = self.policy.get_effective_weights(config)
+        else:
+            weights = config.get_weights_dict()
+
         weighted = (
-            self.technical_health_score * 0.30
-            + self.business_value_score * 0.35
-            + self.cost_efficiency_score * 0.25
-            + self.vendor_risk_score * 0.10
+            self.technical_health_score * weights["technical_health"]
+            + self.business_value_score * weights["business_value"]
+            + self.cost_efficiency_score * weights["cost_efficiency"]
+            + self.vendor_risk_score * weights["vendor_risk"]
         )
 
         return int(round(weighted))
@@ -1310,9 +1329,16 @@ class ReplacementPlan(db.Model):
 # ============================================================================
 
 
-class ScoringConfiguration(db.Model):
+class ScoringConfiguration(HybridCapabilityTenantMixin, db.Model):
     """
-    Configurable scoring weights for application rationalization.
+    The rationalisation formula register: governed scoring weights.
+
+    Each row is one governed formula (inputs, weights, owner, reviewer,
+    version, effective date, scope). ``organization_id IS NULL`` marks a shared
+    row, readable by every organisation and never writable from inside one;
+    an organisation's own rows are visible only to it. Changing a weight
+    creates the next ``formula_version``; scores keep the version that
+    produced them.
 
     Enables business units to customize the importance of each
     scoring dimension based on their specific priorities and mission needs.
@@ -1331,6 +1357,9 @@ class ScoringConfiguration(db.Model):
     """
 
     __tablename__ = "scoring_configurations"
+
+    # Plural noun used in shared/foreign write-refusal messages.
+    hybrid_owner_label = "scoring configurations"
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -1388,8 +1417,35 @@ class ScoringConfiguration(db.Model):
     notes = db.Column(db.Text)
     configuration_version = db.Column(db.Integer, default=1)
 
+    # ==== FORMULA REGISTER GOVERNANCE ====
+    # Incremented whenever a weight changes; scores record the version they used.
+    formula_version = db.Column(
+        db.Integer, nullable=True, default=1, server_default=db.text("1")
+    )
+    owner_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    reviewer_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    effective_from = db.Column(db.Date, nullable=True)
+    rule_text = db.Column(db.Text, nullable=True)
+
     # Relationships
-    created_by = db.relationship("User", backref="scoring_configs_created")
+    created_by = db.relationship(
+        "User", foreign_keys=[created_by_id], backref="scoring_configs_created"
+    )
+
+    WEIGHT_FIELDS = (
+        "technical_health_weight",
+        "business_value_weight",
+        "cost_efficiency_weight",
+        "vendor_risk_weight",
+    )
+
+    @classmethod
+    def visibility_predicate(cls, organization_id):
+        """Shared rows plus, when an organisation is given, that organisation's own."""
+        shared = cls.organization_id.is_(None)
+        if organization_id is not None:
+            return or_(shared, cls.organization_id == organization_id)
+        return shared
 
     def __repr__(self):
         return f"<ScoringConfiguration {self.name} ({self.scope_type}) Tech:{self.technical_health_weight}% Bus:{self.business_value_weight}% Cost:{self.cost_efficiency_weight}% Vend:{self.vendor_risk_weight}%"
@@ -1531,7 +1587,65 @@ class ScoringConfiguration(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "configuration_version": self.configuration_version,
+            "organization_id": self.organization_id,
+            "is_shared": self.organization_id is None,
+            "formula_version": self.formula_version,
+            "owner_user_id": self.owner_user_id,
+            "reviewer_user_id": self.reviewer_user_id,
+            "effective_from": self.effective_from.isoformat() if self.effective_from else None,
+            "rule_text": self.rule_text,
         }
+
+
+def _scoring_weights_changed(session, config, state):
+    """True when a flush would store a weight different from the stored one.
+
+    An expired attribute keeps no prior value in its history, so the stored
+    weights are read back from the row itself in that case.
+    """
+    changed = [
+        name
+        for name in ScoringConfiguration.WEIGHT_FIELDS
+        if state.attrs[name].history.has_changes()
+    ]
+    if not changed:
+        return False
+    stored = None
+    for name in changed:
+        history = state.attrs[name].history
+        if history.deleted:
+            previous = history.deleted[0]
+        else:
+            if stored is None:
+                table = ScoringConfiguration.__table__
+                stored = (
+                    session.connection()
+                    .execute(
+                        db.select(*[table.c[f] for f in ScoringConfiguration.WEIGHT_FIELDS]).where(
+                            table.c.id == config.id
+                        )
+                    )
+                    .mappings()
+                    .first()
+                ) or {}
+            previous = stored.get(name)
+        if previous != getattr(config, name):
+            return True
+    return False
+
+
+@db.event.listens_for(db.session, "before_flush")
+def _version_scoring_configuration_weights(session, flush_context, instances):
+    """Move a configuration to its next formula version when a weight changes.
+
+    Tenant stamping and the refusal of shared or foreign writes come from the
+    hybrid-owner listeners in ``unified_capability``.
+    """
+    for config in (item for item in session.dirty if isinstance(item, ScoringConfiguration)):
+        if not session.is_modified(config, include_collections=False):
+            continue
+        if _scoring_weights_changed(session, config, sa_inspect(config)):
+            config.formula_version = (config.formula_version or 1) + 1
 
 
 # ============================================================================

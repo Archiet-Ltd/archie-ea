@@ -59,6 +59,9 @@ class HybridCapabilityTenantMixin:
     change does not touch that other file beyond this comment.
     """
 
+    # Plural noun used in write-refusal messages.
+    hybrid_owner_label = "capabilities"
+
     @declared_attr
     def organization_id(cls):
         return Column(
@@ -638,13 +641,14 @@ class UnifiedCapability(HybridCapabilityTenantMixin, db.Model, OptimisticLockMix
 
 
 @db.event.listens_for(db.session, "do_orm_execute")
-def _scope_unified_capability_queries(orm_execute_state):
-    """Expose shared reference capabilities plus only the current tenant's rows.
+def _scope_hybrid_owner_queries(orm_execute_state):
+    """Expose shared rows plus only the current tenant's rows, for every hybrid model.
 
-    UnifiedCapability intentionally cannot use the ordinary TenantMixin: that
-    mixin's equality predicate would hide the shared ``organization_id IS
-    NULL`` catalogue.  Writes are stricter than reads so tenants cannot mutate
-    reference rows through an ORM bulk statement.
+    Applies to every mapped class using ``HybridCapabilityTenantMixin``
+    (``UnifiedCapability``, ``ScoringConfiguration``). Those models cannot use
+    the ordinary TenantMixin: its equality predicate would hide the shared
+    ``organization_id IS NULL`` rows. Writes are stricter than reads so tenants
+    cannot mutate shared rows through an ORM bulk statement.
     """
 
     if not has_request_context() or getattr(g, "current_org_id", None) is None:
@@ -668,41 +672,44 @@ def _scope_unified_capability_queries(orm_execute_state):
     else:
         predicate = lambda cls: cls.organization_id == organization_id  # noqa: E731
     orm_execute_state.statement = orm_execute_state.statement.options(
-        with_loader_criteria(UnifiedCapability, predicate, include_aliases=True)
+        with_loader_criteria(HybridCapabilityTenantMixin, predicate, include_aliases=True)
     )
 
 
 @db.event.listens_for(db.session, "before_flush")
-def _protect_reference_capability_writes(session, flush_context, instances):
-    """Stamp tenant-created capabilities and reject reference/cross-org edits."""
+def _protect_hybrid_owner_writes(session, flush_context, instances):
+    """Stamp tenant-created hybrid rows and reject shared/cross-org edits."""
 
     if not has_request_context() or getattr(g, "current_org_id", None) is None:
         return
     organization_id = g.current_org_id
 
-    for capability in (item for item in session.new if isinstance(item, UnifiedCapability)):
-        if capability.scope == "reference":
-            raise PermissionError("reference capabilities are read-only inside a tenant request")
-        if capability.organization_id is None:
-            capability.organization_id = organization_id
-        if capability.organization_id != organization_id:
-            raise PermissionError("capabilities owned by another tenant are read-only")
-        if capability.scope is None:
-            capability.scope = "tenant"
+    for item in (row for row in session.new if isinstance(row, HybridCapabilityTenantMixin)):
+        label = item.hybrid_owner_label
+        is_capability = isinstance(item, UnifiedCapability)
+        if is_capability and item.scope == "reference":
+            raise PermissionError(f"reference {label} are read-only inside a tenant request")
+        if item.organization_id is None:
+            item.organization_id = organization_id
+        if item.organization_id != organization_id:
+            raise PermissionError(f"{label} owned by another tenant are read-only")
+        if is_capability and item.scope is None:
+            item.scope = "tenant"
 
-    for capability in (
-        item
-        for item in session.dirty.union(session.deleted)
-        if isinstance(item, UnifiedCapability)
+    for item in (
+        row
+        for row in session.dirty.union(session.deleted)
+        if isinstance(row, HybridCapabilityTenantMixin)
     ):
-        history = sa_inspect(capability).attrs.organization_id.history
+        label = item.hybrid_owner_label
+        history = sa_inspect(item).attrs.organization_id.history
         original_organization_id = (
-            history.deleted[0] if history.deleted else capability.organization_id
+            history.deleted[0] if history.deleted else item.organization_id
         )
         if original_organization_id is None:
-            raise PermissionError("reference capabilities are read-only inside a tenant request")
-        if original_organization_id != organization_id or capability.organization_id != organization_id:
-            raise PermissionError("capabilities owned by another tenant are read-only")
+            raise PermissionError(f"reference {label} are read-only inside a tenant request")
+        if original_organization_id != organization_id or item.organization_id != organization_id:
+            raise PermissionError(f"{label} owned by another tenant are read-only")
 
 
 

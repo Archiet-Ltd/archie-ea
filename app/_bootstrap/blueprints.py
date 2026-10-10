@@ -173,7 +173,6 @@ def _init_blueprints(app):
     _register_solution_product(app)
     _register_intelligence(app)
     _register_metamodel_properties(app)
-    _register_formula_register(app)
 
     # --- North Star Persona MVP modules (NS-008, NS-009, NS-010, NS-011, NS-012, NS-013) ---
     _register_persona_modules(app)
@@ -1417,18 +1416,6 @@ def _register_intelligence(app):
         app.logger.warning("Failed to register intelligence module: %s", e)
 
 
-def _register_formula_register(app):
-    """R1-B34: Formula register — where a reviewer views and versions a
-    composite score's weights (TB-0135)."""
-    try:
-        from app.modules.formula_register import register as register_formula_register
-
-        register_formula_register(app)
-        app.logger.info(
-            "[BLUEPRINT] Formula Register registered at /admin/formula-register"
-        )
-    except Exception as e:
-        app.logger.warning(f"[BLUEPRINT] Formula Register registration failed: {e}")
 
 
 def _register_solution_product(app):

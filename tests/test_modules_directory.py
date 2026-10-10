@@ -309,43 +309,6 @@ def test_role_exclusive_sections_are_hidden_from_other_personas(
     assert not leaked, f"role-exclusive surfaces shown to a non-owner: {leaked}"
 
 
-@pytest.mark.parametrize(
-    "enterprise_role,platform_admin",
-    [
-        ("portfolio_manager", False),
-        ("platform_admin", True),
-    ],
-)
-def test_formula_register_still_shown_to_its_own_personas(
-    app, db_session, org, client, login_as, enterprise_role, platform_admin
-):
-    """Regression guard for the other direction of the leak fix above:
-    formula_register lives under /admin/formula-register/ (so it is swept up
-    by the "/admin/" prefix check in the leak test) but is gated to
-    "portfolio_management" (role_access.py), not "administration" -- mapping
-    it to "administration" would have hidden it from portfolio_manager, the
-    persona who actually reviews formula versions and whose own zone carries
-    this link, while only incidentally satisfying the leak test for
-    enterprise_architect."""
-    from flask import url_for
-
-    user = _make_user(
-        db_session, org, enterprise_role=enterprise_role, platform_admin=platform_admin
-    )
-    login_as(client, user)
-
-    with app.test_request_context():
-        formula_register_url = url_for("formula_register.index")
-
-    hrefs = _rendered_hrefs(client)
-    assert formula_register_url in hrefs, (
-        f"{enterprise_role} lost the Formula Register link"
-    )
-
-    login_as(client, user)
-    assert client.get(formula_register_url).status_code == 200
-
-
 def test_platform_admin_still_sees_the_admin_zone(
     app, db_session, org, client, login_as
 ):

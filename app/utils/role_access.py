@@ -100,10 +100,6 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
         "roadmaps",
         "governance",
         "procurement",  # Read-only access to procurement for cost visibility
-        # R1-B34 (TB-0135): owns the Formula Register (reviews/versions the
-        # composite-score weights) -- see its _link() in this persona's zone
-        # below.
-        "portfolio_management",
     },
     ROLE_CTO: {
         "home",
@@ -138,7 +134,6 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
         "my_applications",
         "data_integration",
         "administration",
-        "portfolio_management",
     },
     # G6 (register close, 1 Sep 2026): security_architect and data_architect
     # were promoted to first-class roles (VALID_ROLES, own charters, own sidebar
@@ -203,9 +198,6 @@ EXCLUSIVE_SECTIONS: Dict[str, List[str]] = {
     "administration": [ROLE_PLATFORM_ADMIN],
     "procurement": [ROLE_PROCUREMENT, ROLE_PORTFOLIO_MANAGER, ROLE_PLATFORM_ADMIN],
     "my_applications": [ROLE_APPLICATION_MANAGER, ROLE_PLATFORM_ADMIN],
-    # R1-B34 (TB-0135): Formula Register -- reviewed/versioned by
-    # portfolio_manager; platform_admin sees everything.
-    "portfolio_management": [ROLE_PORTFOLIO_MANAGER, ROLE_PLATFORM_ADMIN],
 }
 
 # Default role if user has no enterprise_role set
@@ -810,11 +802,11 @@ _MY_WORK_LINKS = {
         _link("Portfolio", "portfolio.index", "briefcase"),
         _APPROVAL_INBOX_LINK,
         _link("Rationalization", "unified_applications.rationalization_dashboard", "git-merge"),
-        # R1-B34 (TB-0135): the reviewer of a composite score's weights is
-        # this persona -- the rationalization scorecard's own number now
-        # names a formula version, so the page that edits it belongs next
-        # to the dashboard that reads it.
-        _link("Formula Register", "formula_register.index", "calculator"),
+        # R1-B34/#251: ScoringConfiguration is the governed formula register
+        # (owner/reviewer/version/effective_date), but its only interface is
+        # an API (/api/scoring-configurations in dashboard_pages_routes.py) --
+        # no page exists yet to link here. Named gap, not built around: a
+        # dedicated page editor is still owed.
         _link("Vendors", "unified_applications.vendors", "building"),
         _link("Applications", "unified_applications.application_list", "list"),
         # S-11 remainder: directory-only, never in a sidebar zone.

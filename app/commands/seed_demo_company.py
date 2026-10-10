@@ -1450,6 +1450,33 @@ def seed_demo_company() -> dict:
             db.session.flush()
         stats["gaps_created"] = gaps_created
 
+        # ── 13. scoring configuration ───────────────────────────────────
+        # Without this, rationalization scoring returns 409 ("no scoring
+        # formula is registered for this organisation") for the whole demo
+        # company, degrading the Level 10 archetype walkthrough's
+        # portfolio_manager step. One default, org-scoped configuration
+        # (not a shared/global row) is enough -- it is private to this
+        # demo organisation, matching every other row seeded here.
+        from app.models.application_rationalization import ScoringConfiguration
+
+        existing_config = ScoringConfiguration.query.filter_by(
+            organization_id=org_id, is_default=True
+        ).first()
+        if existing_config is None:
+            db.session.add(
+                ScoringConfiguration(
+                    name="Default scoring configuration",
+                    description="CIO.gov federal baseline weights, seeded for the demo company.",
+                    scope_type="global",
+                    organization_id=org_id,
+                    is_active=True,
+                    is_default=True,
+                )
+            )
+            stats["scoring_configuration_created"] = 1
+        else:
+            stats["scoring_configuration_created"] = 0
+
         db.session.commit()
 
     return stats
