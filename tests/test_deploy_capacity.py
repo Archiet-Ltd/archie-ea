@@ -19,13 +19,17 @@ def run_deploy(tmp_path):
     assert BASH and Path(BASH).is_file(), "deployment tests require Bash"
 
     def run(*, available="3250585", minimum=None, docker_root="/srv/docker storage",
-            info_status="0", df_status="0"):
+             info_status="0", df_status="0"):
+        verify_stub = tmp_path / "verify-stub.sh"
+        verify_stub.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+        verify_stub.chmod(0o755)
         env = os.environ.copy()
         env.pop("ARCHIE_DEPLOY_MIN_FREE_MIB", None)
         env.update(
             ARCHIE_REPO=tmp_path.as_posix(),
             ARCHIE_BACKUPS=(tmp_path / "backups").as_posix(),
             ARCHIE_RELEASE_STATE=(tmp_path / "state").as_posix(),
+            DEPLOY_VERIFIED_SCRIPT=verify_stub.as_posix(),
             TEST_SCRIPT=(ROOT / "deploy" / "deploy.sh").as_posix(),
             TEST_LOG=(tmp_path / "commands.log").as_posix(),
             TEST_AVAILABLE=available,

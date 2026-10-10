@@ -168,9 +168,22 @@ def test_deploy_verified_is_wrapped_with_skip_deploy_only_in_dry_run():
     assert deploy["if"] == "steps.gate.outputs.mode == 'deploy'"
     assert "--skip-deploy" not in deploy["run"]
     assert deploy["env"]["AUTO_ROLLBACK"] == "1"
+    assert "steps.release.outputs.image" in deploy["env"]["ARCHIE_IMAGE"]
     assert "steps.gate.outputs.sha" in deploy["env"]["DEPLOY_SHA"]
     assert steps["post"]["run"] == "python3 scripts/post_deploy_verify.py --json"
     assert steps["post"]["if"] == "steps.gate.outputs.mode == 'deploy'"
+
+
+def test_real_deploy_downloads_the_release_manifest_and_uses_its_digest():
+    steps = {s.get("id"): s for _, s in all_steps(load_workflow())}
+    assert steps["release"]["env"]["RELEASE_DIR"] == "${{ runner.temp }}/release-artifact"
+    assert "actions/artifacts?per_page=100" in steps["release"]["run"]
+    assert "archive_download_url" in steps["release"]["run"]
+    assert "target_name = f\"release-" in steps["release"]["run"]
+    assert "archive.extract(\"release.json\"" in steps["release"]["run"]
+    assert "release manifest commit" in steps["release"]["run"]
+    assert "digest-pinned GHCR reference" in steps["release"]["run"]
+    assert "image={image}" in steps["release"]["run"]
 
 
 def test_actions_are_pinned_to_a_full_commit_sha():

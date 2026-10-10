@@ -60,6 +60,14 @@
 #   script's verification half (steps 2-5) should be folded into that one and
 #   this file retired — do not let both remain the "current" answer at once.
 #
+#   29 Sep 2026: The image-pipeline topology (deploy/deploy.sh) is
+#   now the live path. The bind-mount checks (verify_mount, step 3) are
+#   RETIRED for the image-pipeline topology — they only apply to the
+#   bind-mount checkout topology this script was written for. When running
+#   against the image pipeline, set IMAGE_PIPELINE_TOPOLOGY=1 to skip the
+#   bind-mount checks. The cross-organisation check (step 6) is the new
+#   post-deploy verification for the image-pipeline topology.
+#
 # USAGE:
 #   scripts/deploy_verified.sh <ref> [--skip-deploy]
 #
@@ -315,21 +323,56 @@ run_smoke_check() {
 }
 
 # ---------------------------------------------------------------------------
-# Runs steps 2-5 against whatever is currently running and returns their
+# Step 6 (optional): cross-organisation tenant isolation check. Signs in as
+# each production test organisation and asserts neither can read the other's
+# records. Skipped, with a loud warning, if the test org credentials are not
+# supplied. Fails the deploy on any cross-organisation read.
+#
+# Requires the two production test organisations to be seeded first:
+#   flask seed-production-test-organisations
+# ---------------------------------------------------------------------------
+run_cross_org_check() {
+    if [ -z "${PROD_TEST_ORG_A_EMAIL:-}" ] || [ -z "${PROD_TEST_ORG_B_EMAIL:-}" ] || \
+       [ -z "${PROD_TEST_ORG_PASSWORD:-}" ]; then
+        printf 'WARNING: PROD_TEST_ORG_A_EMAIL / PROD_TEST_ORG_B_EMAIL / PROD_TEST_ORG_PASSWORD not set; skipping cross-organisation tenant isolation check (this step proves tenant isolation holds after deploy — skipping it is a real gap, not a pass)\n' >&2
+        return 0
+    fi
+    say "running cross-organisation tenant isolation check"
+    DEPLOY_VERIFY_BASE_URL="${DEPLOY_VERIFY_BASE_URL:-https://165-22-125-156.sslip.io}" \
+    python3 "$SCRIPT_DIR/deploy_verify_cross_org.py"
+}
+
+# ---------------------------------------------------------------------------
+# Runs steps 2-6 against whatever is currently running and returns their
 # combined status. Does not touch $RESOLVED_COMMIT/$EXPECTED_SHORT itself —
 # the caller sets those before calling this, since step 1 (or reading the
 # droplet's current HEAD, in --skip-deploy mode) is what determines them.
+#
+# When IMAGE_PIPELINE_TOPOLOGY=1, the bind-mount check (step 3) is skipped:
+# the image pipeline strips all bind mounts, so the check would always fail.
 # ---------------------------------------------------------------------------
 run_verification() {
     local status=0
     if wait_for_health; then printf 'OK: %s\n' "container reports healthy"; else status=1; fi
-    if verify_mount; then printf 'OK: %s\n' "bind mount is present and correct"; else status=1; fi
+    if [ "${IMAGE_PIPELINE_TOPOLOGY:-0}" = "1" ]; then
+        printf 'OK: %s\n' "bind-mount check skipped (image-pipeline topology has no bind mounts)"
+    else
+        if verify_mount; then printf 'OK: %s\n' "bind mount is present and correct"; else status=1; fi
+    fi
     if verify_running_code; then printf 'OK: %s\n' "running build_id matches target commit"; else status=1; fi
     if run_smoke_check; then
         # run_smoke_check also returns 0 when it deliberately skipped (no
         # credentials set) -- only claim success when it actually ran.
         if [ -n "${DEPLOY_VERIFY_EMAIL:-}" ] && [ -n "${DEPLOY_VERIFY_PASSWORD:-}" ]; then
             printf 'OK: %s\n' "authenticated smoke check reached a real page"
+        fi
+    else
+        status=1
+    fi
+    if run_cross_org_check; then
+        if [ -n "${PROD_TEST_ORG_A_EMAIL:-}" ] && [ -n "${PROD_TEST_ORG_B_EMAIL:-}" ] && \
+           [ -n "${PROD_TEST_ORG_PASSWORD:-}" ]; then
+            printf 'OK: %s\n' "cross-organisation tenant isolation holds"
         fi
     else
         status=1

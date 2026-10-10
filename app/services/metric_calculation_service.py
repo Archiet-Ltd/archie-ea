@@ -119,6 +119,7 @@ class MetricCalculationService:
 
         # Build query
         query = db.session.query(model_class)
+        query = self._apply_production_test_org_filter(query, model_class)
 
         # Apply filters
         if filters:
@@ -179,6 +180,7 @@ class MetricCalculationService:
     def _calculate_total_count(self, model_class, filters: Optional[Dict] = None) -> int:
         """Calculate total record count"""
         query = db.session.query(model_class)
+        query = self._apply_production_test_org_filter(query, model_class)
 
         if filters:
             for key, value in filters.items():
@@ -192,6 +194,7 @@ class MetricCalculationService:
     ) -> int:
         """Calculate count for specific status"""
         query = db.session.query(model_class).filter(model_class.status == status)
+        query = self._apply_production_test_org_filter(query, model_class)
 
         if filters:
             for key, value in filters.items():
@@ -210,8 +213,9 @@ class MetricCalculationService:
         # BusinessCapability-specific metrics
         if model_name == "BusinessCapability":
             # Maturity Score
+            avg_maturity_query = db.session.query(func.avg(model_class.current_maturity_level))
             avg_maturity = (
-                db.session.query(func.avg(model_class.current_maturity_level)).scalar() or 0
+                self._apply_production_test_org_filter(avg_maturity_query, model_class).scalar() or 0
             )
 
             metrics.append(
@@ -227,8 +231,13 @@ class MetricCalculationService:
 
             # Maturity Gap
             total_gap = (
-                db.session.query(
-                    func.sum(model_class.target_maturity_level - model_class.current_maturity_level)
+                self._apply_production_test_org_filter(
+                    db.session.query(
+                        func.sum(
+                            model_class.target_maturity_level - model_class.current_maturity_level
+                        )
+                    ),
+                    model_class,
                 )
                 .filter(model_class.target_maturity_level > model_class.current_maturity_level)
                 .scalar()
@@ -250,7 +259,9 @@ class MetricCalculationService:
         elif model_name == "Application" or model_name == "ApplicationComponent":
             if hasattr(model_class, "annual_cost"):
                 total_cost = (
-                    db.session.query(func.sum(model_class.annual_cost))
+                    self._apply_production_test_org_filter(
+                        db.session.query(func.sum(model_class.annual_cost)), model_class
+                    )
                     .filter(model_class.status == "active")
                     .scalar()
                     or 0
@@ -309,6 +320,7 @@ class MetricCalculationService:
             current_query = db.session.query(model_class).filter(
                 model_class.created_at >= thirty_days_ago
             )
+            current_query = self._apply_production_test_org_filter(current_query, model_class)
             if filters:
                 for key, value in filters.items():
                     if hasattr(model_class, key):
@@ -322,6 +334,7 @@ class MetricCalculationService:
                     model_class.created_at < thirty_days_ago,
                 )
             )
+            previous_query = self._apply_production_test_org_filter(previous_query, model_class)
             if filters:
                 for key, value in filters.items():
                     if hasattr(model_class, key):
@@ -424,3 +437,23 @@ class MetricCalculationService:
         """Clear metric cache"""
         self.cache = {}
         logger.info("Metric cache cleared")
+
+    def _apply_production_test_org_filter(self, query: Query, model_class) -> Query:
+        """Exclude synthetic production test organisations from global metrics.
+
+        These organisations exist only to prove tenant isolation after deploys and
+        must never inflate cross-organisation metrics or billing numbers.
+        """
+        from app.commands.seed_production_test_organisations import production_test_org_slugs
+        from app.models.organization import Organization
+
+        excluded_slugs = production_test_org_slugs()
+        if not excluded_slugs:
+            return query
+        if model_class is Organization:
+            return query.filter(~Organization.slug.in_(excluded_slugs))
+        if hasattr(model_class, "organization_id"):
+            return query.join(
+                Organization, model_class.organization_id == Organization.id
+            ).filter(~Organization.slug.in_(excluded_slugs))
+        return query

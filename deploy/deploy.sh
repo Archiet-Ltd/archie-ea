@@ -14,6 +14,8 @@ PUBLIC_HEALTH_TIMEOUT=${PUBLIC_HEALTH_TIMEOUT:-300}
 IMAGE_REF=${1:-}
 EXPECTED_COMMIT=${2:-}
 COMPOSE=(docker compose -f docker-compose.yml -f deploy/docker-compose.production.yml)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEPLOY_VERIFIED_SCRIPT=${DEPLOY_VERIFIED_SCRIPT:-"$SCRIPT_DIR/../scripts/deploy_verified.sh"}
 
 say() { printf '\n== %s\n' "$*"; }
 die() { printf 'ABORT: %s\n' "$*" >&2; exit 1; }
@@ -183,6 +185,11 @@ docker compose exec -T postgres pg_dumpall -U postgres | gzip > "$BACKUPS/db-$TS
 
 say "activating exact image digest"
 if ! activate "$IMAGE_REF" "$EXPECTED_COMMIT"; then
+    rollback
+fi
+
+say "running deploy_verified.sh for image-pipeline verification"
+if ! IMAGE_PIPELINE_TOPOLOGY=1 AUTO_ROLLBACK=0 bash "$DEPLOY_VERIFIED_SCRIPT" "$EXPECTED_COMMIT" --skip-deploy; then
     rollback
 fi
 

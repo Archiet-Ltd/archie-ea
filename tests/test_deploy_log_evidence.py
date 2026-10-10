@@ -25,11 +25,15 @@ def deployment(tmp_path):
 
     def run(*, log_status="0", product_status="0", message="ERROR: candidate-only diagnostic"):
         live_log.write_text(message + "\n")
+        verify_stub = tmp_path / "verify-stub.sh"
+        verify_stub.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+        verify_stub.chmod(0o755)
         env = os.environ.copy()
         env.update(
             ARCHIE_REPO=tmp_path.as_posix(),
             ARCHIE_BACKUPS=(tmp_path / "backups").as_posix(),
             ARCHIE_RELEASE_STATE=state.as_posix(),
+            DEPLOY_VERIFIED_SCRIPT=verify_stub.as_posix(),
             ARCHIE_DEPLOY_MIN_FREE_MIB="20480",
             TEST_SCRIPT=(ROOT / "deploy" / "deploy.sh").as_posix(),
             TEST_LOG=(tmp_path / "commands.log").as_posix(),
@@ -110,6 +114,7 @@ def test_clean_captured_logs_allow_release(deployment, tmp_path):
     result, commands, _ = deployment(message="INFO: candidate ready")
     assert result.returncode == 0, result.stderr
     assert "deployed and identity-verified" in result.stdout
+    assert "deploy_verified.sh" in result.stdout
     assert commands.count("logs --since 15m server") == 1
     artifacts = list((tmp_path / "state").glob("candidate-*.log"))
     assert len(artifacts) == 1

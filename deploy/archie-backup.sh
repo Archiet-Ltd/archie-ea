@@ -5,10 +5,11 @@
 # dumps in existence were taken by hand during that day's change window. A bad
 # migration, a mistaken DELETE or a disk failure had no recovery path.
 #
-# Takes a verified custom-format dump plus globals, prunes by age, and records
-# a success marker so a silently-failing backup can be detected rather than
-# assumed. Verification matters: an unreadable dump is worse than no dump,
-# because it is mistaken for protection.
+# Takes a verified custom-format dump plus globals, optionally refreshes WAL
+# archiving configuration, prunes by age, and records a success marker so a
+# silently-failing backup can be detected rather than assumed. Verification
+# matters: an unreadable dump is worse than no dump, because it is mistaken for
+# protection.
 set -uo pipefail
 
 DB=archie
@@ -18,6 +19,7 @@ LOG=/var/log/archie-backup.log
 MARKER=$DIR/LAST_SUCCESS
 KEEP_DAILY=14
 MIN_BYTES=100000          # a dump smaller than this is not a real database
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 ts()  { date -u +%Y-%m-%dT%H:%M:%SZ; }
 log() { echo "$(ts) $*" >> "$LOG"; }
@@ -42,6 +44,16 @@ OBJECTS=$(docker exec -i "$CONTAINER" pg_restore --list < "$OUT" 2>>"$LOG" | wc 
 
 docker exec "$CONTAINER" pg_dumpall -U postgres --globals-only > "$DIR/globals.$STAMP.sql" 2>>"$LOG" \
     || log "WARN: globals dump failed (roles/permissions not captured this run)"
+
+if [ -n "${WALG_STORAGE_PREFIX:-}" ]; then
+    if "$SCRIPT_DIR/wal_archive.sh" >>"$LOG" 2>&1; then
+        log "OK  wal-g archive configuration refreshed"
+    else
+        fail "wal-g archive configuration failed"
+    fi
+else
+    log "WARN: WALG_STORAGE_PREFIX not set; wal-g archive configuration skipped"
+fi
 
 find "$DIR" -name 'archie.*.dump'  -mtime +$KEEP_DAILY -delete
 find "$DIR" -name 'globals.*.sql'  -mtime +$KEEP_DAILY -delete

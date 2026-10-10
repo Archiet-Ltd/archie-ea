@@ -215,12 +215,89 @@ jobs:
           fi
           exit 0
 
+      - name: Resolve the immutable release image
+        id: release
+        if: steps.gate.outputs.mode == 'deploy'
+        env:
+          DEPLOY_SHA: ${{ steps.gate.outputs.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_DIR: ${{ runner.temp }}/release-artifact
+        run: |
+          python3 - <<'PY'
+          import io
+          import json
+          import os
+          from pathlib import Path
+          import urllib.request
+          import zipfile
+
+          release_dir = Path(os.environ["RELEASE_DIR"])
+          release_dir.mkdir(parents=True, exist_ok=True)
+          release_path = release_dir / "release.json"
+          if not release_path.is_file():
+              repo = os.environ.get("GITHUB_REPOSITORY", "")
+              token = os.environ.get("GITHUB_TOKEN", "")
+              api_base = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
+              if not repo or not token:
+                  raise SystemExit(
+                      f"missing release manifest: {release_path} (and GitHub artifact lookup is unavailable)"
+                  )
+              listing = urllib.request.Request(
+                  f"{api_base}/repos/{repo}/actions/artifacts?per_page=100",
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "User-Agent": "archie-ea-production-deploy",
+                  },
+              )
+              with urllib.request.urlopen(listing, timeout=30) as response:
+                  payload = json.load(response)
+              target_name = f"release-{os.environ['DEPLOY_SHA']}"
+              artifact = next(
+                  (
+                      item
+                      for item in payload.get("artifacts", [])
+                      if item.get("name") == target_name and not item.get("expired")
+                  ),
+                  None,
+              )
+              if artifact is None:
+                  raise SystemExit(f"no non-expired release artifact named {target_name!r} was found")
+              download = urllib.request.Request(
+                  artifact["archive_download_url"],
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "User-Agent": "archie-ea-production-deploy",
+                  },
+              )
+              with urllib.request.urlopen(download, timeout=30) as response:
+                  archive_bytes = response.read()
+              with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+                  archive.extract("release.json", path=release_dir)
+
+          payload = json.loads(release_path.read_text(encoding="utf-8"))
+          commit = payload.get("commit", "")
+          image = payload.get("image", "")
+          if commit != os.environ["DEPLOY_SHA"]:
+              raise SystemExit(
+                  f"release manifest commit {commit!r} does not match requested commit {os.environ['DEPLOY_SHA']!r}"
+              )
+          if not image.startswith("ghcr.io/") or "@sha256:" not in image:
+              raise SystemExit(f"release manifest image is not a digest-pinned GHCR reference: {image!r}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"image={image}\n")
+          PY
+
       - name: Deploy and verify
         id: deploy
         if: steps.gate.outputs.mode == 'deploy'
         timeout-minutes: 65
         env:
           DEPLOY_SHA: ${{ steps.gate.outputs.sha }}
+          ARCHIE_IMAGE: ${{ steps.release.outputs.image }}
           AUTO_ROLLBACK: "1"
           HEALTH_TIMEOUT_SECONDS: "900"
         run: |

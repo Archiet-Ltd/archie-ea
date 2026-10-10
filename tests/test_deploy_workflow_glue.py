@@ -59,6 +59,10 @@ class Job:
         (self.ws / "scripts").mkdir(parents=True)
         shutil.copy(support.HELPERS, self.ws / "scripts" / "deploy_workflow.py")
         (self.ws / "scripts" / "deploy_verified.sh").write_bytes(support.SCRIPT.read_bytes().replace(b"\r\n", b"\n"))
+        # Cross-organisation check script called by deploy_verified.sh step 6
+        cross_org = ROOT / "scripts" / "deploy_verify_cross_org.py"
+        if cross_org.is_file():
+            shutil.copy(cross_org, self.ws / "scripts" / "deploy_verify_cross_org.py")
         # Stand-in for the wrapper that `setup-ssh` installs.
         (self.temp / "deploy-ssh" / "bin").mkdir(parents=True)
         shutil.copy(droplet.bin / "ssh", self.temp / "deploy-ssh" / "bin" / "ssh")
@@ -70,6 +74,21 @@ class Job:
         self.failed = False
         self.transcript: dict = {}
         self.extra_env: dict = {}
+        artifact_dir = self.temp / "release-artifact"
+        artifact_dir.mkdir(parents=True)
+        (artifact_dir / "release.json").write_text(
+            (
+                '{\n'
+                '  "commit": "%s",\n'
+                '  "digest": "sha256:%s",\n'
+                '  "image": "ghcr.io/anioko/archie@sha256:%s",\n'
+                '  "schema_version": 1,\n'
+                '  "workflow_run": "1"\n'
+                '}\n'
+            )
+            % (requested, "a" * 64, "a" * 64),
+            encoding="utf-8",
+        )
 
     def _expr(self, match) -> str:
         expr = match.group(1).strip()
@@ -79,7 +98,13 @@ class Job:
         m = re.fullmatch(r"steps\.(\w+)\.outcome", expr)
         if m:
             return self.outcomes.get(m.group(1), "skipped")
-        return {"github.server_url": "https://github.com", "github.repository": "o/r", "github.run_id": "1"}[expr]
+        return {
+            "github.server_url": "https://github.com",
+            "github.repository": "o/r",
+            "github.run_id": "1",
+            "github.token": "test-token",
+            "runner.temp": self.temp.as_posix(),
+        }[expr]
 
     def _should_run(self, step: dict) -> bool:
         cond = step.get("if")
@@ -92,7 +117,7 @@ class Job:
         return self.outputs.get(m.group(1), {}).get(m.group(2), "") == m.group(3) and not self.failed
 
     def run_step(self, key: str):
-        step = next(s for s in self.steps if key in (s.get("id"), s.get("name")))
+        step = next(s for s in self.steps if key in (s.get("id"), s.get("name"), s.get("uses")))
         sid = step.get("id")
         if sid in SKIPPED_STEPS or "uses" in step:
             return None
@@ -181,11 +206,37 @@ def test_real_deploy_succeeds_only_when_the_script_verifies_the_requested_commit
     job = Job(droplet, "deploy", sha(droplet, "B")).run_all()
 
     assert job.outputs["baseline"]["result"] == "passed"
+    assert job.outputs["release"]["image"] == "ghcr.io/anioko/archie@sha256:%s" % ("a" * 64)
     assert job.outcomes["deploy"] == "success"
     assert job.outputs["deploy"] == {"deploy_result": "verified", "rollback": "not-attempted"}
     assert droplet.running() == sha(droplet, "B")
     assert "Deployed and verified" in job.summary()
     assert "Running after | `%s`" % sha(droplet, "B") in job.summary()
+
+
+def test_release_manifest_must_match_the_requested_commit(droplet):
+    job = Job(droplet, "deploy", sha(droplet, "B"))
+    (job.temp / "release-artifact" / "release.json").write_text(
+        (
+            '{\n'
+            '  "commit": "%s",\n'
+            '  "digest": "sha256:%s",\n'
+            '  "image": "ghcr.io/anioko/archie@sha256:%s",\n'
+            '  "schema_version": 1,\n'
+            '  "workflow_run": "1"\n'
+            '}\n'
+        )
+        % (sha(droplet, "A"), "a" * 64, "a" * 64),
+        encoding="utf-8",
+    )
+
+    for name in ("Prepare runner directories", "ssh", "baseline", "release"):
+        result = job.run_step(name)
+
+    assert result.returncode != 0
+    assert job.outcomes["release"] == "failure"
+    assert "does not match requested commit" in job.transcript["release"]
+    assert "deploy" not in job.outcomes
 
 
 def test_a_failed_deploy_rolls_back_and_the_run_is_red(droplet):

@@ -348,6 +348,32 @@ def user_limit_status(org_id: int) -> Dict:
     return _status(plan, limit, _count_members(db.session.connection(), org_id, plan.counts))
 
 
+def organization_plan_statuses() -> list[Dict]:
+    """Return billing status for every real organisation.
+
+    Synthetic production test organisations exist only to prove cross-tenant
+    isolation after deploys. They are excluded from any billing aggregation by
+    organisation so they cannot appear as billable customers or usage rows.
+    """
+    from app import db
+    from app.models.organization import Organization
+
+    rows = (
+        _exclude_production_test_orgs(
+            db.session.query(Organization).order_by(Organization.id)
+        )
+        .all()
+    )
+    return [
+        {
+            "organization_id": org.id,
+            "organization_slug": org.slug,
+            **user_limit_status(org.id),
+        }
+        for org in rows
+    ]
+
+
 class PlanLimitReached(Exception):
     """Raised when adding someone would take an organisation past its plan."""
 
@@ -500,3 +526,11 @@ def install_user_limit_guard() -> None:
 
     if not event.contains(Session, "before_flush", _guard_flush):
         event.listen(Session, "before_flush", _guard_flush)
+
+
+def _exclude_production_test_orgs(query):
+    """Filter synthetic production test organisations from org-wide billing queries."""
+    from app.commands.seed_production_test_organisations import production_test_org_slugs
+    from app.models.organization import Organization
+
+    return query.filter(~Organization.slug.in_(production_test_org_slugs()))
