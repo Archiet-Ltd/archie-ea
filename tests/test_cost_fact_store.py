@@ -574,8 +574,9 @@ def test_the_migration_chain_has_one_head_and_a_short_revision_id():
     graph = _revision_graph()
     parents = set().union(*graph.values())
     heads = [r for r in graph if r not in parents]
-    assert heads == ["20261010_cost_fact_store"]
-    assert graph["20261010_cost_fact_store"] == {"20261008_cr_organization_id"}
+    assert heads == ["20261010_cost_facts_rls"]
+    assert graph["20261010_cost_facts_rls"] == {"20261010_cost_fact_store"}
+    assert graph["20261010_cost_fact_store"] == {"20261010_arb_change_requests_rls"}
     assert all(len(r) <= 32 for r in graph)
 
 
@@ -611,3 +612,20 @@ def test_the_migration_is_idempotent_and_adds_what_it_says(db_session):
     assert wanted == {c["name"] for c in inspector.get_columns("cost_facts")}
     wanted = {c.name for c in db.metadata.tables["exchange_rates"].columns}
     assert wanted == {c["name"] for c in inspector.get_columns("exchange_rates")}
+
+
+def test_an_unchanged_amount_keeps_its_recorded_currency_when_the_default_changes(db_session, make_org):
+    from app.services.cost_fact_store import upsert_fact
+
+    org = make_org("a")
+    app_row = _app_component(db_session, org)
+    upsert_fact(org.id, "application", app_row.id, "100", "USD", "test")
+    db_session.flush()
+
+    fact, outcome = upsert_fact(org.id, "application", app_row.id, "100", "GBP", "test",
+                                keep_currency_when_amount_unchanged=True)
+    assert (outcome, fact.currency) == ("unchanged", "USD")
+
+    fact, outcome = upsert_fact(org.id, "application", app_row.id, "120", "GBP", "test",
+                                keep_currency_when_amount_unchanged=True)
+    assert (outcome, fact.currency) == ("updated", "GBP")
