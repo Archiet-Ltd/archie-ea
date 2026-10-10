@@ -1,0 +1,151 @@
+{% extends 'onboarding/_wizard_shell.html' %}
+{% set step_title = 'Bring your company' %}
+{% set step_number = 2 %}
+
+{% block wizard_content %}
+<div x-data="{
+        stage: {{ (current.stage or '') | tojson | forceescape }},
+        companySize: {{ (current.company_size or '') | tojson | forceescape }},
+        industry: {{ (current.industry or '') | tojson | forceescape }},
+        sourceUrl: {{ (current.source_url or '') | tojson | forceescape }},
+        regionEu: {{ (current.region_europe_or_eu_customers | default(false)) | tojson }},
+        cardData: {{ (current.handles_card_data_directly | default(false)) | tojson }},
+        selectedRole: {{ (current_user.enterprise_role or 'solution_architect') | tojson | forceescape }},
+        {% include 'partials/_role_personalization_js.html' %}
+        submitting: false,
+        readingMessage: '',
+        readingStatus: '',
+        errorMessage: '',
+        readSite() {
+            if (!this.sourceUrl) { return; }
+            window.Platform.fetch('{{ url_for('onboarding.api_website_read') }}', {
+                method: 'POST',
+                body: {source_url: this.sourceUrl},
+                silent: true,
+            }).then(data => {
+                this.readingMessage = (data && data.data && data.data.message) || 'Saved.';
+                this.readingStatus = (data && data.data && data.data.status) || '';
+            }).catch(() => {
+                this.readingMessage = 'Could not save the address just now — you can try again later.';
+            });
+        },
+        submit() {
+            if (!this.stage) { this.errorMessage = 'Pick the stage that fits best.'; return; }
+            this.submitting = true;
+            this.errorMessage = '';
+            window.Platform.fetch('{{ url_for('onboarding.company') }}', {
+                method: 'POST',
+                body: {
+                    stage: this.stage,
+                    company_size: this.companySize,
+                    industry: this.industry,
+                    source_url: this.sourceUrl,
+                    region_europe_or_eu_customers: this.regionEu,
+                    handles_card_data_directly: this.cardData,
+                    enterprise_role: this.selectedRole,
+                },
+                silent: true,
+            }).then(data => {
+                this.submitting = false;
+                if (data && data.success && data.data && data.data.next) {
+                    window.location.href = data.data.next;
+                } else {
+                    this.errorMessage = 'Something went wrong — try again.';
+                }
+            }).catch(() => {
+                this.submitting = false;
+                this.errorMessage = 'Something went wrong — try again.';
+            });
+        }
+    }"
+    class="p-8 space-y-8">
+    <div class="space-y-6">
+        <div class="space-y-1">
+            <h2 class="text-lg font-bold text-foreground">Set up your workspace</h2>
+            <p class="text-sm text-muted-foreground">This personalizes {{ config.APP_NAME }} for you — change any of it later from Workspace setup in the menu.</p>
+        </div>
+        {% include 'onboarding/_workspace_setup_fields.html' %}
+    </div>
+
+    <div class="h-px bg-border"></div>
+
+    <div class="space-y-1">
+        <h1 class="text-lg font-bold text-foreground">Bring your company</h1>
+        <p class="text-sm text-muted-foreground">This is the only step that isn't optional — everything else you can fill in later.</p>
+    </div>
+
+    {% if current_user.onboarding_completed_at %}
+    <a href="{{ url_for('onboarding.review') }}"
+       class="flex items-center justify-between rounded-lg border border-border p-3 hover:border-primary/30 transition-colors">
+        <span class="text-sm text-foreground">Review what we can already tell about your company</span>
+        <i data-lucide="arrow-right" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
+    </a>
+    {% endif %}
+
+    <div>
+        <label class="text-sm font-medium text-foreground mb-2 block" id="stage-label">What stage are you at?</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-labelledby="stage-label">
+            {% for s in stages %}
+            <label class="flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors"
+                   :class="stage === '{{ s.key }}' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'">
+                <input type="radio" name="stage" value="{{ s.key }}" x-model="stage" class="accent-primary mt-0.5">
+                <span class="text-sm font-medium text-foreground">{{ s.label }}</span>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label for="company_size" class="text-sm font-medium text-foreground mb-1 block">Company size (optional)</label>
+            <input id="company_size" type="text" x-model="companySize" placeholder="e.g. 12 people"
+                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1
+                          text-sm shadow-sm transition-colors placeholder:text-muted-foreground
+                          focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        </div>
+        <div>
+            <label for="industry" class="text-sm font-medium text-foreground mb-1 block">Industry (optional)</label>
+            <input id="industry" type="text" x-model="industry" placeholder="e.g. Logistics software"
+                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1
+                          text-sm shadow-sm transition-colors placeholder:text-muted-foreground
+                          focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        </div>
+    </div>
+
+    <div class="rounded-lg border border-border p-4 space-y-3">
+        <label for="source_url" class="text-sm font-medium text-foreground block">Your website (optional)</label>
+        <p class="text-xs text-muted-foreground">We'll read your site to save you typing — you'll confirm anything we find.</p>
+        <div class="flex gap-2">
+            <input id="source_url" type="url" x-model="sourceUrl" placeholder="https://yourcompany.com"
+                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1
+                          text-sm shadow-sm transition-colors placeholder:text-muted-foreground
+                          focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+            <button type="button" @click="readSite()" :disabled="!sourceUrl"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium
+                           border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2
+                           disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap">
+                Read our site
+            </button>
+        </div>
+        <p x-show="readingMessage" x-cloak x-text="readingMessage" class="text-xs text-muted-foreground" role="status"></p>
+        <label class="flex items-center gap-2 text-xs text-muted-foreground">
+            <input type="checkbox" x-model="regionEu" class="accent-primary">
+            We're in Europe, or some of our customers are
+        </label>
+        <label class="flex items-center gap-2 text-xs text-muted-foreground">
+            <input type="checkbox" x-model="cardData" class="accent-primary">
+            We handle card payment data directly
+        </label>
+    </div>
+
+    <p x-show="errorMessage" x-cloak x-text="errorMessage" class="text-sm text-destructive" role="alert"></p>
+
+    <button type="button" @click="submit()" :disabled="submitting"
+            class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium
+                   bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2
+                   disabled:opacity-50 disabled:pointer-events-none">
+        <span x-show="!submitting">Continue</span>
+        <span x-show="submitting" x-cloak>Saving…</span>
+    </button>
+</div>
+{% endblock %}

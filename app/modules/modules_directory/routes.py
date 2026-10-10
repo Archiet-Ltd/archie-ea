@@ -115,6 +115,8 @@ _MORE_TOOLS = [
     # code comment: reached from an Ask result, kept out of the sidebar
     # budget) -- this is its one findable home. "network" matches the icon
     # already used for the Twin map button inside ask.html.
+    ("Getting started", "onboarding.index", "rocket"),
+    ("Tell us more", "onboarding.tell_us_more_hub", "clipboard-list"),
     ("Twin Map", "intelligence_ui.twin_map", "network"),
     # Reached from a Twin map element or an Element properties missing-value
     # row as well; this is its findable home, outside the sidebar budget.

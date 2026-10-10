@@ -1,0 +1,338 @@
+{
+  "implementationTypes": [
+    {
+      "id": "enterprise-platform",
+      "icon": "Building2",
+      "title": "Enterprise Platform Implementation",
+      "description": "Implement platforms like Salesforce, SAP, Workday, or Microsoft 365",
+      "fullDescription": "Deploy and configure enterprise-grade platforms that provide comprehensive business functionality out-of-the-box with extensive customization capabilities.",
+      "examples": [
+        "Salesforce Sales Cloud",
+        "SAP S/4HANA",
+        "Workday HCM",
+        "Microsoft 365",
+        "Oracle ERP Cloud",
+        "ServiceNow"
+      ],
+      "badge": "Recommended for large companies",
+      "companySizeFit": ["large", "enterprise"],
+      "industryFocus": ["all"],
+      "typicalUseCase": "Organizations seeking proven, scalable solutions with vendor support",
+      "advantages": [
+        "Proven, battle-tested solutions",
+        "Comprehensive feature sets",
+        "Vendor support and updates",
+        "Large ecosystem of integrations",
+        "Industry best practices built-in"
+      ],
+      "challenges": [
+        "Higher licensing costs",
+        "Vendor lock-in concerns",
+        "Customization limitations",
+        "Complex implementation timelines",
+        "Change management requirements"
+      ],
+      "keyConsiderations": [
+        "Total cost of ownership (licensing + implementation)",
+        "Customization vs. configuration approach",
+        "Integration requirements with existing systems",
+        "Data migration complexity",
+        "User training and adoption plan"
+      ],
+      "estimatedDuration": "6-18 months",
+      "estimatedCost": "$200K - $5M+",
+      "requiredExpertise": [
+        "Platform-specific consultants",
+        "Business analysts",
+        "Change management specialists",
+        "Integration architects"
+      ],
+      "successFactors": [
+        "Executive sponsorship",
+        "Clear business requirements",
+        "Dedicated implementation team",
+        "Phased rollout approach",
+        "Ongoing support plan"
+      ]
+    },
+    {
+      "id": "custom-development",
+      "icon": "Code2",
+      "title": "Custom Application Development",
+      "description": "Build bespoke applications with recommended technology stacks",
+      "fullDescription": "Develop tailored software solutions from scratch using modern technologies to meet unique business requirements and competitive differentiation needs.",
+      "examples": [
+        "Next.js SaaS Application",
+        "FastAPI Backend Services",
+        "React Native Mobile App",
+        "Custom CRM Portal",
+        "Proprietary Analytics Platform",
+        "Industry-specific Workflow Tools"
+      ],
+      "badge": "Recommended for startups",
+      "companySizeFit": ["startup", "small", "medium"],
+      "industryFocus": [
+        "software-development",
+        "saas-platforms",
+        "fintech",
+        "artificial-intelligence"
+      ],
+      "typicalUseCase": "Organizations with unique processes or seeking competitive differentiation",
+      "advantages": [
+        "Complete flexibility and control",
+        "Tailored to exact business needs",
+        "No licensing fees",
+        "Intellectual property ownership",
+        "Competitive differentiation"
+      ],
+      "challenges": [
+        "Higher upfront development costs",
+        "Longer time to market",
+        "Ongoing maintenance responsibility",
+        "Need for in-house technical expertise",
+        "Scalability considerations"
+      ],
+      "keyConsiderations": [
+        "Technology stack selection",
+        "Development methodology (Agile, Scrum)",
+        "Cloud infrastructure requirements",
+        "Security and compliance needs",
+        "Long-term maintenance plan"
+      ],
+      "estimatedDuration": "3-12 months (per application)",
+      "estimatedCost": "$100K - $2M+",
+      "requiredExpertise": [
+        "Full-stack developers",
+        "DevOps engineers",
+        "UX/UI designers",
+        "QA engineers",
+        "Product managers"
+      ],
+      "successFactors": [
+        "Clear product vision",
+        "Experienced development team",
+        "Agile development practices",
+        "Regular stakeholder feedback",
+        "Continuous deployment pipeline"
+      ],
+      "recommendedTechStacks": [
+        {
+          "name": "Modern Web Application",
+          "stack": [
+            "Next.js",
+            "React",
+            "TypeScript",
+            "Tailwind CSS",
+            "PostgreSQL"
+          ]
+        },
+        {
+          "name": "Backend API",
+          "stack": ["FastAPI", "Python", "PostgreSQL", "Redis", "Docker"]
+        },
+        {
+          "name": "Mobile Application",
+          "stack": ["React Native", "TypeScript", "Firebase", "GraphQL"]
+        }
+      ]
+    },
+    {
+      "id": "system-integrations",
+      "icon": "GitBranch",
+      "title": "System Integrations",
+      "description": "Connect platforms with custom development for hybrid solutions",
+      "fullDescription": "Bridge existing enterprise platforms with custom applications and third-party services to create a unified, efficient technology ecosystem.",
+      "examples": [
+        "Salesforce + Custom Portal",
+        "SAP + Mobile App",
+        "Platform APIs Integration",
+        "ERP + E-commerce Connector",
+        "CRM + Marketing Automation",
+        "Legacy System Modernization"
+      ],
+      "badge": "Common for growing companies",
+      "companySizeFit": ["small", "medium", "large"],
+      "industryFocus": ["all"],
+      "typicalUseCase": "Organizations with multiple systems needing seamless data flow",
+      "advantages": [
+        "Best-of-breed approach",
+        "Preserve existing investments",
+        "Improved data consistency",
+        "Enhanced user experience",
+        "Flexibility to add new systems"
+      ],
+      "challenges": [
+        "Integration complexity",
+        "Multiple vendor relationships",
+        "Data synchronization issues",
+        "API versioning management",
+        "Testing complexity"
+      ],
+      "keyConsiderations": [
+        "Integration architecture (ESB, API Gateway, iPaaS)",
+        "Data mapping and transformation",
+        "Real-time vs. batch processing",
+        "Error handling and monitoring",
+        "Security and authentication"
+      ],
+      "estimatedDuration": "2-6 months (per integration)",
+      "estimatedCost": "$50K - $500K",
+      "requiredExpertise": [
+        "Integration architects",
+        "API developers",
+        "Middleware specialists",
+        "Data engineers",
+        "Platform administrators"
+      ],
+      "successFactors": [
+        "Well-documented APIs",
+        "Robust error handling",
+        "Comprehensive testing",
+        "Monitoring and alerting",
+        "Clear data governance"
+      ],
+      "integrationPatterns": [
+        {
+          "pattern": "API-first Integration",
+          "description": "RESTful or GraphQL APIs with authentication",
+          "bestFor": "Real-time data synchronization"
+        },
+        {
+          "pattern": "Event-driven Architecture",
+          "description": "Message queues and event streaming",
+          "bestFor": "Asynchronous workflows and notifications"
+        },
+        {
+          "pattern": "iPaaS Solutions",
+          "description": "Cloud integration platforms (MuleSoft, Dell Boomi)",
+          "bestFor": "Multiple system integrations with low code"
+        }
+      ]
+    },
+    {
+      "id": "governance-only",
+      "icon": "FileText",
+      "title": "Governance & Architecture Only",
+      "description": "Focus on frameworks and documentation without implementation",
+      "fullDescription": "Establish governance structures, architectural standards, and documentation practices without immediate system implementation.",
+      "examples": [
+        "Architecture documentation",
+        "Policy frameworks",
+        "Compliance tracking",
+        "Technology roadmaps",
+        "Reference architectures",
+        "Security standards"
+      ],
+      "badge": null,
+      "companySizeFit": ["all"],
+      "industryFocus": ["all"],
+      "typicalUseCase": "Organizations establishing foundations before implementation",
+      "advantages": [
+        "Low initial investment",
+        "Clear strategic direction",
+        "Risk mitigation",
+        "Consistent standards",
+        "Better decision-making"
+      ],
+      "challenges": [
+        "No immediate business value",
+        "Requires discipline to maintain",
+        "Risk of over-documentation",
+        "Buy-in from stakeholders",
+        "Balancing flexibility with control"
+      ],
+      "keyConsiderations": [
+        "Governance framework selection (COBIT, TOGAF)",
+        "Documentation standards and tools",
+        "Review and approval processes",
+        "Stakeholder communication",
+        "Continuous improvement approach"
+      ],
+      "estimatedDuration": "2-4 months (initial setup)",
+      "estimatedCost": "$20K - $200K",
+      "requiredExpertise": [
+        "Enterprise architects",
+        "Governance specialists",
+        "Compliance officers",
+        "Technical writers",
+        "Business analysts"
+      ],
+      "successFactors": [
+        "Executive support",
+        "Clear governance model",
+        "Practical, not bureaucratic",
+        "Regular reviews and updates",
+        "Tied to business outcomes"
+      ],
+      "deliverables": [
+        {
+          "name": "Architecture Principles",
+          "description": "Guiding principles for technology decisions"
+        },
+        {
+          "name": "Reference Architectures",
+          "description": "Standard patterns and templates"
+        },
+        {
+          "name": "Technology Standards",
+          "description": "Approved technologies and vendors"
+        },
+        {
+          "name": "Governance Processes",
+          "description": "Decision-making and review procedures"
+        },
+        {
+          "name": "Compliance Framework",
+          "description": "Regulatory and policy requirements"
+        }
+      ]
+    }
+  ],
+  "selectionGuidance": {
+    "byCompanySize": {
+      "startup": {
+        "recommended": ["custom-development"],
+        "consider": ["governance-only"],
+        "avoid": ["enterprise-platform"]
+      },
+      "small": {
+        "recommended": ["custom-development", "system-integrations"],
+        "consider": ["governance-only"],
+        "avoid": []
+      },
+      "medium": {
+        "recommended": ["system-integrations", "enterprise-platform"],
+        "consider": ["custom-development", "governance-only"],
+        "avoid": []
+      },
+      "large": {
+        "recommended": ["enterprise-platform", "system-integrations"],
+        "consider": ["custom-development", "governance-only"],
+        "avoid": []
+      },
+      "enterprise": {
+        "recommended": ["enterprise-platform", "governance-only"],
+        "consider": ["system-integrations"],
+        "avoid": []
+      }
+    },
+    "byIndustry": {
+      "financial-services": {
+        "recommended": ["enterprise-platform", "governance-only"],
+        "rationale": "Regulatory compliance and security requirements"
+      },
+      "technology": {
+        "recommended": ["custom-development", "system-integrations"],
+        "rationale": "Innovation and competitive differentiation needs"
+      },
+      "healthcare": {
+        "recommended": ["enterprise-platform", "governance-only"],
+        "rationale": "Compliance and standardization requirements"
+      },
+      "manufacturing": {
+        "recommended": ["enterprise-platform", "system-integrations"],
+        "rationale": "Process optimization and supply chain integration"
+      }
+    }
+  }
+}

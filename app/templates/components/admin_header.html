@@ -194,6 +194,12 @@
                         <i data-lucide="settings" class="h-4 w-4"></i>
                         Settings
                     </a>
+                    <a href="{{ url_for('onboarding.workspace_setup') }}"
+                       role="menuitem"
+                       class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors">
+                        <i data-lucide="layout-dashboard" class="h-4 w-4"></i>
+                        Workspace setup
+                    </a>
                     {% if (current_user.is_org_admin or current_user.is_platform_admin) and 'team.team' in flask.current_app.view_functions %}
                     <a href="{{ url_for('team.team') }}"
                        role="menuitem"
@@ -705,6 +711,7 @@
         { label: 'Dashboard',                    href: '{{ url_for("admin.index") }}',                          icon: 'layout-dashboard',  section: 'Navigation' },
         { label: 'Profile',                      href: '{{ url_for("account.manage") }}',                       icon: 'user',              section: 'Account' },
         { label: 'Settings / Change Password',   href: '{{ url_for("account.change_password") }}',             icon: 'settings',          section: 'Account' },
+        { label: 'Workspace setup',              href: '{{ url_for("onboarding.workspace_setup") }}',           icon: 'layout-dashboard',  section: 'Account' },
         { label: 'Manage Users',                 href: '{{ url_for("admin.registered_users") }}',               icon: 'users',             section: 'Admin' },
         {# Both routes are guarded (platform-admin / org-admin). A command-palette hit
            that 403s is the same defect as a link that 403s, so they are indexed only

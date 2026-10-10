@@ -1,0 +1,154 @@
+{% extends 'onboarding/_wizard_shell.html' %}
+{% from 'components/empty_state.html' import empty_state %}
+{% set step_title = 'Fill the gaps' %}
+{% set step_number = 4 %}
+
+{% block wizard_content %}
+<div x-data="{
+        gaps: {{ gaps | tojson | forceescape }},
+        assigning: null,
+        assignee: '',
+        acceptReason: '',
+        showAll: false,
+        limit: 6,
+        visibleGaps() {
+            return this.showAll ? this.gaps : this.gaps.slice(0, this.limit);
+        },
+        act(gapId, action, extra) {
+            const body = Object.assign({action: action}, extra || {});
+            window.Platform.fetch('{{ url_for('onboarding.gap_action', gap_id='__ID__') }}'.replace('__ID__', encodeURIComponent(gapId)), {
+                method: 'POST',
+                body: body,
+            }).then(data => {
+                if (data && data.success) {
+                    const g = this.gaps.find(x => x.gap_id === gapId);
+                    if (g) {
+                        if (action === 'accept') { g.accepted_reason = {reason: extra.reason || 'Not yet'}; }
+                        if (action === 'assign') { g.assigned_to = {assignee: extra.assignee}; }
+                    }
+                    this.assigning = null;
+                    this.assignee = '';
+                    this.acceptReason = '';
+                }
+            });
+        }
+    }"
+    class="p-8 space-y-6">
+    <div class="space-y-1">
+        <h1 class="text-lg font-bold text-foreground">Fill the gaps</h1>
+        <p class="text-sm text-muted-foreground">
+            Expected at the {{ stage_label | lower }} stage, compared with what's recorded so far.
+            Assign one, or accept it for now — nothing here is mandatory.
+        </p>
+    </div>
+
+    {% if gaps %}
+    <div class="space-y-2">
+        <template x-for="gap in visibleGaps()" :key="gap.gap_id">
+            <div class="rounded-lg border border-border p-3 space-y-2"
+                 :class="(gap.assigned_to || gap.accepted_reason) ? 'opacity-60' : ''">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                    <div class="space-y-1">
+                        <p class="text-sm font-medium text-foreground" x-text="gap.label"></p>
+                        {# Coverage chips (onboarding-redesign-v3 §5): recorded / worked out /
+                           expected at your stage, plus accepted — same visual pattern as
+                           components/provenance.html's coverage_badge macro (Alpine-rendered
+                           here, since a gap's state changes client-side after Assign/Accept
+                           without a reload; the macro is the source of truth for the classes). #}
+                        <span x-show="!gap.assigned_to && !gap.accepted_reason"
+                              class="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            <i data-lucide="circle-dashed" class="h-3 w-3" aria-hidden="true"></i>Expected at your stage
+                        </span>
+                        <span x-show="gap.assigned_to" x-cloak
+                              class="inline-flex items-center gap-1 rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-xs font-medium text-success-emphasis">
+                            <i data-lucide="check-circle-2" class="h-3 w-3" aria-hidden="true"></i>Recorded
+                            <span x-show="gap.assigned_to" x-text="'— ' + (gap.assigned_to && gap.assigned_to.assignee)"></span>
+                        </span>
+                        <span x-show="gap.accepted_reason" x-cloak
+                              class="inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis">
+                            <i data-lucide="clock" class="h-3 w-3" aria-hidden="true"></i>Accepted
+                            <span x-show="gap.accepted_reason" x-text="'— ' + (gap.accepted_reason && gap.accepted_reason.reason)"></span>
+                        </span>
+                    </div>
+                    <div class="flex gap-2 shrink-0" x-show="!gap.assigned_to && !gap.accepted_reason">
+                        <button type="button" @click="assigning = (assigning === gap.gap_id + ':assign' ? null : gap.gap_id + ':assign')"
+                                class="rounded-md text-xs font-medium border border-input bg-background hover:bg-accent h-8 px-3">
+                            Assign
+                        </button>
+                        <button type="button" @click="assigning = (assigning === gap.gap_id + ':accept' ? null : gap.gap_id + ':accept')"
+                                class="rounded-md text-xs font-medium hover:bg-accent h-8 px-3">
+                            Accept for now
+                        </button>
+                    </div>
+                </div>
+                <div x-show="assigning === gap.gap_id + ':assign'" x-cloak class="flex gap-2 pt-1">
+                    <input type="text" x-model="assignee" placeholder="Who, or &quot;founder does this&quot;"
+                           class="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-xs">
+                    <button type="button" @click="act(gap.gap_id, 'assign', {assignee: assignee})"
+                            class="rounded-md text-xs font-medium bg-primary text-primary-foreground h-8 px-3 shrink-0">Save</button>
+                </div>
+                <div x-show="assigning === gap.gap_id + ':accept'" x-cloak class="flex gap-2 pt-1">
+                    <input type="text" x-model="acceptReason" placeholder="Reason (e.g. planned for Q1)"
+                           class="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-xs">
+                    <button type="button" @click="act(gap.gap_id, 'accept', {reason: acceptReason})"
+                            class="rounded-md text-xs font-medium bg-primary text-primary-foreground h-8 px-3 shrink-0">Save</button>
+                </div>
+            </div>
+        </template>
+        <button type="button" x-show="!showAll && gaps.length > limit" x-cloak @click="showAll = true"
+                class="w-full rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4">
+            <span x-text="'Show all ' + gaps.length + ' expected items'"></span>
+        </button>
+    </div>
+    {% else %}
+    <p class="text-sm text-muted-foreground">Nothing expected is missing yet.</p>
+    {% endif %}
+
+    <div class="border-t border-border pt-6">
+        <div class="flex items-center justify-between gap-3 rounded-lg border border-border p-4">
+            <div>
+                <p class="text-sm font-medium text-foreground">Can't answer something yet?</p>
+                <p class="text-xs text-muted-foreground">
+                    Tell us more in five short, optional sections —
+                    <span>{{ tell_us_more_done }} of {{ tell_us_more_total }} done</span>.
+                </p>
+            </div>
+            <a href="{{ url_for('onboarding.tell_us_more_hub') }}"
+               class="inline-flex shrink-0 items-center justify-center rounded-md text-xs font-medium
+                      border border-input bg-background hover:bg-accent h-8 px-3">
+                Tell us more
+                <i data-lucide="arrow-right" class="h-3 w-3 ml-1.5" aria-hidden="true"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="border-t border-border pt-6">
+        <h2 class="text-sm font-semibold text-foreground mb-2">Review</h2>
+        {% if pending_review_count %}
+        <a href="{{ url_for('onboarding.review') }}"
+           class="flex items-center justify-between rounded-lg border border-border p-3 hover:border-primary/30 transition-colors">
+            <span class="text-sm text-foreground">
+                {{ pending_review_count }} suggestion{{ 's' if pending_review_count != 1 else '' }} waiting for you to confirm or dismiss
+            </span>
+            <i data-lucide="arrow-right" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
+        </a>
+        {% else %}
+        {{ empty_state(
+            icon='inbox',
+            title='Nothing to review yet',
+            description="When we read your website, what we find appears here for you to confirm.",
+            cta_text='Open Review',
+            cta_href=url_for('onboarding.review'),
+            padding='py-8'
+        ) }}
+        {% endif %}
+    </div>
+
+    <a href="{{ url_for('onboarding.twin') }}"
+       class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium
+              bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+        Continue
+        <i data-lucide="arrow-right" class="h-4 w-4 ml-2" aria-hidden="true"></i>
+    </a>
+</div>
+{% endblock %}

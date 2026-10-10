@@ -10,6 +10,7 @@ authenticated" canary tests/test_session_invalidation.py uses.
 Written against the shared fixtures in tests/conftest.py.
 """
 
+import datetime
 import uuid
 
 import pyotp
@@ -23,6 +24,11 @@ from tests.smoke.conftest import PASSWORD as _PASSWORD
 def _make_user(db_session, org, password=_PASSWORD, **kw):
     from app.models.user import User
 
+    # A brand-new user with an empty workspace is sent to onboarding by
+    # dashboard.overview (the canary route below), which would fail every
+    # test here on the onboarding redirect rather than on session survival
+    # -- see tests/test_sidebar_render.py's identical fix.
+    kw.setdefault("onboarding_completed_at", datetime.datetime.utcnow())
     user = User(
         email=f"nosignout-{uuid.uuid4().hex[:10]}@example.com",
         organization_id=org.id,
