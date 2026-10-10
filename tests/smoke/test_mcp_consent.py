@@ -119,14 +119,13 @@ def test_allow_reaches_local_listener_and_exchanges_for_a_token(
 
     _login(page, live_server, seeded["emails"]["solution_architect"])
     page.goto(
-        _authorize_url(live_server, client_id, local_callback_server, challenge, "mcp:read mcp:propose"),
+        _authorize_url(live_server, client_id, local_callback_server, challenge, "mcp:read"),
         wait_until="domcontentloaded", timeout=PAGE_TIMEOUT,
     )
 
     assert page.locator("text=Authorize access").count() > 0
-    assert page.locator("text=Propose changes").count() > 0, (
-        "solution_architect has general write permission and asked for "
-        "mcp:propose — the consent screen must offer it"
+    assert page.locator("text=Propose changes").count() == 0, (
+        "every tool is read-only, so the consent screen must not promise writes"
     )
 
     page.click('button[name="decision"][value="allow"]')

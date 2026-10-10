@@ -92,12 +92,22 @@ def test_tool_call_without_matching_organisation_scope_is_refused(client, db_ses
     token = _mint_token_with_scope(current_app, user, org, "mcp:read")
     ran = []
     monkeypatch.setattr(TOOL_REGISTRY["list_canvases"], "_execute", lambda a: ran.append(1) or {})
-    # Simulate a lost scope by making the user report a different organisation.
-    from app.models import User
 
-    monkeypatch.setattr(User, "organization_id", property(lambda self: -1), raising=False)
-    status, _body = _mcp_call(client, token, "list_canvases", {})
-    assert status in (401, 403)
+    # The identity loader accepts the token (the user really belongs to the
+    # organisation); the request's organisation scope is then lost between the
+    # tenant middleware and the tool, which only the guard in the endpoint can
+    # catch. The metering call runs just before the guard, so it is the seam.
+    from flask import g
+
+    from app.services.usage_metering_service import UsageMeteringService
+
+    monkeypatch.setattr(
+        UsageMeteringService, "record",
+        staticmethod(lambda **kw: setattr(g, "current_org_id", -1)),
+    )
+    status, body = _mcp_call(client, token, "list_canvases", {})
+    assert status == 403
+    assert "Organisation scope unavailable" in json.dumps(body)
     assert not ran
 
 
