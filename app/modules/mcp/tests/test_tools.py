@@ -593,6 +593,7 @@ class TestMeteringAndTenantContext:
         events = UsageEvent.query.filter_by(
             event_type="mcp_tool_call",
             resource_type="ask_impact",
+            organization_id=org.id,
         ).all()
         assert len(events) >= 1, "Expected at least one metering event"
         for event in events:

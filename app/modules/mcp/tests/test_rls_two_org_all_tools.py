@@ -200,6 +200,42 @@ def probe_role(app):
     return f"postgresql://{ROLE}:{password}@{host_part}"
 
 
+def _cleanup_seeded_rows(base_uri, state):
+    """Delete the ``usage_events`` and OAuth rows ``_SEED``/``_PROBE``
+    committed for real, via a plain autocommitting connection (not
+    ``db_session`` -- see the module docstring).
+
+    Both subprocesses commit directly, so without this ``usage_events`` rows
+    outlive the test indefinitely in a shared database, and an unrelated
+    test's own query can pick one up if it isn't scoped to its own
+    organisation (confirmed: app/modules/mcp/tests/test_tools.py's
+    ``test_mcp_tool_call_metering_has_correct_org_id`` failed against a
+    leftover event from a previous run of *this* test -- now fixed on both
+    sides, this cleanup and that test's query).
+
+    Deliberately leaves the seeded organisations/users/elements/canvases in
+    place: deleting them would mean unwinding an enormous, unrelated web of
+    foreign keys onto ``users`` across the codebase (hundreds of
+    ``created_by_id``-style columns), and nothing in the suite does an
+    unscoped query over organisations the way the metering test did over
+    usage events -- each CI run gets a fresh database regardless.
+    """
+    org_ids = [state["ALPHA"]["org"], state["BRAVO"]["org"]]
+    client_id = state["client_id"]
+    engine = create_engine(base_uri, poolclass=NullPool)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM usage_events WHERE organization_id IN (:a, :b)"),
+                {"a": org_ids[0], "b": org_ids[1]},
+            )
+            connection.execute(text("DELETE FROM oauth_tokens WHERE client_id = :c"), {"c": client_id})  # nosec B608 - bound parameter
+            connection.execute(text("DELETE FROM oauth_authorization_codes WHERE client_id = :c"), {"c": client_id})  # nosec B608
+            connection.execute(text("DELETE FROM oauth_clients WHERE client_id = :c"), {"c": client_id})  # nosec B608
+    finally:
+        engine.dispose()
+
+
 def test_all_ten_tools_see_zero_rows_from_the_other_organisation_under_rls(
     app, probe_role, tmp_path
 ):
@@ -224,37 +260,41 @@ def test_all_ten_tools_see_zero_rows_from_the_other_organisation_under_rls(
         cwd=str(REPO_ROOT), env=seed_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
     )
     assert seed_proc.returncode == 0, f"seed failed:\nSTDOUT:{seed_proc.stdout}\nSTDERR:{seed_proc.stderr}"
+    state = json.loads(state_path.read_text())
 
-    probe_env = dict(base_env)
-    probe_env["TEST_DATABASE_URL"] = probe_role
-    probe_env["DATABASE_URL"] = probe_role
-    probe_proc = subprocess.run(
-        [sys.executable, "-c", _PROBE, str(state_path)],
-        cwd=str(REPO_ROOT), env=probe_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
-    )
-    out = probe_proc.stdout
-    assert probe_proc.returncode == 0, f"probe failed:\nSTDOUT:{out}\nSTDERR:{probe_proc.stderr}"
+    try:
+        probe_env = dict(base_env)
+        probe_env["TEST_DATABASE_URL"] = probe_role
+        probe_env["DATABASE_URL"] = probe_role
+        probe_proc = subprocess.run(
+            [sys.executable, "-c", _PROBE, str(state_path)],
+            cwd=str(REPO_ROOT), env=probe_env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+        )
+        out = probe_proc.stdout
+        assert probe_proc.returncode == 0, f"probe failed:\nSTDOUT:{out}\nSTDERR:{probe_proc.stderr}"
 
-    role_line = next(line for line in out.splitlines() if line.startswith("ROLE_CHECK"))
-    role_name, is_super, is_bypass = json.loads(role_line.split(" ", 1)[1])
-    assert (role_name, is_super, is_bypass) == (ROLE, False, False)
+        role_line = next(line for line in out.splitlines() if line.startswith("ROLE_CHECK"))
+        role_name, is_super, is_bypass = json.loads(role_line.split(" ", 1)[1])
+        assert (role_name, is_super, is_bypass) == (ROLE, False, False)
 
-    tools_line = next(line for line in out.splitlines() if line.startswith("TOOLS_LIST"))
-    listed_tools = json.loads(tools_line.split(" ", 1)[1])
-    assert listed_tools == sorted(ALL_TEN_TOOLS), f"tool list drifted: {listed_tools}"
+        tools_line = next(line for line in out.splitlines() if line.startswith("TOOLS_LIST"))
+        listed_tools = json.loads(tools_line.split(" ", 1)[1])
+        assert listed_tools == sorted(ALL_TEN_TOOLS), f"tool list drifted: {listed_tools}"
 
-    called_line = next(line for line in out.splitlines() if line.startswith("CALLED"))
-    called_tools = set(json.loads(called_line.split(" ", 1)[1]))
-    assert called_tools == set(ALL_TEN_TOOLS), f"not all ten tools were exercised: missing {set(ALL_TEN_TOOLS) - called_tools}"
+        called_line = next(line for line in out.splitlines() if line.startswith("CALLED"))
+        called_tools = set(json.loads(called_line.split(" ", 1)[1]))
+        assert called_tools == set(ALL_TEN_TOOLS), f"not all ten tools were exercised: missing {set(ALL_TEN_TOOLS) - called_tools}"
 
-    bad_status_line = next(line for line in out.splitlines() if line.startswith("BAD_STATUS"))
-    bad_status = json.loads(bad_status_line.split(" ", 1)[1])
-    assert bad_status == [], f"non-200 responses: {bad_status}"
+        bad_status_line = next(line for line in out.splitlines() if line.startswith("BAD_STATUS"))
+        bad_status = json.loads(bad_status_line.split(" ", 1)[1])
+        assert bad_status == [], f"non-200 responses: {bad_status}"
 
-    summary_line = next(line for line in out.splitlines() if line.startswith("SUMMARY"))
-    parts = dict(p.split("=") for p in summary_line.split()[1:])
-    assert int(parts["bravo_leaks"]) == 0, f"organisation B's data leaked through: {summary_line}\nFull output:\n{out}"
-    assert int(parts["alpha_hits"]) > 0, (
-        "organisation A's own data never appeared -- the tools may be failing closed "
-        f"for everyone rather than isolating correctly: {summary_line}"
-    )
+        summary_line = next(line for line in out.splitlines() if line.startswith("SUMMARY"))
+        parts = dict(p.split("=") for p in summary_line.split()[1:])
+        assert int(parts["bravo_leaks"]) == 0, f"organisation B's data leaked through: {summary_line}\nFull output:\n{out}"
+        assert int(parts["alpha_hits"]) > 0, (
+            "organisation A's own data never appeared -- the tools may be failing closed "
+            f"for everyone rather than isolating correctly: {summary_line}"
+        )
+    finally:
+        _cleanup_seeded_rows(app.config["SQLALCHEMY_DATABASE_URI"], state)
