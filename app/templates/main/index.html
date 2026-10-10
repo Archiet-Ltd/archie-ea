@@ -30,41 +30,65 @@
 {% endblock %}
 
 {% block content %}
-<!-- Hero: category name first, product-in-search-terms second -->
-<section class="relative min-h-screen flex items-center justify-center overflow-hidden bg-background">
+<!-- Hero: category name first, product-in-search-terms second. Text left, the real
+     "what breaks if this fails" answer right in a browser frame (P-03). The two
+     captures are 2x and shown 1:1 (scripts/capture_proof_assets.py). -->
+<section class="home-hero relative overflow-hidden bg-background" data-testid="home-hero">
   <div class="absolute inset-0 -z-10">
     <div class="absolute inset-0 bg-background opacity-80"></div>
     <div class="absolute top-0 right-0 w-96 h-96 bg-primary/20 rounded-full blur-3xl opacity-20 -z-10"></div>
     <div class="absolute bottom-0 left-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl opacity-20 -z-10"></div>
   </div>
 
-  <div class="relative z-10 mx-auto max-w-4xl px-4 sm:px-6 py-20 sm:py-32">
-    <div class="text-center space-y-8">
-      <div class="inline-flex items-center rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-muted-foreground">
-        <span class="mr-2 h-2 w-2 rounded-full bg-primary"></span>
-        Open source under AGPL-3.0 &middot; Self-host free, forever
+  <div class="home-hero__grid relative z-10 mx-auto px-4 sm:px-6">
+    <div class="home-hero__text space-y-6">
+      <div class="home-hero__chip inline-flex items-center rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-muted-foreground">
+        <span class="mr-2 h-2 w-2 shrink-0 rounded-full bg-primary"></span>
+        <span class="sm:hidden">Open source &middot; Self-host free</span>
+        <span class="hidden sm:inline">Open source under AGPL-3.0 &middot; Self-host free, forever</span>
       </div>
 
       <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
         Enterprise Intelligence Management for every enterprise.
       </h1>
 
-      <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
+      <p class="text-lg text-muted-foreground">
         One living, explainable model of your enterprise: its strategy, systems, data, people, money, risk,
         suppliers and AI, kept current and turned into cited answers. Entelim is an open-source enterprise
         architecture and intelligence platform built on ArchiMate 3.2. Import your model and get a free, cited
         answer to what breaks if a system fails, in minutes.
       </p>
 
-      <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+      <div class="home-hero__actions flex flex-col sm:flex-row gap-3 sm:items-center pt-2">
         <a href="{{ url_for('account.register') }}" class="public-btn bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all duration-200">
           Start free
         </a>
-        <a href="/pricing" class="public-btn border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
+        <a href="/pricing" class="home-hero__link text-sm font-medium text-foreground underline underline-offset-4 hover:no-underline text-center sm:px-2">
           See pricing
         </a>
       </div>
     </div>
+
+    <figure class="home-hero__figure" data-testid="home-hero-figure">
+      <div class="home-frame">
+        <div class="home-frame__bar" aria-hidden="true">
+          <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
+          <span class="home-frame__url">Twin map &middot; Calibration Ledger</span>
+        </div>
+        {# Desktop crop is 644 CSS px wide and is only used where the frame can show it at 1:1;
+           the phone-width capture of the same screen is shown below 740px. #}
+        <picture>
+          <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/impact-answer-mobile.webp') }}"
+                  width="358" height="832">
+          <img src="{{ url_for('static', filename='img/home/impact-answer.webp') }}"
+               alt="The Entelim twin map for a calibration system: the business processes, strategy and other systems that depend on it, laid out by architecture layer, with the connections Entelim worked out marked."
+               width="644" height="730" decoding="async" fetchpriority="high" class="home-frame__img">
+        </picture>
+      </div>
+      <figcaption class="mt-3 text-sm text-muted-foreground text-center">
+        What breaks if this system fails: every dependent process, service and strategy, by layer, on the demonstration company.
+      </figcaption>
+    </figure>
   </div>
 </section>
 

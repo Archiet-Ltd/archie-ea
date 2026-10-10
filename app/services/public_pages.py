@@ -125,11 +125,11 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
      "The AI assistant answering a question from the organisation's own architecture model.",
      "Screenshot of the AI Chat module answering a question about Lantern Quay Systems' architecture."),
     ("applications", "/applications/", DEMO_PERSONA,
-     "The application portfolio list, with an owner, cost and lifecycle stage recorded for every entry.",
-     "Screenshot of the Applications module listing Lantern Quay Systems' application portfolio."),
+     "The application portfolio: lifecycle tiles, owner and vendor coverage, and each application's type, lifecycle stage and the capability it supports.",
+     "Screenshot of the Applications module showing Lantern Quay Systems' portfolio tiles, data-quality coverage and application list with type, lifecycle stage and mapped capability."),
     ("arb", "/arb/", DEMO_PERSONA,
-     "The Architecture Review Board dashboard, tracking review sessions and decisions in progress.",
-     "Screenshot of the Architecture Review Board module's dashboard."),
+     "The Architecture Review Board hub: review volume, pending decisions, approval rate and cycle time.",
+     "Screenshot of the Architecture Review Board hub showing total and pending reviews, approval rate, cycle time and the review status chart."),
     ("architecture-model", "/architecture/", DEMO_PERSONA,
      "The ArchiMate element browser, spanning the business, application, technology and motivation layers.",
      "Screenshot of the Architecture Model module's ArchiMate element browser."),
@@ -506,6 +506,16 @@ def use_case_redirect_target(old_filename_slug: str) -> str | None:
     return public_url
 
 
+# Module images captured at 2x device pixel ratio by scripts/capture_proof_assets.py: their file
+# pixels are twice their CSS size, so the <img> width/height attributes halve them and the
+# image displays 1:1. Every other module image is a 1x capture and keeps its file size.
+TWO_X_MODULE_IMAGES = frozenset({"applications", "arb"})
+
+
+def _screenshot_density(slug: str, page_family: str) -> int:
+    return 2 if page_family == "module" and slug in TWO_X_MODULE_IMAGES else 1
+
+
 def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
     """Screenshot metadata for a module or use-case page, if one exists.
 
@@ -540,13 +550,27 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
 
     from PIL import Image
 
+    density = _screenshot_density(page.slug, page.page_family)
     with Image.open(image_path) as im:
-        width, height = im.size
+        width, height = im.size[0] // density, im.size[1] // density
+
+    # Optional phone-width capture of the same screen (scripts/capture_proof_assets.py),
+    # shown below 1100px instead of shrinking the desktop crop under 1:1.
+    mobile = None
+    mobile_path = static_dir / f"{page.slug}-mobile.webp"
+    if mobile_path.is_file():
+        with Image.open(mobile_path) as im:
+            mobile = {
+                "url": f"{url_prefix}/{page.slug}-mobile.webp",
+                "width": im.size[0] // density,
+                "height": im.size[1] // density,
+            }
 
     return {
         "url": f"{url_prefix}/{page.slug}.webp",
         "width": width,
         "height": height,
+        "mobile": mobile,
         "alt": alt,
         "caption": caption,
     }
