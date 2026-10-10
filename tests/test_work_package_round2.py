@@ -136,16 +136,42 @@ def test_writer_creates_archimate_mirror(client, login_as, db_session, make_org)
 
 
 def test_mirror_failure_is_a_writer_error(db_session, make_org, monkeypatch):
-    from app.services import archimate_backbone, work_package_service as svc
+    """A failure in sync_archimate_element is wrapped as WorkPackageError.
+
+    Uses a Core INSERT to create the work package row, bypassing the
+    before_flush hook, so the error comes from the explicit sync call
+    inside _ensure_element.
+    """
+    from app.services import archimate_backbone
+    from app.services.work_package_service import WorkPackageError, _ensure_element
 
     org = make_org("r2-fail")
+
+    # Create a work package via Core INSERT (no ORM listener involvement).
+    from app.datetime_helpers import utcnow
+    from app.models.implementation_migration import WorkPackage as WpModel
+
+    now = utcnow()
+    result = db_session.execute(
+        WpModel.__table__.insert().values(
+            name="Will not mirror",
+            organization_id=org.id,
+            context="application",
+            percent_complete=0,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    wp_id = result.inserted_primary_key[0]
+    db_session.flush()
+    wp_obj = db_session.get(WpModel, wp_id)
 
     def refuse(obj, **kwargs):
         raise ValueError("no organisation")
 
     monkeypatch.setattr(archimate_backbone, "sync_archimate_element", refuse)
-    with pytest.raises(svc.WorkPackageError):
-        svc.create_work_package(organization_id=org.id, name="Will not mirror")
+    with pytest.raises(WorkPackageError):
+        _ensure_element(wp_obj)
 
 
 def test_feature_flag_seeded_by_fixture(client, login_as, db_session, make_org):

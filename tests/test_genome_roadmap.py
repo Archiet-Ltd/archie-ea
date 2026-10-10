@@ -271,7 +271,7 @@ def test_legacy_work_package_reported_as_synthetic(db_session, make_org, tenant_
     db_session.flush()
 
     # Legacy work package — no element, inserted via Core.
-    wp_id = _legacy_work_package(
+    _legacy_work_package(
         db_session, name="Orphaned WP", organization_id=org.id,
         plateau_id=p.id, sequence_order=1,
     )
@@ -308,7 +308,7 @@ def test_legacy_work_package_html_renders_synthetic(db_session, make_org, tenant
     db_session.add(p)
     db_session.flush()
 
-    wp_id = _legacy_work_package(
+    _legacy_work_package(
         db_session, name="Orphaned WP", organization_id=org.id,
         plateau_id=p.id, sequence_order=1,
     )
