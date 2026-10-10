@@ -17,14 +17,14 @@ fixes need:
 Every step is idempotent and skips a table that does not exist yet.
 
 Revision ID: 20261010_oauth_token_grants
-Revises: 20261010_arb_change_requests_rls
+Revises: 20261010_cost_facts_rls
 Create Date: 2026-10-10
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261010_oauth_token_grants"
-down_revision = "20261010_arb_change_requests_rls"
+down_revision = "20261010_cost_facts_rls"
 branch_labels = None
 depends_on = None
 
