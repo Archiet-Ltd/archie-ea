@@ -140,12 +140,18 @@ class SSOService:
         cross-tenant privilege-confusion risk at login time.
         """
         try:
+            from app.jobs.tenant_safe_job import platform_scope
             from app.models.miscellaneous import SSOGroupRoleMapping
 
-            rows = SSOGroupRoleMapping.query.filter_by(
-                is_active=True, organization_id=organization_id
-            ).all()
-            return {r.sso_group_name: r.role_name for r in rows}
+            # Row-level security shows the runtime role no mapping without a
+            # session organisation, and nobody is signed in yet: the lookup
+            # resolves the organisation's roles itself, and stays scoped by the
+            # organization_id predicate below.
+            with platform_scope("SSO callback: group-to-role mappings of the organisation being signed in to"):
+                rows = SSOGroupRoleMapping.query.filter_by(
+                    is_active=True, organization_id=organization_id
+                ).all()
+                return {r.sso_group_name: r.role_name for r in rows}
         except Exception as exc:
             logger.debug("Could not load SSO mappings from DB (table ready?): %s", exc)
             return {}
