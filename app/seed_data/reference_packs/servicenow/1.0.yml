@@ -1,0 +1,1514 @@
+pack_key: servicenow
+pack_version: '1.0'
+vendor: ServiceNow
+product: ServiceNow IT Service Management Platform
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about ServiceNow IT Service Management Platform are taken from ServiceNow's public
+  product documentation, read on 2026-09-23; product, module and service names are used as names only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run ServiceNow IT Service Management Platform?
+- key: platform
+  question: Do you run the ServiceNow IT Service Management Platform platform components (hosting, integration,
+    data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: ServiceNow IT Service Management Platform
+  description: ServiceNow IT Service Management Platform, the core application component of the ServiceNow
+    pack.
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.servicenow-it-service-management-platform
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: ServiceNow Production Instance
+  description: ServiceNow Production Instance
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.servicenow-production-instance
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: ServiceNow Test Instance
+  description: ServiceNow Test Instance
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.servicenow-test-instance
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: MID Server (On-Prem Connector)
+  description: MID Server (On-Prem Connector)
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.mid-server-on-prem-connector
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Discovery Server
+  description: Discovery Server
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.discovery-server
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Mobile ITSM App
+  description: iOS/Android service management app
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.mobile-itsm-app
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Self-Service Portal
+  description: Employee self-service portal
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.self-service-portal
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Virtual Agent Chatbot
+  description: AI-powered service desk chatbot
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.virtual-agent-chatbot
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: CMDB Discovery Agent
+  description: Automated asset discovery
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.cmdb-discovery-agent
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: ServiceNow ITSM
+  description: ServiceNow ITSM
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.servicenow-itsm
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IT Operations Management (ITOM)
+  description: IT Operations Management (ITOM)
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.it-operations-management-itom
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IT Asset Management (ITAM)
+  description: IT Asset Management (ITAM)
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.it-asset-management-itam
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Configuration Management Database (CMDB)
+  description: Configuration Management Database (CMDB)
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.configuration-management-database-cmdb
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Service Portal
+  description: Service Portal
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.service-portal
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Virtual Agent
+  description: Virtual Agent
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.virtual-agent
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IntegrationHub
+  description: IntegrationHub
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.integrationhub
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Performance Analytics
+  description: Performance Analytics
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.performance-analytics
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Incident Management Service
+  description: IT incident tracking and resolution
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.incident-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Change Management Service
+  description: IT change control and approval
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.change-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Asset Management Service
+  description: Hardware and software asset tracking
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.asset-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: CMDB Service
+  description: Configuration item management
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.cmdb-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Service Catalog Service
+  description: IT service request catalog
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.service-catalog-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Knowledge Management Service
+  description: Knowledge base and articles
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.knowledge-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Discovery Service
+  description: Automated IT asset discovery
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.discovery-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Integration Service
+  description: Third-party system integration
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.integration-service
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Update Set
+  description: Update Set
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.update-set
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Scoped Application
+  description: Scoped Application
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.scoped-application
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Integration Spoke
+  description: Integration Spoke
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.integration-spoke
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: CMDB Backup
+  description: CMDB Backup
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.cmdb-backup
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: ServiceNow Cloud Network
+  description: ServiceNow Cloud Network
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.servicenow-cloud-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: MID Server Network
+  description: MID Server Network
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.mid-server-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: API Gateway Network
+  description: API Gateway Network
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: technology.api-gateway-network
+  module_keys:
+  - platform
+- type: Capability
+  layer: strategy
+  name: Incident Management
+  description: IT incident tracking, prioritization, assignment, and resolution
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.incident-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Problem Management
+  description: Root cause analysis, known error management, problem resolution
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.problem-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Change Management
+  description: Change request, approval workflow, CAB, implementation tracking
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.change-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Release Management
+  description: Release planning, deployment tracking, rollback procedures
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.release-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: IT Asset Management (ITAM)
+  description: Hardware/software asset tracking, lifecycle, contracts, compliance
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.it-asset-management-itam
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Configuration Management (CMDB)
+  description: Configuration item discovery, tracking, relationship mapping
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.configuration-management-cmdb
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Service Catalog & Request
+  description: Self-service portal, service catalog, request fulfillment workflow
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.service-catalog-request
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Knowledge Management
+  description: Knowledge base, article authoring, search, AI recommendations
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.knowledge-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Service Level Management
+  description: SLA definition, monitoring, breach alerting, reporting
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.service-level-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Event Management
+  description: Infrastructure event monitoring, correlation, alert routing
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.event-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Discovery & Service Mapping
+  description: Automated infrastructure discovery, application dependency mapping
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.discovery-service-mapping
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Software Asset Management (SAM)
+  description: Software license optimization, compliance, vendor management
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.software-asset-management-sam
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: IT Procurement
+  description: IT purchasing, approval workflow, vendor management, PO tracking
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.it-procurement
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Contract Management
+  description: Vendor contracts, renewals, compliance, cost tracking
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.contract-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: IT Service Portfolio Management
+  description: Service portfolio, business service mapping, service costing
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.it-service-portfolio-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Automated Workflows
+  description: Flow Designer, workflow automation, orchestration
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.automated-workflows
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Virtual Agent (AI Chatbot)
+  description: Conversational AI for incident deflection and self-service
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.virtual-agent-ai-chatbot
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: IT Dashboard & Reporting
+  description: Performance Analytics, custom dashboards, KPI tracking
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.it-dashboard-reporting
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Integration Platform
+  description: IntegrationHub, pre-built spokes, API management
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.integration-platform
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Mobile Service Management
+  description: Mobile app for technicians and end users
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: strategy.mobile-service-management
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: IT Service Desk
+  description: 24/7 IT support for manufacturing operations
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.it-service-desk
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Change Advisory Board (CAB)
+  description: IT change approval and governance
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.change-advisory-board-cab
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Asset Lifecycle Management
+  description: IT asset tracking and compliance
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.asset-lifecycle-management
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: IT Self-Service Portal
+  description: Employee self-service for IT requests
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.it-self-service-portal
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Knowledge Base Service
+  description: IT knowledge repository
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.knowledge-base-service
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Incident Resolution
+  description: Respond to and resolve IT incidents
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.incident-resolution
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Change Request Processing
+  description: IT change control workflow
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.change-request-processing
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Service Request Fulfillment
+  description: Fulfill IT service requests
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.service-request-fulfillment
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Asset Discovery & Reconciliation
+  description: Discover and track IT assets
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.asset-discovery-reconciliation
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Problem Investigation
+  description: Identify and fix recurring issues
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.problem-investigation
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Incident
+  description: IT service disruption or degradation
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.incident
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Change Request
+  description: IT infrastructure change
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.change-request
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Configuration Item (CI)
+  description: IT asset or component
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.configuration-item-ci
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Service Request
+  description: Standard IT service request
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.service-request
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Problem
+  description: Underlying cause of incidents
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.problem
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Knowledge Article
+  description: IT knowledge base article
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: business.knowledge-article
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Service Portal
+  description: Employee self-service portal
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.service-portal
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Platform UI
+  description: Agent workspace interface
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.platform-ui
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mobile App
+  description: ITSM mobile application
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.mobile-app
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Virtual Agent
+  description: AI-powered service desk bot
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.virtual-agent
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Discovery Engine
+  description: Automated asset discovery
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.discovery-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: IntegrationHub
+  description: Integration orchestration
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.integrationhub
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Flow Designer
+  description: Visual workflow builder
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.flow-designer
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Table API
+  description: CRUD operations on ServiceNow tables
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.table-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Import Set API
+  description: Bulk data import
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.import-set-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Aggregate API
+  description: Aggregated data queries
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.aggregate-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Attachment API
+  description: File attachments
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.attachment-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Scripted REST API
+  description: Custom API endpoints
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.scripted-rest-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: REST API
+  description: REST API
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.rest-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: SOAP API
+  description: SOAP API
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.soap-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: IntegrationHub Spoke
+  description: IntegrationHub Spoke
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.integrationhub-spoke
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Email Integration
+  description: Email Integration
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.email-integration
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: JDBC Connection
+  description: JDBC Connection
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.jdbc-connection
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Incident
+  description: Incident
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.incident
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Change Request
+  description: Change Request
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.change-request
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Configuration Item
+  description: Configuration Item
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.configuration-item
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Asset
+  description: Asset
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.asset
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Knowledge Article
+  description: Knowledge Article
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: application.knowledge-article
+  module_keys:
+  - core
+- type: Facility
+  layer: physical
+  name: ServiceNow US Data Center
+  description: Primary US production instance
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: physical.servicenow-us-data-center
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: ServiceNow EU Data Center
+  description: EU instance for data residency
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: physical.servicenow-eu-data-center
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: On-Prem MID Server Room
+  description: MID server for on-prem integration
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: physical.on-prem-mid-server-room
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: MID Server (Physical)
+  description: MID Server (Physical)
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: physical.mid-server-physical
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Discovery Probe Server
+  description: Discovery Probe Server
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: physical.discovery-probe-server
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: ServiceNow Cloud Network
+  description: ServiceNow Cloud Network
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: physical.servicenow-cloud-network
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Corporate WAN
+  description: Corporate WAN
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: physical.corporate-wan
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Internet Gateway
+  description: Internet Gateway
+  mandatory: true
+  source_urls:
+  - https://www.servicenow.com/products/itsm.html
+  element_key: physical.internet-gateway
+  module_keys:
+  - platform
+relationships:
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.service-portal
+  type: composition
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.platform-ui
+  type: composition
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.mobile-app
+  type: composition
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.virtual-agent
+  type: composition
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.discovery-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.integrationhub
+  type: composition
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.flow-designer
+  type: composition
+  module_keys:
+  - core
+- source_key: technology.servicenow-itsm
+  target_key: application.servicenow-it-service-management-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.it-operations-management-itom
+  target_key: application.servicenow-it-service-management-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.it-asset-management-itam
+  target_key: application.servicenow-it-service-management-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.configuration-management-database-cmdb
+  target_key: application.servicenow-it-service-management-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.service-portal
+  target_key: application.service-portal
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.virtual-agent
+  target_key: application.virtual-agent
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.integrationhub
+  target_key: application.integrationhub
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.performance-analytics
+  target_key: application.servicenow-it-service-management-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.servicenow-production-instance
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.servicenow-test-instance
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mid-server-on-prem-connector
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.discovery-server
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mobile-itsm-app
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.self-service-portal
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.virtual-agent-chatbot
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.cmdb-discovery-agent
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.incident-management-service
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.change-management-service
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.asset-management-service
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.cmdb-service
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.service-catalog-service
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.knowledge-management-service
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.discovery-service
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.integration-service
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.servicenow-production-instance
+  target_key: technology.update-set
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.servicenow-production-instance
+  target_key: technology.scoped-application
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.servicenow-production-instance
+  target_key: technology.integration-spoke
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.servicenow-production-instance
+  target_key: technology.cmdb-backup
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.servicenow-cloud-network
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mid-server-network
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.api-gateway-network
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.incident-management
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.problem-management
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.change-management
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.release-management
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.it-asset-management-itam
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.configuration-management-cmdb
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.service-catalog-request
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.knowledge-management
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.service-level-management
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.event-management
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.discovery-service-mapping
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.software-asset-management-sam
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.it-procurement
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.contract-management
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.it-service-portfolio-management
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.automated-workflows
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.virtual-agent-ai-chatbot
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.it-dashboard-reporting
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.integration-platform
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.mobile-service-management
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: business.it-service-desk
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: business.change-advisory-board-cab
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: business.asset-lifecycle-management
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: business.it-self-service-portal
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: business.knowledge-base-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: business.incident-resolution
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: business.change-request-processing
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: business.service-request-fulfillment
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: business.asset-discovery-reconciliation
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: business.problem-investigation
+  type: association
+  module_keys:
+  - core
+- source_key: business.incident
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.change-request
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.configuration-item-ci
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.service-request
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.problem
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.knowledge-article
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.table-api
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.import-set-api
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.aggregate-api
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.attachment-api
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.scripted-rest-api
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.rest-api
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.soap-api
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.integrationhub-spoke
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.email-integration
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.jdbc-connection
+  target_key: application.servicenow-it-service-management-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.incident
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.change-request
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.configuration-item
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.asset
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicenow-it-service-management-platform
+  target_key: application.knowledge-article
+  type: association
+  module_keys:
+  - core
+- source_key: physical.servicenow-us-data-center
+  target_key: technology.servicenow-production-instance
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.servicenow-eu-data-center
+  target_key: technology.servicenow-production-instance
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.on-prem-mid-server-room
+  target_key: technology.servicenow-production-instance
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.mid-server-physical
+  target_key: technology.servicenow-production-instance
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.discovery-probe-server
+  target_key: technology.servicenow-production-instance
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.servicenow-cloud-network
+  target_key: physical.mid-server-physical
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.corporate-wan
+  target_key: physical.mid-server-physical
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.internet-gateway
+  target_key: physical.mid-server-physical
+  type: association
+  module_keys:
+  - platform
+integrations: []
+capability_mappings: []

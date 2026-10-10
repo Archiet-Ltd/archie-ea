@@ -1,0 +1,2275 @@
+pack_key: siemens-opcenter
+pack_version: '1.0'
+vendor: Siemens
+product: Siemens Opcenter Manufacturing Execution System
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about Siemens Opcenter Manufacturing Execution System are taken from Siemens's
+  public product documentation, read on 2026-09-23; product, module and service names are used as names
+  only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run Siemens Opcenter Manufacturing Execution System?
+- key: platform
+  question: Do you run the Siemens Opcenter Manufacturing Execution System platform components (hosting,
+    integration, data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: Siemens Opcenter Manufacturing Execution System
+  description: Siemens Opcenter Manufacturing Execution System, the core application component of the
+    Siemens pack.
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.siemens-opcenter-manufacturing-execution-system
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: OPCenter Execution Core Server
+  description: OPCenter Execution Core Server
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.opcenter-execution-core-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: OPCenter Execution Discrete Server
+  description: OPCenter Execution Discrete Server
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.opcenter-execution-discrete-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: OPCenter Quality Server
+  description: OPCenter Quality Server
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.opcenter-quality-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: OPCenter Intelligence Server
+  description: OPCenter Intelligence Server
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.opcenter-intelligence-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SQL Server Database
+  description: SQL Server Database
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.sql-server-database
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Application Gateway
+  description: Application Gateway
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.application-gateway
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Edge Server (Plant Floor)
+  description: Edge Server (Plant Floor)
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.edge-server-plant-floor
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Industrial Ethernet Switch
+  description: Shop floor network connectivity
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.industrial-ethernet-switch
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: PLC Gateway
+  description: Programmable logic controller integration
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.plc-gateway
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: SCADA Server
+  description: Supervisory control and data acquisition
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.scada-server
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Barcode Scanner
+  description: Material and work order tracking
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.barcode-scanner
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: HMI Panels
+  description: Operator touchscreen terminals
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.hmi-panels
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Siemens OPCenter Execution Core
+  description: Siemens OPCenter Execution Core
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.siemens-opcenter-execution-core
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Siemens OPCenter Execution Discrete
+  description: Siemens OPCenter Execution Discrete
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.siemens-opcenter-execution-discrete
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Siemens OPCenter Quality
+  description: Siemens OPCenter Quality
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.siemens-opcenter-quality
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Siemens OPCenter Intelligence
+  description: Siemens OPCenter Intelligence
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.siemens-opcenter-intelligence
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Microsoft SQL Server
+  description: Microsoft SQL Server
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.microsoft-sql-server
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IIS Web Server
+  description: IIS Web Server
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.iis-web-server
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: .NET Framework
+  description: .NET Framework
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.net-framework
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: OPC UA Server
+  description: OPC UA Server
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.opc-ua-server
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: RabbitMQ
+  description: RabbitMQ
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.rabbitmq
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OPCenter Execution Service
+  description: Core MES execution engine
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.opcenter-execution-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Material Tracking Service
+  description: Real-time material genealogy and location
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.material-tracking-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Production Execution Service
+  description: Work order and routing execution
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.production-execution-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Quality Management Service
+  description: SPC, inspection, and non-conformance management
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.quality-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Equipment Integration Service
+  description: Machine and PLC connectivity
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.equipment-integration-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Intelligence & Analytics Service
+  description: Real-time KPI calculation and dashboards
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.intelligence-analytics-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Document Management Service
+  description: Electronic work instructions and SOPs
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.document-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Label Printing Service
+  description: Automated label generation
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.label-printing-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Genealogy Service
+  description: Forward/backward traceability
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.genealogy-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Dispatching Service
+  description: Work order dispatching and sequencing
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.dispatching-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Data Collection Service
+  description: Operator and machine data collection
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.data-collection-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Integration Gateway Service
+  description: ERP and PLM integration
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.integration-gateway-service
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: OPCenter Package
+  description: OPCenter Package
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.opcenter-package
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Custom Extension DLL
+  description: Custom Extension DLL
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.custom-extension-dll
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Report Template
+  description: Report Template
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.report-template
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Database Backup
+  description: Database Backup
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.database-backup
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Label Template
+  description: Label Template
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.label-template
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Dashboard Configuration
+  description: Dashboard Configuration
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.dashboard-configuration
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Plant Floor Network
+  description: Plant Floor Network
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.plant-floor-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: IT/OT Integration Network
+  description: IT/OT Integration Network
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.it-ot-integration-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: SQL Replication Network
+  description: SQL Replication Network
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.sql-replication-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Corporate WAN
+  description: Corporate WAN
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: technology.corporate-wan
+  module_keys:
+  - platform
+- type: Capability
+  layer: strategy
+  name: Production Execution
+  description: Work order execution, routing, and operations management
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.production-execution
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Material Traceability
+  description: Complete genealogy tracking forward and backward
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.material-traceability
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Quality Management
+  description: SPC, inspection plans, non-conformance, CAPA
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.quality-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Equipment Integration
+  description: PLC, SCADA, machine integration via OPC UA
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.equipment-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Real-Time Analytics
+  description: Live KPI dashboards, OEE, downtime analysis
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.real-time-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Electronic Work Instructions
+  description: Paperless manufacturing with electronic SOPs
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.electronic-work-instructions
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Batch Management
+  description: Process manufacturing batch control and genealogy
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.batch-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Labor Management
+  description: Time tracking, skill verification, labor optimization
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.labor-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Maintenance Integration
+  description: Predictive and preventive maintenance workflows
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.maintenance-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Supply Chain Visibility
+  description: Material consumption and inventory tracking
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.supply-chain-visibility
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Advanced Planning & Scheduling
+  description: Finite capacity scheduling and dispatching
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.advanced-planning-scheduling
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Serialization & Track-Trace
+  description: Unit-level serialization for pharma/medical
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.serialization-track-trace
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Regulatory Compliance
+  description: 21 CFR Part 11, GAMP 5, ISO compliance
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.regulatory-compliance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Performance Management
+  description: OEE, availability, performance, quality metrics
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.performance-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Document Control
+  description: Version-controlled electronic documents
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.document-control
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Non-Conformance Management
+  description: Defect tracking, containment, root cause
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.non-conformance-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Change Management
+  description: ECO/ECN integration and shop floor change control
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.change-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Resource Management
+  description: Tool, fixture, and equipment management
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.resource-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Energy Management
+  description: Real-time energy consumption tracking
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.energy-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Digital Twin Integration
+  description: Integration with PLM digital twin models
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.digital-twin-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Warehouse Integration
+  description: WMS integration for material staging and finished goods
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.warehouse-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Customer Order Visibility
+  description: Link production to customer orders and delivery schedules
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.customer-order-visibility
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Supplier Collaboration
+  description: Supplier portal for material forecasts and delivery coordination
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.supplier-collaboration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Quality Analytics & AI
+  description: Predictive quality analytics and ML-based defect prediction
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.quality-analytics-ai
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Environmental Compliance
+  description: Emissions tracking, waste management, environmental reporting
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.environmental-compliance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Sustainability Metrics
+  description: Carbon footprint, water usage, sustainability KPIs
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.sustainability-metrics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Operator Training Management
+  description: Training records, certification tracking, skill gap analysis
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.operator-training-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Production Costing
+  description: Real-time production cost calculation and variance analysis
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.production-costing
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Multi-Site Orchestration
+  description: Global production coordination across multiple plants
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.multi-site-orchestration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: IoT & Smart Sensors
+  description: IIoT sensor integration, condition monitoring, predictive alerts
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: strategy.iot-smart-sensors
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Production Execution Service
+  description: Execute manufacturing operations
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.production-execution-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Material Tracking Service
+  description: Track material location and genealogy
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.material-tracking-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Quality Control Service
+  description: Manage quality inspections and SPC
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.quality-control-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Equipment Monitoring Service
+  description: Monitor machine performance
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.equipment-monitoring-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Performance Analytics Service
+  description: Calculate and display KPIs
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.performance-analytics-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Document Management Service
+  description: Provide electronic work instructions
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.document-management-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Label Printing Service
+  description: Generate serialized labels
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.label-printing-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Genealogy Service
+  description: Maintain product genealogy records
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.genealogy-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Dispatching Service
+  description: Dispatch work orders to lines
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.dispatching-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: ERP Integration Service
+  description: Synchronize with SAP/ERP
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.erp-integration-service
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Work Order Execution
+  description: Execute manufacturing operations step-by-step
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.work-order-execution
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Material Consumption & Traceability
+  description: Consume and track materials in production
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.material-consumption-traceability
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Quality Inspection
+  description: Perform in-process and final inspections
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.quality-inspection
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Equipment Data Collection
+  description: Collect machine data in real-time
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.equipment-data-collection
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Non-Conformance Management
+  description: Manage defects and CAPAs
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.non-conformance-management
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Production Scheduling & Dispatching
+  description: Schedule and dispatch work orders
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.production-scheduling-dispatching
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Work Order
+  description: Manufacturing order to produce products
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.work-order
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Material Lot
+  description: Batch or lot of material
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.material-lot
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Operation
+  description: Manufacturing step in routing
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.operation
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Inspection Lot
+  description: Quality inspection instance
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.inspection-lot
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Non-Conformance Record
+  description: Quality defect record
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.non-conformance-record
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Container
+  description: Material container or carrier
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.container
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Equipment
+  description: Production machine or tool
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.equipment
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Product Genealogy
+  description: Complete as-built record
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: business.product-genealogy
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: OPCenter Execution Core Engine
+  description: Core MES execution engine
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.opcenter-execution-core-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Material Tracking Module
+  description: Material genealogy and tracking
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.material-tracking-module
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Production Operations Module
+  description: Work order and routing execution
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.production-operations-module
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Quality Management Module
+  description: SPC and inspection management
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.quality-management-module
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: OPCenter Web Portal
+  description: Browser-based operator interface
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.opcenter-web-portal
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Intelligence Analytics Engine
+  description: Real-time KPI engine
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.intelligence-analytics-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Integration Gateway
+  description: ERP and PLM integration
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.integration-gateway
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: OPC UA Client
+  description: Equipment connectivity
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.opc-ua-client
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SQL Server Database
+  description: Relational data store
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.sql-server-database
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Document Server
+  description: Work instruction storage
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.document-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Label Designer
+  description: Label template designer
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.label-designer
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Report Designer
+  description: Custom report builder
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.report-designer
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mobile App
+  description: Operator mobile interface
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.mobile-app
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Execution API
+  description: Core MES operations API
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.execution-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Material API
+  description: Material tracking and genealogy
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.material-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Quality API
+  description: Quality management
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.quality-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Equipment API
+  description: Equipment data collection
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.equipment-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Intelligence API
+  description: Analytics and KPI
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.intelligence-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Integration API
+  description: ERP integration services
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.integration-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: OPC UA Interface
+  description: Machine connectivity
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.opc-ua-interface
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Document API
+  description: Document management
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.document-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Label API
+  description: Label printing
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.label-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Authentication API
+  description: User authentication
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.authentication-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: REST API
+  description: REST API
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.rest-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: SOAP Interface
+  description: SOAP Interface
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.soap-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: OPC UA
+  description: OPC UA
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.opc-ua
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Database Interface
+  description: Database Interface
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.database-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: File Interface
+  description: File Interface
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.file-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Message Queue
+  description: Message Queue
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.message-queue
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: SAP RFC Interface
+  description: SAP RFC Interface
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.sap-rfc-interface
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Work Order Data
+  description: Work Order Data
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.work-order-data
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Material Genealogy
+  description: Material Genealogy
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.material-genealogy
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Quality Record
+  description: Quality Record
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.quality-record
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Equipment Data
+  description: Equipment Data
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.equipment-data
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Audit Trail
+  description: Audit Trail
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.audit-trail
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Electronic Signature
+  description: Electronic Signature
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.electronic-signature
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Non-Conformance Record
+  description: Non-Conformance Record
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.non-conformance-record
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: SPC Data
+  description: SPC Data
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: application.spc-data
+  module_keys:
+  - core
+- type: Facility
+  layer: physical
+  name: Manufacturing Plant 1
+  description: Assembly plant with 6 production lines
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.manufacturing-plant-1
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Manufacturing Plant 2
+  description: Process manufacturing facility
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.manufacturing-plant-2
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Central Data Center
+  description: Centralized MES servers
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.central-data-center
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: MES Application Servers
+  description: MES Application Servers
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.mes-application-servers
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: SQL Server Cluster
+  description: SQL Server Cluster
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.sql-server-cluster
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Edge Servers
+  description: Edge Servers
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.edge-servers
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: HMI Terminals
+  description: HMI Terminals
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.hmi-terminals
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Industrial Switches
+  description: Industrial Switches
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.industrial-switches
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Plant Floor Network
+  description: Plant Floor Network
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.plant-floor-network
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: WAN to Data Center
+  description: WAN to Data Center
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.wan-to-data-center
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: SQL Replication Network
+  description: SQL Replication Network
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.sql-replication-network
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Internet Gateway
+  description: Internet Gateway
+  mandatory: true
+  source_urls:
+  - https://www.sw.siemens.com/en-US/technology/opcenter-manufacturing-operations-management/
+  element_key: physical.internet-gateway
+  module_keys:
+  - platform
+relationships:
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.opcenter-execution-core-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.material-tracking-module
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.production-operations-module
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.quality-management-module
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.opcenter-web-portal
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.intelligence-analytics-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.integration-gateway
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.opc-ua-client
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.sql-server-database
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.document-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.label-designer
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.report-designer
+  type: composition
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.mobile-app
+  type: composition
+  module_keys:
+  - core
+- source_key: technology.siemens-opcenter-execution-core
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.siemens-opcenter-execution-discrete
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.siemens-opcenter-quality
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.siemens-opcenter-intelligence
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.microsoft-sql-server
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.iis-web-server
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.net-framework
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.opc-ua-server
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.rabbitmq
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.opcenter-execution-core-server
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.opcenter-execution-discrete-server
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.opcenter-quality-server
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.opcenter-intelligence-server
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sql-server-database
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.application-gateway
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.edge-server-plant-floor
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.industrial-ethernet-switch
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.plc-gateway
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.scada-server
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.barcode-scanner
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.hmi-panels
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.opcenter-execution-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.material-tracking-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.production-execution-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.quality-management-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.equipment-integration-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.intelligence-analytics-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.document-management-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.label-printing-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.genealogy-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.dispatching-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.data-collection-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.integration-gateway-service
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.opcenter-execution-core-server
+  target_key: technology.opcenter-package
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.opcenter-execution-core-server
+  target_key: technology.custom-extension-dll
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.opcenter-execution-core-server
+  target_key: technology.report-template
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.opcenter-execution-core-server
+  target_key: technology.database-backup
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.opcenter-execution-core-server
+  target_key: technology.label-template
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.opcenter-execution-core-server
+  target_key: technology.dashboard-configuration
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.plant-floor-network
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.it-ot-integration-network
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sql-replication-network
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.corporate-wan
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.production-execution
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.material-traceability
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.quality-management
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.equipment-integration
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.real-time-analytics
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.electronic-work-instructions
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.batch-management
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.labor-management
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.maintenance-integration
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.supply-chain-visibility
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.advanced-planning-scheduling
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.serialization-track-trace
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.regulatory-compliance
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.performance-management
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.document-control
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.non-conformance-management
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.change-management
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.resource-management
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.energy-management
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.digital-twin-integration
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.warehouse-integration
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.customer-order-visibility
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.supplier-collaboration
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.quality-analytics-ai
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.environmental-compliance
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.sustainability-metrics
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.operator-training-management
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.production-costing
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.multi-site-orchestration
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.iot-smart-sensors
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.production-execution-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.material-tracking-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.quality-control-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.equipment-monitoring-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.performance-analytics-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.document-management-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.label-printing-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.genealogy-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.dispatching-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.erp-integration-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.work-order-execution
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.material-consumption-traceability
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.quality-inspection
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.equipment-data-collection
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.non-conformance-management
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: business.production-scheduling-dispatching
+  type: association
+  module_keys:
+  - core
+- source_key: business.work-order
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: business.material-lot
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: business.operation
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: business.inspection-lot
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: business.non-conformance-record
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: business.container
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: business.equipment
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: business.product-genealogy
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.execution-api
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.material-api
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.quality-api
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.equipment-api
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.intelligence-api
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.integration-api
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.opc-ua-interface
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.document-api
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.label-api
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.authentication-api
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.rest-api
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.soap-interface
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.opc-ua
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.database-interface
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.file-interface
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.message-queue
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-rfc-interface
+  target_key: application.siemens-opcenter-manufacturing-execution-system
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.work-order-data
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.material-genealogy
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.quality-record
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.equipment-data
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.audit-trail
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.electronic-signature
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.non-conformance-record
+  type: association
+  module_keys:
+  - core
+- source_key: application.siemens-opcenter-manufacturing-execution-system
+  target_key: application.spc-data
+  type: association
+  module_keys:
+  - core
+- source_key: physical.manufacturing-plant-1
+  target_key: technology.opcenter-execution-core-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.manufacturing-plant-2
+  target_key: technology.opcenter-execution-core-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.central-data-center
+  target_key: technology.opcenter-execution-core-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.mes-application-servers
+  target_key: technology.opcenter-execution-core-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.sql-server-cluster
+  target_key: technology.opcenter-execution-core-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.edge-servers
+  target_key: technology.opcenter-execution-core-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.hmi-terminals
+  target_key: technology.opcenter-execution-core-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.industrial-switches
+  target_key: technology.opcenter-execution-core-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.plant-floor-network
+  target_key: physical.mes-application-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.wan-to-data-center
+  target_key: physical.mes-application-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.sql-replication-network
+  target_key: physical.mes-application-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.internet-gateway
+  target_key: physical.mes-application-servers
+  type: association
+  module_keys:
+  - platform
+integrations: []
+capability_mappings: []

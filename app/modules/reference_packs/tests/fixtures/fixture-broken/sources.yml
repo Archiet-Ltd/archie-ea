@@ -1,0 +1,5 @@
+sources:
+  # licence intentionally omitted — test (15) proves this fails item 5 and
+  # names the pack key in the message.
+  - url: "https://fixture.invalid/broken-product"
+    read_at: "2026-09-23"

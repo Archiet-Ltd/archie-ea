@@ -1,170 +1,16 @@
-"""
-flask seed-vendor-templates — populate canonical SAP, Microsoft, and Salesforce ArchiMate template records.
+"""flask seed-entity-schemas / flask backfill-vendor-element-ids.
 
-Idempotent: upserts on (vendor_key, element_name). Safe to run multiple times.
-Run after deploying to a new environment to seed the vendor template catalogue.
-
-Usage:
-    flask seed-vendor-templates
-    flask seed-vendor-templates --dry-run
+The canonical vendor ArchiMate template records (SAP, Microsoft, Salesforce)
+are now loaded by ``flask reference-packs load`` from
+``app/seed_data/reference_packs/`` — see ``app/modules/reference_packs/``.
+This module keeps the two commands that are not part of that fold: the
+domain entity field seeds below (DataObject specs with ``spec_data_seed``)
+and the ArchiMate element ID backfill.
 """
 import click
 from flask.cli import with_appcontext
 
 from app import db
-
-# Curated SAP 2025.1 template — exact names must match archimate_elements.name
-SAP_TEMPLATE_ELEMENTS = [
-    {"element_name": "SAP S/4HANA Application Server", "element_type": "Node",                 "archimate_layer": "Technology",   "mandatory": True,  "display_order": 1},
-    {"element_name": "SAP HANA Primary Database",       "element_type": "Node",                 "archimate_layer": "Technology",   "mandatory": True,  "display_order": 2},
-    {"element_name": "SAP Business Technology Platform","element_type": "SystemSoftware",        "archimate_layer": "Technology",   "mandatory": True,  "display_order": 3},
-    {"element_name": "SAP Gateway",                     "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": True,  "display_order": 4},
-    {"element_name": "SAP Fiori Launchpad",             "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": True,  "display_order": 5},
-    {"element_name": "SAP Integration Suite",           "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": False, "display_order": 6},
-    {"element_name": "SAP Event Mesh",                  "element_type": "SystemSoftware",        "archimate_layer": "Technology",   "mandatory": False, "display_order": 7},
-    {"element_name": "SAP Web Dispatcher",              "element_type": "Node",                 "archimate_layer": "Technology",   "mandatory": False, "display_order": 8},
-    {"element_name": "SAP HANA Secondary Database",     "element_type": "Node",                 "archimate_layer": "Technology",   "mandatory": False, "display_order": 9},
-    {"element_name": "SAP Fiori Frontend Server",       "element_type": "Node",                 "archimate_layer": "Technology",   "mandatory": False, "display_order": 10},
-]
-
-# Curated Microsoft Dynamics 365 2025.1 template
-MICROSOFT_DYNAMICS_TEMPLATE_ELEMENTS = [
-    {"element_name": "Microsoft Dynamics 365 Application Server", "element_type": "Node",                 "archimate_layer": "Technology",   "mandatory": True,  "display_order": 1},
-    {"element_name": "Azure SQL Database",                        "element_type": "Node",                 "archimate_layer": "Technology",   "mandatory": True,  "display_order": 2},
-    {"element_name": "Azure Active Directory",                    "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": True,  "display_order": 3},
-    {"element_name": "Dynamics 365 Finance Module",               "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": True,  "display_order": 4},
-    {"element_name": "Dynamics 365 SCM Module",                   "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": False, "display_order": 5},
-    {"element_name": "Azure API Management",                      "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": False, "display_order": 6},
-    {"element_name": "Dynamics 365 Customer Engagement",          "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": False, "display_order": 7},
-    {"element_name": "Azure Service Bus",                         "element_type": "SystemSoftware",        "archimate_layer": "Technology",   "mandatory": False, "display_order": 8},
-    {"element_name": "Azure Key Vault",                           "element_type": "SystemSoftware",        "archimate_layer": "Technology",   "mandatory": False, "display_order": 9},
-    {"element_name": "Azure Monitor",                             "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": False, "display_order": 10},
-    {"element_name": "Power Platform Environment",                "element_type": "Node",                 "archimate_layer": "Technology",   "mandatory": False, "display_order": 11},
-]
-
-# Curated Microsoft Power Platform 2025.1 template
-MICROSOFT_POWER_TEMPLATE_ELEMENTS = [
-    {"element_name": "Power Platform Environment", "element_type": "Node",                 "archimate_layer": "Technology",   "mandatory": True,  "display_order": 1},
-    {"element_name": "Dataverse Instance",         "element_type": "Node",                 "archimate_layer": "Technology",   "mandatory": True,  "display_order": 2},
-    {"element_name": "Azure Active Directory",     "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": True,  "display_order": 3},
-    {"element_name": "Power Apps Service",         "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": True,  "display_order": 4},
-    {"element_name": "Power Automate Service",     "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": True,  "display_order": 5},
-    {"element_name": "Power BI Service",           "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": False, "display_order": 6},
-    {"element_name": "Azure API Management",       "element_type": "ApplicationComponent", "archimate_layer": "Application",  "mandatory": False, "display_order": 7},
-    {"element_name": "On-Premises Data Gateway",  "element_type": "Node",                 "archimate_layer": "Technology",   "mandatory": False, "display_order": 8},
-    {"element_name": "Azure Key Vault",            "element_type": "SystemSoftware",        "archimate_layer": "Technology",   "mandatory": False, "display_order": 9},
-]
-
-# Curated Salesforce Platform template (core runtime + APIs; aligns with VendorTemplateService SALESFORCE key)
-SALESFORCE_TEMPLATE_ELEMENTS = [
-    {"element_name": "Salesforce Core Platform", "element_type": "ApplicationComponent", "archimate_layer": "Application", "mandatory": True, "display_order": 1},
-    {"element_name": "Salesforce Lightning Experience", "element_type": "ApplicationComponent", "archimate_layer": "Application", "mandatory": True, "display_order": 2},
-    {"element_name": "Salesforce Identity and SSO", "element_type": "ApplicationComponent", "archimate_layer": "Application", "mandatory": True, "display_order": 3},
-    {"element_name": "Salesforce REST and Bulk API", "element_type": "ApplicationComponent", "archimate_layer": "Application", "mandatory": True, "display_order": 4},
-    {"element_name": "Salesforce Event Bus", "element_type": "SystemSoftware", "archimate_layer": "Technology", "mandatory": False, "display_order": 5},
-    {"element_name": "Salesforce Einstein", "element_type": "ApplicationComponent", "archimate_layer": "Application", "mandatory": False, "display_order": 6},
-    {"element_name": "Salesforce Data Cloud", "element_type": "Node", "archimate_layer": "Technology", "mandatory": False, "display_order": 7},
-    {"element_name": "Heroku Runtime", "element_type": "Node", "archimate_layer": "Technology", "mandatory": False, "display_order": 8},
-]
-
-# Registry of all vendor template groups: (vendor_key, version, elements)
-_VENDOR_TEMPLATE_GROUPS = [
-    ("SAP",                  "2025.1", SAP_TEMPLATE_ELEMENTS),
-    ("MICROSOFT_DYNAMICS",   "2025.1", MICROSOFT_DYNAMICS_TEMPLATE_ELEMENTS),
-    ("MICROSOFT_POWER",      "2025.1", MICROSOFT_POWER_TEMPLATE_ELEMENTS),
-    ("SALESFORCE",           "2025.1", SALESFORCE_TEMPLATE_ELEMENTS),
-]
-
-
-@click.command("seed-vendor-templates")
-@click.option("--dry-run", is_flag=True, help="Print what would be inserted without writing.")
-@with_appcontext
-def seed_vendor_templates(dry_run):
-    """Populate canonical vendor ArchiMate templates (idempotent upsert)."""
-    from app.models.vendor.vendor_organization import VendorArchiMateTemplate
-
-    try:
-        from app.models.archimate import ArchiMateElement
-    except ImportError:
-        # Try alternative import path
-        try:
-            from app.models.archimate_models import ArchiMateElement
-        except ImportError:
-            ArchiMateElement = None
-
-    total_inserted = 0
-    total_skipped = 0
-    total_not_found = 0
-    counts_per_vendor = {}
-
-    for vendor_key, version, elements in _VENDOR_TEMPLATE_GROUPS:
-        inserted = 0
-        skipped = 0
-        not_found = 0
-
-        click.echo(f"\n[{vendor_key} {version}] seeding {len(elements)} elements...")
-
-        for spec in elements:
-            element_id = None
-            if ArchiMateElement is not None:
-                elem = ArchiMateElement.query.filter(
-                    ArchiMateElement.name == spec["element_name"]
-                ).first()
-                if elem:
-                    element_id = elem.id
-                else:
-                    not_found += 1
-                    click.echo(f"  [NOT FOUND] {spec['element_name']} — template will have element_id=None")
-
-            existing = VendorArchiMateTemplate.query.filter_by(
-                vendor_key=vendor_key,
-                element_name=spec["element_name"],
-            ).first()
-
-            if existing:
-                skipped += 1
-                if dry_run:
-                    click.echo(f"  [SKIP] {spec['element_name']} — already exists (id={existing.id})")
-                continue
-
-            if dry_run:
-                click.echo(f"  [INSERT] {spec['element_name']} — element_id={element_id}")
-                inserted += 1
-                continue
-
-            tmpl = VendorArchiMateTemplate(
-                vendor_key=vendor_key,
-                element_id=element_id,
-                element_name=spec["element_name"],
-                element_type=spec["element_type"],
-                archimate_layer=spec["archimate_layer"],
-                mandatory=spec["mandatory"],
-                version=version,
-                display_order=spec["display_order"],
-            )
-            db.session.add(tmpl)
-            inserted += 1
-
-        counts_per_vendor[vendor_key] = {"inserted": inserted, "skipped": skipped, "not_found": not_found}
-        total_inserted += inserted
-        total_skipped += skipped
-        total_not_found += not_found
-
-    if not dry_run and total_inserted > 0:
-        db.session.commit()
-
-    click.echo("\n--- Summary ---")
-    for vendor_key, counts in counts_per_vendor.items():
-        click.echo(
-            f"  {vendor_key}: inserted={counts['inserted']}, skipped={counts['skipped']}, "
-            f"element_name_not_found={counts['not_found']}"
-        )
-    click.echo(
-        f"\nTotal — inserted: {total_inserted}, skipped: {total_skipped}, "
-        f"element_name_not_found: {total_not_found}"
-    )
-    if dry_run:
-        click.echo("(dry run — no changes written)")
 
 
 # ─── Domain entity field seeds ───────────────────────────────────────────────
@@ -825,7 +671,6 @@ def backfill_vendor_element_ids(dry_run):
 
 
 def init_app(app):
-    """Register seed-vendor-templates, seed-entity-schemas, and backfill-vendor-element-ids CLI commands."""
-    app.cli.add_command(seed_vendor_templates)
+    """Register seed-entity-schemas and backfill-vendor-element-ids CLI commands."""
     app.cli.add_command(seed_entity_schemas)
     app.cli.add_command(backfill_vendor_element_ids)

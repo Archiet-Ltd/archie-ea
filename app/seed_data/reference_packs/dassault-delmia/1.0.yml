@@ -1,0 +1,2370 @@
+pack_key: dassault-delmia
+pack_version: '1.0'
+vendor: Dassault Systemes
+product: Dassault DELMIA Digital Manufacturing & Operations
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about Dassault DELMIA Digital Manufacturing & Operations are taken from Dassault
+  Systemes's public product documentation, read on 2026-09-23; product, module and service names are used
+  as names only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run Dassault DELMIA Digital Manufacturing & Operations?
+- key: platform
+  question: Do you run the Dassault DELMIA Digital Manufacturing & Operations platform components (hosting,
+    integration, data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: Dassault DELMIA Digital Manufacturing & Operations
+  description: Dassault DELMIA Digital Manufacturing & Operations, the core application component of the
+    Dassault Systemes pack.
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.dassault-delmia-digital-manufacturing-operations
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: 3DEXPERIENCE Cloud Server 1
+  description: 3DEXPERIENCE Cloud Server 1
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.3dexperience-cloud-server-1
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: 3DEXPERIENCE Cloud Server 2
+  description: 3DEXPERIENCE Cloud Server 2
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.3dexperience-cloud-server-2
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: DELMIA Manufacturing Hub Server
+  description: DELMIA Manufacturing Hub Server
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.delmia-manufacturing-hub-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: ENOVIA PLM Server
+  description: ENOVIA PLM Server
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.enovia-plm-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Oracle Database RAC Node 1
+  description: Oracle Database RAC Node 1
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.oracle-database-rac-node-1
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Oracle Database RAC Node 2
+  description: Oracle Database RAC Node 2
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.oracle-database-rac-node-2
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Simulation Server Cluster
+  description: Simulation Server Cluster
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.simulation-server-cluster
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: API Gateway
+  description: API Gateway
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.api-gateway
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Cloud Load Balancer
+  description: Multi-region load distribution
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.cloud-load-balancer
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Cloud CDN
+  description: Content delivery for 3D models
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.cloud-cdn
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Edge Gateway
+  description: On-premise to cloud connectivity
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.edge-gateway
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: 3D Visualization Workstations
+  description: High-performance engineering workstations
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.3d-visualization-workstations
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Mobile Tablets
+  description: Shop floor operator tablets
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.mobile-tablets
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: 3DEXPERIENCE Platform
+  description: 3DEXPERIENCE Platform
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.3dexperience-platform
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: DELMIA Apriso
+  description: DELMIA Apriso
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.delmia-apriso
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: DELMIA Ortems
+  description: DELMIA Ortems
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.delmia-ortems
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: DELMIA Manufacturing Planning
+  description: DELMIA Manufacturing Planning
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.delmia-manufacturing-planning
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: DELMIA Robotics
+  description: DELMIA Robotics
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.delmia-robotics
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: DELMIA Operations
+  description: DELMIA Operations
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.delmia-operations
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: ENOVIA
+  description: ENOVIA
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.enovia
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Oracle Database
+  description: Oracle Database
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.oracle-database
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Apache Kafka
+  description: Apache Kafka
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.apache-kafka
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Kubernetes
+  description: Kubernetes
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.kubernetes
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: 3DEXPERIENCE Platform Service
+  description: Unified collaboration and data management
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.3dexperience-platform-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: DELMIA Apriso MES Service
+  description: Manufacturing execution and operations
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.delmia-apriso-mes-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: DELMIA Ortems Scheduling Service
+  description: Advanced finite capacity scheduling
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.delmia-ortems-scheduling-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Digital Twin Service
+  description: Virtual manufacturing simulation
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.digital-twin-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Robotics Simulation Service
+  description: Robot path planning and validation
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.robotics-simulation-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Manufacturing Planning Service
+  description: Process planning and work instructions
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.manufacturing-planning-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Quality Management Service
+  description: Quality planning and control
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.quality-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: ENOVIA PLM Service
+  description: Product lifecycle management
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.enovia-plm-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Work Instructions Service
+  description: 3D visual work instructions
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.work-instructions-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Material Management Service
+  description: Material traceability and genealogy
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.material-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Labor Management Service
+  description: Labor tracking and optimization
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.labor-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Analytics & Intelligence Service
+  description: Manufacturing intelligence and KPIs
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.analytics-intelligence-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Integration Gateway Service
+  description: ERP and equipment integration
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.integration-gateway-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: 3D Visualization Service
+  description: Real-time 3D rendering
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.3d-visualization-service
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: 3DEXPERIENCE Object
+  description: 3DEXPERIENCE Object
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.3dexperience-object
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Manufacturing Process Plan
+  description: Manufacturing Process Plan
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.manufacturing-process-plan
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Robot Program
+  description: Robot Program
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.robot-program
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Digital Twin Model
+  description: Digital Twin Model
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.digital-twin-model
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Work Instruction Package
+  description: Work Instruction Package
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.work-instruction-package
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Production Schedule
+  description: Production Schedule
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.production-schedule
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Database Backup
+  description: Database Backup
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.database-backup
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: 3DEXPERIENCE Cloud Network
+  description: 3DEXPERIENCE Cloud Network
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.3dexperience-cloud-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Inter-Service Mesh
+  description: Inter-Service Mesh
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.inter-service-mesh
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: ExpressRoute/DirectConnect
+  description: ExpressRoute/DirectConnect
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.expressroute-directconnect
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Global CDN
+  description: Global CDN
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.global-cdn
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Plant Floor Gateway
+  description: Plant Floor Gateway
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: technology.plant-floor-gateway
+  module_keys:
+  - platform
+- type: Capability
+  layer: strategy
+  name: Digital Manufacturing
+  description: Virtual-to-real manufacturing with digital twin
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.digital-manufacturing
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Manufacturing Execution
+  description: Real-time production execution and control
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.manufacturing-execution
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Advanced Scheduling
+  description: Finite capacity scheduling and optimization
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.advanced-scheduling
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Process Planning
+  description: Manufacturing process and work instruction authoring
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.process-planning
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Robotics Simulation
+  description: Robot programming and path optimization
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.robotics-simulation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Factory Simulation
+  description: Discrete event simulation of manufacturing lines
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.factory-simulation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Quality Management
+  description: Integrated quality planning and execution
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.quality-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Material Traceability
+  description: End-to-end material genealogy
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.material-traceability
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: 3D Work Instructions
+  description: Visual animated work instructions
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.3d-work-instructions
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Labor Management
+  description: Workforce planning and tracking
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.labor-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Equipment Management
+  description: Asset performance and maintenance
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.equipment-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: PLM-MES Integration
+  description: Seamless engineering-to-operations
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.plm-mes-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Ergonomics Analysis
+  description: Human factors and ergonomics simulation
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.ergonomics-analysis
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Line Balancing
+  description: Assembly line optimization
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.line-balancing
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Facility Layout
+  description: Factory floor planning and optimization
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.facility-layout
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Supply Chain Collaboration
+  description: Supplier and customer collaboration
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.supply-chain-collaboration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Manufacturing Analytics
+  description: Real-time KPIs and intelligence
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.manufacturing-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Change Management
+  description: Engineering change propagation to shop floor
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.change-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Compliance Management
+  description: Regulatory and standards compliance
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.compliance-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Virtual Commissioning
+  description: Virtual factory startup and validation
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.virtual-commissioning
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Supplier Quality Management
+  description: Supplier defect tracking and corrective action workflows
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.supplier-quality-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Customer Quality Portal
+  description: Customer-facing quality data and certifications
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.customer-quality-portal
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Sustainability Reporting
+  description: Carbon footprint, energy efficiency, ESG metrics
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.sustainability-reporting
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Workforce Management
+  description: Shift planning, attendance, skill-based assignments
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.workforce-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Material Requirements Integration
+  description: MRP integration for material pull signals
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.material-requirements-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Product Costing & Profitability
+  description: Real-time product cost and margin analysis
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.product-costing-profitability
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Compliance Reporting
+  description: Automated regulatory reporting (FDA, ISO, EPA)
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.compliance-reporting
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Global Production Network
+  description: Multi-plant production orchestration
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.global-production-network
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: AI-Driven Quality Prediction
+  description: Machine learning for quality defect prediction
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.ai-driven-quality-prediction
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Warehouse Integration
+  description: WMS integration for material staging and finished goods
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: strategy.warehouse-integration
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Manufacturing Execution Service
+  description: Real-time production execution
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.manufacturing-execution-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Advanced Scheduling Service
+  description: Optimize production schedules
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.advanced-scheduling-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Digital Twin Service
+  description: Virtual factory simulation
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.digital-twin-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Process Planning Service
+  description: Manufacturing process authoring
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.process-planning-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Quality Management Service
+  description: Quality planning and control
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.quality-management-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Material Tracking Service
+  description: Material genealogy tracking
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.material-tracking-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Work Instructions Service
+  description: 3D visual work instructions
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.work-instructions-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Labor Management Service
+  description: Workforce optimization
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.labor-management-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Analytics Service
+  description: Manufacturing intelligence
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.analytics-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: PLM Integration Service
+  description: ENOVIA-DELMIA synchronization
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.plm-integration-service
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Digital Manufacturing Process Planning
+  description: Create manufacturing plans from 3D CAD
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.digital-manufacturing-process-planning
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Production Order Execution
+  description: Execute manufacturing orders on shop floor
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.production-order-execution
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Finite Capacity Scheduling
+  description: Optimize production schedule with constraints
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.finite-capacity-scheduling
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Robot Programming & Simulation
+  description: Program and validate robot operations
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.robot-programming-simulation
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Engineering Change Order Execution
+  description: Implement ECO on shop floor
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.engineering-change-order-execution
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Digital Twin Synchronization
+  description: Keep virtual and physical in sync
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.digital-twin-synchronization
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Manufacturing Process Plan
+  description: Detailed manufacturing process
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.manufacturing-process-plan
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Production Order
+  description: Shop floor work order
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.production-order
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Digital Twin
+  description: Virtual representation of factory
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.digital-twin
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Robot Program
+  description: Robot motion program
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.robot-program
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Work Instruction
+  description: 3D visual work instruction
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.work-instruction
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Material Lot
+  description: Tracked material batch
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.material-lot
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Quality Plan
+  description: Inspection and test plan
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.quality-plan
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Production Schedule
+  description: Optimized production schedule
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: business.production-schedule
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: 3DEXPERIENCE Platform
+  description: Unified platform foundation
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.3dexperience-platform
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: DELMIA Apriso MES
+  description: Manufacturing execution engine
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.delmia-apriso-mes
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: DELMIA Ortems Scheduler
+  description: Finite capacity scheduler
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.delmia-ortems-scheduler
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: DELMIA Manufacturing Hub
+  description: Process planning environment
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.delmia-manufacturing-hub
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: DELMIA Robotics Simulator
+  description: Robot simulation and programming
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.delmia-robotics-simulator
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: ENOVIA PLM System
+  description: Product lifecycle management
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.enovia-plm-system
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: 3D Visualization Engine
+  description: Real-time 3D rendering
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.3d-visualization-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Manufacturing Intelligence
+  description: KPI and dashboard engine
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.manufacturing-intelligence
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Integration Gateway
+  description: ERP and equipment integration
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.integration-gateway
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mobile Work Instructions App
+  description: Operator mobile interface
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.mobile-work-instructions-app
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Oracle Database
+  description: Enterprise data storage
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.oracle-database
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Kafka Message Bus
+  description: Event streaming platform
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.kafka-message-bus
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: 3DEXPERIENCE REST API
+  description: Platform services API
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.3dexperience-rest-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: DELMIA Apriso API
+  description: MES operations API
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.delmia-apriso-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: DELMIA Ortems API
+  description: Scheduling API
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.delmia-ortems-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: ENOVIA API
+  description: PLM data services
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.enovia-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: 3D Visualization API
+  description: Real-time 3D streaming
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.3d-visualization-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Manufacturing Intelligence API
+  description: Analytics and KPI API
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.manufacturing-intelligence-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Integration Services API
+  description: ERP integration
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.integration-services-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Work Instructions API
+  description: Digital work instructions
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.work-instructions-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Material Tracking API
+  description: Material genealogy
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.material-tracking-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Event Stream API
+  description: Event-driven integration
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.event-stream-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: REST API
+  description: REST API
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.rest-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: SOAP Interface
+  description: SOAP Interface
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.soap-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: WebSocket Interface
+  description: WebSocket Interface
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.websocket-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Kafka Interface
+  description: Kafka Interface
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.kafka-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Database Interface
+  description: Database Interface
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.database-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: File Interface
+  description: File Interface
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.file-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: OPC UA Interface
+  description: OPC UA Interface
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.opc-ua-interface
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Manufacturing BOM
+  description: Manufacturing BOM
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.manufacturing-bom
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Process Plan
+  description: Process Plan
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.process-plan
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Production Order
+  description: Production Order
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.production-order
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Digital Twin Model
+  description: Digital Twin Model
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.digital-twin-model
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Work Instruction
+  description: Work Instruction
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.work-instruction
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Material Genealogy
+  description: Material Genealogy
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.material-genealogy
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Quality Record
+  description: Quality Record
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.quality-record
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Production Schedule
+  description: Production Schedule
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.production-schedule
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Robot Program
+  description: Robot Program
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: application.robot-program
+  module_keys:
+  - core
+- type: Facility
+  layer: physical
+  name: AWS Cloud Region US-East - 1
+  description: Primary cloud deployment
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.aws-cloud-region-us-east-1
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: AWS Cloud Region EU-West - 1
+  description: European cloud deployment
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.aws-cloud-region-eu-west-1
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Smart Factory (Future)
+  description: New greenfield smart factory
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.smart-factory-future
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Cloud Compute Instances
+  description: Cloud Compute Instances
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.cloud-compute-instances
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: GPU Simulation Instances
+  description: GPU Simulation Instances
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.gpu-simulation-instances
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Engineering Workstations
+  description: Engineering Workstations
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.engineering-workstations
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Operator Tablets
+  description: Operator Tablets
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.operator-tablets
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: 3D Visualization Displays
+  description: 3D Visualization Displays
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.3d-visualization-displays
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: AWS Cloud Network
+  description: AWS Cloud Network
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.aws-cloud-network
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: AWS DirectConnect
+  description: AWS DirectConnect
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.aws-directconnect
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: CloudFront CDN
+  description: CloudFront CDN
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.cloudfront-cdn
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Corporate WAN
+  description: Corporate WAN
+  mandatory: true
+  source_urls:
+  - https://www.3ds.com/products/delmia
+  element_key: physical.corporate-wan
+  module_keys:
+  - platform
+relationships:
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.3dexperience-platform
+  type: composition
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.delmia-apriso-mes
+  type: composition
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.delmia-ortems-scheduler
+  type: composition
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.delmia-manufacturing-hub
+  type: composition
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.delmia-robotics-simulator
+  type: composition
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.enovia-plm-system
+  type: composition
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.3d-visualization-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.manufacturing-intelligence
+  type: composition
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.integration-gateway
+  type: composition
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.mobile-work-instructions-app
+  type: composition
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.oracle-database
+  type: composition
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.kafka-message-bus
+  type: composition
+  module_keys:
+  - core
+- source_key: technology.3dexperience-platform
+  target_key: application.3dexperience-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.delmia-apriso
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.delmia-ortems
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.delmia-manufacturing-planning
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.delmia-robotics
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.delmia-operations
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.enovia
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.oracle-database
+  target_key: application.oracle-database
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.apache-kafka
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.kubernetes
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.3dexperience-cloud-server-1
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.3dexperience-cloud-server-2
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.delmia-manufacturing-hub-server
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.enovia-plm-server
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.oracle-database-rac-node-1
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.oracle-database-rac-node-2
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.simulation-server-cluster
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.api-gateway
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.cloud-load-balancer
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.cloud-cdn
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.edge-gateway
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.3d-visualization-workstations
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mobile-tablets
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.3dexperience-platform-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.delmia-apriso-mes-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.delmia-ortems-scheduling-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.digital-twin-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.robotics-simulation-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.manufacturing-planning-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.quality-management-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.enovia-plm-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.work-instructions-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.material-management-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.labor-management-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.analytics-intelligence-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.integration-gateway-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.3d-visualization-service
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.3dexperience-cloud-server-1
+  target_key: technology.3dexperience-object
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.3dexperience-cloud-server-1
+  target_key: technology.manufacturing-process-plan
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.3dexperience-cloud-server-1
+  target_key: technology.robot-program
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.3dexperience-cloud-server-1
+  target_key: technology.digital-twin-model
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.3dexperience-cloud-server-1
+  target_key: technology.work-instruction-package
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.3dexperience-cloud-server-1
+  target_key: technology.production-schedule
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.3dexperience-cloud-server-1
+  target_key: technology.database-backup
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.3dexperience-cloud-network
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.inter-service-mesh
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.expressroute-directconnect
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.global-cdn
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.plant-floor-gateway
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.digital-manufacturing
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.manufacturing-execution
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.advanced-scheduling
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.process-planning
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.robotics-simulation
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.factory-simulation
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.quality-management
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.material-traceability
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.3d-work-instructions
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.labor-management
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.equipment-management
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.plm-mes-integration
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.ergonomics-analysis
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.line-balancing
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.facility-layout
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.supply-chain-collaboration
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.manufacturing-analytics
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.change-management
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.compliance-management
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.virtual-commissioning
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.supplier-quality-management
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.customer-quality-portal
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.sustainability-reporting
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.workforce-management
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.material-requirements-integration
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.product-costing-profitability
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.compliance-reporting
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.global-production-network
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.ai-driven-quality-prediction
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.warehouse-integration
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.manufacturing-execution-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.advanced-scheduling-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.digital-twin-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.process-planning-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.quality-management-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.material-tracking-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.work-instructions-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.labor-management-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.analytics-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.plm-integration-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.digital-manufacturing-process-planning
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.production-order-execution
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.finite-capacity-scheduling
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.robot-programming-simulation
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.engineering-change-order-execution
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: business.digital-twin-synchronization
+  type: association
+  module_keys:
+  - core
+- source_key: business.manufacturing-process-plan
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: business.production-order
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: business.digital-twin
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: business.robot-program
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: business.work-instruction
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: business.material-lot
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: business.quality-plan
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: business.production-schedule
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.3dexperience-rest-api
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.delmia-apriso-api
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.delmia-ortems-api
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.enovia-api
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.3d-visualization-api
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.manufacturing-intelligence-api
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.integration-services-api
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.work-instructions-api
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.material-tracking-api
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.event-stream-api
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.rest-api
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.soap-interface
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.websocket-interface
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.kafka-interface
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.database-interface
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.file-interface
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.opc-ua-interface
+  target_key: application.dassault-delmia-digital-manufacturing-operations
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.manufacturing-bom
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.process-plan
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.production-order
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.digital-twin-model
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.work-instruction
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.material-genealogy
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.quality-record
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.production-schedule
+  type: association
+  module_keys:
+  - core
+- source_key: application.dassault-delmia-digital-manufacturing-operations
+  target_key: application.robot-program
+  type: association
+  module_keys:
+  - core
+- source_key: physical.aws-cloud-region-us-east-1
+  target_key: technology.3dexperience-cloud-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.aws-cloud-region-eu-west-1
+  target_key: technology.3dexperience-cloud-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.smart-factory-future
+  target_key: technology.3dexperience-cloud-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.cloud-compute-instances
+  target_key: technology.3dexperience-cloud-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.gpu-simulation-instances
+  target_key: technology.3dexperience-cloud-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.engineering-workstations
+  target_key: technology.3dexperience-cloud-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.operator-tablets
+  target_key: technology.3dexperience-cloud-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.3d-visualization-displays
+  target_key: technology.3dexperience-cloud-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.aws-cloud-network
+  target_key: physical.cloud-compute-instances
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.aws-directconnect
+  target_key: physical.cloud-compute-instances
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.cloudfront-cdn
+  target_key: physical.cloud-compute-instances
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.corporate-wan
+  target_key: physical.cloud-compute-instances
+  type: association
+  module_keys:
+  - platform
+integrations: []
+capability_mappings: []

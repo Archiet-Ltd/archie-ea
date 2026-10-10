@@ -1,0 +1,2263 @@
+pack_key: outsystems
+pack_version: '1.0'
+vendor: OutSystems
+product: OutSystems Low-Code Application Platform
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about OutSystems Low-Code Application Platform are taken from OutSystems's public
+  product documentation, read on 2026-09-23; product, module and service names are used as names only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run OutSystems Low-Code Application Platform?
+- key: platform
+  question: Do you run the OutSystems Low-Code Application Platform platform components (hosting, integration,
+    data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: OutSystems Low-Code Application Platform
+  description: OutSystems Low-Code Application Platform, the core application component of the OutSystems
+    pack.
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.outsystems-low-code-application-platform
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: OutSystems Controller
+  description: OutSystems Controller
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-controller
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: OutSystems Front-End Server 1
+  description: OutSystems Front-End Server 1
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-front-end-server-1
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: OutSystems Front-End Server 2
+  description: OutSystems Front-End Server 2
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-front-end-server-2
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: OutSystems Deployment Controller
+  description: OutSystems Deployment Controller
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-deployment-controller
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SQL Server Primary
+  description: SQL Server Primary
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.sql-server-primary
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SQL Server Secondary
+  description: SQL Server Secondary
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.sql-server-secondary
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: LifeTime Management Console
+  description: LifeTime Management Console
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.lifetime-management-console
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: AI Mentor Studio
+  description: AI Mentor Studio
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.ai-mentor-studio
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Azure Load Balancer
+  description: Load balancing across front-end servers
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.azure-load-balancer
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Azure Application Gateway
+  description: Web application firewall and API gateway
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.azure-application-gateway
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Azure CDN
+  description: Content delivery network for static assets
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.azure-cdn
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Azure Traffic Manager
+  description: Global traffic routing
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.azure-traffic-manager
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Mobile Device Manager
+  description: Enterprise mobility management
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.mobile-device-manager
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: OutSystems Platform Server
+  description: OutSystems Platform Server
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-platform-server
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: OutSystems Service Studio
+  description: OutSystems Service Studio
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-service-studio
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: OutSystems LifeTime
+  description: OutSystems LifeTime
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-lifetime
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IIS Web Server
+  description: IIS Web Server
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.iis-web-server
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: .NET Framework
+  description: .NET Framework
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.net-framework
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: SQL Server
+  description: SQL Server
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.sql-server
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Redis Cache
+  description: Redis Cache
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.redis-cache
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: OutSystems Mobile Apps Build Service
+  description: OutSystems Mobile Apps Build Service
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-mobile-apps-build-service
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: OutSystems AI Mentor Studio
+  description: OutSystems AI Mentor Studio
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-ai-mentor-studio
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems Platform Server
+  description: Application execution engine
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-platform-server-2
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems Deployment Service
+  description: Application deployment automation
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-deployment-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems Compiler Service
+  description: Visual model compilation to C#/.NET
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-compiler-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems Database Service
+  description: Multi-database abstraction layer
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-database-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems Authentication Service
+  description: Built-in and external authentication
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-authentication-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems BPT Engine
+  description: Business process technology workflow engine
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-bpt-engine
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems Mobile Apps Builder
+  description: Native mobile app compilation
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-mobile-apps-builder
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems AI Mentor Studio
+  description: AI-powered code analysis and guidance
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-ai-mentor-studio-2
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems Architecture Dashboard
+  description: Architecture quality monitoring
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-architecture-dashboard
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems API Gateway
+  description: API lifecycle management
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-api-gateway
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems Integration Builder
+  description: Pre-built integrations and connectors
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-integration-builder
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems Forge
+  description: Community component marketplace
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-forge
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems Experience Builder
+  description: UI/UX design system and templates
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-experience-builder
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: OutSystems Workflow Builder
+  description: Visual workflow design tool
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-workflow-builder
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: OutSystems Application Package (.oap)
+  description: OutSystems Application Package (.oap)
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-application-package-oap
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: OutSystems Solution Pack (.osp)
+  description: OutSystems Solution Pack (.osp)
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-solution-pack-osp
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: OutSystems Module (.oml)
+  description: OutSystems Module (.oml)
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-module-oml
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: OutSystems Extension (.xif)
+  description: OutSystems Extension (.xif)
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.outsystems-extension-xif
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Forge Component
+  description: Forge Component
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.forge-component
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Mobile App Package (.apk/.ipa)
+  description: Mobile App Package (.apk/.ipa)
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.mobile-app-package-apk-ipa
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Database Backup
+  description: Database Backup
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.database-backup
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Azure Production VNet
+  description: Azure Production VNet
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.azure-production-vnet
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: SQL Always On Replication
+  description: SQL Always On Replication
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.sql-always-on-replication
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Internet Gateway
+  description: Internet Gateway
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.internet-gateway
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: ExpressRoute
+  description: ExpressRoute
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.expressroute
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Azure CDN
+  description: Azure CDN
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: technology.azure-cdn-2
+  module_keys:
+  - platform
+- type: Capability
+  layer: strategy
+  name: Full-Stack Low-Code Development
+  description: Complete front-end to back-end application development
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.full-stack-low-code-development
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: AI-Assisted Development
+  description: AI Mentor Studio for architecture guidance and code analysis
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.ai-assisted-development
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Multi-Experience Applications
+  description: Web, mobile, and progressive web apps from single codebase
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.multi-experience-applications
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Enterprise Integration
+  description: Built-in connectors for SAP, Salesforce, Oracle, and more
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.enterprise-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Business Process Management
+  description: Visual workflow designer with case management
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.business-process-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Application Lifecycle Management
+  description: LifeTime platform for complete DevOps automation
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.application-lifecycle-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Architecture Governance
+  description: Automated architecture validation and technical debt monitoring
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.architecture-governance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Cloud-Native & Hybrid Deployment
+  description: Deploy to cloud, on-premise, or hybrid environments
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.cloud-native-hybrid-deployment
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Database Independence
+  description: Support for SQL Server, Oracle, MySQL, PostgreSQL
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.database-independence
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Microservices Architecture
+  description: Build and deploy microservices with service architecture canvas
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.microservices-architecture
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Mobile-Native Development
+  description: True native iOS and Android app generation
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.mobile-native-development
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: API Economy Enablement
+  description: Full API lifecycle management with versioning and documentation
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.api-economy-enablement
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Security & Compliance
+  description: Built-in security controls and compliance frameworks
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.security-compliance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Performance Optimization
+  description: Automated performance monitoring and optimization suggestions
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.performance-optimization
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Extensibility
+  description: Custom C# and JavaScript extension capabilities
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.extensibility
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Legacy Modernization
+  description: Tools and patterns for legacy application migration
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.legacy-modernization
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Scalability & High Availability
+  description: Auto-scaling and load balancing capabilities
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.scalability-high-availability
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Real-Time Applications
+  description: WebSocket support for real-time communication
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.real-time-applications
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Offline-First Mobile
+  description: Offline data sync for mobile applications
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.offline-first-mobile
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Low-Code for Pro Developers
+  description: Full code control with visual abstraction
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: strategy.low-code-for-pro-developers
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Application Development Service
+  description: Build enterprise applications with low-code
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.application-development-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Mobile App Development
+  description: Create native mobile applications
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.mobile-app-development
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Enterprise Integration
+  description: Connect to enterprise systems
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.enterprise-integration
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: API Management
+  description: Publish and manage APIs
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.api-management
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Workflow Automation
+  description: Automate business processes
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.workflow-automation
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Application Monitoring
+  description: Monitor application health and performance
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.application-monitoring
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Architecture Governance
+  description: Validate and govern application architecture
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.architecture-governance
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: DevOps Automation
+  description: Automated deployment pipelines
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.devops-automation
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Security Management
+  description: Application security and compliance
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.security-management
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Platform Administration
+  description: Manage OutSystems environments
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.platform-administration
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Application Development Lifecycle
+  description: End-to-end app development process
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.application-development-lifecycle
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: 1 - Click Deployment Process
+  description: Automated deployment to any environment
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.1-click-deployment-process
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Mobile App Build & Release
+  description: Native mobile app compilation and distribution
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.mobile-app-build-release
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: AI-Powered Code Review
+  description: Automated architecture and code analysis
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.ai-powered-code-review
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Enterprise Integration Development
+  description: Build integrations with external systems
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.enterprise-integration-development
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Factory Delivery Process
+  description: Standardized application factory workflow
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.factory-delivery-process
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: OutSystems Application
+  description: Deployed application in environment
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.outsystems-application
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Module
+  description: Reusable application module
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.module
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Entity
+  description: Data model entity
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.entity
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Screen
+  description: User interface page
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.screen
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Server Action
+  description: Server-side business logic
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.server-action
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: REST API
+  description: Published REST API
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.rest-api
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Extension
+  description: Custom C# integration
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.extension
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Business Process
+  description: BPT workflow definition
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.business-process
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Mobile App
+  description: Native mobile application
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: business.mobile-app
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: OutSystems Platform Server
+  description: Application runtime and execution
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.outsystems-platform-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: OutSystems Deployment Controller
+  description: Automated deployment orchestration
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.outsystems-deployment-controller
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: OutSystems Compiler
+  description: Visual model to C# code compilation
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.outsystems-compiler
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Service Studio
+  description: Professional IDE for developers
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.service-studio
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Integration Studio
+  description: Custom extension development IDE
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.integration-studio
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: LifeTime Console
+  description: DevOps and ALM management
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.lifetime-console
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Service Center
+  description: Environment administration console
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.service-center
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mobile Runtime
+  description: Native mobile app runtime
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.mobile-runtime
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: OutSystems UI Framework
+  description: Responsive web UI components
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.outsystems-ui-framework
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: BPT Engine
+  description: Business process automation engine
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.bpt-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: OutSystems AI Mentor
+  description: AI-powered code analysis
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.outsystems-ai-mentor
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Architecture Dashboard
+  description: Architecture monitoring and metrics
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.architecture-dashboard
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: OutSystems Database
+  description: Multi-database abstraction
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.outsystems-database
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Redis Session Store
+  description: Session state management
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.redis-session-store
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Platform API
+  description: Platform management API
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.platform-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: ServiceCenter API
+  description: Environment management API
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.servicecenter-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Architecture Dashboard API
+  description: Architecture metrics API
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.architecture-dashboard-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: AI Mentor API
+  description: AI analysis API
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.ai-mentor-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Application REST API
+  description: Custom application APIs
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.application-rest-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SOAP Web Service
+  description: Legacy SOAP services
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.soap-web-service
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: BPT API
+  description: Process automation API
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.bpt-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Mobile Apps Build Service
+  description: Native mobile build API
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.mobile-apps-build-service
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Integration Connectors
+  description: Pre-built system connectors
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.integration-connectors
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: User Authentication API
+  description: Authentication services
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.user-authentication-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: REST API Interface
+  description: REST API Interface
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.rest-api-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: SOAP Interface
+  description: SOAP Interface
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.soap-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Database Interface
+  description: Database Interface
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.database-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: SAP RFC Interface
+  description: SAP RFC Interface
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.sap-rfc-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: File System Interface
+  description: File System Interface
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.file-system-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Email Interface
+  description: Email Interface
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.email-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: WebSocket Interface
+  description: WebSocket Interface
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.websocket-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Mobile Push Interface
+  description: Mobile Push Interface
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.mobile-push-interface
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Entity Record
+  description: Entity Record
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.entity-record
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: User Account
+  description: User Account
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.user-account
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Session State
+  description: Session State
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.session-state
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Binary Data
+  description: Binary Data
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.binary-data
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Process Instance
+  description: Process Instance
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.process-instance
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Audit Log
+  description: Audit Log
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.audit-log
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Application Package
+  description: Application Package
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.application-package
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Mobile App Build
+  description: Mobile App Build
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.mobile-app-build
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Performance Metrics
+  description: Performance Metrics
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: application.performance-metrics
+  module_keys:
+  - core
+- type: Facility
+  layer: physical
+  name: Azure East US 2
+  description: Primary production region
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.azure-east-us-2
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Azure West Europe
+  description: European data residency
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.azure-west-europe
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Corporate Data Center
+  description: On-premise development environment
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.corporate-data-center
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Front-End Servers
+  description: Front-End Servers
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.front-end-servers
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Controller Servers
+  description: Controller Servers
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.controller-servers
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: SQL Server Databases
+  description: SQL Server Databases
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.sql-server-databases
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Redis Cache
+  description: Redis Cache
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.redis-cache
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Developer Workstations
+  description: Developer Workstations
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.developer-workstations
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Azure Virtual Network
+  description: Azure Virtual Network
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.azure-virtual-network
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: ExpressRoute
+  description: ExpressRoute
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.expressroute
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Internet Gateway
+  description: Internet Gateway
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.internet-gateway
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Azure Front Door
+  description: Azure Front Door
+  mandatory: true
+  source_urls:
+  - https://www.outsystems.com/low-code-platform/
+  element_key: physical.azure-front-door
+  module_keys:
+  - platform
+relationships:
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.outsystems-platform-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.outsystems-deployment-controller
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.outsystems-compiler
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.service-studio
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.integration-studio
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.lifetime-console
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.service-center
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.mobile-runtime
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.outsystems-ui-framework
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.bpt-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.outsystems-ai-mentor
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.architecture-dashboard
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.outsystems-database
+  type: composition
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.redis-session-store
+  type: composition
+  module_keys:
+  - core
+- source_key: technology.outsystems-platform-server
+  target_key: application.outsystems-platform-server
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-service-studio
+  target_key: application.service-studio
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-lifetime
+  target_key: application.outsystems-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.iis-web-server
+  target_key: application.outsystems-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.net-framework
+  target_key: application.outsystems-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sql-server
+  target_key: application.outsystems-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.redis-cache
+  target_key: application.outsystems-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-mobile-apps-build-service
+  target_key: application.outsystems-low-code-application-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-ai-mentor-studio
+  target_key: application.outsystems-ai-mentor
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-controller
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-front-end-server-1
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-front-end-server-2
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-deployment-controller
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sql-server-primary
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sql-server-secondary
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.lifetime-management-console
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ai-mentor-studio
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.azure-load-balancer
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.azure-application-gateway
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.azure-cdn
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.azure-traffic-manager
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mobile-device-manager
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-platform-server-2
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-deployment-service
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-compiler-service
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-database-service
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-authentication-service
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-bpt-engine
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-mobile-apps-builder
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-ai-mentor-studio-2
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-architecture-dashboard
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-api-gateway
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-integration-builder
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-forge
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-experience-builder
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-workflow-builder
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.outsystems-controller
+  target_key: technology.outsystems-application-package-oap
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.outsystems-controller
+  target_key: technology.outsystems-solution-pack-osp
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.outsystems-controller
+  target_key: technology.outsystems-module-oml
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.outsystems-controller
+  target_key: technology.outsystems-extension-xif
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.outsystems-controller
+  target_key: technology.forge-component
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.outsystems-controller
+  target_key: technology.mobile-app-package-apk-ipa
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.outsystems-controller
+  target_key: technology.database-backup
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.azure-production-vnet
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sql-always-on-replication
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.internet-gateway
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.expressroute
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.azure-cdn-2
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.full-stack-low-code-development
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.ai-assisted-development
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.multi-experience-applications
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.enterprise-integration
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.business-process-management
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.application-lifecycle-management
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.architecture-governance
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.cloud-native-hybrid-deployment
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.database-independence
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.microservices-architecture
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.mobile-native-development
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.api-economy-enablement
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.security-compliance
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.performance-optimization
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.extensibility
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.legacy-modernization
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.scalability-high-availability
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.real-time-applications
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.offline-first-mobile
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.low-code-for-pro-developers
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.application-development-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.mobile-app-development
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.enterprise-integration
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.api-management
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.workflow-automation
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.application-monitoring
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.architecture-governance
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.devops-automation
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.security-management
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.platform-administration
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.application-development-lifecycle
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.1-click-deployment-process
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.mobile-app-build-release
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.ai-powered-code-review
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.enterprise-integration-development
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: business.factory-delivery-process
+  type: association
+  module_keys:
+  - core
+- source_key: business.outsystems-application
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.module
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.entity
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.screen
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.server-action
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.rest-api
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.extension
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.business-process
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.mobile-app
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.platform-api
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.servicecenter-api
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.architecture-dashboard-api
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.ai-mentor-api
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.application-rest-api
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.soap-web-service
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.bpt-api
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.mobile-apps-build-service
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.integration-connectors
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.user-authentication-api
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.rest-api-interface
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.soap-interface
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.database-interface
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-rfc-interface
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.file-system-interface
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.email-interface
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.websocket-interface
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.mobile-push-interface
+  target_key: application.outsystems-low-code-application-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.entity-record
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.user-account
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.session-state
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.binary-data
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.process-instance
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.audit-log
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.application-package
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.mobile-app-build
+  type: association
+  module_keys:
+  - core
+- source_key: application.outsystems-low-code-application-platform
+  target_key: application.performance-metrics
+  type: association
+  module_keys:
+  - core
+- source_key: physical.azure-east-us-2
+  target_key: technology.outsystems-controller
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.azure-west-europe
+  target_key: technology.outsystems-controller
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.corporate-data-center
+  target_key: technology.outsystems-controller
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.front-end-servers
+  target_key: technology.outsystems-controller
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.controller-servers
+  target_key: technology.outsystems-controller
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.sql-server-databases
+  target_key: technology.outsystems-controller
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.redis-cache
+  target_key: technology.outsystems-controller
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.developer-workstations
+  target_key: technology.outsystems-controller
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.azure-virtual-network
+  target_key: physical.front-end-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.expressroute
+  target_key: physical.front-end-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.internet-gateway
+  target_key: physical.front-end-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.azure-front-door
+  target_key: physical.front-end-servers
+  type: association
+  module_keys:
+  - platform
+integrations: []
+capability_mappings: []
