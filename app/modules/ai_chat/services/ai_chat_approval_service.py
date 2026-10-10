@@ -671,7 +671,17 @@ class AIChatApprovalService:
             # Execute the operation
             data_service = AIDataInteractionService(user_id=self.user_id)
 
-            if approval.operation_type == "create":
+            # Connector changes (create/update/delete/sync) execute through
+            # the one connector framework, whose change path only accepts an
+            # approved proposal for the same organisation (or an explicit
+            # organisational delegation, which never reaches this dispatch).
+            # The framework's apply path refuses a write without one.
+            if approval.entity_type == "connectors":
+                from app.services.connector_framework import execute_connector_proposal
+
+                result = execute_connector_proposal(approval)
+
+            elif approval.operation_type == "create":
                 if approval.entity_type == "capability":
                     result = data_service.create_capability(payload)
                 elif approval.entity_type == "application":

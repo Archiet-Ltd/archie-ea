@@ -1,21 +1,32 @@
 """
 Connector Framework
 
-Scaffolding for mapping records from an external system into this
-platform's shape:
+The single framework every connector goes through:
+
 - FieldMapping: a DSL for per-field API-response transformations
 - BaseConnector: the interface each connector implements (test_connection,
   batch_sync, incremental_sync)
 - ConnectorManager: registers connector instances and runs their sync
   methods
+- The connector change path: every connector change (create/update/delete
+  of a ConnectorConfig row, and a sync run) is either proposed into the
+  acting organisation's own approval queue (``propose_or_apply_connector_change``)
+  or, when that organisation has delegated the action type (see
+  ``org_has_delegated_action``), applied directly. A write that is neither
+  an approved proposal nor delegated is refused with ``ConnectorWriteRefused``
+  -- never queued silently and never applied behind an approval's back.
+  ``apply_connector_change`` is the one writer of connector configuration,
+  ``list_org_connectors`` the one reader the connectors page uses, and
+  ``run_connector_sync`` the one sync path that records health, last
+  synchronisation and the identifier crosswalk links for every element a
+  sync touches.
 
-Not implemented: no connector in app/connectors/ is ever registered with
-ConnectorManager, and none of them persist a fetched/mapped record anywhere.
-There is no Kafka bus, no webhook-driven incremental sync, and no
-reconciliation or fuzzy-matching layer -- this module provides only the
-field-mapping scaffolding those would sit on.
+Credentials live only in the per-organisation store
+(``OrgCredentialVault`` over ``OrgConnectorCredential``); connector
+configuration rows hold settings, never secrets.
 """
 
+import json
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -128,6 +139,7 @@ class ConnectorManager:
     def __init__(self):
         self.connectors: Dict[str, BaseConnector] = {}
         self.event_handlers: Dict[str, List[Callable]] = {}
+        self.logger = logger
 
     def register_connector(self, connector: BaseConnector):
         """Register a connector instance."""
@@ -250,3 +262,620 @@ def init_connector_tables():
 def get_connector_manager() -> ConnectorManager:
     """Get the global connector manager instance."""
     return connector_manager
+
+
+# ===========================================================================
+# Connector change path — every connector change goes through the queue
+# ===========================================================================
+
+# The approval entity type used for every connector change proposal. The
+# approval inbox renders these like any other proposal; the connector
+# framework executes them on approval.
+CONNECTOR_APPROVAL_ENTITY_TYPE = "connectors"
+
+# Action types a connector change can carry. An organisation delegates any
+# of these in ``Organization.settings["connector_action_delegation"]`` and
+# that action then applies directly instead of queueing a proposal.
+CONNECTOR_ACTION_CREATE = "create"
+CONNECTOR_ACTION_UPDATE = "update"
+CONNECTOR_ACTION_DELETE = "delete"
+CONNECTOR_ACTION_SYNC = "sync"
+
+# Connector types surfaced by the connectors page. A type is only offered
+# from a per-organisation configuration row already in the system; this is
+# the display order, not an allowlist -- the permit gate is
+# ``assert_connector_permitted``, so only types on that allowlist are
+# offered in the add form.
+CONNECTOR_TYPE_LABELS = {
+    "servicenow": "ServiceNow",
+    "jira": "Jira",
+    "m365": "Microsoft 365",
+    "ea_tool": "Enterprise Architecture tool",
+    "devops": "GitHub / Azure DevOps",
+    "lucidchart": "Lucidchart",
+}
+
+# Concrete connector implementations available for sync (outside credential
+# storage, which lives in the per-organisation vault).
+_CONNECTOR_CLASSES: dict = {}
+
+
+def _register_concrete_connectors():
+    """Import the concrete connector classes once, on first use."""
+    if _CONNECTOR_CLASSES:
+        return
+    from app.connectors.abacus import AbacusConnector
+    from app.connectors.jira import JiraALMConnector
+    from app.connectors.servicenow import ServiceNowCMDBConnector
+
+    _CONNECTOR_CLASSES.update(
+        {
+            "abacus": AbacusConnector,
+            "ea_tool": AbacusConnector,
+            "jira": JiraALMConnector,
+            "servicenow": ServiceNowCMDBConnector,
+        }
+    )
+
+
+class ConnectorWriteRefused(RuntimeError):
+    """A connector write that is neither an approved approval proposal nor
+    explicitly delegated by the organisation is refused, not queued
+    silently.
+
+    Raised by ``apply_connector_change`` and ``run_connector_sync`` when a
+    caller attempts a write without either an ``approval`` or
+    ``delegated=True``. A connector change reaches the model only as an
+    approval proposal in the acting organisation's queue (executed by the
+    approval service on approval) or directly when that organisation has
+    delegated the action type.
+    """
+
+
+def org_has_delegated_action(org_id: int, action: str) -> bool:
+    """True when *org_id* has delegated *action*, letting a connector write
+    apply directly instead of queueing an approval proposal.
+
+    Delegation is an organisation-level setting: ``Organization.settings``
+    key ``connector_action_delegation`` maps an action name (create,
+    update, delete, sync) to a boolean. Absent or unset means the action is
+    not delegated and therefore goes through the approval queue.
+    """
+    if org_id is None:
+        return False
+    from app.models.organization import Organization
+
+    org = Organization.query.filter_by(id=org_id).first()
+    if org is None:
+        return False
+    delegation = (org.settings or {}).get("connector_action_delegation") or {}
+    return bool(delegation.get(action))
+
+
+def scope_connector_change_to_org(*, org_id: int | None) -> int:
+    """Resolve the organisation a connector change acts as.
+
+    Uses the passed org id, or ``g.current_org_id`` when inside a request.
+    A connector write with no organisation context is refused outright --
+    the change path is organisation-scoped by construction, and a write
+    that cannot be attributed to an acting organisation must not be queued
+    into a void.
+    """
+    if org_id is not None:
+        return org_id
+    from flask import g, has_app_context
+
+    if has_app_context():
+        current = getattr(g, "current_org_id", None)
+        if current is not None:
+            return current
+    raise ConnectorWriteRefused(
+        "A connector change requires an acting organisation; none is active "
+        "for this request."
+    )
+
+
+def _load_org_connector(org_id: int, connector_id=None, connector_type=None):
+    """One org-scoped ConnectorConfig row, or None if it does not exist.
+
+    The explicit ``organization_id`` filter is belt-and-suspenders on the
+    tenant middleware: the connectors page and the change path must never
+    resolve a row that another organisation owns.
+    """
+    query = ConnectorConfig.query.filter_by(organization_id=org_id)
+    if connector_id:
+        query = query.filter_by(id=connector_id)
+    if connector_type:
+        query = query.filter_by(connector_type=connector_type)
+    return query.first()
+
+
+def _connector_credential_mask(org_id: int, connector_type: str):
+    """Masked proof that this organisation stores a credential for the
+    connector type, across every credential type the change paths use."""
+    if not connector_type:
+        return None
+    from app.models.connector_config import OrgConnectorCredential
+
+    row = (
+        OrgConnectorCredential.query.filter_by(
+            organization_id=org_id, connector_type=connector_type
+        ).first()
+    )
+    return "******" if row is not None else None
+
+
+def _connector_view(cfg: ConnectorConfig, org_id: int) -> dict:
+    """One connector as the connectors page and API render it.
+
+    Carries configuration, credential reference (masked — never a secret),
+    schedule, health (status) and last synchronisation, so the page has a
+    single source per connector from the framework.
+    """
+    latest_sync = (
+        SyncLog.query.filter_by(connector_id=cfg.id)
+        .order_by(SyncLog.started_at.desc())
+        .first()
+    )
+    return {
+        "id": cfg.id,
+        "name": cfg.name,
+        "connector_type": cfg.connector_type,
+        "connector_type_label": CONNECTOR_TYPE_LABELS.get(cfg.connector_type, cfg.connector_type),
+        "status": cfg.status,
+        "health": cfg.status,
+        "sync_mode": cfg.derived_sync_mode(),
+        "sync_schedule": cfg.sync_schedule,
+        "config": cfg.public_config(),
+        "credential_ref": f"vault:{org_id}:{cfg.connector_type}",
+        "credential_masked": _connector_credential_mask(org_id, cfg.connector_type),
+        "last_sync": cfg.last_sync,
+        "last_sync_status": latest_sync.status if latest_sync else None,
+        "description": cfg.description,
+        "is_proposal": False,
+        "created_at": cfg.created_at,
+        "updated_at": cfg.updated_at,
+    }
+
+
+def _proposal_connector_view(approval, org_id: int) -> dict:
+    """A queued connector change as a pending row on the connectors page.
+
+    Shown until its proposal is decided so the page is the one place that
+    lists every connector of the organisation — configured ones with health
+    and last synchronisation, and proposed ones with their (masked)
+    credential state and the approval waiting in the inbox.
+    """
+    try:
+        payload = json.loads(approval.operation_payload or "{}")
+    except (json.JSONDecodeError, TypeError):
+        payload = {}
+    connector_type = payload.get("connector_type") or ""
+    return {
+        "id": f"proposal-{approval.id}",
+        "name": (payload.get("name") or connector_type or "Proposed connector"),
+        "connector_type": connector_type,
+        "connector_type_label": CONNECTOR_TYPE_LABELS.get(
+            connector_type, connector_type or "connector"
+        ),
+        "status": "pending_review",
+        "health": "pending_review",
+        "sync_mode": None,
+        "sync_schedule": None,
+        "config": payload.get("config") or {},
+        "credential_ref": f"vault:{org_id}:{connector_type}" if connector_type else None,
+        "credential_masked": _connector_credential_mask(org_id, connector_type),
+        "last_sync": None,
+        "last_sync_status": None,
+        "description": approval.summary,
+        "is_proposal": True,
+        "proposal_id": approval.id,
+        "operation_type": approval.operation_type,
+        "created_at": approval.created_at,
+        "updated_at": None,
+    }
+
+
+def list_org_connectors(org_id: int) -> list[dict]:
+    """Every connector of *org_id* with health and last synchronisation,
+    followed by the organisation's queued connector creations as pending rows.
+
+    The one reader the connectors page uses. Only rows — and only approval
+    proposals — the organisation owns are ever returned.
+    """
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    rows = ConnectorConfig.query.filter_by(organization_id=org_id).all()
+    connectors = [_connector_view(row, org_id) for row in rows]
+
+    # A queued create has no row yet, but the page must still show it (with
+    # its masked credential) so the organisation's one connectors page lists
+    # every connector that has been proposed, not only those already applied.
+    # Update and delete proposals act on an existing row, which is already
+    # listed above with its current state.
+    create_proposals = (
+        AIChatCRUDApproval.query.filter_by(
+            organization_id=org_id,
+            entity_type=CONNECTOR_APPROVAL_ENTITY_TYPE,
+            operation_type=CONNECTOR_ACTION_CREATE,
+            status=ApprovalStatus.PENDING,
+        )
+        .order_by(AIChatCRUDApproval.created_at.asc())
+        .all()
+    )
+    for proposal in create_proposals:
+        connectors.append(_proposal_connector_view(proposal, org_id))
+    return connectors
+
+
+def propose_connector_change(
+    *,
+    org_id: int,
+    actor_user_id: int | None = None,
+    action: str,
+    connector_type: str,
+    summary: str,
+    payload: dict,
+) -> Any:
+    """Queue one connector change as an approval proposal in the acting
+    organisation's own queue.
+
+    Uses ``create_approval_record`` -- the one creator the approval queue
+    established -- with the connector entity type, so the same inbox that
+    shows every other proposed change shows connector changes too and the
+    same approval service executes them.
+    """
+    from app.modules.ai_chat.services.ai_chat_approval_service import (
+        create_approval_record,
+    )
+
+    resolved = scope_connector_change_to_org(org_id=org_id)
+    approval = create_approval_record(
+        organization_id=resolved,
+        operation_type=action,
+        entity_type=CONNECTOR_APPROVAL_ENTITY_TYPE,
+        summary=summary,
+        operation_payload=payload,
+        user_id=actor_user_id,
+        source_table="connector_config",
+    )
+    return approval
+
+
+def apply_connector_change(
+    *,
+    org_id: int,
+    action: str,
+    payload: dict,
+    approval=None,
+    delegated: bool = False,
+):
+    """The single writer of connector configuration.
+
+    Refuses (``ConnectorWriteRefused``) a write that is neither an approved
+    approval proposal for the same organisation nor an explicit delegation
+    by that organisation, then applies create/update/delete on
+    ``ConnectorConfig``. Secrets never pass through here: credentials were
+    stored in the per-organisation vault at proposal time -- the payload
+    only carries the connector type that references them.
+    """
+    from app.modules.intelligence.services.connector_allowlist import (
+        assert_connector_permitted,
+    )
+
+    resolved = scope_connector_change_to_org(org_id=org_id)
+    if approval is None and not delegated:
+        raise ConnectorWriteRefused(
+            "A connector write is refused unless it is an approved approval "
+            "proposal or the organisation has delegated this action type."
+        )
+    if approval is not None and approval.organization_id != resolved:
+        raise ConnectorWriteRefused(
+            "The approval executing this connector change belongs to another "
+            "organisation."
+        )
+
+    connector_type = payload.get("connector_type")
+    assert_connector_permitted(connector_type)
+
+    if action == CONNECTOR_ACTION_CREATE:
+        cfg = ConnectorConfig(
+            organization_id=resolved,
+            connector_type=connector_type,
+            name=payload.get("name") or connector_type,
+            description=payload.get("description"),
+            config=payload.get("config") or {},
+            field_mappings=payload.get("field_mappings"),
+            sync_schedule=payload.get("sync_schedule"),
+            status=(
+                payload.get("status")
+                if payload.get("status")
+                else ConnectorStatus.ACTIVE.value
+            ),
+        )
+        db.session.add(cfg)
+        db.session.flush()
+        return cfg
+
+    if action == CONNECTOR_ACTION_UPDATE:
+        cfg = _load_org_connector(
+            resolved,
+            connector_id=payload.get("connector_id"),
+            connector_type=connector_type,
+        )
+        if cfg is None:
+            raise LookupError(
+                f"Connector {payload.get('connector_id') or connector_type} "
+                f"is not configured in this organisation."
+            )
+        if "name" in payload:
+            cfg.name = payload["name"] or cfg.name
+        if "description" in payload:
+            cfg.description = payload["description"]
+        if "config" in payload:
+            cfg.config = payload["config"]
+        if "field_mappings" in payload:
+            cfg.field_mappings = payload["field_mappings"]
+        if "sync_schedule" in payload:
+            cfg.sync_schedule = payload["sync_schedule"]
+        if "status" in payload and payload["status"]:
+            cfg.status = payload["status"]
+        db.session.flush()
+        return cfg
+
+    if action == CONNECTOR_ACTION_DELETE:
+        cfg = _load_org_connector(
+            resolved,
+            connector_id=payload.get("connector_id"),
+            connector_type=connector_type,
+        )
+        if cfg is None:
+            raise LookupError(
+                f"Connector {payload.get('connector_id') or connector_type} "
+                f"is not configured in this organisation."
+            )
+        from app.models.connector_config import OrgConnectorCredential
+
+        # Remove every credential of the deleted connector (all credential
+        # types — the ''credentials'' blob, legacy ''client_secret'' rows,
+        # whatever else the connector used) from the per-organisation vault.
+        OrgConnectorCredential.query.filter_by(
+            organization_id=resolved, connector_type=connector_type
+        ).delete()
+        db.session.delete(cfg)
+        db.session.flush()
+        return cfg
+
+    raise ConnectorWriteRefused(f"Unsupported connector action: {action!r}")
+
+
+def execute_connector_proposal(approval) -> dict:
+    """Apply one approved connector proposal.
+
+    Called by the approval service's execution dispatch. The approval row
+    itself is the authorisation: only a proposal created for the same
+    organisation, executed through the approval path, can write.
+    """
+    try:
+        payload = json.loads(approval.operation_payload or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return {"success": False, "error": "Invalid connector proposal payload"}
+
+    try:
+        if approval.operation_type == CONNECTOR_ACTION_SYNC:
+            return run_connector_sync(
+                org_id=approval.organization_id,
+                connector_id=payload.get("connector_id"),
+                approval=approval,
+            )
+        result = apply_connector_change(
+            org_id=approval.organization_id,
+            action=approval.operation_type,
+            payload=payload,
+            approval=approval,
+        )
+    except ConnectorWriteRefused as exc:
+        return {"success": False, "error": str(exc)}
+    except (LookupError, ValueError, KeyError) as exc:
+        return {"success": False, "error": str(exc)}
+
+    return {"success": True, "connector_id": getattr(result, "id", None)}
+
+
+def propose_or_apply_connector_change(
+    *,
+    org_id: int,
+    actor_user_id: int | None = None,
+    action: str,
+    connector_type: str,
+    summary: str,
+    payload: dict,
+) -> dict:
+    """Route one connector change.
+
+    An organisation that has delegated *action* gets it applied directly;
+    every other organisation gets it queued as an approval proposal in its
+    own queue. A change carries no organisation at all and is refused.
+    """
+    resolved = scope_connector_change_to_org(org_id=org_id)
+    if not org_has_delegated_action(resolved, action):
+        approval = propose_connector_change(
+            org_id=resolved,
+            actor_user_id=actor_user_id,
+            action=action,
+            connector_type=connector_type,
+            summary=summary,
+            payload=payload,
+        )
+        return {"queued": True, "approval_id": approval.id}
+
+    cfg = apply_connector_change(
+        org_id=resolved,
+        action=action,
+        payload=payload,
+        delegated=True,
+    )
+    return {"applied": True, "connector_id": getattr(cfg, "id", None)}
+
+
+def _orphan_sync_log(connector_id: str):
+    """A SyncLog row for a connector run, created before the run so a
+    failure still leaves a record the page can report."""
+    sync_log = SyncLog(
+        connector_id=connector_id,
+        sync_type="manual",
+        status="running",
+    )
+    db.session.add(sync_log)
+    db.session.flush()
+    return sync_log
+
+
+def _write_touched_crosswalk_links(connector_type: str, touched, org_id: int) -> int:
+    """Write one identifier crosswalk link per element a sync touched.
+
+    Goes through ``CrosswalkService.write_link`` -- the single gated
+    crosswalk writer, which applies ``assert_connector_permitted`` before
+    the write -- so a sync never reaches the model through a second
+    identity path.
+    """
+    from app.modules.intelligence.services.crosswalk_service import CrosswalkService
+
+    written = 0
+    for item in touched or []:
+        external_id = item.get("external_id")
+        element_id = item.get("element_id")
+        if not external_id or not element_id:
+            continue
+        CrosswalkService.write_link(
+            source_system=connector_type,
+            external_id=str(external_id),
+            element_id=int(element_id),
+            org_id=org_id,
+        )
+        written += 1
+    return written
+
+
+def run_connector_sync(
+    *,
+    org_id: int,
+    connector_id: str,
+    approval=None,
+    delegated: bool = False,
+) -> dict:
+    """Run one connector sync and record health, last synchronisation and
+    the identifier crosswalk links for every element touched.
+
+    The one sync path behind the connectors page. Refuses a sync that is
+    neither an approved proposal nor delegated, exactly like configuration
+    writes: a sync reaches the external system and the model only through
+    the organisation's own queue (or its explicit delegation).
+    """
+    import asyncio
+
+    from app.modules.intelligence.services.connector_allowlist import (
+        assert_connector_permitted,
+    )
+
+    resolved = scope_connector_change_to_org(org_id=org_id)
+    if approval is None and not delegated:
+        raise ConnectorWriteRefused(
+            "A connector sync is refused unless it is an approved approval "
+            "proposal or the organisation has delegated sync."
+        )
+    if approval is not None and approval.organization_id != resolved:
+        raise ConnectorWriteRefused(
+            "The approval executing this connector sync belongs to another "
+            "organisation."
+        )
+
+    cfg = _load_org_connector(resolved, connector_id=connector_id)
+    if cfg is None:
+        return {"success": False, "error": "Connector not found"}
+
+    assert_connector_permitted(cfg.connector_type)
+
+    sync_log = _orphan_sync_log(cfg.id)
+
+    try:
+        connector = build_connector(cfg, resolved)
+    except LookupError as exc:
+        sync_log.status = "error"
+        sync_log.error_message = str(exc)
+        sync_log.completed_at = datetime.utcnow()
+        db.session.flush()
+        return {"success": False, "error": str(exc)}
+
+    try:
+        call = connector.batch_sync()
+        result = asyncio.run(call) if asyncio.iscoroutine(call) else call
+    except Exception as exc:
+        logger.error("Connector sync failed for %s org %s: %s", cfg.id, resolved, exc)
+        sync_log.status = "error"
+        sync_log.error_message = str(exc)
+        sync_log.completed_at = datetime.utcnow()
+        cfg.status = ConnectorStatus.ERROR.value
+        db.session.flush()
+        return {"success": False, "error": str(exc)}
+
+    result = result or {}
+    sync_log.status = result.get("status", "completed")
+    sync_log.records_processed = result.get("records_processed", 0)
+    sync_log.records_created = result.get("records_created", 0)
+    sync_log.records_updated = result.get("records_updated", 0)
+    sync_log.records_deleted = result.get("records_deleted", 0)
+    sync_log.completed_at = datetime.utcnow()
+
+    cfg.last_sync = datetime.utcnow()
+    cfg.status = (
+        ConnectorStatus.ACTIVE.value
+        if sync_log.status in ("completed", "success")
+        else ConnectorStatus.ERROR.value
+    )
+
+    touched = result.get("elements_touched")
+    if touched:
+        result["crosswalk_links_written"] = _write_touched_crosswalk_links(
+            cfg.connector_type, touched, resolved
+        )
+
+    db.session.flush()
+    logger.info("Connector sync completed for %s org %s: %s", cfg.id, resolved, result)
+    result["success"] = True
+    return result
+
+
+def build_connector(cfg: ConnectorConfig, org_id: int):
+    """Build the concrete connector for a configuration, injecting the
+    organisation's stored credentials for the run.
+
+    Raises ``LookupError`` when the connector type has no concrete
+    implementation registered in ``app/connectors/``.
+    """
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    _register_concrete_connectors()
+    connector_class = _CONNECTOR_CLASSES.get(cfg.connector_type)
+    if connector_class is None:
+        raise LookupError(
+            f"No sync implementation is registered for connector type "
+            f"{cfg.connector_type!r}."
+        )
+
+    credentials = OrgCredentialVault().retrieve_credentials(
+        org_id, cfg.connector_type
+    )
+    merged_config = dict(cfg.config or {})
+    if credentials:
+        merged_config.update(credentials)
+
+    runtime_config = ConnectorConfig(
+        id=cfg.id,
+        connector_type=cfg.connector_type,
+        name=cfg.name,
+        organization_id=cfg.organization_id,
+        config=merged_config,
+        sync_schedule=cfg.sync_schedule,
+    )
+    return connector_class(runtime_config)

@@ -1,22 +1,41 @@
-"""COM-017 — Microsoft 365 connector admin routes.
+"""Connector admin routes — the one connectors page and its change path.
 
-Provides admin UI for configuring the M365 integration:
-    GET  /admin/connectors/m365       — render config form
-    POST /admin/connectors/m365       — save config
-    POST /admin/connectors/m365/test  — test OAuth2 token fetch
+Routes in this module are the single in-product surface for connector
+configuration. Every connector change reaches the model only as an approval
+proposal in the acting organisation's own queue, unless that organisation has
+delegated the action type (``Organization.settings`` key
+``connector_action_delegation``); a write with neither is refused. All
+handlers resolve the organisation from ``g.current_org_id`` (the active
+organisation), never the user's home organisation.
 
-COM-008 — ServiceNow CMDB bidirectional connector admin routes:
-    GET  /admin/connectors/servicenow        — render config form
-    POST /admin/connectors/servicenow        — save config
-    POST /admin/connectors/servicenow/sync   — trigger async CMDB pull (202)
-    GET  /admin/connectors/servicenow/status — connector status JSON
+- GET  /admin/connectors              — one page listing every connector of
+                                        the signed-in organisation with
+                                        health, last synchronisation, the
+                                        masked credential state and the count
+                                        of pending connector proposals
+- POST /admin/connectors              — add/update a connector (credential →
+                                        per-organisation vault, change →
+                                        approval proposal or direct when
+                                        delegated)
+- POST /admin/connectors/<id>/sync    — propose (or run, when delegated) a
+                                        connector sync
+- POST /admin/connectors/<id>/delete  — propose (or do, when delegated) a
+                                        connector removal
+
+Legacy per-connector forms (M365, Jira, ServiceNow) keep their endpoints for
+existing entry points and their save handlers route through the same change
+path, so no connector write bypasses the approval queue or the framework.
+
+Credentials live only in the per-organisation vault; configuration rows never
+carry a secret, and nothing in this module reads or writes credentials any
+other way.
 """
 
+import json as _json
 import logging
-import threading
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
-from flask_login import current_user, login_required
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask_login import login_required
 
 from app.decorators import admin_required
 
@@ -25,27 +44,309 @@ logger = logging.getLogger(__name__)
 m365_connector_bp = Blueprint("m365_connector", __name__, url_prefix="/admin/connectors")
 
 
+def _active_org_id():
+    """The organisation the request is acting as (``g.current_org_id``),
+    never the user's home organisation. Admin authority and every connector
+    write are judged in the active organisation."""
+    from flask import g
+
+    return getattr(g, "current_org_id", None)
+
+
+def _require_active_org() -> int:
+    org_id = _active_org_id()
+    if org_id is None:
+        abort(403, "No organisation is active for this request.")
+    return org_id
+
+
+def _permit_connector_type(connector_type: str):
+    """Refuse an unpermitted connector type before anything is stored."""
+    from app.modules.intelligence.services.connector_allowlist import (
+        assert_connector_permitted,
+    )
+
+    assert_connector_permitted(connector_type)
+
+
+# ---------------------------------------------------------------------------
+# The one connectors page
+# ---------------------------------------------------------------------------
+
+
+@m365_connector_bp.route("", methods=["GET"])
+@login_required
+@admin_required
+def connectors_index():
+    """The one connectors page: every connector of the signed-in
+    organisation with health, last synchronisation, the masked credential
+    state, and how many connector changes are pending in the organisation's
+    approval queue."""
+    org_id = _require_active_org()
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+    from app.services.connector_framework import (
+        CONNECTOR_APPROVAL_ENTITY_TYPE,
+        CONNECTOR_TYPE_LABELS,
+        list_org_connectors,
+        org_has_delegated_action,
+    )
+
+    connectors = list_org_connectors(org_id)
+    pending_count = AIChatCRUDApproval.query.filter_by(
+        organization_id=org_id,
+        entity_type=CONNECTOR_APPROVAL_ENTITY_TYPE,
+        status=ApprovalStatus.PENDING,
+    ).count()
+
+    return render_template(
+        "admin/connectors/index.html",
+        connectors=connectors,
+        pending_count=pending_count,
+        connector_type_labels=CONNECTOR_TYPE_LABELS,
+        delegated_actions={
+            action: org_has_delegated_action(org_id, action)
+            for action in ("create", "update", "delete", "sync")
+        },
+        inbox_url=url_for("unified_ai_chat.approval_inbox"),
+    )
+
+
+@m365_connector_bp.route("", methods=["POST"])
+@login_required
+@admin_required
+def connectors_save():
+    """Add or update a connector of the signed-in organisation.
+
+    The credential (if any) is stored in the per-organisation vault
+    immediately, encrypted with the organisation's own key, so the change
+    can be executed later without the secret ever travelling again. The
+    change itself is then queued as an approval proposal in this
+    organisation's queue, or applied directly when the organisation has
+    delegated the action type. A write without an organisation context is
+    refused.
+    """
+    from app.extensions import db
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_CREATE,
+        CONNECTOR_ACTION_UPDATE,
+        propose_or_apply_connector_change,
+    )
+
+    org_id = _require_active_org()
+
+    connector_type = (request.form.get("connector_type") or "").strip().lower()
+    existing_id = (request.form.get("connector_id") or "").strip() or None
+    name = (request.form.get("name") or "").strip()
+    enabled = request.form.get("enabled") == "1"
+    credential = (request.form.get("credential") or "").strip()
+
+    if not connector_type:
+        flash("A connector type is required.", "error")
+        return redirect(url_for("m365_connector.connectors_index"))
+
+    try:
+        _permit_connector_type(connector_type)
+    except PermissionError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("m365_connector.connectors_index"))
+
+    raw_config = (request.form.get("config_json") or "{}").strip()
+    try:
+        config = _json.loads(raw_config) if raw_config else {}
+    except ValueError:
+        flash("Configuration must be valid JSON.", "error")
+        return redirect(url_for("m365_connector.connectors_index"))
+    if not isinstance(config, dict):
+        flash("Configuration must be a JSON object.", "error")
+        return redirect(url_for("m365_connector.connectors_index"))
+
+    if credential:
+        OrgCredentialVault().store_credentials(
+            org_id, connector_type, {"credential": credential}
+        )
+
+    action = CONNECTOR_ACTION_UPDATE if existing_id else CONNECTOR_ACTION_CREATE
+    payload = {
+        "connector_type": connector_type,
+        "connector_id": existing_id,
+        "name": name or connector_type,
+        "config": config,
+        "status": "active" if enabled else "inactive",
+    }
+    result = propose_or_apply_connector_change(
+        org_id=org_id,
+        actor_user_id=current_user_id(),
+        action=action,
+        connector_type=connector_type,
+        summary=f"{'Update' if action == CONNECTOR_ACTION_UPDATE else 'Add'} connector "
+        f"'{name or connector_type}'",
+        payload=payload,
+    )
+    db.session.commit()
+
+    if result.get("queued"):
+        flash(
+            f"Connector change queued for approval (proposal "
+            f"#{result['approval_id']}). It applies once an approver in this "
+            f"organisation approves it.",
+            "success",
+        )
+    else:
+        flash("Connector saved.", "success")
+    return redirect(url_for("m365_connector.connectors_index"))
+
+
+@m365_connector_bp.route("/<string:connector_id>/sync", methods=["POST"])
+@login_required
+@admin_required
+def connectors_sync(connector_id):
+    """Propose a sync for one connector of the signed-in organisation, or run
+    it directly when the organisation has delegated the sync action.
+
+    On approval (or delegation) the framework runs the sync, records the
+    SyncLog, updates health and last synchronisation, and writes an
+    identifier crosswalk link per element touched.
+    """
+    from app.extensions import db
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_SYNC,
+        _load_org_connector,
+        propose_or_apply_connector_change,
+        run_connector_sync,
+    )
+
+    org_id = _require_active_org()
+    cfg = _load_org_connector(org_id, connector_id=connector_id)
+    if cfg is None:
+        abort(404, "Connector not found in this organisation.")
+    cfg_id = cfg.id
+
+    from app.services.connector_framework import org_has_delegated_action
+
+    if org_has_delegated_action(org_id, CONNECTOR_ACTION_SYNC):
+        result = run_connector_sync(org_id=org_id, connector_id=cfg_id, delegated=True)
+        db.session.commit()
+        if result.get("success"):
+            flash(f"Sync completed for '{cfg.name}'.", "success")
+        else:
+            flash(f"Sync failed: {result.get('error', 'unknown error')}", "error")
+        return redirect(url_for("m365_connector.connectors_index"))
+
+    result = propose_or_apply_connector_change(
+        org_id=org_id,
+        actor_user_id=current_user_id(),
+        action=CONNECTOR_ACTION_SYNC,
+        connector_type=cfg.connector_type,
+        summary=f"Run sync for connector '{cfg.name}'",
+        payload={"connector_id": cfg_id, "connector_type": cfg.connector_type},
+    )
+    db.session.commit()
+    if result.get("queued"):
+        flash(
+            f"Sync queued for approval (proposal #{result['approval_id']}). "
+            "It runs once an approver in this organisation approves it.",
+            "success",
+        )
+    else:
+        flash("Sync completed.", "success")
+    return redirect(url_for("m365_connector.connectors_index"))
+
+
+@m365_connector_bp.route("/<string:connector_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def connectors_delete(connector_id):
+    """Propose removal of one connector, or remove it directly when the
+    organisation has delegated the delete action. Removal also clears the
+    connector's credentials from the per-organisation vault."""
+    from app.extensions import db
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_DELETE,
+        _load_org_connector,
+        org_has_delegated_action,
+        propose_or_apply_connector_change,
+    )
+
+    org_id = _require_active_org()
+    cfg = _load_org_connector(org_id, connector_id=connector_id)
+    if cfg is None:
+        abort(404, "Connector not found in this organisation.")
+
+    result = propose_or_apply_connector_change(
+        org_id=org_id,
+        actor_user_id=current_user_id(),
+        action=CONNECTOR_ACTION_DELETE,
+        connector_type=cfg.connector_type,
+        summary=f"Delete connector '{cfg.name}'",
+        payload={"connector_id": cfg.id, "connector_type": cfg.connector_type},
+    )
+    if org_has_delegated_action(org_id, CONNECTOR_ACTION_DELETE):
+        pass  # already applied above and flushed
+    db.session.commit()
+
+    if result.get("queued"):
+        flash(
+            f"Connector removal queued for approval (proposal "
+            f"#{result['approval_id']}).",
+            "success",
+        )
+    else:
+        flash("Connector removed.", "success")
+    return redirect(url_for("m365_connector.connectors_index"))
+
+
+def current_user_id():
+    from flask_login import current_user
+
+    return getattr(current_user, "id", None)
+
+
+# ---------------------------------------------------------------------------
+# COM-017: Microsoft 365 connector (legacy form, same change path)
+# ---------------------------------------------------------------------------
+
+
 @m365_connector_bp.route("/m365", methods=["GET"])
 @login_required
 @admin_required
 def m365_config():
-    """Render the M365 connector configuration form."""
+    """Render the M365 connector configuration form for the active org."""
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
     from app.services.connector_framework import ConnectorConfig
 
-    cfg = ConnectorConfig.query.filter_by(connector_type="m365").first()
+    org_id = _require_active_org()
+    cfg = (
+        ConnectorConfig.query.filter_by(organization_id=org_id, connector_type="m365").first()
+        or {}
+    )
     cfg_data = (cfg.config or {}) if cfg else {}
-    return render_template("admin/connectors/m365.html", cfg=cfg_data)
+    has_secret = (
+        OrgCredentialVault().get_masked(org_id, "m365", "client_secret") is not None
+    )
+    return render_template(
+        "admin/connectors/m365.html", cfg=cfg_data, has_secret=has_secret
+    )
 
 
 @m365_connector_bp.route("/m365", methods=["POST"])
 @login_required
 @admin_required
 def m365_config_save():
-    """Persist M365 connector configuration."""
-    from app.extensions import db
-    from app.services.connector_framework import ConnectorConfig
-    from app.modules.codegen.services.credential_encryption import encrypt_credential
+    """Persist M365 connector configuration through the change path.
 
+    The client secret goes to the per-organisation vault; the change itself
+    is queued as an approval proposal (or applied directly when the org has
+    delegated the action type)."""
+    from app.extensions import db
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_UPDATE,
+        _load_org_connector,
+        propose_or_apply_connector_change,
+    )
+
+    org_id = _require_active_org()
     form = request.form
     tenant_id = (form.get("tenant_id") or "").strip()
     client_id = (form.get("client_id") or "").strip()
@@ -55,51 +356,55 @@ def m365_config_save():
     teams_webhook_url = (form.get("teams_webhook_url") or "").strip()
     enabled = form.get("enabled") == "1"
 
-    cfg = ConnectorConfig.query.filter_by(connector_type="m365").first()
-
-    # Preserve existing encrypted secret when the field is left blank
-    if not client_secret_raw and cfg:
-        client_secret_stored = (cfg.config or {}).get("client_secret", "")
-    else:
-        try:
-            client_secret_stored = (
-                encrypt_credential(client_secret_raw).decode() if client_secret_raw else ""
-            )
-        except RuntimeError:
-            logger.exception("COM-017: Failed to encrypt M365 client secret")
-            flash("Failed to encrypt client secret — check CREDENTIAL_ENCRYPTION_KEY.", "error")
-            return redirect(url_for("m365_connector.m365_config"))
-
-    config_data = {
-        "tenant_id": tenant_id,
-        "client_id": client_id,
-        "client_secret": client_secret_stored,
-        "site_id": site_id,
-        "folder_path": folder_path,
-        "teams_webhook_url": teams_webhook_url,
-        "enabled": enabled,
-    }
-
     try:
-        if cfg:
-            cfg.config = config_data
-            cfg.status = "active" if enabled else "inactive"
-        else:
-            cfg = ConnectorConfig(
-                connector_type="m365",
-                name="Microsoft 365",
-                description="SharePoint blueprint export and Teams ARB notifications",
-                config=config_data,
-                status="active" if enabled else "inactive",
-            )
-            db.session.add(cfg)
-        db.session.commit()
-        flash("M365 configuration saved successfully.", "success")
-    except Exception:
-        db.session.rollback()
-        logger.exception("COM-017: Failed to save M365 config")
-        flash("Failed to save configuration.", "error")
+        _permit_connector_type("m365")
+    except PermissionError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("m365_connector.m365_config"))
 
+    if client_secret_raw:
+        OrgCredentialVault().store(
+            org_id=org_id,
+            connector_type="m365",
+            credential_type="client_secret",
+            value=client_secret_raw,
+        )
+
+    existing = _load_org_connector(org_id, connector_type="m365")
+    action = CONNECTOR_ACTION_UPDATE if existing else "create"
+    payload = {
+        "connector_type": "m365",
+        "name": "Microsoft 365",
+        "description": "SharePoint blueprint export and Teams ARB notifications",
+        "config": {
+            "tenant_id": tenant_id,
+            "client_id": client_id,
+            "site_id": site_id,
+            "folder_path": folder_path,
+            "teams_webhook_url": teams_webhook_url,
+            "enabled": enabled,
+        },
+        "status": "active" if enabled else "inactive",
+    }
+    result = propose_or_apply_connector_change(
+        org_id=org_id,
+        actor_user_id=current_user_id(),
+        action=action,
+        connector_type="m365",
+        summary="Update Microsoft 365 connector configuration" if existing
+        else "Add Microsoft 365 connector",
+        payload=payload,
+    )
+    db.session.commit()
+
+    if result.get("queued"):
+        flash(
+            "M365 configuration change queued for approval "
+            f"(proposal #{result['approval_id']}).",
+            "success",
+        )
+    else:
+        flash("M365 configuration saved successfully.", "success")
     return redirect(url_for("m365_connector.m365_config"))
 
 
@@ -107,11 +412,20 @@ def m365_config_save():
 @login_required
 @admin_required
 def m365_test():
-    """Test M365 OAuth2 authentication and return JSON status."""
+    """Test M365 OAuth2 authentication and return JSON status.
+
+    Reads the stored connector row of the active organisation. Legacy rows
+    carry the encrypted secret on the row itself; the legacy service is left
+    to them — new configuration proposals keep the secret in the per-
+    organisation vault.
+    """
     from app.services.connector_framework import ConnectorConfig
     from app.services.m365_service import M365Service, _token_cache
 
-    cfg = ConnectorConfig.query.filter_by(connector_type="m365").first()
+    org_id = _require_active_org()
+    cfg = (
+        ConnectorConfig.query.filter_by(organization_id=org_id, connector_type="m365").first()
+    )
     if not cfg:
         return jsonify({
             "status": "error",
@@ -135,56 +449,55 @@ def m365_test():
 
 
 # ---------------------------------------------------------------------------
-# COM-008: ServiceNow CMDB connector routes
+# COM-008: ServiceNow CMDB connector (org-scoped, same change path)
 # ---------------------------------------------------------------------------
-
-def _get_or_create_sn_config(org_id: int):
-    """Return the ServiceNow ConnectorConfig for *org_id*, creating if absent."""
-    from app.extensions import db
-    from app.models.connector_config import OrgConnectorConfig
-
-    config = OrgConnectorConfig.query.filter_by(
-        organization_id=org_id, connector_type="servicenow"
-    ).first()
-    if config is None:
-        config = OrgConnectorConfig(organization_id=org_id, connector_type="servicenow")
-        db.session.add(config)
-        db.session.commit()
-    return config
 
 
 @m365_connector_bp.route("/servicenow", methods=["GET"])
 @login_required
 @admin_required
 def servicenow_config():
-    """Display the ServiceNow connector configuration form."""
-    org_id = getattr(current_user, "organization_id", None)
-    sn_config = _get_or_create_sn_config(org_id) if org_id else None
-    return render_template("admin/connectors/servicenow.html", sn_config=sn_config)
+    """Display the ServiceNow connector configuration form for the active org."""
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+    from app.services.connector_framework import _load_org_connector
+
+    org_id = _require_active_org()
+    config = _load_org_connector(org_id, connector_type="servicenow")
+    cfg = (config.config or {}) if config else {}
+    has_secret = (
+        OrgCredentialVault().get_masked(org_id, "servicenow", "client_secret") is not None
+    )
+    return render_template(
+        "admin/connectors/servicenow.html",
+        sn_config=config,
+        cfg=cfg,
+        has_secret=has_secret,
+    )
 
 
 @m365_connector_bp.route("/servicenow", methods=["POST"])
 @login_required
 @admin_required
 def servicenow_config_save():
-    """Save ServiceNow connector configuration."""
-    import json as _json
+    """Save ServiceNow connector configuration through the change path.
 
+    Non-secret settings land on the organisation's ConnectorConfig row when
+    the proposal is approved; the client secret goes to the per-organisation
+    vault at proposal time."""
     from app.extensions import db
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_UPDATE,
+        _load_org_connector,
+        propose_or_apply_connector_change,
+    )
 
-    org_id = getattr(current_user, "organization_id", None)
-    if not org_id:
-        flash("No organisation found for current user.", "error")
-        return redirect(url_for("m365_connector.servicenow_config"))
-
-    config = _get_or_create_sn_config(org_id)
-    config.instance_url = (request.form.get("instance_url") or "").strip()
-    config.client_id = (request.form.get("client_id") or "").strip()
+    org_id = _require_active_org()
+    instance_url = (request.form.get("instance_url") or "").strip()
+    client_id = (request.form.get("client_id") or "").strip()
 
     secret = (request.form.get("client_secret") or "").strip()
     if secret:
-        from app.modules.codegen.services.credential_vault import OrgCredentialVault
-
         OrgCredentialVault().store(
             org_id=org_id,
             connector_type="servicenow",
@@ -203,11 +516,39 @@ def servicenow_config_save():
     if ci_filter:
         mapping["ci_query_filter"] = ci_filter
 
-    config.field_mapping = mapping
-    config.enabled = request.form.get("enabled") == "on"
+    enabled = request.form.get("enabled") == "on"
+    existing = _load_org_connector(org_id, connector_type="servicenow")
+    action = CONNECTOR_ACTION_UPDATE if existing else "create"
+    payload = {
+        "connector_type": "servicenow",
+        "name": "ServiceNow CMDB",
+        "config": {
+            "instance_url": instance_url,
+            "client_id": client_id,
+            "field_mapping": mapping,
+            "enabled": enabled,
+        },
+        "status": "active" if enabled else "inactive",
+    }
+    result = propose_or_apply_connector_change(
+        org_id=org_id,
+        actor_user_id=current_user_id(),
+        action=action,
+        connector_type="servicenow",
+        summary="Update ServiceNow connector configuration" if existing
+        else "Add ServiceNow connector",
+        payload=payload,
+    )
     db.session.commit()
 
-    flash("ServiceNow connector configuration saved.", "success")
+    if result.get("queued"):
+        flash(
+            "ServiceNow connector configuration change queued for approval "
+            f"(proposal #{result['approval_id']}).",
+            "success",
+        )
+    else:
+        flash("ServiceNow connector configuration saved.", "success")
     return redirect(url_for("m365_connector.servicenow_config"))
 
 
@@ -215,80 +556,121 @@ def servicenow_config_save():
 @login_required
 @admin_required
 def servicenow_sync():
-    """Trigger an async CMDB inventory pull. Returns 202 Accepted."""
-    org_id = getattr(current_user, "organization_id", None)
-    if not org_id:
-        return jsonify({"error": "No organisation found for current user."}), 400
+    """Route a ServiceNow sync through the organisation's approval queue (or
+    run it directly when the org has delegated the sync action)."""
+    from app.extensions import db
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_SYNC,
+        _load_org_connector,
+        org_has_delegated_action,
+        propose_or_apply_connector_change,
+        run_connector_sync,
+    )
 
-    def _do_sync(oid):
-        from app.services.servicenow_connector_service import ServiceNowConnectorService
+    org_id = _require_active_org()
+    cfg = _load_org_connector(org_id, connector_type="servicenow")
+    if cfg is None:
+        return jsonify({"error": "ServiceNow connector is not configured."}), 404
 
-        try:
-            ServiceNowConnectorService().pull_cmdb_inventory(oid)
-        except Exception as exc:
-            logger.error("Background ServiceNow sync failed for org %s: %s", oid, exc)
+    if org_has_delegated_action(org_id, CONNECTOR_ACTION_SYNC):
+        result = run_connector_sync(org_id=org_id, connector_id=cfg.id, delegated=True)
+        db.session.commit()
+        return jsonify(result), 202
 
-    threading.Thread(target=_do_sync, args=(org_id,), daemon=True).start()
-    return jsonify({"status": "accepted", "message": "Sync started in background."}), 202
+    result = propose_or_apply_connector_change(
+        org_id=org_id,
+        actor_user_id=current_user_id(),
+        action=CONNECTOR_ACTION_SYNC,
+        connector_type="servicenow",
+        summary="Run ServiceNow CMDB sync",
+        payload={"connector_id": cfg.id, "connector_type": "servicenow"},
+    )
+    db.session.commit()
+    if result.get("queued"):
+        return jsonify(
+            {
+                "status": "queued_for_approval",
+                "message": "Sync queued for approval.",
+                "approval_id": result["approval_id"],
+            }
+        ), 202
+    return jsonify(result), 202
 
 
 @m365_connector_bp.route("/servicenow/status", methods=["GET"])
 @login_required
 @admin_required
 def servicenow_status():
-    """Return JSON status for the ServiceNow connector."""
-    org_id = getattr(current_user, "organization_id", None)
-    if not org_id:
-        return jsonify({"error": "No organisation."}), 400
+    """Return JSON status for the ServiceNow connector of the active org."""
+    from app.services.connector_framework import _load_org_connector
 
-    from app.models.connector_config import OrgConnectorConfig
-
-    config = OrgConnectorConfig.query.filter_by(
-        organization_id=org_id, connector_type="servicenow"
-    ).first()
+    org_id = _require_active_org()
+    config = _load_org_connector(org_id, connector_type="servicenow")
 
     if config is None:
         return jsonify({"enabled": False, "last_sync_at": None, "status": "not_configured"})
 
+    enabled = bool((config.config or {}).get("enabled", False))
     return jsonify(
         {
-            "enabled": config.enabled,
-            "last_sync_at": config.last_sync_at.isoformat() if config.last_sync_at else None,
-            "status": "active" if config.enabled else "disabled",
+            "enabled": enabled,
+            "last_sync_at": (
+                config.last_sync.isoformat() if config.last_sync else None
+            ),
+            "status": "active" if enabled else "disabled",
         }
     )
 
 
 # ---------------------------------------------------------------------------
-# COM-009: Jira connector routes
+# COM-009: Jira connector (legacy form, same change path)
 # ---------------------------------------------------------------------------
 
 
-def _get_jira_config():
-    """Return the Jira ConnectorConfig row, or None."""
+def _get_jira_config(org_id: int):
+    """Return the active org's Jira ConnectorConfig row, or None."""
     from app.services.connector_framework import ConnectorConfig
-    return ConnectorConfig.query.filter_by(connector_type="jira").first()
+
+    return ConnectorConfig.query.filter_by(
+        organization_id=org_id, connector_type="jira"
+    ).first()
 
 
 @m365_connector_bp.route("/jira", methods=["GET"])
 @login_required
 @admin_required
 def jira_config():
-    """Display the Jira connector configuration form."""
-    connector = _get_jira_config()
+    """Display the Jira connector configuration form for the active org."""
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    org_id = _require_active_org()
+    connector = _get_jira_config(org_id)
     cfg = (connector.config or {}) if connector else {}
-    return render_template("admin/connectors/jira.html", connector=connector, cfg=cfg)
+    has_secret = (
+        OrgCredentialVault().get_masked(org_id, "jira", "api_token") is not None
+    )
+    return render_template(
+        "admin/connectors/jira.html", connector=connector, cfg=cfg, has_secret=has_secret
+    )
 
 
 @m365_connector_bp.route("/jira", methods=["POST"])
 @login_required
 @admin_required
 def jira_config_save():
-    """Persist Jira connector configuration with encrypted API token."""
-    from app.extensions import db
-    from app.services.connector_framework import ConnectorConfig, ConnectorStatus
-    from app.modules.codegen.services.credential_encryption import encrypt_credential
+    """Persist Jira connector configuration through the change path.
 
+    The API token goes to the per-organisation vault; the change itself is
+    queued as an approval proposal (or applied directly when the org has
+    delegated the action type)."""
+    from app.extensions import db
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_UPDATE,
+        propose_or_apply_connector_change,
+    )
+
+    org_id = _require_active_org()
     instance_url = (request.form.get("instance_url") or "").strip().rstrip("/")
     email = (request.form.get("email") or "").strip()
     api_token_raw = (request.form.get("api_token") or "").strip()
@@ -299,45 +681,53 @@ def jira_config_save():
         flash("Instance URL and email are required.", "error")
         return redirect(url_for("m365_connector.jira_config"))
 
-    config = _get_jira_config()
-    existing_cfg = (config.config or {}) if config else {}
+    try:
+        _permit_connector_type("jira")
+    except PermissionError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("m365_connector.jira_config"))
 
     if api_token_raw:
-        try:
-            encrypted = encrypt_credential(api_token_raw)
-            existing_cfg["api_token_encrypted"] = (
-                encrypted.decode("utf-8") if isinstance(encrypted, bytes) else encrypted
-            )
-        except Exception:
-            logger.exception("COM-009: Failed to encrypt Jira API token")
-            flash("Failed to encrypt API token — check CREDENTIAL_ENCRYPTION_KEY.", "error")
-            return redirect(url_for("m365_connector.jira_config"))
+        OrgCredentialVault().store(
+            org_id=org_id,
+            connector_type="jira",
+            credential_type="api_token",
+            value=api_token_raw,
+        )
 
-    existing_cfg["instance_url"] = instance_url
-    existing_cfg["email"] = email
-    existing_cfg["default_project_key"] = default_project_key
-    existing_cfg["enabled"] = enabled
+    existing = _get_jira_config(org_id)
+    action = CONNECTOR_ACTION_UPDATE if existing else "create"
+    payload = {
+        "connector_type": "jira",
+        "name": "Jira ALM Connector",
+        "description": "Bidirectional Jira integration — ARB epics and backlog import.",
+        "config": {
+            "instance_url": instance_url,
+            "email": email,
+            "default_project_key": default_project_key,
+            "enabled": enabled,
+        },
+        "status": "active" if enabled else "inactive",
+    }
+    result = propose_or_apply_connector_change(
+        org_id=org_id,
+        actor_user_id=current_user_id(),
+        action=action,
+        connector_type="jira",
+        summary="Update Jira connector configuration" if existing
+        else "Add Jira connector",
+        payload=payload,
+    )
+    db.session.commit()
 
-    try:
-        if config is None:
-            config = ConnectorConfig(
-                connector_type="jira",
-                name="Jira ALM Connector",
-                description="Bidirectional Jira integration — ARB epics and backlog import.",
-                config=existing_cfg,
-                status=ConnectorStatus.ACTIVE.value if enabled else ConnectorStatus.INACTIVE.value,
-            )
-            db.session.add(config)
-        else:
-            config.config = existing_cfg
-            config.status = ConnectorStatus.ACTIVE.value if enabled else ConnectorStatus.INACTIVE.value
-        db.session.commit()
+    if result.get("queued"):
+        flash(
+            "Jira connector configuration change queued for approval "
+            f"(proposal #{result['approval_id']}).",
+            "success",
+        )
+    else:
         flash("Jira connector configuration saved.", "success")
-    except Exception:
-        db.session.rollback()
-        logger.exception("COM-009: Failed to save Jira config")
-        flash("Failed to save configuration.", "error")
-
     return redirect(url_for("m365_connector.jira_config"))
 
 
@@ -361,4 +751,3 @@ def jira_config_test():
     result = JiraConnectorService().test_connection(instance_url, email, api_token)
     code = 200 if result.get("status") == "ok" else 400
     return jsonify(result), code
-
