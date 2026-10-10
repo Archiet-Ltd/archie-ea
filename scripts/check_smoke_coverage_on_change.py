@@ -40,16 +40,22 @@ non-visual file -- an email template, a CLI-only script's template, a pure
 data/config module with no rendered surface).
 
 NOT flagged: a diff that touches no template/JS files at all (most backend-
-only or docs-only changes), and `app/static/js/bundles/**` (generated,
-JS-syntax already gates its own build-freshness via `js-build`/`css-build`).
+only or docs-only changes), `app/static/js/bundles/**` (generated,
+JS-syntax already gates its own build-freshness via `js-build`/`css-build`),
+and a watched path that no longer exists in the working tree -- a deletion
+appears in `git diff --name-only` exactly like an edit, but a file that is
+gone renders nothing, so there is no surface left for a browser test to
+exercise and no first line left to carry the escape marker on.
 
 Proven-against: a synthetic diff of {'app/templates/dashboard/overview.html'}
 with no tests/smoke/ file and no escape marker -- red, reporting the one file.
 Adding a tests/smoke/test_dashboard.py touch to the same diff, or adding
 'smoke-coverage-ok: <reason>' as the template's first line, both turn it
-green. Confirmed by monkeypatching `_changed_files` with each of these three
-diff shapes and checking `find_unverified()`'s return value directly, since
-the real function reads live git state that a unit test cannot control.
+green. A synthetic diff naming a watched path that does not exist on disk --
+the deletion case -- is also green, with no escape marker needed. Confirmed
+by monkeypatching `_changed_files` with each of these diff shapes and
+checking `find_unverified()`'s return value directly, since the real
+function reads live git state that a unit test cannot control.
 """
 import argparse
 import subprocess
@@ -128,6 +134,12 @@ def find_unverified(base: str | None = None) -> list[str]:
     unverified = []
     for f in sorted(changed):
         if not _is_watched(f):
+            continue
+        if not (REPO_ROOT / f).exists():
+            # Deleted, not edited: the path is in the diff (git diff --name-only
+            # lists a deletion exactly like an edit) but nothing renders at it
+            # any more, so there is no rendered surface for a browser test to
+            # cover -- and no first line left on which to put the escape marker.
             continue
         if _has_escape_marker(f):
             continue

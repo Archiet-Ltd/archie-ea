@@ -213,17 +213,6 @@ def register_api_blueprints(app):
     except ImportError as e:
         app.logger.warning(f"[API] Could not register ArchiMate Generation API: {e}")
 
-    # Import and register Architecture Analytics API
-    try:
-        from .architecture_analytics import architecture_analytics_bp
-
-        app.register_blueprint(architecture_analytics_bp)
-        app.logger.info(
-            "[API] Architecture Analytics API registered at /api/architecture/analytics"
-        )
-    except ImportError as e:
-        app.logger.warning(f"[API] Could not register Architecture Analytics API: {e}")
-
     # Set up request processing for version detection
     @app.before_request
     def detect_api_version():
