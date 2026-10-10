@@ -26,10 +26,6 @@ from tests.test_schema_migrations import (
 )
 
 REVISION = "20261007_scim_provisioning"
-# REVISION's own down_revision has moved as the branch re-chained onto main's
-# head across several merges -- read the current one directly rather than
-# re-hardcoding it every time main grows a new head.
-PREVIOUS = "20261010_arb_change_requests_rls"
 # 20261010_scim_group_members_rls fences scim_group_memberships with RLS on top
 # of REVISION -- it is now the real chain head, one step past REVISION.
 HEAD = "20261010_scim_group_members_rls"
@@ -81,7 +77,14 @@ def test_there_is_exactly_one_head_and_it_chains_onto_the_previous_head():
     assert script.get_heads() == [HEAD]
     assert _true_head() == HEAD
     assert script.get_revision(HEAD).down_revision == REVISION
-    assert script.get_revision(REVISION).down_revision == PREVIOUS
+    # REVISION's own parent moves every time this branch re-chains onto a
+    # new main head -- don't hardcode it (it has gone stale twice already).
+    # What must hold regardless is that it resolves to a real, distinct
+    # revision already in the chain, i.e. REVISION has not become its own
+    # root and the chain has not forked.
+    previous = script.get_revision(REVISION).down_revision
+    assert previous not in (None, REVISION, HEAD)
+    assert script.get_revision(previous) is not None
 
 
 def test_upgrade_reaches_head_downgrade_one_and_upgrade_again(empty_db):
