@@ -398,6 +398,15 @@ class MonitoringBaseline(TenantMixin, db.Model):
 
     Persists architecture baseline snapshots so drift detection data
     survives application restarts.
+
+    Tenant-scoped (F-3, SECURITY-FINDINGS-R2-5.md): two organisations must
+    never see or compare against each other's baselines.
+
+    Nullable for the usual reason: monitoring_baselines is an existing table
+    and reconcile-schema can only ADD nullable columns (ADR 0002). A row with
+    a NULL organization_id is invisible to every tenant once the ORM filter
+    is in place -- correct for baselines that predate tenancy and cannot be
+    attributed after the fact.
     """
 
     __tablename__ = "monitoring_baselines"
@@ -412,6 +421,16 @@ class MonitoringBaseline(TenantMixin, db.Model):
     snapshot_data = Column(Text, nullable=False)  # JSON blob of all snapshots
     checksum = Column(String(64), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # TenantMixin defaults organization_id to nullable=False; override so
+    # reconcile-schema can add the column to the existing table (ADR 0002)
+    # and pre-tenancy rows are tolerated as NULL rather than migrated blind.
+    organization_id = Column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -432,6 +451,13 @@ class MonitoringAlert(TenantMixin, db.Model):
 
     Persists architecture drift alerts so alert history and acknowledgement
     state survives application restarts.
+
+    Tenant-scoped (F-3, SECURITY-FINDINGS-R2-5.md): an alert raised for one
+    organisation's drift must never be listed, fetched or acknowledged by
+    another.
+
+    Nullable for the usual reason: monitoring_alerts is an existing table and
+    reconcile-schema can only ADD nullable columns (ADR 0002).
     """
 
     __tablename__ = "monitoring_alerts"
@@ -455,6 +481,16 @@ class MonitoringAlert(TenantMixin, db.Model):
     acknowledged_at = Column(DateTime, nullable=True)
     alert_metadata = Column(Text, nullable=True)  # JSON
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # TenantMixin defaults organization_id to nullable=False; override so
+    # reconcile-schema can add the column to the existing table (ADR 0002)
+    # and pre-tenancy rows are tolerated as NULL rather than migrated blind.
+    organization_id = Column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
