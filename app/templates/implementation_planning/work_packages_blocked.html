@@ -1,0 +1,49 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/card.html' import card, card_content %}
+
+{% block title %}Blocked by another programme{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {{ page_header(
+        title='Blocked by another programme',
+        breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Work packages', 'href': url_for('implementation_planning.work_packages_list')}, {'label': 'Blocked by another programme'}],
+        description='Work packages that wait on an unfinished work package in a different programme of your organisation.',
+        actions=[
+            {'text': 'New work package', 'icon': 'plus', 'href': url_for('implementation_planning.create_work_package'), 'variant': 'outline'}
+        ]
+    ) }}
+
+    {% call card() %}
+        {% call card_content() %}
+            {% if blocked %}
+            <table id="blocked-table" class="w-full text-sm">
+                <thead>
+                    <tr class="text-left">
+                        <th class="py-2">Work package</th>
+                        <th class="py-2">Programme</th>
+                        <th class="py-2">Blocked by</th>
+                        <th class="py-2">Blocker's programme</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in blocked %}
+                    {% for blocker in item.blocked_by %}
+                    <tr data-work-package-id="{{ item.work_package.id }}">
+                        <td class="py-2"><a class="underline" href="{{ url_for('implementation_planning.edit_work_package', work_package_id=item.work_package.id) }}">{{ item.work_package.name }}</a></td>
+                        <td class="py-2">{{ programme_names.get(item.work_package.enterprise_initiative_id, '') }}</td>
+                        <td class="py-2">{{ blocker.name }} ({{ blocker.status|replace('_', ' ') }})</td>
+                        <td class="py-2">{{ programme_names.get(blocker.enterprise_initiative_id, '') }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p id="blocked-empty" class="text-sm text-muted-foreground">No work package is waiting on another programme. When one depends on an unfinished work package in a different programme, it appears here.</p>
+            {% endif %}
+        {% endcall %}
+    {% endcall %}
+</div>
+{% endblock %}

@@ -19,6 +19,7 @@ except ImportError:
 
 from app.extensions import db
 from app.flask_email import send_email
+from app.jobs.tenant_safe_job import platform_scope
 from app.models import User
 from app.models.org_role import OrgRole
 from app.services import session_registry
@@ -210,16 +211,21 @@ class AccountService:
             return "mail_unavailable"
         user = User.find_by_email(email)
         if user is not None and user.password_hash is not None and user.is_active:
-            row, raw = AccountToken.issue(user, PURPOSE_PASSWORD_RESET)
-            db.session.commit()
+            # No one is signed in, so there is no session organisation: the token
+            # row belongs to the account's own organisation (account_tokens is
+            # fenced by row-level security), hence the platform scope.
+            with platform_scope("password reset: issue a token for an account that is not signed in"):
+                row, raw = AccountToken.issue(user, PURPOSE_PASSWORD_RESET)
+                db.session.commit()
             token_id = row.id
 
             def record(delivered, error):
                 # tenant-scoping-ok: the row this request just issued, by primary key
-                issued = db.session.get(AccountToken, token_id)
-                if issued is not None:
-                    issued.record_delivery(delivered, error)
-                    db.session.commit()
+                with platform_scope("password reset: record delivery on the token just issued"):
+                    issued = db.session.get(AccountToken, token_id)
+                    if issued is not None:
+                        issued.record_delivery(delivered, error)
+                        db.session.commit()
 
             # Sent after the answer has gone out, so the answer takes as long
             # for an address with an account as for one without.
@@ -238,7 +244,9 @@ class AccountService:
     def reset_link_usable(token):
         from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
 
-        row = AccountToken.find_usable(token, PURPOSE_PASSWORD_RESET)
+        # The reader is not signed in; the digest of the link is the credential.
+        with platform_scope("password reset: look up the token by its digest, which names the organisation"):
+            row = AccountToken.find_usable(token, PURPOSE_PASSWORD_RESET)
         return row is not None and row.user is not None and row.user.is_active
 
     @staticmethod
@@ -249,17 +257,18 @@ class AccountService:
         """
         from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
 
-        usable = AccountToken.find_usable(token, PURPOSE_PASSWORD_RESET)
-        if usable is not None and usable.user is not None and not usable.user.is_active:
-            # A leaver's link is as dead as an expired one.
-            return False, "This reset link has expired or has already been used."
-        row = AccountToken.consume(token, PURPOSE_PASSWORD_RESET)
-        if row is None:
-            return False, "This reset link has expired or has already been used."
-        user = row.user
-        user.password = new_password
-        db.session.add(user)
-        db.session.commit()
+        with platform_scope("password reset: redeem the token by its digest, which names the organisation"):
+            usable = AccountToken.find_usable(token, PURPOSE_PASSWORD_RESET)
+            if usable is not None and usable.user is not None and not usable.user.is_active:
+                # A leaver's link is as dead as an expired one.
+                return False, "This reset link has expired or has already been used."
+            row = AccountToken.consume(token, PURPOSE_PASSWORD_RESET)
+            if row is None:
+                return False, "This reset link has expired or has already been used."
+            user = row.user
+            user.password = new_password
+            db.session.add(user)
+            db.session.commit()
         # I've-lost-control-of-this-account path: kill everything,
         # including any session on the machine performing the reset.
         # There is no acting session to preserve -- a reset happens
@@ -357,7 +366,9 @@ class AccountService:
         actual_user = user._get_current_object() if hasattr(user, '_get_current_object') else user
         if not mail_available():
             return False, "E-mail is not available on this server."
-        row, raw = AccountToken.issue(actual_user, PURPOSE_CONFIRM_EMAIL)
+        # Sent at sign-up, before any organisation is active for the new account.
+        with platform_scope("confirm e-mail: issue a token for the account being confirmed"):
+            row, raw = AccountToken.issue(actual_user, PURPOSE_CONFIRM_EMAIL)
         confirm_link = url_for("account.confirm", token=raw, _external=True)
         delivered, error = deliver_email(
             recipient=actual_user.email,
@@ -367,8 +378,9 @@ class AccountService:
             confirm_link=confirm_link,
             expires_at=row.expires_at,
         )
-        row.record_delivery(delivered, error)
-        db.session.commit()
+        with platform_scope("confirm e-mail: record delivery on the token just issued"):
+            row.record_delivery(delivered, error)
+            db.session.commit()
         return delivered, error
 
     @staticmethod
@@ -379,13 +391,14 @@ class AccountService:
         """
         from app.models.account_token import PURPOSE_CONFIRM_EMAIL, AccountToken
 
-        row = AccountToken.consume(token, PURPOSE_CONFIRM_EMAIL)
-        if row is None:
-            db.session.rollback()
-            return None, "This confirmation link has expired or has already been used."
-        row.user.confirmed = True
-        db.session.commit()
-        return row.user, "Your e-mail address is confirmed."
+        with platform_scope("confirm e-mail: redeem the token by its digest, which names the organisation"):
+            row = AccountToken.consume(token, PURPOSE_CONFIRM_EMAIL)
+            if row is None:
+                db.session.rollback()
+                return None, "This confirmation link has expired or has already been used."
+            row.user.confirmed = True
+            db.session.commit()
+            return row.user, "Your e-mail address is confirmed."
 
     @staticmethod
     def accept_invitation(user, invitation_id):

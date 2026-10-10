@@ -494,6 +494,7 @@ def manage_users_redirect():
 @admin_required
 def registered_users():
     """View all registered users."""
+    require_org_or_platform_admin(g.current_org_id)
     users = _svc.get_all_users()
     roles = _svc.get_all_roles()
     # A-02: get_all_users() is (correctly) org-scoped — see the
@@ -521,6 +522,7 @@ def registered_users():
 @admin_required
 def user_info(user_id):
     """View a user's profile."""
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -640,6 +642,7 @@ def set_user_password(user_id):
 @admin_required
 def delete_user_request(user_id):
     """Request deletion of a user's account."""
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -2998,6 +3001,12 @@ def jira_field_discovery():
 @admin_bp_v2.route("/seed-management")
 @timed_route
 @login_required
+# SeedManagementService seeds global reference/catalogue tables shared by
+# every tenant (vendor organisations/products, capability taxonomies, feature
+# flags, APQC processes, AI prompt templates, ...), none of them org-scoped.
+# admin_required alone let any tenant's own admin reach it
+# (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def seed_management():
     """Seed management dashboard."""
@@ -3014,6 +3023,7 @@ def seed_management():
 @admin_bp_v2.route("/api/seed-status")
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def seed_status():
     """API: Get current seed status."""
@@ -3030,6 +3040,7 @@ def seed_status():
 @admin_bp_v2.route("/api/seed/<key>", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 @audit_log("seed_data")
 def seed(key):
@@ -3047,6 +3058,7 @@ def seed(key):
 @admin_bp_v2.route("/api/seed-all", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 @audit_log("seed_all_data")
 def seed_all():
@@ -3312,6 +3324,7 @@ def _auto_discover_features(app):
 @admin_required
 def api_list_users():
     """Paginated user list API for canonical data table."""
+    require_org_or_platform_admin(g.current_org_id)
     from sqlalchemy.orm import joinedload
 
     page = safe_int_arg('page', 1, minimum=1)
@@ -3553,6 +3566,7 @@ def api_list_enterprise_roles():
 @admin_required
 def api_enterprise_role_users():
     """List all users with their enterprise role assignments."""
+    require_org_or_platform_admin(g.current_org_id)
     users = User.query.filter_by(organization_id=g.current_org_id).order_by(User.last_name, User.first_name).all()
     items = []
     for u in users:
@@ -4899,6 +4913,13 @@ def _get_capability_suggestion_default():
 @admin_bp_v2.route("/solution-prompts")
 @timed_route
 @login_required
+# AIPromptTemplate (app/models/ai_service.py) is a GLOBAL table -- these are
+# the platform's own LLM system prompts, shared by every tenant, not tenant
+# data. admin_required alone let any tenant's own admin read every prompt,
+# its override history and diffs; the write routes on this same resource
+# (update/reset/rollback, below) already require platform_admin_required --
+# the reads were the gap (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def solution_prompts_page():
     """Render the solution AI prompt management page."""
@@ -4907,6 +4928,7 @@ def solution_prompts_page():
 
 @admin_bp_v2.route("/solution-prompts/data")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompts_data():
     """JSON API: return all solution prompt configs merged with DB overrides."""
@@ -5031,6 +5053,7 @@ def _version_content_v2(prompt_key, version, override_name):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/history")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompt_history(prompt_key):
     """A-05: version history for a prompt override, newest first."""
@@ -5071,6 +5094,7 @@ def solution_prompt_history(prompt_key):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/diff")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompt_diff(prompt_key):
     """A-05: unified diff between two versions (or a version and "current").
@@ -5404,6 +5428,7 @@ def governance_gates_list():
 @audit_log("admin_governance_gate_create")
 def governance_gates_create():
     """Create a new governance gate."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     data = request.get_json()
@@ -5440,6 +5465,7 @@ def governance_gates_create():
 @audit_log("admin_governance_gate_update")
 def governance_gates_update(gate_id):
     """Update an existing governance gate."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     gate = GovernanceGate.query.get_or_404(gate_id)
@@ -5482,6 +5508,7 @@ def governance_gates_update(gate_id):
 @audit_log("admin_governance_gate_delete")
 def governance_gates_delete(gate_id):
     """Soft-delete a governance gate by disabling it."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     gate = GovernanceGate.query.get_or_404(gate_id)

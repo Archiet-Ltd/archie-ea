@@ -234,6 +234,13 @@ TRANSFORMATION_API_PERMITTED = {
     "platform_admin",
 }
 
+# Impact API (GET /api/v1/intelligence/impact/<id>): carries only
+# @login_required — no enterprise-role gate — so every archetype is expected
+# to reach it.  Pagination parameters (cursor, page_size) and response fields
+# (total, next_cursor, health) are on the same route.  Tested separately
+# below because the path includes a dynamic element id.
+IMPACT_API_PERMITTED = set(ARCHETYPES) | {"platform_admin"}
+
 
 def _login(page, base, email, _attempts=2):
     """Sign in, retrying once, and say which failure actually happened.
@@ -844,6 +851,9 @@ def test_intelligence_impact_route_authorisation(
     _login(page, live_server, seeded["emails"][archetype])
     path = "/api/v1/intelligence/impact/%d" % seeded_interface_element
     actual = _observe(page, live_server, path)
+    assert archetype in IMPACT_API_PERMITTED, (
+        f"{archetype} not in IMPACT_API_PERMITTED set"
+    )
     assert actual == ALLOWED, (
         f"{archetype} could not reach {path}: expected ALLOWED (login_required only)"
     )

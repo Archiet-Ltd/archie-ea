@@ -121,6 +121,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALLOW_MARKER = "store-agreement-ok:"
 
 
+# The scope of a retired store's surface: it is not compared with anything, it
+# must hold nothing that is not copied across (`retired-store-unmerged`).
+RETIRED_SCOPE = "unmerged retired rows"
+
+
 class Surface:
     """One way the product answers "how many X are there?".
 
@@ -139,12 +144,13 @@ class Surface:
 
     def __init__(self, name, kind, target, extract=None, scope="all", waived=None,
                  filter_eq=None, filter_not_null=None, distinct=None,
-                 tenant_via=None, shared=None):
+                 tenant_via=None, shared=None, filter_null=None,
+                 expect_zero=False):
         self.name = name
         self.kind = kind
         self.target = target
         self.extract = extract
-        self.scope = scope
+        self.scope = RETIRED_SCOPE if expect_zero else scope
         self.waived = waived
         # orm-only: a real WHERE, not just "how many rows" -- lets a concept
         # express a genuine filtered-count question (e.g. "how many of these
@@ -152,6 +158,13 @@ class Surface:
         # filter_not_null takes one column, or a tuple meaning "any of these".
         self.filter_eq = filter_eq or {}
         self.filter_not_null = filter_not_null
+        # orm-only: the column(s) must be NULL (same shape as filter_not_null:
+        # one column, or a tuple meaning "all of these are NULL").
+        self.filter_null = filter_null
+        # A retired store: the surface is not compared with the others, it
+        # must simply hold nothing that has not been copied across. A count
+        # above zero is a `retired-store-unmerged` finding.
+        self.expect_zero = expect_zero
         # orm-only: count distinct values of this column rather than rows, for a
         # question about the parent ("applications with an owner") asked of a
         # child store that can hold several rows per parent.
@@ -276,25 +289,43 @@ CONCEPTS = {
                 filter_eq={"source_table": "business_capability"},
                 filter_not_null="current_maturity_level"),
     ],
-    # Four work-package stores and five list screens. Stores without an
-    # organisation column are attributed by the linked element, else by the
-    # creating user.
+    # One store (UnifiedWorkPackage) and five list screens, all reading it.
+    # The four older stores (WorkPackage, RoadmapWorkPackage,
+    # ImplementationWorkPackage, TechnologyRoadmapInitiative) are retired into
+    # it: R1-B04 PR 1 copies their rows, and until PR 3 retires their last
+    # writers a bridge copies what those writers add. They are not compared
+    # with the one store (that would hide a failed merge as an "explained"
+    # subset); each must hold zero rows that are not copied across, so an
+    # unmerged row is a finding. Stores without an organisation column are
+    # attributed by the linked element, else by the creating user.
     "work packages": [
-        Surface("orm:WorkPackage", "orm",
-                "app.models.implementation_migration.WorkPackage"),
+        Surface("orm:WorkPackage(unmerged)", "orm",
+                "app.models.implementation_migration.WorkPackage",
+                expect_zero=True,
+                filter_null=("retired_into_id", "retired_at")),
         Surface("orm:UnifiedWorkPackage", "orm",
                 "app.models.unified_work_package.UnifiedWorkPackage",
                 tenant_via=[("archimate_element_id", "archimate_elements"),
                             ("application_component_id", "application_components"),
                             ("capability_id", "unified_capabilities"),
                             ("created_by", "users")]),
-        Surface("orm:RoadmapWorkPackage", "orm",
+        Surface("orm:RoadmapWorkPackage(unmerged)", "orm",
                 "app.models.roadmap_models.RoadmapWorkPackage",
-                tenant_via=[("created_by", "users")]),
-        Surface("orm:ImplementationWorkPackage", "orm",
+                tenant_via=[("created_by", "users")],
+                expect_zero=True,
+                filter_null=("retired_into_id", "retired_at")),
+        Surface("orm:ImplementationWorkPackage(unmerged)", "orm",
                 "app.models.implementation_planning.ImplementationWorkPackage",
                 tenant_via=[("application_component_id", "application_components"),
-                            ("architecture_id", "architecture_models")]),
+                            ("architecture_id", "architecture_models")],
+                expect_zero=True,
+                filter_null=("retired_into_id", "retired_at")),
+        Surface("orm:TechnologyRoadmapInitiative(unmerged)", "orm",
+                "app.models.implementation_migration.TechnologyRoadmapInitiative",
+                tenant_via=[("solution_id", "solutions"),
+                            ("architecture_id", "architecture_models")],
+                expect_zero=True,
+                filter_null=("retired_into_id", "retired_at")),
         Surface("GET /enterprise/api/work-packages", "http",
                 "/enterprise/api/work-packages?per_page=1", extract="total"),
         Surface("GET /api/roadmap/work-packages", "http",
@@ -525,6 +556,14 @@ def compare(observations):
         rows = []
         for row in observations[concept]:
             if row[1] is None:
+                continue
+            if row[2] == RETIRED_SCOPE:
+                if row[1]:
+                    findings.append(
+                        "  %s [retired-store-unmerged] %s still holds %d row(s) "
+                        "that are not in the one store. Run the merge; until "
+                        "then the list screens read an incomplete store."
+                        % (concept, row[0], row[1]))
                 continue
             if len(row) > 3 and row[3]:
                 if row[1]:
@@ -871,6 +910,12 @@ def _count_orm(surface, db, org_id):
                 names = (names,)
             query = query.filter(or_(*[getattr(model, n).isnot(None)
                                        for n in names]))
+        if surface.filter_null:
+            names = surface.filter_null
+            if isinstance(names, str):
+                names = (names,)
+            for n in names:
+                query = query.filter(getattr(model, n).is_(None))
         return query
 
     try:

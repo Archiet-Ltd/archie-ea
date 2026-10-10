@@ -1,8 +1,8 @@
 {% extends 'layouts/public_base.html' %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
 {% block full_title %}Entelim — your whole company, one model you can ask{% endblock %}
 {% block meta_description %}
-<meta name="description" content="Entelim is the open-source Enterprise Intelligence Model: build your company's architecture, applications, risks and gaps as one model you can ask. Self-host free under AGPL-3.0.">
 <link rel="canonical" href="https://entelim.org/">
+<meta name="description" content="Entelim is the open-source Enterprise Intelligence Model: build your company's architecture, applications, risks and gaps as one model you can ask. Self-host free under AGPL-3.0.">
 <meta property="og:title" content="Entelim — your whole company, one model you can ask">
 <meta property="og:description" content="Build your company as one model you can ask. Open source, self-host free, forever.">
 <meta property="og:type" content="website">
@@ -50,14 +50,14 @@
       </h1>
 
       <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
-        Build your company's architecture, applications, risks and gaps as one model inside Entelim. Ask what breaks if something fails, who is on the hook, and what you pay for twice.
+        Build your company's architecture, applications, risks and gaps as one model inside Entelim. Ask what breaks if something fails and who is on the hook.
       </p>
 
       <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-        <a href="{{ url_for('account.register') }}" class="inline-flex items-center justify-center px-6 py-3 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all duration-200">
+        <a href="{{ url_for('account.register') }}" class="public-btn bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all duration-200">
           Start free
         </a>
-        <a href="/pricing" class="inline-flex items-center justify-center px-6 py-3 rounded-md border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
+        <a href="/pricing" class="public-btn border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
           Buy
         </a>
       </div>
@@ -65,7 +65,7 @@
   </div>
 </section>
 
-<!-- What it answers: six questions -->
+<!-- What it answers: five questions -->
 <section class="relative py-20 sm:py-32 bg-muted/30">
   <div class="mx-auto max-w-7xl px-4 sm:px-6">
     <div class="text-center mb-16 space-y-4">
@@ -81,11 +81,11 @@
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
         <h3 class="text-lg font-semibold text-foreground mb-2">Which value streams are at risk, and why?</h3>
-        <p class="text-muted-foreground text-sm">The capabilities under each stream, how mature they are, and what that puts at risk.</p>
+        <p class="text-muted-foreground text-sm">The capabilities under each stream, how mature they are, and what that puts at risk, answered on <a href="/use-cases/value-streams-at-risk" class="text-primary underline hover:no-underline">its own dedicated page</a>.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">What are we paying for twice?</h3>
-        <p class="text-muted-foreground text-sm">Overlapping applications and contracts, gathered into one list you can act on.</p>
+        <h3 class="text-lg font-semibold text-foreground mb-2">Which controls have no evidence they're met?</h3>
+        <p class="text-muted-foreground text-sm">Every control an application maps to, any open policy violation, and when it was last scanned — never a guessed percentage.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
         <h3 class="text-lg font-semibold text-foreground mb-2">What are we trying to achieve here, and how is it tracking?</h3>
@@ -94,10 +94,6 @@
       <div class="rounded-lg border border-border bg-card p-6">
         <h3 class="text-lg font-semibold text-foreground mb-2">What could hurt this, and what does it touch?</h3>
         <p class="text-muted-foreground text-sm">Every recorded risk and how far its effects reach.</p>
-      </div>
-      <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">Who is accountable for this?</h3>
-        <p class="text-muted-foreground text-sm">The owner and the team behind every system.</p>
       </div>
     </div>
   </div>
@@ -115,7 +111,7 @@
     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
       <div class="rounded-lg border border-border bg-card p-6">
         <h3 class="text-lg font-semibold text-foreground mb-2">Startup founders</h3>
-        <p class="text-muted-foreground text-sm">Your business on one page, filled in from your own words. Your canvas drafted from your own site, every line with its source. Ready for the diligence request before it arrives.</p>
+        <p class="text-muted-foreground text-sm">Your business on one page, built from nine standard blocks. Not a blank page to fill alone: each block gets an AI-drafted suggestion you edit, pulled from your own model data.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
         <h3 class="text-lg font-semibold text-foreground mb-2">Scale-up CTOs</h3>
@@ -123,7 +119,7 @@
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
         <h3 class="text-lg font-semibold text-foreground mb-2">Enterprise architects</h3>
-        <p class="text-muted-foreground text-sm">An architecture model your whole company can question, and you can check. Every suggestion traced to its source. One annual platform fee: no per-application true-up, ever.</p>
+        <p class="text-muted-foreground text-sm">An architecture model your whole company can question, and you can check. Every derived connection shows how it was worked out. One annual platform fee: no per-application true-up, ever.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
         <h3 class="text-lg font-semibold text-foreground mb-2">Operations leads</h3>
@@ -172,10 +168,10 @@
       Licensed under AGPL-3.0.
     </h2>
     <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
-      Every question, every canvas and the twin map run on software licensed under AGPL-3.0. Run it on your own servers at any size, free, for as long as you like. Pay us when you want us to run it for you, support it under contract, or connect it to your systems.
+      Every question, the Business Model Canvas and the twin map run on software licensed under AGPL-3.0. Run it on your own servers at any size, free, for as long as you like. Pay us when you want us to run it for you, support it under contract, or connect it to your systems.
     </p>
     <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-      <a href="/contact" class="inline-flex items-center justify-center px-6 py-3 rounded-md border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
+      <a href="/contact" class="public-btn border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
         Get in touch
       </a>
     </div>
@@ -196,19 +192,19 @@
         <h3 class="text-lg font-semibold text-foreground mb-1">Community</h3>
         <p class="text-2xl font-bold text-foreground mb-1">Free</p>
         <p class="text-sm text-muted-foreground mb-3">No trial clock.</p>
-        <p class="text-sm text-muted-foreground">For evaluation, one-person companies and self-hosters. One organisation, three people. Every question, every canvas, the twin map. File import. Community support.</p>
+        <p class="text-sm text-muted-foreground">For evaluation, one-person companies and self-hosters. One organisation, three people. Every question, the Business Model Canvas, the twin map. File import. Community support.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
         <h3 class="text-lg font-semibold text-foreground mb-1">Startup</h3>
         <p class="text-2xl font-bold text-foreground mb-1">$49<span class="text-sm font-normal text-muted-foreground">/month</span></p>
-        <p class="text-sm text-muted-foreground mb-3">$490/year. Ten people.</p>
-        <p class="text-sm text-muted-foreground">For founders and small services firms, 5 to 50 people. Everything in Community plus webhook feed, export and share, email support.</p>
+        <p class="text-sm text-muted-foreground mb-3">$490/year.</p>
+        <p class="text-sm text-muted-foreground">For founders and small services firms, 5 to 50 people. Ten people and email support, everything in Community included.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6 ring-2 ring-primary">
         <h3 class="text-lg font-semibold text-foreground mb-1">Team</h3>
         <p class="text-2xl font-bold text-foreground mb-1">$29<span class="text-sm font-normal text-muted-foreground">/editor/month</span></p>
         <p class="text-sm text-muted-foreground mb-3">$290/editor/year. Askers free.</p>
-        <p class="text-sm text-muted-foreground">For scale-ups and services companies, 50 to 500 people. SSO, review-board workflow, own model key, usage history.</p>
+        <p class="text-sm text-muted-foreground">For scale-ups and services companies, 50 to 500 people. Single sign-on, the review-board workflow, and your own model key.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
         <h3 class="text-lg font-semibold text-foreground mb-1">Enterprise</h3>
@@ -216,6 +212,11 @@
         <p class="text-sm text-muted-foreground mb-3">Annual contract.</p>
         <p class="text-sm text-muted-foreground">For enterprise architecture teams. Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</p>
       </div>
+    </div>
+
+    <div class="text-center mt-10 space-y-1">
+      <p class="font-semibold text-foreground">On the way</p>
+      <p class="text-muted-foreground text-sm">Export any answer as a spreadsheet or PDF, and share it with a link.</p>
     </div>
   </div>
 </section>
