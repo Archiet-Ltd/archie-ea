@@ -1136,7 +1136,6 @@ def seed_demo_company() -> dict:
     from app.models import ArchiMateElement, ArchiMateRelationship
     from app.models.application_portfolio import ApplicationComponent
     from app.models.application_owner import ApplicationOwner
-    from app.models.unified_capability import UnifiedCapability
     from app.models.risk import Risk, RiskStatus
     from app.models.enterprise_intelligence import PortfolioInitiative
     from app.models.unified_work_package import UnifiedWorkPackage
