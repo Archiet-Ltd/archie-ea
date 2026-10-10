@@ -559,7 +559,7 @@ to reconfirm the count before trusting it:**
 | `nav-verified` | a new sidebar route with no test loading it | ratchet @ 0, carries no tags |
 | `docs-drift` | CLAUDE.md/DELIVERY_CONTRACT.md gate claims disagreeing with build_gates() | must be 0 |
 | `public-repo-hygiene` | a docs/buckets/ directory or path reference in this public repository | must be 0 |
-| `background-mechanisms` | a background-work mechanism (rq, celery, apscheduler, thread, process pool) missing from `docs/background-mechanisms.yml`, or a stale entry | ratchet @ 22 thread entries |
+| `background-mechanisms` | a background-work mechanism (rq, celery, apscheduler, thread, process pool, detached subprocess) missing from `docs/background-mechanisms.yml`, or a stale entry | ratchet @ 29 thread instances in 22 files; keyed on file, kind and function |
 | `unregistered-checks` | a scripts/check_\*.py with no Gate(...) entry (F500-008) | ratchet @ 33 |
 
 Per-line escape hatches, each of which makes the exception reviewable rather than

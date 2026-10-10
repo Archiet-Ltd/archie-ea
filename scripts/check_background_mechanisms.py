@@ -57,6 +57,7 @@ from __future__ import annotations
 import argparse
 import ast
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -96,22 +97,31 @@ def _walk_with_scope(tree):
     yield from visit(tree, "<module>")
 
 
-def _module_aliases(tree, module):
-    """(names bound to the module, {local name: original} for from-imports)."""
-    mods, members = {module}, {}
+# Cheap prefilter: a file naming none of these cannot start a mechanism, so it is
+# never parsed (parsing every module under app/ is most of the run time).
+_HINT = re.compile(r"threading|Thread|Timer|Executor|subprocess|Popen|fork|spawn|"
+                   r"multiprocessing|celery|apscheduler|\brq\b|flask_rq")
+
+
+def _module_aliases(tree, modules):
+    """({module: names bound to it}, {module: {local name: original}})."""
+    mods = {m: {m} for m in modules}
+    members = {m: {} for m in modules}
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name == module:
-                    mods.add(alias.asname or module)
-        elif isinstance(node, ast.ImportFrom) and node.module == module:
+                if alias.name in mods:
+                    mods[alias.name].add(alias.asname or alias.name)
+        elif isinstance(node, ast.ImportFrom) and node.module in members:
             for alias in node.names:
-                members[alias.asname or alias.name] = alias.name
+                members[node.module][alias.asname or alias.name] = alias.name
     return mods, members
 
 
 def _instances(source: str) -> dict:
     """{(kind, scope): instance count} for one file's source."""
+    if not _HINT.search(source):
+        return {}
     try:
         tree = ast.parse(source)
     except (SyntaxError, ValueError):
@@ -121,10 +131,12 @@ def _instances(source: str) -> dict:
     def add(kind, scope):
         found[(kind, scope)] = found.get((kind, scope), 0) + 1
 
-    thr_mods, thr_members = _module_aliases(tree, "threading")
-    _, fut_members = _module_aliases(tree, "concurrent.futures")
-    sub_mods, sub_members = _module_aliases(tree, "subprocess")
-    os_mods, os_members = _module_aliases(tree, "os")
+    mods, members = _module_aliases(
+        tree, ("threading", "concurrent.futures", "subprocess", "os"))
+    thr_mods, thr_members = mods["threading"], members["threading"]
+    fut_members = members["concurrent.futures"]
+    sub_mods, sub_members = mods["subprocess"], members["subprocess"]
+    os_mods, os_members = mods["os"], members["os"]
     thread_names = {n for n, o in thr_members.items() if o in ("Thread", "Timer")}
     pool_names = {n for n, o in fut_members.items() if o == "ThreadPoolExecutor"}
     ppool_names = {n for n, o in fut_members.items() if o == "ProcessPoolExecutor"}
