@@ -227,6 +227,10 @@ def test_no_page_links_to_the_private_repository(app):
             assert "archiet-ltd/entelim" not in html, (
                 f"{path} links to the private archiet-ltd/entelim repository"
             )
-            assert "github.com" not in html, (
-                f"{path} links to github.com; the repository is not public"
+            # The open-source repository (Archiet-Ltd/archie-ea) is public, and the
+            # pricing page's self-hosting band links to it. Any other GitHub link
+            # is still a dead-link risk.
+            other = html.replace("github.com/Archiet-Ltd/archie-ea", "")
+            assert "github.com" not in other, (
+                f"{path} links to a github.com repository other than the public archie-ea one"
             )

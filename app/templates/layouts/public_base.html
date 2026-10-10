@@ -42,9 +42,21 @@
         {% block header %}{% endblock %}
 
         <!-- Main Content Area. Public pages scroll the document (no inner scroll container);
-             the fixed-height shell is for the authenticated product (admin_base.html). -->
+             the fixed-height shell is for the authenticated product (admin_base.html).
+             overflow-x-clip, not overflow-x-hidden, and overflow-y-visible is required, not
+             cosmetic: the CSS overflow spec computes the *other* axis as 'auto' whenever one
+             axis is 'hidden'/'auto'/'scroll' and the other is 'visible' -- setting overflow-y:
+             visible explicitly does not escape this, the UA overrides it back to 'auto' anyway
+             (confirmed the hard way: an earlier fix here that only added overflow-y-visible
+             while leaving overflow-x-hidden in place did not change the actual rendered
+             behaviour at all). 'clip' is exempt from that promotion because, unlike 'hidden',
+             it never establishes a scroll container in the first place. Without this,
+             #main-content silently becomes its own scroll/sticky containing block even though
+             nothing inside it actually overflows, breaking position:sticky for any descendant
+             expecting to stick to the document (found via /pricing's comparison-table header,
+             which stuck to this element's own top instead of the viewport's). -->
         <main id="main-content"
-              class="flex-1 overflow-x-hidden bg-background"
+              class="flex-1 overflow-x-clip overflow-y-visible bg-background"
               role="main">
             {# Flash messages surface as toasts only (components/toast-container.html,
                included below) — this used to also render partials/_flashes.html as an

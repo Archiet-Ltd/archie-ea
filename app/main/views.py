@@ -495,9 +495,8 @@ def llms_txt():
     lines = ["# Entelim"]
     lines.append("")
     lines.append(
-        "> Entelim is the open-source Enterprise Intelligence Model: "
-        "build your company's architecture, applications, risks and gaps "
-        "as one model you can ask."
+        "> Enterprise Intelligence Management: one living, explainable model of your "
+        "enterprise, for every company that has a strategy, systems, suppliers and risks."
     )
     lines.append("")
 
@@ -534,9 +533,8 @@ def llms_full_txt():
     lines = ["# Entelim — Full Content"]
     lines.append("")
     lines.append(
-        "> Entelim is the open-source Enterprise Intelligence Model: "
-        "build your company's architecture, applications, risks and gaps "
-        "as one model you can ask."
+        "> Enterprise Intelligence Management: one living, explainable model of your "
+        "enterprise, for every company that has a strategy, systems, suppliers and risks."
     )
     lines.append("")
 
@@ -861,7 +859,12 @@ def public_site_page(slug):
     if page is None:
         from flask import abort
         abort(404)
-    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+    # A page may name its own layout in front-matter (`template: pricing`),
+    # for pages whose structure is not a single prose column.
+    template = "public/page.html"
+    if page.front_matter.get("template") == "pricing":
+        template = "public/pricing.html"
+    return render_template(template, page=page, jsonld=build_jsonld(page))
 
 
 @main.route(
