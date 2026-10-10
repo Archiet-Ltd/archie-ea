@@ -125,6 +125,7 @@ evidence_head_events
 evidence_records
 evidence_requests
 external_identity_crosswalk
+extraction_feedback
 framework_instances
 gaps
 gdpr_requests
