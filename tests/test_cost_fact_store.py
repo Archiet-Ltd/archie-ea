@@ -34,6 +34,23 @@ def _facts(org_id, **filters):
     return list_facts(org_id, **filters)
 
 
+@pytest.fixture
+def as_org(tenant_ctx):
+    """Enter an organisation's request context and leave nothing behind: the
+    shared app context keeps ``g`` after the request context exits."""
+    import contextlib
+
+    @contextlib.contextmanager
+    def _as(org_id):
+        try:
+            with tenant_ctx(org_id):
+                yield
+        finally:
+            g.pop("current_org_id", None)
+
+    return _as
+
+
 class _Stub:
     """A signed-in user: ``platform`` makes it a platform administrator; every
     stub holds the administer permission, so a False ``platform`` is an
@@ -191,7 +208,7 @@ def test_one_organisations_facts_never_include_the_others(db_session, make_org):
     assert _facts(org_a.id, element_ids=[app_b.id]) == []
 
 
-def test_an_organisation_cannot_read_or_write_the_others_facts(db_session, make_org, tenant_ctx):
+def test_an_organisation_cannot_read_or_write_the_others_facts(db_session, make_org, as_org):
     from app.models.application_portfolio import ApplicationComponent
     from app.services.application_cost_accessor import set_annual_cost
     from app.services.cost_fact_store import list_facts, upsert_fact
@@ -201,7 +218,7 @@ def test_an_organisation_cannot_read_or_write_the_others_facts(db_session, make_
     set_annual_cost(app_b, Decimal("200"))
     db_session.flush()
 
-    with tenant_ctx(org_a.id):
+    with as_org(org_a.id):
         # the application itself is invisible to A, so the accessor has nothing to write through
         assert db_session.get(ApplicationComponent, app_b.id) is None or g.current_org_id == org_a.id
         with pytest.raises(PermissionError):
@@ -215,7 +232,7 @@ def test_an_organisation_cannot_read_or_write_the_others_facts(db_session, make_
 
 
 def test_clearing_through_the_accessor_in_a_request_touches_only_that_organisation(
-        db_session, make_org, tenant_ctx):
+        db_session, make_org, as_org):
     from app.services.application_cost_accessor import set_annual_cost
 
     org_a, org_b = make_org("a"), make_org("b")
@@ -224,7 +241,7 @@ def test_clearing_through_the_accessor_in_a_request_touches_only_that_organisati
     set_annual_cost(app_a, Decimal("1"))
     set_annual_cost(app_b, Decimal("2"))
     db_session.flush()
-    with tenant_ctx(org_a.id):
+    with as_org(org_a.id):
         set_annual_cost(app_a, None)
         db_session.flush()
     assert _facts(org_a.id) == []
@@ -503,7 +520,7 @@ def test_the_fact_store_is_a_surface_of_applications_with_a_recorded_annual_cost
 
 
 def test_the_store_agreement_check_reports_agreement_on_a_seeded_organisation(
-        app, db_session, make_org, tenant_ctx):
+        app, db_session, make_org, as_org):
     from app import db
     from app.commands.backfill_cost_facts import backfill_cost_facts
     from scripts import check_store_agreement as gate
@@ -512,11 +529,16 @@ def test_the_store_agreement_check_reports_agreement_on_a_seeded_organisation(
     other = make_org("b")
     _seed_sources(db_session, org, "A")
     _app_component(db_session, other, "B app", total_cost_of_ownership=7.0)
-    concepts = {"applications with a recorded annual cost":
-                gate.CONCEPTS["applications with a recorded annual cost"]}
+    # The two live surfaces. The old application_costs surface stays registered
+    # and still reads empty; the store-agreement tests cover it.
+    surfaces = [s for s in gate.CONCEPTS["applications with a recorded annual cost"]
+                if s.name in ("orm:ApplicationComponent(annual cost recorded)",
+                              "orm:CostFact(applications)")]
+    assert len(surfaces) == 2
+    concepts = {"applications with a recorded annual cost": surfaces}
 
     def disagreements(org_id):
-        with tenant_ctx(org_id):
+        with as_org(org_id):
             observations, _ = gate.observe_tenant(app, db, org_id, concepts=concepts, http=False)
             findings, _ = gate.compare(observations)
         return observations, findings
@@ -528,8 +550,8 @@ def test_the_store_agreement_check_reports_agreement_on_a_seeded_organisation(
     backfill_cost_facts(organization_ids=[org.id, other.id])
     observations, after = disagreements(org.id)
     rows = observations["applications with a recorded annual cost"]
-    assert {r[0] for r in rows} == {"orm:ApplicationComponent(annual cost recorded)",
-                                    "orm:CostFact(applications)"}
+    assert {r[0]: r[1] for r in rows} == {"orm:ApplicationComponent(annual cost recorded)": 1,
+                                          "orm:CostFact(applications)": 1}
     assert after == []
 
 

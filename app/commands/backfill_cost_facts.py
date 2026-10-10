@@ -214,8 +214,9 @@ def backfill_cost_facts(dry_run: bool = False, organization_ids: Optional[List[i
             logger.exception("cost fact backfill: organisation %s failed", org_id)
             db.session.rollback()
             report[str(org_id)] = {"error": "organisation could not be backfilled"}
-        # Next organisation starts from a clean session.
-        db.session.expunge_all()
+        # Next organisation re-reads from the database; every query here carries
+        # an explicit organisation predicate, so no cached row is ever reused.
+        db.session.expire_all()
     return report
 
 

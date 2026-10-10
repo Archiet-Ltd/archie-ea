@@ -200,7 +200,7 @@ def sync_cost_fact(app: ApplicationComponent, column: str, currency: Optional[st
     return outcome
 
 
-def _finish_new_applications(session) -> None:
+def _finish_new_applications(session, flush_context) -> None:
     pending = session.info.pop(_PENDING_KEY, None)
     for app, column, currency in (pending or {}).values():
         if app.id is not None:

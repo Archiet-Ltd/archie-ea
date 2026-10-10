@@ -428,10 +428,7 @@ CONCEPTS = {
                 "app.models.enterprise_intelligence.ApplicationCost",
                 distinct="application_id",
                 tenant_via=[("application_id", "application_components"),
-                            ("created_by_id", "users")],
-                waived="store-agreement-ok: retired table, its rows are copied into "
-                       "the cost fact store by backfill-cost-facts and nothing writes "
-                       "to it; kept listed until the table is marked retired"),
+                            ("created_by_id", "users")]),
         Surface("orm:CostFact(applications)", "orm",
                 "app.models.cost_fact.CostFact",
                 filter_eq={"element_type": "application"},

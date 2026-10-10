@@ -515,16 +515,23 @@ def test_live_seeded_disagreement_is_red_and_consistent_state_is_green(
     assert "orm:ApplicationComponent(annual cost recorded)=1" in findings[0]
     assert "orm:ApplicationCost(applications)=0" in findings[0]
 
-    # Record the same cost in the cost store: both stores answer 1.
+    assert "orm:CostFact(applications)=0" in findings[0]
+
+    # Record the same cost in both cost stores (the fact store is filled by its
+    # backfill): all three answer 1.
+    from app.commands.backfill_cost_facts import backfill_cost_facts
+
     db_session.add(ApplicationCost(application_id=application.id,
                                    fiscal_year=2026, total_cost=1200))
     db_session.flush()
+    backfill_cost_facts(organization_ids=[org.id])
     findings, notes, observations = _live_findings(
         app, tenant_ctx, org.id, user, [concept], http=False)
     assert findings == [], (findings, notes)
     assert {row[0]: row[1] for row in observations[concept]} == {
         "orm:ApplicationComponent(annual cost recorded)": 1,
-        "orm:ApplicationCost(applications)": 1}
+        "orm:ApplicationCost(applications)": 1,
+        "orm:CostFact(applications)": 1}
 
 
 def test_live_gap_kinds_agree_across_stores_and_screens(
