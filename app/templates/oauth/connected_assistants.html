@@ -41,7 +41,7 @@
           <td class="px-6 py-4 text-muted-foreground">{{ grant.last_used_at.strftime('%d %b %Y %H:%M') if grant.last_used_at else '—' }}</td>
           {% if not admin_view %}
           <td class="px-6 py-4 text-right">
-            <form method="post" action="{{ url_for('connected_assistants.revoke', grant_id=grant.grant_id) }}">
+            <form method="post" action="{% if 'connected_assistants.revoke' in flask.current_app.view_functions %}{{ url_for('connected_assistants.revoke', grant_id=grant.grant_id) }}{% endif %}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground">Disconnect</button>
             </form>
@@ -58,7 +58,7 @@
 
   {% if grants %}
   <form method="post" class="mt-6 flex justify-end"
-        action="{% if admin_view %}{{ url_for('connected_assistants.admin_revoke', user_id=subject.id) }}{% else %}{{ url_for('connected_assistants.revoke_all') }}{% endif %}">
+        action="{% if admin_view %}{% if 'connected_assistants.admin_revoke' in flask.current_app.view_functions %}{{ url_for('connected_assistants.admin_revoke', user_id=subject.id) }}{% endif %}{% else %}{% if 'connected_assistants.revoke_all' in flask.current_app.view_functions %}{{ url_for('connected_assistants.revoke_all') }}{% endif %}{% endif %}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit" class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
       {% if admin_view %}Disconnect every assistant{% else %}Disconnect all{% endif %}
