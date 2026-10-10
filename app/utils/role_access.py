@@ -1105,6 +1105,29 @@ _GROUP_FOR_ENDPOINT = {
     "organization.index": "what_we_do",
     "stakeholder_map.stakeholder_map_page": "what_we_do",
     "dashboard_pages.rationalization_scorecard": "what_we_do",
+    # Added since this branch last touched role_access.py -- each already
+    # rendered under "what_we_do" via _ZONE_DEFAULT_GROUP (my_work's
+    # fallback); explicit here only to satisfy the completeness test, no
+    # placement change.
+    "unified_ai_chat.approval_inbox": "what_we_do",
+    "intelligence_ui.history_as_of_page": "what_we_do",
+    "intelligence_ui.history_changes_page": "what_we_do",
+    "unified_applications.ownership_coverage": "what_we_do",
+    "capability_map.capabilities_no_owner": "what_we_do",
+    "cto_scorecard.index": "what_we_do",
+    "formula_register.index": "what_we_do",
+    "agent_registry.index": "what_we_do",
+    "gdpr_bp.dsr_index": "what_we_do",
+    "data_governance.entities": "what_we_do",
+    "data_governance.domains": "what_we_do",
+    "service_status.status_page": "what_we_do",
+    "intelligence_ui.value_streams_at_risk": "what_we_do",
+    # Also appears in _ADMIN_LINKS, but get_sidebar_groups() checks the
+    # zone the link actually came from before consulting this map (admin
+    # zone always wins) -- this entry only applies when a role instead
+    # surfaces it via _MY_WORK_LINKS (e.g. security_architect), where it
+    # already renders under "what_we_do" via _ZONE_DEFAULT_GROUP.
+    "admin.audit_log_viewer": "what_we_do",
     # What supports it: the tools, data, suppliers and people behind it
     "unified_applications.application_list": "supports",
     "unified_applications.vendors": "supports",
