@@ -5,14 +5,14 @@ notice period of 90 days and "no notice period recorded" was impossible.
 This migration alters the column to be nullable and removes the default.
 
 Revision ID: 20261009_notice_nullable
-Revises: 20261008_uwp_element_unique
+Revises: 20261010_arb_change_requests_rls
 Create Date: 2026-10-09
 """
 from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261009_notice_nullable"
-down_revision = "20261008_uwp_element_unique"
+down_revision = "20261010_arb_change_requests_rls"
 branch_labels = None
 depends_on = None
 
