@@ -6,7 +6,7 @@ Extracted from: app/admin/views.py (user CRUD, invitations, role changes)
 import logging
 from typing import Optional, Tuple
 
-from flask import g, url_for
+from flask import g
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
@@ -112,7 +112,17 @@ class AdminUserService:
 
         Returns:
             The newly created User.
+
+        When ``role`` is Administrator, this also writes the OrgRole row and
+        the denormalised ``is_org_admin`` column for the user's organisation
+        (the same organisation ``organization_id`` places them in), so the
+        team page and database-level guards agree with this page about who is
+        an organisation administrator from the moment the account exists --
+        through the one shared helper (app/models/org_role.py), not a second
+        implementation of the grant.
         """
+        from app.models.org_role import apply_admin_role_grant_for_new_user
+
         user = User(
             first_name=first_name,
             last_name=last_name,
@@ -124,45 +134,35 @@ class AdminUserService:
             organization_id=organization_id,
         )
         db.session.add(user)
+        db.session.flush()
+        apply_admin_role_grant_for_new_user(user, role)
         db.session.commit()
         return user
 
     @staticmethod
     def invite_user(first_name: str, last_name: str, email: str,
-                    role: Role, organization_id: Optional[int] = None) -> User:
-        """Create a new user via invitation and send invite email.
+                    role: Role, organization_id: Optional[int] = None):
+        """Invite a new person into an organisation, by default the signed-in administrator's.
 
-        Args:
-            first_name: User's first name.
-            last_name: User's last name.
-            email: User's email.
-            role: Role to assign.
+        Goes through the same invitation as the Team page: the account is
+        opened in the inviter's organisation and a single-use link is e-mailed.
 
-        Returns:
-            The newly created User.
+        Returns ``(user, delivered, error)``. Raises ``InvitationError`` when
+        no invitation can be made (for example, e-mail is not available), and
+        ``PlanLimitReached`` when the organisation's plan has no place left.
         """
-        user = User(
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            role=role,
-            organization_id=organization_id,
-        )
-        db.session.add(user)
-        db.session.commit()
+        from flask_login import current_user
 
-        token = user.generate_confirmation_token()
-        invite_link = url_for(
-            "account.join_from_invite", user_id=user.id, token=token, _external=True
+        from app.modules.account.services import invitation_service
+
+        if organization_id is None:
+            organization_id = current_user.organization_id
+        row, delivered, error = invitation_service.invite_new_person(
+            organization_id, current_user, email,
+            org_role="viewer", first_name=first_name, last_name=last_name,
+            platform_role=role,
         )
-        AdminUserService.queue_email(
-            recipient=user.email,
-            subject="You Are Invited To Join",
-            template="account/email/invite",
-            user=user,
-            invite_link=invite_link,
-        )
-        return user
+        return row.user, delivered, error
 
     @staticmethod
     def change_user_email(user: User, new_email: str) -> None:
@@ -183,8 +183,19 @@ class AdminUserService:
         Args:
             user: User to modify.
             new_role: New Role to assign.
+
+        Crossing the Administrator boundary (either direction) also syncs the
+        per-organisation OrgRole row and the denormalised ``is_org_admin``
+        column, and -- on revoke -- leaves a platform admin's
+        Permission.ADMINISTER untouched, through the one shared helper
+        (app/models/org_role.py) that both the v1 and v2 admin services call,
+        instead of this service re-implementing the state transition (which
+        previously reassigned ``user.role`` unconditionally, stripping a
+        platform admin's Administrator role as a side effect).
         """
-        user.role = new_role
+        from app.models.org_role import apply_admin_role_change
+
+        apply_admin_role_change(user, new_role)
         db.session.add(user)
         db.session.commit()
 

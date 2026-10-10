@@ -1,16 +1,24 @@
 <p>Dear {{ user.full_name() }},</p>
 
+{% if organisation_name %}
+<p>{% if inviter %}{{ inviter.full_name() }} invited you{% else %}You are invited{% endif %} to join <b>{{ organisation_name }}</b> on {{ config.APP_NAME }}.</p>
+{% else %}
 <p>You are invited to join <b>{{ config.APP_NAME }}</b>!</p>
+{% endif %}
 
-<p>To set your password, please <a href="{{ invite_link }}">click here</a>.</p>
+{% if has_account %}
+<p>You already have an account. To accept or decline, <a href="{{ invite_link }}">open this link</a> and sign in as {{ user.email }}.</p>
+{% else %}
+<p>To accept, <a href="{{ invite_link }}">open this link</a> and choose a password.</p>
+{% endif %}
 
-<p>Alternatively, you can paste the following link in your browser's address bar:</p>
+<p>Or paste it into your browser's address bar:</p>
 
 <p>{{ invite_link }}</p>
 
-<p>Once completed, please log in as {{ user.email }} with the password you set.</p>
+{% if expires_at %}<p>The link works once and until {{ expires_at.strftime('%d %b %Y %H:%M') }} UTC.</p>{% endif %}
 
-<p>Sincerely,</p>
+{% if not has_account %}<p>Then sign in as {{ user.email }} with the password you chose.</p>{% endif %}
 
 <p>The {{ config.APP_NAME }} Team</p>
 

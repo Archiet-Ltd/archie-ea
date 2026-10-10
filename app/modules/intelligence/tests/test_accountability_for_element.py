@@ -15,7 +15,7 @@ method; these tests cover the service method itself, which is now a
 constant.
 
 Fixtures (app, db_session, make_org) are discovered via
-app/modules/intelligence/tests/conftest.py's own import of tests.conftest,
+app/modules/conftest.py's import of tests.conftest,
 same pattern as test_query_service.py. No import needed here.
 """
 

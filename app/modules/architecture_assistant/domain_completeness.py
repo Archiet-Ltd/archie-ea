@@ -157,7 +157,7 @@ class DomainCompletenessService:
         """
         from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
         from app.models.acm_property_template import AcmPropertyTemplate
-        from app.modules.architecture_assistant.property_service import tiers_up_to, is_visible
+        from app.modules.architecture_assistant.property_service import is_visible, template_query, tiers_up_to
 
         proposals = SolutionBlueprintProposal.query.filter_by(
             solution_id=solution_id, acm_domain=domain_code,
@@ -167,7 +167,7 @@ class DomainCompletenessService:
 
         result = []
         for p in proposals:
-            templates = AcmPropertyTemplate.query.filter_by(
+            templates = template_query().filter_by(
                 archimate_type=p.archimate_type,
             ).filter(
                 AcmPropertyTemplate.required_for_tier.in_(tiers_up_to(tier))

@@ -9,11 +9,20 @@ Decorators:
 - login_required — JSON-aware wrapper around Flask-Login
 - requires_permission — granular permission check (string-based)
 - permission_required — Permission enum-based check
-- admin_required — shortcut for ADMINISTER permission
 - require_auth — simple authentication check (no role/permission)
 - require_feature — feature flag gate
 - require_roles — role-based access control
 - audit_log — no-op audit decorator (compatibility stub)
+
+D-5 (admin-rbac-active-org continuation): this module used to also define
+its own ``admin_required`` -- one of three separate implementations in this
+codebase, and the one that never carried the active-org fix
+``admin_required``/``org_admin_required`` get elsewhere in this PR (it was
+only ``permission_required(Permission.ADMINISTER)``, a bare global-flag
+check). Removed; its one caller (app/main/views.py, three platform-wide
+settings routes already additionally gated by ``platform_admin_required``)
+now imports the canonical, fixed implementation from ``app.decorators``
+instead.
 """
 
 from functools import wraps
@@ -116,16 +125,6 @@ def permission_required(permission):
         return decorated_function
 
     return decorator
-
-
-def admin_required(f):
-    """Shortcut: require Permission.ADMINISTER.
-
-    Source: app/decorators.py
-    """
-    from app.models import Permission
-
-    return permission_required(Permission.ADMINISTER)(f)
 
 
 def require_roles(*allowed_roles):

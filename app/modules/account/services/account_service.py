@@ -6,7 +6,7 @@ All behavior preserved exactly from the original views.py implementation.
 """
 import logging
 
-from flask import session, url_for
+from flask import g, session, url_for
 from flask_login import logout_user
 
 try:
@@ -19,6 +19,7 @@ except ImportError:
 
 from app.extensions import db
 from app.flask_email import send_email
+from app.jobs.tenant_safe_job import platform_scope
 from app.models import User
 from app.models.org_role import OrgRole
 from app.services import session_registry
@@ -36,6 +37,45 @@ def _queue_email(*args, **kwargs):
 
 class AccountService:
     """Service layer for account-related operations."""
+
+    @staticmethod
+    def switch_active_organization(user, requested_org_id):
+        """Switch the signed-in user's active organisation.
+
+        Returns ``(success, message)`` so both account blueprints can keep the
+        same flash/redirect behaviour while delegating the membership and
+        session handling to one implementation.
+        """
+        from app.middleware.tenant_context import (
+            ACTIVE_ORG_SESSION_KEY,
+            accessible_organizations,
+            clear_tenant_context_cache,
+            user_can_access_org,
+        )
+        from app.models.organization import Organization
+
+        memberships = accessible_organizations(user)
+        if requested_org_id is None:
+            return False, "Select an organisation to continue."
+
+        if not any(org.id == requested_org_id for org in memberships) or not user_can_access_org(
+            user, requested_org_id
+        ):
+            session.pop(ACTIVE_ORG_SESSION_KEY, None)
+            session.modified = True
+            clear_tenant_context_cache()
+            return False, "You do not have access to that organisation."
+
+        session[ACTIVE_ORG_SESSION_KEY] = requested_org_id
+        session.modified = True
+        clear_tenant_context_cache()
+
+        active_org = db.session.get(Organization, requested_org_id)
+        g.current_org_id = requested_org_id
+        g.current_org = active_org
+        return True, (
+            f"Now working in {active_org.name if active_org else 'the selected organisation'}."
+        )
 
     @staticmethod
     def authenticate(email, password):
@@ -76,11 +116,11 @@ class AccountService:
             logout_user()
 
     @staticmethod
-    def register_user(first_name, last_name, email, password):
-        """Register a new user.
+    def register_user(first_name, last_name, email, password, confirmed=True):
+        """Register a new user in an organisation of their own, and sign them in.
 
-        Auto-confirms the account (email confirmation disabled).
-        Admin can manage user access via /admin/users.
+        ``confirmed`` is False when the address still has to be confirmed by
+        e-mail; ``sign_up`` below decides that from whether mail can be sent.
 
         Returns the newly created User object.
         """
@@ -89,6 +129,10 @@ class AccountService:
         import re as _re
         import uuid as _uuid
         from app.models import Organization
+        from app.modules.account.services.invitation_service import release_for_registration
+
+        # An address held only by an invitation nobody took up is freed here.
+        release_for_registration(email)
         _label = ("{} {}".format(first_name or "", last_name or "").strip()
                   or (email.split("@")[0] if email else "New"))
         _base_slug = _re.sub(r"[^a-z0-9]+", "-",
@@ -105,11 +149,12 @@ class AccountService:
             last_name=last_name,
             email=email,
             password=password,
-            confirmed=True,  # Auto-confirm — email verification disabled for now
+            confirmed=confirmed,
             organization_id=org.id,
         )
-        if hasattr(user, "is_org_admin"):
-            user.is_org_admin = True
+        # The user owns the organisation just created for them, so granting
+        # org-admin here is always a grant in their own organisation.
+        user.grant_org_admin()
         db.session.add(user)
         try:
             db.session.flush()
@@ -120,51 +165,104 @@ class AccountService:
             raise
         # Auto-login after registration
         session_registry.login_and_register(user)
-        # Email confirmation disabled — re-enable by removing confirmed=True above
-        # and uncommenting the email block below:
-        # token = user.generate_confirmation_token()
-        # confirm_link = url_for("account.confirm", token=token, _external=True)
-        # _queue_email(
-        #     recipient=user.email,
-        #     subject="Confirm Your Account",
-        #     template="account/email/confirm",
-        #     user=user,
-        #     confirm_link=confirm_link,
-        # )
         return user
 
     @staticmethod
-    def request_password_reset(email):
-        """Send a password reset email if the user exists."""
-        user = User.find_by_email(email)
-        if user:
-            token = user.generate_password_reset_token()
-            reset_link = url_for("account.reset_password", token=token, _external=True)
-            _queue_email(
-                recipient=user.email,
-                subject="Reset Your Password",
-                template="account/email/reset_password",
-                user=user,
-                reset_link=reset_link,
-            )
+    def sign_up(first_name, last_name, email, password):
+        """Self-serve registration, with the address confirmed by e-mail.
+
+        Returns ``(user, confirmation)``: "sent" (a link was mailed and the
+        account waits on it), "failed" (the mail server refused it; the
+        account waits and can ask for another), or "mail_unavailable" (no
+        mail server here, so the account is usable at once and the person is
+        told no message was sent -- holding it behind a message that can
+        never arrive would lock them out of their own trial).
+        """
+        from app.flask_email import mail_available
+
+        can_mail = mail_available()
+        user = AccountService.register_user(
+            first_name, last_name, email, password, confirmed=not can_mail
+        )
+        if not can_mail:
+            return user, "mail_unavailable"
+        delivered, _error = AccountService.send_confirmation_email(user)
+        return user, ("sent" if delivered else "failed")
 
     @staticmethod
-    def reset_password(token, email, new_password):
-        """Reset a user's password with the given token.
+    def request_password_reset(email):
+        """Mail a single-use reset link if an account uses ``email``.
 
-        Returns (success: bool, message: str).
+        Returns "mail_unavailable" when this server cannot send mail (decided
+        before the address is looked up, so the answer is the same for every
+        address), otherwise "requested" whether or not the address exists.
         """
+        from app.flask_email import deliver_email_after_response, mail_available
+        from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
+
+        if not mail_available():
+            return "mail_unavailable"
         user = User.find_by_email(email)
-        if user is None:
-            return False, "Invalid email address."
-        if user.reset_password(token, new_password):
-            # I've-lost-control-of-this-account path: kill everything,
-            # including any session on the machine performing the reset.
-            # There is no acting session to preserve -- a reset happens
-            # while logged out.
-            AccountService._revoke_other_sessions(user.id, "password_change", except_sid=None)
-            return True, "Your password has been updated."
-        return False, "The password reset link is invalid or has expired."
+        if user is not None and user.password_hash is not None:
+            # No one is signed in, so there is no session organisation: the token
+            # row belongs to the account's own organisation (account_tokens is
+            # fenced by row-level security), hence the platform scope.
+            with platform_scope("password reset: issue a token for an account that is not signed in"):
+                row, raw = AccountToken.issue(user, PURPOSE_PASSWORD_RESET)
+                db.session.commit()
+            token_id = row.id
+
+            def record(delivered, error):
+                # tenant-scoping-ok: the row this request just issued, by primary key
+                with platform_scope("password reset: record delivery on the token just issued"):
+                    issued = db.session.get(AccountToken, token_id)
+                    if issued is not None:
+                        issued.record_delivery(delivered, error)
+                        db.session.commit()
+
+            # Sent after the answer has gone out, so the answer takes as long
+            # for an address with an account as for one without.
+            deliver_email_after_response(
+                recipient=user.email,
+                subject="Reset your password",
+                template="account/email/reset_password",
+                user=user,
+                reset_link=url_for("account.reset_password", token=raw, _external=True),
+                expires_at=row.expires_at,
+                on_result=record,
+            )
+        return "requested"
+
+    @staticmethod
+    def reset_link_usable(token):
+        from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
+
+        # The reader is not signed in; the digest of the link is the credential.
+        with platform_scope("password reset: look up the token by its digest, which names the organisation"):
+            return AccountToken.find_usable(token, PURPOSE_PASSWORD_RESET) is not None
+
+    @staticmethod
+    def reset_password(token, new_password):
+        """Set a new password through a reset link. The link works once.
+
+        Returns (success: bool, message: str). No session is created.
+        """
+        from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
+
+        with platform_scope("password reset: redeem the token by its digest, which names the organisation"):
+            row = AccountToken.consume(token, PURPOSE_PASSWORD_RESET)
+            if row is None:
+                return False, "This reset link has expired or has already been used."
+            user = row.user
+            user.password = new_password
+            db.session.add(user)
+            db.session.commit()
+        # I've-lost-control-of-this-account path: kill everything,
+        # including any session on the machine performing the reset.
+        # There is no acting session to preserve -- a reset happens
+        # while logged out.
+        AccountService._revoke_other_sessions(user.id, "password_change", except_sid=None)
+        return True, "Your password has been updated. Sign in with your new password."
 
     @staticmethod
     def change_password(user, old_password, new_password):
@@ -246,70 +344,61 @@ class AccountService:
 
     @staticmethod
     def send_confirmation_email(user):
-        """Send (or re-send) account confirmation email."""
+        """Mail (or re-mail) a single-use link confirming the user's address.
+
+        Returns ``(delivered, error)``; ``error`` says why nothing went out.
+        """
+        from app.flask_email import deliver_email, mail_available
+        from app.models.account_token import PURPOSE_CONFIRM_EMAIL, AccountToken
+
         actual_user = user._get_current_object() if hasattr(user, '_get_current_object') else user
-        token = actual_user.generate_confirmation_token()
-        confirm_link = url_for("account.confirm", token=token, _external=True)
-        _queue_email(
+        if not mail_available():
+            return False, "E-mail is not available on this server."
+        # Sent at sign-up, before any organisation is active for the new account.
+        with platform_scope("confirm e-mail: issue a token for the account being confirmed"):
+            row, raw = AccountToken.issue(actual_user, PURPOSE_CONFIRM_EMAIL)
+        confirm_link = url_for("account.confirm", token=raw, _external=True)
+        delivered, error = deliver_email(
             recipient=actual_user.email,
-            subject="Confirm Your Account",
+            subject="Confirm your account",
             template="account/email/confirm",
             user=actual_user,
             confirm_link=confirm_link,
+            expires_at=row.expires_at,
         )
+        with platform_scope("confirm e-mail: record delivery on the token just issued"):
+            row.record_delivery(delivered, error)
+            db.session.commit()
+        return delivered, error
 
     @staticmethod
-    def confirm_account(user, token):
-        """Confirm a user's account with the given token.
+    def confirm_account(token):
+        """Confirm the address behind a confirmation link. The link works once.
 
-        Returns (success: bool, message: str).
+        Returns (user or None, message).
         """
-        if user.confirm_account(token):
-            return True, "Your account has been confirmed."
-        return False, "The confirmation link is invalid or has expired."
+        from app.models.account_token import PURPOSE_CONFIRM_EMAIL, AccountToken
 
-    @staticmethod
-    def join_from_invite(user_id, token):
-        """Process a join-from-invite request.
-
-        Returns (user, token_valid: bool, message: str).
-        user is None if user_id not found.
-        """
-        # tenant-scoping-ok: pre-auth invite-join flow, no org context yet --
-        # the signed confirmation token checked below is the real gate.
-        new_user = User.query.get(user_id)
-        if new_user is None:
-            return None, False, "User not found."
-
-        if new_user.password_hash is not None:
-            return new_user, False, "You have already joined."
-
-        if new_user.confirm_account(token):
-            return new_user, True, "Account confirmed."
-        else:
-            # Re-send invite
-            new_token = new_user.generate_confirmation_token()
-            invite_link = url_for(
-                "account.join_from_invite", user_id=user_id, token=new_token, _external=True
-            )
-            _queue_email(
-                recipient=new_user.email,
-                subject="You Are Invited To Join",
-                template="account/email/invite",
-                user=new_user,
-                invite_link=invite_link,
-            )
-            return new_user, False, (
-                "The confirmation link is invalid or has expired. Another "
-                "invite email with a new link has been sent to you."
-            )
+        with platform_scope("confirm e-mail: redeem the token by its digest, which names the organisation"):
+            row = AccountToken.consume(token, PURPOSE_CONFIRM_EMAIL)
+            if row is None:
+                db.session.rollback()
+                return None, "This confirmation link has expired or has already been used."
+            row.user.confirmed = True
+            db.session.commit()
+            return row.user, "Your e-mail address is confirmed."
 
     @staticmethod
     def accept_invitation(user, invitation_id):
         """Accept a pending invitation for the current user.
 
         Returns (success: bool, message: str). On success, creates the
-        OrgRole row and removes the pending invitation.
+        OrgRole row, removes the pending invitation, and — the same as the
+        ``/account/join/<token>`` path (``invitation_service.answer_existing``)
+        — syncs the one canonical admin authority when the invitation is for
+        the user's own organisation, so this route never disagrees with the
+        toggle/team/invitation-link paths about who is an organisation
+        administrator.
         """
         from app.models.pending_invitation import PendingInvitation
 
@@ -330,6 +419,16 @@ class AccountService:
             invitation.role,
             granted_by_id=invitation.invited_by,
         )
+        # The Administrator role is global to the user, not scoped to one
+        # organisation: only touch it when the invitation is for the user's
+        # OWN organisation, exactly as answer_existing does, so accepting an
+        # invitation into a different organisation can never grant or revoke
+        # admin in the user's own one.
+        if invitation.organization_id == user.organization_id:
+            if invitation.role == "org_admin":
+                user.grant_org_admin()
+            elif user.is_admin():
+                user.revoke_org_admin()
         db.session.delete(invitation)
         db.session.commit()
         return True, "Invitation accepted."
@@ -353,13 +452,3 @@ class AccountService:
         db.session.delete(invitation)
         db.session.commit()
         return True, "Invitation declined."
-
-    @staticmethod
-    def set_password(user, password):
-        """Set a user's password (for join-from-invite flow)."""
-        user.password = password
-        db.session.add(user)
-        db.session.commit()
-        # Defensive: there should be no prior session for a fresh
-        # join-from-invite user, but revoke everything just in case.
-        AccountService._revoke_other_sessions(user.id, "password_change", except_sid=None)

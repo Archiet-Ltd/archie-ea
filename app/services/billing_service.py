@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app import db
-from app.services import billing_plans
+from app.services import billing_plans, monelytics_provider
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,21 @@ def _utc(ts: Any) -> Optional[datetime]:
     if not isinstance(ts, (int, float)) or ts <= 0:
         return None
     return datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
+
+
+def _utc_from_iso(value: Any) -> Optional[datetime]:
+    """Monelytics' RFC3339 timestamp string -> naive UTC datetime (the column
+    type). Monelytics (a Go service) serialises times this way; Stripe sends
+    unix timestamps instead, which is what _utc above is for."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
 
 
 def _money(amount: Any, currency: Optional[str]) -> Optional[float]:
@@ -170,7 +185,14 @@ class BillingService:
     # ------------------------------------------------------------------ #
 
     @classmethod
-    def _purchasable(cls, plan_key: str, interval: str):
+    def _validate_plan_and_interval(cls, plan_key: str, interval: str):
+        """The Plan for *plan_key*, once it is confirmed purchasable and
+        *interval* is one billing_plans knows. Raises BillingError otherwise.
+
+        Shared by both checkout paths: this does not look up a price id,
+        since Monelytics resolves its own plan/variant ids and the direct
+        Stripe path needs a price id in addition (see _purchasable below).
+        """
         plan = billing_plans.get_plan(plan_key)
         if plan.key != plan_key or not plan.purchasable:
             if plan_key == "enterprise":
@@ -178,6 +200,11 @@ class BillingService:
             raise BillingError("Choose Startup or Team to buy online.")
         if interval not in billing_plans.INTERVALS:
             raise BillingError("Choose monthly or annual billing.")
+        return plan
+
+    @classmethod
+    def _purchasable(cls, plan_key: str, interval: str):
+        plan = cls._validate_plan_and_interval(plan_key, interval)
         price_id = billing_plans.price_id_for(plan.key, interval)
         if not price_id:
             raise BillingNotConfigured(
@@ -202,7 +229,7 @@ class BillingService:
 
         return bool(
             sub is not None
-            and sub.stripe_subscription_id
+            and (sub.stripe_subscription_id or sub.monelytics_subscription_id)
             and sub.status != SubscriptionStatus.cancelled
         )
 
@@ -216,7 +243,17 @@ class BillingService:
         success_url: str,
         cancel_url: str,
     ) -> str:
-        """Start a hosted checkout for *org* and return its URL."""
+        """Start a hosted checkout for *org* and return its URL.
+
+        Dispatches to Monelytics (Archiet's shared billing service) when
+        MONELYTICS_BASE_URL is set; the direct Stripe path below is the
+        fallback when it is not.
+        """
+        if monelytics_provider.configured():
+            return cls._create_checkout_session_via_monelytics(
+                org, plan_key, interval, seats, success_url, cancel_url
+            )
+
         api = _api()
         plan, price_id = cls._purchasable(plan_key, interval)
         quantity = cls._quantity(plan, seats)
@@ -246,6 +283,91 @@ class BillingService:
         session = _call(api.checkout.Session.create, **params)
         logger.info("Checkout %s started for org %s plan %s/%s", session["id"], org.id, plan.key, interval)
         return session["url"]
+
+    @classmethod
+    def _create_checkout_session_via_monelytics(
+        cls,
+        org,
+        plan_key: str,
+        interval: str,
+        seats: Optional[int],
+        success_url: str,
+        cancel_url: str,
+    ) -> str:
+        plan = cls._validate_plan_and_interval(plan_key, interval)
+        quantity = cls._quantity(plan, seats)
+        sub = billing_plans.current_subscription(org)  # read-only: nothing is written here
+        if cls.has_live_subscription(sub):
+            raise BillingError(
+                "Your organisation already has a subscription. Use Change plan to switch."
+            )
+        try:
+            checkout_url = monelytics_provider.start_checkout(
+                org, plan.key, interval, quantity if plan.per_seat else None, success_url, cancel_url
+            )
+        except monelytics_provider.MonelyticsNotConfigured as exc:
+            raise BillingNotConfigured(str(exc)) from exc
+        except monelytics_provider.MonelyticsError as exc:
+            raise BillingError(str(exc)) from exc
+        logger.info("Monelytics checkout started for org %s plan %s/%s", org.id, plan.key, interval)
+        return checkout_url
+
+    @classmethod
+    def refresh_from_monelytics(cls, org) -> None:
+        """Pull *org*'s subscription state from Monelytics onto its local
+        subscriptions row, so the billing page and plan limits read what
+        Monelytics currently holds. A no-op when Monelytics has no
+        subscription for this organisation yet (a fresh signup still on
+        Community, or an abandoned checkout)."""
+        try:
+            remote = monelytics_provider.refresh_subscription(org)
+        except monelytics_provider.MonelyticsNotConfigured as exc:
+            raise BillingNotConfigured(str(exc)) from exc
+        except monelytics_provider.MonelyticsError as exc:
+            raise BillingError(str(exc)) from exc
+        if remote is None:
+            return
+        sub = billing_plans.ensure_subscription(org)
+        cls._apply_monelytics_subscription(sub, remote)
+        db.session.commit()
+
+    @staticmethod
+    def _apply_monelytics_subscription(sub, remote: Dict[str, Any]) -> None:
+        """Copy a Monelytics schemas.Subscription object onto the stored row."""
+        from app.models.subscription import SubscriptionPlan, SubscriptionStatus
+
+        plan_key = monelytics_provider.plan_key_for_code(remote.get("planCode"))
+        if plan_key is not None:
+            sub.plan = SubscriptionPlan[plan_key]
+        else:
+            logger.warning(
+                "Monelytics plan code %r on subscription %s is not a configured plan; "
+                "plan left unchanged",
+                remote.get("planCode"), remote.get("id"),
+            )
+
+        interval = monelytics_provider.interval_for_variant(remote.get("billingInterval"))
+        if interval is not None:
+            sub.billing_interval = interval
+
+        seats = remote.get("seatCount")
+        if isinstance(seats, int) and seats > 0:
+            sub.seats_purchased = seats
+
+        remote_id = remote.get("id")
+        if remote_id:
+            sub.monelytics_subscription_id = remote_id
+
+        status = monelytics_provider.STATUS_MAP.get(remote.get("status"))
+        if status is not None:
+            sub.status = SubscriptionStatus(status)
+        else:
+            logger.warning("Unrecognised Monelytics status %r; stored status kept", remote.get("status"))
+
+        period_end = _utc_from_iso(remote.get("currentPeriodEnd"))
+        if period_end is not None:
+            sub.current_period_end = period_end
+        sub.cancel_at_period_end = bool(remote.get("cancelAtPeriodEnd", False))
 
     @classmethod
     def complete_checkout(cls, org, session_id: str):
@@ -450,7 +572,13 @@ class BillingService:
         except ValueError as exc:
             logger.warning("Stripe webhook payload unreadable: %s", exc)
             return {"ok": False, "status": 400, "error": "Invalid payload"}
-        return cls.process_event(json.loads(payload))
+        from app.jobs.tenant_safe_job import platform_scope
+
+        # A signed provider event carries no signed-in user; it names the
+        # organisation by customer id, so the lookup that finds the organisation
+        # and the billing_events rows it writes need the platform scope.
+        with platform_scope("billing webhook: a signed provider event names the organisation by customer id"):
+            return cls.process_event(json.loads(payload))
 
     _HANDLED = (
         "checkout.session.completed",

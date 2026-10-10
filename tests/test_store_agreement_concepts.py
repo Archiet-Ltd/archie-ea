@@ -48,6 +48,7 @@ EXPECTED = {
         "app.models.implementation_migration.WorkPackage",
         "app.models.roadmap_models.RoadmapWorkPackage",
         "app.models.implementation_planning.ImplementationWorkPackage",
+        "app.models.implementation_migration.TechnologyRoadmapInitiative",
         "/enterprise/api/work-packages",
         "/api/roadmap/work-packages",
         "/api/roadmap-builder/work-packages",
@@ -70,9 +71,15 @@ EXPECTED = {
         "app.models.enterprise_intelligence.ApplicationOwnership",
         "app.models.application_portfolio.ApplicationComponent",
     ],
+    # ArchitectureDecisionRecord dropped from this list by the decision-register
+    # consolidation: every row is dual-write paired into ArchitectureDecision
+    # (app.models.adr.ArchitectureDecisionRecord.pair_with_canonical_register()),
+    # so it is a satellite detail-store for review-board fields the canonical
+    # model has no column for, not an independent answer to "how many
+    # architecture decisions" -- see scripts/check_store_agreement.py's own
+    # "architecture decisions" entry for the full reasoning.
     "architecture decisions": [
         "app.models.architecture_decision.ArchitectureDecision",
-        "app.models.adr.ArchitectureDecisionRecord",
         "/arb/api/decisions",
     ],
     "pending AI change approvals": [
@@ -111,8 +118,6 @@ NOT_REGISTERED = {
     "app.models.roadmap_models.RoadmapGap",
     # a compliance control not met, not an architecture gap
     "app.models.compliance_models.ComplianceGap",
-    # a technology roadmap initiative, not a work package
-    "app.models.implementation_migration.TechnologyRoadmapInitiative",
     # append-only governance events, several per capability
     "app.models.decision_ledger.DecisionLedger",
 }
@@ -169,6 +174,10 @@ def test_every_orm_surface_resolves_and_is_tenant_scoped(app):
                 model = getattr(importlib.import_module(module), cls)
                 columns = model.__table__.c
                 named = list(surface.filter_eq)
+                if surface.filter_null:
+                    named += ([surface.filter_null]
+                              if isinstance(surface.filter_null, str)
+                              else list(surface.filter_null))
                 if surface.filter_not_null:
                     named += ([surface.filter_not_null]
                               if isinstance(surface.filter_not_null, str)
@@ -224,7 +233,11 @@ def _probe(concept, count, overrides=None):
     rows = []
     for surface in gate.CONCEPTS[concept]:
         n = count if surface.scope == "all" else max(count - 1, 0)
-        rows.append({"surface": surface.name, "count": n, "scope": surface.scope})
+        row = {"surface": surface.name, "count": n, "scope": surface.scope}
+        if surface.expect_zero:
+            # A retired store must hold nothing that is not copied across.
+            row["count"] = 0
+        rows.append(row)
     for name, value in (overrides or {}).items():
         for row in rows:
             if row["surface"] == name:
@@ -272,14 +285,28 @@ def test_probe_all_zero_is_no_evidence(tmp_path, concept):
 
 @pytest.mark.parametrize("concept", sorted(
     c for c in EXPECTED
-    if any(s.scope != "all" for s in gate.CONCEPTS[c])))
+    if any(s.scope != "all" and not s.expect_zero for s in gate.CONCEPTS[c])))
 def test_probe_narrower_scope_exceeding_the_whole_is_reported(tmp_path, concept):
     probe = _probe(concept, 3)
-    narrower = [row for row in probe[concept] if row["scope"] != "all"]
+    narrower = [row for row in probe[concept]
+                if row["scope"] not in ("all", gate.RETIRED_SCOPE)]
     narrower[0]["count"] = 9
     count, out = _run_probe(tmp_path, probe)
     assert count >= 1, out
     assert "%s reports 9 under the declared narrowing" % narrower[0]["surface"] in out
+
+
+def test_probe_unmerged_retired_row_is_its_own_finding(tmp_path):
+    probe = _probe("work packages", 7)
+    retired = [row for row in probe["work packages"] if row["scope"] == gate.RETIRED_SCOPE]
+    assert len(retired) == 4, retired
+    retired[0]["count"] = 2
+    count, out = _run_probe(tmp_path, probe)
+    assert count == 1, out
+    finding = [ln for ln in out.splitlines() if "[retired-store-unmerged]" in ln]
+    assert len(finding) == 1, out
+    assert retired[0]["surface"] in finding[0] and "2 row(s)" in finding[0]
+    assert "[store-disagreement]" not in out
 
 
 def test_probe_different_gap_kinds_are_not_a_disagreement(tmp_path):
@@ -403,7 +430,11 @@ def test_two_organisations_never_change_each_others_counts(
     assert before["applications with a recorded annual cost"][
         "orm:ApplicationCost(applications)"] == 1
     assert before["risks"]["orm:Risk"] == 3
-    assert before["work packages"]["orm:RoadmapWorkPackage"] == 1
+    # The roadmap package is copied into the one store as it is written, so
+    # the organisation's one store holds it and the retired store holds
+    # nothing that is not copied.
+    assert before["work packages"]["orm:UnifiedWorkPackage"] == 1
+    assert before["work packages"]["orm:RoadmapWorkPackage(unmerged)"] == 0
     assert before["pending AI change approvals"][
         "orm:AIChatCRUDApproval(pending)"] == 2
     assert all(not names for names in unscoped.values()), unscoped
@@ -418,7 +449,7 @@ def test_two_organisations_never_change_each_others_counts(
     assert b_counts["applications with a recorded annual cost"][
         "orm:ApplicationCost(applications)"] == 4
     assert b_counts["risks"]["orm:Risk"] == 6
-    assert b_counts["work packages"]["orm:RoadmapWorkPackage"] == 3
+    assert b_counts["work packages"]["orm:UnifiedWorkPackage"] == 3
     assert b_counts["pending AI change approvals"][
         "orm:AIChatCRUDApproval(pending)"] == 1
 
@@ -426,18 +457,21 @@ def test_two_organisations_never_change_each_others_counts(
 def test_row_no_link_attributes_counts_for_no_organisation(
         app, db_session, make_org, tenant_ctx):
     from app.models.roadmap_models import RoadmapWorkPackage
+    from app.services import work_package_bridge
 
     org = make_org("store-orphan")
     user = _make_user(db_session, org)
-    db_session.add(RoadmapWorkPackage(name="Owned", business_capability="Billing",
-                                      created_by=user.id))
-    db_session.add(RoadmapWorkPackage(name="Orphan", business_capability="Billing"))
-    db_session.flush()
+    # Not yet copied across: the rows stay in the retired store.
+    with work_package_bridge.suspended():
+        db_session.add(RoadmapWorkPackage(name="Owned", business_capability="Billing",
+                                          created_by=user.id))
+        db_session.add(RoadmapWorkPackage(name="Orphan", business_capability="Billing"))
+        db_session.flush()
 
     from app import db
 
     surface = next(s for s in gate.CONCEPTS["work packages"]
-                   if s.name == "orm:RoadmapWorkPackage")
+                   if s.name == "orm:RoadmapWorkPackage(unmerged)")
     with tenant_ctx(org.id):
         count, why, unscoped, unattributed = gate._count_orm(
             surface, db, org.id)
@@ -521,3 +555,117 @@ def test_live_gap_kinds_agree_across_stores_and_screens(
         assert any("GET /implementation/api/gaps: HTTP 404" in n
                    for n in notes), notes
     assert counts.get("GET /api/roadmap/gaps") == 3, (counts, notes)
+
+
+# ---------------------------------------------------------------------------
+# R1-B04 PR 2 fix round 1 (D-01): the work packages concept counts the retired
+# stores honestly (unmerged rows must be zero) and every list screen reads the
+# one store.
+# ---------------------------------------------------------------------------
+def _admin_user(db_session, org):
+    from app.models.user import Role, User
+
+    Role.insert_roles()
+    role = Role.query.filter_by(name="Administrator").first()
+    user = User(email="wp-sa-%s@example.com" % uuid.uuid4().hex[:10],
+                first_name="Store", last_name="Agreement",
+                organization_id=org.id, confirmed=True, role=role)
+    user.password = uuid.uuid4().hex
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def _seed_retired_stores(db_session, org, user, work_packages, roadmap, implementation):
+    from app.models.implementation_migration import WorkPackage
+    from app.models.implementation_planning import ImplementationWorkPackage
+    from app.models.roadmap_models import RoadmapWorkPackage
+    from tests.test_work_package_consolidation import _app_component
+
+    component = _app_component(db_session, org)
+    for i in range(work_packages):
+        db_session.add(WorkPackage(name="WP %s %s" % (i, uuid.uuid4().hex[:6]),
+                                   organization_id=org.id))
+    for i in range(roadmap):
+        db_session.add(RoadmapWorkPackage(name="RM %s %s" % (i, uuid.uuid4().hex[:6]),
+                                          business_capability="Billing",
+                                          created_by=user.id))
+    for i in range(implementation):
+        db_session.add(ImplementationWorkPackage(
+            name="IMP %s %s" % (i, uuid.uuid4().hex[:6]),
+            application_component_id=component.id))
+    db_session.flush()
+
+
+def _merge(app):
+    result = app.test_cli_runner().invoke(args=["merge-work-package-stores"])
+    assert result.exit_code == 0, result.output
+    return result
+
+
+def test_work_packages_concept_agrees_after_merge(
+        app, db_session, make_org, tenant_ctx):
+    from app.services import work_package_bridge, work_package_service
+
+    org_a, org_b = make_org("wp-agree-a"), make_org("wp-agree-b")
+    user_a, user_b = _admin_user(db_session, org_a), _admin_user(db_session, org_b)
+    with work_package_bridge.suspended():
+        _seed_retired_stores(db_session, org_a, user_a, 5, 3, 4)
+        _seed_retired_stores(db_session, org_b, user_b, 2, 2, 2)
+    for i in range(2):
+        work_package_service.create_work_package(
+            organization_id=org_a.id, name="Writer A %s" % i)
+    work_package_service.create_work_package(organization_id=org_b.id, name="Writer B")
+    db_session.flush()
+
+    # Before the merge the retired stores hold rows that are not copied.
+    findings, _notes, _obs = _live_findings(
+        app, tenant_ctx, org_a.id, user_a, ["work packages"], http=False)
+    assert any("[retired-store-unmerged]" in f for f in findings), findings
+
+    _merge(app)
+
+    findings, notes, observations = _live_findings(
+        app, tenant_ctx, org_a.id, user_a, ["work packages"], http=True)
+    assert findings == [], (findings, notes)
+    assert not any("work packages [no-evidence]" in n for n in notes), notes
+    whole = {row[0]: row[1] for row in observations["work packages"]
+             if row[2] == "all"}
+    assert whole["orm:UnifiedWorkPackage"] == 14, whole
+    for screen in ("GET /enterprise/api/work-packages",
+                   "GET /api/roadmap/work-packages",
+                   "GET /api/roadmap-builder/work-packages",
+                   "GET /capability-map/api/roadmap/work-packages"):
+        assert whole.get(screen) == 14, (screen, whole, notes)
+    assert set(whole.values()) == {14}, whole
+    unmerged = {row[0]: row[1] for row in observations["work packages"]
+                if row[2] == gate.RETIRED_SCOPE}
+    assert unmerged and set(unmerged.values()) == {0}, unmerged
+
+
+def test_work_packages_concept_reports_one_unmerged_retired_row(
+        app, db_session, make_org, tenant_ctx):
+    from sqlalchemy import text
+
+    from app.services import work_package_bridge
+
+    org = make_org("wp-agree-one")
+    user = _admin_user(db_session, org)
+    with work_package_bridge.suspended():
+        _seed_retired_stores(db_session, org, user, 1, 2, 1)
+    _merge(app)
+    findings, notes, _obs = _live_findings(
+        app, tenant_ctx, org.id, user, ["work packages"], http=False)
+    assert findings == [], (findings, notes)
+
+    # One retired row back to unmerged: exactly one finding, naming the store.
+    db_session.execute(text(
+        "UPDATE roadmap_work_packages SET retired_into_id = NULL, retired_at = NULL "
+        "WHERE id = (SELECT min(id) FROM roadmap_work_packages WHERE created_by = :u)"),
+        {"u": user.id})
+    findings, notes, _obs = _live_findings(
+        app, tenant_ctx, org.id, user, ["work packages"], http=False)
+    assert len(findings) == 1, (findings, notes)
+    assert "[retired-store-unmerged]" in findings[0]
+    assert "orm:RoadmapWorkPackage(unmerged)" in findings[0]
+    assert "1 row(s)" in findings[0]

@@ -27,12 +27,16 @@ class OrgService:
             password_hash=generate_password_hash(admin_password) if admin_password else None,
             first_name=admin_first_name,
             last_name=admin_last_name,
-            role=admin_role,
             organization_id=org.id,
-            is_org_admin=True,
             confirmed=True
         )
+        # The user owns the organisation just created for them, so this is
+        # always a grant in their own organisation.
+        user.grant_org_admin()
         db.session.add(user)
+        db.session.flush()  # get user.id
+        from app.models.org_role import OrgRole
+        OrgRole.set_role(org.id, user.id, 'org_admin', granted_by_id=user.id)
         try:
             db.session.commit()
         except IntegrityError:

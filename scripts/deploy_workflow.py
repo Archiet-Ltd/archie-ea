@@ -73,6 +73,9 @@ REQUIRED_CHECKS = (
     "Static gates (compile + ratchets)",
     "Boot health (no database)",
     "Tests (pytest + coverage)",
+    # The backend-test matrix shards that job combines, one per matrix.shard
+    # value in ci.yml (a count kept in step with it by the test named above).
+    *(f"Tests (pytest + coverage) \u2014 shard {shard}" for shard in range(8)),
     "Database gates (schema drift)",
     "SAST (bandit)",
     "Browser journeys (one per archetype)",

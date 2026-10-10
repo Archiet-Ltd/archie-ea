@@ -1374,6 +1374,7 @@ def seed_viewpoints(org_id=None):
     logger.info("QA-CMP-004: Seeded viewpoints - created=%d, updated=%d (total: %d)", created, updated, len(_STANDARD_VIEWPOINTS))
 
     seed_canvas_templates(org_id=org_id)
+    seed_property_templates()
 
     return created, updated
 
@@ -1452,9 +1453,11 @@ def seed_canvas_templates(org_id=None):
     profile_created = 0
     profile_updated = 0
     for archimate_type, options in sorted(CANVAS_PROFILE_OPTIONS_BY_TYPE.items()):
+        # Only the shared platform row: an organisation's own definition with
+        # the same key is that organisation's, never updated by the seed.
         existing = AcmPropertyTemplate.query.filter_by(
             archimate_type=archimate_type, property_key="profile",
-        ).first()
+        ).filter(AcmPropertyTemplate.organization_id.is_(None)).first()
         if existing:
             existing.display_name = "Profile"
             existing.property_type = "enum"
@@ -1476,6 +1479,33 @@ def seed_canvas_templates(org_id=None):
         vp_created, vp_updated, profile_created, profile_updated,
     )
     return vp_created, vp_updated, profile_created, profile_updated
+
+
+def seed_property_templates():
+    """Upsert typed property templates registered for the journey property writer."""
+    from app.config.property_templates import PROPERTY_TEMPLATES
+    from app.models.acm_property_template import AcmPropertyTemplate
+
+    created = 0
+    updated = 0
+    for row in PROPERTY_TEMPLATES:
+        stored = {k: v for k, v in row.items() if k != "unit"}
+        existing = AcmPropertyTemplate.query.filter_by(
+            archimate_type=stored["archimate_type"],
+            property_key=stored["property_key"],
+        ).first()
+        if existing:
+            for field, value in stored.items():
+                setattr(existing, field, value)
+            updated += 1
+            continue
+
+        db.session.add(AcmPropertyTemplate(**stored))
+        created += 1
+
+    db.session.commit()
+    logger.info("Property templates seeded - created=%d updated=%d", created, updated)
+    return created, updated
 
 
 def _resolve_seed_org_id():

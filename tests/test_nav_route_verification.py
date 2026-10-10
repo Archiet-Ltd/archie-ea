@@ -58,6 +58,10 @@ NAV_PAGES = {
         "/admin/errors",
         "Deduplicated server + client errors, aggregated by fingerprint across every organization.",
     ),
+    "intelligence_ui.value_streams_at_risk": (
+        "/intelligence/value-streams-at-risk",
+        "Value streams at risk",
+    ),
     # Canvas/framework UI fix (24 Sep 2026): batch_import_view.dashboard was
     # intentionally folded from platform_admin's Admin zone to stay within the
     # link budget.
@@ -114,6 +118,8 @@ def _make_user(db_session, enterprise_role="platform_admin"):
     ``is_platform_admin`` is set for the same reason: four of these pages sit
     in the Admin zone, which is gated on that real boolean.
     """
+    from sqlalchemy import select
+
     from app.models.organization import Organization
     from app.models.user import Role, User
 
@@ -122,25 +128,31 @@ def _make_user(db_session, enterprise_role="platform_admin"):
     db_session.add(org)
     db_session.flush()
 
-    user = User(
-        email=f"nav-{suffix}@example.com",
-        first_name="Nav",
-        last_name="Verifier",
-        organization_id=org.id,
-        confirmed=True,
-        enterprise_role=enterprise_role,
-        is_platform_admin=True,
-    )
-    db_session.add(user)
-    db_session.flush()
-
     role = Role.query.filter_by(name="Administrator").first()
     if role is None:
         Role.insert_roles()
         role = Role.query.filter_by(name="Administrator").first()
-    user.role = role
-    db_session.flush()
-    return user
+
+    # User's mapper-level audit hook writes its own audit row on the flush
+    # connection. In this rollback-fixture transaction shape that can leave the
+    # connection aborted even when the insert itself succeeds, which would make
+    # this file prove only the fixture breakage rather than whether the sidebar
+    # route renders. Insert the row directly, then load the mapped User back for
+    # login and route guards.
+    inserted = db_session.execute(
+        User.__table__.insert().values(
+            email=f"nav-{suffix}@example.com",
+            first_name="Nav",
+            last_name="Verifier",
+            organization_id=org.id,
+            confirmed=True,
+            enterprise_role=enterprise_role,
+            is_platform_admin=True,
+            role_id=role.id,
+        )
+    )
+    user_id = inserted.inserted_primary_key[0]
+    return db_session.execute(select(User).where(User.id == user_id)).scalar_one()
 
 
 def _login(client, user_id):

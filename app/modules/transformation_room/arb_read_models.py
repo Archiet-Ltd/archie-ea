@@ -39,7 +39,11 @@ from app.models.arb_condition_evidence import ARBConditionEvidenceRecord
 from app.models.arb_decision_event import ARBCondition, ARBDecisionEvent
 from app.models.arb_submission_event import ARBSubmissionEvent
 from app.models.arb_submission_evidence import ARBSubmissionEvidenceSnapshot
-from app.models.architecture_review_board import ARBReviewCycle, ARBReviewItem
+from app.models.architecture_review_board import (
+    ARBReviewComment,
+    ARBReviewCycle,
+    ARBReviewItem,
+)
 from app.models.solution_models import Solution
 from app.models.transformation_decision import (
     ARBSubjectEvidenceSnapshot,
@@ -482,6 +486,7 @@ class TypedARBReadModel:
             "decision": None,
             "conditions": [],
             "history": [],
+            "comments": [],
             "allowed_actions": cls._no_actions(),
             "command_keys": {},
         }
@@ -509,6 +514,7 @@ class TypedARBReadModel:
             "canonical_url": cls._canonical_url(session, actor, cycle),
         }
         history = cls._history(session, actor, cycle)
+        comments = cls._comments(session, actor, review)
 
         if cycle.status == HISTORICAL_UNVERIFIED:
             return {
@@ -538,6 +544,7 @@ class TypedARBReadModel:
                 },
                 "conditions": [],
                 "history": history,
+                "comments": comments,
                 "allowed_actions": cls._no_actions(),
                 "command_keys": {},
             }
@@ -575,6 +582,7 @@ class TypedARBReadModel:
             },
             "conditions": conditions,
             "history": history,
+            "comments": comments,
             "allowed_actions": allowed_actions,
             "command_keys": cls._command_keys(allowed_actions),
         }
@@ -599,6 +607,7 @@ class TypedARBReadModel:
             "decision": None,
             "conditions": [],
             "history": [],
+            "comments": [],
             "allowed_actions": cls._no_actions(),
             "command_keys": {},
         }
@@ -1110,6 +1119,42 @@ class TypedARBReadModel:
                 }
             )
         return entries
+
+    @classmethod
+    def _comments(cls, session, actor, review):
+        """Discussion comments on this review item, oldest first.
+
+        Tenant-scoped the same way as every other loader in this module: an
+        explicit ``(review_item_id, organization_id)`` predicate, never
+        ``Session.get()``. Comments are written by the existing
+        ``arb.add_comment`` route, which this read model does not replace —
+        it only exposes what that route already persists so the typed
+        workspace can display it again.
+        """
+        rows = (
+            session.execute(
+                select(ARBReviewComment)
+                .where(
+                    ARBReviewComment.review_item_id == review.id,
+                    ARBReviewComment.organization_id == actor.organization_id,
+                )
+                .order_by(ARBReviewComment.id)
+            )
+            .scalars()
+            .all()
+        )
+        return [
+            {
+                "comment_id": row.id,
+                "comment_type": row.comment_type,
+                "content": row.content,
+                "actor_display": _display_name(
+                    cls._load_user(session, actor, row.user_id)
+                ),
+                "created_at": row.created_at,
+            }
+            for row in rows
+        ]
 
     # ------------------------------------------------------------------
     # authority

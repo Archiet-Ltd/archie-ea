@@ -43,6 +43,27 @@ class SSOConfig(db.Model):  # migration-exempt
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
 
+    # -- SAML 2.0 (R1-B12 PR 2, TB-0141) --------------------------------
+    # The IdP's SSO redirect-binding endpoint (where an AuthnRequest is sent).
+    idp_sso_url = db.Column(db.String(500))
+    # The IdP's signing certificate, PEM-encoded, used to verify the
+    # <Response>/<Assertion> signature. Never trust a certificate carried
+    # inside the response itself (that is what an attacker would forge) --
+    # this column is the operator-entered, out-of-band trust anchor.
+    idp_x509_cert = db.Column(db.Text)
+    # This organisation's SAML entity id as the Service Provider. Nullable:
+    # defaults to the platform's base URL + "/auth/sso/metadata/<org_id>"
+    # when unset (see SSOConfig.sp_entity_id_or_default).
+    sp_entity_id = db.Column(db.String(500))
+
+    # -- Test sign-in mode (R1-B12 PR 2, TB-0142/PB-0129) ---------------
+    # An administrator tests a draft config before it is enforced. The run
+    # authenticates against the real IdP but never calls provision_user --
+    # it only proves the flow and the claims it would produce. Nullable JSON:
+    # {"status": "success"|"failure", "message": str, "tested_at": iso8601,
+    #  "claims_preview": {...}}.
+    last_test_result = db.Column(db.JSON)
+
     organization = db.relationship(
         "Organization", backref=db.backref("sso_config", uselist=False)
     )
@@ -104,6 +125,13 @@ class SSOConfig(db.Model):  # migration-exempt
         if not self.email_domain:
             return []
         return [d.strip().lower() for d in self.email_domain.split(",") if d.strip()]
+
+    def sp_entity_id_or_default(self, base_url):
+        """This organisation's SAML SP entity id, falling back to a URL
+        derived from the platform's own base URL when none was entered."""
+        if self.sp_entity_id:
+            return self.sp_entity_id
+        return f"{base_url.rstrip('/')}/auth/sso/metadata/{self.organization_id}"
 
     def __repr__(self):
         return (

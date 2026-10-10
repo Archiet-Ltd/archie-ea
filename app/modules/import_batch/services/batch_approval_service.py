@@ -29,6 +29,12 @@ from app.models.batch_import import (  # dead-code-ok
     CheckpointType,
     ElementApprovalStatus,
 )
+from app.services.application_cost_accessor import (
+    apply_cost_to_application,
+    detect_cost_columns_from_dict,
+    get_reporting_currency,
+    map_import_cost_columns,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -634,6 +640,12 @@ class BatchApprovalService:
         if "business_domain" in source:
             new_app.business_domain = source["business_domain"]
 
+        # Apply cost fields through the accessor
+        cost_mapping = self._extract_cost_mapping(source)
+        if cost_mapping:
+            parsed = map_import_cost_columns(source, cost_mapping, reporting_currency=get_reporting_currency())
+            apply_cost_to_application(new_app, parsed["cost_fields"])
+
         db.session.add(new_app)
         db.session.flush()
 
@@ -667,6 +679,14 @@ class BatchApprovalService:
             )
         except Exception as exc:
             logger.error("Programme snapshot failed (import unaffected): %s", exc)
+
+    def _extract_cost_mapping(self, source: Dict[str, Any]) -> Dict[str, str]:
+        """
+        Build a cost column mapping from the available source data keys.
+
+        Delegates to the shared detect_cost_columns_from_dict in the accessor module.
+        """
+        return detect_cost_columns_from_dict(source)
 
     def _merge_into_existing(
         self,
@@ -720,6 +740,12 @@ class BatchApprovalService:
             if (not existing_val or 
                 (isinstance(import_val, str) and import_val.strip() and import_val != existing_val)):
                 setattr(existing, field, import_val)
+        
+        # Apply cost fields through the accessor
+        cost_mapping = self._extract_cost_mapping(source)
+        if cost_mapping:
+            parsed = map_import_cost_columns(source, cost_mapping, reporting_currency=get_reporting_currency())
+            apply_cost_to_application(existing, parsed["cost_fields"])
         
         return existing
 

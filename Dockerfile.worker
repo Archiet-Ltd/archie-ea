@@ -36,10 +36,15 @@ COPY . /app
 RUN useradd --create-home appuser && chown -R appuser /app
 USER appuser
 
-# RQ background worker.
+# RQ background worker by default, kept override-able so the same image also
+# serves the tenant-scoped jobs worker: `docker run ... <this image>
+# python -m app.jobs.worker` (or a compose `command:` override) replaces the
+# whole command rather than appending to a fixed entrypoint. The compose service
+# that runs this command is added separately.
+#
 # Must invoke the Flask CLI command, NOT `python manage.py run_worker`:
 # manage.py's __main__ block ignores argv and unconditionally starts the web
 # server (app.run on :5000), so `python manage.py run_worker` silently ran a
 # dev server instead of the worker. `run_worker` is registered via
 # @app.cli.command(), exposed as `run-worker`.
-ENTRYPOINT ["flask", "--app", "manage", "run-worker"]
+CMD ["flask", "--app", "manage", "run-worker"]

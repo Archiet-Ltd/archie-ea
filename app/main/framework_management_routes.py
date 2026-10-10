@@ -5,12 +5,15 @@ Shows available frameworks, extensions, and templates.
 Allows adoption and deployment of framework configurations.
 """
 
+import json
+import re
 from datetime import datetime
 
 from flask import Blueprint, jsonify, render_template, request
 
 from app import db
 from app.decorators import audit_log
+from app.jobs.tenant_safe_job import platform_scope
 from app.models.framework_configuration import (
     CapabilityFrameworkConfiguration,
     FrameworkConfigurationTemplate,
@@ -98,12 +101,48 @@ def get_manufacturing_instances():
     return jsonify({"data": data, "total": len(data)})
 
 
+def _extension_slug(value):
+    """Normalise a name/code to the dash-separated form used in extension dashboard URLs."""
+    return re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
+
+
+def _extension_json_list(raw):
+    """Parse a FrameworkExtension JSON-array text column into a list of strings."""
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [str(item) for item in parsed if str(item).strip()]
+
+
 @framework_management_bp.route("/extensions/<extension_name>")
 @platform_admin_required
 def extension_dashboard(extension_name):
-    """Framework Extension Dashboard"""
+    """Framework Extension Dashboard — renders the registered FrameworkExtension record, if any."""
+    slug = _extension_slug(extension_name)
+    extension = next(
+        (
+            ext
+            for ext in FrameworkExtension.query.all()
+            if _extension_slug(ext.extension_code) == slug
+            or _extension_slug(ext.extension_name) == slug
+        ),
+        None,
+    )
+    features = _extension_json_list(extension.additional_capabilities) if extension else []
+    compatible_versions = ", ".join(_extension_json_list(extension.compatible_versions)) if extension else ""
+    dependencies_display = ", ".join(_extension_json_list(extension.dependencies)) if extension else ""
     return render_template(
-        "framework_management/extension_dashboard.html", extension_name=extension_name
+        "framework_management/extension_dashboard.html",
+        extension_name=extension_name,
+        extension=extension,
+        features=features,
+        compatible_versions=compatible_versions,
+        dependencies_display=dependencies_display,
     )
 
 
@@ -306,19 +345,20 @@ def apply_template():
         # Apply template configuration
         if template.template_configuration:
             # Parse and apply template settings
-            import json
-
             template_config = json.loads(template.template_configuration)
             for key, value in template_config.items():
                 if hasattr(configuration, key):
                     setattr(configuration, key, value)
 
-        db.session.add(configuration)
+        # The new configuration and the template's usage count are both
+        # platform-wide catalogue rows.
+        with platform_scope("platform administrator applies a shared framework template"):
+            db.session.add(configuration)
 
-        # Update template usage count
-        template.usage_count = template.usage_count + 1
+            # Update template usage count
+            template.usage_count = template.usage_count + 1
 
-        db.session.commit()
+            db.session.commit()
 
         return jsonify(
             {

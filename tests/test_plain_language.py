@@ -118,6 +118,7 @@ def test_plain_name_for_none_returns_em_dash():
 
 def test_plain_layer_names():
     from app.models.archimate_element_types import plain_layer_name
+    from app.models.constants import ArchiMateLayer
 
     assert plain_layer_name("strategy") == "Strategy"
     assert plain_layer_name("business") == "Business"
@@ -125,6 +126,8 @@ def test_plain_layer_names():
     assert plain_layer_name("technology") == "Technology"
     assert plain_layer_name("implementation") == "Projects and change"
     assert plain_layer_name("implementation_migration") == "Projects and change"
+    assert ArchiMateLayer.IMPLEMENTATION == "implementation"
+    assert ArchiMateLayer.normalize("Implementation & Migration") == "implementation"
     assert plain_layer_name(None) == "\u2014"
 
 
@@ -683,12 +686,22 @@ def test_landing_page_no_archimate_in_badge(app):
 
 
 def test_landing_page_no_archimate_in_feature_desc(app):
-    """No feature text on the landing page refers to ArchiMate elements."""
+    """No feature text on the landing page refers to ArchiMate's internal
+    element vocabulary (e.g. "ApplicationComponent") in place of a plain
+    description.
+
+    Naming the ArchiMate 3.2 *standard* once, in the hero's search-facing
+    sentence ("built on ArchiMate 3.2"), is a deliberate, approved choice
+    (docs/eim-category-positioning-v1.md section 5.1's own hero text,
+    agreed with the SEO plan for the credibility/ranking value of naming
+    the open standard) -- not the jargon this test guards against, which
+    is referring to features using ArchiMate's own element-type names
+    instead of plain language.
+    """
     client = app.test_client()
     resp = client.get("/")
     assert resp.status_code == 200
     html = resp.data.decode()
-    assert "ArchiMate 3.2" not in html
     assert "ArchiMate elements" not in html
 
 
@@ -894,5 +907,4 @@ def test_plain_language_context_populated_for_authenticated(app, db_session, mak
     assert "window.__PLAIN_LANGUAGE_NAMES__" in html
     assert "window.__PLAIN_LAYER_NAMES__" in html
     assert "window.__SHOW_ARCHIMATE_NAMES__" in html
-
 

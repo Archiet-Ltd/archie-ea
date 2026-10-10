@@ -53,7 +53,7 @@ HTTP_REQUEST_DURATION = Histogram(
         0.5,
         0.75,
         1.0,
-        # TB-0165: an explicit 2.0s edge so the "answers" objective's 2-second
+        # An explicit 2.0s edge so the "answers" objective's 2-second
         # p95 target (app/services/platform_slo_service.py) lands on a real
         # declared bucket boundary rather than only ever reading the 2.5s one.
         2.0,
@@ -292,7 +292,7 @@ def get_metrics_response():
     return Response(generate_latest(REGISTRY), mimetype=CONTENT_TYPE_LATEST)
 
 
-# TB-0165: platform SLOs read HTTP_REQUESTS_TOTAL / HTTP_REQUEST_DURATION --
+# Platform SLOs read HTTP_REQUESTS_TOTAL / HTTP_REQUEST_DURATION --
 # the existing counters above, populated by the one request hook in
 # app/_bootstrap/security.py -- rather than adding a second metrics store
 # (CLAUDE.md ADR 0008, "one system of record per concept").
