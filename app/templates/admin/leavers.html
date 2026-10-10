@@ -1,0 +1,87 @@
+{% extends 'layouts/admin_base.html' %}
+{% block title %}Leavers{% endblock %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+
+    {{ page_header(
+        title='Leavers',
+        description='People removed by your identity provider and everything they still own. Hand each item to someone who is still here.',
+        breadcrumbs=[
+            {'label': 'Admin', 'href': url_for('admin.index')},
+            {'label': 'Leavers'}
+        ]
+    ) }}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-6 space-y-2">
+                {% for category, message in messages %}
+                    <div class="rounded-md border p-4 {% if category == 'success' %}bg-primary/10 border-primary/20 text-foreground{% elif category == 'error' %}bg-destructive/10 border-destructive/20 text-destructive-emphasis{% else %}bg-accent border-border text-foreground{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% set has_items = leavers | selectattr('ownerships') | list | length > 0 %}
+    {% if not has_items %}
+        <div class="rounded-xl border-2 border-input bg-card p-8 text-center" data-testid="leavers-empty">
+            <p class="text-sm font-medium text-foreground">No departed users hold any ownership.</p>
+        </div>
+    {% endif %}
+
+    {% for entry in leavers if entry.ownerships %}
+    <div data-slot="card" class="rounded-xl border-2 border-input bg-card mb-6" data-testid="leaver-card">
+        <div class="p-4 sm:p-6 border-b">
+            <h3 class="text-lg font-semibold">{{ entry.user.full_name() }}</h3>
+            <p class="text-sm text-muted-foreground mt-0.5">
+                {{ entry.user.email }} &middot; removed {{ entry.user.deactivated_at.strftime('%Y-%m-%d %H:%M') if entry.user.deactivated_at else '' }}
+                &middot; {{ (entry.user.deactivation_reason or 'deactivated') | replace('_', ' ') }}
+            </p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b bg-muted/40">
+                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Owns</th>
+                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Kind</th>
+                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Ownership</th>
+                        <th class="text-right px-4 py-3 font-medium text-muted-foreground">Hand over to</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    {% for item in entry.ownerships %}
+                    <tr>
+                        <td class="px-4 py-3">{{ item.item_name }}</td>
+                        <td class="px-4 py-3">{{ item.kind | replace('_', ' ') | title }}</td>
+                        <td class="px-4 py-3">{{ item.ownership_label }}</td>
+                        <td class="px-4 py-3 text-right">
+                            <form method="POST" action="{{ url_for('admin.leaver_transfer', owner_id=item.owner_id) }}" class="inline-flex items-center gap-2">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <label class="sr-only" for="new-owner-{{ item.owner_id }}">New owner for {{ item.item_name }}</label>
+                                <select id="new-owner-{{ item.owner_id }}" name="new_owner_id" required
+                                        class="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                    <option value="">Choose a person&hellip;</option>
+                                    {% for person in active_users %}
+                                        <option value="{{ person.id }}">{{ person.full_name() }} ({{ person.email }})</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit"
+                                        class="inline-flex items-center rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:bg-primary/90 transition-colors"
+                                        aria-label="Hand over {{ item.item_name }}">
+                                    Hand over
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

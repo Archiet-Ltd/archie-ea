@@ -279,6 +279,89 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- SCIM provisioning (R1-B26) -->
+    <div id="scim-provisioning" class="mt-8" data-slot="card">
+        <div class="rounded-xl border-2 border-input bg-card">
+            <div class="p-4 sm:p-6 border-b flex items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-lg font-semibold">Automatic user provisioning (SCIM)</h3>
+                    <p class="text-sm text-muted-foreground mt-0.5">
+                        Let your identity provider create, update and remove your organisation's users. A removed user is signed out and refused on their next request, and the things they own appear on the leaver list.
+                    </p>
+                </div>
+                <form method="POST" action="{{ url_for('admin.create_scim_token') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit"
+                            class="inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+                            aria-label="Create a SCIM token">
+                        Create token
+                    </button>
+                </form>
+            </div>
+            <div class="p-4 sm:p-6 space-y-4">
+                <div>
+                    <p class="text-sm font-medium">SCIM base URL</p>
+                    <p class="font-mono text-xs break-all" data-testid="scim-base-url">{{ scim_base_url }}</p>
+                </div>
+
+                {% if new_scim_token %}
+                <div class="rounded-md border border-primary/20 bg-primary/10 p-4" x-data="{ copied: false }" data-testid="scim-new-token">
+                    <p class="text-sm font-medium mb-2">Your new token. Copy it now; it is shown only once.</p>
+                    <div class="flex items-center gap-2">
+                        <code class="font-mono text-xs break-all flex-1" id="scim-token-value">{{ new_scim_token }}</code>
+                        <button type="button"
+                                class="inline-flex items-center rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                                @click="navigator.clipboard.writeText(document.getElementById('scim-token-value').textContent.trim()); copied = true"
+                                aria-label="Copy the SCIM token">
+                            <span x-text="copied ? 'Copied' : 'Copy'">Copy</span>
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if scim_tokens %}
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b bg-muted/40">
+                                <th class="text-left px-4 py-3 font-medium text-muted-foreground">Token</th>
+                                <th class="text-left px-4 py-3 font-medium text-muted-foreground">Created</th>
+                                <th class="text-left px-4 py-3 font-medium text-muted-foreground">Last used</th>
+                                <th class="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                                <th class="text-right px-4 py-3 font-medium text-muted-foreground">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            {% for token in scim_tokens %}
+                            <tr>
+                                <td class="px-4 py-3 font-mono text-xs">{{ token.token_prefix }}&hellip;</td>
+                                <td class="px-4 py-3">{{ token.created_at.strftime('%Y-%m-%d %H:%M') if token.created_at else '—' }}</td>
+                                <td class="px-4 py-3">{{ token.last_used_at.strftime('%Y-%m-%d %H:%M') if token.last_used_at else 'Never' }}</td>
+                                <td class="px-4 py-3">{{ 'Revoked' if token.revoked_at else 'Active' }}</td>
+                                <td class="px-4 py-3 text-right">
+                                    {% if not token.revoked_at %}
+                                    <form method="POST" action="{{ url_for('admin.revoke_scim_token', token_id=token.id) }}" class="inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit"
+                                                class="inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-1 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 transition-colors"
+                                                aria-label="Revoke token {{ token.token_prefix }}">
+                                            Revoke
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-sm text-muted-foreground">No tokens yet. Create one, then paste it and the base URL into your identity provider's provisioning settings.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>

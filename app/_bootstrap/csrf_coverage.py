@@ -110,6 +110,9 @@ VIEW_OPT_OUT = {
 # justification, or it belongs in VIEW_OPT_OUT instead of here.
 BLUEPRINT_OPT_OUT = {
     "health": "Unauthenticated monitoring probes (liveness/readiness), no session to ride.",
+    "scim": "SCIM 2.0 provisioning (R1-B26): authenticated only by a per-organisation "
+            "bearer token and never reads the session cookie, so there is no ambient "
+            "credential a forged request could ride.",
 }
 
 

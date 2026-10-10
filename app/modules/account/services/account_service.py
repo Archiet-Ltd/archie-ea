@@ -89,13 +89,20 @@ class AccountService:
             and user.password_hash is not None
             and user.verify_password(password)
         ):
+            if not user.is_active:
+                # Same work and same answer as a wrong password, so a
+                # deactivated account cannot be told apart by its password.
+                _log.info("account_service: sign-in refused for deactivated user %s", user.id)
+                return None
             return user
         return None
 
     @staticmethod
     def login(user, remember_me=False):
-        """Log in a user via flask-login and mint a server-side session record."""
-        session_registry.login_and_register(user, remember=remember_me)
+        """Log in a user via flask-login and mint a server-side session record.
+
+        Returns False, with no session minted, when the user is deactivated."""
+        return session_registry.login_and_register(user, remember=remember_me)
 
     @staticmethod
     def logout():
@@ -203,7 +210,7 @@ class AccountService:
         if not mail_available():
             return "mail_unavailable"
         user = User.find_by_email(email)
-        if user is not None and user.password_hash is not None:
+        if user is not None and user.password_hash is not None and user.is_active:
             # No one is signed in, so there is no session organisation: the token
             # row belongs to the account's own organisation (account_tokens is
             # fenced by row-level security), hence the platform scope.
@@ -239,7 +246,8 @@ class AccountService:
 
         # The reader is not signed in; the digest of the link is the credential.
         with platform_scope("password reset: look up the token by its digest, which names the organisation"):
-            return AccountToken.find_usable(token, PURPOSE_PASSWORD_RESET) is not None
+            row = AccountToken.find_usable(token, PURPOSE_PASSWORD_RESET)
+        return row is not None and row.user is not None and row.user.is_active
 
     @staticmethod
     def reset_password(token, new_password):
@@ -250,6 +258,10 @@ class AccountService:
         from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
 
         with platform_scope("password reset: redeem the token by its digest, which names the organisation"):
+            usable = AccountToken.find_usable(token, PURPOSE_PASSWORD_RESET)
+            if usable is not None and usable.user is not None and not usable.user.is_active:
+                # A leaver's link is as dead as an expired one.
+                return False, "This reset link has expired or has already been used."
             row = AccountToken.consume(token, PURPOSE_PASSWORD_RESET)
             if row is None:
                 return False, "This reset link has expired or has already been used."

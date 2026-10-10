@@ -14,6 +14,10 @@ from app.models.user_session import UserSession
 
 logger = logging.getLogger(__name__)
 
+#: Shown to a deactivated user at every sign-in path (neutral: it names no
+#: reason and no administrator).
+INACTIVE_ACCOUNT_MESSAGE = "This account is not active. Contact your administrator."
+
 #: Only write last_seen_at when it is older than this, so an authenticated
 #: session does not take a DB write on every single request.
 _TOUCH_THROTTLE_SECONDS = 60
@@ -60,14 +64,22 @@ def issue(user, remember=False):
 def login_and_register(user, remember=False):
     """Session-fixation-safe login: clear session, log in, mint a registry
     record. The single replacement for all nine ``login_user(...)`` call
-    sites."""
+    sites.
+
+    Returns ``True`` once the user is logged in and a registry record is
+    minted, ``False`` when Flask-Login refuses the user (a deactivated
+    account): no session row is minted and the caller must send the person
+    back to the sign-in page, never on to the application."""
     from flask import session
     from flask_login import login_user
 
     session.clear()
-    login_user(user, remember=remember)
+    if not login_user(user, remember=remember):
+        session.clear()
+        return False
     session.permanent = True
     issue(user, remember=remember)
+    return True
 
 
 def is_active(sid):

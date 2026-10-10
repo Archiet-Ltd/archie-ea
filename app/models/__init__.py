@@ -61,6 +61,7 @@ if _FAST_INIT:
     # Session registry is read on every authenticated request via
     # app/_bootstrap/session_policy.py -- must exist even under fast init.
     from .user_session import UserSession  # noqa: F401
+    from .scim import ScimToken, ScimGroupMembership  # noqa: F401
 else:
     from .adr import *  # noqa - ArchitectureDecisionRecord (Solution Architecture governance)
     from .ai_audit_log import *  # noqa - AIAuditLog (ai_audit_logs table; needed by create_all)
@@ -475,6 +476,7 @@ else:
     from .public_visitor_event import PublicVisitorEvent  # noqa: F401
     from .pending_invitation import PendingInvitation  # noqa: F401
     from .account_token import AccountToken  # noqa: F401
+    from .scim import ScimToken, ScimGroupMembership  # noqa: F401 - R1-B26 provisioning
 
     # Stored model-health / drift report per organisation.
     from .drift_report import DriftReport  # noqa: F401

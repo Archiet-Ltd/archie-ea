@@ -99,7 +99,14 @@ def record_session_rejected(user, reason):
     return _record(ACTION_SESSION_REJECTED, user=user, extra={"reason": reason})
 
 
-def _record(action, user=None, extra=None):
+def _record(action, user=None, extra=None, organization_id=None, record_id=None, actor_id=None):
+    """Write one authentication/provisioning audit row. Never raises.
+
+    ``organization_id`` is for events with no ``current_user`` to take it from
+    (SCIM calls carry only a bearer token). ``actor_id`` is the signed-in
+    administrator who caused the event when that is not the subject ``user``;
+    ``record_id`` overrides the subject id (a transferred ownership row).
+    """
     try:
         from app.models.audit_log import AuditLog
 
@@ -107,12 +114,13 @@ def _record(action, user=None, extra=None):
         payload = {"ip_address": ip, "user_agent": ua}
         if extra:
             payload.update(extra)
+        org_id = organization_id if organization_id is not None else getattr(user, "organization_id", None)
         return AuditLog.log(
             action=action,
             table_name=AUTH_TABLE,
-            user_id=getattr(user, "id", None),
-            organization_id=getattr(user, "organization_id", None),
-            record_id=getattr(user, "id", None),
+            user_id=actor_id if actor_id is not None else getattr(user, "id", None),
+            organization_id=org_id,
+            record_id=record_id if record_id is not None else getattr(user, "id", None),
             ip_address=ip,
             user_agent=ua,
             new_value=payload,
@@ -121,6 +129,102 @@ def _record(action, user=None, extra=None):
         # Authentication must never fail because auditing did.
         logger.warning("auth audit: failed to record %s", action, exc_info=True)
         return None
+
+
+# --- Provisioning and leaver events (R1-B26 PR 1, TB-0143) -----------------
+# Each action is at most 20 characters (AuditLog.action is String(20)). The
+# ``extra`` dict records the actor, the names of changed attributes and, for
+# transfers, the from/to users and the item -- never a secret or a raw token.
+ACTION_SCIM_USER_CREATED = "scim_user_created"
+ACTION_SCIM_USER_UPDATED = "scim_user_updated"
+ACTION_USER_DEACTIVATED = "user_deactivated"
+ACTION_USER_REACTIVATED = "user_reactivated"
+ACTION_SCIM_GROUP_CHANGED = "scim_group_changed"
+ACTION_SCIM_TOKEN_ISSUED = "scim_token_issued"
+ACTION_SCIM_TOKEN_REVOKED = "scim_token_revoked"
+ACTION_SCIM_AUTH_FAILED = "scim_auth_failed"
+ACTION_OWNER_TRANSFERRED = "owner_transferred"
+ACTION_SSO_EMAIL_MISMATCH = "sso_email_mismatch"
+
+
+def _actor_extra(actor, extra):
+    payload = {"actor": actor}
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+def record_scim_user_created(org_id, user, actor, changed=()):
+    return _record(ACTION_SCIM_USER_CREATED, user=user, organization_id=org_id,
+                   extra=_actor_extra(actor, {"changed": sorted(changed)}))
+
+
+def record_scim_user_updated(org_id, user, actor, changed=()):
+    return _record(ACTION_SCIM_USER_UPDATED, user=user, organization_id=org_id,
+                   extra=_actor_extra(actor, {"changed": sorted(changed)}))
+
+
+def record_user_deactivated(org_id, user, actor, reason, actor_id=None):
+    return _record(ACTION_USER_DEACTIVATED, user=user, organization_id=org_id, actor_id=actor_id,
+                   record_id=user.id, extra=_actor_extra(actor, {"reason": reason, "subject_user_id": user.id}))
+
+
+def record_user_reactivated(org_id, user, actor, actor_id=None):
+    return _record(ACTION_USER_REACTIVATED, user=user, organization_id=org_id, actor_id=actor_id,
+                   record_id=user.id, extra=_actor_extra(actor, {"subject_user_id": user.id}))
+
+
+def record_scim_group_changed(org_id, group_id, actor, changed=(), extra=None):
+    payload = {"group_id": group_id, "changed": sorted(changed)}
+    if extra:
+        payload.update(extra)
+    return _record(ACTION_SCIM_GROUP_CHANGED, organization_id=org_id, record_id=group_id,
+                   extra=_actor_extra(actor, payload))
+
+
+def record_scim_token_issued(org_id, token_id, token_prefix, actor, actor_id=None):
+    return _record(ACTION_SCIM_TOKEN_ISSUED, organization_id=org_id, record_id=token_id, actor_id=actor_id,
+                   extra=_actor_extra(actor, {"token_prefix": token_prefix}))
+
+
+def record_scim_token_revoked(org_id, token_id, token_prefix, actor, actor_id=None):
+    return _record(ACTION_SCIM_TOKEN_REVOKED, organization_id=org_id, record_id=token_id, actor_id=actor_id,
+                   extra=_actor_extra(actor, {"token_prefix": token_prefix}))
+
+
+def record_scim_auth_failed(reason, organization_id=None, token_prefix=None):
+    """A rejected SCIM bearer token. Only the reason and, when the token row
+    was found, its prefix are recorded -- never the presented value."""
+    extra = {"reason": reason}
+    if token_prefix:
+        extra["token_prefix"] = token_prefix
+    return _record(ACTION_SCIM_AUTH_FAILED, organization_id=organization_id, extra=extra)
+
+
+def record_sso_email_mismatch(org_id, user, provider):
+    """A global sign-in whose identity-provider email differs from the account's.
+
+    Records the provider and the user id only, never either address.
+    """
+    return _record(ACTION_SSO_EMAIL_MISMATCH, user=user, organization_id=org_id,
+                   record_id=user.id, extra={"provider": provider, "subject_user_id": user.id})
+
+
+def record_owner_transferred(org_id, owner_row_id, from_user_id, to_user_id, actor_id,
+                             application_id=None, element_type=None, element_id=None,
+                             removed_duplicate=False):
+    return _record(
+        ACTION_OWNER_TRANSFERRED, organization_id=org_id, record_id=owner_row_id, actor_id=actor_id,
+        extra={
+            "actor": f"user:{actor_id}",
+            "from_user_id": from_user_id,
+            "to_user_id": to_user_id,
+            "application_id": application_id,
+            "element_type": element_type,
+            "element_id": element_id,
+            "removed_duplicate": bool(removed_duplicate),
+        },
+    )
 
 
 def _current_org_id():

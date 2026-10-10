@@ -195,6 +195,10 @@ class ApplicationOwner(db.Model):
                 ),
                 "assigned_at": row.assigned_at.isoformat() if row.assigned_at else None,
                 "assigned_by": row.assigned_by,
+                # False when the owner has been deactivated (R1-B26): the
+                # fact sheet marks them; the row stays until an administrator
+                # transfers it from the leaver list.
+                "owner_active": bool(user.is_active) if user is not None else True,
             })
         return display_rows
 
@@ -262,6 +266,10 @@ class ApplicationOwner(db.Model):
                 ),
                 "assigned_at": row.assigned_at.isoformat() if row.assigned_at else None,
                 "assigned_by": row.assigned_by,
+                # False when the owner has been deactivated (R1-B26): the
+                # fact sheet marks them; the row stays until an administrator
+                # transfers it from the leaver list.
+                "owner_active": bool(user.is_active) if user is not None else True,
             })
         return display_rows
 
@@ -274,3 +282,67 @@ class ApplicationOwner(db.Model):
             cls.element_id == element_id,
             cls.organization_id == organization_id,
         ).first() is not None
+
+    @classmethod
+    def find_duplicate(
+        cls,
+        user_id,
+        ownership_type,
+        organization_id,
+        *,
+        application_id=None,
+        element_type=None,
+        element_id=None,
+        exclude_owner_id=None,
+    ):
+        """The one duplicate rule: an existing row giving ``user_id`` the same
+        ``ownership_type`` on the same application, or on the same element
+        (``element_type`` + ``element_id``), in the same organisation.
+
+        Used by the application owner writer routes and by the leaver
+        transfer, so a person can never end up holding the same ownership
+        twice by either path.
+        """
+        query = cls.query.filter(
+            cls.user_id == user_id,
+            cls.ownership_type == ownership_type,
+            cls.organization_id == organization_id,
+        )
+        if application_id is not None:
+            query = query.filter(cls.application_id == application_id)
+        else:
+            query = query.filter(
+                cls.application_id.is_(None),
+                cls.element_type == element_type,
+                cls.element_id == element_id,
+            )
+        if exclude_owner_id is not None:
+            query = query.filter(cls.id != exclude_owner_id)
+        return query.first()
+
+    def transfer_to(self, new_user_id, organization_id):
+        """Hand this ownership to ``new_user_id``, in place.
+
+        Updates ``user_id`` on this row, keeping ``ownership_type``, the
+        application or element reference and the organisation. When the target
+        already holds the same ownership on the same item the departing row is
+        deleted instead, leaving exactly one. Returns ``(row, removed)`` where
+        ``row`` is the surviving row. The caller validates the target user and
+        commits.
+        """
+        if self.organization_id != organization_id:
+            raise ValueError("ownership row belongs to a different organisation")
+        duplicate = type(self).find_duplicate(
+            new_user_id,
+            self.ownership_type,
+            organization_id,
+            application_id=self.application_id,
+            element_type=self.element_type,
+            element_id=self.element_id,
+            exclude_owner_id=self.id,
+        )
+        if duplicate is not None:
+            db.session.delete(self)
+            return duplicate, True
+        self.user_id = new_user_id
+        return self, False

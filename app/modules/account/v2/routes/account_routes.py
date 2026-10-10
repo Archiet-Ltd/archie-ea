@@ -113,7 +113,11 @@ def login():
             _landing = buy_intent.next_candidate(consume=True)
             session.clear()
             session.modified = True
-            _svc.login(user, form.remember_me.data)
+            if not _svc.login(user, form.remember_me.data):
+                from app.services.session_registry import INACTIVE_ACCOUNT_MESSAGE
+
+                flash(INACTIVE_ACCOUNT_MESSAGE, "form-error")
+                return redirect(url_for("account.login"))
             session.permanent = True
             try:
                 audit_logger.log_authentication(success=True)
@@ -177,7 +181,11 @@ def _complete_login_after_mfa(user):
 
     session.clear()
     session.modified = True
-    _svc.login(user, remember)
+    if not _svc.login(user, remember):
+        from app.services.session_registry import INACTIVE_ACCOUNT_MESSAGE
+
+        flash(INACTIVE_ACCOUNT_MESSAGE, "form-error")
+        return redirect(url_for("account.login"))
     session.permanent = True
     try:
         audit_logger.log_authentication(success=True)
@@ -617,7 +625,7 @@ def sso_callback(provider):
 
     from app import db
     from app.models import User
-    from app.services import session_registry
+    from app.services import mfa_service, session_registry
 
     # external_id is derived per-provider: Azure uses a tenant-qualified
     # oid+tid composite rather than the raw `sub` claim (see
@@ -684,6 +692,14 @@ def sso_callback(provider):
     # when `user` was already resolved above.
     db.session.commit()
 
+    # R1-B26 PR 1: a leaver deactivated through the identity-provider
+    # lifecycle must not still be able to sign in via SSO. Checked after
+    # the nOAuth-protected identity resolution above (never skips that
+    # check), before anything else mints a session.
+    if not user.is_active:
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
+
     # R1-B12 PR 2 (TB-0144/PB-0100): the same MFA gate login() applies to a
     # password sign-in, applied here too -- an administrator must complete
     # multi-factor before SSO can finish the login, whether enrolling for
@@ -703,15 +719,15 @@ def sso_callback(provider):
     # explicitly -- USE_ACCOUNT_GUARDRAILS chooses which of the two is
     # registered, so whichever is live stays internally consistent between
     # its own MFA and non-MFA paths.
-    from app.services import mfa_service
-
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False
         session["_mfa_pending_next"] = ""
         return redirect(url_for("account.mfa_challenge"))
 
-    session_registry.login_and_register(user)
+    if not session_registry.login_and_register(user):
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
     # Pre-existing bug, fixed here because it blocked verifying this file's
     # own SSO success path: AuditLogger has no `log()` method (only
     # log_event/log_authentication/...), so this line raised AttributeError

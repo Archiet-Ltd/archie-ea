@@ -332,6 +332,7 @@ sap_metadata
 saved_diagram_elements
 saved_diagram_relationships
 savings_realizations
+scim_tokens
 scoring_configs
 scoring_configurations
 security_scans

@@ -1,8 +1,11 @@
+from datetime import datetime
+
 from flask import current_app
 from flask_login import AnonymousUserMixin, UserMixin
 from itsdangerous import BadSignature, SignatureExpired
 from itsdangerous import URLSafeTimedSerializer as Serializer
 from sqlalchemy import event, func, select
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import validates
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -182,6 +185,36 @@ class User(UserMixin, db.Model):
     # SSO / Enterprise Identity (S0-01)
     external_id = db.Column(db.String(255), index=True)
     sso_provider = db.Column(db.String(50))
+    # The identity provider's SCIM directory id (``externalId``). SCIM reads and
+    # writes only this column; no sign-in path reads it (PR 424 v3, V3-01b).
+    scim_external_id = db.Column(db.String(255), nullable=True)
+
+    # Provisioning and leaver state (R1-B26 PR 1, TB-0143). A deactivated user
+    # keeps every row they own (no hard delete anywhere); the state lives here
+    # and nowhere else. Written only by app.services.provisioning_service.
+    deactivated_at = db.Column(db.DateTime, nullable=True)
+    deactivation_reason = db.Column(db.String(32), nullable=True)
+    provisioned_via = db.Column(db.String(16), nullable=True)  # 'scim' or NULL
+    # Nullable on purpose: users that existed before these columns have no
+    # truthful creation time, so none is invented (SCIM meta omits a NULL).
+    created_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    @hybrid_property
+    def is_active(self):
+        """Flask-Login's ``is_active``: False once the user is deactivated.
+
+        Overrides ``UserMixin.is_active`` (hard-wired to True) so that
+        ``login_user`` refuses a deactivated user and the class-level form
+        ``User.is_active == True`` is a real SQL predicate.
+        """
+        return self.deactivated_at is None
+
+    @is_active.expression
+    def is_active(cls):  # noqa: N805 - hybrid expression receives the class
+        return cls.deactivated_at.is_(None)
 
     # Multi-factor authentication (R1-B12 PR 2, TB-0144/PB-0100). Required
     # for administrators (app.services.mfa_service.required_for) regardless

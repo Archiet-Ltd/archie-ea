@@ -106,7 +106,11 @@ def login():
             _landing = buy_intent.next_candidate(consume=True)
             session.clear()
             session.modified = True
-            _svc.login(user, form.remember_me.data)
+            if not _svc.login(user, form.remember_me.data):
+                from app.services.session_registry import INACTIVE_ACCOUNT_MESSAGE
+
+                flash(INACTIVE_ACCOUNT_MESSAGE, "form-error")
+                return redirect(url_for("account.login"))
             session.permanent = True
             try:
                 audit_logger.log_authentication(success=True)
@@ -186,7 +190,11 @@ def _complete_login_after_mfa(user):
 
     session.clear()
     session.modified = True
-    _svc.login(user, remember)
+    if not _svc.login(user, remember):
+        from app.services.session_registry import INACTIVE_ACCOUNT_MESSAGE
+
+        flash(INACTIVE_ACCOUNT_MESSAGE, "form-error")
+        return redirect(url_for("account.login"))
     session.permanent = True
     try:
         audit_logger.log_authentication(success=True)
@@ -669,6 +677,7 @@ def sso_callback(provider):
     # Find or create user by external_id
     from app import db
     from app.models.user import User
+    from app.services import mfa_service, session_registry
 
     # tenant-scoping-ok: pre-auth SSO callback, no org context yet -- scoped
     # by the (external_id, sso_provider) pair, which is unique per IdP.
@@ -713,6 +722,14 @@ def sso_callback(provider):
     # when `user` was already resolved above.
     db.session.commit()
 
+    # R1-B26 PR 1: a leaver deactivated through the identity-provider
+    # lifecycle must not still be able to sign in via SSO. Checked after
+    # the nOAuth-protected identity resolution above (never skips that
+    # check), before anything else mints a session.
+    if not user.is_active:
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
+
     # R1-B12 PR 2 (TB-0144/PB-0100): the same MFA gate login() applies to a
     # password sign-in, applied here too -- an administrator must complete
     # multi-factor before SSO can finish the login, whether enrolling for
@@ -724,8 +741,6 @@ def sso_callback(provider):
     # remember=True below; _mfa_pending_next has no equivalent "next" here
     # either, matching _complete_login_after_mfa()'s own empty-string
     # fallback.
-    from app.services import mfa_service
-
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = True
@@ -733,9 +748,9 @@ def sso_callback(provider):
         return redirect(url_for("account.mfa_challenge"))
 
     # Establish Flask-Login session (same as password login)
-    from app.services import session_registry
-
-    session_registry.login_and_register(user, remember=True)
+    if not session_registry.login_and_register(user, remember=True):
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
 
     flash("Successfully signed in via SSO.", "success")
     return redirect(url_for("main.index"))

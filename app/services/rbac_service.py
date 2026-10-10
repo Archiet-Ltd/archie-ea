@@ -63,24 +63,9 @@ class RBACService:
         return False
 
     def org_ids_for(self, user):
-        """Every organisation ``user`` belongs to: the home organisation
-        (if any) plus every ``OrgRole`` row, with no active-state
-        filtering at all.
-
-        Deactivation is not enforced at login or at session-switch time --
-        neither ``app.middleware.tenant_context.user_can_access_org`` nor
-        ``account_service.switch_active_organization`` checks
-        ``Organization.is_active`` -- so a deactivated organisation can
-        still be switched into today exactly like an active one. A caller
-        that uses this to decide MFA authority (``is_org_admin_anywhere``
-        below, via ``mfa_service.required_for``) must fail closed on that
-        fact: an administrator of a deactivated organisation is still an
-        administrator of a place they can still reach, so this reader must
-        not pretend otherwise by excluding it. A caller that genuinely
-        needs active-only organisations should query ``Organization``
-        directly through its own, explicitly named function rather than
-        filtering this one.
-        """
+        """Every organisation ``user`` belongs to: the home organisation plus
+        each ``OrgRole`` row. Reads rows only, so it answers the same
+        for a deactivated user as for an active one."""
         from app.models.org_role import OrgRole
 
         ids = set()
@@ -110,7 +95,7 @@ class RBACService:
 
         Used where "is this user an administrator of anything" must be
         answered regardless of which specific organisation granted it --
-        e.g. ``mfa_service.required_for``, which must require MFA for an
+        for example ``mfa_service.required_for``, which must require MFA for an
         administrator invited into a foreign organisation exactly as it
         does for a home-organisation administrator."""
         from app.models.org_role import OrgRole

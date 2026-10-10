@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 
 from flask import (
     Blueprint,
+    abort,
     flash,
     g,
     jsonify,
@@ -67,10 +68,13 @@ from ...forms.admin_forms import (
 from app.modules.account.forms.account_forms import CreatePasswordForm
 from app.decorators import admin_required, audit_log, governance_gate_reader_required
 from app.middleware.tenant_decorators import (
+    is_platform_admin,
     org_admin_required,
     platform_admin_required,
     require_org_or_platform_admin,
 )
+from app.services.rbac_service import rbac_service
+from app.services.rate_limiter import rate_limit
 from app.models import APISettings, EditableHTML, Permission, Role, User
 from app.models.organization import Organization
 from app.models.org_role import OrgRole
@@ -2297,6 +2301,8 @@ from app.models.user import VALID_ROLES as _VALID_ROLES  # noqa: E402
 @audit_log("update_sso_settings")
 def sso_settings():
     """Manage SSO group-to-role mappings stored in the database."""
+    if not (is_platform_admin(current_user) or rbac_service.is_org_admin(current_user, g.current_org_id)):
+        abort(403)
     from app.models.miscellaneous import SSOGroupRoleMapping
 
     if request.method == "POST":
@@ -2408,6 +2414,16 @@ def sso_settings():
         return redirect(url_for("admin.sso_settings"))
 
     # GET
+    return _render_sso_settings()
+
+
+def _render_sso_settings(new_scim_token=None):
+    """The SSO settings page: group mappings plus the SCIM token panel
+    (R1-B26). ``new_scim_token`` is the raw token, shown once on the response
+    that creates it and never again."""
+    from app.models.miscellaneous import SSOGroupRoleMapping
+    from app.services import provisioning_service
+
     mappings = SSOGroupRoleMapping.query.order_by(
         SSOGroupRoleMapping.sso_group_name
     ).all()
@@ -2415,7 +2431,51 @@ def sso_settings():
         "admin/sso_settings.html",
         mappings=mappings,
         valid_roles=_VALID_ROLES,
+        scim_tokens=provisioning_service.list_scim_tokens(g.current_org_id),
+        scim_base_url=request.url_root.rstrip("/") + "/scim/v2",
+        new_scim_token=new_scim_token,
     )
+
+
+@admin_bp_v2.route("/sso-settings/scim-tokens", methods=["POST"])
+@login_required
+@admin_required
+@rate_limit(10, "1m", methods=("POST",))
+def create_scim_token():
+    """Issue a SCIM bearer token for the caller's organisation (shown once)."""
+    if not (is_platform_admin(current_user) or rbac_service.is_org_admin(current_user, g.current_org_id)):
+        abort(403)
+    from flask import current_app
+
+    from app.services import provisioning_service
+
+    try:
+        _row, raw = provisioning_service.issue_scim_token(g.current_org_id, current_user)
+    except provisioning_service.TokenLimitReached as exc:
+        flash(exc.detail, "error")
+        return redirect(url_for("admin.sso_settings"))
+    response = current_app.make_response(_render_sso_settings(new_scim_token=raw))
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@admin_bp_v2.route("/sso-settings/scim-tokens/<int:token_id>/revoke", methods=["POST"])
+@login_required
+@admin_required
+@rate_limit(10, "1m", methods=("POST",))
+def revoke_scim_token(token_id):
+    """Revoke one of the caller's organisation's SCIM tokens."""
+    if not (is_platform_admin(current_user) or rbac_service.is_org_admin(current_user, g.current_org_id)):
+        abort(403)
+    from app.services import provisioning_service
+
+    row = provisioning_service.revoke_scim_token(
+        g.current_org_id, token_id, f"user:{current_user.id}", actor_id=current_user.id
+    )
+    if row is None:
+        return jsonify({"success": False, "error": "Token not found"}), 404
+    flash("SCIM token revoked. The identity provider can no longer use it.", "success")
+    return redirect(url_for("admin.sso_settings"))
 
 
 # ============================================================================
