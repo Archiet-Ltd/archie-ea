@@ -243,6 +243,7 @@ scripts/check_*.py
 !scripts/check_smoke_coverage_on_change.py
 !scripts/check_composer_url_params.py
 !scripts/check_crosswalk_writer_gated.py
+!scripts/check_platform_admin_coverage.py
 !scripts/check_is_admin_called.py
 scripts/patch_*.py
 scripts/find_*.py

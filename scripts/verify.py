@@ -1668,6 +1668,37 @@ def gate_count_checker(name: str, script: str, baseline: int) -> Result:
     return Result(name, PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_named_platform_admin_coverage(baseline: int) -> Result:
+    """The narrow, confirmed-real half of platform-admin-coverage (pr321-review-v1 nit 3).
+
+    The broad scan's baseline (347) is mostly a different, FK-scoped-parent
+    risk this decorator would wrongly gate (see check_platform_admin_coverage.py's
+    NAMED_PLATFORM_MODELS comment). This counts hits ONLY on the five models
+    confirmed to be genuinely parentless singleton config -- ExternalSystem,
+    Job, AIPromptTemplate, ScoringConfiguration, FeatureFlag -- where every
+    hit really is the admin_required/platform_admin_required bug. Baselined
+    at the true current count (10, all pending PR #314's Jira fix), not 0,
+    for the same reason untenanted-reads and unregistered-checks are not
+    baselined at 0: this should reach and hold at 0 once #314 merges, and
+    staying a true ratchet in the meantime still stops a NEW instance of the
+    confirmed bug arriving silently, which the broad scan's noise floor
+    cannot do on its own.
+    """
+    proc = _run([sys.executable, "scripts/check_platform_admin_coverage.py", "--named-count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("named-platform-admin-coverage", FAIL, f"could not parse: {proc.stdout!r}")
+    detail = ""
+    if count > baseline:
+        detail = _run(
+            [sys.executable, "scripts/check_platform_admin_coverage.py", "--named-count"]
+        ).stdout[-1500:]
+    return Result(
+        "named-platform-admin-coverage", PASS if count <= baseline else FAIL, detail, count, baseline
+    )
+
+
 # ---------------------------------------------------------------- registry
 
 
@@ -1753,6 +1784,30 @@ def build_gates(baseline: dict) -> list[Gate]:
              "ratchet", gate_unfenced_tables,
              remediation="give the model TenantMixin, or list the table in "
                          "scripts/unfenced_tables.txt with a reason in review",
+             tags=["static", "security"]),
+        Gate("platform-admin-coverage",
+             "a write route on a model with no tenant column at all requires "
+             "platform_admin_required, not admin_required",
+             "ratchet",
+             lambda: gate_count_checker(
+                 "platform-admin-coverage", "scripts/check_platform_admin_coverage.py",
+                 baseline.get("platform_admin_coverage", 347),
+             ),
+             remediation="run scripts/check_platform_admin_coverage.py; confirm the model "
+                         "is really platform-wide, then add @platform_admin_required -- if it "
+                         "is instead scoped through a foreign key to a tenant-fenced parent, "
+                         "that decorator is wrong (it would lock out ordinary tenant users); "
+                         "add 'platform-admin-ok: <reason>' and verify the parent-ownership "
+                         "fence instead",
+             tags=["static", "security"]),
+        Gate("named-platform-admin-coverage",
+             "the same bug, narrowed to the 5 confirmed-real singleton-config models "
+             "(ExternalSystem, Job, AIPromptTemplate, ScoringConfiguration, FeatureFlag)",
+             "ratchet",
+             lambda: gate_named_platform_admin_coverage(baseline.get("named_platform_admin_coverage", 10)),
+             remediation="run scripts/check_platform_admin_coverage.py --named-count; add "
+                         "@platform_admin_required -- every hit here is the confirmed bug, "
+                         "not FK-scoped-parent noise",
              tags=["static", "security"]),
         Gate("llm-boundary", "codegen emitters make no direct LLM calls (deterministic boundary)",
              "ratchet", lambda: gate_llm_boundary(baseline.get("llm_boundary", 0)),

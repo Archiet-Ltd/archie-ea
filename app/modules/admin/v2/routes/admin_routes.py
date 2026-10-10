@@ -79,6 +79,7 @@ from app.models.feature_flags import FeatureFlag, FeatureState, FeatureType
 from app.modules.admin.v2.services.llm_service_v2 import test_api_key
 from app.utils.sidebar_parser import SidebarSubmenu, parse_sidebar_template
 from app.modules.admin.v2.services.admin_user_service_v2 import AdminUserService
+from app.services import platform_feature_flag_service
 
 # Blueprint name MUST be "admin" (not "admin_v2") because cross-module code
 # uses url_for("admin.api_settings") etc.  The 3-tier fallback in
@@ -1273,7 +1274,7 @@ def feature_flag_new():
                         "admin/feature_flag_form.html", form=form, action="New"
                     )
 
-            feature = FeatureFlag(
+            feature = platform_feature_flag_service.create_feature_flag(
                 key=form.key.data,
                 name=form.name.data,
                 description=form.description.data,
@@ -1285,11 +1286,7 @@ def feature_flag_new():
                 routes=routes_data,
                 parent_id=form.parent_id.data or None,
                 sort_order=form.sort_order.data or 0,
-                last_modified_by=current_user.id,
             )
-
-            db.session.add(feature)
-            db.session.commit()
 
             flash(f"Feature flag '{feature.name}' created successfully", "success")
             return redirect(url_for("admin.feature_flags"))
@@ -1326,20 +1323,20 @@ def feature_flag_edit(id):
                         action="Edit",
                     )
 
-            feature.key = form.key.data
-            feature.name = form.name.data
-            feature.description = form.description.data
-            feature.feature_type = FeatureType(form.feature_type.data)
-            feature.state = FeatureState(form.state.data)
-            feature.enabled = form.enabled.data
-            feature.sidebar_label = form.sidebar_label.data
-            feature.sidebar_icon = form.sidebar_icon.data
-            feature.routes = routes_data
-            feature.parent_id = form.parent_id.data or None
-            feature.sort_order = form.sort_order.data or 0
-            feature.last_modified_by = current_user.id
-
-            db.session.commit()
+            platform_feature_flag_service.update_feature_flag(
+                feature,
+                key=form.key.data,
+                name=form.name.data,
+                description=form.description.data,
+                feature_type=FeatureType(form.feature_type.data),
+                state=FeatureState(form.state.data),
+                enabled=form.enabled.data,
+                sidebar_label=form.sidebar_label.data,
+                sidebar_icon=form.sidebar_icon.data,
+                routes=routes_data,
+                parent_id=form.parent_id.data or None,
+                sort_order=form.sort_order.data or 0,
+            )
 
             flash(f"Feature flag '{feature.name}' updated successfully", "success")
             return redirect(url_for("admin.feature_flags"))
@@ -1368,9 +1365,7 @@ def feature_flag_toggle(id):
     feature = FeatureFlag.query.get_or_404(id)
 
     try:
-        feature.enabled = not feature.enabled
-        feature.last_modified_by = current_user.id
-        db.session.commit()
+        platform_feature_flag_service.toggle_feature_flag(feature)
 
         status = "enabled" if feature.enabled else "disabled"
         return jsonify(
@@ -1395,9 +1390,9 @@ def feature_flag_delete(id):
     feature = FeatureFlag.query.get_or_404(id)
 
     try:
-        db.session.delete(feature)
-        db.session.commit()
-        flash(f"Feature flag '{feature.name}' deleted successfully", "success")
+        flag_name = feature.name
+        platform_feature_flag_service.delete_feature_flag(feature)
+        flash(f"Feature flag '{flag_name}' deleted successfully", "success")
     except Exception:
         db.session.rollback()
         flash("Error deleting feature flag. Please try again.", "error")
@@ -1478,41 +1473,9 @@ def feature_flags_create_from_sidebar():
                 "link": link,
             }
 
-        created_count = 0
-        skipped_count = 0
-
-        for key in selected_keys:
-            existing = FeatureFlag.query.filter_by(key=key).first()
-            if existing:
-                skipped_count += 1
-                continue
-
-            item_data = items_map.get(key)
-            if not item_data:
-                continue
-
-            link = item_data["link"]
-            submenu = item_data["submenu"]
-            section = item_data["section"]
-
-            feature = FeatureFlag(
-                key=key,
-                name=link.text,
-                description=f"Controls visibility of '{link.text}' in {section}"
-                + (f" > {submenu}" if submenu else ""),
-                feature_type=FeatureType.SIDEBAR_LINK,
-                state=FeatureState.BETA,
-                enabled=True,
-                sidebar_label=link.text,
-                sidebar_icon=link.icon,
-                routes=[link.endpoint] if link.endpoint else [],
-                last_modified_by=current_user.id,
-            )
-
-            db.session.add(feature)
-            created_count += 1
-
-        db.session.commit()
+        created_count, skipped_count = platform_feature_flag_service.create_feature_flags_from_sidebar(
+            selected_keys, items_map
+        )
 
         message = f"Created {created_count} feature flag(s)"
         if skipped_count > 0:

@@ -486,7 +486,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 68 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 70 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -510,6 +510,8 @@ to reconfirm the count before trusting it:**
 | `tenant-scoping` | ORM queries on a tenant-owned-but-unmixed model with no org predicate | ratchet @ 0 |
 | `untenanted-reads` | a read (`db.select`, `.query`, `session.get`) of ANY model with no `TenantMixin`, with no org predicate in the statement | ratchet @ 2633; a bare `tenant-scoping-ok` (no reason) or an org word inside another name does not clear a read |
 | `unfenced-tables` | a database table with no `TenantMixin` that is not listed in `scripts/unfenced_tables.txt` (a new one is a decision) | ratchet @ 0 |
+| `platform-admin-coverage` | a write route (POST/PUT/PATCH/DELETE) that mutates a model with no tenant column at all, gated by `admin_required` instead of `platform_admin_required` | ratchet @ 347; `platform-admin-ok: <reason>` clears it; most of the 347 are FK-scoped-to-a-fenced-parent models needing a different, ownership-fence check, not this gate's fix |
+| `named-platform-admin-coverage` | the same bug, narrowed to the 5 confirmed-real singleton-config models (`ExternalSystem`, `Job`, `AIPromptTemplate`, `ScoringConfiguration`, `FeatureFlag`) -- every hit here is the real bug, not FK-scoped-parent noise | ratchet @ 10, should reach 0 once PR #314 merges |
 | `llm-boundary` | a codegen emitter calling an LLM directly | ratchet @ 0 |
 | `evidence-contract` | behavioural changes/checkers missing evidence or provenance | ratchet @ 29 |
 | `untyped-property-writes` | direct ArchiMate element property writes bypassing the typed writer | ratchet @ 1 |
