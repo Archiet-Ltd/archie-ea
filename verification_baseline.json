@@ -44,6 +44,7 @@
     "raw_html_escaping": 0,
     "store_agreement": 4,
     "canonical_store": 0,
+    "background_mechanisms_thread": 22,
     "unrendered_model_fields": 342,
     "tenant_isolation_route_coverage_pct": 44.0
   }

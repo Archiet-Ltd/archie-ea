@@ -908,6 +908,28 @@ def gate_unregistered_checks(baseline: int) -> Result:
     return Result("unregistered-checks", PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_background_mechanisms(baseline: int) -> Result:
+    """Every background-work mechanism is in docs/background-mechanisms.yml. RATCHET.
+
+    Static (no boot, no database): fails when a file under app/ uses rq, celery,
+    apscheduler, threading.Thread, ThreadPoolExecutor or multiprocessing with no
+    register entry, when an entry names something no longer used, and when the
+    count of `thread` entries rises above the baseline. An empty scan exits 2
+    and is a FAIL here: finding nothing proves nothing.
+    """
+    script = "scripts/check_background_mechanisms.py"
+    count_proc = _run([sys.executable, script, "--count"])
+    try:
+        count = int(count_proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("background-mechanisms", FAIL,
+                      f"could not parse count: {count_proc.stdout!r} {count_proc.stderr[:300]}")
+    proc = _run([sys.executable, script])
+    ok = proc.returncode == 0 and count <= baseline
+    detail = "" if ok else proc.stdout[-1800:]
+    return Result("background-mechanisms", PASS if ok else FAIL, detail, count, baseline)
+
+
 def gate_null_filters() -> Result:
     """No `|default(...)` feeds a filter that calls len(). Gated at ZERO.
 
@@ -1939,6 +1961,13 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_public_repo_hygiene.py; remove the "
                          "content/reference, or mark the line 'hygiene-ok: <reason>'",
              tags=["static", "qa"]),
+        Gate("background-mechanisms",
+             "every background-work mechanism is listed in the one register",
+             "ratchet",
+             lambda: gate_background_mechanisms(baseline.get("background_mechanisms_thread", 22)),
+             remediation="add the file to docs/background-mechanisms.yml with its class, "
+                         "disposition and tenant_context (see scripts/check_background_mechanisms.py)",
+             tags=["static"]),
         Gate("unregistered-checks",
              "no scripts/check_*.py exists with no Gate(...) entry in build_gates()",
              "ratchet", lambda: gate_unregistered_checks(baseline.get("unregistered_checks", 41)),
