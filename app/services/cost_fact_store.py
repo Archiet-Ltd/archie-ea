@@ -64,8 +64,13 @@ def upsert_fact(
     period_end: Optional[date] = None,
     source_table: Optional[str] = None,
     source_id: str = "",
+    keep_currency_when_amount_unchanged: bool = False,
 ) -> tuple:
     """Insert the fact, or update it when its amount or currency changed.
+
+    With ``keep_currency_when_amount_unchanged`` an unchanged amount keeps the
+    currency it was recorded in, so a change of the default reporting currency
+    alone never relabels an existing amount.
 
     Returns ``(fact, outcome)`` with outcome ``created``, ``updated`` or
     ``unchanged``. A second identical call changes nothing, including the
@@ -88,7 +93,8 @@ def upsert_fact(
         )
         db.session.add(fact)
         return fact, "created"
-    if Decimal(fact.amount) == amount and fact.currency == currency:
+    if Decimal(fact.amount) == amount and (
+            fact.currency == currency or keep_currency_when_amount_unchanged):
         return fact, "unchanged"
     fact.amount = amount
     fact.currency = currency

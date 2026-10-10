@@ -196,6 +196,8 @@ def sync_cost_fact(app: ApplicationComponent, column: str, currency: Optional[st
         currency or get_reporting_currency(app.organization_id), FACT_SOURCE,
         category=category, period=period, period_start=start, period_end=end,
         source_table="application_components", source_id=source_id,
+        # An explicit currency is a statement about the amount; the default is not.
+        keep_currency_when_amount_unchanged=currency is None,
     )
     return outcome
 

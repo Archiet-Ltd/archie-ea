@@ -245,6 +245,7 @@ def get_exchange_rate(from_currency: str, to_currency: str, on_date: Optional[da
     on_date = on_date or date.today()
 
     def _latest(frm, to):
+        # tenant-scoping-ok: exchange_rates is a platform reference table shared by every organisation
         return db.session.execute(
             db.select(ExchangeRate)
             .where(ExchangeRate.from_currency == frm, ExchangeRate.to_currency == to,
@@ -276,6 +277,7 @@ def record_exchange_rate(actor, from_currency: str, to_currency: str, rate, effe
     if rate <= 0:
         raise ValueError("an exchange rate must be positive")
     frm, to = from_currency.upper(), to_currency.upper()
+    # tenant-scoping-ok: exchange_rates is a platform reference table shared by every organisation
     row = db.session.execute(
         db.select(ExchangeRate).where(
             ExchangeRate.from_currency == frm, ExchangeRate.to_currency == to,

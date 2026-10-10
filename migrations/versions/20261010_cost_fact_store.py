@@ -10,7 +10,7 @@ absent, so a second run (or a database where ``init-db`` got there first) is a
 no-op.
 
 Revision ID: 20261010_cost_fact_store
-Revises: 20261008_cr_organization_id
+Revises: 20261010_arb_change_requests_rls
 Create Date: 2026-10-10
 """
 import sqlalchemy as sa
@@ -18,7 +18,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261010_cost_fact_store"
-down_revision = "20261008_cr_organization_id"
+down_revision = "20261010_arb_change_requests_rls"
 branch_labels = None
 depends_on = None
 
