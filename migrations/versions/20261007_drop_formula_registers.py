@@ -12,14 +12,14 @@ a non-empty table means someone did write to it and the drop must be
 reconsidered, not silently discarded.
 
 Revision ID: 20261007_drop_formula_registers
-Revises: 20261006_owner_element_ref
+Revises: 20261010_arb_change_requests_rls
 Create Date: 2026-10-07
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261007_drop_formula_registers"
-down_revision = "20261006_owner_element_ref"
+down_revision = "20261010_arb_change_requests_rls"
 branch_labels = None
 depends_on = None
 
