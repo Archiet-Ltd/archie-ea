@@ -546,7 +546,7 @@
 
     function appendSystemMessage(text, type, opts) {
         type = type || 'info';
-        var noScroll = opts && opts.noScroll;
+        opts = opts || {};
         var div = document.createElement('div');
         div.className = 'flex justify-center my-4';
 
@@ -561,9 +561,21 @@
             '</div>';
 
         var container = messages();
-        if (container) container.appendChild(div);
-        if (!noScroll) scrollToBottom();
-        if (window.lucide) lucide.createIcons();
+        if (container) {
+            if (opts.placement === 'top') {
+                container.insertBefore(div, container.firstChild);
+            } else {
+                container.appendChild(div);
+            }
+        }
+        // A context notice written during the deep-link load pass sits above the
+        // welcome greeting (opts.placement === 'top') and must not scroll it away;
+        // every other notice — appended below the latest turn — keeps scroll-to-newest.
+        // (opts.noScroll was an earlier, narrower version of this same flag from #83;
+        // placement === 'top' supersedes it — it also repositions the notice above the
+        // ~1000px welcome-suggestions grid, which noScroll alone did not, so nothing
+        // else in this file still sets noScroll.)
+        if (opts.placement !== 'top') scrollToBottom();
         return div;
     }
 
