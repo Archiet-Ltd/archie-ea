@@ -71,29 +71,37 @@ The onboarding builds the model you will use in these modules:
 
 ## Frequently asked questions
 
-### How much does enterprise architecture tool onboarding cost?
+### How much does the Team annual plan with onboarding cost?
 
-The Team annual plan with onboarding costs $290 per editor per year plus a one-time $1,500 for onboarding. People who only ask questions are free. A team with ten editors pays $2,900 for the year plus $1,500 for onboarding.
+It costs $290 per editor per year plus a one-time $1,500 for onboarding. Five editors pay $2,950 in the first year and ten pay $4,400. An editor is a workspace member who is not set to read-only, and people who only ask questions are free. To try Team first, the monthly rate is $29 per editor, and the free Community plan has no time limit.
 
-### How many sessions are included?
+### Can we add editors during the year?
 
-Onboarding is working sessions with your team, for a fixed $1,500. We agree the sessions and the start date on the scoping call, once we know how much data you have and how many people will edit the model.
+Yes. Add them whenever you need to. If you add seats part-way through a period, you pay the pro-rata difference for the rest of that period, and the new editors join the workspace you already have. Removing editors takes effect at the next renewal, and the current period is not refunded.
 
-### Can we start monthly and switch to annual later?
+### What happens at renewal?
 
-This offer is the annual plan with onboarding. If you want to try Team month by month first, the monthly price is $29 per editor. See the [pricing page](/pricing) for every plan and for what each includes.
+The plan renews for another annual period unless an organisation administrator cancels before then, from the billing page or by contacting us. The $1,500 onboarding is one time and does not recur. The editor count you renew with is the one you have then, so remove editors you no longer need before the renewal date.
 
-### What if we already use Archi?
+### Is onboarding repeated if we add people later?
 
-Then your model comes with you. Entelim imports Archi files and ArchiMate Open Exchange files, bringing across elements, relationships and properties, and keeps an import history. Onboarding includes importing them and checking the result with your team.
+No. Onboarding is charged once, and editors who join later are not charged for it again. The working sessions teach your team to add and change applications, set owners and read the answers, so new colleagues learn the model from the people who built it with us. If you want another round of sessions for a new group, [contact us](/contact).
 
-### What counts as an editor?
+### What if we need to pause or cancel, and what happens to our data?
 
-An editor is a member of your workspace who is not set to read-only. Editors can change the model. Read-only members can ask questions and see answers, and they are free on the Team plan, so only the people who keep the model current count towards the price.
+You can cancel at any time, and cancelling stops the plan renewing. You keep full access until the end of the period you have paid for, and you can export your data for 30 days after it ends, including the model as an ArchiMate Open Exchange file. After that period, we delete your data. Backups expire on their normal cycle within 90 days. Dates for the working sessions are agreed on the scoping call, so say then if a busy period is coming.
 
-### Is there a cheaper way to start?
+### How does this differ from the architecture health check?
 
-Yes. The Community plan is free with no time limit, for one organisation and up to three people. Startup is $49 a month for up to ten people. You can also self-host Entelim for free under AGPL-3.0. This offer is for teams that want help getting set up.
+The [architecture health check](/architecture-health-check) is a $4,500 assessment: we run Entelim over your data and you receive a written report. This offer is for teams who want to run Entelim themselves: the Team plan, a model built with you, and the training to keep it current. The health check is the lower-commitment way to see your landscape first.
+
+### Do unused seats roll over?
+
+No, and you do not need spare seats. You pay per editor, not for a block of seats, and added editors are charged pro-rata for the rest of the period. Read-only members are free, so only the people who change the model count. If you remove editors, the change takes effect at the next renewal.
+
+### Is multi-year pricing available?
+
+The published rate is $290 per editor per year, billed annually, with $1,500 for onboarding, and those are the prices on the [pricing page](/pricing). For a commitment longer than a year, or for more than the Team plan covers, [contact us](/contact) and we will talk it through. Enterprise starts at $24,000 a year.
 
 ## Request the Team annual plan with onboarding
 
