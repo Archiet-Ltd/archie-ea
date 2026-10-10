@@ -47,18 +47,30 @@ class JobQueueService:
         logger.info(f"Created job {job.id}: {name}")
         return job
 
-    def list_jobs(self, organization_id: int, limit: int = 50) -> List[Job]:
+    def list_jobs(
+        self,
+        organization_id: int,
+        limit: int = 50,
+        task: Optional[str] = None,
+        statuses: Optional[List[str]] = None,
+    ) -> List[Job]:
         """Most recent jobs belonging to one organisation, newest first.
 
-        Only jobs whose payload names this organisation are returned; a job with no
-        organisation in its payload (platform-wide work) is never listed here.
+        ``organization_id`` must be the caller's own organisation (``g.current_org_id``
+        or the organisation a worker is running for), never a value taken from a
+        request parameter: the argument is trusted as given. Only jobs whose payload
+        names this organisation are returned; a job with no organisation in its
+        payload (platform-wide work) is never listed here. ``task`` and ``statuses``
+        narrow the list to one task name and to jobs in any of those statuses.
         """
-        return (
-            Job.query.filter(Job.payload["organization_id"].as_string() == str(organization_id))
-            .order_by(Job.created_at.desc(), Job.id.desc())
-            .limit(limit)
-            .all()
+        query = Job.query.filter(
+            Job.payload["organization_id"].as_string() == str(organization_id)
         )
+        if task is not None:
+            query = query.filter(Job.task == task)
+        if statuses:
+            query = query.filter(Job.status.in_(list(statuses)))
+        return query.order_by(Job.created_at.desc(), Job.id.desc()).limit(limit).all()
 
     def get_job(self, job_id: int) -> Optional[Job]:
         """Get a job by ID."""
