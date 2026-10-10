@@ -251,6 +251,10 @@ def _on_before_flush(session, flush_context, instances):
             continue
         if getattr(obj, "archimate_element_id", None):
             continue
+        # Skip objects with no organisation — they cannot own an element.
+        org_id = getattr(obj, "organization_id", None)
+        if org_id is None:
+            continue
         element = sync_archimate_element(obj, session=session, flush=False)
         if element is not None:
             pending[id(obj)] = (obj, element)
