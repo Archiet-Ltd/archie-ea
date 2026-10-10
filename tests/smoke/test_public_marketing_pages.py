@@ -99,7 +99,7 @@ def test_home_page_footer_and_navbar_links_are_clickable(browser, live_server):
 
         page.locator('a[href="/pricing"]').first.click()
         page.wait_for_url(lambda url: url.rstrip("/").endswith("/pricing"), timeout=PAGE_TIMEOUT)
-        assert page.locator("h1", has_text="Priced per company").count() == 1
+        assert page.locator("h1", has_text="Pricing").count() == 1
 
         page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(300)
