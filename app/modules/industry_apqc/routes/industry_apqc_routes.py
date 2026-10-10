@@ -10,6 +10,7 @@ from flask import Blueprint, current_app, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app.decorators import audit_log
+from app.jobs.tenant_safe_job import platform_scope
 from app.middleware.tenant_decorators import platform_admin_required
 
 from app.services.industry_apqc_service import IndustryAPQCService
@@ -277,7 +278,8 @@ def api_seed_frameworks():
     """
     try:
         service = IndustryAPQCService()
-        created = service.seed_default_frameworks()
+        with platform_scope("platform administrator seeds the shared industry frameworks"):
+            created = service.seed_default_frameworks()
 
         return jsonify(
             {

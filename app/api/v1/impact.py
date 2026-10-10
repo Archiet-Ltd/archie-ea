@@ -62,9 +62,9 @@ def analyze_impact():
     try:
         max_depth = int(max_depth_raw)
     except (TypeError, ValueError):
-        return error_response("max_depth must be an integer between 1 and 5", status_code=400)
-    if not (1 <= max_depth <= 5):
-        return error_response("max_depth must be between 1 and 5", status_code=400)
+        return error_response("max_depth must be an integer between 1 and 10", status_code=400)
+    if not (1 <= max_depth <= 10):
+        return error_response("max_depth must be between 1 and 10", status_code=400)
 
     # Validate mutually exclusive identifier fields
     if not app_id and not element_id:
