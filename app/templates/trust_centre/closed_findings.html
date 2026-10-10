@@ -1,0 +1,63 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% block title %}Closed security findings — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto">
+  {{ page_header(
+      title='Closed security findings',
+      description='Weaknesses found by testing the platform that were fixed and then passed a re-test. Each source of testing is listed separately.',
+      breadcrumbs=[
+          {'label': 'Home', 'href': url_for('main.index')},
+          {'label': 'Closed security findings'}
+      ]
+  ) }}
+
+  <div class="p-6 space-y-6">
+    {% if summary.total == 0 %}
+    {{ empty_state(
+        icon='shield-check',
+        title='No closed findings published',
+        description='No finding has yet been closed after a passing re-test and published, so there is nothing to summarise. This page lists only findings that have been fixed and re-tested.',
+        cta_text=None
+    ) }}
+    {% else %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <section class="rounded-lg border border-border bg-card p-4" aria-labelledby="by-severity-heading" data-testid="closed-by-severity">
+        <h2 id="by-severity-heading" class="text-sm font-semibold mb-3">By severity</h2>
+        <dl class="space-y-2">
+          {% for label, count in summary.by_severity %}
+          <div class="flex justify-between text-sm"><dt>{{ label }}</dt><dd class="font-semibold">{{ count }}</dd></div>
+          {% endfor %}
+        </dl>
+      </section>
+      <section class="rounded-lg border border-border bg-card p-4" aria-labelledby="by-source-heading" data-testid="closed-by-source">
+        <h2 id="by-source-heading" class="text-sm font-semibold mb-3">By source of testing</h2>
+        <dl class="space-y-2">
+          {% for label, count in summary.by_source %}
+          <div class="flex justify-between gap-4 text-sm"><dt>{{ label }}</dt>
+            <dd class="font-semibold text-right">{% if count is none %}<span class="font-normal text-muted-foreground">— none published from this source</span>{% else %}{{ count }}{% endif %}</dd></div>
+          {% endfor %}
+        </dl>
+      </section>
+    </div>
+
+    <section class="rounded-lg border border-border bg-card" aria-labelledby="closed-list-heading">
+      <div class="px-4 py-3 border-b border-border"><h2 id="closed-list-heading" class="text-sm font-semibold">Findings</h2></div>
+      <ul class="divide-y divide-border" data-testid="closed-finding-list">
+        {% for f in summary.findings %}
+        <li class="p-4" data-testid="closed-finding-{{ f.id }}">
+          <p class="text-sm font-medium">{{ f.title }}</p>
+          <p class="text-xs text-muted-foreground">
+            {{ f.severity_label }} · {{ f.source_label }} · found {{ f.discovered_on.isoformat() }} · re-tested and closed {{ f.closed_on.isoformat() if f.closed_on else '—' }}
+          </p>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

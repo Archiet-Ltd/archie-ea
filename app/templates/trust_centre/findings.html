@@ -1,0 +1,175 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% block title %}Security findings — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto">
+  {{ page_header(
+      title='Security findings',
+      description='Each weakness found by testing the platform, followed from severity through the fix to a passing re-test. Internal scans, the manual checklist and external reports are kept as separate sources.',
+      breadcrumbs=[
+          {'label': 'Home', 'href': url_for('main.index')},
+          {'label': 'Security findings'}
+      ],
+      actions=[
+          {'text': 'Published summary', 'icon': 'file-check', 'href': url_for('trust_centre.closed_findings'), 'variant': 'outline'}
+      ]
+  ) }}
+
+  <div class="p-6 space-y-6">
+    <div class="rounded-lg border border-border bg-card p-4" data-testid="finding-status-summary">
+      {% if state.total == 0 %}
+      <p class="text-sm text-muted-foreground">—  No findings have been recorded yet, so there is nothing to count. Counts appear here once a finding is recorded.</p>
+      {% else %}
+      <dl class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {% for status, count in state.status_counts.items() %}
+        <div>
+          <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ status_labels[status] }}</dt>
+          <dd class="text-2xl font-semibold mt-1" data-testid="finding-count-{{ status }}">{{ count }}</dd>
+        </div>
+        {% endfor %}
+      </dl>
+      {% endif %}
+    </div>
+
+    {% if state.unretested %}
+    <div class="rounded-lg border border-border bg-card p-4" role="status" data-testid="unretested-flag">
+      <p class="text-sm font-medium">Fixed without a re-test</p>
+      <p class="text-sm text-muted-foreground mt-1">
+        {{ state.unretested | length }} {{ 'finding has' if state.unretested | length == 1 else 'findings have' }} a fix recorded and no passing re-test yet. Until a re-test passes, {{ 'it stays' if state.unretested | length == 1 else 'they stay' }} out of the published summary.
+      </p>
+    </div>
+    {% endif %}
+
+    <section class="rounded-lg border border-border bg-card" aria-labelledby="record-finding-heading">
+      <div class="px-4 py-3 border-b border-border">
+        <h2 id="record-finding-heading" class="text-sm font-semibold">Record a finding</h2>
+      </div>
+      <form method="POST" action="{{ url_for('trust_centre.record_finding') }}" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="record-finding-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="md:col-span-2">
+          <label for="finding-title" class="block text-xs font-medium mb-1">Title</label>
+          <input id="finding-title" name="title" type="text" required maxlength="300" class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+        </div>
+        <div>
+          <label for="finding-severity" class="block text-xs font-medium mb-1">Severity</label>
+          <select id="finding-severity" name="severity" required class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+            <option value="" selected disabled>Choose…</option>
+            {% for s in severities %}<option value="{{ s }}">{{ severity_labels[s] }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="finding-source" class="block text-xs font-medium mb-1">Found by</label>
+          <select id="finding-source" name="source" required class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+            <option value="" selected disabled>Choose…</option>
+            {% for s in sources %}<option value="{{ s }}">{{ source_labels[s] }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="finding-reference" class="block text-xs font-medium mb-1">Rule, checklist item or report section</label>
+          <input id="finding-reference" name="source_reference" type="text" maxlength="300" class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+        </div>
+        <div>
+          <label for="finding-discovered" class="block text-xs font-medium mb-1">Date found</label>
+          <input id="finding-discovered" name="discovered_on" type="date" required class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+        </div>
+        <div class="md:col-span-2">
+          <label for="finding-description" class="block text-xs font-medium mb-1">What was found</label>
+          <textarea id="finding-description" name="description" rows="3" class="w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm"></textarea>
+        </div>
+        <div class="md:col-span-2">
+          <button type="submit" data-testid="record-finding-submit"
+            class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4">
+            Record finding
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="rounded-lg border border-border bg-card" aria-labelledby="finding-list-heading" data-testid="finding-list">
+      <div class="px-4 py-3 border-b border-border">
+        <h2 id="finding-list-heading" class="text-sm font-semibold">Findings</h2>
+      </div>
+      {% if state.total == 0 %}
+      <div class="p-4">
+      {{ empty_state(
+          icon='shield-check',
+          title='No findings recorded',
+          description='Nothing has been recorded from any testing source yet. This is a statement about the register, not a result: a source with no findings here has not reported any, and is not shown as clean.',
+          cta_text=None
+      ) }}
+      </div>
+      {% else %}
+      <ul class="divide-y divide-border">
+        {% for f in state.findings %}
+        <li class="p-4 space-y-3" data-testid="finding-{{ f.id }}">
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p class="text-sm font-medium">{{ f.title }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ f.severity_label }} · {{ f.source_label }}{% if f.source_reference %} · {{ f.source_reference }}{% endif %} · found {{ f.discovered_on.isoformat() }}
+              </p>
+            </div>
+            <span class="text-xs font-medium rounded-md border border-border px-2 py-1" data-testid="finding-status-{{ f.id }}">{{ f.status_label }}</span>
+          </div>
+          {% if f.description %}<p class="text-sm text-muted-foreground">{{ f.description }}</p>{% endif %}
+          <dl class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div><dt class="text-muted-foreground">Fix pull request</dt>
+              <dd data-testid="finding-fix-{{ f.id }}">{% if f.fix_pr_url %}<a class="underline" href="{{ f.fix_pr_url }}" rel="noopener noreferrer">{{ f.fix_pr_url }}</a>{% else %}— not linked yet{% endif %}</dd></div>
+            <div><dt class="text-muted-foreground">Re-test scheduled</dt>
+              <dd data-testid="finding-scheduled-{{ f.id }}">{{ f.retest_scheduled_on.isoformat() if f.retest_scheduled_on else '— not scheduled' }}{% if f.retest_overdue %} (overdue){% endif %}</dd></div>
+            <div><dt class="text-muted-foreground">Re-test result</dt>
+              <dd data-testid="finding-retest-{{ f.id }}">{% if f.retested_on %}{{ f.retest_result | capitalize }} on {{ f.retested_on.isoformat() }}{% else %}— not re-tested{% endif %}</dd></div>
+          </dl>
+          {% if f.fixed_without_retest %}
+          <p class="text-xs font-medium" data-testid="finding-unretested-{{ f.id }}">Fixed without a re-test</p>
+          {% endif %}
+
+          {% if f.status != 'closed' %}
+          <div class="flex flex-wrap gap-3">
+            <form method="POST" action="{{ url_for('trust_centre.link_fix', finding_id=f.id) }}" class="flex items-center gap-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label for="fix-{{ f.id }}" class="sr-only">Fix pull request link</label>
+              <input id="fix-{{ f.id }}" name="fix_pr_url" type="url" required placeholder="https://…" class="h-8 w-56 rounded-md border border-input bg-transparent px-2 text-xs">
+              <button type="submit" data-testid="link-fix-{{ f.id }}" class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3">Link fix</button>
+            </form>
+            <form method="POST" action="{{ url_for('trust_centre.schedule_retest', finding_id=f.id) }}" class="flex items-center gap-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label for="schedule-{{ f.id }}" class="sr-only">Re-test date</label>
+              <input id="schedule-{{ f.id }}" name="retest_scheduled_on" type="date" required class="h-8 rounded-md border border-input bg-transparent px-2 text-xs">
+              <button type="submit" data-testid="schedule-retest-{{ f.id }}" class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3">Schedule re-test</button>
+            </form>
+            {% if f.fixed_without_retest %}
+            <form method="POST" action="{{ url_for('trust_centre.record_retest', finding_id=f.id) }}" class="flex items-center gap-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label for="retest-date-{{ f.id }}" class="sr-only">Date re-tested</label>
+              <input id="retest-date-{{ f.id }}" name="retested_on" type="date" required class="h-8 rounded-md border border-input bg-transparent px-2 text-xs">
+              <label for="retest-result-{{ f.id }}" class="sr-only">Re-test result</label>
+              <select id="retest-result-{{ f.id }}" name="result" class="h-8 rounded-md border border-input bg-transparent px-2 text-xs">
+                <option value="passed">Passed</option>
+                <option value="failed">Failed</option>
+              </select>
+              <button type="submit" data-testid="record-retest-{{ f.id }}" class="inline-flex items-center justify-center rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3">Record re-test</button>
+            </form>
+            {% endif %}
+          </div>
+          {% else %}
+          <form method="POST" action="{{ url_for('trust_centre.publish', finding_id=f.id) }}" class="flex items-center gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="publish" value="{{ '0' if f.published_at else '1' }}">
+            <button type="submit" data-testid="publish-{{ f.id }}" class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3">
+              {{ 'Remove from published summary' if f.published_at else 'Add to published summary' }}
+            </button>
+            <span class="text-xs text-muted-foreground" data-testid="finding-published-{{ f.id }}">{{ 'Published' if f.published_at else 'Not published' }}</span>
+          </form>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

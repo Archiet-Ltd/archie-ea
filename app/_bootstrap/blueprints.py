@@ -250,6 +250,8 @@ def _register_optional_standalone(app):
         # ARCH-124: Tech Radar — adopt/trial/assess/hold over the existing
         # Technology-layer ArchiMateElement catalogue.
         ("app.modules.tech_radar.routes", "tech_radar_bp", "/technology/radar"),
+        # Security finding tracker and the published closed-findings summary.
+        ("app.modules.trust_centre.routes", "trust_centre_bp", None),
         # SAP S/4HANA Interface Register (Task 02): gives
         # ApplicationInterfaceMetadata its first producer, scoped to a
         # TechnologyRoadmapInitiative.

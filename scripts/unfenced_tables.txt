@@ -334,6 +334,7 @@ saved_diagram_relationships
 savings_realizations
 scoring_configs
 scoring_configurations
+security_findings
 security_scans
 service_dependency
 service_incidents

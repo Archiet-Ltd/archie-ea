@@ -475,6 +475,8 @@ def _link(label, endpoint, icon, requires=None, query_params=None):
       "admin"          — route is @admin_required (Permission.ADMINISTER)
       "platform_admin" — route is @platform_admin_required (the cross-tenant
                          is_platform_admin super-admin flag)
+      "governance_gate_reader" — route is @governance_gate_reader_required
+                         (Permission.ADMINISTER or the security_architect role)
       "data_subject_requests" — routes are @requires_role(DATA_SUBJECT_REQUEST_ROLES)
                          (security_architect, and platform_admin as always)
       "general"        — route requires Permission.GENERAL (require_roles()
@@ -929,6 +931,8 @@ _MY_WORK_LINKS = {
         _link("Interface Register", "interface_register.index", "cable"),
         # Read access to the organisation's audit trail: export and verify.
         _link("Audit Log", "admin.audit_log_viewer", "scroll-text"),
+        _link("Security Findings", "trust_centre.findings", "shield-half",
+              requires="governance_gate_reader"),
     ],
     # ARCH-123 folded this into enterprise_architect with the note "no dedicated
     # role for either yet". These three surfaces ship and are the whole of the
@@ -1075,6 +1079,13 @@ def link_requires_satisfied(user, requires):
         return bool(getattr(user, "is_org_admin", False))
     if requires == "platform_admin":
         return bool(getattr(user, "is_platform_admin", False))
+    if requires == "governance_gate_reader":
+        try:
+            from app._decorators_base import may_read_governance_gates
+
+            return may_read_governance_gates(user)
+        except Exception:  # anonymous / unexpected user object
+            return False
     if requires == "data_subject_requests":
         try:
             from app.decorators.requires_role import may_handle_data_subject_requests
