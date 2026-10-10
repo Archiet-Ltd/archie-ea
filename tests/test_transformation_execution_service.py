@@ -431,6 +431,9 @@ def committed_execution_scope(app):
         try:
             table_names = (
                 "organizations",
+                # Adding a person reads the organisation's plan and roles.
+                "subscriptions",
+                "org_roles",
                 "soc2_audit_log",
                 "roles",
                 "users",
@@ -457,6 +460,9 @@ def committed_execution_scope(app):
                 "arb_review_items",
                 "archimate_elements",
                 "work_packages",
+                "unified_work_packages",
+                "work_package_plateaus",
+                "gap_work_packages",
                 "strategic_roadmap_items",
                 "benefits",
                 "solutions",

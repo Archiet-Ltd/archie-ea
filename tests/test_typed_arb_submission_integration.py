@@ -13,6 +13,8 @@ import pytest
 from sqlalchemy import event, select, text
 from sqlalchemy.orm import Session
 
+from tests._raw_psycopg2 import raw_psycopg2_connection
+
 from app import db
 from app.models.architecture_decision import ArchitectureDecision
 from app.models.architecture_review_board import ARBReviewCycle, ARBReviewItem
@@ -278,7 +280,7 @@ def solution_scope(app, _schema):
             yield scope
         finally:
             db.session.remove()
-            raw = db.engine.raw_connection()
+            raw = raw_psycopg2_connection(db.engine)
             try:
                 with raw.cursor() as cursor:
                     cursor.execute("SET LOCAL session_replication_role = replica")
@@ -866,7 +868,7 @@ def test_real_solution_snapshot_is_database_immutable(
             assertions={"human_reviewed": True},
         )
 
-    raw = db.engine.raw_connection()
+    raw = raw_psycopg2_connection(db.engine)
     try:
         with pytest.raises(psycopg2.Error, match="append-only"):
             with raw.cursor() as cursor:

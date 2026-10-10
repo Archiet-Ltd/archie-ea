@@ -19,7 +19,7 @@ Pages:
 import logging
 
 from flask import Blueprint, Response, current_app, flash, jsonify, redirect, render_template, request, url_for  # noqa: F401
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app import db
 from app.utils.pagination import safe_int_arg
@@ -382,6 +382,141 @@ def import_oef_preview():
     return jsonify({"success": True, **preview}), 200
 
 
+# --- Restore before a faulty import ----------------------------------------
+# Restore points are the imports the one OEF engine recorded on
+# ``ImportSessionLog``; everything below is scoped to the caller's organisation.
+
+RESTORE_ROLES = ("enterprise_architect",)
+
+
+def _restore_gate():
+    """Who may restore: administrators (organisation or platform) and enterprise
+    architects. The stored ``platform_admin`` title is the default for every
+    member, so it is never treated as authority here."""
+    from flask import abort
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.utils.role_access import get_user_role
+
+    if getattr(current_user, "is_org_admin", False) or is_platform_admin(current_user):
+        return
+    if get_user_role(current_user) in RESTORE_ROLES:
+        return
+    abort(403)
+
+
+def _restore_org_id():
+    from flask import abort, g
+
+    org_id = getattr(g, "current_org_id", None) or getattr(current_user, "organization_id", None)
+    if org_id is None:
+        abort(403)
+    return int(org_id)
+
+
+def _user_labels(user_ids, org_id):
+    from app.models import User
+
+    ids = sorted({i for i in user_ids if i})
+    if not ids:
+        return {}
+    rows = User.query.filter(User.id.in_(ids), User.organization_id == org_id).all()
+    return {u.id: u.email for u in rows}
+
+
+@architect_ui_bp.route("/architecture/import/oef/restore-points", methods=["GET"])
+@login_required
+def import_restore_points():
+    """The organisation's imports that can be restored, newest first."""
+    from app.services import import_snapshot_service
+
+    _restore_gate()
+    org_id = _restore_org_id()
+    points = import_snapshot_service.restore_points(org_id)
+    labels = _user_labels([p.user_id for p in points], org_id)
+    rows = [
+        {
+            "id": p.id,
+            "started_at": p.started_at,
+            "filename": p.filename,
+            "strategy": p.duplicate_mode,
+            "model_name": (p.snapshot_data or {}).get("model_name"),
+            "user": labels.get(p.user_id, ""),
+            "elements_created": (p.changes_summary or {}).get("elements_created", 0),
+            "elements_updated": (p.changes_summary or {}).get("elements_updated", 0),
+            "relationships_created": (p.changes_summary or {}).get("relationships_created", 0),
+        }
+        for p in points
+    ]
+    if _oef_wants_json():
+        return jsonify({"success": True, "restore_points": [
+            dict(r, started_at=r["started_at"].isoformat() if r["started_at"] else None) for r in rows
+        ]}), 200
+    return render_template("archimate_crud/import_restore_points.html", restore_points=rows)
+
+
+@architect_ui_bp.route("/architecture/import/oef/restore-points/<int:log_id>", methods=["GET"])
+@login_required
+def import_restore_preview(log_id):
+    """What restoring to before this import would change. Writes nothing."""
+    from app.services import import_restore_service, import_snapshot_service
+
+    _restore_gate()
+    org_id = _restore_org_id()
+    log = import_snapshot_service.get_restore_point(org_id, log_id)
+    if log is None:
+        return jsonify({"success": False, "errors": ["Restore point not found."]}), 404
+    try:
+        preview = import_restore_service.build_preview(org_id, log)
+    except import_restore_service.RestoreError as exc:
+        return jsonify({"success": False, "errors": [str(exc)]}), exc.status_code
+    labels = _user_labels(
+        [preview["restore_point"]["user_id"]] + [c["user_id"] for c in preview["changes_since"]], org_id
+    )
+    preview["restore_point"]["user"] = labels.get(preview["restore_point"]["user_id"], "")
+    for change in preview["changes_since"]:
+        change["user"] = labels.get(change["user_id"], "")
+    if _oef_wants_json():
+        return jsonify({"success": True, **preview}), 200
+    return render_template("archimate_crud/import_restore_preview.html", preview=preview, log_id=log_id)
+
+
+@architect_ui_bp.route("/architecture/import/oef/restore-points/<int:log_id>/restore", methods=["POST"])
+@login_required
+def import_restore_confirm(log_id):
+    """Restore the organisation to before this import, after the preview."""
+    from app.services import import_restore_service
+
+    _restore_gate()
+    org_id = _restore_org_id()
+    if request.is_json:
+        payload = request.get_json(silent=True) or {}
+        raw = payload.get("reapply") or []
+    else:
+        raw = request.form.getlist("reapply")
+    try:
+        reapply = [int(v) for v in raw]
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "errors": ["Invalid choice of changes to apply again."]}), 400
+    try:
+        result = import_restore_service.restore(org_id, current_user.id, log_id, reapply)
+    except import_restore_service.RestoreError as exc:
+        if _oef_wants_json() or request.is_json:
+            return jsonify({"success": False, "errors": [str(exc)]}), exc.status_code
+        flash(str(exc), "error")
+        return redirect(url_for("architect_ui.import_restore_points")), 303
+    if _oef_wants_json() or request.is_json:
+        return jsonify({"success": True, **result}), 200
+    flash(
+        "Restored: %d elements and %d relationships removed, %d elements returned to their earlier state, "
+        "%d later changes applied again."
+        % (result["elements_removed"], result["relationships_removed"],
+           result["elements_reverted"], result["changes_reapplied"]),
+        "success",
+    )
+    return redirect(url_for("architect_ui.import_restore_points")), 303
+
+
 def _oef_strategy():
     """The import strategy named by the request (form field or JSON key)."""
     if request.is_json:
@@ -470,22 +605,21 @@ def technology_lifecycle():
 @login_required
 def update_lifecycle(element_id):
     """Update the lifecycle phase of a Technology element."""
-    import json as _json
-
     from app.models.archimate_core import ArchiMateElement
+    from app.modules.architecture_assistant.property_service import PropertyService, PropertyValidationError
 
-    element = ArchiMateElement.query.get_or_404(element_id)
+    element = ArchiMateElement.query.filter_by(
+        id=element_id,
+        organization_id=current_user.organization_id,
+    ).first_or_404()
     phase = request.json.get("lifecycle")
-    props = element.properties or {}
-    if isinstance(props, str):
-        try:
-            props = _json.loads(props)
-        except Exception:
-            props = {}
-    props["lifecycle"] = phase
-    element.properties = _json.dumps(props)
-    db.session.commit()
-    return jsonify({"success": True})
+    try:
+        PropertyService().set_element_property(element, "lifecycle", phase)
+        db.session.commit()
+        return jsonify({"success": True})
+    except PropertyValidationError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
 
 
 # =============================================================================
@@ -603,10 +737,12 @@ def element_traceability(element_id):
     from app.services.archimate_impact_service import ArchiMateImpactService
     from app.services.archimate_traceability_service import ArchiMateTraceabilityService
     from app.models.archimate_core import ArchiMateElement
+    from app.utils.route_guards import require_entity
+
+    element = require_entity(ArchiMateElement, element_id, description="ArchiMate element not found")
 
     service = ArchiMateTraceabilityService()
     impact_service = ArchiMateImpactService()
-    element = ArchiMateElement.query.get_or_404(element_id)
     chain = service.get_element_chain(element_id)
     impact_summary = impact_service.get_impact_summary(element_id)
     return render_template(
@@ -643,9 +779,10 @@ def impact_analysis(element_id):
     """Impact Analysis page — change propagation for an ArchiMate element."""
     from app.services.archimate_impact_service import ArchiMateImpactService
     from app.models.archimate_core import ArchiMateElement
+    from app.utils.route_guards import require_entity
 
+    element = require_entity(ArchiMateElement, element_id, description="ArchiMate element not found")
     service = ArchiMateImpactService()
-    element = ArchiMateElement.query.get_or_404(element_id)
     analysis = service.analyze_impact(element_id)
     capability_gaps = service.get_capability_gaps(element_id)
     return render_template(

@@ -17,6 +17,7 @@ from flask import Blueprint, jsonify, request
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
 from app.decorators import admin_required, audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 from app.extensions import db
 from app.models.sidebar_menu import SidebarMenuItem
 from app.modules.admin.v2.services.sidebar_menu_audit_log_v2 import SidebarMenuAuditLog
@@ -30,6 +31,12 @@ mark_blueprint_guardrailed(sidebar_mgmt_bp_v2)
 
 @sidebar_mgmt_bp_v2.route("/items", methods=["GET"])
 @timed_route
+# SidebarMenuItem carries no organization_id -- it is platform-wide sidebar
+# config. Every mutating route below (toggle/toggle_section/toggle_subsection/
+# reset_all_items) already requires platform_admin_required; this read-only
+# listing was the one left on admin_required, letting any tenant's own admin
+# read it (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def list_sidebar_items():
     """List all sidebar menu items with hierarchical grouping."""
@@ -70,7 +77,7 @@ def list_sidebar_items():
 
 @sidebar_mgmt_bp_v2.route("/items/<int:item_id>/toggle", methods=["POST"])
 @timed_route
-@admin_required
+@platform_admin_required
 @audit_log("toggle_sidebar_item")
 def toggle_sidebar_item(item_id):
     """Toggle a sidebar item on/off."""
@@ -97,7 +104,7 @@ def toggle_sidebar_item(item_id):
 
 @sidebar_mgmt_bp_v2.route("/items/section/<section>/toggle", methods=["POST"])
 @timed_route
-@admin_required
+@platform_admin_required
 @audit_log("toggle_sidebar_section")
 def toggle_section(section):
     """Toggle all items in a section."""
@@ -136,7 +143,7 @@ def toggle_section(section):
 
 @sidebar_mgmt_bp_v2.route("/items/subsection/<section>/<subsection>/toggle", methods=["POST"])
 @timed_route
-@admin_required
+@platform_admin_required
 @audit_log("toggle_sidebar_subsection")
 def toggle_subsection(section, subsection):
     """Toggle all items in a subsection."""
@@ -170,7 +177,7 @@ def toggle_subsection(section, subsection):
 
 @sidebar_mgmt_bp_v2.route("/items/reset", methods=["POST"])
 @timed_route
-@admin_required
+@platform_admin_required
 @audit_log("reset_sidebar_items")
 def reset_all_items():
     """Reset all items to enabled state."""

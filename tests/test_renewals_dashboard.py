@@ -42,7 +42,7 @@ def procurement_setup(app, db_session, make_org):
         last_name="Ewals",
         organization_id=org.id,
         confirmed=True,
-        enterprise_role="platform_admin",
+        enterprise_role="procurement",
     )
     db_session.add(user)
     contract = VendorContract(

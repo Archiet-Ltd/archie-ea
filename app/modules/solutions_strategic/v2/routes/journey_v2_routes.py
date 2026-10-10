@@ -155,7 +155,28 @@ def _validate_evidence_manifest(value):
             document = AIChatDocumentUpload.query.filter_by(id=document_id).first()
             if document is None:
                 return None, "Canonical evidence document was not found in this organization"
-            if document.uploaded_by_id != current_user.id and not current_user.is_admin():
+            # D-4 (admin-rbac-active-org continuation): the admin branch
+            # used to be ``current_user.is_admin()`` -- a global
+            # Permission.ADMINISTER flag, independent of which organisation
+            # is active in the session (AIChatDocumentUpload is
+            # TenantMixin-scoped by g.current_org_id, not
+            # current_user.organization_id). Since every self-registered
+            # user is Administrator of their own organisation, a user who
+            # merely accepted a Viewer invitation into another organisation
+            # and switched their session into it could reference any
+            # document there as canonical evidence too, not just their own
+            # -- the exact bug admin_required/org_admin_required already
+            # fix elsewhere in this PR.
+            from flask import g
+
+            from app.middleware.tenant_decorators import is_platform_admin
+            from app.services.rbac_service import rbac_service
+
+            _active_org_id = getattr(g, "current_org_id", None)
+            _is_admin_here = is_platform_admin(current_user) or rbac_service.is_org_admin(
+                current_user, _active_org_id
+            )
+            if document.uploaded_by_id != current_user.id and not _is_admin_here:
                 return None, "Canonical evidence document is not available to this user"
         if not reference and document_id is None:
             return None, "Evidence needs a reference or canonical document_id"
@@ -253,16 +274,36 @@ def _require_journey_editor(view):
 
 
 def _require_solution_owner(f):
-    """Guard: authenticated user must own the solution or be an admin.
+    """Guard: authenticated user must own the solution or be an admin OF
+    THE ACTIVE organisation.
 
     Wraps route functions with signature f(solution_id, ...).
     Returns HTTP 403 if the current user is not the creator.
     Must be placed AFTER @login_required so current_user is populated.
+
+    D-4 (admin-rbac-active-org continuation): the admin branch used to be
+    ``current_user.is_admin()`` -- a global Permission.ADMINISTER flag,
+    independent of which organisation is active in the session (Solution is
+    TenantMixin-scoped by g.current_org_id). Since every self-registered
+    user is Administrator of their own organisation, a user who merely
+    accepted a Viewer invitation into another organisation and switched
+    their session into it could act on any solution there too, not just
+    their own -- the exact bug admin_required/org_admin_required already
+    fix elsewhere in this PR.
     """
     @wraps(f)
     def decorated(solution_id, *args, **kwargs):
+        from flask import g
+
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
         solution = Solution.query.get_or_404(solution_id)
-        if solution.created_by_id != current_user.id and not current_user.is_admin():
+        active_org_id = getattr(g, "current_org_id", None)
+        is_admin_here = is_platform_admin(current_user) or rbac_service.is_org_admin(
+            current_user, active_org_id
+        )
+        if solution.created_by_id != current_user.id and not is_admin_here:
             return api_error("Access denied: you do not own this solution", 403)
         return f(solution_id, *args, **kwargs)
     return decorated
@@ -1098,9 +1139,14 @@ def _ingest_text_background(app_ctx, solution_id, text, filename):
     def _run():
         with app_ctx:
             try:
+                from app.jobs.tenant_safe_job import organization_id_of, tenant_scope
                 from app.modules.architecture_assistant.journey_orchestrator import JourneyOrchestrator
-                orch = JourneyOrchestrator(solution_id)
-                orch.ingest_text(text, source_name=filename)
+
+                # A new thread has no request and so no session organisation; do
+                # the work as the organisation that owns the solution.
+                with tenant_scope(organization_id_of(Solution, solution_id)):
+                    orch = JourneyOrchestrator(solution_id)
+                    orch.ingest_text(text, source_name=filename)
             except Exception as e:
                 logger.error("Background ingestion failed for solution %s / %s: %s", solution_id, filename, e)
 
@@ -1586,6 +1632,8 @@ def update_element(solution_id, element_id):
         data = request.get_json() or {}
         orch = JourneyOrchestrator(solution_id)
         result = orch.update_element(element_id, data)
+        if result.get("error"):
+            return api_error(result["error"], result.get("status_code", 400))
         return api_success(data=result)
     except Exception as e:
         logger.error("Element update failed: %s", e, exc_info=True)
@@ -2138,6 +2186,8 @@ def update_proposal_properties(solution_id, proposal_id):
         data = request.get_json() or {}
         orch = JourneyOrchestrator(solution_id)
         result = orch.update_proposal_properties(proposal_id, data.get("properties", {}))
+        if result.get("error"):
+            return api_error(result["error"], result.get("status_code", 400))
         return api_success(data=result)
     except Exception as e:
         logger.error("Property update failed: %s", e, exc_info=True)
@@ -2783,7 +2833,11 @@ def _generate_architecture_background(app_ctx, solution_id, capabilities, proble
             logger.error("_set_status failed for solution %d: %s", solution_id, exc)
 
     def _run():
-        with app_ctx:
+        from app.jobs.tenant_safe_job import organization_id_of, tenant_scope
+
+        # A new thread has no request and so no session organisation; do the
+        # work as the organisation that owns the solution.
+        with app_ctx, tenant_scope(organization_id_of(Solution, solution_id)):
             _set_status("running")
             try:
                 from app.modules.architecture_assistant.journey_orchestrator import JourneyOrchestrator

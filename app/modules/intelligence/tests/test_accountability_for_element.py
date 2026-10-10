@@ -6,8 +6,9 @@ date. Each test guards one defect from the review that withdrew the read:
 expired ownership shown as current, a unit read with no tenant fence, and
 personal data serialised without being shown.
 
-Fixtures (app, db_session, make_org) come from
-app/modules/intelligence/tests/conftest.py.
+Fixtures (app, db_session, make_org) are discovered via
+app/modules/conftest.py's import of tests.conftest,
+same pattern as test_query_service.py. No import needed here.
 """
 
 from __future__ import annotations

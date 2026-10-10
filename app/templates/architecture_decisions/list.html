@@ -14,9 +14,25 @@
             {'label': 'Architecture Decisions'}
         ],
         actions=[
-            {'text': 'New Decision', 'icon': 'plus', 'href': url_for('arch_decisions.create_decision'), 'variant': 'default'}
+            {'text': 'New Decision', 'icon': 'plus', 'href': url_for('arch_decisions.create_decision', element_id=filter_element.id) if filter_element else url_for('arch_decisions.create_decision'), 'variant': 'default'}
         ]
     ) }}
+
+    {% if element_filter is not none %}
+    <div class="mb-4 flex flex-wrap items-center gap-2 text-sm" data-element-filter>
+        {% if filter_element %}
+        <span class="text-muted-foreground">Decisions recorded against</span>
+        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=filter_element.id) }}"
+           class="font-medium text-primary hover:underline break-words">{{ filter_element.name }}</a>
+        {% else %}
+        <span class="text-foreground">That element is not recorded in your organisation.</span>
+        {% endif %}
+        <a href="{{ url_for('arch_decisions.list_decisions') }}"
+           class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+            <i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>Show all decisions
+        </a>
+    </div>
+    {% endif %}
 
     <!-- Status Filter Pills -->
     <div class="flex flex-wrap gap-2 mb-6">
@@ -26,7 +42,7 @@
             All
         </a>
         {% for s, label in [('proposed','Proposed'),('accepted','Accepted'),('deprecated','Deprecated'),('superseded','Superseded')] %}
-        <a href="{{ url_for('arch_decisions.list_decisions', status=s, phase=phase_filter) }}"
+        <a href="{{ url_for('arch_decisions.list_decisions', status=s, phase=phase_filter, element_id=element_filter) }}"
            class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors
  {% if status_filter == s %}bg-primary text-primary-foreground{% else %}bg-muted text-muted-foreground hover:bg-accent{% endif %}">
             {{ label }}
@@ -107,9 +123,14 @@
         {% else %}
         <div class="flex flex-col items-center justify-center py-16 text-center">
             <i data-lucide="file-text" class="h-12 w-12 text-muted-foreground/40 mb-4"></i>
+            {% if filter_element %}
+            <h3 class="text-lg font-semibold text-foreground mb-1">No decisions recorded against this element</h3>
+            <p class="text-sm text-muted-foreground mb-4">Record a decision and choose this element as one it affects.</p>
+            {% else %}
             <h3 class="text-lg font-semibold text-foreground mb-1">No Architecture Decisions</h3>
             <p class="text-sm text-muted-foreground mb-4">Record your first enterprise architecture decision.</p>
-            <a href="{{ url_for('arch_decisions.create_decision') }}"
+            {% endif %}
+            <a href="{{ url_for('arch_decisions.create_decision', element_id=filter_element.id) if filter_element else url_for('arch_decisions.create_decision') }}"
                class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
                 <i data-lucide="plus" class="h-4 w-4"></i>
                 New Decision

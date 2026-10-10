@@ -6,7 +6,7 @@ state: briefed
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /enterprise-architecture/ai-assistant
+url_slug: /use-cases/ai-assistant-for-your-architecture
 ---
 
 # Let our AI assistant query the model instead of guessing
@@ -18,11 +18,14 @@ url_slug: /enterprise-architecture/ai-assistant
 Your team's AI assistant answers architecture questions from general knowledge, not from your actual
 model. It sounds confident either way — only one of those is trustworthy.
 
-## What Entelim is building
+## What Entelim already does, and what it's building
 
-MCP read tools over the same questions Ask already answers, so any AI assistant your team uses can
-query the real model directly — and one chat page inside Entelim where every generated narrative
-lands, for anyone who wants it built in rather than external.
+Entelim's own [AI Chat](/modules/ai-chat) is live today, on a paid plan: one chat page backed
+directly by your model data: it reads your model's own records and shows which ones it cites, so
+you can check an answer rather than take it on faith.
+
+What's still coming is access for an AI assistant your team already uses elsewhere, outside
+Entelim's own chat page: MCP read tools over the same questions Ask answers.
 
 Coming soon. Join the waiting list and we'll tell you the day it ships.
 

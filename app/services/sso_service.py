@@ -494,25 +494,49 @@ class SSOService:
     # SAML stub
     # ------------------------------------------------------------------
 
-    def initiate_saml_flow(self, config) -> str:  # noqa: ARG002
-        """Build a SAML 2.0 AuthnRequest redirect URL.
+    def initiate_saml_flow(self, config, base_url: str) -> dict:
+        """Build a SAML 2.0 AuthnRequest redirect URL (R1-B12 PR 2, TB-0141).
 
-        .. todo::
-            Full implementation requires the ``python3-saml`` library
-            (``pip install python3-saml``).  Once installed, replace this
-            stub with::
+        Delegates to :class:`app.services.saml_service.SAMLService`, which
+        verifies responses with ``signxml`` against the operator-entered
+        IdP certificate rather than the ``python3-saml``/``xmlsec1`` path
+        this used to stub out.
 
-                from onelogin.saml2.auth import OneLogin_Saml2_Auth
-                auth = OneLogin_Saml2_Auth(request_data, saml_settings)
-                return auth.login()
+        Args:
+            config: :class:`app.models.sso_config.SSOConfig` instance.
+            base_url: This platform's own base URL.
+
+        Returns:
+            Dict with keys ``redirect_url`` and ``request_id`` (str). The
+            caller must keep ``request_id`` in the login session and hand
+            it to :meth:`handle_saml_callback`.
 
         Raises:
-            :class:`SSONotConfiguredError` always, until python3-saml is
-            installed and wired.
+            :class:`SSONotConfiguredError` if config is None or incomplete.
         """
-        if config is None:
-            raise SSONotConfiguredError("No SSO config provided")
-        raise SSONotConfiguredError(
-            "SAML 2.0 federation requires the python3-saml library. "
-            "Install with: pip install python3-saml"
+        from app.services.saml_service import SAMLService
+
+        redirect_url, request_id = SAMLService().build_authn_request(config, base_url)
+        return {"redirect_url": redirect_url, "request_id": request_id}
+
+    def handle_saml_callback(
+        self,
+        config,
+        saml_response_b64: str,
+        base_url: str,
+        expected_request_id: Optional[str] = None,
+    ) -> dict:
+        """Verify a SAML Response and return its asserted claims.
+
+        Delegates to :class:`app.services.saml_service.SAMLService`.
+
+        Raises:
+            :class:`SSONotConfiguredError` (specifically
+            :class:`app.services.saml_service.SAMLVerificationError`) on any
+            verification failure.
+        """
+        from app.services.saml_service import SAMLService
+
+        return SAMLService().verify_and_parse_response(
+            config, saml_response_b64, base_url, expected_request_id
         )

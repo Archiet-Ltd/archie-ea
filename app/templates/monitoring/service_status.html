@@ -1,0 +1,120 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% block title %}Service status{% endblock %}
+
+{% macro state_badge(state) -%}
+{%- if state == 'operational' -%}
+<span class="inline-flex items-center rounded-md bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Operational</span>
+{%- elif state == 'degraded' -%}
+<span class="inline-flex items-center rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">Degraded</span>
+{%- elif state == 'outage' -%}
+<span class="inline-flex items-center rounded-md bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">Outage</span>
+{%- else -%}
+<span class="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">—</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+{{ page_shell(
+    'Service status',
+    subtitle='Whether the platform is working normally right now, and the incidents of the last 90 days.',
+    breadcrumb=[('Home', url_for('dashboard.overview')), ('Service status', None)],
+    icon='activity'
+) }}
+
+<div class="space-y-6" data-testid="service-status-page">
+    <section class="rounded-lg border border-border bg-card p-5" aria-labelledby="current-status-heading">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <h2 id="current-status-heading" class="text-sm font-medium text-muted-foreground">Current status</h2>
+                <p class="mt-1 text-xl font-semibold text-foreground" data-testid="service-status-state" data-state="{{ status.state }}">{{ status.label }}</p>
+                <p class="mt-1 text-xs text-muted-foreground">Checked {{ status.checked_at.strftime('%d %b %Y %H:%M') }} UTC</p>
+            </div>
+            <form method="post" action="{{ url_for('service_status.update_subscription') }}" data-testid="service-status-subscription">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if subscribed %}
+                <p class="mb-2 text-sm text-foreground" data-testid="service-status-subscribed">You are subscribed to status updates.</p>
+                <input type="hidden" name="subscribe" value="0">
+                <button type="submit" data-testid="service-status-unsubscribe"
+                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent">
+                    <i data-lucide="bell-off" class="h-4 w-4" aria-hidden="true"></i> Unsubscribe
+                </button>
+                {% else %}
+                <p class="mb-2 text-sm text-muted-foreground" data-testid="service-status-not-subscribed">Get told when an incident opens or is resolved.</p>
+                <input type="hidden" name="subscribe" value="1">
+                <button type="submit" data-testid="service-status-subscribe"
+                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                    <i data-lucide="bell" class="h-4 w-4" aria-hidden="true"></i> Subscribe
+                </button>
+                {% endif %}
+            </form>
+        </div>
+
+        <ul class="mt-5 divide-y divide-border rounded-md border border-border" data-testid="service-status-checks">
+            {% for check in status.checks %}
+            <li class="flex items-center justify-between gap-4 px-4 py-2.5 text-sm">
+                <span class="font-medium text-foreground">{{ check.name }}</span>
+                <span class="flex items-center gap-3">
+                    <span class="text-muted-foreground">{{ check.detail }}</span>
+                    {{ state_badge(check.state) }}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    {% if status.open_incidents %}
+    <section aria-labelledby="open-incidents-heading" data-testid="service-status-open-incidents">
+        <h2 id="open-incidents-heading" class="mb-2 text-base font-semibold text-foreground">Ongoing incidents</h2>
+        <ul class="space-y-2">
+            {% for incident in status.open_incidents %}
+            <li class="rounded-lg border border-border bg-card p-4">
+                <div class="flex items-center justify-between gap-3">
+                    <span class="font-medium text-foreground">{{ incident.title }}</span>
+                    {{ state_badge(incident.impact) }}
+                </div>
+                {% if incident.summary %}<p class="mt-1 text-sm text-muted-foreground">{{ incident.summary }}</p>{% endif %}
+                <p class="mt-1 text-xs text-muted-foreground">Since {{ incident.started_at.strftime('%d %b %Y %H:%M') }} UTC</p>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    <section aria-labelledby="incident-history-heading">
+        <h2 id="incident-history-heading" class="mb-2 text-base font-semibold text-foreground">Incident history</h2>
+        {% if status.history %}
+        <div class="overflow-x-auto rounded-lg border border-border">
+            <table class="w-full text-sm" data-testid="service-status-history">
+                <thead class="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                        <th class="px-4 py-2.5">Incident</th>
+                        <th class="px-4 py-2.5">Impact</th>
+                        <th class="px-4 py-2.5">Started</th>
+                        <th class="px-4 py-2.5">Resolved</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    {% for incident in status.history %}
+                    <tr data-testid="service-incident-{{ incident.id }}">
+                        <td class="px-4 py-2.5 font-medium text-foreground">{{ incident.title }}</td>
+                        <td class="px-4 py-2.5">{{ state_badge(incident.impact) }}</td>
+                        <td class="px-4 py-2.5 text-muted-foreground">{{ incident.started_at.strftime('%d %b %Y %H:%M') }}</td>
+                        <td class="px-4 py-2.5 text-muted-foreground">{{ incident.resolved_at.strftime('%d %b %Y %H:%M') if incident.resolved_at else 'Ongoing' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        {{ empty_state(
+            title='No incidents in the last 90 days',
+            description='When the platform is degraded or down, the incident is listed here with when it started and when it was resolved.',
+            icon='shield-check'
+        ) }}
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

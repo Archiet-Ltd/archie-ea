@@ -39,6 +39,20 @@ ROLE_PLATFORM_ADMIN = "platform_admin"
 ROLE_SECURITY_ARCHITECT = "security_architect"
 ROLE_DATA_ARCHITECT = "data_architect"
 
+# R1-B36 (TB-0146): promoted from unassignable to assignable, 2026-10-04.
+# finance: licence/contract cost exposure had no owner who could act on it.
+# compliance: RegulatoryFramework/ComplianceControl is a security_architect-owned
+# surface today; this role is the one who actually works the control backlog.
+# risk: SolutionRisk/the risk register had readers with no accountable owner.
+# operations: service incidents and connector health had no persona of record.
+# non_technical_owner: a business-side application/capability owner who is not
+# an architect -- read-focused, named directly in the brief's objective line.
+ROLE_FINANCE = "finance"
+ROLE_COMPLIANCE = "compliance"
+ROLE_RISK = "risk"
+ROLE_OPERATIONS = "operations"
+ROLE_NON_TECHNICAL_OWNER = "non_technical_owner"
+
 VALID_ROLES = [
     ROLE_SOLUTION_ARCHITECT,
     ROLE_ENTERPRISE_ARCHITECT,
@@ -51,6 +65,11 @@ VALID_ROLES = [
     ROLE_PLATFORM_ADMIN,
     ROLE_SECURITY_ARCHITECT,
     ROLE_DATA_ARCHITECT,
+    ROLE_FINANCE,
+    ROLE_COMPLIANCE,
+    ROLE_RISK,
+    ROLE_OPERATIONS,
+    ROLE_NON_TECHNICAL_OWNER,
 ]
 
 # Role display names for UI
@@ -66,6 +85,11 @@ ROLE_DISPLAY_NAMES = {
     ROLE_PLATFORM_ADMIN: "Platform Admin",
     ROLE_SECURITY_ARCHITECT: "Security Architect",
     ROLE_DATA_ARCHITECT: "Data Architect",
+    ROLE_FINANCE: "Finance",
+    ROLE_COMPLIANCE: "Compliance",
+    ROLE_RISK: "Risk",
+    ROLE_OPERATIONS: "Operations",
+    ROLE_NON_TECHNICAL_OWNER: "Non-Technical Owner",
 }
 
 
@@ -159,6 +183,18 @@ class User(UserMixin, db.Model):
     external_id = db.Column(db.String(255), index=True)
     sso_provider = db.Column(db.String(50))
 
+    # Multi-factor authentication (R1-B12 PR 2, TB-0144/PB-0100). Required
+    # for administrators (app.services.mfa_service.required_for) regardless
+    # of sign-in path (password, OIDC or SAML); an administrator who has not
+    # enrolled yet is sent to enrol, not let through. Not Fernet-encrypted
+    # like SSOConfig.client_secret: pyotp secrets are base32, high-entropy,
+    # and rotated by re-enrolling -- a mirror of the existing
+    # password_hash column's own protection level, not a lesser one.
+    mfa_secret = db.Column(db.String(64))
+    mfa_enabled = db.Column(
+        db.Boolean, default=False, nullable=False, server_default=db.text("false")
+    )
+
     # Onboarding fields
     role_archetype = db.Column(
         db.String(50)
@@ -185,8 +221,95 @@ class User(UserMixin, db.Model):
 
     # Multi-tenancy: every user belongs to exactly one organization
     organization_id = db.Column(db.Integer, db.ForeignKey("organizations.id"), nullable=False)
-    is_org_admin = db.Column(db.Boolean, default=False)
+
+    # is_org_admin is now a derived property (see below).  The column
+    # stays for backward compatibility (never dropped — consolidation rule 6)
+    # but the system of record for "is this user an organisation administrator"
+    # is Permission.ADMINISTER via is_admin().  The backfill command
+    # `flask reconcile-admin-flags` sets every row's is_org_admin to match
+    # is_admin() and lists any disagreements it found.
+    _is_org_admin = db.Column("is_org_admin", db.Boolean, default=False)
+
+    # Cross-tenant super-admin flag.  Distinct from org-level admin:
+    # is_platform_admin gates @platform_admin_required routes (organisation
+    # list, error telemetry) and is NOT derived from is_admin() — a platform
+    # admin must hold BOTH this flag AND Permission.ADMINISTER.
     is_platform_admin = db.Column(db.Boolean, default=False)
+
+    @property
+    def is_org_admin(self):
+        """True when this user is an organisation administrator of their own
+        (home) organisation.
+
+        Delegates to ``rbac_service.is_org_admin(self, self.organization_id)``
+        — the one check every caller uses for this question — rather than
+        computing its own answer, so this property and that function can
+        never disagree for the user's own organisation.  A grant made only in
+        a foreign organisation (OrgRole, for a user who belongs to several)
+        is correctly excluded: see ``rbac_service.is_org_admin``.  The
+        ``is_org_admin`` database column is a denormalised copy kept current
+        by ``flask reconcile-admin-flags`` and by every grant/revoke site
+        (see ``grant_org_admin`` / ``revoke_org_admin`` below); it is never
+        read for an auth decision."""
+        from app.services.rbac_service import rbac_service
+
+        return rbac_service.is_org_admin(self, self.organization_id)
+
+    @is_org_admin.setter
+    def is_org_admin(self, value):
+        """Assign the Administrator role when set to True, so is_admin()
+        returns True.  The False case is a no-op — revoking org-admin status
+        should be done by assigning a different Role directly, not by writing
+        the denormalised flag.  This setter exists as a migration path for the
+        common ``user.is_org_admin = True`` pattern found across the codebase."""
+        if value:
+            self.grant_org_admin()
+
+    def grant_org_admin(self):
+        """Grant organisation-admin authority in this user's OWN organisation.
+
+        Assigns the Administrator role — the one system of record for "is
+        this user an organisation administrator" (Permission.ADMINISTER via
+        is_admin()) — and keeps the denormalised ``is_org_admin`` column live
+        immediately, rather than only after the next ``flask
+        reconcile-admin-flags`` run, because code that reads the column
+        directly (database-level guards on transformation commands) must see
+        the same answer the instant the grant happens.
+
+        Every grant site (registration, invitation acceptance, the team page,
+        the organisation admin toggle) calls this one method instead of each
+        re-deriving its own copy, so a new site cannot drift from the others.
+        Never call this for a grant into an organisation other than the
+        user's own ``organization_id``: the Administrator role is global to
+        the user, so granting it for a foreign organisation would also make
+        the user an administrator of their own organisation — use
+        ``OrgRole.set_role`` alone for a foreign-organisation grant.
+        """
+        admin_role = Role.query.filter_by(name="Administrator").first()
+        if admin_role is not None:
+            self.role = admin_role
+            self._is_org_admin = True
+
+    def revoke_org_admin(self, fallback_role=None):
+        """Revoke organisation-admin authority, unless the user is a platform admin.
+
+        A no-op when the user does not currently hold admin authority, and
+        also when the user is a platform admin: ``is_platform_admin`` (see
+        above) requires Permission.ADMINISTER as well as the flag, so an
+        org-scoped revoke must never strip it as a side effect of leaving, or
+        being removed from, one organisation — not even when the caller
+        asked for a specific ``fallback_role``.
+
+        Demotes to ``fallback_role`` when given (the role an admin explicitly
+        picked, for callers that let one be chosen directly, e.g. the change
+        account-type page), otherwise to the default Role, same as before.
+        """
+        if not self.is_admin() or self.is_platform_admin:
+            return
+        target_role = fallback_role or Role.query.filter_by(default=True).first()
+        if target_role is not None:
+            self.role = target_role
+        self._is_org_admin = False
 
     # PLT-018: Business unit scoping — links user to a BusinessActor (actor_type='Department' or similar)
     business_unit_id = db.Column(db.Integer, db.ForeignKey("business_actors.id"), nullable=True)  # migration-exempt
@@ -250,12 +373,8 @@ class User(UserMixin, db.Model):
 
     def can(self, permissions):
         # Primary check: bitfield on Role model
-        if (
-            self.role is not None
-            and self.role.permissions is not None
-            and (self.role.permissions & permissions) == permissions
-        ):
-            return True
+        if self.role is not None and self.role.permissions is not None:
+            return (self.role.permissions & permissions) == permissions
         # Fallback: check UserRole junction table for granular RBAC
         try:
             from app.models.permission import UserRole
@@ -297,30 +416,9 @@ class User(UserMixin, db.Model):
 
     # ---------------- Token Methods ----------------
 
-    def generate_confirmation_token(self):
-        s = Serializer(current_app.config["SECRET_KEY"])
-        return s.dumps({"confirm": self.id})
-
     def generate_email_change_token(self, new_email):
         s = Serializer(current_app.config["SECRET_KEY"])
         return s.dumps({"change_email": self.id, "new_email": new_email})
-
-    def generate_password_reset_token(self):
-        s = Serializer(current_app.config["SECRET_KEY"])
-        return s.dumps({"reset": self.id})
-
-    def confirm_account(self, token, expiration=604800):
-        s = Serializer(current_app.config["SECRET_KEY"])
-        try:
-            data = s.loads(token, max_age=expiration)
-        except (BadSignature, SignatureExpired):
-            return False
-        if data.get("confirm") != self.id:
-            return False
-        self.confirmed = True
-        db.session.add(self)
-        db.session.commit()
-        return True
 
     def change_email(self, token, expiration=3600):
         s = Serializer(current_app.config["SECRET_KEY"])
@@ -344,18 +442,8 @@ class User(UserMixin, db.Model):
         db.session.commit()
         return True
 
-    def reset_password(self, token, new_password, expiration=3600):
-        s = Serializer(current_app.config["SECRET_KEY"])
-        try:
-            data = s.loads(token, max_age=expiration)
-        except (BadSignature, SignatureExpired):
-            return False
-        if data.get("reset") != self.id:
-            return False
-        self.password = new_password
-        db.session.add(self)
-        db.session.commit()
-        return True
+    # Password-reset links are single-use, stored as digests and issued by
+    # AccountService.request_password_reset (app/models/account_token.py).
 
     # ── Enterprise RBAC helpers (ENT-068) ────────────────────────────
 
@@ -496,3 +584,14 @@ def _assign_default_organization(mapper, connection, target):
             orgs.insert().values(name="Default Organization", slug="default")
         )
         target.organization_id = result.inserted_primary_key[0]
+
+
+def _install_plan_limit_guard():
+    """Every flush that adds a person to an organisation is checked against its
+    plan here, whichever path creates them (see billing_plans.check_capacity)."""
+    from app.services.billing_plans import install_user_limit_guard
+
+    install_user_limit_guard()
+
+
+_install_plan_limit_guard()

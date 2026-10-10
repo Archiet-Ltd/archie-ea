@@ -1000,6 +1000,12 @@ def update_webhook(solution_id, webhook_id):
     PUT /api/solutions/<id>/webhooks/<wid>
     """
     from app.models.spec_webhook import SpecWebhook
+    from app.models.solution_models import Solution
+    from app.utils.route_guards import require_entity
+
+    # A webhook carries no organisation of its own; its solution does. Listing
+    # already resolves the solution first; editing, deleting and firing must too.
+    require_entity(Solution, solution_id, description="Solution not found")
 
     webhook = SpecWebhook.query.filter_by(id=webhook_id, solution_id=solution_id).first()
     if not webhook:
@@ -1051,6 +1057,12 @@ def delete_webhook(solution_id, webhook_id):
     DELETE /api/solutions/<id>/webhooks/<wid>
     """
     from app.models.spec_webhook import SpecWebhook
+    from app.models.solution_models import Solution
+    from app.utils.route_guards import require_entity
+
+    # A webhook carries no organisation of its own; its solution does. Listing
+    # already resolves the solution first; editing, deleting and firing must too.
+    require_entity(Solution, solution_id, description="Solution not found")
 
     webhook = SpecWebhook.query.filter_by(id=webhook_id, solution_id=solution_id).first()
     if not webhook:
@@ -1071,6 +1083,12 @@ def test_webhook(solution_id, webhook_id):
     """
     from app.models.spec_webhook import SpecWebhook
     from app.modules.solutions_product.services.drift_remediation_service import DriftRemediationService
+    from app.models.solution_models import Solution
+    from app.utils.route_guards import require_entity
+
+    # A webhook carries no organisation of its own; its solution does. Listing
+    # already resolves the solution first; editing, deleting and firing must too.
+    require_entity(Solution, solution_id, description="Solution not found")
 
     webhook = SpecWebhook.query.filter_by(id=webhook_id, solution_id=solution_id).first()
     if not webhook:

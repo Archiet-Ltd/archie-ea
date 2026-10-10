@@ -41,15 +41,15 @@ def _login(page, base, email):
 @pytest.mark.smoke
 @pytest.mark.journey
 def test_duplicate_detection_run_persists_after_reload(browser, live_server, seeded):
-    """An enterprise architect opens the Duplicate Detection dashboard, runs
-    detection through the real modal, sees the completion feedback panel,
+    """A platform admin (running detection is platform-admin only) opens the
+    Duplicate Detection dashboard, runs detection through the real modal, sees the completion feedback panel,
     then reloads the page and confirms the run is recorded server-side (not
     just held in the page's own Alpine state)."""
     context = browser.new_context(ignore_https_errors=True)
     page = context.new_page()
     page.on("dialog", lambda d: d.accept())
     try:
-        _login(page, live_server, seeded["emails"]["enterprise_architect"])
+        _login(page, live_server, seeded["emails"]["platform_admin"])
 
         run_name = "Smoke Run %d" % int(time.time() * 1000)
         dashboard_url = live_server + "/duplicate-detection/simple"
@@ -57,7 +57,9 @@ def test_duplicate_detection_run_persists_after_reload(browser, live_server, see
         page.goto(dashboard_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
         # ---- Open the real "Run Detection" control ---------------------------
-        page.get_by_role("button", name="Run duplicate detection").click()
+        # exact: once the dashboard finishes loading with no groups, its empty
+        # state adds a second control, "Run duplicate detection now".
+        page.get_by_role("button", name="Run duplicate detection", exact=True).click()
         expect(page.locator("#run-detection-modal-title")).to_be_visible(timeout=PAGE_TIMEOUT)
         page.fill('input[placeholder="e.g., Q1 2026 Detection"]', run_name)
 

@@ -48,8 +48,12 @@ import json
 from datetime import datetime, timedelta
 from html import escape
 
+from werkzeug.exceptions import HTTPException
+
 from app import csrf
 from app.extensions import db
+from app.services.billing_plans import PlanLimitReached
+from app.services import solution_prompt_override_service
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
 from ...forms.admin_forms import (
@@ -62,9 +66,14 @@ from ...forms.admin_forms import (
 )
 from app.modules.account.forms.account_forms import CreatePasswordForm
 from app.decorators import admin_required, audit_log, governance_gate_reader_required
-from app.middleware.tenant_decorators import org_admin_required, platform_admin_required
+from app.middleware.tenant_decorators import (
+    org_admin_required,
+    platform_admin_required,
+    require_org_or_platform_admin,
+)
 from app.models import APISettings, EditableHTML, Permission, Role, User
 from app.models.organization import Organization
+from app.models.org_role import OrgRole
 from app.models.ai_service import AIPromptTemplate, AIPromptTemplateVersion
 from app.models.feature_flags import FeatureFlag, FeatureState, FeatureType
 from app.modules.admin.v2.services.llm_service_v2 import test_api_key
@@ -385,6 +394,22 @@ def dashboard():
 # ============================================================================
 
 
+def _plan_limit():
+    """(org id, people-limit status) for the signed-in admin's organisation.
+
+    The form shows the limit and an upgrade link instead of the submit when
+    the plan is full. The refusal itself is made when the user is saved
+    (billing_plans.check_capacity), which also covers two admins adding the
+    last place at once: the second sees the same limit message.
+    """
+    org_id = getattr(current_user, "organization_id", None)
+    if org_id is None:
+        return None, None
+    from app.services.billing_plans import user_limit_status
+
+    return org_id, user_limit_status(org_id)
+
+
 @admin_bp_v2.route("/new-user", methods=["GET", "POST"])
 @timed_route
 @login_required
@@ -393,16 +418,24 @@ def dashboard():
 def new_user():
     """Create a new user."""
     form = NewUserForm()
-    if form.validate_on_submit():
-        user = _svc.create_user(
-            first_name=form.first_name.data,
-            last_name=form.last_name.data,
-            email=form.email.data,
-            password=form.password.data,
-            role=form.role.data,
-        )
-        flash("User {} successfully created".format(user.full_name()), "form-success")
-    return render_template("admin/new_user.html", form=form)
+    org_id, plan_limit = _plan_limit()
+    if form.validate_on_submit() and not (plan_limit and plan_limit["limit_reached"]):
+        try:
+            user = _svc.create_user(
+                first_name=form.first_name.data,
+                last_name=form.last_name.data,
+                email=form.email.data,
+                password=form.password.data,
+                role=form.role.data,
+                organization_id=org_id,
+            )
+        except PlanLimitReached as exc:
+            db.session.rollback()
+            plan_limit = exc.status
+        else:
+            flash("User {} successfully created".format(user.full_name()), "form-success")
+            org_id, plan_limit = _plan_limit()
+    return render_template("admin/new_user.html", form=form, plan_limit=plan_limit)
 
 
 @admin_bp_v2.route("/invite-user", methods=["GET", "POST"])
@@ -413,15 +446,36 @@ def new_user():
 def invite_user():
     """Invites a new user to create an account and set their own password."""
     form = InviteUserForm()
-    if form.validate_on_submit():
-        user = _svc.invite_user(
-            first_name=form.first_name.data,
-            last_name=form.last_name.data,
-            email=form.email.data,
-            role=form.role.data,
-        )
-        flash("User {} successfully invited".format(user.full_name()), "form-success")
-    return render_template("admin/new_user.html", form=form)
+    org_id, plan_limit = _plan_limit()
+    if form.validate_on_submit() and not (plan_limit and plan_limit["limit_reached"]):
+        from app.modules.account.services.invitation_service import InvitationError
+
+        try:
+            user, delivered, error = _svc.invite_user(
+                first_name=form.first_name.data,
+                last_name=form.last_name.data,
+                email=form.email.data,
+                role=form.role.data,
+                organization_id=org_id,
+            )
+        except PlanLimitReached as exc:
+            db.session.rollback()
+            plan_limit = exc.status
+        except InvitationError as exc:
+            db.session.rollback()
+            flash(exc.message, "form-error")
+        else:
+            if delivered:
+                flash("Invitation sent to {}.".format(user.email), "form-success")
+            else:
+                flash(
+                    "The invitation to {} could not be sent: {} Resend it from the Team page.".format(
+                        user.email, error
+                    ),
+                    "form-error",
+                )
+            org_id, plan_limit = _plan_limit()
+    return render_template("admin/new_user.html", form=form, plan_limit=plan_limit)
 
 
 @admin_bp_v2.route("/manage-users")
@@ -436,6 +490,7 @@ def manage_users_redirect():
 @admin_required
 def registered_users():
     """View all registered users."""
+    require_org_or_platform_admin(g.current_org_id)
     users = _svc.get_all_users()
     roles = _svc.get_all_roles()
     # A-02: get_all_users() is (correctly) org-scoped — see the
@@ -445,7 +500,7 @@ def registered_users():
     # /admin/organizations read as a platform undercounting itself rather
     # than the same figure viewed at two different scopes. Name the scope
     # and surface the platform-wide total so the two views reconcile.
-    current_org = Organization.query.get(g.current_org_id)
+    current_org = db.session.get(Organization, g.current_org_id)
     platform_total_users = User.query.count()
     return render_template(
         "admin/registered_users.html",
@@ -463,6 +518,7 @@ def registered_users():
 @admin_required
 def user_info(user_id):
     """View a user's profile."""
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -474,6 +530,17 @@ def user_info(user_id):
 @audit_log("change_user_email")
 def change_user_email(user_id):
     """Change a user's email."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and change
+    # org B's own administrator's email out from under them. Same
+    # tenant_decorators.require_org_or_platform_admin guard used by every
+    # other fixed route on this branch (set_user_password,
+    # api_bulk_delete_users, webhook_settings, the D4-D6 routes).
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     form = ChangeUserEmailForm()
     if form.validate_on_submit():
@@ -494,6 +561,17 @@ def change_user_email(user_id):
 @audit_log("change_account_type")
 def change_account_type(user_id):
     """Change a user's account type."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and demote
+    # org B's own administrator, or promote any of that org's users --
+    # same session-switch IDOR class as change_user_email (commit 7ae1b168)
+    # and set_user_password; same tenant_decorators
+    # .require_org_or_platform_admin guard, reproduced by the refuter.
+    require_org_or_platform_admin(g.current_org_id)
     if current_user.id == user_id:
         flash(
             "You cannot change the type of your own account. Please ask "
@@ -529,6 +607,17 @@ def change_account_type(user_id):
 @audit_log("set_user_password")
 def set_user_password(user_id):
     """Set or reset a user's password."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and set a new
+    # password for org B's own administrator -- full account takeover, no
+    # reset-flow step needed. Found by the sweep that found change_user_email's
+    # identical gap (commit 7ae1b168); same tenant_decorators
+    # .require_org_or_platform_admin guard.
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     form = CreatePasswordForm()
     if form.validate_on_submit():
@@ -549,6 +638,7 @@ def set_user_password(user_id):
 @admin_required
 def delete_user_request(user_id):
     """Request deletion of a user's account."""
+    require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     return render_template("admin/manage_user.html", user=user)
 
@@ -559,6 +649,17 @@ def delete_user_request(user_id):
 @admin_required
 def delete_user(user_id):
     """Delete a user's account."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit (an Administrator
+    # in their own org is globally True), while get_user_or_404 below
+    # correctly scopes its lookup to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and delete
+    # org B's own administrator -- same session-switch IDOR class as
+    # change_user_email (commit 7ae1b168) and set_user_password; same
+    # tenant_decorators.require_org_or_platform_admin guard, reproduced by
+    # the refuter.
+    require_org_or_platform_admin(g.current_org_id)
     if current_user.id == user_id:
         flash(
             "You cannot delete your own account. Please ask another "
@@ -598,7 +699,7 @@ def delete_user(user_id):
 @admin_bp_v2.route("/_update_editor_contents", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("update_editor_contents")
 def update_editor_contents():
     """Update the contents of an editor."""
@@ -1053,7 +1154,6 @@ def consolidation_status():
 @admin_bp_v2.route("/feature-flags")
 @timed_route
 @platform_admin_required
-@admin_required
 def feature_flags():
     """Feature flags management page with pagination."""
     page = safe_int_arg('page', 1, minimum=1)
@@ -1155,7 +1255,7 @@ def feature_flags():
 @admin_bp_v2.route("/feature-flags/new", methods=["GET", "POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("create_feature_flag")
 def feature_flag_new():
     """Create new feature flag."""
@@ -1204,7 +1304,7 @@ def feature_flag_new():
 @admin_bp_v2.route("/feature-flags/<int:id>/edit", methods=["GET", "POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("edit_feature_flag")
 def feature_flag_edit(id):
     """Edit feature flag."""
@@ -1261,7 +1361,7 @@ def feature_flag_edit(id):
 @admin_bp_v2.route("/feature-flags/<int:id>/toggle", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("toggle_feature_flag")
 def feature_flag_toggle(id):
     """Quick toggle feature enabled/disabled."""
@@ -1288,7 +1388,7 @@ def feature_flag_toggle(id):
 @admin_bp_v2.route("/feature-flags/<int:id>/delete", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("delete_feature_flag")
 def feature_flag_delete(id):
     """Delete feature flag."""
@@ -1308,7 +1408,7 @@ def feature_flag_delete(id):
 @admin_bp_v2.route("/feature-flags/discover-sidebar")
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def feature_flags_discover_sidebar():
     """Discover sidebar menu items for feature flagging."""
     try:
@@ -1352,7 +1452,7 @@ def feature_flags_discover_sidebar():
 @admin_bp_v2.route("/feature-flags/discover-sidebar/create", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("create_feature_flags_from_sidebar")
 def feature_flags_create_from_sidebar():
     """Create feature flags from selected sidebar items."""
@@ -1435,7 +1535,7 @@ def feature_flags_create_from_sidebar():
 @admin_bp_v2.route("/abacus-settings", methods=["GET", "POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("update_abacus_settings")
 def abacus_settings():
     """Manage Abacus connector configuration."""
@@ -1657,7 +1757,7 @@ def abacus_settings():
 @admin_bp_v2.route("/abacus-settings/test-connection", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("test_abacus_connection")
 def test_abacus_connection():
     """Test Abacus connection."""
@@ -1746,7 +1846,7 @@ def test_abacus_connection():
 @admin_bp_v2.route("/abacus-settings/trigger-sync", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("trigger_abacus_sync")
 def trigger_abacus_sync():
     """Trigger manual Abacus synchronization."""
@@ -1798,7 +1898,7 @@ def trigger_abacus_sync():
 @admin_bp_v2.route("/abacus-settings/sync-status", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def abacus_sync_status():
     """API endpoint to check current sync job status."""
     from app.models import Job
@@ -1833,7 +1933,7 @@ def abacus_sync_status():
 @admin_bp_v2.route("/abacus-settings/cancel-job/<int:job_id>", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("cancel_abacus_job")
 def cancel_abacus_job(job_id):
     """Cancel a running or pending Abacus sync job."""
@@ -1869,7 +1969,7 @@ def cancel_abacus_job(job_id):
 
 @admin_bp_v2.route("/abacus-settings/clear-stale-jobs", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def clear_stale_abacus_jobs():
     """Force-clear sync jobs stuck in_progress for more than 1 hour."""
     from app.models import Job  # local import to match pattern
@@ -1896,7 +1996,7 @@ def clear_stale_abacus_jobs():
 
 @admin_bp_v2.route("/abacus-settings/discover-types", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def discover_abacus_types():
     """Discover available ComponentType names from the Abacus API."""
     import asyncio
@@ -1939,7 +2039,7 @@ def discover_abacus_types():
 @admin_bp_v2.route("/abacus-settings/stats", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def abacus_stats():
     """Get Abacus import statistics."""
     try:
@@ -1981,7 +2081,7 @@ def abacus_stats():
 @admin_bp_v2.route("/abacus-settings/discover-filters", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def discover_abacus_filters():
     """Discover available filter dimensions from the Abacus API.
 
@@ -2039,7 +2139,7 @@ def discover_abacus_filters():
 @admin_bp_v2.route("/abacus-dashboard", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def abacus_dashboard():
     """Display Abacus sync dashboard with health metrics and statistics."""
     from app.models.application_portfolio import ApplicationComponent
@@ -2121,7 +2221,7 @@ def abacus_dashboard():
 
 @admin_bp_v2.route("/abacus-settings/save-relationship-mappings", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def save_relationship_mappings():
     """Save custom OutConnection → ArchiMate relationship mappings."""
     from app.config.abacus_field_mapping import save_outconnection_mappings
@@ -2148,7 +2248,7 @@ def save_relationship_mappings():
 
 @admin_bp_v2.route("/abacus-settings/relationship-mappings", methods=["GET"])
 @login_required
-@admin_required
+@platform_admin_required
 def get_relationship_mappings():
     """Get current OutConnection → ArchiMate relationship mappings."""
     from app.config.abacus_field_mapping import (
@@ -2326,7 +2426,7 @@ def sso_settings():
 @admin_bp_v2.route("/jira-settings", methods=["GET", "POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_settings():
     """Manage Jira push integration configuration."""
     from flask_wtf import FlaskForm
@@ -2480,7 +2580,7 @@ def jira_settings():
 @admin_bp_v2.route("/jira-settings/test-connection", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_test_connection():
     """Test Jira API connectivity."""
     import asyncio
@@ -2602,7 +2702,7 @@ def jira_webhook():
 
 @admin_bp_v2.route("/jira-settings/save-env-config", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 def save_env_jira_config():
     """Save .env Jira credentials to database."""
     import os
@@ -2645,7 +2745,7 @@ def save_env_jira_config():
 @admin_bp_v2.route("/jira-settings/trigger-push", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_trigger_push():
     """Create a Job and start pushing applications to Jira."""
     from app.models.job import Job, JobStatus
@@ -2685,7 +2785,7 @@ def jira_trigger_push():
 @admin_bp_v2.route("/jira-settings/push-status", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_push_status():
     """Return JSON push status for polling."""
     from app.models.job import Job
@@ -2712,7 +2812,7 @@ def jira_push_status():
 @admin_bp_v2.route("/jira-settings/kanban-push-status", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_kanban_push_status():
     """Return JSON kanban push status for polling."""
     try:
@@ -2728,7 +2828,7 @@ def jira_kanban_push_status():
 @admin_bp_v2.route("/jira-settings/trigger-kanban-push", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_trigger_kanban_push():
     """Push all unpushed KanbanCard rows to Jira."""
     try:
@@ -2744,7 +2844,7 @@ def jira_trigger_kanban_push():
 @admin_bp_v2.route("/jira-settings/push-epics", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_push_epics():
     """Create one Jira Epic per ADM phase as an ArchiMate Plateau."""
     try:
@@ -2759,7 +2859,7 @@ def jira_push_epics():
 @admin_bp_v2.route("/jira-settings/push-applications", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_push_applications():
     """Push ApplicationComponents (ArchiMate Application Layer, Phase C/D) to Jira."""
     try:
@@ -2774,7 +2874,7 @@ def jira_push_applications():
 @admin_bp_v2.route("/jira-settings/push-dependencies", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_push_dependencies():
     """Create Jira Subtasks from KanbanCard.depends_on (ArchiMate TriggeringRelationship).
 
@@ -2792,7 +2892,7 @@ def jira_push_dependencies():
 @admin_bp_v2.route("/jira-settings/field-discovery", methods=["GET"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def jira_field_discovery():
     """Trigger discover_fields and return available Jira fields."""
     import asyncio
@@ -2841,6 +2941,12 @@ def jira_field_discovery():
 @admin_bp_v2.route("/seed-management")
 @timed_route
 @login_required
+# SeedManagementService seeds global reference/catalogue tables shared by
+# every tenant (vendor organisations/products, capability taxonomies, feature
+# flags, APQC processes, AI prompt templates, ...), none of them org-scoped.
+# admin_required alone let any tenant's own admin reach it
+# (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def seed_management():
     """Seed management dashboard."""
@@ -2857,6 +2963,7 @@ def seed_management():
 @admin_bp_v2.route("/api/seed-status")
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def seed_status():
     """API: Get current seed status."""
@@ -2873,6 +2980,7 @@ def seed_status():
 @admin_bp_v2.route("/api/seed/<key>", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 @audit_log("seed_data")
 def seed(key):
@@ -2890,6 +2998,7 @@ def seed(key):
 @admin_bp_v2.route("/api/seed-all", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 @audit_log("seed_all_data")
 def seed_all():
@@ -3155,6 +3264,7 @@ def _auto_discover_features(app):
 @admin_required
 def api_list_users():
     """Paginated user list API for canonical data table."""
+    require_org_or_platform_admin(g.current_org_id)
     from sqlalchemy.orm import joinedload
 
     page = safe_int_arg('page', 1, minimum=1)
@@ -3212,6 +3322,15 @@ def api_list_users():
 @admin_required
 def api_bulk_delete_users():
     """Bulk delete users by IDs (cannot delete yourself)."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while the delete
+    # query below correctly scopes to g.current_org_id. Without this guard,
+    # a caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and delete
+    # org B's users outright. Found by the sweep that found
+    # change_user_email's identical gap (commit 7ae1b168); same
+    # tenant_decorators.require_org_or_platform_admin guard.
+    require_org_or_platform_admin(g.current_org_id)
     data = request.get_json() or {}
     ids = data.get("ids", [])
     if not ids or not isinstance(ids, list):
@@ -3229,9 +3348,17 @@ def api_bulk_delete_users():
 @admin_bp_v2.route("/api/roles", methods=["GET"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def api_list_roles():
-    """List all roles with user counts and permission flags."""
+    """List all roles with user counts and permission flags.
+
+    Role is a GLOBAL table (app/models/user.py's Role carries no
+    organization_id) -- reachable by any org admin of their own,
+    brand-new organisation, no invitation into anyone else's org needed.
+    platform_admin_required added alongside this route's own
+    admin_required for every /api/roles verb (list/get/create/update/
+    delete), same as the enterprise-roles sibling finding."""
     roles = Role.query.order_by(Role.name).all()
     items = []
     for role in roles:
@@ -3257,9 +3384,11 @@ def api_list_roles():
 @admin_bp_v2.route("/api/roles/<int:role_id>", methods=["GET"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def api_get_role(role_id):
-    """Get a single role by ID."""
+    """Get a single role by ID. See api_list_roles's docstring: Role is a
+    global table, platform_admin_required required."""
     role = Role.query.get_or_404(role_id)
     users = User.query.filter_by(role_id=role.id, organization_id=g.current_org_id).all()
     return jsonify({
@@ -3280,9 +3409,11 @@ def api_get_role(role_id):
 @admin_bp_v2.route("/api/roles", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def api_create_role():
-    """Create a new custom role."""
+    """Create a new custom role. See api_list_roles's docstring: Role is a
+    global table, platform_admin_required required."""
     data = request.get_json() or {}
     name = (data.get("name") or "").strip()
     if not name:
@@ -3300,9 +3431,11 @@ def api_create_role():
 @admin_bp_v2.route("/api/roles/<int:role_id>", methods=["PUT"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def api_update_role(role_id):
-    """Update a role name or permissions."""
+    """Update a role name or permissions. See api_list_roles's docstring:
+    Role is a global table, platform_admin_required required."""
     role = Role.query.get_or_404(role_id)
     if role.name in ("Administrator", "User"):
         return jsonify({"success": False, "error": "System roles cannot be modified"}), 403
@@ -3319,9 +3452,12 @@ def api_update_role(role_id):
 @admin_bp_v2.route("/api/roles/<int:role_id>", methods=["DELETE"])
 @timed_route
 @login_required
+@platform_admin_required
 @admin_required
 def api_delete_role(role_id):
-    """Delete a custom role. Reassigns users to the default User role."""
+    """Delete a custom role. Reassigns users to the default User role. See
+    api_list_roles's docstring: Role is a global table,
+    platform_admin_required required."""
     role = Role.query.get_or_404(role_id)
     if role.name in ("Administrator", "User"):
         return jsonify({"success": False, "error": "System roles cannot be deleted"}), 403
@@ -3370,6 +3506,7 @@ def api_list_enterprise_roles():
 @admin_required
 def api_enterprise_role_users():
     """List all users with their enterprise role assignments."""
+    require_org_or_platform_admin(g.current_org_id)
     users = User.query.filter_by(organization_id=g.current_org_id).order_by(User.last_name, User.first_name).all()
     items = []
     for u in users:
@@ -3389,6 +3526,16 @@ def api_enterprise_role_users():
 @admin_required
 def api_assign_enterprise_role():
     """Assign an enterprise role to a user."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while the lookup
+    # below correctly scopes to g.current_org_id. Without this guard, a
+    # caller who is an Administrator in org A but holds only a Viewer
+    # OrgRole in org B can switch the active session to org B and assign
+    # any enterprise role to that org's users -- the JSON API twin of
+    # change_account_type's session-switch IDOR (commit 7ae1b168 class);
+    # same tenant_decorators.require_org_or_platform_admin guard,
+    # reproduced by the refuter.
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.user import VALID_ROLES
     data = request.get_json() or {}
     user_id = data.get("user_id")
@@ -3408,15 +3555,51 @@ def api_assign_enterprise_role():
 # =============================================================================
 
 
-@admin_bp_v2.route("/audit-log")
+@admin_bp_v2.route("/audit-log", methods=["GET", "POST"])
 @login_required
-@admin_required
+@governance_gate_reader_required
 def audit_log_viewer():
-    """PLT-032: Admin audit log query UI for SOX/HIPAA compliance."""
+    """PLT-032: the organisation's audit trail — query, export in full, verify.
+
+    Readers are organisation administrators and security architects (the same
+    readers as the governance gates). Every read carries the caller's
+    organisation predicate, so an export or verification covers only the
+    caller's own organisation.
+
+    * ``GET``            — filtered, paginated listing.
+    * ``GET ?export=csv`` — every matching entry streamed as CSV, no row cap;
+      the row count and organisation are stated in the file and headers.
+    * ``POST``           — verify the organisation's integrity chain; the
+      result is itself recorded as an audit entry and shown on reload.
+    """
+    import csv
+    import io
     import logging
     from datetime import datetime as dt
 
+    from flask import Response, abort, stream_with_context
+    from sqlalchemy import func
+
+    from app.models.audit_log import AuditLog
+
     logger = logging.getLogger(__name__)
+
+    org_id = getattr(g, "current_org_id", None)
+    if org_id is None:
+        abort(403)
+
+    if request.method == "POST":
+        result = AuditLog.verify_and_record(org_id, user_id=current_user.id)
+        if result["status"] == "broken":
+            flash(
+                f"Integrity check failed at entry #{result['first_broken_id']}: {result['reason']}",
+                "error",
+            )
+        elif result["status"] == "intact":
+            flash(f"Integrity check passed: {result['checked']} entries verified.", "success")
+        else:
+            flash("There are no sealed entries to verify yet.", "info")
+        return redirect(url_for("admin.audit_log_viewer", **request.args.to_dict()))
 
     page = safe_int_arg('page', 1, minimum=1)
     per_page = min(safe_int_arg('per_page', 50, minimum=1, maximum=500), 200)
@@ -3429,107 +3612,158 @@ def audit_log_viewer():
     export_csv = request.args.get("export") == "csv"
 
     entries = []
-    total = 0
+    total = None
     action_types = []
     entity_types = []
+    latest_verification = None
+    load_error = False
 
     try:
-        from app.models.audit_log import AuditLog
-
-        # NOTE: AuditLog's real columns are created_at / user_id / table_name /
-        # record_id (no timestamp/user_email/entity_type/description/is_deleted).
-        # Filters below use the real columns; the model exposes the old names as
-        # read-only display properties for the template/CSV.
-        # admin_required is org-scoped admin, not platform_admin — restrict to
-        # the current org's audit trail.
-        query = AuditLog.query.filter_by(organization_id=g.current_org_id)
+        # AuditLog's real columns are created_at / user_id / table_name /
+        # record_id; the model exposes older names as display properties.
+        criteria = [AuditLog.org_predicate(org_id)]
 
         if date_from:
             try:
-                query = query.filter(AuditLog.created_at >= dt.fromisoformat(date_from))
+                criteria.append(AuditLog.created_at >= dt.fromisoformat(date_from))
             except ValueError:
                 logger.debug("PLT-032: invalid date_from: %s", date_from)
 
         if date_to:
             try:
-                to_dt = dt.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
-                query = query.filter(AuditLog.created_at <= to_dt)
+                to_dt = dt.fromisoformat(date_to).replace(hour=23, minute=59, second=59, microsecond=999999)
+                criteria.append(AuditLog.created_at <= to_dt)
             except ValueError:
                 logger.debug("PLT-032: invalid date_to: %s", date_to)
 
         if user_email:
             # AuditLog stores user_id, not email — resolve matching users first.
-            from app.models.user import User
-
             _uids = [
                 u.id
                 for u in User.query.filter(
                     User.email.ilike(f"%{user_email}%"),
-                    User.organization_id == g.current_org_id,
+                    User.organization_id == org_id,
                 ).all()
             ]
-            query = query.filter(AuditLog.user_id.in_(_uids or [-1]))
+            criteria.append(AuditLog.user_id.in_(_uids or [-1]))
 
         if action_filter:
-            query = query.filter(AuditLog.action == action_filter)
+            criteria.append(AuditLog.action == action_filter)
 
         if entity_type_filter:
-            query = query.filter(AuditLog.table_name == entity_type_filter)
+            criteria.append(AuditLog.table_name == entity_type_filter)
 
         if search_q:
-            query = query.filter(
+            criteria.append(
                 db.or_(
                     AuditLog.table_name.ilike(f"%{search_q}%"),
                     AuditLog.action.ilike(f"%{search_q}%"),
                 )
             )
 
-        query = query.order_by(AuditLog.created_at.desc())
-
-        # Get distinct action types and entity types (table names) for dropdowns
-        action_types = [
-            r[0] for r in db.session.query(AuditLog.action).distinct().order_by(AuditLog.action).all() if r[0]
-        ]
-        entity_types = [
-            r[0] for r in db.session.query(AuditLog.table_name).distinct().order_by(AuditLog.table_name).all() if r[0]
-        ]
-
         if export_csv:
-            import csv
-            import io
-
-            rows = query.limit(10000).all()
-            output = io.StringIO()
-            writer = csv.writer(output)
-            writer.writerow(["timestamp", "user_email", "action", "entity_type", "entity_id", "entity_name", "description", "status"])
-            for row in rows:
-                writer.writerow([
-                    row.timestamp.isoformat() if row.timestamp else "",
-                    row.user_email or "",
-                    row.action,
-                    row.entity_type,
-                    row.entity_id or "",
-                    row.entity_name or "",
-                    row.description or "",
-                    row.status or "",
-                ])
-
-            from flask import Response
-            return Response(
-                output.getvalue(),
-                mimetype="text/csv",
-                headers={"Content-Disposition": "attachment; filename=audit_log_export.csv"},
+            # Snapshot the newest id first so the stated count and the rows
+            # streamed describe the same set, however long the stream runs.
+            upto_id = (
+                db.session.query(func.max(AuditLog.id))
+                .filter(AuditLog.org_predicate(org_id))
+                .scalar()
+            ) or 0
+            row_count = (
+                db.session.query(func.count(AuditLog.id))
+                .filter(*criteria, AuditLog.id <= upto_id)
+                .scalar()
+            )
+            org = db.session.get(Organization, org_id)  # tenant-scoping-ok: the caller's own organisation, by its id
+            org_name = org.name if org is not None else str(org_id)
+            emails = dict(
+                db.session.query(User.id, User.email)
+                .filter(User.organization_id == org_id)
+                .all()
             )
 
+            def _cell(value):
+                if value is None:
+                    return ""
+                if isinstance(value, (dict, list)):
+                    return json.dumps(value, sort_keys=True, default=str)
+                text = str(value)
+                # Spreadsheet formula injection: never let a cell start a formula.
+                return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
+            def _generate():
+                buf = io.StringIO()
+                writer = csv.writer(buf)
+                writer.writerow([
+                    "id", "organisation", "recorded_at", "user", "action",
+                    "entity_type", "entity_id", "description", "old_value",
+                    "new_value", "source_table", "source_id", "prev_hash", "row_hash",
+                ])
+                for row in AuditLog.iter_rows(criteria, upto_id):
+                    record = f"#{row['record_id']}" if row["record_id"] else ""
+                    writer.writerow([_cell(v) for v in (
+                        row["id"],
+                        org_name,
+                        row["created_at"].isoformat() if row["created_at"] else None,
+                        emails.get(row["user_id"], row["user_id"]),
+                        row["action"],
+                        row["table_name"],
+                        row["record_id"],
+                        f"{row['action']} {row['table_name'] or ''}{record}".strip(),
+                        row["old_value"],
+                        row["new_value"],
+                        row["source_table"],
+                        row["source_id"],
+                        row["prev_hash"],
+                        row["row_hash"],
+                    )])
+                    if buf.tell() > 65536:
+                        yield buf.getvalue()
+                        buf.seek(0)
+                        buf.truncate(0)
+                yield buf.getvalue()
+
+            stamp = dt.utcnow().strftime("%Y%m%d-%H%M%S")
+            slug = secure_filename(getattr(org, "slug", None) or f"org-{org_id}") or f"org-{org_id}"
+            return Response(
+                stream_with_context(_generate()),
+                mimetype="text/csv",
+                headers={
+                    "Content-Disposition": f"attachment; filename=audit-log-{slug}-{stamp}.csv",
+                    "X-Audit-Row-Count": str(row_count),
+                    "X-Audit-Organisation": slug,
+                    "Cache-Control": "no-store",
+                },
+            )
+
+        # tenant-scoping-ok: criteria[0] is AuditLog.org_predicate(org_id)
+        query = AuditLog.query.filter(*criteria).order_by(
+            AuditLog.created_at.desc(), AuditLog.id.desc()
+        )
         total = query.count()
         entries = query.offset((page - 1) * per_page).limit(per_page).all()
 
-    except Exception as exc:
-        logger.warning("PLT-032: AuditLog query failed: %s", exc)
+        # Dropdown values come from this organisation's entries only.
+        action_types = [
+            r[0] for r in db.session.query(AuditLog.action)
+            .filter(AuditLog.org_predicate(org_id)).distinct().order_by(AuditLog.action).all() if r[0]
+        ]
+        entity_types = [
+            r[0] for r in db.session.query(AuditLog.table_name)
+            .filter(AuditLog.org_predicate(org_id)).distinct().order_by(AuditLog.table_name).all() if r[0]
+        ]
+        latest_verification = AuditLog.latest_verification(org_id)
 
-    total_pages = (total + per_page - 1) // per_page if per_page else 1
+    except Exception as exc:
+        db.session.rollback()
+        logger.warning("PLT-032: AuditLog query failed: %s", exc, exc_info=True)
+        load_error = True
+
+    total_pages = ((total or 0) + per_page - 1) // per_page if per_page else 1
 
     if request.accept_mimetypes.best == "application/json":
+        if load_error:
+            return jsonify({"error": "The audit log could not be read."}), 500
         return jsonify({
             "entries": [e.to_dict() for e in entries],
             "total": total,
@@ -3553,6 +3787,8 @@ def audit_log_viewer():
         search_q=search_q,
         action_types=action_types,
         entity_types=entity_types,
+        latest_verification=latest_verification,
+        load_error=load_error,
     )
 
 
@@ -3696,6 +3932,17 @@ def report_builder():
 @audit_log("update_webhook_settings")
 def webhook_settings():
     """PLT-015: Manage Slack/Teams webhook subscriptions and notification settings."""
+    # tenant-scoping-ok: admin_required only checks the caller's own,
+    # organisation-independent Permission.ADMINISTER bit, while
+    # WebhookSubscription's TenantMixin scopes the query/create below to
+    # g.current_org_id. Without this guard, a caller who is an
+    # Administrator in org A but holds only a Viewer OrgRole in org B can
+    # switch the active session to org B and plant a webhook URL they
+    # control into org B, which then streams org B's events out to them.
+    # Found by the sweep that found change_user_email's identical gap
+    # (commit 7ae1b168); same tenant_decorators.require_org_or_platform_admin
+    # guard.
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.webhook import WebhookSubscription
 
     VALID_EVENTS = [
@@ -4603,13 +4850,16 @@ def _get_capability_suggestion_default():
         return "(Could not load default prompt)"
 
 
-def _override_key(prompt_key):
-    return f"solution_prompt_{prompt_key}"
-
-
 @admin_bp_v2.route("/solution-prompts")
 @timed_route
 @login_required
+# AIPromptTemplate (app/models/ai_service.py) is a GLOBAL table -- these are
+# the platform's own LLM system prompts, shared by every tenant, not tenant
+# data. admin_required alone let any tenant's own admin read every prompt,
+# its override history and diffs; the write routes on this same resource
+# (update/reset/rollback, below) already require platform_admin_required --
+# the reads were the gap (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def solution_prompts_page():
     """Render the solution AI prompt management page."""
@@ -4618,6 +4868,7 @@ def solution_prompts_page():
 
 @admin_bp_v2.route("/solution-prompts/data")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompts_data():
     """JSON API: return all solution prompt configs merged with DB overrides."""
@@ -4625,7 +4876,7 @@ def solution_prompts_data():
     prompts = []
 
     for key, config in defaults.items():
-        override_name = _override_key(key)
+        override_name = solution_prompt_override_service.override_key(key)
         override = AIPromptTemplate.query.filter_by(name=override_name).first()
 
         prompts.append({
@@ -4647,7 +4898,7 @@ def solution_prompts_data():
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/update", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("update_solution_prompt")
 def solution_prompt_update(prompt_key):
     """Save a custom override for a solution prompt."""
@@ -4661,42 +4912,13 @@ def solution_prompt_update(prompt_key):
     if not prompt_text:
         return jsonify({"error": "Prompt text cannot be empty"}), 400
 
-    override_name = _override_key(prompt_key)
-    override = AIPromptTemplate.query.filter_by(name=override_name).first()
-
-    if not override:
-        override = AIPromptTemplate(
-            name=override_name,
-            description=defaults[prompt_key]["description"],
-            system_prompt=prompt_text,
-            user_prompt_template="",
-            category="solution_prompt",
-            updated_by_id=current_user.id,
-            version=1,
-        )
-        db.session.add(override)
-    else:
-        # A-05: snapshot the state being replaced before mutating — see the
-        # equivalent legacy-blueprint route in solution_prompt_admin.py for
-        # the full rationale. This admin/v2 copy is the one actually
-        # registered at boot (USE_ADMIN_GUARDRAILS defaults on, see
-        # CLAUDE.md "Two parallel code layouts"), so the history/diff/
-        # rollback endpoints below live here, not only in the legacy module.
-        db.session.add(AIPromptTemplateVersion(
-            template_name=override.name,
-            version=override.version or 1,
-            system_prompt=override.system_prompt,
-            change_type="update",
-            updated_by_id=override.updated_by_id,
-        ))
-        override.system_prompt = prompt_text
-        override.updated_at = datetime.utcnow()
-        override.updated_by_id = current_user.id
-        override.version = (override.version or 1) + 1
-
     try:
-        db.session.commit()
+        override = solution_prompt_override_service.update_override(
+            prompt_key, defaults[prompt_key]["description"], prompt_text
+        )
         logger.info("Solution prompt override saved for %s by user %s", prompt_key, current_user.id)
+    except HTTPException:
+        raise
     except Exception:
         db.session.rollback()
         logger.exception("Failed to save solution prompt override for %s", prompt_key)
@@ -4723,7 +4945,7 @@ def solution_prompt_update(prompt_key):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/reset", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("reset_solution_prompt")
 def solution_prompt_reset(prompt_key):
     """Remove custom override, reverting to hardcoded default."""
@@ -4731,25 +4953,15 @@ def solution_prompt_reset(prompt_key):
     if prompt_key not in defaults:
         return jsonify({"error": f"Unknown prompt: {prompt_key}"}), 404
 
-    override_name = _override_key(prompt_key)
-    override = AIPromptTemplate.query.filter_by(name=override_name).first()
-
-    if override:
-        try:
-            db.session.add(AIPromptTemplateVersion(
-                template_name=override.name,
-                version=override.version or 1,
-                system_prompt=override.system_prompt,
-                change_type="reset",
-                updated_by_id=current_user.id,
-            ))
-            db.session.delete(override)
-            db.session.commit()
-            logger.info("Solution prompt override reset for %s by user %s", prompt_key, current_user.id)
-        except Exception:
-            db.session.rollback()
-            logger.exception("Failed to reset solution prompt for %s", prompt_key)
-            return jsonify({"error": "Database error resetting prompt"}), 500
+    try:
+        solution_prompt_override_service.reset_override(prompt_key)
+        logger.info("Solution prompt override reset for %s by user %s", prompt_key, current_user.id)
+    except HTTPException:
+        raise
+    except Exception:
+        db.session.rollback()
+        logger.exception("Failed to reset solution prompt for %s", prompt_key)
+        return jsonify({"error": "Database error resetting prompt"}), 500
 
     config = defaults[prompt_key]
     return jsonify({
@@ -4781,6 +4993,7 @@ def _version_content_v2(prompt_key, version, override_name):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/history")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompt_history(prompt_key):
     """A-05: version history for a prompt override, newest first."""
@@ -4788,7 +5001,7 @@ def solution_prompt_history(prompt_key):
     if prompt_key not in defaults:
         return jsonify({"error": f"Unknown prompt: {prompt_key}"}), 404
 
-    override_name = _override_key(prompt_key)
+    override_name = solution_prompt_override_service.override_key(prompt_key)
     override = AIPromptTemplate.query.filter_by(name=override_name).first()
     history = (
         AIPromptTemplateVersion.query.filter_by(template_name=override_name)
@@ -4821,6 +5034,7 @@ def solution_prompt_history(prompt_key):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/diff")
 @login_required
+@platform_admin_required
 @admin_required
 def solution_prompt_diff(prompt_key):
     """A-05: unified diff between two versions (or a version and "current").
@@ -4835,7 +5049,7 @@ def solution_prompt_diff(prompt_key):
 
     from_v = request.args.get("from", "current")
     to_v = request.args.get("to", "current")
-    override_name = _override_key(prompt_key)
+    override_name = solution_prompt_override_service.override_key(prompt_key)
 
     try:
         from_text = _version_content_v2(prompt_key, from_v, override_name)
@@ -4866,7 +5080,7 @@ def solution_prompt_diff(prompt_key):
 
 @admin_bp_v2.route("/solution-prompts/<prompt_key>/rollback/<int:version>", methods=["POST"])
 @login_required
-@admin_required
+@platform_admin_required
 @audit_log("rollback_solution_prompt")
 def solution_prompt_rollback(prompt_key, version):
     """A-05: restore a prior version's content as the live override."""
@@ -4874,44 +5088,18 @@ def solution_prompt_rollback(prompt_key, version):
     if prompt_key not in defaults:
         return jsonify({"error": f"Unknown prompt: {prompt_key}"}), 404
 
-    override_name = _override_key(prompt_key)
-    target = AIPromptTemplateVersion.query.filter_by(
-        template_name=override_name, version=version
-    ).order_by(AIPromptTemplateVersion.id.desc()).first()
-    if not target:
-        return jsonify({"error": f"No version {version} found for {prompt_key}"}), 404
-
-    override = AIPromptTemplate.query.filter_by(name=override_name).first()
-
     try:
-        if override:
-            db.session.add(AIPromptTemplateVersion(
-                template_name=override.name,
-                version=override.version or 1,
-                system_prompt=override.system_prompt,
-                change_type="update",
-                updated_by_id=current_user.id,
-            ))
-            override.system_prompt = target.system_prompt
-            override.updated_at = datetime.utcnow()
-            override.updated_by_id = current_user.id
-            override.version = (override.version or 1) + 1
-        else:
-            override = AIPromptTemplate(
-                name=override_name,
-                description=defaults[prompt_key]["description"],
-                system_prompt=target.system_prompt,
-                user_prompt_template="",
-                category="solution_prompt",
-                updated_by_id=current_user.id,
-                version=1,
-            )
-            db.session.add(override)
-        db.session.commit()
+        override = solution_prompt_override_service.rollback_override(
+            prompt_key, version, defaults[prompt_key]["description"]
+        )
+        if override is None:
+            return jsonify({"error": f"No version {version} found for {prompt_key}"}), 404
         logger.info(
             "Solution prompt %s rolled back to version %s by user %s",
             prompt_key, version, current_user.id,
         )
+    except HTTPException:
+        raise
     except Exception:
         db.session.rollback()
         logger.exception("Failed to roll back solution prompt %s to version %s", prompt_key, version)
@@ -4994,7 +5182,7 @@ def vendor_pricing_import():
 @admin_bp_v2.route("/vendor-pricing/confirm", methods=["POST"])
 @timed_route
 @login_required
-@admin_required
+@platform_admin_required
 def vendor_pricing_confirm():
     """Confirm staged pricing items — write to VendorProductPricing as contract_verified."""
     from difflib import SequenceMatcher
@@ -5180,6 +5368,7 @@ def governance_gates_list():
 @audit_log("admin_governance_gate_create")
 def governance_gates_create():
     """Create a new governance gate."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     data = request.get_json()
@@ -5216,6 +5405,7 @@ def governance_gates_create():
 @audit_log("admin_governance_gate_update")
 def governance_gates_update(gate_id):
     """Update an existing governance gate."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     gate = GovernanceGate.query.get_or_404(gate_id)
@@ -5258,6 +5448,7 @@ def governance_gates_update(gate_id):
 @audit_log("admin_governance_gate_delete")
 def governance_gates_delete(gate_id):
     """Soft-delete a governance gate by disabling it."""
+    require_org_or_platform_admin(g.current_org_id)
     from app.models.governance_gates import GovernanceGate
 
     gate = GovernanceGate.query.get_or_404(gate_id)
@@ -5280,11 +5471,17 @@ def governance_gates_delete(gate_id):
 @platform_admin_required
 def organizations_list():
     """List all organizations with user counts."""
+    from app.services.billing_plans import user_limit_status
+
     orgs = Organization.query.order_by(Organization.name).all()
     org_data = []
     for org in orgs:
         user_count = User.query.filter_by(organization_id=org.id).count()
-        org_data.append({"org": org, "user_count": user_count})
+        org_data.append({
+            "org": org,
+            "user_count": user_count,
+            "limits": user_limit_status(org.id),
+        })
     return render_template("admin/organizations/list.html", organizations=org_data)
 
 
@@ -5297,35 +5494,67 @@ def organization_create():
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         slug = request.form.get("slug", "").strip() or name.lower().replace(" ", "-")
-        plan = request.form.get("plan", "free")
-        try:
-            max_users = int(request.form.get("max_users") or 10)
-        except (ValueError, TypeError):
-            flash("Max users must be a whole number.", "error")
-            return render_template("admin/organizations/form.html", org=None)
+        plan_key, seats, error = _contract_plan_from_form()
+        if error:
+            flash(error, "error")
+            return _organization_form(None)
 
         if not name:
             flash("Organization name is required.", "error")
-            return render_template("admin/organizations/form.html", org=None)
+            return _organization_form(None)
 
         if Organization.query.filter_by(slug=slug).first():
             flash(f'An organization with slug "{slug}" already exists.', "error")
-            return render_template("admin/organizations/form.html", org=None)
+            return _organization_form(None)
 
-        org = Organization(name=name, slug=slug, plan=plan, max_users=max_users)
+        from app.services.billing_plans import set_contract_plan
+
+        org = Organization(name=name, slug=slug)
         db.session.add(org)
+        db.session.flush()
+        set_contract_plan(org, plan_key, seats)
         db.session.commit()
         flash(f'Organization "{name}" created.', "success")
         return redirect(url_for("admin.organizations_list"))
 
-    return render_template("admin/organizations/form.html", org=None)
+    return _organization_form(None)
+
+
+def _contract_plan_from_form():
+    """(plan key, seats, error) from the organisation form's plan fields."""
+    from app.services.billing_plans import get_plan
+
+    plan_key = request.form.get("plan", "free")
+    if get_plan(plan_key).key != plan_key:
+        return None, None, "Choose a plan from the list."
+    try:
+        seats = int(request.form.get("seats") or 0) or None
+    except (ValueError, TypeError):
+        return None, None, "Team seats must be a whole number."
+    if seats is not None and not 1 <= seats <= 10000:
+        return None, None, "Choose between 1 and 10,000 Team seats."
+    return plan_key, seats, None
+
+
+def _organization_form(org):
+    """The organisation form, its plan fields read from the subscriptions row."""
+    from app.services.billing_plans import current_subscription, effective_plan
+    from app.services.billing_service import BillingService
+
+    sub = current_subscription(org) if org is not None else None
+    return render_template(
+        "admin/organizations/form.html",
+        org=org,
+        plan_key=effective_plan(sub).key if sub is not None else "free",
+        seats=sub.seats_purchased if sub is not None else None,
+        paid_online=BillingService.has_live_subscription(sub),
+    )
 
 
 _ORG_USER_SORT_COLUMNS = {
     "name": (User.first_name, User.last_name),
     "email": (User.email,),
     "persona": (User.enterprise_role,),
-    "org_admin": (User.is_org_admin,),
 }
 
 
@@ -5335,6 +5564,8 @@ _ORG_USER_SORT_COLUMNS = {
 @platform_admin_required
 def organization_detail(org_id):
     """View organization details and its users."""
+    from app.services.billing_plans import user_limit_status
+
     from app.utils.role_access import get_role_display_name
 
     org = Organization.query.get_or_404(org_id)
@@ -5343,13 +5574,23 @@ def organization_detail(org_id):
     # Python method, not a column SQL can order by.
     sort_key = request.args.get("sort", "name")
     direction = request.args.get("dir", "asc")
-    columns = _ORG_USER_SORT_COLUMNS.get(sort_key, _ORG_USER_SORT_COLUMNS["name"])
-    order = [c.desc() if direction == "desc" else c.asc() for c in columns]
-    users = User.query.filter_by(organization_id=org.id).order_by(*order, User.id).all()
+    # org_admin sort uses the one canonical check (rbac_service.is_org_admin),
+    # not the denormalised _is_org_admin column, so it is handled in Python.
+    if sort_key == "org_admin":
+        from app.services.rbac_service import rbac_service
+
+        users = User.query.filter_by(organization_id=org.id).order_by(User.id).all()
+        users.sort(key=lambda u: rbac_service.is_org_admin(u, org.id), reverse=(direction == "desc"))
+    else:
+        columns = _ORG_USER_SORT_COLUMNS.get(sort_key, _ORG_USER_SORT_COLUMNS["name"])
+        order = [c.desc() if direction == "desc" else c.asc() for c in columns]
+        users = User.query.filter_by(organization_id=org.id).order_by(*order, User.id).all()
+    valid_sort_keys = set(_ORG_USER_SORT_COLUMNS.keys()) | {"org_admin"}
     return render_template(
         "admin/organizations/detail.html", org=org, users=users,
+        limits=user_limit_status(org.id),
         get_role_display_name=get_role_display_name,
-        current_sort=sort_key if sort_key in _ORG_USER_SORT_COLUMNS else "name",
+        current_sort=sort_key if sort_key in valid_sort_keys else "name",
         current_dir=direction if direction in ("asc", "desc") else "asc",
     )
 
@@ -5369,20 +5610,31 @@ def organization_edit(org_id):
             existing = Organization.query.filter_by(slug=new_slug).first()
             if existing and existing.id != org.id:
                 flash(f'Slug "{new_slug}" is already taken.', "error")
-                return render_template("admin/organizations/form.html", org=org)
+                db.session.rollback()
+                return _organization_form(org)
             org.slug = new_slug
-        org.plan = request.form.get("plan", org.plan)
-        try:
-            org.max_users = int(request.form.get("max_users") or org.max_users)
-        except (ValueError, TypeError):
-            db.session.rollback()
-            flash("Max users must be a whole number.", "error")
-            return render_template("admin/organizations/form.html", org=org)
+        from app.services.billing_plans import set_contract_plan
+
+        applied = True
+        if "plan" in request.form:
+            plan_key, seats, error = _contract_plan_from_form()
+            if error:
+                db.session.rollback()
+                flash(error, "error")
+                return _organization_form(org)
+            applied = set_contract_plan(org, plan_key, seats)
         db.session.commit()
-        flash(f'Organization "{org.name}" updated.', "success")
+        if applied:
+            flash(f'Organization "{org.name}" updated.', "success")
+        else:
+            flash(
+                f'Organization "{org.name}" updated. Its plan is paid online, so the plan set '
+                "here was not applied; the organisation changes it from its billing page.",
+                "warning",
+            )
         return redirect(url_for("admin.organization_detail", org_id=org.id))
 
-    return render_template("admin/organizations/form.html", org=org)
+    return _organization_form(org)
 
 
 @admin_bp_v2.route("/organizations/<int:org_id>/toggle", methods=["POST"])
@@ -5412,9 +5664,24 @@ def toggle_org_admin(org_id, user_id):
     if user.organization_id != org_id:
         flash("User does not belong to this organization.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
-    user.is_org_admin = not user.is_org_admin
+    # is_org_admin derives from is_admin() (Permission.ADMINISTER). Toggle the
+    # Administrator role assignment through the one grant/revoke authority
+    # (app/models/user.py) instead of each route re-deriving its own copy,
+    # and sync the OrgRole table so team-management routes (which read
+    # OrgRole via rbac_service.is_org_admin) see the same answer.  This route
+    # only ever reaches a user whose own organization_id equals org_id
+    # (checked above), so this is always a grant/revoke in their own
+    # organisation.
+    if user.is_admin():
+        user.revoke_org_admin()
+        OrgRole.query.filter_by(
+            organization_id=org_id, user_id=user_id
+        ).delete(synchronize_session=False)
+    else:
+        user.grant_org_admin()
+        OrgRole.set_role(org_id, user_id, "org_admin")
     db.session.commit()
-    role_label = "granted" if user.is_org_admin else "revoked"
+    role_label = "granted" if user.is_admin() else "revoked"
     flash(f'Org-admin role {role_label} for {user.full_name() or user.email}.', "success")
     return redirect(url_for("admin.organization_detail", org_id=org_id))
 
@@ -5437,9 +5704,22 @@ def organization_delete(org_id):
         flash("Cannot delete — no Default organization to reassign users.", "error")
         return redirect(url_for("admin.organization_detail", org_id=org_id))
 
-    moved = User.query.filter_by(organization_id=org.id).update(
-        {"organization_id": default_org.id, "is_org_admin": False},
-        synchronize_session=False,
+    # Move all users to Default org.  Preserve each user's existing role;
+    # only downgrade users who currently hold the Administrator role (the
+    # system of record for org-admin).  A Viewer stays a Viewer, an Architect
+    # stays an Architect — only an Administrator is reset to the default role
+    # (a no-op for a platform admin — see User.revoke_org_admin).
+    users = User.query.filter_by(organization_id=org.id).all()
+    moved = 0
+    for user in users:
+        user.organization_id = default_org.id
+        if user.is_admin():
+            user.revoke_org_admin()
+        moved += 1
+    # Remove OrgRole rows for the deleted organisation so no stale
+    # per-organisation role grants survive.
+    OrgRole.query.filter_by(organization_id=org.id).delete(
+        synchronize_session=False
     )
 
     org_name = org.name
@@ -5469,7 +5749,17 @@ def remove_user_from_org(org_id, user_id):
         return redirect(url_for("admin.organization_detail", org_id=org_id))
 
     user.organization_id = default_org.id
-    user.is_org_admin = False
+    # Preserve the user's existing role.  Only downgrade users who currently
+    # hold the Administrator role (the system of record for org-admin).
+    # A Viewer stays a Viewer, an Architect stays an Architect (and this is a
+    # no-op for a platform admin — see User.revoke_org_admin).
+    if user.is_admin():
+        user.revoke_org_admin()
+    # Remove OrgRole rows for the old organisation so team-management
+    # routes (which read OrgRole via rbac_service) see the same answer.
+    OrgRole.query.filter_by(
+        organization_id=org_id, user_id=user_id
+    ).delete(synchronize_session=False)
     db.session.commit()
     flash(f'{user.full_name() or user.email} moved to Default organization.', "success")
     return redirect(url_for("admin.organization_detail", org_id=org_id))

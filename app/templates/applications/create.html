@@ -68,7 +68,7 @@
                             if (q.length < 2) { this.ures = []; this.ushow = false; return Promise.resolve(); }
                             return Platform.fetch.get('/api/users', {}, { silent: true })
                                 .then(function (d) {
-                                    if (d.success) { const lq = q.toLowerCase(); self.ures = d.users.filter(u => u.name.toLowerCase().includes(lq) || u.email.toLowerCase().includes(lq)).slice(0, 5); self.ushow = self.ures.length > 0; }
+                                    if (d.success) { const lq = q.toLowerCase(); self.ures = d.users.filter(u => (u.name || '').toLowerCase().includes(lq) || (u.email || '').toLowerCase().includes(lq)).slice(0, 5); self.ushow = self.ures.length > 0; }
                                     self.uErrorShown = false;
                                 })
                                 .catch(function (e) {

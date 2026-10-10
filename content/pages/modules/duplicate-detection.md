@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S2-03, segment: S2}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Duplicate Detection
@@ -22,7 +23,7 @@ Rationalization is where you act on what it finds.
 
 ## Where you'll meet it
 
-- [What are we paying for twice?](/scale-up/duplicate-spend)
+- [What are we paying for twice?](/use-cases/duplicate-software-spend)
 
 ## Related modules
 
