@@ -258,17 +258,14 @@
     }
 
     /* One ownership row's server payload turned into the flat camelCase
-       shape ask.js's template reads. organizationUnit passes through
-       as-is (already a small, flat object or null server-side). */
+       shape ask.js's template reads: only what the card shows. The contact
+       person is not served, so it is not mapped. organizationUnit passes
+       through as-is (a small, flat object or null server-side). */
     function ownerModel(owner) {
         return {
             ownerId: owner.owner_id,
             ownershipType: owner.ownership_type,
-            ownershipPercentage: owner.ownership_percentage,
-            primaryContact: owner.primary_contact || null,
-            contactEmail: owner.contact_email || null,
             startDate: owner.start_date,
-            endDate: owner.end_date,
             organizationUnit: owner.organization_unit || null
         };
     }

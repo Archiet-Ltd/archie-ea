@@ -276,7 +276,7 @@
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
         <template x-if="accountabilityState === 'empty'">
-            <p class="text-sm text-muted-foreground">Ownership data is not yet connected.</p>
+            <p class="text-sm text-muted-foreground">No current ownership is recorded for this element.</p>
         </template>
         <template x-if="accountabilityState === 'error'">
             <p class="text-sm text-destructive">Could not load ownership records for this element.</p>
@@ -289,8 +289,6 @@
                         <h3 class="min-w-0 break-words text-base font-semibold text-foreground" x-text="owner.ownershipType"></h3>
                         <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-show="owner.organizationUnit" x-text="owner.organizationUnit && owner.organizationUnit.name"></span>
                     </div>
-                    <p class="mt-1 text-sm text-foreground" x-show="owner.primaryContact"><span x-text="owner.primaryContact"></span></p>
-                    <p class="mt-1 text-sm text-muted-foreground" x-show="!owner.primaryContact">No contact recorded</p>
                     {# Currency is decided once, server-side, by the as_of
                        date the accountability query used -- no browser date
                        comparison here, so a row reaching this template is

@@ -190,7 +190,9 @@ def _current_ownerships_batch(
     unit, for MANY element ids in a small constant number of queries. Returns
     every current ownership row per element (an empty list when there is
     none), each carrying only ``ownership_id``, ``ownership_type``,
-    ``primary_contact``, ``start_date``, ``unit_id`` and ``unit_name``.
+    ``start_date``, ``unit_id`` and ``unit_name``. The contact person is not
+    read: nothing else in the product shows it, so serving it here would
+    create a new place personal data is displayed.
 
     ``_resolve_owners_batch`` (``cross_layer_impact``'s single owner) and
     ``accountability_for_element`` (the whole list) are both projections of
@@ -287,7 +289,6 @@ def _current_ownerships_batch(
                 {
                     "ownership_id": ownership.id,
                     "ownership_type": ownership.ownership_type,
-                    "primary_contact": ownership.primary_contact,
                     "start_date": ownership.start_date,
                     "unit_id": unit.id,
                     "unit_name": unit.name,
@@ -1628,47 +1629,82 @@ class IntelligenceQueryService:
 
     @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:
-        """L4, "who's accountable for ___, and can they take on more?":
-        WITHDRAWN -- the ownership data source is decided, but no shared,
-        tenant-safe reader for it exists yet, and this method's own first
-        version shipped one anyway rather than using the one that already
-        existed. Not a "still undecided" state; a "not built safely yet"
-        one, and the two must not be conflated in copy or reason naming.
+        """L4, "who's accountable for ___, and can they take on more?".
 
-        The original version re-implemented the element -> component ->
-        ownership -> unit chain that ``_resolve_owners_batch``/
-        ``_sec09_tenant_check`` already provide (``cross_layer_impact``'s
-        own owner field), without that function's tenant assertion. It also
-        had a real, unreviewed tenant-isolation gap of its own:
-        ``OrganizationUnit`` carries no ``TenantMixin``/``organization_id``,
-        and the original fetched it by ``organization_unit_id`` with no
-        tenant predicate at all, so a cross-tenant-seeded
-        ``organization_unit_id`` on an otherwise correctly-scoped
-        ``ApplicationOwnership`` row would have leaked another
-        organisation's unit name/type/head-of-unit -- not caught by this
-        lens's own tests, which only exercised the element-level
-        cross-tenant case. It also showed expired ownership (no
-        ``end_date`` filter) as current, and serialised PII fields
-        (``contact_email``, ``head_of_unit``, ...) nothing in the template
-        ever rendered.
+        The accountability half: every CURRENT ``ApplicationOwnership`` row
+        for the element's ``ApplicationComponent``, each with its owning
+        unit's name. It reads through ``_current_ownerships_batch``, the one
+        owner chain ``cross_layer_impact`` also uses, so there is no second
+        implementation to drift. Current means started and not ended as of
+        the date returned in ``as_of``.
 
-        Withdrawing the read entirely -- no query against either table --
-        rather than patching those in place, since the underlying gap
-        (``OrganizationUnit`` has no tenant scoping of its own) needs a
-        real, separate fix before ANY reader of it is safe, not just this
-        one. The route, question card and tests stay in place so the lens
-        is easy to re-enable once a shared, tenant-safe reader exists;
-        only the query itself is disabled.
+        Every read is fenced to the caller's organisation (component check,
+        ownership predicate, unit predicate and a post-fetch unit check, each
+        a named seam). Only what the Ask card shows is returned: ownership
+        type, unit name and start date. The contact person and e-mail, the
+        head of unit, percentages and notes are deliberately not served.
+
+        Capacity is not answered here yet, so every response carries
+        ``capacity_not_available`` and its reason.
         """
-        # No record_query_latency wrapper -- there is no query to time, and
-        # sampling a constant into the NFR-5 latency series would only
-        # dilute it with meaningless near-zero readings.
-        del element_id  # withdrawn; kept for a stable call signature
-        return {
-            "owners": [],
-            "capacity_not_available": True,
-            "reasons": [OWNERSHIP_READER_NOT_BUILT_REASON, CAPACITY_NOT_AVAILABLE_REASON],
-        }
+        from datetime import date
+
+        from app.models import ArchiMateElement
+        from app.models.application_portfolio import ApplicationComponent
+
+        org_id = current_org_id()
+
+        with record_query_latency("accountability_for_element") as scope:
+            scope.organization_id = org_id
+
+            def answer(owners, reason, as_of=None):
+                reasons = ([reason] if reason else []) + [CAPACITY_NOT_AVAILABLE_REASON]
+                return {
+                    "owners": owners,
+                    "capacity_not_available": True,
+                    "reasons": reasons,
+                    "as_of": as_of.isoformat() if as_of else None,
+                }
+
+            if org_id is None:
+                return answer([], NO_TENANT_CONTEXT_REASON)
+
+            element = db.session.execute(
+                db.select(ArchiMateElement)
+                .where(ArchiMateElement.id == element_id)
+                .where(ArchiMateElement.organization_id == org_id)
+            ).scalar_one_or_none()
+            if element is None:
+                return answer([], ELEMENT_NOT_FOUND_REASON)
+
+            as_of = date.today()
+            rows = _current_ownerships_batch([element_id], org_id, as_of).get(element_id, [])
+            if rows:
+                owners = [
+                    {
+                        "owner_id": row["ownership_id"],
+                        "ownership_type": row["ownership_type"],
+                        "start_date": row["start_date"].isoformat() if row["start_date"] else None,
+                        "organization_unit": {"id": row["unit_id"], "name": row["unit_name"]},
+                    }
+                    for row in rows
+                ]
+                return answer(owners, None, as_of)
+
+            has_component = (
+                db.session.execute(
+                    db.select(ApplicationComponent.id)
+                    .where(ApplicationComponent.archimate_element_id == element_id)
+                    .where(ApplicationComponent.organization_id == org_id)
+                    .limit(1)
+                ).first()
+                is not None
+            )
+            return answer(
+                [],
+                NO_OWNERSHIP_RECORDS_REASON if has_component else NO_APPLICATION_COMPONENT_REASON,
+                as_of,
+            )
 
     # ------------------------------------------------------------------ #
     # L7: the Data lens.

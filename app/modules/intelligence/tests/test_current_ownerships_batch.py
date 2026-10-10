@@ -191,9 +191,9 @@ def test_the_payload_carries_only_the_fields_the_card_renders(app, db_session, m
 
     row = _read(app, org.id, [element.id])[element.id][0]
 
-    assert set(row) == {"ownership_id", "ownership_type", "primary_contact", "start_date", "unit_id", "unit_name"}
+    assert set(row) == {"ownership_id", "ownership_type", "start_date", "unit_id", "unit_name"}
     blob = repr(row)
-    for hidden in ("jordan@example.com", "unit@example.com", "Pat Head"):
+    for hidden in ("jordan@example.com", "Jordan Owner", "unit@example.com", "Pat Head"):
         assert hidden not in blob
 
 
