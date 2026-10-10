@@ -112,6 +112,16 @@ def _sidebar_html(app, db_session, make_org, role, label):
     return match.group(0)
 
 
+def _group_html(sidebar_html, key):
+    """The rendered html of one sidebar display group (see get_sidebar_groups), or None."""
+    marker = f'data-sidebar-group="{key}"'
+    start = sidebar_html.find(marker)
+    if start == -1:
+        return None
+    nxt = sidebar_html.find("data-sidebar-group=", start + len(marker))
+    return sidebar_html[start:nxt] if nxt != -1 else sidebar_html[start:]
+
+
 @pytest.mark.parametrize(
     "role,label",
     [
@@ -177,21 +187,19 @@ def test_platform_admin_hits_the_link_budget_exactly(app, db_session, make_org):
         ("platform_admin", "pa-ask"),
     ],
 )
-def test_ask_link_renders_first_under_my_work_and_the_twin_map_has_none(
+def test_ask_link_renders_first_and_the_twin_map_has_none(
     app, db_session, make_org, role, label
 ):
-    """One front door to the Ask page, under My work, before that persona's own
-    links; the Twin map is reached from the Ask page and has no link of its own."""
+    """One front door to the Ask page: the first link in the sidebar, before every titled group,
+    for every role; the Twin map is reached from the Ask page and has no link of its own."""
     sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
     ask = sidebar_html.find('href="/intelligence/ask"')
     assert ask != -1, f"{role}: no Ask a question link in the rendered sidebar"
     assert sidebar_html.count('href="/intelligence/ask"') == 1
-    my_work = sidebar_html.find("My work")
-    library = sidebar_html.find("Library", my_work)
-    assert my_work != -1 and library != -1 and my_work < ask < library
-    # First link of the zone: nothing but the heading sits between them.
-    first_link = sidebar_html.find("<a ", my_work)
-    assert first_link == sidebar_html.rfind("<a ", 0, ask + 1)
+    ask_group = _group_html(sidebar_html, "ask")
+    assert ask_group is not None and 'href="/intelligence/ask"' in ask_group
+    first_titled = sidebar_html.find('data-sidebar-group="start"')
+    assert first_titled != -1 and ask < first_titled, f"{role}: Ask is not before the first titled group"
     assert "Ask a question" in sidebar_html
     assert "/intelligence/twin-map" not in sidebar_html
 
@@ -298,16 +306,14 @@ def test_sidebar_includes_all_modules_link(app, db_session, make_org, role, labe
         ("business_architect", "ba-impact"),
     ],
 )
-def test_impact_analysis_is_linked_under_my_work(app, db_session, make_org, role, label):
-    """The reported problem: reachable in one click from the persona's own sidebar, in the zone
-    for their primary jobs (between the "My work" and "Library" headings), not only via All modules."""
+def test_impact_analysis_is_linked_under_what_if_we_change_it(app, db_session, make_org, role, label):
+    """The reported problem: reachable in one click from the persona's own sidebar, under the
+    group that answers "what would this change affect", not only via All modules."""
     sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
-    link = sidebar_html.find('href="/strategic/impact-analysis"')
-    assert link != -1, f"{role}: no Impact Analysis link in the rendered sidebar"
-    my_work = sidebar_html.find("My work")
-    library = sidebar_html.find("Library", my_work)
-    assert my_work != -1 and library != -1 and my_work < link < library, (
-        f"{role}: the Impact Analysis link is not under the My work heading"
+    group = _group_html(sidebar_html, "what_if")
+    assert group is not None, f"{role}: no 'What if we change it' group"
+    assert 'href="/strategic/impact-analysis"' in group, (
+        f"{role}: the Impact Analysis link is not under the 'What if we change it' group"
     )
 
 
@@ -320,18 +326,15 @@ def test_impact_analysis_is_linked_under_my_work(app, db_session, make_org, role
         ("procurement", "proc-canvases"),
     ],
 )
-def test_canvases_and_frameworks_in_library_zone(app, db_session, make_org, role, label):
-    """Canvas/framework UI fix: "Canvases" and "Frameworks" must appear in the
-    shared Library zone for every role."""
+def test_canvases_and_frameworks_are_reachable_for_every_role(app, db_session, make_org, role, label):
+    """Canvas/framework UI fix: "Canvases" and "Frameworks" must appear in the shared Library
+    zone for every role. They are DISPLAYED under "Build and model" (canvases, where you draw
+    and write) and "Goals and changes" (the standards you rate against)."""
     sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
-    assert "Canvases" in sidebar_html, f"{role}: no Canvases link in sidebar"
-    assert "Frameworks" in sidebar_html, f"{role}: no Frameworks link in sidebar"
-    # Both must be under the Library heading, not My work.
-    library = sidebar_html.find("Library")
-    canvases = sidebar_html.find("Canvases")
-    frameworks = sidebar_html.find("Frameworks")
-    assert library != -1 and library < canvases, f"{role}: Canvases not under Library"
-    assert library != -1 and library < frameworks, f"{role}: Frameworks not under Library"
+    build = _group_html(sidebar_html, "build")
+    goals = _group_html(sidebar_html, "goals")
+    assert build is not None and "Canvases" in build, f"{role}: Canvases not under Build and model"
+    assert goals is not None and "Frameworks" in goals, f"{role}: Frameworks not under Goals and changes"
 
 
 def test_framework_management_and_config_reachable_from_admin_dashboard(app, db_session, make_org):
