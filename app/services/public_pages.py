@@ -34,6 +34,70 @@ from app.services.billing_plans import CONTACT_SALES_URL, PLANS
 
 CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content" / "pages"
 STATIC_ROOT = Path(__file__).resolve().parent.parent / "static"
+SITE_URL = "https://entelim.org"
+
+# ── SEO/GEO audit verdicts (2026-10-06) -- single source of truth ───────────
+# Which pages fold into a parent page (MERGE, 301 from the old URL) and which
+# stay reachable but out of the sitemap, llms.txt/llms-full.txt and every
+# nav/index listing (HOLD, noindex) -- see the audit bucket for the full
+# page-by-page reasoning. One registry each, the same pattern
+# MODULE_CAPTURE_PENDING above already uses, rather than a front-matter flag
+# hand-edited onto 38 separate files.
+
+MERGED_PAGES: dict[str, str] = {
+    "/vision": "/about",
+    "/modules/batch-import": "/modules/architecture-model",
+    "/modules/duplicate-detection": "/modules/rationalization",
+    "/modules/gap-analysis": "/modules/roadmaps",
+    "/modules/investment-analysis": "/modules/business-case",
+    "/modules/my-applications": "/use-cases/what-i-own",
+    "/modules/projects": "/use-cases/programme-tracking",
+    "/modules/solutions": "/modules/arb",
+    "/modules/value-streams": "/use-cases/value-streams-at-risk",
+    "/use-cases/revenue-stream-risk": "/use-cases/value-streams-at-risk",
+    "/use-cases/show-investors-what-we-run": "/use-cases/architecture-map-for-due-diligence",
+    "/use-cases/key-person-risk": "/modules/org-chart",
+}
+
+HELD_PAGE_URLS: frozenset[str] = frozenset({
+    "/modules/capability-maturity",
+    "/use-cases/capability-maturity-heatmap",
+    "/modules/industry-apqc",
+    "/modules/integrations",
+    "/use-cases/canvas-dependencies",
+    "/use-cases/lean-canvas",
+    "/use-cases/reference-packs",
+    "/use-cases/website-first-look",
+    "/use-cases/website-full-profile",
+    "/use-cases/systems-with-no-owner",
+    "/use-cases/import-from-jira-and-github",
+    "/use-cases/match-systems-across-jira-and-servicenow",
+    "/use-cases/architecture-change-tracking",
+    "/use-cases/pagerduty-and-datadog-incidents",
+    "/use-cases/connector-candidates",
+    "/use-cases/leanix-ardoq-import",
+    "/use-cases/servicenow-cmdb-mapping",
+    "/use-cases/ai-assistant-for-your-architecture",
+    "/use-cases/derivation-yield",
+    "/use-cases/workforce-planning",
+    "/use-cases/adopt-reference-pack",
+    "/use-cases/see-your-own-twin",
+    "/use-cases/set-up-in-an-afternoon",
+    "/use-cases/demo-on-a-company-like-mine",
+    "/use-cases/what-we-can-and-cannot-tell",
+    "/docs",
+})
+
+# A single, parameterised offer for every held page's "tell us you need
+# this" enquiry -- see PublicPage.feature_interest_offer below. The
+# product_inquiries.offer column is String(50); "feature:" (8 chars) plus
+# the longest held slug today (41 chars) is 49, so this fits without a
+# migration. A future held slug longer than 42 characters would not --
+# flagged here rather than guessed around.
+FEATURE_INTEREST_OFFER_PREFIX = "feature:"
+FEATURE_INTEREST_CONSENT_TEXT = (
+    "Used to tell you when this becomes available, and for nothing else."
+)
 IMG_MODULES_DIR = STATIC_ROOT / "img" / "modules"
 IMG_USE_CASES_DIR = STATIC_ROOT / "img" / "use-cases"
 VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
@@ -237,6 +301,10 @@ _ALLOWED_ATTRS = {
     "img": ["src", "alt", "title"],
     "th": ["align"],
     "td": ["align"],
+    # id is not an XSS vector; allowed so a page's own headings can carry a
+    # deep-link anchor (e.g. /features#strategy-management) for other pages
+    # to link into, without needing the markdown "toc" extension.
+    "h1": ["id"], "h2": ["id"], "h3": ["id"], "h4": ["id"], "h5": ["id"], "h6": ["id"],
 }
 
 
@@ -267,7 +335,10 @@ class PublicPage:
     body_html: str
     front_matter: dict[str, Any] = field(default_factory=dict)
     source_path: Path | None = None
-    canonical_url: str | None = None
+    # The archiet.ai address this page's content also lives at, for
+    # cross-linking (the /vs hub) -- NOT a canonical-tag assertion. See
+    # self_canonical_url below for the tag that actually goes in <head>.
+    external_url: str | None = None
 
     @property
     def cta(self) -> str | None:
@@ -276,6 +347,56 @@ class PublicPage:
     @property
     def page_family(self) -> str:
         return self.front_matter.get("page_family", self.family)
+
+    @property
+    def self_canonical_url(self) -> str:
+        """Every public page is canonical to its own entelim.org address --
+        no exceptions, including comparison pages that also have an
+        ``external_url`` on archiet.ai (section 2 of the SEO/GEO audit:
+        the two are different products' content now, not the same page)."""
+        return f"{SITE_URL}{self.url}"
+
+    @property
+    def is_held(self) -> bool:
+        """Out of the sitemap, llms.txt/llms-full.txt and every nav/index
+        listing, but still reachable at its own URL with a noindex tag.
+
+        True for a HOLD-verdict page (``HELD_PAGE_URLS`` -- not built yet)
+        and for a page withdrawn from discovery via front matter
+        ``state: not_planned`` (a feature that shipped as a page, then had
+        its release item pulled, with nothing left to build towards) --
+        both are the same "still reachable, just not advertised" case to
+        every caller, so one property covers both reasons.
+
+        A MERGE-verdict page (``MERGED_PAGES``) is a different case --
+        its own URL 301s to a parent instead of rendering at all -- so it
+        is not folded into this property; see load_feed_pages(), which
+        checks both ``is_held`` and ``MERGED_PAGES`` separately.
+        """
+        return (
+            self.url in HELD_PAGE_URLS
+            or self.front_matter.get("state") == "not_planned"
+        )
+
+    @property
+    def description(self) -> str | None:
+        """Meta description: this page's own front-matter ``description``,
+        falling back to its first rendered paragraph trimmed to 155
+        characters when no explicit one is set. Computed, not stored --
+        the six pages a content-writer is rewriting on another branch get
+        this fallback too without anyone editing their front matter."""
+        explicit = self.front_matter.get("description")
+        if isinstance(explicit, str) and explicit.strip():
+            return explicit.strip()
+        return _first_paragraph_summary(self.body_html)
+
+    @property
+    def feature_interest_offer(self) -> str:
+        """The ``offer`` value for this page's "tell us you need this"
+        enquiry -- unique per page (the product_inquiries table has a
+        UNIQUE(email, offer) constraint), so asking about two different
+        held features from the same address stores two rows, not one."""
+        return (FEATURE_INTEREST_OFFER_PREFIX + self.slug)[:50]
 
 
 def _parse_front_matter(raw: str) -> tuple[dict[str, Any], str]:
@@ -307,12 +428,35 @@ def _extract_title(body_html: str, front_matter: dict[str, Any]) -> str:
     return front_matter.get("title", front_matter.get("module_label", "Untitled"))
 
 
-def _build_canonical(front_matter: dict[str, Any]) -> str | None:
-    """Build a canonical URL from front-matter if the page targets another domain."""
+def _build_external_url(front_matter: dict[str, Any]) -> str | None:
+    """The archiet.ai address this page's content also lives at, if any --
+    used only for cross-linking (the /vs hub), never as this page's own
+    <link rel="canonical">, which is always self (PublicPage.self_canonical_url)."""
     url_slug = front_matter.get("url_slug", "")
     if isinstance(url_slug, str) and url_slug.startswith("archiet.ai/"):
         return "https://" + url_slug
     return None
+
+
+def _first_paragraph_summary(body_html: str, limit: int = 155) -> str | None:
+    """The page's first rendered paragraph, tags and entities stripped,
+    trimmed to ``limit`` characters at a word boundary -- the fallback
+    meta description for a page with no explicit front-matter one."""
+    import html as _html
+    import re
+
+    match = re.search(r"<p[^>]*>(.*?)</p>", body_html, re.DOTALL)
+    if not match:
+        return None
+    text = re.sub(r"<[^>]+>", "", match.group(1))
+    text = _html.unescape(text)
+    text = " ".join(text.split())
+    if not text:
+        return None
+    if len(text) <= limit:
+        return text
+    truncated = text[:limit].rsplit(" ", 1)[0].rstrip(",;:")
+    return truncated + "…"
 
 
 def _use_case_slug_and_url(front_matter: dict[str, Any], filename_slug: str) -> tuple[str, str]:
@@ -454,7 +598,7 @@ def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
         slug, url = _use_case_slug_and_url(front_matter, slug)
     body_html = _sanitize_html(_md.reset().convert(body_md))
     title = _extract_title(body_html, front_matter)
-    canonical = _build_canonical(front_matter)
+    external_url = _build_external_url(front_matter)
     return PublicPage(
         family=family,
         slug=slug,
@@ -463,7 +607,7 @@ def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
         body_html=body_html,
         front_matter=front_matter,
         source_path=file_path,
-        canonical_url=canonical,
+        external_url=external_url,
     )
 
 
@@ -496,6 +640,46 @@ def load_all_pages() -> list[PublicPage]:
             pages.append(_load_page(md_file, family, slug, url))
 
     return pages
+
+
+def load_feed_pages() -> list[PublicPage]:
+    """Every public page that belongs in a "lists every page" surface: the
+    sitemap, /llms.txt, /llms-full.txt, the /vs hub, and any per-family
+    "see every one of these" index (e.g. the /use-cases index).
+
+    The single, combined feed set, built on both verdicts the SEO/GEO audit
+    produces -- excludes a HOLD-verdict page or a page withdrawn from
+    discovery via front matter ``state: not_planned`` (see
+    PublicPage.is_held, which covers both) and a MERGE-verdict page
+    (MERGED_PAGES -- its own URL 301s to a parent instead of rendering, so
+    it is not a second entry for content that now lives at the target).
+    Every excluded page still renders at its own URL via load_page() /
+    load_all_pages(), which this does not change; it is simply not
+    advertised as current. Every caller that used to build its own feed
+    list (a prior round's ``_indexable_pages()`` in app/main/views.py among
+    them) should call this instead of load_all_pages() directly, so a newly
+    held, withdrawn or merged page is left out everywhere at once rather
+    than one surface at a time.
+    """
+    return [
+        page for page in load_all_pages()
+        if not page.is_held and page.url not in MERGED_PAGES
+    ]
+
+
+def feed_page_paths() -> list[str]:
+    """Every path that belongs in a "submit/list every page" surface: the
+    homepage, the /vs and /use-cases hub views (not PublicPage content, so
+    load_feed_pages() alone does not carry them) and every path from
+    load_feed_pages() itself.
+
+    The sitemap (app/main/views.py::sitemap_xml) and the IndexNow CLI
+    (app/commands/indexnow_commands.py::ping_indexnow_command) both build
+    their URL set from this one list, so the two cannot drift apart again
+    the way they did when each built its own (see
+    tests/test_public_content_pages.py::test_indexnow_submission_matches_sitemap_urls).
+    """
+    return ["/", "/vs", "/use-cases"] + [page.url for page in load_feed_pages()]
 
 
 def load_page(family: str, slug: str | None = None) -> PublicPage | None:
@@ -546,6 +730,14 @@ def load_page(family: str, slug: str | None = None) -> PublicPage | None:
 def build_jsonld(page: PublicPage) -> str:
     """Build JSON-LD structured data for a page based on its family.
 
+    Extended (not duplicated) to also carry BreadcrumbList for module,
+    use-case, comparison and offer pages, and FAQPage for ANY page family
+    whose own body has a real "## Frequently asked ..." section -- not just
+    comparison pages, which is all the FAQ extractor originally gated on.
+    Every applicable node shares one ``@graph`` in a single script block,
+    the standard way to combine more than one schema.org type in one
+    place, rather than a second builder function or a second <script> tag.
+
     Returns ``Markup`` (a ``str`` subclass -- every existing caller treating
     it as plain text, including ``json.loads()``, is unaffected): the value
     is already escaped for a <script> block by the time it leaves this
@@ -553,7 +745,7 @@ def build_jsonld(page: PublicPage) -> str:
     test_template_escaping.py to flag.
     """
     family = page.page_family
-    site_url = "https://entelim.org"
+    site_url = SITE_URL
 
     if family == "comparison":
         ld = _jsonld_faq(page, site_url)
@@ -568,7 +760,66 @@ def build_jsonld(page: PublicPage) -> str:
     else:
         ld = _jsonld_webpage(page, site_url)
 
+    extra_nodes: list[dict[str, Any]] = []
+
+    breadcrumbs = _breadcrumb_list_items(page, site_url)
+    if breadcrumbs:
+        extra_nodes.append({"@type": "BreadcrumbList", "itemListElement": breadcrumbs})
+
+    # Comparison pages already ARE a FAQPage above -- every other family
+    # gets one added alongside its own primary type when its body actually
+    # has a "## Frequently asked ..." section with real Q&A pairs under it
+    # (PR415's longer module/offer rewrites, going forward).
+    if family != "comparison":
+        faq_questions = _extract_faq_questions(page.body_html)
+        if faq_questions:
+            extra_nodes.append({
+                "@type": "FAQPage",
+                "url": f"{site_url}{page.url}",
+                "mainEntity": faq_questions,
+            })
+
+    if extra_nodes:
+        primary = {k: v for k, v in ld.items() if k != "@context"}
+        ld = {
+            "@context": "https://schema.org",
+            "@graph": [primary, *extra_nodes],
+        }
+
     return Markup(_escape_for_script_block(json.dumps(ld, indent=2, ensure_ascii=False)))
+
+
+# ── BreadcrumbList (SEO/GEO audit item 3) ───────────────────────────────────
+# Module, use-case, comparison and offer pages get a breadcrumb trail; the
+# fixed site pages (about, pricing, contact, features, docs...) that aren't
+# offers, plus vision and dogfood, have no natural parent index and are left
+# without one, same as before this change.
+
+_BREADCRUMB_PARENTS: dict[str, tuple[str, str]] = {
+    "module": ("Features", "/features"),
+    "function-per-segment": ("Use cases", "/use-cases"),
+    "comparison": ("Compare", "/vs"),
+}
+
+
+def _breadcrumb_list_items(page: PublicPage, site_url: str) -> list[dict[str, Any]] | None:
+    family = page.page_family
+    parent = _BREADCRUMB_PARENTS.get(family)
+    if parent is None and family == "site" and page.front_matter.get("offer"):
+        parent = ("Pricing", "/pricing")
+    if parent is None:
+        return None
+
+    trail = [("Home", "/"), parent, (page.title, page.url)]
+    return [
+        {
+            "@type": "ListItem",
+            "position": position,
+            "name": name,
+            "item": f"{site_url}{path}",
+        }
+        for position, (name, path) in enumerate(trail, start=1)
+    ]
 
 
 def _escape_for_script_block(serialised: str) -> str:
@@ -743,27 +994,55 @@ def _jsonld_software_app(page: PublicPage, site_url: str) -> dict[str, Any]:
     }
 
 
-def _jsonld_faq(page: PublicPage, site_url: str) -> dict[str, Any]:
+def _extract_faq_questions(body_html: str) -> list[dict[str, Any]]:
+    """Every Question/Answer pair under this page's own "## Frequently
+    asked ..." section, in FAQPage ``mainEntity`` shape -- shared by every
+    page family, not just comparison pages. Two heading shapes are
+    supported: <h3>Question</h3><p>Answer</p> (the shape PR415's longer
+    module/offer rewrites use) and <p><strong>Question</strong>Answer</p>
+    (the shape the original comparison pages used).
+    """
     import html as _html
     import re
 
     questions: list[dict[str, str]] = []
-    # Extract FAQ entries from rendered HTML: h2 "Frequently asked" followed by
-    # either <h3>Question</h3><p>Answer</p> or <p><strong>Question</strong>Answer</p>
     faq_section = re.search(
         r"<h2[^>]*>Frequently asked.*?</h2>(.*?)(?=<h2|$)",
-        page.body_html,
+        body_html,
         re.DOTALL | re.IGNORECASE,
     )
-    if faq_section:
-        section_html = faq_section.group(1)
-        # Format A: <h3>Question</h3><p>Answer</p>
-        qa_pairs = re.findall(
-            r"<h3[^>]*>(.*?)</h3>\s*<p[^>]*>(.*?)</p>",
+    if not faq_section:
+        return questions
+
+    section_html = faq_section.group(1)
+    # Format A: <h3>Question</h3><p>Answer</p>
+    qa_pairs = re.findall(
+        r"<h3[^>]*>(.*?)</h3>\s*<p[^>]*>(.*?)</p>",
+        section_html,
+        re.DOTALL,
+    )
+    for q_html, a_html in qa_pairs:
+        q_text = _html.unescape(re.sub(r"<[^>]+>", "", q_html).strip())
+        a_text = _html.unescape(re.sub(r"<[^>]+>", "", a_html).strip())
+        if q_text and a_text:
+            questions.append(
+                {
+                    "@type": "Question",
+                    "name": q_text,
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": a_text,
+                    },
+                }
+            )
+    # Format B: <p><strong>Question</strong>Answer text</p>
+    if not questions:
+        bold_pairs = re.findall(
+            r"<p[^>]*>\s*<strong[^>]*>(.*?)</strong>\s*(.*?)</p>",
             section_html,
             re.DOTALL,
         )
-        for q_html, a_html in qa_pairs:
+        for q_html, a_html in bold_pairs:
             q_text = _html.unescape(re.sub(r"<[^>]+>", "", q_html).strip())
             a_text = _html.unescape(re.sub(r"<[^>]+>", "", a_html).strip())
             if q_text and a_text:
@@ -777,31 +1056,13 @@ def _jsonld_faq(page: PublicPage, site_url: str) -> dict[str, Any]:
                         },
                     }
                 )
-        # Format B: <p><strong>Question</strong>Answer text</p>
-        if not questions:
-            bold_pairs = re.findall(
-                r"<p[^>]*>\s*<strong[^>]*>(.*?)</strong>\s*(.*?)</p>",
-                section_html,
-                re.DOTALL,
-            )
-            for q_html, a_html in bold_pairs:
-                q_text = _html.unescape(re.sub(r"<[^>]+>", "", q_html).strip())
-                a_text = _html.unescape(re.sub(r"<[^>]+>", "", a_html).strip())
-                if q_text and a_text:
-                    questions.append(
-                        {
-                            "@type": "Question",
-                            "name": q_text,
-                            "acceptedAnswer": {
-                                "@type": "Answer",
-                                "text": a_text,
-                            },
-                        }
-                    )
+    return questions
 
+
+def _jsonld_faq(page: PublicPage, site_url: str) -> dict[str, Any]:
     return {
         "@context": "https://schema.org",
         "@type": "FAQPage",
         "url": f"{site_url}{page.url}",
-        "mainEntity": questions,
+        "mainEntity": _extract_faq_questions(page.body_html),
     }

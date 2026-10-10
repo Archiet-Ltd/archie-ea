@@ -164,8 +164,16 @@ def test_no_stray_image_file_for_a_pending_module():
 
 
 def test_every_live_module_page_renders_its_screenshot_with_alt_text(app):
+    from app.services.public_pages import MERGED_PAGES
+
     with app.test_client() as client:
         for slug, _path, _persona, caption, alt in MODULE_CAPTURES:
+            if f"/modules/{slug}" in MERGED_PAGES:
+                # A SEO/GEO audit MERGE-verdict module (e.g. duplicate-detection):
+                # its own URL now 301s to its parent instead of rendering --
+                # the captured image file itself is still checked above
+                # (test_every_live_module_has_a_captured_image_file_under_the_size_cap).
+                continue
             rv = client.get(f"/modules/{slug}")
             assert rv.status_code == 200, f"/modules/{slug} returned {rv.status_code}"
             # Jinja autoescapes attribute values (an apostrophe becomes &#39;),
@@ -184,12 +192,25 @@ def test_capture_pending_module_pages_render_no_screenshot(app):
     """Every MODULE_CAPTURE_PENDING page renders with no media at all --
     capture_status stays live (previous test), but get_page_screenshot()'s
     file-exists gate means the removed file renders nothing rather than a
-    broken <img> or a stale picture."""
+    broken <img> or a stale picture.
+
+    Four of these (batch-import, investment-analysis, gap-analysis,
+    value-streams) are also SEO/GEO audit MERGE-verdict pages as of this
+    revision: their own URL now 301s to the parent page their content
+    folded into, instead of rendering -- get_page_screenshot() is still
+    checked directly (it has nothing to do with routing), but the
+    HTTP-level "no screenshot on the page" check only makes sense for a
+    page that still renders.
+    """
+    from app.services.public_pages import MERGED_PAGES
+
     with app.test_client() as client:
         for slug in MODULE_CAPTURE_PENDING:
             page = load_page("module", slug=slug)
             assert page is not None
             assert get_page_screenshot(page) is None, f"{slug}: expected no screenshot"
+            if page.url in MERGED_PAGES:
+                continue
             rv = client.get(f"/modules/{slug}")
             assert rv.status_code == 200
             assert 'data-testid="page-screenshot"' not in rv.data.decode()
@@ -291,6 +312,8 @@ def test_awaiting_capture_use_case_page_renders_no_screenshot(app):
     """A use-case page whose capture_status is awaiting_capture must never
     render a screenshot block, even though it has its own body copy and
     may (once round 2 lands) carry a recording instead."""
+    from app.services.public_pages import MERGED_PAGES
+
     live_slugs = {entry[0] for entry in USE_CASE_SCREENSHOT_CAPTURES} | set(
         USE_CASE_SCREENSHOT_PENDING
     )
@@ -301,6 +324,9 @@ def test_awaiting_capture_use_case_page_renders_no_screenshot(app):
         if p.family == "function-per-segment"
         and p.front_matter.get("capture_status") == "awaiting_capture"
         and p.slug not in live_slugs
+        # SEO/GEO audit MERGE-verdict use cases 301 to their parent page
+        # instead of rendering -- out of scope for this render-level check.
+        and p.url not in MERGED_PAGES
     ]
     assert len(pages) > 0, "expected at least one awaiting_capture use-case page to check"
     with app.test_client() as client:

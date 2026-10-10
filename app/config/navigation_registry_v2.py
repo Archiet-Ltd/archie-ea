@@ -341,7 +341,15 @@ class NavigationRegistryV2:
             return user is not None
         
         if config.visibility == ItemVisibility.ADMIN_ONLY:
-            return user and getattr(user, "is_admin", False)
+            # R3-1 (PR 428 round 4): ``getattr(user, "is_admin", False)``
+            # with no call returned the bound method, always truthy --
+            # every user was shown admin-only navigation. Judged against
+            # the active organisation, same as the rest of this PR.
+            if not user:
+                return False
+            from app.middleware.tenant_decorators import is_active_org_admin
+
+            return is_active_org_admin(user)
         
         if config.visibility == ItemVisibility.SPECIFIC_ROLES:
             if not user:

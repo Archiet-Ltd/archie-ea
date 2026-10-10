@@ -219,6 +219,21 @@ class Config:
     CLARITY_PROJECT_ID = os.environ.get("CLARITY_PROJECT_ID", "")
     GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "")
     BING_SITE_VERIFICATION = os.environ.get("BING_SITE_VERIFICATION", "")
+    # First-party, cookieless page/event analytics -- no consent banner, no
+    # third party. Pepper for the daily-rotating visitor correlation hash
+    # (app/services/visitor_hash.py); falls back to SECRET_KEY when unset, so
+    # this always works, but a dedicated secret keeps the two uses apart.
+    VISITOR_HASH_SECRET = os.environ.get("VISITOR_HASH_SECRET", "")
+    # IndexNow: pings search engines when a public URL changes instead of
+    # waiting for re-crawl. A self-generated key, not issued by anyone -- see
+    # app/services/indexnow_service.py. Not a secret: the IndexNow protocol
+    # requires this exact value to be served in plaintext, unauthenticated,
+    # at /<key>.txt so search engines can verify it (see
+    # app/main/views.py:indexnow_key_file). Committed here like APP_NAME
+    # above; still overridable by an env var if the key is ever rotated.
+    INDEXNOW_API_KEY = os.environ.get(
+        "INDEXNOW_API_KEY", "d51b9c0554cf9ff9c975e8f5a67c7892328f56e1e4afe0f73fb8c34507bb292f"  # gitleaks:allow
+    )
 
     # Admin account
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
@@ -248,6 +263,14 @@ class Config:
             "WARNING: CREDENTIAL_ENCRYPTION_KEY env var not set. Any connector "
             "credential save (M365, Jira, DevOps, Lucidchart) will refuse to "
             "store the secret rather than store it unencrypted. Generate one: "
+            'python -c "from cryptography.fernet import Fernet; '
+            'print(Fernet.generate_key().decode())"'
+        )
+    ORG_ENCRYPTION_MASTER_KEY = os.environ.get("ORG_ENCRYPTION_MASTER_KEY", "")
+    if not ORG_ENCRYPTION_MASTER_KEY:
+        print(
+            "WARNING: ORG_ENCRYPTION_MASTER_KEY env var not set. Per-organisation "
+            "credential storage will refuse to store secrets. Generate one: "
             'python -c "from cryptography.fernet import Fernet; '
             'print(Fernet.generate_key().decode())"'
         )
@@ -508,6 +531,7 @@ class TestingConfig(Config):
     # at import time rather than a literal, so nothing here reads as a real key.
     from cryptography.fernet import Fernet as _Fernet
     CREDENTIAL_ENCRYPTION_KEY = _Fernet.generate_key().decode()
+    ORG_ENCRYPTION_MASTER_KEY = _Fernet.generate_key().decode()
 
     # Brute-force protection is a production control; under test it throttles the
     # suite instead of an attacker. /account/login is capped at 10 POSTs per

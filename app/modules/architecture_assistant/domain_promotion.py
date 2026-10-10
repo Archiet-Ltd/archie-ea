@@ -183,7 +183,14 @@ class DomainPromotionService:
                 node.model.overlay_code = p.overlay_code
             # Persist wizard ACM fields on the catalog element so UML/codegen can read them
             if hasattr(node.model, "acm_properties") and p.acm_properties:
-                node.model.acm_properties = p.acm_properties
+                from app.modules.architecture_assistant.property_service import PropertyService
+                raw = {}
+                for k, v in p.acm_properties.items():
+                    if isinstance(v, dict) and "value" in v:
+                        raw[k] = v["value"]
+                    else:
+                        raw[k] = v
+                PropertyService().merge_element_properties(node.model, raw, source="promotion")
 
             p.promoted_element_id = node.id
             p.status = "promoted"

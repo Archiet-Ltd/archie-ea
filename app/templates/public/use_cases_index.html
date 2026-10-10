@@ -10,7 +10,10 @@
 {% extends 'layouts/public_base.html' %}
 {% block title %}Use cases{% endblock %}
 {% block meta_description %}
-<meta name="description" content="What Entelim answers for startup founders, scale-up CTOs, enterprise architecture teams and operations leads.">
+{% from 'partials/_seo_meta.html' import seo_meta %}
+{{ seo_meta('https://entelim.org/use-cases', "What Entelim answers for startup founders, scale-up CTOs, enterprise architecture teams and operations leads.") }}
+<meta property="og:title" content="Use cases">
+<meta name="twitter:title" content="Use cases">
 {% endblock %}
 
 {% block header %}

@@ -21,11 +21,61 @@ from app.services.public_pages import (
     CONTENT_ROOT,
     FAMILY_DIR_MAP,
     FAMILY_URL_PREFIX,
+    HELD_PAGE_URLS,
+    MERGED_PAGES,
     _parse_front_matter,
     build_jsonld,
     load_all_pages,
+    load_feed_pages,
     load_page,
 )
+
+
+def _is_merged(page) -> bool:
+    """True for a MERGE-verdict page: its own URL now 301s to a parent page
+    instead of rendering (see app/services/public_pages.py MERGED_PAGES),
+    so it is excluded from every "every page renders / is listed" check
+    below and covered instead by its own 301 test."""
+    return page.url in MERGED_PAGES
+
+
+def _is_held(page) -> bool:
+    """True for a HOLD-verdict page (HELD_PAGE_URLS) or a page withdrawn
+    from discovery via front matter ``state: not_planned`` -- both stay
+    reachable and rendered at their own URL (unlike a merged page), but
+    out of the sitemap, llms.txt/llms-full.txt and every nav/index listing.
+    Delegates to PublicPage.is_held rather than reimplementing it, so this
+    test file cannot drift from the one mechanism in
+    app/services/public_pages.py."""
+    return page.is_held
+
+
+def _indexable(pages):
+    """Pages a crawler file (sitemap.xml, llms.txt, llms-full.txt) or a
+    nav/index listing is expected to carry -- excludes both verdicts
+    above. Same filter as app/services/public_pages.py::load_feed_pages,
+    applied to a given subset of pages rather than all of them."""
+    return [p for p in pages if not _is_merged(p) and not _is_held(p)]
+
+
+def _jsonld_graph_nodes(ld: dict) -> list[dict]:
+    """Every schema.org node in one page's JSON-LD, whether or not it's
+    wrapped in an @graph (module/use-case/comparison/offer pages carry a
+    BreadcrumbList, and some also an FAQPage, alongside their own primary
+    type -- see app/services/public_pages.py build_jsonld)."""
+    return ld["@graph"] if "@graph" in ld else [ld]
+
+
+def _primary_jsonld_node(ld: dict) -> dict:
+    """The primary (non-breadcrumb, non-FAQ-extra) schema.org node for a
+    page's JSON-LD -- always the first node, @graph or not."""
+    return _jsonld_graph_nodes(ld)[0]
+
+
+def _jsonld_node_of_type(ld: dict, type_name: str) -> dict | None:
+    return next(
+        (n for n in _jsonld_graph_nodes(ld) if n.get("@type") == type_name), None
+    )
 
 FORBIDDEN_STRINGS = [
     "on_main",
@@ -66,6 +116,123 @@ BANNED_CLAIMS = [
         "self-hosting under AGPL is a separate, true fact, but it does not mean pricing is "
         "unpublished",
     ),
+    (
+        "every canvas",
+        "only the Business Model Canvas model exists (app/models/business_model.py); no other "
+        "canvas type is modelled, so no plan or page can honestly promise 'every canvas'",
+    ),
+    (
+        "who to hire next",
+        "no hiring or workforce-planning capability exists anywhere in the codebase; "
+        "content/pages/function-per-segment/uc-s3-12-who-do-we-need.md records this as a feature "
+        "with no surface built at all",
+    ),
+    (
+        "enter your website address",
+        "there is no website-URL-intake feature; no route builds a model or a canvas from a "
+        "submitted URL",
+    ),
+    (
+        "your team's own AI assistants can work directly over your twin",
+        "no MCP server exists in this codebase; only Entelim's own AI chat works over a tenant's "
+        "model today",
+    ),
+    (
+        "usage history",
+        "no customer-visible usage-history page is confirmed to exist; dropped from every plan "
+        "description rather than promised",
+    ),
+    (
+        "webhook feed",
+        "the real, shipped feature is a generic webhook subscription (admin.webhook_settings), "
+        "not a branded 'webhook feed'",
+    ),
+    (
+        "webhook delivery for events you post",
+        "WebhookService.publish_event starts a bare threading.Thread with no Flask app "
+        "context; _deliver_webhook's db.session.add (and its own except-block's "
+        "error-logging call) both raise outside an app context, so the thread dies "
+        "silently -- nothing posted through the real customer-facing path "
+        "(POST /api/webhooks/public/events) is ever actually delivered",
+    ),
+    (
+        "twelve platform events",
+        "WebhookService.publish_event() is called from exactly one place in the app "
+        "(POST /public/events) -- nothing internal to Entelim ever publishes any of the twelve "
+        "named events on the webhook-settings picklist, so the platform does not notify a "
+        "subscriber when one of those twelve things happens; only a customer's own API call or "
+        "the manual 'test' button ever publishes an event",
+    ),
+    (
+        "canvas drafted from your own site",
+        "no route or service reads a customer's website to draft a canvas; "
+        "uc-s1-09-website-full-profile.md (state: missing) records this as still "
+        "unbuilt, not a shipped feature",
+    ),
+    (
+        "ready for the diligence request",
+        "no diligence-pack or investor-readiness export feature exists anywhere in the "
+        "codebase",
+    ),
+    (
+        "who's accountable, what's at risk",
+        "the accountability lens is withdrawn -- accountability_for_element "
+        "(query_service.py:1538) returns no owners, with ownership_reader_not_built, for "
+        "every element; D-24 removed this claim from /about and the homepage, and it must "
+        "not reappear on a vs or use-case page either. Narrower than a bare "
+        "'who's accountable': /about:11, vision/home.md:18 and modules/org-chart.md:31 all "
+        "say 'who's accountable for it/what', describing recorded ownership rather than an "
+        "Ask-lens answer, and D-24 confirmed that phrasing is true and must stay",
+    ),
+    (
+        "every suggestion traced to its source",
+        "only a derived connection (computed from other data, see "
+        "app/modules/intelligence/services/derived_facts.py's provenance field) carries a "
+        "proof trail; a plain suggestion does not",
+    ),
+    (
+        "deep-linked directly from a plain-language question",
+        "duplicate detection (NAV-DUPLICATE-DETECTION, partial) runs across the whole "
+        "application portfolio from the dashboard (POST /duplicate-detection/simple/"
+        "run-detection, returning overlapping groups to add to a consolidation list) -- it "
+        "is not a per-application view reached by picking one application, and it is not "
+        "answered as a question the way Ask's other lenses are either",
+    ),
+    (
+        "deep-linked from a plain-language question",
+        "duplicate detection (NAV-DUPLICATE-DETECTION, partial) runs across the whole "
+        "application portfolio from the dashboard (POST /duplicate-detection/simple/"
+        "run-detection, returning overlapping groups to add to a consolidation list) -- it "
+        "is not a per-application view reached by picking one application, and it is not "
+        "answered as a question the way Ask's other lenses are either",
+    ),
+    (
+        "answered directly from a plain-language question",
+        "duplicate detection (NAV-DUPLICATE-DETECTION, partial) runs across the whole "
+        "application portfolio from the dashboard (POST /duplicate-detection/simple/"
+        "run-detection, returning overlapping groups to add to a consolidation list) -- it "
+        "is not a per-application view reached by picking one application, and it is not "
+        "answered as a question the way Ask's other lenses are either",
+    ),
+    (
+        "deep-linked straight into the answer",
+        "duplicate detection runs across the whole application portfolio from the "
+        "dashboard, returning overlapping groups to add to a consolidation list -- it is "
+        "not a per-application view, and it is not part of what Ask or AI Chat answers",
+    ),
+    (
+        "ask the question directly and get duplicate detection",
+        "duplicate detection (NAV-DUPLICATE-DETECTION, partial) runs across the whole "
+        "application portfolio from the dashboard, not a per-application view, and not by "
+        "asking Ask a question",
+    ),
+    (
+        "pick an application and see",
+        "duplicate detection (app/modules/intelligence/services/query_service.py's "
+        "portfolio_component_for_element confirms no per-application HTML page exists for "
+        "it) runs across the whole application portfolio from the dashboard -- there is no "
+        "per-application view that shows it for one picked application",
+    ),
 ]
 
 # Front-matter keys that are metadata-only and must never appear as visible
@@ -86,18 +253,75 @@ FORBIDDEN_FRONT_MATTER_PATTERNS = [
     "segment_id",
 ]
 
+# Front matter's own "source:" key (which working document or register a
+# page's claims were grounded against, e.g. "source:
+# docs/eim-category-positioning-v1.md section 2") can't go in
+# FORBIDDEN_FRONT_MATTER_PATTERNS above: "source" alone is an ordinary
+# English word several live pages' own prose legitimately uses ("open
+# source", "source of truth"), so a bare substring check there would fail
+# pages that said nothing wrong. Checked instead as the actual leak shape
+# -- the key followed by a path-like value -- which real prose does not
+# produce. Found missing in independent review, PR 451.
+FORBIDDEN_SOURCE_LEAK_PATTERNS = [
+    re.compile(r"source:\s*docs[/\\]"),
+    re.compile(r"source:\s*[A-Za-z]:\\"),
+]
+
 
 # ── AC1: Every file returns 200 with title in <title> and <h1> ────────────
 
 
 def test_all_pages_return_200(app):
-    """Every .md file under content/pages/ returns 200 at its URL."""
+    """Every .md file under content/pages/ returns 200 at its URL, except a
+    MERGE-verdict page, whose own URL now 301s to its parent instead (see
+    test_merged_pages_301_to_their_parent below)."""
     pages = load_all_pages()
     assert len(pages) > 0, "No pages loaded from content/pages/"
     with app.test_client() as client:
         for page in pages:
+            if _is_merged(page):
+                continue
             rv = client.get(page.url)
             assert rv.status_code == 200, f"{page.url} returned {rv.status_code}"
+
+
+def test_merged_pages_301_to_their_parent(app):
+    """Every MERGE-verdict page's own URL 301s to its parent page instead
+    of rendering -- the old URL is not a second entry for content that now
+    lives at the target."""
+    with app.test_client() as client:
+        for old_url, target in MERGED_PAGES.items():
+            rv = client.get(old_url, follow_redirects=False)
+            assert rv.status_code == 301, (
+                f"{old_url}: expected 301 to {target}, got {rv.status_code}"
+            )
+            from urllib.parse import urlparse
+
+            assert urlparse(rv.location).path == target, (
+                f"{old_url}: expected 301 to {target}, got {rv.location}"
+            )
+            # The target itself resolves (200, not another redirect / 404).
+            follow = client.get(old_url, follow_redirects=True)
+            assert follow.status_code == 200, (
+                f"{old_url} -> {target}: target did not resolve (got {follow.status_code})"
+            )
+
+
+def test_held_pages_still_return_200_with_noindex(app):
+    """Every HOLD-verdict page stays reachable at its own URL (not a 404)
+    and carries a noindex meta tag."""
+    pages = [p for p in load_all_pages() if _is_held(p)]
+    assert len(pages) > 0, "no HOLD-verdict pages loaded"
+    with app.test_client() as client:
+        for page in pages:
+            rv = client.get(page.url)
+            assert rv.status_code == 200, (
+                f"{page.url}: HOLD page should still render, got {rv.status_code}"
+            )
+            html = rv.data.decode()
+            assert '<meta name="robots" content="noindex">' in html, (
+                f"{page.url}: HOLD page missing noindex meta tag"
+            )
 
 
 def test_all_pages_have_title_in_html_title(app):
@@ -108,6 +332,8 @@ def test_all_pages_have_title_in_html_title(app):
     pages = load_all_pages()
     with app.test_client() as client:
         for page in pages:
+            if _is_merged(page):
+                continue
             rv = client.get(page.url)
             html = rv.data.decode()
             title_match = re.search(r"<title>(.*?)</title>", html, re.DOTALL)
@@ -132,6 +358,8 @@ def test_all_pages_have_h1_with_title(app):
     pages = load_all_pages()
     with app.test_client() as client:
         for page in pages:
+            if _is_merged(page):
+                continue
             rv = client.get(page.url)
             html = rv.data.decode()
             assert "<h1" in html, f"{page.url}: no <h1> found"
@@ -152,6 +380,8 @@ def test_no_forbidden_strings_in_rendered_pages(app):
     pages = load_all_pages()
     with app.test_client() as client:
         for page in pages:
+            if _is_merged(page):
+                continue
             rv = client.get(page.url)
             html = rv.data.decode()
             # Remove script and style blocks before checking
@@ -163,6 +393,10 @@ def test_no_forbidden_strings_in_rendered_pages(app):
             for key in FORBIDDEN_FRONT_MATTER_PATTERNS:
                 assert key not in clean, (
                     f"{page.url}: front-matter key '{key}' found in rendered output"
+                )
+            for pattern in FORBIDDEN_SOURCE_LEAK_PATTERNS:
+                assert not pattern.search(clean), (
+                    f"{page.url}: front matter's 'source:' provenance path leaked into rendered output"
                 )
 
 
@@ -182,13 +416,21 @@ def _strip_tags(html: str, tags: list[str]) -> str:
 
 
 def test_llms_txt_lists_every_page(app):
-    """/llms.txt lists every page with its title and URL."""
+    """/llms.txt lists every page with its title and URL, except a
+    HOLD-verdict page, a MERGE-verdict page, or a page withdrawn from
+    discovery (state: not_planned) -- none of those belong in a "lists
+    every page" feed; see app/services/public_pages.py::load_feed_pages."""
     pages = load_all_pages()
     with app.test_client() as client:
         rv = client.get("/llms.txt")
         assert rv.status_code == 200
         text = rv.data.decode()
         for page in pages:
+            if _is_merged(page) or page.is_held:
+                assert page.url not in text, (
+                    f"llms.txt should not list held/merged/withdrawn page {page.url}"
+                )
+                continue
             assert page.url in text, (
                 f"llms.txt missing URL {page.url}"
             )
@@ -199,7 +441,9 @@ def test_llms_txt_lists_every_page(app):
 
 
 def test_sitemap_xml_includes_every_page(app):
-    """/sitemap.xml includes every page."""
+    """/sitemap.xml includes every page, except a HOLD-verdict page, a
+    MERGE-verdict page, or a page withdrawn from discovery (state:
+    not_planned)."""
     pages = load_all_pages()
     with app.test_client() as client:
         rv = client.get("/sitemap.xml")
@@ -208,6 +452,11 @@ def test_sitemap_xml_includes_every_page(app):
         assert xml.startswith('<?xml')
         assert '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' in xml
         for page in pages:
+            if _is_merged(page) or page.is_held:
+                assert page.url not in xml, (
+                    f"sitemap.xml should not include held/merged/withdrawn page {page.url}"
+                )
+                continue
             assert page.url in xml, (
                 f"sitemap.xml missing URL {page.url}"
             )
@@ -227,8 +476,132 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     assert "<priority>1.0</priority>" in homepage[0][1]
     # Listing it does not displace any content page. +3 non-content URLs:
     # the homepage, the /vs comparison hub and the /use-cases index (views,
-    # not load_all_pages() pages).
-    assert len(entries) == len(load_all_pages()) + 3
+    # not load_all_pages() pages). load_feed_pages(), not load_all_pages():
+    # the sitemap is built from the feed set, which leaves out a held page,
+    # a merged page, and a page withdrawn from discovery (state:
+    # not_planned) -- see app/services/public_pages.py::load_feed_pages.
+    assert len(entries) == len(load_feed_pages()) + 3
+
+
+def test_withdrawn_pages_200_but_excluded_from_every_feed(app):
+    """A page withdrawn from discovery (front matter ``state: not_planned``)
+    still renders at its own URL -- an existing inbound link or bookmark
+    must not 404 -- but its URL and title must not appear in /sitemap.xml,
+    /llms.txt or /llms-full.txt, and (for a use-case page) it must not be
+    linked from the /use-cases index either.
+
+    Found generically from front matter, not hardcoded to one page's slug,
+    so this keeps covering the mechanism if another page is withdrawn the
+    same way later. A HOLD-verdict page (HELD_PAGE_URLS) gets the
+    equivalent check in test_held_pages_still_return_200_with_noindex
+    above -- both reasons share the one PublicPage.is_held property (see
+    app/services/public_pages.py), exercised here from the not_planned
+    side specifically.
+    """
+    withdrawn = [
+        p for p in load_all_pages()
+        if p.front_matter.get("state") == "not_planned"
+    ]
+    assert len(withdrawn) > 0, (
+        "expected at least one withdrawn page (state: not_planned) to exist "
+        "on this branch to exercise the exclusion"
+    )
+
+    with app.test_client() as client:
+        for page in withdrawn:
+            rv = client.get(page.url)
+            assert rv.status_code == 200, (
+                f"withdrawn page {page.url} should still render, got {rv.status_code}"
+            )
+
+            sitemap = client.get("/sitemap.xml").data.decode()
+            assert page.url not in sitemap, (
+                f"sitemap.xml should not include withdrawn page {page.url}"
+            )
+
+            llms = client.get("/llms.txt").data.decode()
+            assert page.url not in llms, (
+                f"llms.txt should not include withdrawn page {page.url}"
+            )
+
+            llms_full = client.get("/llms-full.txt").data.decode()
+            assert page.title not in llms_full, (
+                f"llms-full.txt should not contain withdrawn page title '{page.title}'"
+            )
+
+            if page.family == "function-per-segment":
+                use_cases_html = client.get("/use-cases").data.decode()
+                assert f'href="{page.url}"' not in use_cases_html, (
+                    f"/use-cases should not link to withdrawn page {page.url}"
+                )
+
+
+def test_withdrawn_page_is_noindex_but_live_page_is_not(app):
+    """A page withdrawn from discovery (state: not_planned) still renders,
+    but must tell search engines not to index it; a normal live page (not
+    held or withdrawn for any reason) must not carry that tag at all."""
+    withdrawn = [
+        p for p in load_all_pages()
+        if p.front_matter.get("state") == "not_planned"
+    ]
+    assert withdrawn, (
+        "expected at least one withdrawn page (state: not_planned) to exist "
+        "on this branch to exercise the noindex tag"
+    )
+    live = next(p for p in load_all_pages() if not p.is_held)
+
+    with app.test_client() as client:
+        for page in withdrawn:
+            html = client.get(page.url).data.decode()
+            assert '<meta name="robots" content="noindex">' in html, (
+                f"withdrawn page {page.url} is missing <meta name=\"robots\" content=\"noindex\">"
+            )
+
+        live_html = client.get(live.url).data.decode()
+        assert 'name="robots"' not in live_html, (
+            f"live page {live.url} should not carry a robots noindex tag"
+        )
+
+
+def test_indexnow_submission_matches_sitemap_urls(app, monkeypatch):
+    """The ping-indexnow CLI command and /sitemap.xml are now both built
+    from the one shared path list (public_pages.feed_page_paths()) --
+    asserts the two surfaces' own, actually-rendered outputs agree path
+    for path, with no subtraction hiding a gap between them. A held,
+    merged or withdrawn page, or a hub view, missing from one surface but
+    not the other would be caught here.
+    """
+    from urllib.parse import urlparse
+
+    captured = {}
+
+    def _fake_ping_indexnow(app, urls, base_url=None):
+        captured["urls"] = list(urls)
+        return {"status_code": 200, "body": "ok"}
+
+    monkeypatch.setattr(
+        "app.services.indexnow_service.ping_indexnow", _fake_ping_indexnow
+    )
+
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["ping-indexnow"])
+    assert result.exit_code == 0, result.output
+
+    submitted = captured.get("urls")
+    assert submitted is not None, (
+        "ping-indexnow did not call ping_indexnow (is INDEXNOW_API_KEY unset?)"
+    )
+
+    with app.test_client() as client:
+        sitemap_xml = client.get("/sitemap.xml").data.decode()
+    sitemap_paths = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml))
+    submitted_paths = {urlparse(url).path or "/" for url in submitted}
+
+    assert submitted_paths == sitemap_paths, (
+        "IndexNow's page URL set does not match the sitemap's:\n"
+        f"only in IndexNow: {sorted(submitted_paths - sitemap_paths)}\n"
+        f"only in sitemap: {sorted(sitemap_paths - submitted_paths)}"
+    )
 
 
 def _strings_in(value):
@@ -258,9 +631,12 @@ def test_structured_data_cannot_end_its_script_block_early(app):
 
 
 def test_every_page_renders_one_script_block_for_its_structured_data(app):
-    """Rendered pages keep exactly one JSON-LD script element."""
+    """Rendered pages keep exactly one JSON-LD script element (a page with
+    a BreadcrumbList and/or FAQPage alongside its primary type still gets
+    one script, carrying one @graph -- see build_jsonld)."""
+    sample = [p for p in load_all_pages() if not _is_merged(p)][:8]
     with app.test_client() as client:
-        for page in load_all_pages()[:8]:
+        for page in sample:
             html = client.get(page.url).data.decode()
             assert html.count('type="application/ld+json"') == 1
 
@@ -286,7 +662,7 @@ def test_llms_txt_has_capabilities_section(app):
     """/llms.txt includes a ## Capabilities section with all module pages."""
     from app.services.public_pages import load_all_pages
 
-    module_pages = [p for p in load_all_pages() if p.family == "module"]
+    module_pages = _indexable(p for p in load_all_pages() if p.family == "module")
     assert len(module_pages) > 0, "No module pages found"
 
     with app.test_client() as client:
@@ -320,7 +696,7 @@ def test_llms_full_txt_contains_all_module_titles(app):
     """/llms-full.txt contains the title of every module page."""
     from app.services.public_pages import load_all_pages
 
-    module_pages = [p for p in load_all_pages() if p.family == "module"]
+    module_pages = _indexable(p for p in load_all_pages() if p.family == "module")
     assert len(module_pages) > 0, "No module pages found"
 
     with app.test_client() as client:
@@ -333,11 +709,19 @@ def test_llms_full_txt_contains_all_module_titles(app):
 
 
 def test_llms_full_txt_contains_all_use_case_titles(app):
-    """/llms-full.txt contains the title of every use-case page."""
+    """/llms-full.txt contains the title of every live use-case page,
+    except a MERGE-verdict page, a HOLD-verdict page, or a page withdrawn
+    from discovery (state: not_planned) -- none of which it should
+    contain."""
     from app.services.public_pages import load_all_pages
 
-    use_case_pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+    use_case_pages = [
+        p for p in load_all_pages() if p.family == "function-per-segment"
+    ]
     assert len(use_case_pages) > 0, "No use-case pages found"
+    assert any(
+        p.front_matter.get("state") == "not_planned" for p in use_case_pages
+    ), "expected at least one withdrawn use-case page to exercise the exclusion"
 
     with app.test_client() as client:
         rv = client.get("/llms-full.txt")
@@ -345,6 +729,17 @@ def test_llms_full_txt_contains_all_use_case_titles(app):
         text = rv.data.decode()
 
         for page in use_case_pages:
+            if _is_merged(page) or page.is_held:
+                # Checked as its own "## {title}" section heading, not a
+                # bare substring: a held/merged page's title can still
+                # legitimately appear inside a still-included page's own
+                # body copy (a "Related" link naming it by title), which
+                # is not the same as llms-full.txt carrying its own entry.
+                assert f"## {page.title}" not in text, (
+                    f"llms-full.txt should not contain a merged/held/withdrawn use-case "
+                    f"section for '{page.title}'"
+                )
+                continue
             assert page.title in text, f"llms-full.txt missing use-case title '{page.title}'"
 
 
@@ -365,7 +760,9 @@ def test_llms_full_txt_contains_all_comparison_titles(app):
 
 
 def test_llms_full_txt_includes_urls(app):
-    """/llms-full.txt includes the URL for each page."""
+    """/llms-full.txt includes the URL for each page, except a
+    MERGE-verdict page, a HOLD-verdict page, or a page withdrawn from
+    discovery (state: not_planned) -- none of which it should include."""
     from app.services.public_pages import load_all_pages
 
     target_pages = [
@@ -380,6 +777,19 @@ def test_llms_full_txt_includes_urls(app):
         text = rv.data.decode()
 
         for page in target_pages:
+            if _is_merged(page) or page.is_held:
+                # Checked as its own "URL: https://entelim.org<path>" line
+                # (the exact format llms_full_txt emits for an included
+                # page's own entry), not a bare substring: a held/merged
+                # page's old URL can still legitimately appear as an
+                # inline link inside a still-included page's own body
+                # copy, which is not the same as llms-full.txt carrying
+                # its own entry for that page.
+                assert f"URL: https://entelim.org{page.url}" not in text, (
+                    f"llms-full.txt should not include a merged/held/withdrawn "
+                    f"page entry for {page.url}"
+                )
+                continue
             assert page.url in text, f"llms-full.txt missing URL {page.url}"
 
 
@@ -473,10 +883,14 @@ def test_html_to_plain_text_removes_script_and_style_content():
 
 
 def test_every_page_has_valid_jsonld(app):
-    """Each page has valid JSON-LD that parses as JSON."""
+    """Each page has valid JSON-LD that parses as JSON, whether it's one
+    primary node or an @graph of several (BreadcrumbList and/or FAQPage
+    alongside the primary type -- see build_jsonld)."""
     pages = load_all_pages()
     with app.test_client() as client:
         for page in pages:
+            if _is_merged(page):
+                continue
             rv = client.get(page.url)
             html = rv.data.decode()
             assert 'application/ld+json' in html, (
@@ -497,7 +911,12 @@ def test_every_page_has_valid_jsonld(app):
             except json.JSONDecodeError as e:
                 pytest.fail(f"{page.url}: invalid JSON-LD: {e}")
             assert "@context" in ld, f"{page.url}: JSON-LD missing @context"
-            assert "@type" in ld, f"{page.url}: JSON-LD missing @type"
+            if "@graph" in ld:
+                assert ld["@graph"], f"{page.url}: JSON-LD @graph is empty"
+                for node in ld["@graph"]:
+                    assert "@type" in node, f"{page.url}: a @graph node is missing @type"
+            else:
+                assert "@type" in ld, f"{page.url}: JSON-LD missing @type"
 
 
 def test_comparison_pages_have_faq_jsonld(app):
@@ -516,15 +935,14 @@ def test_comparison_pages_have_faq_jsonld(app):
                 re.DOTALL,
             )
             ld = json.loads(ld_match.group(1))
-            assert ld["@type"] == "FAQPage", (
-                f"{page.url}: expected FAQPage, got {ld['@type']}"
-            )
-            assert "mainEntity" in ld, f"{page.url}: FAQPage missing mainEntity"
+            faq = _jsonld_node_of_type(ld, "FAQPage")
+            assert faq is not None, f"{page.url}: no FAQPage node in JSON-LD"
+            assert "mainEntity" in faq, f"{page.url}: FAQPage missing mainEntity"
 
 
 def test_module_pages_have_software_application_jsonld(app):
     """Module pages have SoftwareApplication JSON-LD."""
-    pages = [p for p in load_all_pages() if p.family == "module"]
+    pages = [p for p in load_all_pages() if p.family == "module" and not _is_merged(p)]
     assert len(pages) > 0, "No module pages found"
     with app.test_client() as client:
         for page in pages[:5]:  # Sample first 5
@@ -538,22 +956,40 @@ def test_module_pages_have_software_application_jsonld(app):
                 re.DOTALL,
             )
             ld = json.loads(ld_match.group(1))
-            assert ld["@type"] == "SoftwareApplication", (
-                f"{page.url}: expected SoftwareApplication, got {ld['@type']}"
+            app_node = _jsonld_node_of_type(ld, "SoftwareApplication")
+            assert app_node is not None, (
+                f"{page.url}: no SoftwareApplication node in JSON-LD"
             )
 
 
-def test_comparison_pages_have_canonical_link(app):
-    """Comparison pages with archiet.ai url_slug have canonical link."""
-    pages = [p for p in load_all_pages() if p.family == "comparison"]
+def test_every_public_page_has_a_self_canonical_link(app):
+    """Every public page's <head> carries a <link rel="canonical"> to its
+    own entelim.org URL -- including comparison pages, which used to point
+    at a different product's archiet.ai page (SEO/GEO audit item 1/2)."""
+    pages = [p for p in load_all_pages() if not _is_merged(p)]
+    assert len(pages) > 0
     with app.test_client() as client:
         for page in pages:
-            rv = client.get(page.url)
-            html = rv.data.decode()
-            if page.canonical_url:
-                assert f'rel="canonical" href="{page.canonical_url}"' in html, (
-                    f"{page.url}: missing canonical link to {page.canonical_url}"
-                )
+            html = client.get(page.url).data.decode()
+            expected = f'<link rel="canonical" href="{page.self_canonical_url}">'
+            assert expected in html, f"{page.url}: missing self-canonical link"
+            # And never the old archiet.ai canonical, which used to be
+            # rendered in the page body where search engines ignore it.
+            assert 'rel="canonical" href="https://archiet.ai' not in html, (
+                f"{page.url}: still carries an archiet.ai canonical link"
+            )
+
+
+def test_comparison_pages_external_url_still_tracked_for_cross_linking():
+    """Comparison pages with an archiet.ai url_slug still carry that address
+    as PublicPage.external_url, for the /vs hub's cross-link -- it is simply
+    no longer this page's own <link rel="canonical"> (see the test above)."""
+    pages = [p for p in load_all_pages() if p.family == "comparison"]
+    assert len(pages) > 0
+    with_external = [p for p in pages if p.external_url]
+    assert with_external, "expected at least one comparison page with an external_url"
+    for page in with_external:
+        assert page.external_url.startswith("https://archiet.ai/vs/")
 
 
 # ── AC5: Adding a new Markdown file works without code changes ────────────
@@ -610,9 +1046,11 @@ This is a test module page.
             # AC5d: Has JSON-LD
             assert 'application/ld+json' in html
 
-            # AC5e: cta=waiting_list shows waiting list link
-            assert "/#waitlist" in html
-            assert "Join the waiting list" in html
+            # AC5e: cta=waiting_list shows the "tell us you need this"
+            # enquiry form (not a dead link to the home page's waiting
+            # list -- see app/templates/public/page.html).
+            assert "Tell us you need this" in html
+            assert "/#waitlist" not in html
     finally:
         if test_file.exists():
             test_file.unlink()
@@ -659,7 +1097,7 @@ Content for the test segment page.
 
 def test_public_pages_accessible_without_login(app):
     """All public pages are accessible without authentication."""
-    pages = load_all_pages()
+    pages = [p for p in load_all_pages() if not _is_merged(p)]
     with app.test_client() as client:
         for page in pages[:10]:  # Sample
             rv = client.get(page.url)
@@ -670,7 +1108,7 @@ def test_public_pages_accessible_without_login(app):
 
 def test_public_pages_no_login_required(app):
     """Public content pages do not require authentication (no redirect to login)."""
-    pages = load_all_pages()
+    pages = [p for p in load_all_pages() if not _is_merged(p)]
     with app.test_client() as client:
         for page in pages[:10]:  # Sample
             rv = client.get(page.url, follow_redirects=False)
@@ -782,50 +1220,64 @@ def test_load_page_dogfood():
 
 
 def test_build_jsonld_webpage():
-    """build_jsonld returns valid JSON for a function-per-segment page."""
+    """build_jsonld returns valid JSON for a function-per-segment page,
+    with its primary WebPage node alongside a BreadcrumbList (@graph,
+    since use-case pages get one -- see build_jsonld)."""
     page = load_page("function-per-segment", slug="canvas-dependencies")
     assert page is not None
     ld_str = build_jsonld(page)
     ld = json.loads(ld_str)
-    assert ld["@type"] == "WebPage"
-    assert "name" in ld
+    primary = _primary_jsonld_node(ld)
+    assert primary["@type"] == "WebPage"
+    assert "name" in primary
+    assert _jsonld_node_of_type(ld, "BreadcrumbList") is not None
 
 
 def test_build_jsonld_module():
-    """build_jsonld returns SoftwareApplication for a module page."""
+    """build_jsonld returns SoftwareApplication for a module page,
+    alongside a BreadcrumbList (@graph -- module pages get one)."""
     page = load_page("module", slug="applications")
     assert page is not None
     ld_str = build_jsonld(page)
     ld = json.loads(ld_str)
-    assert ld["@type"] == "SoftwareApplication"
-    assert "offers" in ld
+    primary = _primary_jsonld_node(ld)
+    assert primary["@type"] == "SoftwareApplication"
+    assert "offers" in primary
+    assert _jsonld_node_of_type(ld, "BreadcrumbList") is not None
 
 
 def test_build_jsonld_comparison():
-    """build_jsonld returns FAQPage for a comparison page."""
+    """build_jsonld returns FAQPage for a comparison page, alongside a
+    BreadcrumbList (@graph -- comparison pages get one too)."""
     page = load_page("comparison", slug="leanix")
     assert page is not None
     ld_str = build_jsonld(page)
     ld = json.loads(ld_str)
-    assert ld["@type"] == "FAQPage"
+    assert _jsonld_node_of_type(ld, "FAQPage") is not None
+    assert _jsonld_node_of_type(ld, "BreadcrumbList") is not None
 
 
-def test_comparison_canonical_url():
-    """Comparison pages with archiet.ai url_slug have canonical_url set."""
+def test_comparison_external_url():
+    """Comparison pages with an archiet.ai url_slug carry that address as
+    external_url (cross-linking only -- see self_canonical_url for this
+    page's own <link rel="canonical">)."""
     page = load_page("comparison", slug="leanix")
     assert page is not None
-    assert page.canonical_url == "https://archiet.ai/vs/leanix"
+    assert page.external_url == "https://archiet.ai/vs/leanix"
+    assert page.self_canonical_url == "https://entelim.org/vs/leanix"
 
 
-def test_non_comparison_no_canonical():
-    """Non-comparison pages have no canonical_url."""
+def test_non_comparison_no_external_url():
+    """Non-comparison pages have no external_url."""
     page = load_page("module", slug="applications")
     assert page is not None
-    assert page.canonical_url is None
+    assert page.external_url is None
 
 
-def test_waiting_list_cta_renders_link(app):
-    """Pages with cta=waiting_list show the waiting list link."""
+def test_waiting_list_cta_renders_feature_interest_form(app):
+    """Pages with cta=waiting_list show the "tell us you need this"
+    enquiry form, not a dead link to the home page's waiting-list
+    section."""
     # ai-chat moved to cta: plans (feature shipped) and /contact moved to
     # cta: inquiry (a sales enquiry form), so use a not-yet-built use-case
     # page instead, which still carries cta: waiting_list. Its current,
@@ -834,8 +1286,9 @@ def test_waiting_list_cta_renders_link(app):
     with app.test_client() as client:
         rv = client.get("/use-cases/canvas-dependencies")
         html = rv.data.decode()
-        assert "/#waitlist" in html
-        assert "Join the waiting list" in html
+        assert "Tell us you need this" in html
+        assert "/#waitlist" not in html
+        assert 'name="offer" value="feature:canvas-dependencies"' in html
 
 
 def test_no_waiting_list_on_non_cta_pages(app):
@@ -907,11 +1360,12 @@ def test_comparison_faq_jsonld_has_entries():
         assert page is not None, f"Comparison page {slug} not found"
         ld_str = build_jsonld(page)
         ld = json.loads(ld_str)
-        assert ld["@type"] == "FAQPage", f"{slug}: expected FAQPage"
-        assert len(ld["mainEntity"]) > 0, (
-            f"{slug}: FAQPage mainEntity is empty, got {ld['mainEntity']}"
+        faq = _jsonld_node_of_type(ld, "FAQPage")
+        assert faq is not None, f"{slug}: expected a FAQPage node"
+        assert len(faq["mainEntity"]) > 0, (
+            f"{slug}: FAQPage mainEntity is empty, got {faq['mainEntity']}"
         )
-        for item in ld["mainEntity"]:
+        for item in faq["mainEntity"]:
             assert item["@type"] == "Question"
             assert len(item["name"]) > 0
             assert item["acceptedAnswer"]["@type"] == "Answer"
@@ -931,7 +1385,9 @@ def test_comparison_faq_jsonld_question_count():
         page = load_page("comparison", slug=slug)
         assert page is not None
         ld = json.loads(build_jsonld(page))
-        actual = len(ld["mainEntity"])
+        faq = _jsonld_node_of_type(ld, "FAQPage")
+        assert faq is not None, f"{slug}: expected a FAQPage node"
+        actual = len(faq["mainEntity"])
         assert actual == expected, (
             f"{slug}: expected {expected} FAQ entries, got {actual}"
         )
@@ -1141,7 +1597,9 @@ def test_sitemap_homepage_has_priority(app):
 
 
 def test_sitemap_still_includes_all_content_pages(app):
-    """/sitemap.xml still includes every content page after homepage addition."""
+    """/sitemap.xml still includes every content page after homepage
+    addition, except a HOLD-verdict page, a MERGE-verdict page, or a page
+    withdrawn from discovery (state: not_planned)."""
     from app.services.public_pages import load_all_pages
 
     pages = load_all_pages()
@@ -1149,6 +1607,11 @@ def test_sitemap_still_includes_all_content_pages(app):
         rv = client.get("/sitemap.xml")
         xml = rv.data.decode()
         for page in pages:
+            if _is_merged(page) or page.is_held:
+                assert page.url not in xml, (
+                    f"sitemap.xml should not include held/merged/withdrawn content page URL {page.url}"
+                )
+                continue
             assert page.url in xml, (
                 f"sitemap.xml missing content page URL {page.url}"
             )
@@ -1369,6 +1832,62 @@ def test_no_page_repeats_a_disproven_claim():
     assert not violations, (
         "Disproven claim(s) reappeared on a content page:\n"
         + "\n".join(violations)
+    )
+
+
+def test_billing_plans_summaries_repeat_no_disproven_claim():
+    """billing_plans.PLANS's own ``summary`` strings are never rendered
+    through load_all_pages() (they are not content pages), but they feed
+    every page's JSON-LD Offer/AggregateOffer description directly (see
+    app/services/public_pages.py::_flat_plan_offer / _per_unit_plan_offer /
+    _enterprise_offer, all of which interpolate ``plan.summary`` verbatim).
+    A disproven claim fixed on the rendered pages but left in
+    billing_plans.py would resurface there the next time those templates
+    changed what they pull from the catalogue."""
+    from app.services.billing_plans import PLANS
+
+    violations = []
+    for plan in PLANS:
+        summary_lower = plan.summary.lower()
+        for phrase, reason in BANNED_CLAIMS:
+            if phrase.lower() in summary_lower:
+                violations.append(
+                    f"billing_plans.PLANS[{plan.key!r}].summary: contains banned phrase "
+                    f"'{phrase}' ({reason})"
+                )
+    assert not violations, (
+        "Disproven claim(s) reappeared in billing_plans.py's own PLANS summaries:\n"
+        + "\n".join(violations)
+    )
+
+
+def test_rendered_home_pricing_and_onboarding_pages_repeat_no_disproven_claim(app):
+    """The actually-rendered HTML of /, /pricing and /team-annual-onboarding
+    must never contain a disproven claim either.
+
+    test_no_page_repeats_a_disproven_claim already checks every content
+    page's ``body_html`` -- the Markdown-derived content only. The home
+    page is not a content page at all (rendered directly from
+    app/templates/main/index.html, never through load_all_pages()), and a
+    content page's full HTTP response can contain more than its own
+    body_html (template chrome, the plan_buy_section() CTA, JSON-LD). This
+    checks the three pages a pricing claim is most likely to land on, as
+    they are actually served.
+    """
+    pages_to_check = ["/", "/pricing", "/team-annual-onboarding"]
+    with app.test_client() as client:
+        violations = []
+        for url in pages_to_check:
+            rv = client.get(url)
+            assert rv.status_code == 200, f"{url} returned {rv.status_code}"
+            body_lower = rv.data.decode().lower()
+            for phrase, reason in BANNED_CLAIMS:
+                if phrase.lower() in body_lower:
+                    violations.append(
+                        f"{url}: contains banned phrase '{phrase}' ({reason})"
+                    )
+    assert not violations, (
+        "Disproven claim(s) reappeared on a rendered page:\n" + "\n".join(violations)
     )
 
 
@@ -1665,9 +2184,16 @@ def test_no_stale_internal_use_case_uc_slug_references():
 
 def test_use_cases_index_returns_200_and_lists_every_page(app):
     """/use-cases returns 200 and links every live use-case page by its
-    current (post-migration) URL and title."""
+    current (post-migration) URL and title, except a MERGE-verdict page
+    (its own URL 301s elsewhere -- see test_merged_pages_301_to_their_parent),
+    a HOLD-verdict page (see test_held_use_cases_absent_from_use_cases_index
+    below), or a page withdrawn from discovery (state: not_planned) --
+    none of those should be linked to or named from this index."""
     pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
     assert len(pages) > 0
+    assert any(
+        p.front_matter.get("state") == "not_planned" for p in pages
+    ), "expected at least one withdrawn use-case page to exercise the exclusion"
 
     with app.test_client() as client:
         rv = client.get("/use-cases")
@@ -1680,8 +2206,33 @@ def test_use_cases_index_returns_200_and_lists_every_page(app):
 
         unescaped = _html_mod.unescape(html)
         for page in pages:
+            if _is_merged(page) or page.is_held:
+                assert f'href="{page.url}"' not in html, (
+                    f"/use-cases should not link to merged/held/withdrawn page {page.url}"
+                )
+                assert page.title not in unescaped, (
+                    f"/use-cases should not name merged/held/withdrawn page title '{page.title}'"
+                )
+                continue
             assert f'href="{page.url}"' in html, f"/use-cases missing link to {page.url}"
             assert page.title in unescaped, f"/use-cases missing title for {page.url}"
+
+
+def test_held_use_cases_absent_from_use_cases_index(app):
+    """HOLD-verdict use-case pages are not linked from /use-cases -- they
+    stay reachable at their own URL (test_held_pages_still_return_200_with_noindex
+    above), just not promoted from the index."""
+    held = [
+        p for p in load_all_pages()
+        if p.family == "function-per-segment" and _is_held(p)
+    ]
+    assert len(held) > 0, "expected at least one held use-case page"
+    with app.test_client() as client:
+        html = client.get("/use-cases").data.decode()
+    for page in held:
+        assert f'href="{page.url}"' not in html, (
+            f"/use-cases still links to held page {page.url}"
+        )
 
 
 def test_use_cases_index_groups_by_segment(app):

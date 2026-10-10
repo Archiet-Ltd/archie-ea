@@ -3399,13 +3399,20 @@ def fix_dimension(solution_id):
         dimension, files, quality_details
     )
 
-    from flask import current_app
+    from contextlib import nullcontext
+
+    from flask import current_app, g
+    from app.jobs.tenant_safe_job import tenant_scope
     from app.modules.codegen.services.nl_code_editor import stream_chat_edit
 
     _app = current_app._get_current_object()
+    # The generator runs after the request context ends, in a fresh app context
+    # with no session organisation: carry the caller's into it so row-level
+    # security shows it its own api_settings row.
+    _org_id = getattr(g, "current_org_id", None)
 
     def _generate():
-        with _app.app_context():
+        with _app.app_context(), (tenant_scope(_org_id) if _org_id is not None else nullcontext()):
             yield from stream_chat_edit(
                 instruction=instruction,
                 current_file=primary_file,
@@ -3492,13 +3499,20 @@ def fix_recommendation(solution_id):
         "If multiple files need changes, return multiple diffs."
     )
 
-    from flask import current_app
+    from contextlib import nullcontext
+
+    from flask import current_app, g
+    from app.jobs.tenant_safe_job import tenant_scope
     from app.modules.codegen.services.nl_code_editor import stream_chat_edit
 
     _app = current_app._get_current_object()
+    # The generator runs after the request context ends, in a fresh app context
+    # with no session organisation: carry the caller's into it so row-level
+    # security shows it its own api_settings row.
+    _org_id = getattr(g, "current_org_id", None)
 
     def _generate():
-        with _app.app_context():
+        with _app.app_context(), (tenant_scope(_org_id) if _org_id is not None else nullcontext()):
             yield from stream_chat_edit(
                 instruction=instruction,
                 current_file=primary_file,
@@ -5853,14 +5867,19 @@ def monaco_chat_edit(solution_id):
             if content:
                 loaded_related.append({"path": rf_path, "content": content})
 
-    from flask import current_app
+    from contextlib import nullcontext
+
+    from flask import current_app, g
+    from app.jobs.tenant_safe_job import tenant_scope
     from app.modules.codegen.services.nl_code_editor import stream_chat_edit
 
     # Capture app object now — the generator runs lazily after the request context ends
     _app = current_app._get_current_object()
+    # ... and carry the caller's organisation into it (row-level security).
+    _org_id = getattr(g, "current_org_id", None)
 
     def _generate():
-        with _app.app_context():
+        with _app.app_context(), (tenant_scope(_org_id) if _org_id is not None else nullcontext()):
             yield from stream_chat_edit(
                 instruction=instruction,
                 current_file=current_file,

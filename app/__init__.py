@@ -75,6 +75,11 @@ def create_app(config=None):
     install_tenant_context(app)
     install_tenant_filter(app)
 
+    # 1b'. Transitional: keep unified_work_packages in step with the four retired
+    # work package stores while their remaining writers are repointed (R1-B04 PR 3).
+    from app.services.work_package_bridge import register as register_work_package_bridge
+    register_work_package_bridge(app)
+
     # 1c. Usage metering: non-blocking after_request event recording
     from app.middleware.usage_tracking import install_usage_tracking
     install_usage_tracking(app)
@@ -82,6 +87,14 @@ def create_app(config=None):
     # 1d. PostHog product analytics: auto-pageview tracking (COM-013)
     from app.middleware.analytics_middleware import install_analytics
     install_analytics(app)
+
+    # 1d-2. First-party, cookieless pageview counting for public marketing
+    # pages -- separate from the PostHog hook above, which only fires for a
+    # signed-in user.
+    from app.middleware.public_analytics_middleware import (
+        install_public_pageview_tracking,
+    )
+    install_public_pageview_tracking(app)
 
     # 1d. SOC 2 audit logging: SQLAlchemy mapper events for controlled models
     from app.middleware.audit_middleware import install_audit_logging
