@@ -102,9 +102,29 @@ def require_roles(*allowed_roles):
         def decorated_function(*args, **kwargs):
             if not current_user.is_authenticated:
                 return jsonify({"error": "Authentication required"}), 401
-            
-            # Admins bypass role check
-            if hasattr(current_user, 'is_admin') and current_user.is_admin():
+
+            # Admins OF THE ACTIVE organisation bypass the role check.
+            #
+            # D-4 (admin-rbac-active-org continuation): this used to be
+            # ``hasattr(current_user, 'is_admin') and current_user.is_admin()``
+            # -- a global Permission.ADMINISTER flag, independent of which
+            # organisation is active in the session. Since every
+            # self-registered user is Administrator of their own
+            # organisation, a user who merely accepted a Viewer invitation
+            # into another organisation and switched their session into it
+            # bypassed every @require_roles route here too (including the
+            # admin-only one gating risk-register settings) -- the exact bug
+            # admin_required/org_admin_required already fix elsewhere in
+            # this PR.
+            from flask import g
+
+            from app.middleware.tenant_decorators import is_platform_admin
+            from app.services.rbac_service import rbac_service
+
+            active_org_id = getattr(g, "current_org_id", None)
+            if is_platform_admin(current_user) or rbac_service.is_org_admin(
+                current_user, active_org_id
+            ):
                 return f(*args, **kwargs)
             
             # Check user roles
@@ -134,9 +154,19 @@ def _apply_division_filter(query, model, user):
     """
     if not user or not user.is_authenticated:
         return query.filter(False)  # Deny all
-    
-    # Admins see everything
-    if hasattr(user, 'is_admin') and user.is_admin():
+
+    # Admins OF THE ACTIVE organisation see everything (D-4,
+    # admin-rbac-active-org continuation -- see the matching fix and comment
+    # on require_roles' decorator above; no live route distinguishes this
+    # branch from the no-op fallback below today, since no model here yet
+    # carries a division_id column, but a future one would).
+    from flask import g
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    _active_org_id = getattr(g, "current_org_id", None)
+    if is_platform_admin(user) or rbac_service.is_org_admin(user, _active_org_id):
         return query
     
     # Apply division filtering when permission model is available
@@ -507,9 +537,22 @@ def list_risk_statuses():
         query = db.session.query(RiskAssessment)
 
         # Apply division filter when permission model is available
+        # (D-4, admin-rbac-active-org continuation: see the matching fix in
+        # _apply_division_filter above -- no live route distinguishes this
+        # from the fallback today, since BusinessCapability has no
+        # division_id column yet, but a future one would).
+        from flask import g
+
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
         user_division = getattr(current_user, 'division_id', None)
+        _active_org_id = getattr(g, "current_org_id", None)
         if (user_division
-                and not (hasattr(current_user, 'is_admin') and current_user.is_admin())
+                and not (
+                    is_platform_admin(current_user)
+                    or rbac_service.is_org_admin(current_user, _active_org_id)
+                )
                 and hasattr(BusinessCapability, 'division_id')):
             query = query.join(BusinessCapability).filter(
                 BusinessCapability.division_id == user_division
@@ -575,7 +618,18 @@ def list_risks():
         )
         
         # Apply division filter when permission model is available
-        if (not (hasattr(current_user, 'is_admin') and current_user.is_admin())
+        # (D-4, admin-rbac-active-org continuation: see the matching fix in
+        # _apply_division_filter above).
+        from flask import g
+
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
+        _active_org_id = getattr(g, "current_org_id", None)
+        if (not (
+                    is_platform_admin(current_user)
+                    or rbac_service.is_org_admin(current_user, _active_org_id)
+                )
                 and hasattr(BusinessCapability, 'division_id')
                 and hasattr(current_user, 'division_id')):
             query = query.join(BusinessCapability).filter(

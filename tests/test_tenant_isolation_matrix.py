@@ -406,9 +406,9 @@ SHARED_MODELS = {
 _PR258 = "PR 258 (scoring/consolidation): consolidation entries are fenced through their application"
 _PR274 = "PR 274 and PR 218 edit solution_design_routes.py; the fix waits for them to land"
 KNOWN_LEAKS = {
-    "DELETE /api/roadmap/deliverables/<int:deliverable_id>": (
-        "PR 265 (work package stores): a deliverable is scoped through its work package"),
-    "PUT /api/roadmap/deliverables/<int:deliverable_id>": "PR 265 (work package stores), as above",
+    # PR 421 (one work package store) scoped the deliverable update and delete
+    # through the organisation's own work packages; test_known_leak_is_still_open
+    # went XPASS(strict) on both, so their entries come out.
     "DELETE /api/v1/mappings/application-to-vendor/<int:mapping_id>": "PR 269 (vendor/contract)",
     "DELETE /api/v1/mappings/unified-to-application/<int:mapping_id>": "capability store brief",
     "DELETE /api/v1/mappings/unified-to-vendor-org/<int:mapping_id>": "capability store brief",
@@ -426,7 +426,16 @@ KNOWN_LEAKS = {
     "GET /solutions/api/registry/specs/<int:spec_id>": _PR274,
 }
 
+# Parameters whose record the codebase reading no longer finds, because the lookup moved
+# into work_package_service (R1-B04 PR 2): the work package and deliverable routes.
+PARAM_MODELS = {
+    "wp_id": "unified_work_packages",
+    "work_package_id": "unified_work_packages",
+    "deliverable_id": "deliverables",
+}
+
 POLICY = sweep.Policy(
+    param_models=PARAM_MODELS,
     non_identifier_ints=NON_IDENTIFIER_INTS,
     string_identifier=STRING_IDENTIFIER,
     excluded_params=EXCLUDED_PARAMS,

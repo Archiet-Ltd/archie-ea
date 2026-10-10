@@ -26,6 +26,7 @@ from app.services.public_pages import (
     _parse_front_matter,
     build_jsonld,
     load_all_pages,
+    load_feed_pages,
     load_page,
 )
 
@@ -39,16 +40,21 @@ def _is_merged(page) -> bool:
 
 
 def _is_held(page) -> bool:
-    """True for a HOLD-verdict page: still reachable and rendered at its
-    own URL (unlike a merged page), but out of the sitemap, llms.txt/
-    llms-full.txt and every nav/index listing -- see HELD_PAGE_URLS."""
-    return page.url in HELD_PAGE_URLS
+    """True for a HOLD-verdict page (HELD_PAGE_URLS) or a page withdrawn
+    from discovery via front matter ``state: not_planned`` -- both stay
+    reachable and rendered at their own URL (unlike a merged page), but
+    out of the sitemap, llms.txt/llms-full.txt and every nav/index listing.
+    Delegates to PublicPage.is_held rather than reimplementing it, so this
+    test file cannot drift from the one mechanism in
+    app/services/public_pages.py."""
+    return page.is_held
 
 
 def _indexable(pages):
     """Pages a crawler file (sitemap.xml, llms.txt, llms-full.txt) or a
     nav/index listing is expected to carry -- excludes both verdicts
-    above."""
+    above. Same filter as app/services/public_pages.py::load_feed_pages,
+    applied to a given subset of pages rather than all of them."""
     return [p for p in pages if not _is_merged(p) and not _is_held(p)]
 
 
@@ -110,6 +116,123 @@ BANNED_CLAIMS = [
         "self-hosting under AGPL is a separate, true fact, but it does not mean pricing is "
         "unpublished",
     ),
+    (
+        "every canvas",
+        "only the Business Model Canvas model exists (app/models/business_model.py); no other "
+        "canvas type is modelled, so no plan or page can honestly promise 'every canvas'",
+    ),
+    (
+        "who to hire next",
+        "no hiring or workforce-planning capability exists anywhere in the codebase; "
+        "content/pages/function-per-segment/uc-s3-12-who-do-we-need.md records this as a feature "
+        "with no surface built at all",
+    ),
+    (
+        "enter your website address",
+        "there is no website-URL-intake feature; no route builds a model or a canvas from a "
+        "submitted URL",
+    ),
+    (
+        "your team's own AI assistants can work directly over your twin",
+        "no MCP server exists in this codebase; only Entelim's own AI chat works over a tenant's "
+        "model today",
+    ),
+    (
+        "usage history",
+        "no customer-visible usage-history page is confirmed to exist; dropped from every plan "
+        "description rather than promised",
+    ),
+    (
+        "webhook feed",
+        "the real, shipped feature is a generic webhook subscription (admin.webhook_settings), "
+        "not a branded 'webhook feed'",
+    ),
+    (
+        "webhook delivery for events you post",
+        "WebhookService.publish_event starts a bare threading.Thread with no Flask app "
+        "context; _deliver_webhook's db.session.add (and its own except-block's "
+        "error-logging call) both raise outside an app context, so the thread dies "
+        "silently -- nothing posted through the real customer-facing path "
+        "(POST /api/webhooks/public/events) is ever actually delivered",
+    ),
+    (
+        "twelve platform events",
+        "WebhookService.publish_event() is called from exactly one place in the app "
+        "(POST /public/events) -- nothing internal to Entelim ever publishes any of the twelve "
+        "named events on the webhook-settings picklist, so the platform does not notify a "
+        "subscriber when one of those twelve things happens; only a customer's own API call or "
+        "the manual 'test' button ever publishes an event",
+    ),
+    (
+        "canvas drafted from your own site",
+        "no route or service reads a customer's website to draft a canvas; "
+        "uc-s1-09-website-full-profile.md (state: missing) records this as still "
+        "unbuilt, not a shipped feature",
+    ),
+    (
+        "ready for the diligence request",
+        "no diligence-pack or investor-readiness export feature exists anywhere in the "
+        "codebase",
+    ),
+    (
+        "who's accountable, what's at risk",
+        "the accountability lens is withdrawn -- accountability_for_element "
+        "(query_service.py:1538) returns no owners, with ownership_reader_not_built, for "
+        "every element; D-24 removed this claim from /about and the homepage, and it must "
+        "not reappear on a vs or use-case page either. Narrower than a bare "
+        "'who's accountable': /about:11, vision/home.md:18 and modules/org-chart.md:31 all "
+        "say 'who's accountable for it/what', describing recorded ownership rather than an "
+        "Ask-lens answer, and D-24 confirmed that phrasing is true and must stay",
+    ),
+    (
+        "every suggestion traced to its source",
+        "only a derived connection (computed from other data, see "
+        "app/modules/intelligence/services/derived_facts.py's provenance field) carries a "
+        "proof trail; a plain suggestion does not",
+    ),
+    (
+        "deep-linked directly from a plain-language question",
+        "duplicate detection (NAV-DUPLICATE-DETECTION, partial) runs across the whole "
+        "application portfolio from the dashboard (POST /duplicate-detection/simple/"
+        "run-detection, returning overlapping groups to add to a consolidation list) -- it "
+        "is not a per-application view reached by picking one application, and it is not "
+        "answered as a question the way Ask's other lenses are either",
+    ),
+    (
+        "deep-linked from a plain-language question",
+        "duplicate detection (NAV-DUPLICATE-DETECTION, partial) runs across the whole "
+        "application portfolio from the dashboard (POST /duplicate-detection/simple/"
+        "run-detection, returning overlapping groups to add to a consolidation list) -- it "
+        "is not a per-application view reached by picking one application, and it is not "
+        "answered as a question the way Ask's other lenses are either",
+    ),
+    (
+        "answered directly from a plain-language question",
+        "duplicate detection (NAV-DUPLICATE-DETECTION, partial) runs across the whole "
+        "application portfolio from the dashboard (POST /duplicate-detection/simple/"
+        "run-detection, returning overlapping groups to add to a consolidation list) -- it "
+        "is not a per-application view reached by picking one application, and it is not "
+        "answered as a question the way Ask's other lenses are either",
+    ),
+    (
+        "deep-linked straight into the answer",
+        "duplicate detection runs across the whole application portfolio from the "
+        "dashboard, returning overlapping groups to add to a consolidation list -- it is "
+        "not a per-application view, and it is not part of what Ask or AI Chat answers",
+    ),
+    (
+        "ask the question directly and get duplicate detection",
+        "duplicate detection (NAV-DUPLICATE-DETECTION, partial) runs across the whole "
+        "application portfolio from the dashboard, not a per-application view, and not by "
+        "asking Ask a question",
+    ),
+    (
+        "pick an application and see",
+        "duplicate detection (app/modules/intelligence/services/query_service.py's "
+        "portfolio_component_for_element confirms no per-application HTML page exists for "
+        "it) runs across the whole application portfolio from the dashboard -- there is no "
+        "per-application view that shows it for one picked application",
+    ),
 ]
 
 # Front-matter keys that are metadata-only and must never appear as visible
@@ -128,6 +251,20 @@ FORBIDDEN_FRONT_MATTER_PATTERNS = [
     "module_label",
     "use_case_id",
     "segment_id",
+]
+
+# Front matter's own "source:" key (which working document or register a
+# page's claims were grounded against, e.g. "source:
+# docs/eim-category-positioning-v1.md section 2") can't go in
+# FORBIDDEN_FRONT_MATTER_PATTERNS above: "source" alone is an ordinary
+# English word several live pages' own prose legitimately uses ("open
+# source", "source of truth"), so a bare substring check there would fail
+# pages that said nothing wrong. Checked instead as the actual leak shape
+# -- the key followed by a path-like value -- which real prose does not
+# produce. Found missing in independent review, PR 451.
+FORBIDDEN_SOURCE_LEAK_PATTERNS = [
+    re.compile(r"source:\s*docs[/\\]"),
+    re.compile(r"source:\s*[A-Za-z]:\\"),
 ]
 
 
@@ -257,6 +394,10 @@ def test_no_forbidden_strings_in_rendered_pages(app):
                 assert key not in clean, (
                     f"{page.url}: front-matter key '{key}' found in rendered output"
                 )
+            for pattern in FORBIDDEN_SOURCE_LEAK_PATTERNS:
+                assert not pattern.search(clean), (
+                    f"{page.url}: front matter's 'source:' provenance path leaked into rendered output"
+                )
 
 
 def _strip_tags(html: str, tags: list[str]) -> str:
@@ -275,14 +416,21 @@ def _strip_tags(html: str, tags: list[str]) -> str:
 
 
 def test_llms_txt_lists_every_page(app):
-    """/llms.txt lists every indexable page with its title and URL (held
-    and merged pages are excluded -- see _indexable)."""
-    pages = _indexable(load_all_pages())
+    """/llms.txt lists every page with its title and URL, except a
+    HOLD-verdict page, a MERGE-verdict page, or a page withdrawn from
+    discovery (state: not_planned) -- none of those belong in a "lists
+    every page" feed; see app/services/public_pages.py::load_feed_pages."""
+    pages = load_all_pages()
     with app.test_client() as client:
         rv = client.get("/llms.txt")
         assert rv.status_code == 200
         text = rv.data.decode()
         for page in pages:
+            if _is_merged(page) or page.is_held:
+                assert page.url not in text, (
+                    f"llms.txt should not list held/merged/withdrawn page {page.url}"
+                )
+                continue
             assert page.url in text, (
                 f"llms.txt missing URL {page.url}"
             )
@@ -293,9 +441,10 @@ def test_llms_txt_lists_every_page(app):
 
 
 def test_sitemap_xml_includes_every_page(app):
-    """/sitemap.xml includes every indexable page (held and merged pages
-    are excluded -- see _indexable)."""
-    pages = _indexable(load_all_pages())
+    """/sitemap.xml includes every page, except a HOLD-verdict page, a
+    MERGE-verdict page, or a page withdrawn from discovery (state:
+    not_planned)."""
+    pages = load_all_pages()
     with app.test_client() as client:
         rv = client.get("/sitemap.xml")
         assert rv.status_code == 200
@@ -303,6 +452,11 @@ def test_sitemap_xml_includes_every_page(app):
         assert xml.startswith('<?xml')
         assert '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' in xml
         for page in pages:
+            if _is_merged(page) or page.is_held:
+                assert page.url not in xml, (
+                    f"sitemap.xml should not include held/merged/withdrawn page {page.url}"
+                )
+                continue
             assert page.url in xml, (
                 f"sitemap.xml missing URL {page.url}"
             )
@@ -322,9 +476,132 @@ def test_sitemap_xml_lists_the_homepage_once_with_top_priority(app):
     assert "<priority>1.0</priority>" in homepage[0][1]
     # Listing it does not displace any content page. +3 non-content URLs:
     # the homepage, the /vs comparison hub and the /use-cases index (views,
-    # not load_all_pages() pages). Held and merged pages are excluded from
-    # the sitemap entirely -- see _indexable.
-    assert len(entries) == len(_indexable(load_all_pages())) + 3
+    # not load_all_pages() pages). load_feed_pages(), not load_all_pages():
+    # the sitemap is built from the feed set, which leaves out a held page,
+    # a merged page, and a page withdrawn from discovery (state:
+    # not_planned) -- see app/services/public_pages.py::load_feed_pages.
+    assert len(entries) == len(load_feed_pages()) + 3
+
+
+def test_withdrawn_pages_200_but_excluded_from_every_feed(app):
+    """A page withdrawn from discovery (front matter ``state: not_planned``)
+    still renders at its own URL -- an existing inbound link or bookmark
+    must not 404 -- but its URL and title must not appear in /sitemap.xml,
+    /llms.txt or /llms-full.txt, and (for a use-case page) it must not be
+    linked from the /use-cases index either.
+
+    Found generically from front matter, not hardcoded to one page's slug,
+    so this keeps covering the mechanism if another page is withdrawn the
+    same way later. A HOLD-verdict page (HELD_PAGE_URLS) gets the
+    equivalent check in test_held_pages_still_return_200_with_noindex
+    above -- both reasons share the one PublicPage.is_held property (see
+    app/services/public_pages.py), exercised here from the not_planned
+    side specifically.
+    """
+    withdrawn = [
+        p for p in load_all_pages()
+        if p.front_matter.get("state") == "not_planned"
+    ]
+    assert len(withdrawn) > 0, (
+        "expected at least one withdrawn page (state: not_planned) to exist "
+        "on this branch to exercise the exclusion"
+    )
+
+    with app.test_client() as client:
+        for page in withdrawn:
+            rv = client.get(page.url)
+            assert rv.status_code == 200, (
+                f"withdrawn page {page.url} should still render, got {rv.status_code}"
+            )
+
+            sitemap = client.get("/sitemap.xml").data.decode()
+            assert page.url not in sitemap, (
+                f"sitemap.xml should not include withdrawn page {page.url}"
+            )
+
+            llms = client.get("/llms.txt").data.decode()
+            assert page.url not in llms, (
+                f"llms.txt should not include withdrawn page {page.url}"
+            )
+
+            llms_full = client.get("/llms-full.txt").data.decode()
+            assert page.title not in llms_full, (
+                f"llms-full.txt should not contain withdrawn page title '{page.title}'"
+            )
+
+            if page.family == "function-per-segment":
+                use_cases_html = client.get("/use-cases").data.decode()
+                assert f'href="{page.url}"' not in use_cases_html, (
+                    f"/use-cases should not link to withdrawn page {page.url}"
+                )
+
+
+def test_withdrawn_page_is_noindex_but_live_page_is_not(app):
+    """A page withdrawn from discovery (state: not_planned) still renders,
+    but must tell search engines not to index it; a normal live page (not
+    held or withdrawn for any reason) must not carry that tag at all."""
+    withdrawn = [
+        p for p in load_all_pages()
+        if p.front_matter.get("state") == "not_planned"
+    ]
+    assert withdrawn, (
+        "expected at least one withdrawn page (state: not_planned) to exist "
+        "on this branch to exercise the noindex tag"
+    )
+    live = next(p for p in load_all_pages() if not p.is_held)
+
+    with app.test_client() as client:
+        for page in withdrawn:
+            html = client.get(page.url).data.decode()
+            assert '<meta name="robots" content="noindex">' in html, (
+                f"withdrawn page {page.url} is missing <meta name=\"robots\" content=\"noindex\">"
+            )
+
+        live_html = client.get(live.url).data.decode()
+        assert 'name="robots"' not in live_html, (
+            f"live page {live.url} should not carry a robots noindex tag"
+        )
+
+
+def test_indexnow_submission_matches_sitemap_urls(app, monkeypatch):
+    """The ping-indexnow CLI command and /sitemap.xml are now both built
+    from the one shared path list (public_pages.feed_page_paths()) --
+    asserts the two surfaces' own, actually-rendered outputs agree path
+    for path, with no subtraction hiding a gap between them. A held,
+    merged or withdrawn page, or a hub view, missing from one surface but
+    not the other would be caught here.
+    """
+    from urllib.parse import urlparse
+
+    captured = {}
+
+    def _fake_ping_indexnow(app, urls, base_url=None):
+        captured["urls"] = list(urls)
+        return {"status_code": 200, "body": "ok"}
+
+    monkeypatch.setattr(
+        "app.services.indexnow_service.ping_indexnow", _fake_ping_indexnow
+    )
+
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["ping-indexnow"])
+    assert result.exit_code == 0, result.output
+
+    submitted = captured.get("urls")
+    assert submitted is not None, (
+        "ping-indexnow did not call ping_indexnow (is INDEXNOW_API_KEY unset?)"
+    )
+
+    with app.test_client() as client:
+        sitemap_xml = client.get("/sitemap.xml").data.decode()
+    sitemap_paths = set(re.findall(r"<loc>https://entelim\.org([^<]*)</loc>", sitemap_xml))
+    submitted_paths = {urlparse(url).path or "/" for url in submitted}
+
+    assert submitted_paths == sitemap_paths, (
+        "IndexNow's page URL set does not match the sitemap's:\n"
+        f"only in IndexNow: {sorted(submitted_paths - sitemap_paths)}\n"
+        f"only in sitemap: {sorted(sitemap_paths - submitted_paths)}"
+    )
 
 
 def _strings_in(value):
@@ -432,13 +709,19 @@ def test_llms_full_txt_contains_all_module_titles(app):
 
 
 def test_llms_full_txt_contains_all_use_case_titles(app):
-    """/llms-full.txt contains the title of every use-case page."""
+    """/llms-full.txt contains the title of every live use-case page,
+    except a MERGE-verdict page, a HOLD-verdict page, or a page withdrawn
+    from discovery (state: not_planned) -- none of which it should
+    contain."""
     from app.services.public_pages import load_all_pages
 
-    use_case_pages = _indexable(
+    use_case_pages = [
         p for p in load_all_pages() if p.family == "function-per-segment"
-    )
+    ]
     assert len(use_case_pages) > 0, "No use-case pages found"
+    assert any(
+        p.front_matter.get("state") == "not_planned" for p in use_case_pages
+    ), "expected at least one withdrawn use-case page to exercise the exclusion"
 
     with app.test_client() as client:
         rv = client.get("/llms-full.txt")
@@ -446,6 +729,17 @@ def test_llms_full_txt_contains_all_use_case_titles(app):
         text = rv.data.decode()
 
         for page in use_case_pages:
+            if _is_merged(page) or page.is_held:
+                # Checked as its own "## {title}" section heading, not a
+                # bare substring: a held/merged page's title can still
+                # legitimately appear inside a still-included page's own
+                # body copy (a "Related" link naming it by title), which
+                # is not the same as llms-full.txt carrying its own entry.
+                assert f"## {page.title}" not in text, (
+                    f"llms-full.txt should not contain a merged/held/withdrawn use-case "
+                    f"section for '{page.title}'"
+                )
+                continue
             assert page.title in text, f"llms-full.txt missing use-case title '{page.title}'"
 
 
@@ -466,7 +760,9 @@ def test_llms_full_txt_contains_all_comparison_titles(app):
 
 
 def test_llms_full_txt_includes_urls(app):
-    """/llms-full.txt includes the URL for each page."""
+    """/llms-full.txt includes the URL for each page, except a
+    MERGE-verdict page, a HOLD-verdict page, or a page withdrawn from
+    discovery (state: not_planned) -- none of which it should include."""
     from app.services.public_pages import load_all_pages
 
     target_pages = _indexable(
@@ -481,6 +777,19 @@ def test_llms_full_txt_includes_urls(app):
         text = rv.data.decode()
 
         for page in target_pages:
+            if _is_merged(page) or page.is_held:
+                # Checked as its own "URL: https://entelim.org<path>" line
+                # (the exact format llms_full_txt emits for an included
+                # page's own entry), not a bare substring: a held/merged
+                # page's old URL can still legitimately appear as an
+                # inline link inside a still-included page's own body
+                # copy, which is not the same as llms-full.txt carrying
+                # its own entry for that page.
+                assert f"URL: https://entelim.org{page.url}" not in text, (
+                    f"llms-full.txt should not include a merged/held/withdrawn "
+                    f"page entry for {page.url}"
+                )
+                continue
             assert page.url in text, f"llms-full.txt missing URL {page.url}"
 
 
@@ -1288,14 +1597,21 @@ def test_sitemap_homepage_has_priority(app):
 
 
 def test_sitemap_still_includes_all_content_pages(app):
-    """/sitemap.xml still includes every indexable content page after
-    homepage addition (held and merged pages are excluded -- see
-    _indexable)."""
-    pages = _indexable(load_all_pages())
+    """/sitemap.xml still includes every content page after homepage
+    addition, except a HOLD-verdict page, a MERGE-verdict page, or a page
+    withdrawn from discovery (state: not_planned)."""
+    from app.services.public_pages import load_all_pages
+
+    pages = load_all_pages()
     with app.test_client() as client:
         rv = client.get("/sitemap.xml")
         xml = rv.data.decode()
         for page in pages:
+            if _is_merged(page) or page.is_held:
+                assert page.url not in xml, (
+                    f"sitemap.xml should not include held/merged/withdrawn content page URL {page.url}"
+                )
+                continue
             assert page.url in xml, (
                 f"sitemap.xml missing content page URL {page.url}"
             )
@@ -1516,6 +1832,62 @@ def test_no_page_repeats_a_disproven_claim():
     assert not violations, (
         "Disproven claim(s) reappeared on a content page:\n"
         + "\n".join(violations)
+    )
+
+
+def test_billing_plans_summaries_repeat_no_disproven_claim():
+    """billing_plans.PLANS's own ``summary`` strings are never rendered
+    through load_all_pages() (they are not content pages), but they feed
+    every page's JSON-LD Offer/AggregateOffer description directly (see
+    app/services/public_pages.py::_flat_plan_offer / _per_unit_plan_offer /
+    _enterprise_offer, all of which interpolate ``plan.summary`` verbatim).
+    A disproven claim fixed on the rendered pages but left in
+    billing_plans.py would resurface there the next time those templates
+    changed what they pull from the catalogue."""
+    from app.services.billing_plans import PLANS
+
+    violations = []
+    for plan in PLANS:
+        summary_lower = plan.summary.lower()
+        for phrase, reason in BANNED_CLAIMS:
+            if phrase.lower() in summary_lower:
+                violations.append(
+                    f"billing_plans.PLANS[{plan.key!r}].summary: contains banned phrase "
+                    f"'{phrase}' ({reason})"
+                )
+    assert not violations, (
+        "Disproven claim(s) reappeared in billing_plans.py's own PLANS summaries:\n"
+        + "\n".join(violations)
+    )
+
+
+def test_rendered_home_pricing_and_onboarding_pages_repeat_no_disproven_claim(app):
+    """The actually-rendered HTML of /, /pricing and /team-annual-onboarding
+    must never contain a disproven claim either.
+
+    test_no_page_repeats_a_disproven_claim already checks every content
+    page's ``body_html`` -- the Markdown-derived content only. The home
+    page is not a content page at all (rendered directly from
+    app/templates/main/index.html, never through load_all_pages()), and a
+    content page's full HTTP response can contain more than its own
+    body_html (template chrome, the plan_buy_section() CTA, JSON-LD). This
+    checks the three pages a pricing claim is most likely to land on, as
+    they are actually served.
+    """
+    pages_to_check = ["/", "/pricing", "/team-annual-onboarding"]
+    with app.test_client() as client:
+        violations = []
+        for url in pages_to_check:
+            rv = client.get(url)
+            assert rv.status_code == 200, f"{url} returned {rv.status_code}"
+            body_lower = rv.data.decode().lower()
+            for phrase, reason in BANNED_CLAIMS:
+                if phrase.lower() in body_lower:
+                    violations.append(
+                        f"{url}: contains banned phrase '{phrase}' ({reason})"
+                    )
+    assert not violations, (
+        "Disproven claim(s) reappeared on a rendered page:\n" + "\n".join(violations)
     )
 
 
@@ -1811,12 +2183,17 @@ def test_no_stale_internal_use_case_uc_slug_references():
 
 
 def test_use_cases_index_returns_200_and_lists_every_page(app):
-    """/use-cases returns 200 and links every live, indexable use-case
-    page by its current (post-migration) URL and title. Held and merged
-    use cases are deliberately absent -- see
-    test_held_use_cases_absent_from_use_cases_index below."""
-    pages = _indexable(p for p in load_all_pages() if p.family == "function-per-segment")
+    """/use-cases returns 200 and links every live use-case page by its
+    current (post-migration) URL and title, except a MERGE-verdict page
+    (its own URL 301s elsewhere -- see test_merged_pages_301_to_their_parent),
+    a HOLD-verdict page (see test_held_use_cases_absent_from_use_cases_index
+    below), or a page withdrawn from discovery (state: not_planned) --
+    none of those should be linked to or named from this index."""
+    pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
     assert len(pages) > 0
+    assert any(
+        p.front_matter.get("state") == "not_planned" for p in pages
+    ), "expected at least one withdrawn use-case page to exercise the exclusion"
 
     with app.test_client() as client:
         rv = client.get("/use-cases")
@@ -1829,6 +2206,14 @@ def test_use_cases_index_returns_200_and_lists_every_page(app):
 
         unescaped = _html_mod.unescape(html)
         for page in pages:
+            if _is_merged(page) or page.is_held:
+                assert f'href="{page.url}"' not in html, (
+                    f"/use-cases should not link to merged/held/withdrawn page {page.url}"
+                )
+                assert page.title not in unescaped, (
+                    f"/use-cases should not name merged/held/withdrawn page title '{page.title}'"
+                )
+                continue
             assert f'href="{page.url}"' in html, f"/use-cases missing link to {page.url}"
             assert page.title in unescaped, f"/use-cases missing title for {page.url}"
 

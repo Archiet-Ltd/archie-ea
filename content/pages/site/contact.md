@@ -20,7 +20,7 @@ hosted plan, or a commercial licence.
 ## Bugs, feature requests and security issues
 
 Entelim is licensed under AGPL-3.0. For a bug, a feature request, or a security issue, use
-[reqarchitect.com](https://reqarchitect.com) or [archiet.com](https://archiet.com) — please
+[reqarchitect.com](https://reqarchitect.com) or [archiet.dev](https://archiet.dev) — please
 report a security issue privately rather than in public, so it can be fixed first.
 
 ## Already have an account?

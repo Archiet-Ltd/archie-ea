@@ -18,8 +18,13 @@ from flask_login import current_user, login_required
 
 from app import db
 
+# D-5 (admin-rbac-active-org continuation): repointed from
+# app.core.auth.decorators.admin_required (one of three duplicate
+# admin_required implementations; that one never carried the active-org
+# fix at all) to the canonical, now-fixed implementation.
+from app.decorators import admin_required
+
 # Import capability framework blueprint
-from app.core.auth.decorators import admin_required
 from app.main.capability_framework_routes import capability_framework_bp
 from app.main.framework_management_routes import framework_management_bp
 from app.middleware.tenant_decorators import platform_admin_required
@@ -433,47 +438,28 @@ def robots_txt():
     return send_from_directory("static", "robots.txt")
 
 
-def _indexable_pages():
-    """Every public content page, minus the pages the SEO/GEO audit holds
-    (not built yet -- stay reachable, noindex, but out of every crawler
-    file and nav listing) or merges into a parent (301 from the old URL,
-    so the old URL is not a second entry for the same content)."""
-    from app.services.public_pages import HELD_PAGE_URLS, MERGED_PAGES, load_all_pages
-
-    return [
-        p for p in load_all_pages()
-        if p.url not in MERGED_PAGES and p.url not in HELD_PAGE_URLS
-    ]
-
-
 @main.route("/sitemap.xml")
 def sitemap_xml():
     """Serve sitemap.xml for SEO — generated from public content pages.
 
-    Excludes MERGE-verdict pages (301 elsewhere -- the old URL is not a
-    second entry for content that now lives at the target) and HOLD-verdict
-    pages (not built yet -- noindex, kept out of every crawler file until
-    they are)."""
-    pages = _indexable_pages()
+    Built from feed_page_paths(), the one path list shared with the
+    IndexNow CLI (app/commands/indexnow_commands.py), so the two cannot
+    drift apart: it already excludes a HOLD-verdict page, a MERGE-verdict
+    page (301s elsewhere -- the old URL is not a second entry for content
+    that now lives at the target) and a page withdrawn from discovery
+    (front matter ``state: not_planned``) -- see
+    app/services/public_pages.py::load_feed_pages / feed_page_paths.
+    """
+    from html import escape
+
+    from app.services.public_pages import feed_page_paths
+
     base_url = "https://entelim.org"
     urls = []
-    # Homepage is not a content page but is the most important URL
-    urls.append(
-        f"  <url><loc>{base_url}/</loc><priority>1.0</priority></url>"
-    )
-    # The /vs comparison hub and the /use-cases index are views, not content
-    # pages from load_all_pages(), so each needs its own entry here, same as
-    # the homepage above.
-    urls.append(
-        f"  <url><loc>{base_url}/vs</loc></url>"
-    )
-    urls.append(
-        f"  <url><loc>{base_url}/use-cases</loc></url>"
-    )
-    for p in pages:
-        urls.append(
-            f"  <url><loc>{base_url}{p.url}</loc></url>"
-        )
+    for path in feed_page_paths():
+        # Homepage is not a content page but is the most important URL.
+        priority = "<priority>1.0</priority>" if path == "/" else ""
+        urls.append(f"  <url><loc>{base_url}{escape(path)}</loc>{priority}</url>")
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
     from flask import Response
     return Response(xml, mimetype="application/xml")
@@ -499,17 +485,18 @@ def indexnow_key_file(key):
 
 @main.route("/llms.txt")
 def llms_txt():
-    """Serve llms.txt listing every indexable public content page with a
-    Capabilities section. Held and merged pages are excluded, same as
-    sitemap.xml -- see _indexable_pages()."""
-    pages = _indexable_pages()
+    """Serve llms.txt listing every public content page with a Capabilities
+    section. Held, merged and withdrawn pages are excluded, same as
+    sitemap.xml -- see app/services/public_pages.py::load_feed_pages."""
+    from app.services.public_pages import load_feed_pages
+
+    pages = load_feed_pages()
     base_url = "https://entelim.org"
     lines = ["# Entelim"]
     lines.append("")
     lines.append(
-        "> Entelim is the open-source Enterprise Intelligence Model: "
-        "build your company's architecture, applications, risks and gaps "
-        "as one model you can ask."
+        "> Enterprise Intelligence Management: one living, explainable model of your "
+        "enterprise, for every company that has a strategy, systems, suppliers and risks."
     )
     lines.append("")
 
@@ -535,17 +522,19 @@ def llms_txt():
 
 @main.route("/llms-full.txt")
 def llms_full_txt():
-    """Serve llms-full.txt with the full text of every indexable public
-    module, use-case and comparison page. Held and merged pages are
-    excluded, same as sitemap.xml -- see _indexable_pages()."""
-    pages = _indexable_pages()
+    """Serve llms-full.txt with the full text of every public module,
+    use-case and comparison page. Held, merged and withdrawn pages are
+    excluded, same as sitemap.xml -- see
+    app/services/public_pages.py::load_feed_pages."""
+    from app.services.public_pages import load_feed_pages
+
+    pages = load_feed_pages()
     base_url = "https://entelim.org"
     lines = ["# Entelim — Full Content"]
     lines.append("")
     lines.append(
-        "> Entelim is the open-source Enterprise Intelligence Model: "
-        "build your company's architecture, applications, risks and gaps "
-        "as one model you can ask."
+        "> Enterprise Intelligence Management: one living, explainable model of your "
+        "enterprise, for every company that has a strategy, systems, suppliers and risks."
     )
     lines.append("")
 
@@ -722,20 +711,15 @@ _USE_CASE_SEGMENT_LABELS = {
 def public_use_cases_index():
     """The /use-cases index: every live use-case page, grouped by segment.
 
-    HOLD-verdict pages (SEO/GEO audit) are left out of this listing
-    entirely -- they stay reachable at their own URL, just not promoted
-    from here, same as every other nav/index listing. MERGE-verdict pages
-    are left out too: their own URL now 301s to a parent page, so listing
-    them here would just be an extra redirect hop for a nav link.
+    Built from load_feed_pages(): a HOLD-verdict page and a MERGE-verdict
+    page (its own URL now 301s to a parent page, so listing it here would
+    just be an extra redirect hop for a nav link) are both left out of this
+    listing, same as every other nav/index listing -- see
+    app/services/public_pages.py::load_feed_pages.
     """
-    from app.services.public_pages import HELD_PAGE_URLS, MERGED_PAGES, load_all_pages
+    from app.services.public_pages import load_feed_pages
 
-    pages = [
-        p for p in load_all_pages()
-        if p.family == "function-per-segment"
-        and p.url not in HELD_PAGE_URLS
-        and p.url not in MERGED_PAGES
-    ]
+    pages = [p for p in load_feed_pages() if p.family == "function-per-segment"]
 
     groups: dict[str, list] = {}
     for page in pages:
@@ -796,11 +780,16 @@ def public_comparison_hub():
     a comparison page's own front-matter `routing` decides its real address — most
     carry an archiet.ai canonical URL, so the hub links there rather than assuming
     every comparison page lives on entelim.org.
+
+    load_feed_pages(), not load_all_pages(): a comparison page withdrawn from
+    discovery (state: not_planned) still renders at its own URL but must drop
+    out of this hub automatically, the same as the sitemap, llms.txt and the
+    /use-cases index.
     """
-    from app.services.public_pages import load_all_pages
+    from app.services.public_pages import load_feed_pages
 
     site_url = "https://entelim.org"
-    pages = [p for p in load_all_pages() if p.family == "comparison"]
+    pages = [p for p in load_feed_pages() if p.family == "comparison"]
     entries = [
         {
             "competitor": p.front_matter.get("competitor", p.title),
@@ -1166,6 +1155,7 @@ def integrations():
 
 @main.route("/settings")
 @login_required
+@platform_admin_required
 @admin_required
 def settings():
     """System Settings - Application configuration and user preferences.
@@ -1183,6 +1173,13 @@ def settings():
 # any authenticated user of any tenant could read it. The page that consumes it
 # (settings/index.html) is linked only from the Administration sidebar section,
 # so gating it on admin matches how it is actually reached.
+#
+# admin_required alone was not enough either: it is satisfied by
+# Permission.ADMINISTER, a GLOBAL flag every self-registered user holds for
+# their own organisation, so any tenant's own admin -- not just a platform
+# admin -- could read this platform-wide table. platform_admin_required
+# closes that (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def get_system_settings():
     """Return all saved system settings as JSON."""
@@ -1212,6 +1209,11 @@ def get_system_settings():
 @login_required
 # The write half of the same global table: with @login_required alone, any
 # authenticated user could rewrite platform-wide configuration for every tenant.
+#
+# Same gap as get_system_settings above: admin_required alone let any
+# tenant's own admin rewrite this platform-wide table. platform_admin_required
+# closes that (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def save_system_settings():
     """Persist system settings to the database."""

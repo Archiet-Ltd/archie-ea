@@ -23,11 +23,32 @@ wizard_ai_bp = Blueprint("wizard_ai", __name__, url_prefix="/api/wizard")
 
 
 def _require_solution_owner(f):
-    """Guard: authenticated user must own the solution or be admin."""
+    """Guard: authenticated user must own the solution or be admin OF THE
+    ACTIVE organisation.
+
+    D-4 (admin-rbac-active-org continuation): the admin branch used to be
+    ``current_user.is_admin()`` -- a global Permission.ADMINISTER flag,
+    independent of which organisation is active in the session
+    (``g.current_org_id``). Since every self-registered user is
+    Administrator of their own organisation, a user who merely accepted a
+    Viewer invitation into another organisation and switched their session
+    into it could act on any solution there too, not just their own -- the
+    exact bug admin_required/org_admin_required already fix elsewhere in
+    this PR.
+    """
     @wraps(f)
     def decorated(solution_id, *args, **kwargs):
+        from flask import g
+
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
         solution = Solution.query.get_or_404(solution_id)
-        if solution.created_by_id != current_user.id and not current_user.is_admin():
+        active_org_id = getattr(g, "current_org_id", None)
+        is_admin_here = is_platform_admin(current_user) or rbac_service.is_org_admin(
+            current_user, active_org_id
+        )
+        if solution.created_by_id != current_user.id and not is_admin_here:
             return api_error("Access denied: you do not own this solution", 403)
         return f(solution_id, *args, **kwargs)
     return decorated

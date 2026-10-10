@@ -301,6 +301,10 @@ _ALLOWED_ATTRS = {
     "img": ["src", "alt", "title"],
     "th": ["align"],
     "td": ["align"],
+    # id is not an XSS vector; allowed so a page's own headings can carry a
+    # deep-link anchor (e.g. /features#strategy-management) for other pages
+    # to link into, without needing the markdown "toc" extension.
+    "h1": ["id"], "h2": ["id"], "h3": ["id"], "h4": ["id"], "h5": ["id"], "h6": ["id"],
 }
 
 
@@ -355,9 +359,24 @@ class PublicPage:
     @property
     def is_held(self) -> bool:
         """Out of the sitemap, llms.txt/llms-full.txt and every nav/index
-        listing, but still reachable at its own URL with a noindex tag --
-        see HELD_PAGE_URLS."""
-        return self.url in HELD_PAGE_URLS
+        listing, but still reachable at its own URL with a noindex tag.
+
+        True for a HOLD-verdict page (``HELD_PAGE_URLS`` -- not built yet)
+        and for a page withdrawn from discovery via front matter
+        ``state: not_planned`` (a feature that shipped as a page, then had
+        its release item pulled, with nothing left to build towards) --
+        both are the same "still reachable, just not advertised" case to
+        every caller, so one property covers both reasons.
+
+        A MERGE-verdict page (``MERGED_PAGES``) is a different case --
+        its own URL 301s to a parent instead of rendering at all -- so it
+        is not folded into this property; see load_feed_pages(), which
+        checks both ``is_held`` and ``MERGED_PAGES`` separately.
+        """
+        return (
+            self.url in HELD_PAGE_URLS
+            or self.front_matter.get("state") == "not_planned"
+        )
 
     @property
     def description(self) -> str | None:
@@ -621,6 +640,46 @@ def load_all_pages() -> list[PublicPage]:
             pages.append(_load_page(md_file, family, slug, url))
 
     return pages
+
+
+def load_feed_pages() -> list[PublicPage]:
+    """Every public page that belongs in a "lists every page" surface: the
+    sitemap, /llms.txt, /llms-full.txt, the /vs hub, and any per-family
+    "see every one of these" index (e.g. the /use-cases index).
+
+    The single, combined feed set, built on both verdicts the SEO/GEO audit
+    produces -- excludes a HOLD-verdict page or a page withdrawn from
+    discovery via front matter ``state: not_planned`` (see
+    PublicPage.is_held, which covers both) and a MERGE-verdict page
+    (MERGED_PAGES -- its own URL 301s to a parent instead of rendering, so
+    it is not a second entry for content that now lives at the target).
+    Every excluded page still renders at its own URL via load_page() /
+    load_all_pages(), which this does not change; it is simply not
+    advertised as current. Every caller that used to build its own feed
+    list (a prior round's ``_indexable_pages()`` in app/main/views.py among
+    them) should call this instead of load_all_pages() directly, so a newly
+    held, withdrawn or merged page is left out everywhere at once rather
+    than one surface at a time.
+    """
+    return [
+        page for page in load_all_pages()
+        if not page.is_held and page.url not in MERGED_PAGES
+    ]
+
+
+def feed_page_paths() -> list[str]:
+    """Every path that belongs in a "submit/list every page" surface: the
+    homepage, the /vs and /use-cases hub views (not PublicPage content, so
+    load_feed_pages() alone does not carry them) and every path from
+    load_feed_pages() itself.
+
+    The sitemap (app/main/views.py::sitemap_xml) and the IndexNow CLI
+    (app/commands/indexnow_commands.py::ping_indexnow_command) both build
+    their URL set from this one list, so the two cannot drift apart again
+    the way they did when each built its own (see
+    tests/test_public_content_pages.py::test_indexnow_submission_matches_sitemap_urls).
+    """
+    return ["/", "/vs", "/use-cases"] + [page.url for page in load_feed_pages()]
 
 
 def load_page(family: str, slug: str | None = None) -> PublicPage | None:

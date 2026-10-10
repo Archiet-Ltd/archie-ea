@@ -47,7 +47,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16">
+<div class="public-container">
   {% if jsonld %}
   <script type="application/ld+json">{{ jsonld }}</script>
   {% endif %}
@@ -60,7 +60,7 @@
   {# A real captured screen of this module/use case -- see
      app/services/public_pages.py:get_page_screenshot(). Only ever set for a
      capture_status: live page whose captured file exists on disk. #}
-  <figure class="mt-10" data-testid="page-screenshot">
+  <figure class="public-figure mt-10" data-testid="page-screenshot">
     <img src="{{ screenshot.url }}" alt="{{ screenshot.alt }}"
          width="{{ screenshot.width }}" height="{{ screenshot.height }}"
          loading="lazy" decoding="async"
@@ -74,7 +74,7 @@
      app/services/public_pages.py:get_page_recording(). Never autoplays: no
      autoplay attribute, preload="none" so nothing fetches until the visitor
      presses play. #}
-  <figure class="mt-10" data-testid="page-recording">
+  <figure class="public-figure mt-10" data-testid="page-recording">
     <video controls muted playsinline preload="none"
            poster="{{ recording.poster_url }}" aria-label="{{ recording.alt }}"
            width="{{ recording.width }}" height="{{ recording.height }}"
@@ -117,7 +117,7 @@
         <input type="checkbox" id="feature-interest-consent" name="consent" value="1" required class="mt-1">
         <label for="feature-interest-consent" class="text-sm text-muted-foreground">Used to tell you when this becomes available, and for nothing else.</label>
       </div>
-      <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" data-testid="feature-interest-submit">Tell us you need this</button>
+      <button type="submit" class="public-btn bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors" data-testid="feature-interest-submit">Tell us you need this</button>
     </form>
     {% endif %}
   </section>
@@ -156,7 +156,7 @@
         <input type="checkbox" id="inquiry-consent" name="consent" value="1" required class="mt-1">
         <label for="inquiry-consent" class="text-sm text-muted-foreground">{{ page.front_matter.get('inquiry_consent_text', '') }}</label>
       </div>
-      <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" data-testid="offer-inquiry-submit">Request this</button>
+      <button type="submit" class="public-btn bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" data-testid="offer-inquiry-submit">Request this</button>
     </form>
     {% endif %}
   </section>

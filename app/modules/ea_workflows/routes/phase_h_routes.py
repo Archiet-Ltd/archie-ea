@@ -18,6 +18,7 @@ from app.models.architecture_review_board import ChangeRequest
 from app.services.architecture_change_impact_service import (
     ArchitectureChangeImpactService,
 )
+from app.utils.route_guards import load_entity
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +140,9 @@ def impact_assessment(change_request_id):
     Returns the impact dict from ArchitectureChangeImpactService.
     404 if change_request_id does not exist.
     """
-    cr = db.session.get(ChangeRequest, change_request_id)
+    # Not db.session.get() -- it does not reliably run the tenant
+    # with_loader_criteria filter (see load_entity's own docstring).
+    cr = load_entity(ChangeRequest, change_request_id)
     if cr is None:
         return jsonify({"error": "ChangeRequest not found"}), 404
 

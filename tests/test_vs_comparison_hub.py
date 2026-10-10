@@ -161,6 +161,50 @@ def test_new_vs_pages_no_invented_price_without_a_source_marker(app):
             )
 
 
+def test_vs_hub_excludes_a_withdrawn_comparison_page(app):
+    """app/main/views.py::public_comparison_hub builds its list from
+    load_feed_pages(), not load_all_pages() -- a comparison page withdrawn
+    from discovery (state: not_planned) must drop out of /vs automatically,
+    the same as it already drops out of the sitemap, llms.txt and the
+    /use-cases index. No comparison page is withdrawn today, so this proves
+    the mechanism with a temporary fixture page rather than trusting the
+    loader switch by inspection alone.
+    """
+    vs_dir = CONTENT_ROOT / "vs"
+    test_file = vs_dir / "zzz-test-withdrawn-comparison.md"
+    test_content = """---
+page_family: comparison
+competitor: Zzz Test Competitor
+url_slug: archiet.ai/vs/zzz-test-withdrawn-comparison
+state: not_planned
+---
+
+# Entelim vs Zzz Test Competitor
+
+Temporary fixture page for a test.
+"""
+    try:
+        test_file.write_text(test_content, encoding="utf-8")
+        with app.test_client() as client:
+            # Still renders at its own URL -- withdrawn means "not actively
+            # advertised", not "404".
+            rv = client.get("/vs/zzz-test-withdrawn-comparison")
+            assert rv.status_code == 200, (
+                f"withdrawn comparison page should still render, got {rv.status_code}"
+            )
+
+            html = client.get("/vs").data.decode()
+            assert "archiet.ai/vs/zzz-test-withdrawn-comparison" not in html, (
+                "/vs hub should not link to a withdrawn comparison page"
+            )
+            assert "Zzz Test Competitor" not in html, (
+                "/vs hub should not list a withdrawn comparison page's competitor name"
+            )
+    finally:
+        if test_file.exists():
+            test_file.unlink()
+
+
 def test_sitemap_includes_vs_hub(app):
     """/sitemap.xml includes the /vs hub."""
     with app.test_client() as client:

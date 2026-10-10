@@ -27,4 +27,3 @@ and when. Everything lands in one element browser, across every ArchiMate layer,
 ## Related
 
 - [Architecture Model](/modules/architecture-model)
-- [Bring our LeanIX or Ardoq fact sheets across](/use-cases/leanix-ardoq-import)
