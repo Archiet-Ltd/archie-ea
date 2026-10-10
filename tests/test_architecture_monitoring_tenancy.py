@@ -41,7 +41,20 @@ def _enable_monitoring_api(app, monkeypatch):
         )
 
         mark_blueprint_guardrailed(architecture_monitoring_bp)
-        app.register_blueprint(architecture_monitoring_bp)
+        # Flask._check_setup_finished (and flasgger's own wrapped
+        # add_url_rule, which this blueprint's swagger-decorated views
+        # trigger a second time from inside register_blueprint itself) both
+        # key off this one flag. The shared session app has already handled
+        # a first request by the time a later test module runs this fixture
+        # (e.g. after tests/test_account_mail_flows.py in the same
+        # invocation) -- flip it off for the registration call only, so
+        # both guards see a fresh app, then restore it immediately.
+        got_first_request = app._got_first_request
+        app._got_first_request = False
+        try:
+            app.register_blueprint(architecture_monitoring_bp)
+        finally:
+            app._got_first_request = got_first_request
 
 
 def _user(db_session, org, *, enterprise_role):
