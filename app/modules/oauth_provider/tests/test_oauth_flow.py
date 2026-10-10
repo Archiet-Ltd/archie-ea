@@ -616,10 +616,10 @@ class TestHashedStorage:
 
 
 class TestScopesAndPermissionGating:
-    def test_mcp_propose_requires_permission_and_consent_tick(self, client, db_session, make_org, login_as, app):
-        """mcp:propose is dropped for a user without general write permission."""
+    def test_consent_offers_only_the_read_scope(self, client, db_session, make_org, login_as, app):
+        """Every tool is read-only, so a requested write scope is never offered."""
         org = make_org("oauth")
-        user = _make_user(db_session, org, "oauth-noperm@example.com", role_name="Viewer")
+        user = _make_user(db_session, org, "oauth-readonly@example.com")
         login_as(client, user)
         oauth_client = _register_client()
         _verifier, challenge = _pkce_pair()
@@ -635,7 +635,8 @@ class TestScopesAndPermissionGating:
             })
         )
         assert resp.status_code == 200
-        assert b"mcp:propose" not in resp.data or b"Propose changes" not in resp.data
+        assert b"Propose changes" not in resp.data
+        assert b'name="scope" value="mcp:read"' in resp.data
 
     def test_unknown_scope_is_dropped(self, client, db_session, make_org, login_as, app):
         org = make_org("oauth")

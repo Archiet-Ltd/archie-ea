@@ -35,7 +35,7 @@ def protected_resource_metadata():
         "resource": f"{base}/mcp",
         "authorization_servers": [base],
         "bearer_methods_supported": ["header"],
-        "scopes_supported": ["mcp:read", "mcp:propose"],
+        "scopes_supported": ["mcp:read"],
     })
 
 
@@ -49,7 +49,7 @@ def authorization_server_metadata():
         "token_endpoint": f"{base}/oauth/token",
         "registration_endpoint": f"{base}/oauth/register",
         "revocation_endpoint": f"{base}/oauth/revoke",
-        "scopes_supported": ["mcp:read", "mcp:propose"],
+        "scopes_supported": ["mcp:read"],
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code", "refresh_token"],
         "token_endpoint_auth_methods_supported": ["none"],

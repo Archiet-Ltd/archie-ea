@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import time
+import uuid
 from datetime import datetime, timezone
 
 from app.extensions import db
@@ -30,6 +31,27 @@ def _new_client_id(prefix: str = "cl") -> str:
 def hash_secret(value: str) -> str:
     """The SHA-256 hex digest this module stores in place of a plaintext secret."""
     return hashlib.sha256(value.encode("ascii")).hexdigest()
+
+
+def auth_state_for(user) -> str:
+    """A digest of the account facts a connector token must not outlive.
+
+    Recorded on the token at issue and compared on every use and every refresh:
+    a changed password, a changed multi-factor or single-sign-on state, a move
+    to another organisation, or an account no longer confirmed all change the
+    digest, so the token stops working without any caller having to remember to
+    revoke it. Only the digest is stored, never the inputs.
+    """
+    parts = (
+        getattr(user, "password_hash", None) or "",
+        str(bool(getattr(user, "mfa_enabled", False))),
+        getattr(user, "mfa_secret", None) or "",
+        getattr(user, "sso_provider", None) or "",
+        getattr(user, "external_id", None) or "",
+        str(getattr(user, "organization_id", None)),
+        str(bool(getattr(user, "confirmed", False))),
+    )
+    return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
 
 
 class OAuthAuthorizationCode(db.Model):
@@ -52,7 +74,9 @@ class OAuthAuthorizationCode(db.Model):
 
     code = db.Column(db.String(256), primary_key=True)
     client_id = db.Column(db.String(128), nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     redirect_uri = db.Column(db.Text, nullable=False)
     scope = db.Column(db.String(256), nullable=True)
     resource = db.Column(db.String(512), nullable=True)
@@ -212,7 +236,9 @@ class OAuthToken(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.String(128), nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     access_token = db.Column(db.String(256), unique=True, nullable=False, index=True)
     refresh_token = db.Column(db.String(256), unique=True, nullable=True, index=True)
     scope = db.Column(db.String(256), nullable=True)
@@ -223,6 +249,13 @@ class OAuthToken(db.Model):
     refresh_expires_at = db.Column(db.DateTime, nullable=True)
     revoked_at = db.Column(db.DateTime, nullable=True)
     last_used_at = db.Column(db.DateTime, nullable=True)
+    # One authorisation grant = one consent. Every token minted by rotating a
+    # refresh token carries the grant id of the token it replaced, so reuse of
+    # a rotated-away refresh token can revoke the whole family, and a person
+    # can revoke "this assistant" as one thing.
+    grant_id = db.Column(db.String(64), nullable=True, index=True)
+    # auth_state_for(user) at issue time; see that function.
+    auth_state = db.Column(db.String(64), nullable=True)
 
     # The organisation the token was issued for, set explicitly at issue
     # time (nullable for an ADD-only rollout onto an existing table).
@@ -233,14 +266,19 @@ class OAuthToken(db.Model):
         index=True,
     )
 
-    user = db.relationship("User", backref="oauth_tokens", lazy="select")
+    user = db.relationship(
+        "User",
+        backref=db.backref("oauth_tokens", cascade="all, delete-orphan", passive_deletes=True),
+        lazy="select",
+    )
 
     @classmethod
     def issue(cls, *, client_id: str, user_id: int, scope: str | None = None,
               resource: str | None = None, expires_in: int = 3600,
               grant_type: str = "authorization_code",
               organization_id: int | None = None,
-              refresh_expires_in: int | None = None) -> tuple[str, str, "OAuthToken"]:
+              refresh_expires_in: int | None = None,
+              grant_id: str | None = None) -> tuple[str, str, "OAuthToken"]:
         """Issue a new access token (and refresh token).
 
         Returns ``(plaintext_access_token, plaintext_refresh_token, row)``.
@@ -248,6 +286,9 @@ class OAuthToken(db.Model):
         now = datetime.now(timezone.utc)
         raw_access = _new_client_id("at")
         raw_refresh = _new_client_id("rt")
+        from app.models.user import User
+
+        owner = db.session.get(User, user_id)  # tenant-scoping-ok: the token owner by primary key, to bind the token to that account's state
         refresh_expires_at = None
         if refresh_expires_in is not None:
             refresh_expires_at = datetime.fromtimestamp(time.time() + refresh_expires_in, tz=timezone.utc)
@@ -260,6 +301,8 @@ class OAuthToken(db.Model):
             resource=resource,
             grant_type=grant_type,
             organization_id=organization_id,
+            grant_id=grant_id or uuid.uuid4().hex,
+            auth_state=auth_state_for(owner) if owner is not None else None,
             issued_at=now,
             expires_at=datetime.fromtimestamp(time.time() + expires_in, tz=timezone.utc),
             refresh_expires_at=refresh_expires_at,
@@ -309,6 +352,42 @@ class OAuthToken(db.Model):
         if updated_rows:
             self.revoked_at = now
         return bool(updated_rows)
+
+    @classmethod
+    def revoke_grant(cls, grant_id: str, user_id: int | None = None) -> int:
+        """Revoke every still-active token in one grant. Returns the count.
+
+        Pass *user_id* when the caller is a person acting on their own
+        grants, so a grant id belonging to someone else revokes nothing.
+        """
+        if not grant_id:
+            return 0
+        criterion = cls.grant_id == grant_id
+        if user_id is not None:
+            criterion = db.and_(criterion, cls.user_id == user_id)
+        return cls._revoke_where(criterion)
+
+    @classmethod
+    def revoke_all_for_user(cls, user_id: int) -> int:
+        """Revoke every still-active connector token a user holds. Returns the count.
+
+        Called from the one session-revocation path
+        (``session_registry.revoke_all_for_user``), so every account-security
+        action that ends a person's sessions also ends their connected
+        assistants.
+        """
+        return cls._revoke_where(cls.user_id == user_id)
+
+    @classmethod
+    def _revoke_where(cls, criterion) -> int:
+        now = datetime.now(timezone.utc)
+        count = (
+            db.session.query(cls)
+            .filter(criterion, cls.revoked_at.is_(None))
+            .update({"revoked_at": now}, synchronize_session=False)
+        )
+        db.session.commit()
+        return count
 
     @property
     def is_revoked(self) -> bool:
@@ -360,3 +439,34 @@ class OAuthToken(db.Model):
                 return
         self.last_used_at = now
         db.session.flush()
+
+
+def _revoke_connector_tokens_on_organisation_change(mapper, connection, target):
+    """A person moved to another organisation takes no assistant with them.
+
+    The bearer loader already refuses a token whose organisation no longer
+    matches the user's, but a person moved out and later back in would find
+    the old token working again. Revoking at the moment of the move closes
+    that. Runs inside the same flush as the move itself.
+    """
+    from sqlalchemy import inspect as sa_inspect
+
+    if not sa_inspect(target).attrs.organization_id.history.has_changes():
+        return
+    table = OAuthToken.__table__
+    connection.execute(
+        table.update()
+        .where(table.c.user_id == target.id, table.c.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(timezone.utc))
+    )
+
+
+def _register_user_listeners() -> None:
+    from sqlalchemy import event
+
+    from app.models.user import User
+
+    event.listen(User, "after_update", _revoke_connector_tokens_on_organisation_change)
+
+
+_register_user_listeners()

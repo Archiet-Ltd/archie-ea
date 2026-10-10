@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
+import json
 import logging
 import re
 import urllib.parse
@@ -17,7 +19,6 @@ from flask import Blueprint, current_app, g, jsonify, redirect, render_template,
 from flask_login import current_user, login_required
 
 from app.extensions import csrf
-from app.models.user import Permission
 from app.modules.oauth_provider.models import OAuthAuthorizationCode, OAuthClient, OAuthToken
 
 logger = logging.getLogger(__name__)
@@ -28,17 +29,22 @@ _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "[::1]"}
 
 # Scopes a client may ever be granted. Anything else requested is silently
-# dropped rather than granted — an allow-list, not a denylist.
-ALLOWED_SCOPES = ("mcp:read", "mcp:propose")
+# dropped rather than granted — an allow-list, not a denylist. Every tool is
+# read-only, so read is the only scope that exists; a write scope is added
+# together with the first write tool, not before.
+ALLOWED_SCOPES = ("mcp:read",)
 
-# A scope that requires more than "a token exists" to grant: mcp:propose lets
-# an assistant write, so it is only ever granted when the person ticks it on
-# the consent screen AND their own account already carries general write
-# permission. Dropping a requested scope here is not an error — the token
-# response states the scope actually granted.
-_SCOPE_PERMISSION_GATE = {
-    "mcp:propose": Permission.GENERAL,
-}
+# A scope that requires more than "a token exists" to grant maps to the
+# permission it needs here. Empty while read is the only scope.
+_SCOPE_PERMISSION_GATE: dict = {}
+
+# RFC 7636: a code challenge is 43 to 128 unreserved characters.
+_CODE_CHALLENGE_FORMAT = re.compile(r"^[A-Za-z0-9_-]{43,128}$")
+
+# Dynamic registration is unauthenticated, so what it stores is bounded.
+MAX_REGISTRATION_REDIRECT_URIS = 10
+MAX_REGISTRATION_REDIRECT_URI_LENGTH = 2000
+MAX_REGISTRATION_BODY_BYTES = 32 * 1024
 
 
 def _hash_code_verifier(verifier: str) -> str:
@@ -124,6 +130,9 @@ def authorize():
 
     if code_challenge_method != "S256":
         return jsonify({"error": "invalid_request", "error_description": "only S256 code_challenge_method is supported"}), 400
+
+    if not _CODE_CHALLENGE_FORMAT.match(code_challenge):
+        return jsonify({"error": "invalid_request", "error_description": "code_challenge must be 43 to 128 base64url characters"}), 400
 
     expected_resource = _mcp_resource_url()
     if not requested_resource or expected_resource is None or requested_resource.rstrip("/") != expected_resource:
@@ -240,7 +249,7 @@ def _token_authorization_code(expected_resource: str):
 
     expected_challenge = auth_code.code_challenge
     actual_challenge = _hash_code_verifier(code_verifier)
-    if actual_challenge != expected_challenge:
+    if not hmac.compare_digest(actual_challenge.encode("ascii"), expected_challenge.encode("ascii")):
         return jsonify({"error": "invalid_grant", "error_description": "code_verifier does not match"}), 400
 
     if auth_code.resource != expected_resource:
@@ -272,11 +281,38 @@ def _token_refresh(expected_resource: str):
         return jsonify({"error": "invalid_request"}), 400
 
     old_token = OAuthToken.find_by_refresh_token(raw_refresh)
-    if old_token is None or not old_token.is_refresh_active:
+    if old_token is None:
         return jsonify({"error": "invalid_grant", "error_description": "refresh token not found, expired or revoked"}), 400
 
     if old_token.client_id != client_id:
         return jsonify({"error": "invalid_grant", "error_description": "client_id mismatch"}), 400
+
+    if old_token.is_revoked:
+        # A refresh token that was already rotated away (or revoked) is being
+        # presented again: either the client is broken or a copy leaked. Cut
+        # off the whole grant, so the pair minted from it stops working too.
+        OAuthToken.revoke_grant(old_token.grant_id)
+        logger.warning("oauth: revoked token presented for refresh; grant revoked (client=%s)", client_id)
+        return jsonify({"error": "invalid_grant", "error_description": "refresh token not found, expired or revoked"}), 400
+
+    if not old_token.is_refresh_active:
+        return jsonify({"error": "invalid_grant", "error_description": "refresh token not found, expired or revoked"}), 400
+
+    # The client must still exist and be active, and the account must still
+    # be what it was when the person consented (password, multi-factor,
+    # single sign-on, organisation, confirmation).
+    client_row = OAuthClient.query.filter_by(client_id=client_id, is_active=True).first()  # tenant-scoping-ok: platform-level client registry, not tenant-owned data
+    if client_row is None:
+        return jsonify({"error": "invalid_client", "error_description": "client not found"}), 401
+
+    from app.extensions import db
+    from app.models.user import User
+    from app.modules.oauth_provider.models import auth_state_for
+
+    owner = db.session.get(User, old_token.user_id)  # tenant-scoping-ok: the refresh token's owner by primary key; no session exists on this endpoint
+    if owner is None or not old_token.auth_state or old_token.auth_state != auth_state_for(owner):
+        old_token.revoke()
+        return jsonify({"error": "invalid_grant", "error_description": "refresh token not found, expired or revoked"}), 400
 
     if old_token.resource != expected_resource:
         return jsonify({"error": "invalid_target", "error_description": "resource does not match this server"}), 400
@@ -304,6 +340,7 @@ def _token_refresh(expected_resource: str):
         scope=old_token.scope,
         resource=old_token.resource,
         grant_type="refresh_token",
+        grant_id=old_token.grant_id,
         organization_id=old_token.organization_id,
         refresh_expires_in=current_app.config.get("OAUTH_REFRESH_TOKEN_DAYS", 30) * 86400,
     )
@@ -369,14 +406,30 @@ def register():
     view is unauthenticated by design and rate-limited per remote address
     instead.
     """
-    body = request.get_json(silent=True)
+    if request.content_length is not None and request.content_length > MAX_REGISTRATION_BODY_BYTES:
+        return _registration_error("registration body is too large")
+    raw_body = request.get_data(cache=False)[: MAX_REGISTRATION_BODY_BYTES + 1]
+    if len(raw_body) > MAX_REGISTRATION_BODY_BYTES:
+        return _registration_error("registration body is too large")
+    try:
+        body = json.loads(raw_body)
+    except ValueError:
+        body = None
     if not isinstance(body, dict):
         return _registration_error("a JSON object body is required")
 
     redirect_uris = body.get("redirect_uris")
     if not isinstance(redirect_uris, list) or not redirect_uris:
         return _registration_error("redirect_uris must be a non-empty array")
+    if len(redirect_uris) > MAX_REGISTRATION_REDIRECT_URIS:
+        return _registration_error(
+            f"at most {MAX_REGISTRATION_REDIRECT_URIS} redirect_uris may be registered"
+        )
     for uri in redirect_uris:
+        if isinstance(uri, str) and len(uri) > MAX_REGISTRATION_REDIRECT_URI_LENGTH:
+            return _registration_error(
+                f"a redirect_uri may be at most {MAX_REGISTRATION_REDIRECT_URI_LENGTH} characters"
+            )
         if not isinstance(uri, str) or not _is_valid_registration_redirect_uri(uri):
             return _registration_error(
                 f"redirect_uri {uri!r} must be https, or http on a loopback address, "

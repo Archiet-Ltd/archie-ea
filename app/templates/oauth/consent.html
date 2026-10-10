@@ -34,8 +34,6 @@
             <i data-lucide="check" class="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" aria-hidden="true"></i>
             {% if scope == "mcp:read" %}
               <span>Read your architecture data — elements, canvases and intelligence lenses</span>
-            {% elif scope == "mcp:propose" %}
-              <span>Propose changes to your architecture data for you to review</span>
             {% else %}
               <span>{{ scope|e }}</span>
             {% endif %}
@@ -66,7 +64,8 @@
     </div>
 
     <p class="mt-6 text-center text-xs text-muted-foreground">
-      You can revoke this access at any time from your account settings.
+      You can revoke this access at any time from
+      {% if 'connected_assistants.index' in flask.current_app.view_functions %}<a class="underline" href="{{ url_for('connected_assistants.index') }}">your account settings</a>{% else %}your account settings{% endif %}.
     </p>
   </div>
 </div>

@@ -91,6 +91,14 @@ def load_user_from_bearer_token(req):
     if getattr(user, "organization_id", None) != token.organization_id:
         return None
 
+    # The account must still be what it was when the person consented: a reset
+    # password, changed multi-factor or single-sign-on state, a move to another
+    # organisation or an unconfirmed account ends the token (D1).
+    from app.modules.oauth_provider.models import auth_state_for
+
+    if not token.auth_state or token.auth_state != auth_state_for(user):
+        return None
+
     token.touch_last_used()
 
     g.auth_mode = "bearer"

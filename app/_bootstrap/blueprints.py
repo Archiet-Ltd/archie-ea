@@ -631,8 +631,13 @@ def _register_always_on_apis(app, csrf):
                 "before enabling MCP_ENABLED."
             )
 
-        from app.modules.oauth_provider import oauth_provider_bp, oauth_metadata_bp
+        from app.modules.oauth_provider import (
+            connected_assistants_bp,
+            oauth_metadata_bp,
+            oauth_provider_bp,
+        )
 
+        app.register_blueprint(connected_assistants_bp)
         app.register_blueprint(oauth_provider_bp)
         app.logger.info("[BLUEPRINT] OAuth provider registered at /oauth")
         app.register_blueprint(oauth_metadata_bp)

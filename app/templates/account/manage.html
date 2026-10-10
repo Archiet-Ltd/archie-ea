@@ -10,6 +10,9 @@
     ('account.change_email_request', 'Change email address'),
     ('account.change_password', 'Change password')
 ] %}
+{% if 'connected_assistants.index' in flask.current_app.view_functions %}
+    {% set endpoints = endpoints + [('connected_assistants.index', 'Connected assistants')] %}
+{% endif %}
 
 {% macro navigation(items) %}
     <nav class="flex flex-col space-y-1">

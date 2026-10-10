@@ -13,5 +13,6 @@ Provides:
 
 from app.modules.oauth_provider.routes import oauth_provider_bp
 from app.modules.oauth_provider.metadata_routes import oauth_metadata_bp
+from app.modules.oauth_provider.assistants_routes import connected_assistants_bp
 
-__all__ = ["oauth_provider_bp", "oauth_metadata_bp"]
+__all__ = ["oauth_provider_bp", "oauth_metadata_bp", "connected_assistants_bp"]
