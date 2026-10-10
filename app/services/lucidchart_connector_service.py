@@ -97,7 +97,8 @@ class LucidchartConnectorService:
         config: LucidchartConnectorConfig,
     ) -> Dict[str, Any]:
         self._require_client_credentials(config)
-        if not config.refresh_token:
+        refresh_token = self.get_refresh_token(config)
+        if not refresh_token:
             raise LucidchartConnectorError(
                 "Lucidchart refresh_token is not configured."
             )
@@ -107,7 +108,7 @@ class LucidchartConnectorService:
                 self.TOKEN_URL,
                 data={
                     "grant_type": "refresh_token",
-                    "refresh_token": config.refresh_token,
+                    "refresh_token": refresh_token,
                     "client_id": config.client_id,
                     "client_secret": config.client_secret,
                 },
@@ -122,8 +123,33 @@ class LucidchartConnectorService:
         self._store_token_payload(config, token_payload)
         return token_payload
 
+    def get_access_token(self, config: LucidchartConnectorConfig) -> Optional[str]:
+        """Return the organisation's stored Lucidchart access token, or None.
+
+        Reads from ``OrgConnectorCredential`` via ``OrgCredentialVault`` —
+        the retired ``LucidchartConnectorConfig.access_token`` column is no
+        longer written to.
+        """
+        return self._retrieve_credential(config, "access_token")
+
+    def get_refresh_token(self, config: LucidchartConnectorConfig) -> Optional[str]:
+        """Return the organisation's stored Lucidchart refresh token, or None."""
+        return self._retrieve_credential(config, "refresh_token")
+
+    def _retrieve_credential(
+        self, config: LucidchartConnectorConfig, credential_type: str
+    ) -> Optional[str]:
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        return OrgCredentialVault().retrieve(
+            org_id=config.organization_id,
+            connector_type="lucidchart",
+            credential_type=credential_type,
+        )
+
     def ensure_access_token(self, config: LucidchartConnectorConfig) -> str:
-        if not config.access_token:
+        access_token = self.get_access_token(config)
+        if not access_token:
             raise LucidchartConnectorError("Lucidchart access_token is not configured.")
 
         if config.token_expires_at is None or (
@@ -131,10 +157,11 @@ class LucidchartConnectorService:
             <= datetime.utcnow() + timedelta(seconds=self.TOKEN_REFRESH_SKEW_SECONDS)
         ):
             self.refresh_access_token(config)
+            access_token = self.get_access_token(config)
 
-        if not config.access_token:
+        if not access_token:
             raise LucidchartConnectorError("Lucidchart access_token refresh failed.")
-        return config.access_token
+        return access_token
 
     def list_documents(
         self,
@@ -198,14 +225,37 @@ class LucidchartConnectorService:
         config: LucidchartConnectorConfig,
         token_payload: Dict[str, Any],
     ) -> None:
+        """Persist the OAuth token response.
+
+        The access and refresh tokens are secrets, so they go through
+        ``OrgCredentialVault`` into ``OrgConnectorCredential`` — encrypted
+        with this organisation's own key — rather than onto the retired
+        ``LucidchartConnectorConfig`` columns. Everything else here
+        (expiry, scope, account id, enabled) is non-secret and stays on the
+        config row where it lives today.
+        """
         access_token = token_payload.get("access_token")
         refresh_token = token_payload.get("refresh_token")
         expires_in = token_payload.get("expires_in")
 
-        if access_token:
-            config.access_token = access_token
-        if refresh_token:
-            config.refresh_token = refresh_token
+        if access_token or refresh_token:
+            from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+            vault = OrgCredentialVault()
+            if access_token:
+                vault.store(
+                    org_id=config.organization_id,
+                    connector_type="lucidchart",
+                    credential_type="access_token",
+                    value=access_token,
+                )
+            if refresh_token:
+                vault.store(
+                    org_id=config.organization_id,
+                    connector_type="lucidchart",
+                    credential_type="refresh_token",
+                    value=refresh_token,
+                )
         if expires_in is not None:
             config.token_expires_at = datetime.utcnow() + timedelta(
                 seconds=int(expires_in)

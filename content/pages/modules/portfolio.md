@@ -7,7 +7,8 @@ state: on_main
 answers_use_cases:
   - {id: UC-S3-04, segment: S3}
   - {id: UC-S3-09, segment: S3}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Portfolio
@@ -25,8 +26,8 @@ missing cost plainly rather than defaulting to zero.
 
 ## Where you'll meet it
 
-- [Which value streams are at risk?](/enterprise-architecture/value-streams-at-risk)
-- [Is the programme on time and on budget?](/enterprise-architecture/programme-tracking)
+- [Which value streams are at risk?](/use-cases/value-streams-at-risk)
+- [Is the programme on time and on budget?](/use-cases/programme-tracking)
 
 ## Related modules
 

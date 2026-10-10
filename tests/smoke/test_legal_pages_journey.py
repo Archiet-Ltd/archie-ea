@@ -3,8 +3,8 @@
 Boots its own server with LEGAL_PAGES_ENABLED=true so the flag is on here and
 nowhere else in the smoke session. Signed out, each page renders in the public
 layout and the footer reaches all six legal pages by clicking. Signed in as an
-organisation administrator, the billing page's "Upgrade Plan" button opens the
-checkout panel, and each legal link in it opens a page that renders.
+organisation administrator, choosing a plan on the billing page opens its
+checkout step, and each legal link in it opens a page that renders.
 """
 
 import pytest
@@ -53,10 +53,10 @@ def test_the_checkout_panel_links_every_legal_page(page, legal_server, seeded):
     _login(page, legal_server, seeded["emails"]["platform_admin"])
     page.goto(legal_server + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
-    panel = page.locator("#upgrade-panel")
-    expect(panel).to_be_hidden()
-    page.get_by_role("button", name="Upgrade Plan").click()
-    expect(panel).to_be_visible()
+    panel = page.locator("#checkout")
+    expect(panel).to_have_count(0)
+    page.get_by_test_id("plan-card-team").get_by_role("link", name="Choose Team").click()
+    expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
 
     notice = panel.locator("[data-checkout-legal]")
     expect(notice).to_be_visible()

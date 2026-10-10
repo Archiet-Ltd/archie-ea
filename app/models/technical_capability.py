@@ -21,7 +21,7 @@ Each domain has L0 - L4 abstraction levels:
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from .. import db
@@ -250,6 +250,18 @@ class TechnicalCapability(db.Model):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Set once by `flask backfill-capability-catalogs` (ADR 0008): this table
+    # has no organisation of its own (it is a fixed ACM domain taxonomy), so
+    # every row is projected as a reference-scope `unified_capabilities` row,
+    # matched first by `code` and otherwise by normalised name. NULL means
+    # "not yet processed"; the backfill is idempotent on it.
+    retired_into_id = Column(
+        BigInteger,
+        ForeignKey("unified_capabilities.id", ondelete="SET NULL", use_alter=True),
+        nullable=True,
+        index=True,
+    )
 
     # Dual mapping for backward compatibility
     # Legacy: maps to BusinessCapability (deprecated)

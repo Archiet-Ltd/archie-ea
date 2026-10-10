@@ -27,7 +27,7 @@ function userSearchWidget(getVal, setVal) {
             try {
                 const d = await Platform.fetch.get('/api/users', {}, { silent: true });
                 // The response body is already parsed; assume it has `success` and `users`.
-                if (d.success) { const lq = q.toLowerCase(); this.ures = d.users.filter(u => u.name.toLowerCase().includes(lq) || u.email.toLowerCase().includes(lq)).slice(0, 5); this.ushow = this.ures.length > 0; }
+                if (d.success) { const lq = q.toLowerCase(); this.ures = d.users.filter(u => (u.name || '').toLowerCase().includes(lq) || (u.email || '').toLowerCase().includes(lq)).slice(0, 5); this.ushow = this.ures.length > 0; }
                 this.uErrorShown = false;
             } catch (e) {
                 // Debounced on every keystroke — toast once per outage, not on every retry.

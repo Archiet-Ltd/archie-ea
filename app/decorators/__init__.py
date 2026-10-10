@@ -17,5 +17,6 @@ from .requires_role import (  # noqa
     requires_application_owner,
     requires_governance,
     requires_procurement,
+    requires_procurement_or_finance,
     requires_role,
 )

@@ -184,6 +184,18 @@ def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
     `extra_env` overrides configuration for this server only, so a module can
     exercise a feature flag without switching it on for every other journey.
     """
+    # The smoke server starts against the shared candidate database before the
+    # ORM seeding below runs. When a branch adds nullable columns to existing
+    # tables, requests can 500 on the first SELECT unless the add-only repair
+    # path runs first. Production already does init-db -> reconcile-schema on
+    # boot; mirror that here so browser journeys observe the real branch code,
+    # not drift left behind by an older local schema.
+    from app.commands.reconcile_schema import _reconcile
+
+    with app.app_context():
+        _added, failed, _missing, _blocking = _reconcile(dry_run=False)
+        assert not failed, "smoke live_server could not reconcile schema: %s" % failed
+
     port = _free_port()
     env = dict(os.environ)
     env.update(extra_env or {})
@@ -191,7 +203,22 @@ def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
     if ai_protocol_stub is not None:
         env = ai_protocol_stub.child_environment(env)
     env.setdefault("SECRET_KEY", "smoke-only-not-secret-" + "x" * 16)
-    env.setdefault("FLASK_CONFIG", "testing")
+    # "smoke", not "testing": config.py's SmokeTestingConfig is identical to
+    # TestingConfig except for ADMIN_MFA_BYPASS, which lets the dozens of
+    # admin-archetype fixtures in this suite reach the app shell without a
+    # browser driving a real TOTP round trip (R1-B12 PR 2). The hardcoded
+    # switch lives only on that one config class -- see its docstring and
+    # app/services/mfa_service.py's required_for().
+    #
+    # An explicit assignment, not setdefault: tests/conftest.py's session-
+    # scoped `app` fixture (a dependency of `live_server` below) already ran
+    # `os.environ.setdefault("FLASK_CONFIG", "testing")` in this same process
+    # before this function is ever called, so `os.environ` here already has
+    # FLASK_CONFIG="testing" -- a setdefault on `env` would silently keep
+    # that inherited value and never select the smoke config at all. A caller
+    # that genuinely needs a different config for one journey can still win,
+    # since `extra_env` was folded into `env` above and is preserved here.
+    env["FLASK_CONFIG"] = (extra_env or {}).get("FLASK_CONFIG", "smoke")
     env["FLASK_DEBUG"] = "0"
     # TestingConfig reads TEST_DATABASE_URL, not DATABASE_URL. Without this the
     # subprocess silently falls back to the default DSN on port 5432 and every
@@ -388,8 +415,18 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
         if ai_protocol_stub is not None:
             from app.models.models import APISettings
 
+            # Clean up any stale protocol-stub records from interrupted runs.
+            # The live_server subprocess may have created a record, then the
+            # seeder's own app_context reads the same database.  Without this
+            # cleanup a previous run whose finalizer did not execute leaves an
+            # enabled provider behind, and every smoke test errors at setup.
+            for stale in APISettings.query.filter_by(key_label="ci-protocol-stub").all():
+                db.session.delete(stale)
+            db.session.commit()
+
             # This app context is intentionally unscoped: reject ANY existing
-            # enabled provider before exercising AI in a candidate database.
+            # enabled provider (other than our own, which was just removed)
+            # before exercising AI in a candidate database.
             if APISettings.query.filter_by(enabled=True).count():
                 pytest.fail("AI protocol qualification requires a candidate database without enabled provider records")
         Role.insert_roles()
@@ -398,8 +435,19 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
 
         org = Organization(name="Smoke Org %s" % suffix, slug="smoke-%s" % suffix)
         db.session.add(org)
+        db.session.flush()
+        # One person per archetype is more than Community admits; the plan is
+        # recorded where every limit is read from, the subscriptions row.
+        from app.services.billing_plans import set_contract_plan
+
+        set_contract_plan(org, "enterprise", None)
         db.session.commit()
         out["ids"]["org"] = org.id
+
+        # Enable the implementation_planning feature flag so /implementation/ routes work
+        from tests.conftest import seed_implementation_planning_flag
+
+        seed_implementation_planning_flag()
 
         if ai_protocol_stub is not None:
             from tests.smoke.ai_protocol_stub import MODEL, TOKEN
@@ -686,10 +734,25 @@ def browser(request):
     try:
         b = engine.launch(headless=True)
     except Exception as exc:                      # no browser binary in this env
-        message = "%s unavailable: %s" % (engine_name, str(exc)[:120])
-        if os.environ.get("SMOKE_REQUIRE_BROWSER") == "1":
-            pytest.fail(message)
-        pytest.skip(message)
+        # Some sandboxes pre-install a browser revision that doesn't match
+        # the pinned Playwright pip package (it then looks for a newer
+        # chromium_headless_shell revision that was never downloaded). Retry
+        # once against the generic pre-installed executable before giving up
+        # -- same fallback the environment's own docs recommend for the
+        # Node/@playwright/test side.
+        fallback = os.environ.get("SMOKE_CHROMIUM_EXECUTABLE") or "/opt/pw-browsers/chromium"
+        if engine_name == "chromium" and os.path.exists(fallback):
+            try:
+                b = engine.launch(headless=True, executable_path=fallback)
+            except Exception:
+                b = None
+        else:
+            b = None
+        if b is None:
+            message = "%s unavailable: %s" % (engine_name, str(exc)[:120])
+            if os.environ.get("SMOKE_REQUIRE_BROWSER") == "1":
+                pytest.fail(message)
+            pytest.skip(message)
     yield b
     b.close()
 
@@ -713,4 +776,6 @@ ARCHETYPES = [
     "arb_member", "portfolio_manager", "cto", "procurement",
     "application_manager", "platform_admin", "security_architect",
     "data_architect",
+    # R1-B36 (TB-0146): promoted from unassignable to assignable.
+    "finance", "compliance", "risk", "operations", "non_technical_owner",
 ]

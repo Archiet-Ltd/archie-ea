@@ -99,18 +99,22 @@ def test_no_archie_trace_in_codegen_workbench():
 
 
 def test_account_flash_welcome_uses_app_name():
-    """The registration flash message reads APP_NAME from config, not a hardcoded string."""
-    account_routes = APP_DIR / "modules" / "account" / "routes" / "account_routes.py"
-    text = account_routes.read_text(encoding="utf-8")
+    """The registration welcome reads APP_NAME from config, not a hardcoded string.
+
+    Both account tiers register through one shared view in mail_views.py.
+    """
+    mail_views = APP_DIR / "modules" / "account" / "routes" / "mail_views.py"
+    text = mail_views.read_text(encoding="utf-8")
     assert "current_app.config['APP_NAME']" in text
     assert '"Welcome to Entelim!"' not in text
 
 
 def test_account_v2_flash_welcome_uses_app_name():
-    account_routes = APP_DIR / "modules" / "account" / "v2" / "routes" / "account_routes.py"
-    text = account_routes.read_text(encoding="utf-8")
-    assert "current_app.config['APP_NAME']" in text
-    assert '"Welcome to Entelim!"' not in text
+    for tier in ("routes", "v2/routes"):
+        account_routes = APP_DIR / "modules" / "account" / tier / "account_routes.py"
+        text = account_routes.read_text(encoding="utf-8")
+        assert "mail_views.register_view()" in text
+        assert '"Welcome to Entelim!"' not in text
 
 
 def test_onboarding_descriptions_use_app_name():
@@ -140,7 +144,9 @@ _ROOT_DOCS = {
     "ARCHITECT_QUICK_START.md": ROOT / "ARCHITECT_QUICK_START.md",
     "DESIGN.md": ROOT / "DESIGN.md",
     "CITATION.cff": ROOT / "CITATION.cff",
-    "llms.txt": ROOT / "llms.txt",
+    # The stale, unreferenced root llms.txt (describing an old product
+    # identity, separate from the dynamically served /llms.txt route in
+    # app/main/views.py) was deleted -- nothing serves or references it.
     "package.json": ROOT / "package.json",
     "CONTRIBUTING.md": ROOT / "CONTRIBUTING.md",
     "COMMERCIAL-LICENSE.md": ROOT / "COMMERCIAL-LICENSE.md",

@@ -321,6 +321,12 @@ class SolutionStakeholderMapping(db.Model):
         Integer, ForeignKey("solution_analysis_sessions.id", ondelete="CASCADE"), nullable=True
     )
     solution_id = Column(Integer, ForeignKey("solutions.id", ondelete="CASCADE"), nullable=True)
+    # A transformation programme (the platform's programme store is
+    # StrategicInitiative). Nullable like the two links above; the same
+    # stakeholder row can sit on a solution's map and a programme's map.
+    programme_id = Column(
+        Integer, ForeignKey("strategic_initiatives.id", ondelete="CASCADE"), nullable=True, index=True
+    )
 
     # Role and engagement
     role = Column(Enum(StakeholderRole), nullable=False, default=StakeholderRole.INFORMED)

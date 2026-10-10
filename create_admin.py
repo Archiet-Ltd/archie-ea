@@ -32,7 +32,13 @@ with app.app_context():
         )
         # First admin owns the platform and their organization.
         u.organization_id = org.id
-        u.is_org_admin = True
+        # is_org_admin is now derived from is_admin() (Permission.ADMINISTER).
+        # User.__init__ already assigns the Administrator role when the email
+        # matches ADMIN_EMAIL, so is_admin() will be True; keep the
+        # denormalised column live immediately rather than only after the
+        # next reconcile-admin-flags run.
+        if u.is_admin():
+            u._is_org_admin = True
         u.is_platform_admin = True
         db.session.add(u)
         try:

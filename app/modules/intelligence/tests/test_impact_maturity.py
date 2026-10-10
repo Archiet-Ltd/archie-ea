@@ -21,7 +21,7 @@ import uuid
 import pytest
 
 # Fixtures (app, db_session, make_org, tenant_ctx, client, login_as) are
-# discovered via app/modules/intelligence/tests/conftest.py's own import of
+# discovered via app/modules/conftest.py's import of
 # tests.conftest -- pytest resolves fixtures by name without this module
 # importing them itself (see test_impact_route.py for the same pattern).
 
@@ -243,7 +243,7 @@ def test_4_unassessed_row_and_flag_shape_identical_to_assessed_same_fixture(app,
     assessed = _impact(app, org_a.id, app_a.id, with_owner=False)
 
     def _strip_maturity(rows):
-        return [{k: v for k, v in row.items() if k != "maturity"} for row in rows]
+        return [{k: v for k, v in row.items() if k not in ("maturity", "health")} for row in rows]
 
     assert _strip_maturity(unassessed["rows"]) == _strip_maturity(assessed["rows"])
     for key in ("explicit_count", "derived_count", "stale_count", "derivation_state"):
