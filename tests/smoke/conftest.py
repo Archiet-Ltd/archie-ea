@@ -217,6 +217,9 @@ def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
     # `env` by the time this checks it.
     if "PUBLIC_BASE_URL" not in (extra_env or {}):
         env["PUBLIC_BASE_URL"] = "http://127.0.0.1:%d" % port
+    # The assistant connector is off by default; the consent journey needs it on in
+    # the server it drives, and no other journey is affected by its extra routes.
+    env.setdefault("MCP_ENABLED", "true")
     _require_explicit_test_database(env)
     if ai_protocol_stub is not None:
         env = ai_protocol_stub.child_environment(env)
