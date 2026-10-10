@@ -31,7 +31,13 @@ from contextlib import nullcontext
 from flask import current_app, has_app_context
 
 from app.extensions import db
-from app.jobs.tenant_safe_job import JobRun, TenantResult, job_lock, run_for_each_tenant
+from app.jobs.tenant_safe_job import (
+    JobRun,
+    TenantResult,
+    job_lock,
+    platform_scope,
+    run_for_each_tenant,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +63,16 @@ def stale_carrying_organization_ids() -> list[int]:
     here enters an identity map a later lookup could serve under the wrong
     tenant.
     """
-    rows = db.session.execute(
-        db.text(
-            "SELECT DISTINCT organization_id FROM archimate_derived_relationships "
-            "WHERE stale = TRUE ORDER BY organization_id"
-        )
-    ).all()
+    # Row-level security shows the runtime role only the session organisation's
+    # rows and this sweep has none yet; it reads the ids of the organisations
+    # that carry stale rows, nothing else.
+    with platform_scope("derived facts sweep: which organisations carry stale derived relationships"):
+        rows = db.session.execute(
+            db.text(
+                "SELECT DISTINCT organization_id FROM archimate_derived_relationships "
+                "WHERE stale = TRUE ORDER BY organization_id"
+            )
+        ).all()
     return [int(row[0]) for row in rows]
 
 

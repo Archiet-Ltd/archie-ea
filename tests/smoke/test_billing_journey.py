@@ -22,7 +22,10 @@ def test_pricing_buy_button_leads_a_visitor_to_that_plans_checkout(browser, live
         page.goto(live_server + "/pricing", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         buy = page.get_by_test_id("buy-startup")
         expect(buy).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_test_id("buy-enterprise")).to_have_attribute("href", "/contact")
+        # Routed through the click-tracking redirect (app/main/views.py::
+        # track_plan_click) before landing on /contact.
+        expect(page.get_by_test_id("buy-enterprise")).to_have_attribute(
+            "href", "/t/plan-click?plan=enterprise&next=/contact")
 
         buy.click()
         # Not signed in yet: the button opens registration and keeps the plan;

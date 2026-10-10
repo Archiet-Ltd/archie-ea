@@ -82,8 +82,6 @@ def _work_package(
         actual_cost=actual_cost,
         start_date=start_date,
         end_date=end_date,
-        plateau_id=plateau_id,
-        gap_id=gap_id,
         risk_mitigation=risk_mitigation,
     )
     if risk_level is not None:
@@ -93,7 +91,28 @@ def _work_package(
     wp = UnifiedWorkPackage(**kwargs)
     db_session.add(wp)
     db_session.flush()
+    _link(db_session, wp, plateau_id, gap_id)
     return wp
+
+
+def _link(db_session, wp, plateau_id, gap_id):
+    """A work package's plateau and gap are ArchiMate relationships from its element
+    (realization to the plateau's, association to the gap's). Written directly, so a
+    plateau or gap of another organisation can be pointed at for the tenancy tests."""
+    from app.models import ArchiMateRelationship
+    from app.models.implementation_migration import Gap, Plateau
+    from app.services.archimate_backbone import sync_archimate_element
+
+    for model, row_id, kind in ((Plateau, plateau_id, "realization"), (Gap, gap_id, "association")):
+        if row_id is None:
+            continue
+        target = db_session.get(model, row_id)
+        sync_archimate_element(target)
+        db_session.flush()
+        db_session.add(ArchiMateRelationship(
+            source_id=wp.archimate_element_id, target_id=target.archimate_element_id,
+            type=kind, organization_id=wp.organization_id))
+    db_session.flush()
 
 
 def _plateau(db_session, org_id, *, name="Plateau", sequence_order=1, target_date=None,
@@ -431,17 +450,18 @@ def test_risk_level_none_vs_default_disclosed(app, db_session, make_org):
 
     org = make_org("plategap-risk-default")
     a = _element(db_session, org.id, "A")
+    a_none = _element(db_session, org.id, "A (explicit none)")  # one element per work package
     default_wp = _work_package(db_session, a, name="Default risk")
-    explicit_none_wp = _work_package(db_session, a, name="Explicit none")
+    explicit_none_wp = _work_package(db_session, a_none, name="Explicit none")
     # Set AFTER construction so the column's own default does not fill it.
     explicit_none_wp.risk_level = None
     db_session.commit()
 
     with app.test_request_context("/"):
         g.current_org_id = org.id
-        result = IntelligenceQueryService.programme_for_element(a.id)
+        results = [IntelligenceQueryService.programme_for_element(e.id) for e in (a, a_none)]
 
-    by_name = {wp["name"]: wp for wp in result["work_packages"]}
+    by_name = {wp["name"]: wp for result in results for wp in result["work_packages"]}
     assert by_name["Default risk"]["risk_level"] == "medium"
     assert by_name["Default risk"]["risk_level_default_possible"] is True
     assert by_name["Explicit none"]["risk_level"] is None
@@ -550,6 +570,9 @@ def test_three_new_selects_regardless_of_package_count(app, db_session, make_org
     g1 = _gap(db_session, org.id, name="G1")
     _work_package(db_session, a, name="WP1", plateau_id=p1.id, gap_id=g1.id)
     db_session.commit()
+    # An element now holds one work package; the lens still reads a list of them, so the
+    # batching is exercised on a database without the element index (rolled back with the test).
+    db_session.execute(db.text("DROP INDEX IF EXISTS uq_unified_wp_archimate_element"))  # tenancy-ok: test fixture
 
     def _counts():
         statement_counter.statements.clear()
@@ -684,16 +707,11 @@ def test_fabrication_every_absent_block_is_all_none_never_falsy(app, db_session,
 
 
 def test_route_redacts_gap_estimated_cost_without_budget_authority(app, db_session, make_org, client, login_as):
-    from app.models.unified_work_package import UnifiedWorkPackage
-
     org = make_org("plategap-route-redact")
     user = _make_user(db_session, org, enterprise_role="solution_architect")
     a = _element(db_session, org.id, "A")
     g1 = _gap(db_session, org.id, name="Costed gap", estimated_cost=5000.0)
-    db_session.add(UnifiedWorkPackage(
-        name="Migrate", archimate_element_id=a.id, organization_id=org.id,
-        business_capability="Test", gap_id=g1.id,
-    ))
+    _work_package(db_session, a, name="Migrate", gap_id=g1.id)
     db_session.commit()
 
     login_as(client, user)
@@ -708,16 +726,11 @@ def test_route_redacts_gap_estimated_cost_without_budget_authority(app, db_sessi
 
 
 def test_route_does_not_redact_gap_estimated_cost_for_cto(app, db_session, make_org, client, login_as):
-    from app.models.unified_work_package import UnifiedWorkPackage
-
     org = make_org("plategap-route-no-redact")
     user = _make_user(db_session, org, enterprise_role="cto")
     a = _element(db_session, org.id, "A")
     g1 = _gap(db_session, org.id, name="Costed gap", estimated_cost=5000.0)
-    db_session.add(UnifiedWorkPackage(
-        name="Migrate", archimate_element_id=a.id, organization_id=org.id,
-        business_capability="Test", gap_id=g1.id,
-    ))
+    _work_package(db_session, a, name="Migrate", gap_id=g1.id)
     db_session.commit()
 
     login_as(client, user)

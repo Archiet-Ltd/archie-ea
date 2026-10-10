@@ -17,12 +17,8 @@ model.*
 
 ## What this module does
 
-Jira, GitHub, Azure DevOps, ServiceNow CMDB and more, connected here — so the model stays current
-because it reads what your team already maintains, not because someone re-enters it by hand.
-
-## Where you'll meet it
-
-- [Pull our systems and initiatives from Jira and GitHub instead of typing them in](/use-cases/import-from-jira-and-github)
+Jira, ServiceNow, Datadog and ABACUS, connected here — so the model stays current because it reads
+what your team already maintains, not because someone re-enters it by hand.
 
 ## Related modules
 

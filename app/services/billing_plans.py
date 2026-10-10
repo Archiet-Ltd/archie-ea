@@ -73,7 +73,7 @@ PLANS: Tuple[Plan, ...] = (
     Plan(
         key="free",
         name="Community",
-        summary="One organisation, three people. Every question, every canvas, the twin map.",
+        summary="One organisation, three people. Every question, the Business Model Canvas, the twin map.",
         purchasable=False,
         user_limit=3,
         display_price_monthly=0,
@@ -81,7 +81,9 @@ PLANS: Tuple[Plan, ...] = (
     Plan(
         key="startup",
         name="Startup",
-        summary="Ten people. Adds the webhook feed, export and share, and email support.",
+        summary=(
+            "Ten people and email support, everything in Community included."
+        ),
         purchasable=True,
         user_limit=10,
         price_env={"month": "STRIPE_PRICE_STARTUP_MONTHLY", "year": "STRIPE_PRICE_STARTUP_ANNUAL"},
@@ -91,7 +93,10 @@ PLANS: Tuple[Plan, ...] = (
     Plan(
         key="team",
         name="Team",
-        summary="Priced per editor; people who only ask questions are free. Single sign-on and the review-board workflow.",
+        summary=(
+            "Priced per editor; people who only ask questions are free. Single "
+            "sign-on, the review-board workflow, and your own model key."
+        ),
         purchasable=True,
         user_limit=None,
         per_seat=True,
