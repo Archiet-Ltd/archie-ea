@@ -3355,10 +3355,13 @@ def api_list_roles():
 
     Role is a GLOBAL table (app/models/user.py's Role carries no
     organization_id) -- reachable by any org admin of their own,
-    brand-new organisation, no invitation into anyone else's org needed.
-    platform_admin_required added alongside this route's own
-    admin_required for every /api/roles verb (list/get/create/update/
-    delete), same as the enterprise-roles sibling finding."""
+    brand-new organisation, no invitation into anyone else's org
+    needed. platform_admin_required added alongside this route's own
+    admin_required for every /api/roles verb (list/create/update/
+    delete): tests/test_admin_org_member_idor.py's
+    TestRolesApiPlatformAdminOnly (pre-existing on main, independent
+    of this PR) already pins list to platform_admin-only, and no
+    template calls this endpoint -- team management does not need it."""
     roles = Role.query.order_by(Role.name).all()
     items = []
     for role in roles:
@@ -3410,7 +3413,6 @@ def api_get_role(role_id):
 @timed_route
 @login_required
 @platform_admin_required
-@admin_required
 def api_create_role():
     """Create a new custom role. See api_list_roles's docstring: Role is a
     global table, platform_admin_required required."""
@@ -3432,7 +3434,6 @@ def api_create_role():
 @timed_route
 @login_required
 @platform_admin_required
-@admin_required
 def api_update_role(role_id):
     """Update a role name or permissions. See api_list_roles's docstring:
     Role is a global table, platform_admin_required required."""
@@ -3453,7 +3454,6 @@ def api_update_role(role_id):
 @timed_route
 @login_required
 @platform_admin_required
-@admin_required
 def api_delete_role(role_id):
     """Delete a custom role. Reassigns users to the default User role. See
     api_list_roles's docstring: Role is a global table,
