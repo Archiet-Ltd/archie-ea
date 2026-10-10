@@ -1,0 +1,237 @@
+# Tool aliases and the connector ladder for the company-context intake.
+#
+# One entry per tool. rung is one of byo_feed | unified_ticketing | native;
+# native is claimed only for a tool whose connector type exists in the product
+# (servicenow, jira, m365, devops). pack_key is the published pack key, or the
+# character ``-`` when no pack exists. status_page_hosts and marketplace_hosts
+# are the hosts a mention of that tool points at; the rules never fetch them.
+# Vendor and tool names appear only as names; no customer, employer, prospect
+# name, owner, cost, contract, maturity, headcount, salary or person exists
+# anywhere in this file.
+
+tools:
+  - tool: ServiceNow
+    aliases: [servicenow, now platform]
+    category: ticketing
+    rung: native
+    pack_key: servicenow
+    status_page_hosts: []
+    marketplace_hosts: [store.servicenow.com]
+  - tool: Jira
+    aliases: [jira, atlassian jira, jira cloud]
+    category: ticketing
+    rung: native
+    pack_key: jira
+    status_page_hosts: []
+    marketplace_hosts: [marketplace.atlassian.com, apps.atlassian.com]
+  - tool: Jira Service Management
+    aliases: [jira service management, jsm, jira sm]
+    category: ticketing
+    rung: byo_feed
+    pack_key: jira
+    status_page_hosts: []
+    marketplace_hosts: [marketplace.atlassian.com, apps.atlassian.com]
+  - tool: Linear
+    aliases: [linear, linear.app, linearapp]
+    category: ticketing
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: []
+    marketplace_hosts: []
+  - tool: Zendesk
+    aliases: [zendesk, zendesk support]
+    category: ticketing
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: []
+    marketplace_hosts: [www.zendesk.com/marketplace]
+  - tool: Freshservice
+    aliases: [freshservice, freshdesk, freshworks]
+    category: ticketing
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: []
+    marketplace_hosts: []
+  - tool: PagerDuty
+    aliases: [pagerduty, pager duty]
+    category: alerting
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [status.pagerduty.com]
+    marketplace_hosts: []
+  - tool: incident.io
+    aliases: [incident.io, incidentio, incident dot io]
+    category: alerting
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [status.incident.io]
+    marketplace_hosts: []
+  - tool: Opsgenie
+    aliases: [opsgenie, atlassian opsgenie]
+    category: alerting
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: []
+    marketplace_hosts: [marketplace.atlassian.com]
+  - tool: Datadog
+    aliases: [datadog, datadog cloud]
+    category: monitoring
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [status.datadoghq.com]
+    marketplace_hosts: []
+  - tool: New Relic
+    aliases: [new relic, newrelic, new relic cloud]
+    category: monitoring
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [status.newrelic.com]
+    marketplace_hosts: []
+  - tool: Grafana
+    aliases: [grafana, grafana labs]
+    category: monitoring
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [status.grafana.com]
+    marketplace_hosts: []
+  - tool: Splunk
+    aliases: [splunk, splunk cloud]
+    category: observability
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [status.splunkcloud.com]
+    marketplace_hosts: []
+  - tool: GitHub
+    aliases: [github, github.com, github cloud]
+    category: source_control
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [www.githubstatus.com]
+    marketplace_hosts: [github.com/marketplace]
+  - tool: GitLab
+    aliases: [gitlab, gitlab.com]
+    category: source_control
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [status.gitlab.com]
+    marketplace_hosts: []
+  - tool: Azure DevOps
+    aliases: [azure devops, azuredevops, visual studio team services, azure pipelines]
+    category: source_control
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [status.dev.azure.com]
+    marketplace_hosts: [azuremarketplace.microsoft.com]
+  - tool: Bitbucket
+    aliases: [bitbucket, bitbucket cloud]
+    category: source_control
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: []
+    marketplace_hosts: [marketplace.atlassian.com]
+  - tool: CircleCI
+    aliases: [circleci, circle ci, circle cloud]
+    category: ci
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [status.circleci.com]
+    marketplace_hosts: []
+  - tool: Confluence
+    aliases: [confluence, atlassian confluence]
+    category: documentation
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: []
+    marketplace_hosts: [marketplace.atlassian.com]
+  - tool: Notion
+    aliases: [notion, notion.so, notionapp]
+    category: documentation
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: []
+    marketplace_hosts: [www.notion.so/integrations]
+  - tool: Slack
+    aliases: [slack, slack.com]
+    category: messaging
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [status.slack.com]
+    marketplace_hosts: [slack.com/apps]
+  - tool: Microsoft Teams
+    aliases: [microsoft teams, ms teams, msteams]
+    category: messaging
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: []
+    marketplace_hosts: [appsource.microsoft.com]
+  - tool: Statuspage
+    aliases: [statuspage, atlassian statuspage, statuspage.io]
+    category: status_page
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [statuspage.io]
+    marketplace_hosts: []
+  - tool: Status.io
+    aliases: [status.io, statusio]
+    category: status_page
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [status.io]
+    marketplace_hosts: []
+  - tool: Instatus
+    aliases: [instatus, instatus.com]
+    category: status_page
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [instatus.com]
+    marketplace_hosts: []
+  - tool: Better Uptime
+    aliases: [better uptime, betteruptime, better stack]
+    category: status_page
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [betteruptime.com, betterstack.com]
+    marketplace_hosts: []
+  - tool: HUND
+    aliases: [hund, hund.io]
+    category: status_page
+    rung: byo_feed
+    pack_key: "-"
+    status_page_hosts: [hund.io]
+    marketplace_hosts: []
+
+# Hosts that are mentions, never fetched: the hosted status-page providers and
+# the app stores / marketplaces.
+status_page_providers:
+  - statuspage.io
+  - status.io
+  - instatus.com
+  - betteruptime.com
+  - betterstack.com
+  - hund.io
+
+marketplace_hosts:
+  - marketplace.atlassian.com
+  - appexchange.salesforce.com
+  - apps.apple.com
+  - play.google.com
+  - aws.amazon.com
+  - azuremarketplace.microsoft.com
+  - slack.com
+  - github.com
+  - store.servicenow.com
+  - apps.atlassian.com
+  - zendesk.com
+  - notion.so
+  - appsource.microsoft.com
+  - status.pagerduty.com
+  - status.incident.io
+  - status.datadoghq.com
+  - status.newrelic.com
+  - status.grafana.com
+  - status.splunkcloud.com
+  - www.githubstatus.com
+  - status.gitlab.com
+  - status.dev.azure.com
+  - status.circleci.com
+  - status.slack.com

@@ -1,0 +1,175 @@
+# Segment signals for the company-context intake (static data, schema-tested).
+#
+# Each rule names a purpose from page_rules.yml: purposes, a matcher and the
+# segment it points at (S1..S4). The matcher kinds are: phrase (any token
+# found in the page's stored text), numeric_statement (a single integer
+# capture with min/max bounds), open_roles_count (how many postings the
+# careers page yielded), page_present (whether a purpose was fetched) and
+# links_out_host (a host listed as a mention on the page). Rules that change
+# without a deploy belong here, never in code. No owner, cost, contract,
+# maturity, headcount, salary or person rule or key exists in this file.
+
+rules:
+  - rule_id: s1_team_under_50
+    purpose: home
+    matcher:
+      kind: numeric_statement
+      pattern: "(?i)(?:a team of|team of)[ ]+([0-9]+)[ ]*(?:people|employees|engineers|staff|colleagues|sizing)?"
+      max: 49
+    segment: S1
+    note: A team-size statement under fifty on the home or about page.
+  - rule_id: s1_fewer_than_six_open_roles
+    purpose: careers
+    matcher:
+      kind: open_roles_count
+      max: 5
+    segment: S1
+    note: Fewer than six postings under careers.
+  - rule_id: s1_self_serve_signup
+    purpose: home
+    matcher:
+      kind: phrase
+      any_of:
+        - sign up
+        - sign-up
+        - create your account
+        - start free
+        - try for free
+        - get started free
+    segment: S1
+    note: A self-serve sign-up phrase on the home page, with a pricing page present.
+  - rule_id: s2_certification
+    purpose: security
+    matcher:
+      kind: phrase
+      any_of:
+        - soc 2
+        - iso 27001
+        - iso/iec 27001
+        - cyber essentials
+        - pci dss
+        - hipaa
+    segment: S2
+    note: A recognised certification phrase on the security page.
+  - rule_id: s2_engineering_page
+    purpose: engineering
+    matcher:
+      kind: page_present
+      purpose: engineering
+    segment: S2
+    note: An engineering page was fetched.
+  - rule_id: s2_open_roles_six_to_thirty
+    purpose: careers
+    matcher:
+      kind: open_roles_count
+      min: 6
+      max: 30
+    segment: S2
+    note: Between six and thirty postings under careers.
+  - rule_id: s2_status_page_link
+    purpose: home
+    matcher:
+      kind: links_out_host
+      host_list:
+        - statuspage.io
+        - status.io
+        - instatus.com
+        - betteruptime.com
+        - betterstack.com
+        - hund.io
+    segment: S2
+    note: A hosted status-page provider is mentioned on the home page.
+  - rule_id: s3_investor_relations
+    purpose: strategy
+    matcher:
+      kind: phrase
+      any_of:
+        - investor relations
+        - investor-relations
+        - investors
+        - annual report
+        - annual-report
+        - financial results
+    segment: S3
+    note: An investor-relations or annual-report phrase on the strategy page.
+  - rule_id: s3_over_thirty_open_roles
+    purpose: careers
+    matcher:
+      kind: open_roles_count
+      min: 31
+    segment: S3
+    note: More than thirty postings under careers.
+  - rule_id: s3_contact_sales
+    purpose: home
+    matcher:
+      kind: phrase
+      any_of:
+        - contact sales
+        - talk to sales
+        - book a demo
+        - request a demo
+    segment: S3
+    note: A contact-sales phrase on the home page, with no pricing page.
+  - rule_id: s3_enterprise_platforms
+    purpose: careers
+    matcher:
+      kind: phrase
+      any_of:
+        - enterprise platform
+        - enterprise software
+        - at enterprise scale
+        - for large organisations
+        - global organisations
+    segment: S3
+    note: Careers pages that name enterprise platforms.
+  - rule_id: s4_services_words
+    purpose: home
+    matcher:
+      kind: phrase
+      any_of:
+        - agency
+        - consultancy
+        - practice
+        - our clients
+        - our services
+        - our practice
+    segment: S4
+    note: Services language on the home or about page, with no product and no pricing page.
+
+answer_rules:
+  stage:
+    - pre_revenue
+    - early_revenue
+    - growing
+    - established
+  size:
+    - under_10
+    - "10_49"
+    - "50_500"
+    - over_500
+  industry_kind:
+    - software
+    - services
+    - other
+  rules:
+    - stage:
+        - pre_revenue
+        - early_revenue
+      segment: S1
+    - stage:
+        - growing
+      industry_kind:
+        - software
+      segment: S2
+    - stage:
+        - established
+      industry_kind:
+        - software
+        - other
+      segment: S3
+    - stage:
+        - growing
+        - established
+      industry_kind:
+        - services
+      segment: S4
