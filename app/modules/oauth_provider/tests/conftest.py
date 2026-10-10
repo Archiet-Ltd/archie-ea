@@ -1,18 +1,8 @@
-"""Reuse the shared fixtures from tests/conftest.py for this module's tests."""
+"""Collection rules for the connector tests; the shared fixtures come from app/modules/conftest.py."""
 
 from __future__ import annotations
 
 import os
-
-from tests.conftest import (  # noqa: F401
-    _schema,
-    app,
-    client,
-    db_session,
-    login_as,
-    make_org,
-    tenant_ctx,
-)
 
 # These tests need the connector switched on (MCP_ENABLED and PUBLIC_BASE_URL are
 # read when the app is created), which the ordinary suite run leaves off. A
