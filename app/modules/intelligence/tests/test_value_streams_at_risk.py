@@ -1,7 +1,7 @@
 """T-S1: `IntelligenceQueryService.value_streams_at_risk` and its route.
 
 Fixtures (app, db_session, make_org, tenant_ctx, client, login_as) are
-discovered via app/modules/intelligence/tests/conftest.py's own import of
+discovered via app/modules/conftest.py's import of
 tests.conftest -- no import needed here, matching test_impact_route.py's
 own pattern.
 
@@ -178,10 +178,16 @@ def _relax_not_null(db_session, table: str, column: str) -> None:
     otherwise be constructed against a schema built from the current models.
     This recreates exactly that shape for one test, not a schema change that
     survives it.
-    """
-    from app.extensions import db
 
-    db_session.execute(db.text(f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL"))
+    Delegates to the production ``relax_not_null`` rather than duplicating
+    the ``ALTER TABLE`` statement. ``relax_not_null`` needs an
+    actual ``Connection`` (it reads ``.dialect`` to quote identifiers), not
+    the ``scoped_session`` itself -- ``db_session.connection()`` returns the
+    one bound to this test's own transaction.
+    """
+    from app.commands.schema_migrations import relax_not_null
+
+    relax_not_null(db_session.connection(), table, column)
 
 
 # --- Acceptance item 1 ----------------------------------------------------------
@@ -1328,7 +1334,7 @@ def test_four_batched_selects_regardless_of_row_count(app, db_session, make_org,
     IntelligenceQueryService.value_streams_at_risk(org_id)
     big_count = len(select_counter.statements)
 
-    assert small_count == 4, select_counter.statements
+    assert small_count == 5, select_counter.statements
     assert big_count == small_count, select_counter.statements
 
 
@@ -1369,6 +1375,276 @@ def test_statement_count_constant_inside_tenant_context(
     more_caps = [
         _capability(
             db_session, org_id, f"Cap Extra {i}", f"VSR-AC19CTX-EXTRA-{i}-{_org_suffix()}",
+            current=1, target=5,
+        )
+        for i in range(4)
+    ]
+    for cap in more_caps:
+        _mapping(db_session, org_id, cap.id, vs2.id, stage2.id)
+    db_session.commit()
+
+    with tenant_ctx(org_id):
+        select_counter.statements.clear()
+        IntelligenceQueryService.value_streams_at_risk(org_id)
+        big_count_in_context = len(select_counter.statements)
+
+    assert big_count_in_context == small_count_in_context, select_counter.statements
+
+
+# --- T-MAT-3: under_target, target_gap and risk_reasons ---------------------------------------
+
+
+def test_capability_under_target_is_named_not_scored(app, db_session, make_org):
+    """Test (4): threshold 3, capability at 3 → 5:
+    at_risk is False, under_target is True, target_gap == 2,
+    stream's risk_reasons == ["capability_under_target"],
+    at_risk_capability_count == 0, summary.value_streams_at_risk == 0.
+    """
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("mat3-ac4")
+    vs = _value_stream(db_session, org.id, "VS", f"MAT3-AC4-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(
+        db_session, org.id, "Cap", f"MAT3-AC4-CAP-{_org_suffix()}", current=3, target=5
+    )
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id, threshold=3)
+    row = result["rows"][0]
+    cap_row = row["capabilities"][0]
+
+    assert cap_row["at_risk"] is False
+    assert cap_row["under_target"] is True
+    assert cap_row["target_gap"] == 2
+    assert row["risk_reasons"] == ["capability_under_target"]
+    assert row["at_risk_capability_count"] == 0
+    assert result["summary"]["value_streams_at_risk"] == 0
+
+
+def test_capability_below_threshold_carries_both_reasons_when_also_under_target(
+    app, db_session, make_org
+):
+    """Test (5): capability 2 → 4, threshold 3 →
+    risk_reasons == ["capability_below_threshold", "capability_under_target"],
+    counts as T-S1 (1 at risk).
+    """
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("mat3-ac5")
+    vs = _value_stream(db_session, org.id, "VS", f"MAT3-AC5-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(
+        db_session, org.id, "Cap", f"MAT3-AC5-CAP-{_org_suffix()}", current=2, target=4
+    )
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id, threshold=3)
+    row = result["rows"][0]
+
+    assert row["risk_reasons"] == ["capability_below_threshold", "capability_under_target"]
+    assert row["at_risk_capability_count"] == 1
+    assert result["summary"]["value_streams_at_risk"] == 1
+
+
+def test_unassessed_capability_is_named_and_not_counted(app, db_session, make_org):
+    """Test (6): current null →
+    risk_reasons == ["capability_unassessed"],
+    under_target is None, target_gap is None,
+    capabilities_with_no_maturity == 1, at_risk_capability_count == 0.
+    """
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("mat3-ac6")
+    vs = _value_stream(db_session, org.id, "VS", f"MAT3-AC6-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(
+        db_session, org.id, "Cap", f"MAT3-AC6-CAP-{_org_suffix()}", current=None, target=None
+    )
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    row = result["rows"][0]
+    cap_row = row["capabilities"][0]
+
+    assert row["risk_reasons"] == ["capability_unassessed"]
+    assert cap_row["under_target"] is None
+    assert cap_row["target_gap"] is None
+    assert result["summary"]["capabilities_with_no_maturity"] == 1
+    assert row["at_risk_capability_count"] == 0
+
+
+def test_assessed_without_target_carries_no_target_reason(app, db_session, make_org):
+    """Test (7): current 3, target null →
+    the row's under_target is None, target_gap is None, reason is None at row level
+    (the row is assessed; the block's no_maturity_target_recorded is not a row reason) —
+    assert risk_reasons does not name it and no count moves.
+    """
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("mat3-ac7")
+    vs = _value_stream(db_session, org.id, "VS", f"MAT3-AC7-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(
+        db_session, org.id, "Cap", f"MAT3-AC7-CAP-{_org_suffix()}", current=3, target=None
+    )
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    row = result["rows"][0]
+    cap_row = row["capabilities"][0]
+
+    assert cap_row["under_target"] is None
+    assert cap_row["target_gap"] is None
+    assert cap_row["reason"] is None
+    assert "capability_under_target" not in row["risk_reasons"]
+    assert row["at_risk_capability_count"] == 0
+    assert result["summary"]["capabilities_below_threshold"] == 0
+    assert result["summary"]["capabilities_with_no_maturity"] == 0
+
+
+def test_every_risk_reason_string_is_an_enum_member(app, db_session, make_org):
+    """Test (8): walks a realistic payload against VALUE_STREAM_RISK_REASONS.
+    An invented string is proven outside the frozen set by construction.
+    """
+    from app.modules.intelligence.services.query_service import (
+        VALUE_STREAM_RISK_REASONS,
+        IntelligenceQueryService,
+    )
+
+    org = make_org("mat3-ac8")
+    vs = _value_stream(db_session, org.id, "VS", f"MAT3-AC8-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(
+        db_session, org.id, "Cap", f"MAT3-AC8-CAP-{_org_suffix()}", current=2, target=4
+    )
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+
+    for row in result["rows"]:
+        for reason in row["risk_reasons"]:
+            assert reason in VALUE_STREAM_RISK_REASONS, (
+                f"risk_reason {reason!r} not in {VALUE_STREAM_RISK_REASONS}"
+            )
+
+    # An invented string is not a member by construction.
+    assert "invented_reason" not in VALUE_STREAM_RISK_REASONS
+
+
+def test_fabrication_none_not_zero(app, db_session, make_org):
+    """Test (10): for every capability row with current_maturity is None,
+    target_maturity is None and target_gap is None (asserted is None),
+    and the JSON of an all-unassessed payload contains none of
+    "current_maturity": 0, "target_maturity": 0, "target_gap": 0.
+    """
+    import json
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("mat3-ac10")
+    vs = _value_stream(db_session, org.id, "VS", f"MAT3-AC10-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(
+        db_session, org.id, "Cap", f"MAT3-AC10-CAP-{_org_suffix()}", current=None, target=None
+    )
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    row = result["rows"][0]
+
+    for cap_row in row["capabilities"]:
+        if cap_row["current_maturity"] is None:
+            assert cap_row["target_maturity"] is None
+            assert cap_row["target_gap"] is None
+
+    json_str = json.dumps(result)
+    assert '"current_maturity": 0' not in json_str
+    assert '"target_maturity": 0' not in json_str
+    assert '"target_gap": 0' not in json_str
+
+
+def test_five_batched_selects_regardless_of_row_count(app, db_session, make_org, select_counter):
+    """T-MAT-3: the helper adds a fifth select (its own element map)."""
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("mat3-ac19")
+    org_id = org.id
+    vs1 = _value_stream(db_session, org.id, "VS Small", f"MAT3-AC19-SMALL-{_org_suffix()}")
+    stage1 = _stage(db_session, org.id, vs1.id, "Stage 1", 1)
+    small_caps = [
+        _capability(
+            db_session, org.id, f"Cap {i}", f"MAT3-AC19-CAP-{i}-{_org_suffix()}",
+            current=2, target=4,
+        )
+        for i in range(6)
+    ]
+    for cap in small_caps:
+        _mapping(db_session, org.id, cap.id, vs1.id, stage1.id)
+    db_session.commit()
+
+    select_counter.statements.clear()
+    IntelligenceQueryService.value_streams_at_risk(org_id)
+    small_count = len(select_counter.statements)
+
+    vs2 = _value_stream(db_session, org_id, "VS Big", f"MAT3-AC19-BIG-{_org_suffix()}")
+    stage2 = _stage(db_session, org_id, vs2.id, "Stage 2", 1)
+    more_caps = [
+        _capability(
+            db_session, org_id, f"Cap Extra {i}", f"MAT3-AC19-EXTRA-{i}-{_org_suffix()}",
+            current=1, target=5,
+        )
+        for i in range(4)
+    ]
+    for cap in more_caps:
+        _mapping(db_session, org_id, cap.id, vs2.id, stage2.id)
+    db_session.commit()
+
+    select_counter.statements.clear()
+    IntelligenceQueryService.value_streams_at_risk(org_id)
+    big_count = len(select_counter.statements)
+
+    assert small_count == 5, select_counter.statements
+    assert big_count == small_count, select_counter.statements
+
+
+def test_statement_count_constant_five_inside_tenant_context(
+    app, db_session, make_org, select_counter, tenant_ctx
+):
+    """T-MAT-3: same constant-five assertion inside a request-like context."""
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("mat3-ac19-ctx")
+    org_id = org.id
+    vs1 = _value_stream(db_session, org_id, "VS Small", f"MAT3-AC19CTX-SMALL-{_org_suffix()}")
+    stage1 = _stage(db_session, org_id, vs1.id, "Stage 1", 1)
+    small_caps = [
+        _capability(
+            db_session, org_id, f"Cap {i}", f"MAT3-AC19CTX-CAP-{i}-{_org_suffix()}",
+            current=2, target=4,
+        )
+        for i in range(6)
+    ]
+    for cap in small_caps:
+        _mapping(db_session, org_id, cap.id, vs1.id, stage1.id)
+    db_session.commit()
+
+    with tenant_ctx(org_id):
+        select_counter.statements.clear()
+        IntelligenceQueryService.value_streams_at_risk(org_id)
+        small_count_in_context = len(select_counter.statements)
+
+    vs2 = _value_stream(db_session, org_id, "VS Big", f"MAT3-AC19CTX-BIG-{_org_suffix()}")
+    stage2 = _stage(db_session, org_id, vs2.id, "Stage 2", 1)
+    more_caps = [
+        _capability(
+            db_session, org_id, f"Cap Extra {i}", f"MAT3-AC19CTX-EXTRA-{i}-{_org_suffix()}",
             current=1, target=5,
         )
         for i in range(4)

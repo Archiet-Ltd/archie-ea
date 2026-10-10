@@ -76,6 +76,7 @@ def backfill_feedback_org(dry_run):
         return
 
     updated = db.session.execute(
+        # tenancy-ok: one-time backfill, retirement 2026-12-31
         db.text(
             "UPDATE ai_chat_feedback f SET organization_id = u.organization_id "
             "FROM users u "

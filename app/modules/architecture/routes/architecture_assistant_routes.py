@@ -4416,13 +4416,35 @@ def get_ai_reasoning(solution_id):
     })
 
 
+def _ai_audit_entry_or_404(entry_id):
+    """An AI audit entry, only if the caller may see it.
+
+    ``AIAuditLog`` has no tenant column. An entry tied to a solution is reachable through that
+    solution, which is tenant-fenced (another organisation's solution is a 404). An entry with no
+    solution belongs to the user who made it; a platform admin may read any.
+    """
+    from flask import abort
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.models.ai_audit_log import AIAuditLog
+    from app.models.solution_models import Solution
+    from app.utils.route_guards import require_entity
+
+    # tenant-scoping-ok: access is decided on the next lines, through the tenant-fenced solution
+    # or the entry's own user.
+    entry = AIAuditLog.query.get_or_404(entry_id)
+    if entry.solution_id is not None:
+        require_entity(Solution, entry.solution_id, description="Entry not found")
+    elif not is_platform_admin(current_user) and entry.user_id != current_user.id:
+        abort(404)
+    return entry
+
+
 @architecture_assistant_bp.route("/ai-reasoning/entry/<int:entry_id>", methods=["GET"])
 @login_required
 def get_ai_reasoning_detail(entry_id):
     """ENH-019: Return detailed reasoning for a single AI audit log entry."""
-    from app.models.ai_audit_log import AIAuditLog
-
-    entry = AIAuditLog.query.get_or_404(entry_id)
+    entry = _ai_audit_entry_or_404(entry_id)
     return jsonify({
         "success": True,
         "entry": entry.to_dict(),
@@ -4434,9 +4456,7 @@ def get_ai_reasoning_detail(entry_id):
 @require_roles("admin", "architect")
 def approve_ai_reasoning(entry_id):
     """ENH-019: Approve or reject an AI-generated output after reviewing reasoning."""
-    from app.models.ai_audit_log import AIAuditLog
-
-    entry = AIAuditLog.query.get_or_404(entry_id)
+    entry = _ai_audit_entry_or_404(entry_id)
     data = request.get_json(silent=True) or {}
     decision = data.get("decision")
 

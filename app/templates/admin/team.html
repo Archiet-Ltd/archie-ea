@@ -26,35 +26,112 @@
         {% endif %}
     {% endwith %}
 
-    <!-- Add Member -->
+    <!-- Invite Member -->
     <div class="bg-background shadow rounded-lg mb-8 p-6">
-        <h2 class="text-lg font-semibold text-foreground mb-4">Invite Member</h2>
+        <h2 class="text-lg font-semibold text-foreground mb-1">Invite a teammate</h2>
+        <p class="text-sm text-muted-foreground mb-4">They get an e-mail with a link to choose a password and join this organisation. The link works once and for 14 days.</p>
+        {% if invite_error %}
+        <div role="alert" data-team-invite-error
+             class="mb-4 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive-emphasis">
+            {{ invite_error }}
+        </div>
+        {% endif %}
+        {% if not mail_is_available %}
+        <div role="alert" data-team-mail-unavailable
+             class="mb-4 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+            E-mail is not available on this server, so invitations cannot be sent to people who do not have an account yet.
+        </div>
+        {% endif %}
         <form method="POST" action="{{ url_for('team.team_invite') }}" class="flex flex-wrap gap-3 items-end">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div>
+            <div class="w-full sm:w-auto">
                 <label for="email" class="block text-sm font-medium text-foreground mb-1">Email</label>
-                <input id="email" name="email" type="email" required
-                    class="block w-64 rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                <input id="email" name="email" type="email" required autocomplete="off"
+                    class="flex h-9 w-full sm:w-64 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     placeholder="user@example.com">
+            </div>
+            <div>
+                <label for="persona" class="block text-sm font-medium text-foreground mb-1">Persona</label>
+                <select id="persona" name="persona"
+                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    {% for value, label in personas %}
+                        <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div>
                 <label for="role" class="block text-sm font-medium text-foreground mb-1">Role</label>
                 <select id="role" name="role"
-                    class="block rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm">
+                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     {% for r in valid_roles %}
-                        <option value="{{ r }}">{{ r }}</option>
+                        <option value="{{ r }}"{% if r == 'viewer' %} selected{% endif %}>{{ r }}</option>
                     {% endfor %}
                 </select>
             </div>
             <button type="submit"
-                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
-                Invite
+                class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                Send invitation
             </button>
         </form>
     </div>
 
+    <!-- Open invitations -->
+    <div class="bg-background shadow rounded-lg mb-8 overflow-hidden" data-team-invitations>
+        <div class="px-6 py-4 border-b border-border">
+            <h2 class="text-lg font-semibold text-foreground">Invitations not yet accepted</h2>
+        </div>
+        {% if invitations %}
+        <ul class="divide-y divide-border">
+            {% for inv in invitations %}
+            <li class="px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" data-invitation-email="{{ inv.user.email }}">
+                <div class="min-w-0 space-y-1">
+                    <p class="text-sm font-medium text-foreground break-words">{{ inv.user.email }}</p>
+                    <p class="text-sm text-muted-foreground">
+                        Role: {{ inv.role or '—' }}
+                        <span aria-hidden="true">·</span>
+                        {% if inv.state == 'expired' %}Expired{% else %}Open until {{ inv.effective_expiry.strftime('%d %b %Y') }}{% endif %}
+                    </p>
+                    {% if inv.user_id in has_account_ids %}
+                    <p class="text-sm text-muted-foreground" data-invitation-kind="has-account">Has an account: accepts after signing in</p>
+                    {% endif %}
+                    <p class="text-sm" data-invitation-delivery="{{ inv.delivery_status or 'unknown' }}">
+                        {% if inv.delivery_status == 'sent' %}
+                            <span class="text-foreground">Sent {{ inv.delivered_at.strftime('%d %b %Y %H:%M') }} UTC</span>
+                        {% elif inv.delivery_status == 'failed' %}
+                            <span class="text-destructive-emphasis">Not sent: {{ inv.delivery_error or '—' }}</span>
+                        {% elif not inv.token_hash %}
+                            <span class="text-muted-foreground">Not e-mailed</span>
+                        {% else %}
+                            <span class="text-muted-foreground">Delivery —</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="flex shrink-0 gap-2">
+                    <form method="POST" action="{{ url_for('team.team_invitation_resend', invitation_id=inv.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" aria-label="Resend invitation to {{ inv.user.email }}"
+                            class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 disabled:opacity-50 disabled:pointer-events-none">
+                            Resend
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('team.team_invitation_revoke', invitation_id=inv.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" aria-label="Withdraw invitation to {{ inv.user.email }}"
+                            class="inline-flex items-center justify-center rounded-md text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 h-8 px-3 disabled:opacity-50 disabled:pointer-events-none">
+                            Withdraw
+                        </button>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="px-6 py-4 text-sm text-muted-foreground">No open invitations.</p>
+        {% endif %}
+    </div>
+
     <!-- Members Table -->
-    <div class="bg-background shadow rounded-lg overflow-hidden">
+    <div class="bg-background shadow rounded-lg overflow-x-auto" data-team-members>
         <table class="min-w-full divide-y divide-border">
             <thead class="bg-muted/30">
                 <tr>

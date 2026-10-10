@@ -51,6 +51,17 @@ def _configuration_app(monkeypatch, *, existing=True, csrf=False):
         commit=commit, rollback=lambda: None,
     ))
 
+    # admin_required resolves authority in the ACTIVE organisation through
+    # rbac_service.is_org_admin -> OrgRole.get_role. This isolated app has no
+    # database, so the OrgRole lookup is the storage boundary double: the
+    # signed-in user is an org_admin of organisation 7, which is also the
+    # active organisation (g.current_org_id, set in before_request below).
+    from app.models.org_role import OrgRole
+    monkeypatch.setattr(
+        OrgRole, "get_role",
+        classmethod(lambda cls, org_id, user_id: "org_admin" if org_id == 7 else None),
+    )
+
     class User(UserMixin):
         id = "sso-validation"
         organization_id = 7
@@ -58,10 +69,19 @@ def _configuration_app(monkeypatch, *, existing=True, csrf=False):
         def can(self, permission):
             return True
 
+        def is_admin(self):
+            return True
+
     application = Flask(__name__)
     application.config.update(SECRET_KEY="isolated-sso-validation", TESTING=True,
                               WTF_CSRF_ENABLED=csrf)
     CSRFProtect(application)
+
+    @application.before_request
+    def _active_organisation():
+        from flask import g
+        g.current_org_id = 7
+
     manager = LoginManager(application)
     manager.user_loader(lambda user_id: User())
     application.jinja_loader = ChoiceLoader([
@@ -82,7 +102,7 @@ def _configuration_app(monkeypatch, *, existing=True, csrf=False):
 
 
 @pytest.mark.parametrize("existing", [False, True])
-@pytest.mark.parametrize("protocol,enabled", [("saml", "on"), ("bogus", "on"), ("", "")])
+@pytest.mark.parametrize("protocol,enabled", [("bogus", "on"), ("", "")])
 def test_rejected_protocol_preserves_configuration(monkeypatch, existing, protocol, enabled):
     application, state = _configuration_app(monkeypatch, existing=existing)
     before = deepcopy(state.persisted)
@@ -95,6 +115,27 @@ def test_rejected_protocol_preserves_configuration(monkeypatch, existing, protoc
     assert response.status_code == 200
     assert b"SSO configuration saved." not in response.data
     assert b"not supported" in response.data
+    assert state.persisted == before
+    assert (vars(state.config) if state.config else None) == before
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_rejected_saml_enabled_without_idp_fields_preserves_configuration(monkeypatch, existing):
+    """SAML can now be enabled (R1-B12 PR 2), but only once the IdP SSO URL
+    and signing certificate it would verify assertions against are present
+    -- there is no protocol to run without them, so this is still a
+    rejection, with a different, field-specific message than the generic
+    "protocol not supported" case above."""
+    application, state = _configuration_app(monkeypatch, existing=existing)
+    before = deepcopy(state.persisted)
+    client = application.test_client()
+    client.get("/test-entry")
+    response = client.post("/admin/sso", data={
+        "protocol": "saml", "enabled": "on", "email_domain": "replacement.example",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"SSO configuration saved." not in response.data
+    assert b"needs an IdP SSO URL and signing certificate" in response.data
     assert state.persisted == before
     assert (vars(state.config) if state.config else None) == before
 
@@ -115,7 +156,29 @@ def test_supported_oidc_and_disabled_saml_draft_remain_saveable(monkeypatch, pro
     assert state.persisted["client_secret"] == "retained-secret"
 
 
-def test_browser_rejects_enabled_saml_and_reloads_prior_oidc_settings(monkeypatch):
+def test_saml_with_idp_fields_can_be_enabled_and_saved(monkeypatch):
+    """The positive case this PR adds: SAML with its required IdP fields
+    present saves and enables cleanly, the same as OIDC always could."""
+    application, state = _configuration_app(monkeypatch)
+    client = application.test_client()
+    client.get("/test-entry")
+    response = client.post("/admin/sso", data={
+        "protocol": "saml", "enabled": "on", "email_domain": "updated.example",
+        "idp_sso_url": "https://idp.example.com/saml/sso",
+        "idp_x509_cert": "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"SSO configuration saved." in response.data
+    assert state.persisted["protocol"] == "saml"
+    assert state.persisted["enabled"] is True
+    assert state.persisted["idp_sso_url"] == "https://idp.example.com/saml/sso"
+
+
+def test_browser_rejects_enabled_saml_without_idp_fields_and_reloads_prior_oidc_settings(monkeypatch):
+    """SAML can be enabled now (R1-B12 PR 2), but still not without the IdP
+    SSO URL and certificate it would verify assertions against -- this
+    browser-level test is updated to fill neither, which still rejects, with
+    the field-specific message rather than the old blanket "coming soon" one."""
     from threading import Thread
     from playwright.sync_api import sync_playwright, expect
     from werkzeug.serving import make_server
@@ -138,7 +201,10 @@ def test_browser_rejects_enabled_saml_and_reloads_prior_oidc_settings(monkeypatc
                 with page.expect_navigation() as navigation:
                     page.get_by_role("button", name="Save Configuration").click()
                 assert navigation.value.status == 200
-                expect(page.get_by_text("SAML federation is not supported by this configuration. Use OIDC or save SAML with SSO disabled.", exact=True)).to_be_visible()
+                expect(page.get_by_text(
+                    "SAML SSO needs an IdP SSO URL and signing certificate before it can be enabled.",
+                    exact=True,
+                )).to_be_visible()
                 expect(page.get_by_text("SSO configuration saved.", exact=True)).to_have_count(0)
                 page.reload()
                 expect(page.get_by_label("Protocol", exact=True)).to_have_value("oidc")

@@ -18,10 +18,16 @@ from flask_login import current_user, login_required
 
 from app import db
 
+# D-5 (admin-rbac-active-org continuation): repointed from
+# app.core.auth.decorators.admin_required (one of three duplicate
+# admin_required implementations; that one never carried the active-org
+# fix at all) to the canonical, now-fixed implementation.
+from app.decorators import admin_required
+
 # Import capability framework blueprint
-from app.core.auth.decorators import admin_required
 from app.main.capability_framework_routes import capability_framework_bp
 from app.main.framework_management_routes import framework_management_bp
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.business_capabilities import BusinessCapability
 from app.services.rate_limiter import rate_limit
 from app.services.vendor_analysis.capability_based_vendor_selector import (
@@ -35,6 +41,89 @@ main.register_blueprint(capability_framework_bp)
 main.register_blueprint(framework_management_bp)
 
 
+@main.before_app_request
+def _redirect_www_to_apex():
+    """301 any request to www.entelim.org to the same path on entelim.org.
+
+    A host check, not server config -- the app owns this redirect the same
+    way it owns every other canonicalisation decision in this module. Only
+    ever fires for that exact host, so local/dev/test requests (localhost,
+    127.0.0.1, the test client's default "localhost") are untouched.
+    """
+    host = (request.host or "").split(":", 1)[0].lower()
+    if host == "www.entelim.org":
+        target = request.url.replace("www.entelim.org", "entelim.org", 1)
+        return redirect(target, code=301)
+    return None
+
+
+def _csv_safe(value):
+    """Escape one CSV cell against spreadsheet formula injection.
+
+    A value starting with ``=``, ``+``, ``-``, ``@``, or a leading tab/CR
+    becomes a formula when the file is opened in Excel/Sheets. Prefixing it
+    with a single quote keeps the value literal. Shared by every export in
+    this module that writes a user-submitted string into a CSV cell.
+    """
+    if value is None:
+        return ""
+    text = str(value)
+    if text[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + text
+    return text
+
+
+# The home page's "see it for your segment" section: use-case pages curated
+# per segment to match that segment's existing persona blurb above it on the
+# page (see main/index.html, "Who it is for"), not every page in the family
+# -- the full, generated list lives at /use-cases. Each page's own title
+# (loaded live, not copied here) is the link text, so this never drifts from
+# the page it points to.
+#
+# Every slug below must be a REWRITE-verdict page in the SEO/GEO audit (live,
+# ranking, not folded into another page) -- never a HOLD slug (not built yet)
+# or a MERGE slug (its own URL now 301s elsewhere): a curated "see it
+# answered" showcase should never be the dead end or extra redirect hop
+# those two verdicts exist to avoid. Startup founders and Operations leads
+# each only have two REWRITE use cases today, so those two groups list two,
+# not three -- a short, accurate list over padding it with a page that isn't
+# ready yet.
+_HOME_USE_CASE_HIGHLIGHTS = {
+    "Startup founders": [
+        "business-model-canvas-on-one-page",
+        "single-point-of-failure",
+    ],
+    "Scale-up CTOs": [
+        "what-breaks-and-who-gets-called",
+        "risk-blast-radius",
+        "duplicate-software-spend",
+    ],
+    "Enterprise architects": [
+        "import-archimate-model",
+        "value-streams-at-risk",
+        "architecture-review-board",
+    ],
+    "Operations leads": [
+        "what-happens-if-a-supplier-fails",
+        "contract-renewals",
+    ],
+}
+
+
+def _home_use_case_highlights():
+    """Three curated use-case pages per home-page persona, loaded live so
+    the link text always matches each page's real, current title."""
+    from app.services.public_pages import load_page
+
+    groups = []
+    for label, slugs in _HOME_USE_CASE_HIGHLIGHTS.items():
+        pages = [load_page("function-per-segment", slug=slug) for slug in slugs]
+        pages = [p for p in pages if p is not None]
+        if pages:
+            groups.append({"label": label, "pages": pages})
+    return groups
+
+
 @main.route("/", methods=["GET", "POST"])
 @rate_limit(10, "1m", methods=("POST",))
 def index():
@@ -43,6 +132,7 @@ def index():
 
     thanks = False
     error = None
+    use_case_highlights = _home_use_case_highlights()
 
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
@@ -58,7 +148,12 @@ def index():
                 email = valid.normalized
             except EmailNotValidError:
                 error = "Please enter a valid email address."
-                return render_template("main/index.html", thanks=False, error=error)
+                return render_template(
+                    "main/index.html",
+                    thanks=False,
+                    error=error,
+                    use_case_highlights=use_case_highlights,
+                )
 
             from app.models.waitlist_signup import WaitlistSignup
 
@@ -73,14 +168,20 @@ def index():
                 db.session.commit()
             thanks = True
 
-    return render_template("main/index.html", thanks=thanks, error=error)
+    return render_template(
+        "main/index.html",
+        thanks=thanks,
+        error=error,
+        use_case_highlights=use_case_highlights,
+    )
 
 
 @main.route("/admin/waitlist.csv")
-@login_required
-@admin_required
+@platform_admin_required
 def waitlist_csv():
-    """Export the waiting list as CSV. Admin only."""
+    """Export the waiting list as CSV. Platform admin only — this is prospect
+    data across every organisation, not something an organisation's own
+    admin should be able to download."""
     from app.models.waitlist_signup import WaitlistSignup
 
     rows = (
@@ -93,13 +194,177 @@ def waitlist_csv():
     writer = csv.writer(output)
     writer.writerow(["email", "created_at", "source", "consent_text"])
     for row in rows:
-        writer.writerow([row.email, row.created_at.isoformat(), row.source, row.consent_text])
+        writer.writerow([
+            _csv_safe(row.email),
+            row.created_at.isoformat(),
+            _csv_safe(row.source),
+            _csv_safe(row.consent_text),
+        ])
 
     csv_content = output.getvalue()
     return Response(
         csv_content,
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=waitlist.csv"},
+    )
+
+
+def _notify_sales_of_inquiry(inquiry, page):
+    """E-mail ``SALES_NOTIFY_EMAIL`` about one new sales enquiry.
+
+    Store-only when the setting is unset: logged once as a warning, never
+    raised, so a visitor's submission is never affected either way. Called
+    after the inquiry row is already committed.
+    """
+    recipient = current_app.config.get("SALES_NOTIFY_EMAIL")
+    if not recipient:
+        current_app.logger.warning(
+            "SALES_NOTIFY_EMAIL is not configured; product inquiry %s (offer=%s) was not emailed",
+            inquiry.id,
+            inquiry.offer,
+        )
+        return
+
+    from app.flask_email import deliver_email
+
+    delivered, error = deliver_email(
+        recipient=recipient,
+        subject="New enquiry: {}".format(inquiry.offer),
+        template="public/email/sales_inquiry",
+        inquiry=inquiry,
+        page_url=page.url,
+    )
+    if not delivered:
+        current_app.logger.error(
+            "sales enquiry notification for product inquiry %s failed: %s",
+            inquiry.id,
+            error,
+        )
+
+
+@main.route("/offers/inquire", methods=["POST"])
+@rate_limit(10, "1m", methods=("POST",))
+def product_inquiry_submit():
+    """Submit an inquiry from one of the fixed-price offer pages, or a
+    "tell us you need this" enquiry from a HOLD-verdict (not built yet)
+    page's waiting-list box.
+
+    One route serves both: hidden fields say which page and family to
+    reload. For an offer page (``cta: inquiry``) the offer identifier and
+    the consent sentence both come from that page's own front-matter, so
+    what gets stored can never say something the visitor was not shown.
+    For a waiting-list page (``cta: waiting_list``) there is no per-page
+    front-matter for either -- PublicPage.feature_interest_offer and
+    FEATURE_INTEREST_CONSENT_TEXT supply the same two things generically,
+    one named offer per page so a second, different request from the same
+    address is never silently dropped as a duplicate (product_inquiries
+    has a UNIQUE(email, offer) constraint).
+    """
+    from flask import abort
+
+    from app.models.product_inquiry import ProductInquiry
+    from app.services.public_pages import (
+        FEATURE_INTEREST_CONSENT_TEXT,
+        build_jsonld,
+        load_page,
+    )
+
+    page_family = request.form.get("family", "")
+    page_slug = request.form.get("slug", "")
+    page = load_page(page_family, slug=page_slug) if page_family and page_slug else None
+    if page is None or page.cta not in ("inquiry", "waiting_list"):
+        abort(404)
+
+    if page.cta == "inquiry":
+        offer = page.front_matter.get("offer")
+        consent_text = page.front_matter.get("inquiry_consent_text")
+    else:
+        offer = page.feature_interest_offer
+        consent_text = FEATURE_INTEREST_CONSENT_TEXT
+    submitted_offer = request.form.get("offer", "")
+
+    thanks = False
+    error = None
+
+    if not offer or not consent_text or submitted_offer != offer:
+        error = "This request could not be matched to an offer. Please try again."
+    else:
+        email = (request.form.get("email") or "").strip().lower()
+        name = (request.form.get("name") or "").strip() or None
+        consent = request.form.get("consent")
+
+        if not email:
+            error = "Please enter an email address."
+        elif not consent:
+            error = "You must agree to be contacted about this request."
+        elif name is not None and len(name) > 200:
+            error = "Please use a shorter name (200 characters or fewer)."
+        else:
+            try:
+                valid = validate_email(email, check_deliverability=False)
+                email = valid.normalized
+            except EmailNotValidError:
+                error = "Please enter a valid email address."
+
+        if error is None:
+            existing = ProductInquiry.query.filter_by(email=email, offer=offer).first()
+            if existing is None:
+                inquiry = ProductInquiry(
+                    email=email,
+                    name=name,
+                    offer=offer,
+                    consent_text=consent_text,
+                )
+                db.session.add(inquiry)
+                db.session.commit()
+                _notify_sales_of_inquiry(inquiry, page)
+            thanks = True
+            from app.services.public_analytics_service import (
+                log_offer_enquiry_submitted,
+            )
+
+            log_offer_enquiry_submitted(offer)
+
+    return render_template(
+        "public/page.html",
+        page=page,
+        jsonld=build_jsonld(page),
+        thanks=thanks,
+        error=error,
+    )
+
+
+@main.route("/admin/product-inquiries.csv")
+@platform_admin_required
+def product_inquiries_csv():
+    """Export product inquiries as CSV. Platform admin only — this is prospect
+    data across every organisation, not something an organisation's own
+    admin should be able to download."""
+    from app.models.product_inquiry import ProductInquiry
+
+    rows = (
+        ProductInquiry.query
+        .order_by(ProductInquiry.created_at.desc())
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["email", "name", "offer", "created_at", "consent_text"])
+    for row in rows:
+        writer.writerow([
+            _csv_safe(row.email),
+            _csv_safe(row.name or ""),
+            _csv_safe(row.offer),
+            row.created_at.isoformat(),
+            _csv_safe(row.consent_text),
+        ])
+
+    csv_content = output.getvalue()
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=product-inquiries.csv"},
     )
 
 
@@ -175,44 +440,209 @@ def robots_txt():
 
 @main.route("/sitemap.xml")
 def sitemap_xml():
-    """Serve sitemap.xml for SEO — generated from public content pages."""
-    from app.services.public_pages import load_all_pages
+    """Serve sitemap.xml for SEO — generated from public content pages.
 
-    pages = load_all_pages()
+    Built from feed_page_paths(), the one path list shared with the
+    IndexNow CLI (app/commands/indexnow_commands.py), so the two cannot
+    drift apart: it already excludes a HOLD-verdict page, a MERGE-verdict
+    page (301s elsewhere -- the old URL is not a second entry for content
+    that now lives at the target) and a page withdrawn from discovery
+    (front matter ``state: not_planned``) -- see
+    app/services/public_pages.py::load_feed_pages / feed_page_paths.
+    """
+    from html import escape
+
+    from app.services.public_pages import feed_page_paths
+
     base_url = "https://entelim.org"
     urls = []
-    # Homepage is not a content page but is the most important URL
-    urls.append(
-        f"  <url><loc>{base_url}/</loc><priority>1.0</priority></url>"
-    )
-    for p in pages:
-        urls.append(
-            f"  <url><loc>{base_url}{p.url}</loc></url>"
-        )
+    for path in feed_page_paths():
+        # Homepage is not a content page but is the most important URL.
+        priority = "<priority>1.0</priority>" if path == "/" else ""
+        urls.append(f"  <url><loc>{base_url}{escape(path)}</loc>{priority}</url>")
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
     from flask import Response
     return Response(xml, mimetype="application/xml")
 
 
+@main.route("/<key>.txt")
+def indexnow_key_file(key):
+    """IndexNow domain-ownership proof: the configured key's own text file.
+
+    IndexNow (api.indexnow.org) proves ownership of a domain the same way
+    Google/Bing site verification already does elsewhere in this app: by
+    hosting a file at a path derived from the key, containing the key. 404s
+    unless INDEXNOW_API_KEY is set and *key* matches it exactly, so this
+    route does nothing beyond a normal 404 for every other "*.txt" request.
+    """
+    from flask import Response, abort
+
+    configured_key = (current_app.config.get("INDEXNOW_API_KEY") or "").strip()
+    if not configured_key or key != configured_key:
+        abort(404)
+    return Response(configured_key, mimetype="text/plain")
+
+
 @main.route("/llms.txt")
 def llms_txt():
-    """Serve llms.txt listing every public content page."""
-    from app.services.public_pages import load_all_pages
+    """Serve llms.txt listing every public content page with a Capabilities
+    section. Held, merged and withdrawn pages are excluded, same as
+    sitemap.xml -- see app/services/public_pages.py::load_feed_pages."""
+    from app.services.public_pages import load_feed_pages
 
-    pages = load_all_pages()
+    pages = load_feed_pages()
     base_url = "https://entelim.org"
     lines = ["# Entelim"]
     lines.append("")
     lines.append(
-        "> Entelim is the open-source Enterprise Intelligence Model: "
-        "enter your website address and see your company."
+        "> Enterprise Intelligence Management: one living, explainable model of your "
+        "enterprise, for every company that has a strategy, systems, suppliers and risks."
     )
     lines.append("")
-    for p in pages:
+
+    # Capabilities section: modules and intelligence lenses
+    module_pages = [p for p in pages if p.family == "module"]
+    if module_pages:
+        lines.append("## Capabilities")
+        lines.append("")
+        for p in module_pages:
+            # Extract a quotable factual sentence from the page body
+            sentence = _extract_first_sentence(p.body_html)
+            lines.append(f"- [{p.title}]({base_url}{p.url}) — {sentence}")
+        lines.append("")
+
+    # All pages list (exclude module pages already listed in Capabilities)
+    non_module_pages = [p for p in pages if p.family != "module"]
+    for p in non_module_pages:
         lines.append(f"- [{p.title}]({base_url}{p.url})")
     text = "\n".join(lines) + "\n"
     from flask import Response
     return Response(text, mimetype="text/plain")
+
+
+@main.route("/llms-full.txt")
+def llms_full_txt():
+    """Serve llms-full.txt with the full text of every public module,
+    use-case and comparison page. Held, merged and withdrawn pages are
+    excluded, same as sitemap.xml -- see
+    app/services/public_pages.py::load_feed_pages."""
+    from app.services.public_pages import load_feed_pages
+
+    pages = load_feed_pages()
+    base_url = "https://entelim.org"
+    lines = ["# Entelim — Full Content"]
+    lines.append("")
+    lines.append(
+        "> Enterprise Intelligence Management: one living, explainable model of your "
+        "enterprise, for every company that has a strategy, systems, suppliers and risks."
+    )
+    lines.append("")
+
+    # Include modules, use-cases, and comparisons
+    target_families = {"module", "function-per-segment", "comparison"}
+    target_pages = [p for p in pages if p.family in target_families]
+
+    for p in target_pages:
+        lines.append(f"## {p.title}")
+        lines.append("")
+        lines.append(f"URL: {base_url}{p.url}")
+        lines.append("")
+        # Convert HTML body to plain text/markdown
+        plain_text = _html_to_plain_text(p.body_html)
+        lines.append(plain_text)
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    text = "\n".join(lines) + "\n"
+    from flask import Response
+    return Response(text, mimetype="text/plain")
+
+
+def _extract_first_sentence(html: str) -> str:
+    """Extract the first meaningful sentence from rendered HTML body.
+
+    Takes the first sentence from the first <p> element (skipping headings)
+    to avoid the h1 title running into the first paragraph.
+    """
+    import re
+    import html as html_mod
+
+    # Find the first <p> element content
+    p_match = re.search(r"<p[^>]*>(.*?)</p>", html, flags=re.DOTALL | re.IGNORECASE)
+    if p_match:
+        text = p_match.group(1)
+        # Strip any nested HTML tags from the paragraph content
+        text = re.sub(r"<[^>]+>", "", text)
+    else:
+        # Fallback: remove all tags and use the whole text
+        text = re.sub(r"<[^>]+>", "", html)
+
+    text = html_mod.unescape(text)
+    text = " ".join(text.split())  # Normalize whitespace
+
+    # Find first sentence ending with . ! or ?
+    match = re.search(r"([^.!?]*[.!?])", text)
+    if match:
+        sentence = match.group(1).strip()
+        # Limit length
+        if len(sentence) > 200:
+            sentence = sentence[:197] + "..."
+        return sentence
+    return text[:200] if text else "No description available."
+
+
+def _html_to_plain_text(html: str) -> str:
+    """Convert rendered HTML body to plain text/markdown."""
+    import re
+    import html as html_mod
+
+    # Remove <script> and <style> elements with their content FIRST
+    text = re.sub(r"<script\b[^>]*>.*?</script>", "", html, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<style\b[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
+
+    # Convert common HTML elements to markdown-like plain text
+    # Headings
+    text = re.sub(r"<h1[^>]*>(.*?)</h1>", r"# \1", text, flags=re.DOTALL)
+    text = re.sub(r"<h2[^>]*>(.*?)</h2>", r"## \1", text, flags=re.DOTALL)
+    text = re.sub(r"<h3[^>]*>(.*?)</h3>", r"### \1", text, flags=re.DOTALL)
+
+    # Links
+    text = re.sub(r'<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>', r"[\2](\1)", text, flags=re.DOTALL)
+
+    # Bold/italic
+    text = re.sub(r"<strong[^>]*>(.*?)</strong>", r"**\1**", text, flags=re.DOTALL)
+    text = re.sub(r"<b[^>]*>(.*?)</b>", r"**\1**", text, flags=re.DOTALL)
+    text = re.sub(r"<em[^>]*>(.*?)</em>", r"*\1*", text, flags=re.DOTALL)
+    text = re.sub(r"<i[^>]*>(.*?)</i>", r"*\1*", text, flags=re.DOTALL)
+
+    # Code
+    text = re.sub(r"<code[^>]*>(.*?)</code>", r"`\1`", text, flags=re.DOTALL)
+    text = re.sub(r"<pre[^>]*>(.*?)</pre>", r"\n```\n\1\n```\n", text, flags=re.DOTALL)
+
+    # Lists
+    text = re.sub(r"<li[^>]*>(.*?)</li>", r"- \1", text, flags=re.DOTALL)
+    text = re.sub(r"</?(ul|ol)[^>]*>", "", text, flags=re.DOTALL)
+
+    # Paragraphs and line breaks
+    text = re.sub(r"</p>", "\n\n", text, flags=re.DOTALL)
+    text = re.sub(r"<p[^>]*>", "", text, flags=re.DOTALL)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.DOTALL)
+
+    # Horizontal rule
+    text = re.sub(r"<hr\s*/?>", "\n---\n", text, flags=re.DOTALL)
+
+    # Remove remaining tags
+    text = re.sub(r"<[^>]+>", "", text)
+
+    # Unescape HTML entities
+    text = html_mod.unescape(text)
+
+    # Normalize whitespace
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = text.strip()
+
+    return text
 
 
 # ============================================================================
@@ -222,8 +652,16 @@ def llms_txt():
 
 @main.route("/vision")
 def public_vision():
-    """The vision / home narrative page."""
-    from app.services.public_pages import build_jsonld, load_page
+    """The vision / home narrative page.
+
+    MERGE verdict (SEO/GEO audit): /vision duplicates /about and the home
+    page, so it 301s to /about rather than rendering -- see MERGED_PAGES.
+    """
+    from app.services.public_pages import MERGED_PAGES, build_jsonld, load_page
+
+    merge_target = MERGED_PAGES.get("/vision")
+    if merge_target:
+        return redirect(merge_target, code=301)
 
     page = load_page("vision")
     if page is None:
@@ -234,26 +672,139 @@ def public_vision():
 
 @main.route("/modules/<slug>")
 def public_module(slug):
-    """A module content page."""
-    from app.services.public_pages import build_jsonld, load_page
+    """A module content page.
+
+    MERGE-verdict modules (SEO/GEO audit) 301 to their parent page instead
+    of rendering, checked against MERGED_PAGES by this exact URL before
+    the file is even loaded -- see MERGED_PAGES.
+    """
+    from app.services.public_pages import (
+        MERGED_PAGES,
+        build_jsonld,
+        get_page_screenshot,
+        load_page,
+    )
+
+    merge_target = MERGED_PAGES.get(f"/modules/{slug}")
+    if merge_target:
+        return redirect(merge_target, code=301)
 
     page = load_page("module", slug=slug)
     if page is None:
         from flask import abort
         abort(404)
-    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        screenshot=get_page_screenshot(page),
+    )
+
+
+_USE_CASE_SEGMENT_LABELS = {
+    "S1": "Startups",
+    "S2": "Scale-ups",
+    "S3": "Enterprise architecture teams",
+    "S4": "Services and operations",
+}
+
+
+@main.route("/use-cases")
+def public_use_cases_index():
+    """The /use-cases index: every live use-case page, grouped by segment.
+
+    Built from load_feed_pages(): a HOLD-verdict page and a MERGE-verdict
+    page (its own URL now 301s to a parent page, so listing it here would
+    just be an extra redirect hop for a nav link) are both left out of this
+    listing, same as every other nav/index listing -- see
+    app/services/public_pages.py::load_feed_pages.
+    """
+    from app.services.public_pages import load_feed_pages
+
+    pages = [p for p in load_feed_pages() if p.family == "function-per-segment"]
+
+    groups: dict[str, list] = {}
+    for page in pages:
+        segment_id = page.front_matter.get("segment_id", "")
+        groups.setdefault(segment_id, []).append(page)
+
+    ordered_groups = []
+    for segment_id in sorted(groups):
+        label = _USE_CASE_SEGMENT_LABELS.get(segment_id, segment_id or "More")
+        entries = sorted(groups[segment_id], key=lambda p: p.title.lower())
+        ordered_groups.append({"label": label, "pages": entries})
+
+    return render_template("public/use_cases_index.html", groups=ordered_groups)
 
 
 @main.route("/use-cases/<slug>")
 def public_use_case(slug):
-    """A function-per-segment content page."""
-    from app.services.public_pages import build_jsonld, load_page
+    """A function-per-segment content page.
+
+    MERGE-verdict use cases (SEO/GEO audit) 301 to their parent page
+    instead of rendering -- see MERGED_PAGES. A slug that no longer
+    resolves is checked against the family's old, internal uc-sN-NN-*
+    filename slugs before 404ing: some of those URLs are already indexed,
+    so a page that moved gets a real redirect, not a dead link.
+    """
+    from app.services.public_pages import (
+        MERGED_PAGES,
+        build_jsonld,
+        get_page_recording,
+        get_page_screenshot,
+        load_page,
+        use_case_redirect_target,
+    )
+
+    merge_target = MERGED_PAGES.get(f"/use-cases/{slug}")
+    if merge_target:
+        return redirect(merge_target, code=301)
 
     page = load_page("function-per-segment", slug=slug)
     if page is None:
+        redirect_target = use_case_redirect_target(slug)
+        if redirect_target:
+            return redirect(redirect_target, code=301)
         from flask import abort
         abort(404)
-    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        screenshot=get_page_screenshot(page),
+        recording=get_page_recording(page),
+    )
+
+
+@main.route("/vs")
+def public_comparison_hub():
+    """The /vs comparison hub: links to every comparison page at its real URL.
+
+    Reuses the same page loader as every other public page (no second loader):
+    a comparison page's own front-matter `routing` decides its real address — most
+    carry an archiet.ai canonical URL, so the hub links there rather than assuming
+    every comparison page lives on entelim.org.
+
+    load_feed_pages(), not load_all_pages(): a comparison page withdrawn from
+    discovery (state: not_planned) still renders at its own URL but must drop
+    out of this hub automatically, the same as the sitemap, llms.txt and the
+    /use-cases index.
+    """
+    from app.services.public_pages import load_feed_pages
+
+    site_url = "https://entelim.org"
+    pages = [p for p in load_feed_pages() if p.family == "comparison"]
+    entries = [
+        {
+            "competitor": p.front_matter.get("competitor", p.title),
+            "real_url": p.external_url or f"{site_url}{p.url}",
+            # The entelim.org page itself, so a visitor who stays on this
+            # site (and a crawler following only entelim.org links) can
+            # still reach it even when real_url points at archiet.ai --
+            # only shown when it differs from real_url, to avoid a second,
+            # identical link.
+            "same_origin_url": p.url if p.external_url else None,
+        }
+        for p in pages
+    ]
+    entries.sort(key=lambda entry: entry["competitor"].lower())
+    return render_template("public/vs_hub.html", entries=entries)
 
 
 @main.route("/vs/<slug>")
@@ -266,6 +817,22 @@ def public_comparison(slug):
         from flask import abort
         abort(404)
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+
+
+@main.route("/vs/avolution")
+def vs_avolution_redirect():
+    """/vs/avolution and /vs/avolution-abacus covered the same comparison,
+    added separately by two uncoordinated changes. The merged page lives at
+    avolution-abacus; this old URL 301s there rather than 404ing."""
+    return redirect("/vs/avolution-abacus", code=301)
+
+
+@main.route("/vs/orbus")
+def vs_orbus_redirect():
+    """/vs/orbus and /vs/orbus-iserver covered the same comparison, added
+    separately by two uncoordinated changes. The merged page lives at
+    orbus-iserver; this old URL 301s there rather than 404ing."""
+    return redirect("/vs/orbus-iserver", code=301)
 
 
 @main.route("/how-archiet-runs-on-entelim")
@@ -281,7 +848,8 @@ def public_dogfood():
 
 
 @main.route(
-    "/<any(about, security, privacy, terms, contact, features, pricing, docs):slug>"
+    "/<any(about, security, privacy, terms, contact, features, pricing, docs, "
+    "'architecture-health-check', 'team-annual-onboarding'):slug>"
 )
 def public_site_page(slug):
     """A fixed top-level marketing/legal page (one file per page under content/pages/site/)."""
@@ -290,6 +858,30 @@ def public_site_page(slug):
     page = load_page("site", slug=slug)
     if page is None:
         from flask import abort
+        abort(404)
+    # A page may name its own layout in front-matter (`template: pricing`),
+    # for pages whose structure is not a single prose column.
+    template = "public/page.html"
+    if page.front_matter.get("template") == "pricing":
+        template = "public/pricing.html"
+    return render_template(template, page=page, jsonld=build_jsonld(page))
+
+
+@main.route(
+    "/<any('data-processing-agreement', 'cookie-policy', 'refund-policy', "
+    "'commercial-licence'):slug>"
+)
+def public_legal_page(slug):
+    """A legal page whose text awaits approval; 404 until LEGAL_PAGES_ENABLED is on."""
+    from flask import abort
+
+    from app.services.legal_pages import legal_pages_enabled
+    from app.services.public_pages import build_jsonld, load_page
+
+    if not legal_pages_enabled():
+        abort(404)
+    page = load_page("legal", slug=slug)
+    if page is None:
         abort(404)
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
@@ -304,6 +896,27 @@ def public_signup_redirect():
 def public_register_redirect():
     """/register is not a second form — it redirects to the real sign-up page."""
     return redirect(url_for("account.register"), code=301)
+
+
+@main.route("/t/plan-click")
+def track_plan_click():
+    """Log a pricing-plan click, then send the visitor on to the real link.
+
+    The "Choose a plan" buttons on the pricing page and every module page
+    (app/templates/public/page.html) are plain GET links to registration
+    (carrying the chosen plan through sign-up, see app/services/buy_intent.py)
+    or to /contact -- there is no form submit and no JS beacon to hang the
+    event on, so this view is the event: it logs which plan was clicked and
+    redirects on to *next* (validated as a safe, site-relative path, same
+    rule the sign-in flow already uses for its own ?next=).
+    """
+    from app.services.public_analytics_service import log_pricing_plan_click
+    from app.utils.safe_redirect import safe_next_url
+
+    plan = (request.args.get("plan") or "")[:40]
+    dest = safe_next_url(request.args.get("next"), url_for("main.index"))
+    log_pricing_plan_click(plan)
+    return redirect(dest)
 
 
 # ============================================================================
@@ -547,6 +1160,7 @@ def integrations():
 
 @main.route("/settings")
 @login_required
+@platform_admin_required
 @admin_required
 def settings():
     """System Settings - Application configuration and user preferences.
@@ -564,6 +1178,13 @@ def settings():
 # any authenticated user of any tenant could read it. The page that consumes it
 # (settings/index.html) is linked only from the Administration sidebar section,
 # so gating it on admin matches how it is actually reached.
+#
+# admin_required alone was not enough either: it is satisfied by
+# Permission.ADMINISTER, a GLOBAL flag every self-registered user holds for
+# their own organisation, so any tenant's own admin -- not just a platform
+# admin -- could read this platform-wide table. platform_admin_required
+# closes that (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def get_system_settings():
     """Return all saved system settings as JSON."""
@@ -593,6 +1214,11 @@ def get_system_settings():
 @login_required
 # The write half of the same global table: with @login_required alone, any
 # authenticated user could rewrite platform-wide configuration for every tenant.
+#
+# Same gap as get_system_settings above: admin_required alone let any
+# tenant's own admin rewrite this platform-wide table. platform_admin_required
+# closes that (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def save_system_settings():
     """Persist system settings to the database."""

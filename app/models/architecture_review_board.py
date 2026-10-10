@@ -33,6 +33,7 @@ from typing import Any, Dict, List, Optional  # dead-code-ok
 
 from sqlalchemy import event  # dead-code-ok
 from sqlalchemy.ext.hybrid import hybrid_property  # dead-code-ok
+from sqlalchemy.orm import declared_attr
 
 from .. import db
 from .mixins import OptimisticLockMixin, TenantMixin
@@ -171,6 +172,9 @@ class ARBAuditLog(TenantMixin, db.Model):
     user_agent = db.Column(db.String(500))
     request_id = db.Column(db.String(100))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    # Set when this row has been copied into the one audit store
+    # (soc2_audit_log); points at the copy. NULL until copied.
+    retired_into_id = db.Column(db.BigInteger, db.ForeignKey("soc2_audit_log.id"), nullable=True)
 
 
 class ARBException(TenantMixin, db.Model):
@@ -465,6 +469,8 @@ _ARB_REVIEW_CYCLE_SHAPE = (
     "AND decision_brief_version_id IS NULL "
     "AND solution_evidence_snapshot_id IS NULL "
     "AND subject_evidence_snapshot_id IS NULL "
+    "AND source_table IS NULL AND source_id IS NULL AND source_org_id IS NULL "
+    "AND source_checksum IS NULL AND retired_into_id IS NULL "
     "AND ((subject_type = 'solution' AND subject_id = solution_id "
     "AND solution_id IS NOT NULL AND decision_brief_id IS NULL "
     "AND architecture_model_id IS NULL AND adr_id IS NULL) "
@@ -579,6 +585,31 @@ class ARBReviewCycle(TenantMixin, db.Model):
     terminal_outcome = db.Column(db.String(80), nullable=True)
     condition_projection_revision = db.Column(db.Integer, nullable=True)
 
+    # Consolidation provenance: tracks legacy row origin and retirement
+    source_table = db.Column(db.String(128), nullable=True, index=True)
+    source_id = db.Column(db.String(255), nullable=True, index=True)
+    source_org_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    source_checksum = db.Column(db.String(64), nullable=True)
+    retired_into_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("arb_review_cycles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # Explicit organization relationship to disambiguate from source_org_id
+    @declared_attr
+    def organization(cls):
+        from app import db
+        return db.relationship(
+            "Organization",
+            foreign_keys=[cls.organization_id],
+            lazy="select",
+        )
+
     __table_args__ = (
         db.CheckConstraint(_ARB_REVIEW_CYCLE_SHAPE, name="ck_arb_review_cycle_shape"),
         db.UniqueConstraint(
@@ -607,12 +638,22 @@ class ARBReviewCycle(TenantMixin, db.Model):
         ),
     )
 
+    # Consolidation relationship
+    retired_into = db.relationship(
+        "ARBReviewCycle",
+        foreign_keys=[retired_into_id],
+        remote_side="ARBReviewCycle.id",
+        backref="retired_duplicates",
+    )
+
 
 _ARB_TYPED_REVIEW_SHAPE = (
     "(review_cycle_id IS NULL AND subject_type IS NULL AND subject_id IS NULL "
     "AND decision_brief_id IS NULL AND decision_brief_version_id IS NULL "
     "AND solution_evidence_snapshot_id IS NULL "
-    "AND subject_evidence_snapshot_id IS NULL) "
+    "AND subject_evidence_snapshot_id IS NULL "
+    "AND source_table IS NULL AND source_id IS NULL AND source_org_id IS NULL "
+    "AND source_checksum IS NULL AND retired_into_id IS NULL) "
     "OR (review_cycle_id IS NOT NULL AND status = 'historical_unverified' "
     "AND subject_type IS NOT NULL AND subject_id IS NOT NULL "
     "AND decision_brief_id IS NULL AND decision_brief_version_id IS NULL "
@@ -796,6 +837,21 @@ class ARBReviewItem(TenantMixin, db.Model, OptimisticLockMixin):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Consolidation provenance: tracks legacy row origin and retirement
+    source_table = db.Column(db.String(128), nullable=True, index=True)
+    source_id = db.Column(db.String(255), nullable=True, index=True)
+    source_org_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    source_checksum = db.Column(db.String(64), nullable=True)
+    retired_into_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("arb_review_items.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     # Relationships
     arb_session = db.relationship("ArchitectureReviewBoard", back_populates="review_items")
     solution = db.relationship("Solution", foreign_keys=[solution_id], backref="arb_reviews")
@@ -815,6 +871,24 @@ class ARBReviewItem(TenantMixin, db.Model, OptimisticLockMixin):
     capability_links = db.relationship(
         "ARBCapabilityImpact", back_populates="review_item", cascade="all, delete-orphan"
     )
+
+    # Consolidation relationship
+    retired_into = db.relationship(
+        "ARBReviewItem",
+        foreign_keys=[retired_into_id],
+        remote_side="ARBReviewItem.id",
+        backref="retired_duplicates",
+    )
+
+    # Explicit organization relationship to disambiguate from source_org_id
+    @declared_attr
+    def organization(cls):
+        from app import db
+        return db.relationship(
+            "Organization",
+            foreign_keys=[cls.organization_id],
+            lazy="select",
+        )
 
     __table_args__ = (
         db.CheckConstraint(_ARB_TYPED_REVIEW_SHAPE, name="ck_arb_review_item_typed_shape"),
@@ -2660,7 +2734,7 @@ if not _FAST_INIT:
 
 if not _FAST_INIT:
 
-    class ChangeRequest(db.Model):
+    class ChangeRequest(TenantMixin, db.Model):
         """Formal architecture change request for TOGAF Phase H governance.
 
         Records a proposed change to the current architecture baseline.
@@ -2668,6 +2742,13 @@ if not _FAST_INIT:
         to process the change through relevant ADM phases.
 
         TOGAF ADM Phase H: Architecture Change Management.
+
+        PR 297 defect 2/3: organization_id added via migration
+        20261008_cr_organization_id, backfilled from
+        arb_review_item_id's own tenant. A row with no review item has
+        no derivable tenant and keeps a NULL organization_id -- same as
+        every other TenantMixin model, the ORM listener then excludes it
+        from every tenant-scoped query rather than guessing its owner.
         """
 
         __tablename__ = "arb_change_requests"

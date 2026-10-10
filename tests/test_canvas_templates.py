@@ -145,17 +145,17 @@ class TestSeedIdempotence:
         from app.models.acm_property_template import AcmPropertyTemplate
         from app.models.archimate_viewpoint import ArchiMateViewpoint
 
-        # A single organization so the tenant column's own single-tenant
-        # fallback (app/models/mixins/core.py _default_org_id) applies
-        # outside a request context, the same way the CLI command runs.
-        make_org("canvas-seed-idempotence")
+        # Named explicitly, the same way the CLI command takes --org-id: the
+        # seed does not have to guess a tenant among however many other
+        # organizations already exist in the database.
+        org = make_org("canvas-seed-idempotence")
 
         profile_type_count = len(CANVAS_PROFILE_OPTIONS_BY_TYPE)
 
-        first = seed_canvas_templates()
+        first = seed_canvas_templates(org_id=org.id)
         assert first == (3, 0, profile_type_count, 0)
 
-        second = seed_canvas_templates()
+        second = seed_canvas_templates(org_id=org.id)
         assert second == (0, 3, 0, profile_type_count)
 
         canvas_rows = ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").all()
@@ -172,13 +172,43 @@ class TestSeedIdempotence:
         from app.commands.seed_viewpoints import seed_viewpoints
         from app.models.archimate_viewpoint import ArchiMateViewpoint
 
-        # Same single-tenant fallback as above: seed_viewpoints() also
-        # inserts the standard viewpoints, which carry the same tenant
-        # column.
-        make_org("canvas-seed-viewpoints")
+        # Same explicit tenant as above: seed_viewpoints() also inserts the
+        # standard viewpoints, which carry the same tenant column.
+        org = make_org("canvas-seed-viewpoints")
 
-        seed_viewpoints()
+        seed_viewpoints(org_id=org.id)
         assert ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").count() == 3
+
+    def test_seed_property_templates_is_idempotent(self, app, db_session):
+        from app.config.property_templates import PROPERTY_TEMPLATES
+        from app.commands.seed_viewpoints import seed_property_templates
+        from app.models.acm_property_template import AcmPropertyTemplate
+
+        # The repository's test database is shared and persistent across runs.
+        # Remove the four shared rows this seed owns so the first call exercises
+        # creation even if a prior session left them behind.
+        seeded_keys = {
+            (row["archimate_type"], row["property_key"])
+            for row in PROPERTY_TEMPLATES
+        }
+        for row in AcmPropertyTemplate.query.filter(
+            AcmPropertyTemplate.organization_id.is_(None)
+        ).all():
+            if (row.archimate_type, row.property_key) in seeded_keys:
+                db_session.delete(row)
+        db_session.flush()
+
+        first = seed_property_templates()
+        assert first == (4, 0)
+
+        second = seed_property_templates()
+        assert second == (0, 4)
+
+        rate_limit = AcmPropertyTemplate.query.filter_by(
+            archimate_type="ApplicationInterface",
+            property_key="rate_limit",
+        ).one()
+        assert rate_limit.property_type == "number"
 
 
 # -- Composer render shape ----------------------------------------------------

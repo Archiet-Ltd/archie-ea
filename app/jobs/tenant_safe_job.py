@@ -50,6 +50,24 @@ full traceback, counted, and re-surfaced in the returned ``JobRun`` — and
 ``JobRun.failed`` is what the CLI exit code and the operator page read.
 
 Intended home: ``app/jobs/tenant_safe_job.py``.
+
+Job declaration maps
+--------------------
+Every scheduled job id registered in ``init_scheduler`` or
+``init_abacus_scheduler`` must be listed in exactly one of the two sets below.
+``_remove_undeclared_jobs`` is called after registration to enforce this: a job
+whose id is in neither set is removed with an ERROR log, so an undeclared job
+never runs.
+
+The two categories:
+
+* **PLATFORM_JOBS**: no per-organisation association — the work is global
+  (error_events, capability projection, the Abacus connection). These jobs are
+  guarded by ``job_lock`` alone.
+* **TENANT_JOBS**: visited per organisation through ``run_for_each_tenant`` /
+  ``tenant_scope``, so each tenant's rows are isolated by the ORM listeners.
+  (EA workflow schedules are tenant-scoped because ``EAWorkflowSchedule`` is a
+  ``TenantMixin`` model.)
 """
 
 from __future__ import annotations
@@ -64,8 +82,54 @@ from typing import Callable, Iterator, Sequence
 from flask import g
 
 from app.extensions import db
+from app.utils.tracing import trace_scope
 
 logger = logging.getLogger(__name__)
+
+# --------------------------------------------------------------------------- #
+# Job declaration maps — every registered job id belongs in exactly one set.
+# --------------------------------------------------------------------------- #
+
+PLATFORM_JOBS: frozenset[str] = frozenset({
+    "error_digest",            # error_events carries no organisation predicate
+    "capability_projection",   # all-tenant lock-guarded pass
+    "abacus_incremental_sync", # ExternalSystem has no organisation predicate
+    "approval_escalation",     # groups overdue rows by their own organization_id internally
+    "event_log_partition_maintenance",  # partitions are shared across all orgs
+})
+
+TENANT_JOBS: frozenset[str] = frozenset({
+    "data_maturity_digest",         # visited via run_for_each_tenant
+    "executive_summary",            # visited via run_for_each_tenant
+    "teams_subscription_renewal",   # visited via run_for_each_tenant
+    "typed_arb_waiver_expiry",      # config-driven organisation ids
+    "derived_facts_recompute",      # visited via run_for_each_tenant
+    "ea_workflow_scheduler",        # visited via run_for_each_tenant
+"event_log_relay",              # visited via run_for_each_tenant
+    "model_health_scan",            # per-org drift detection + store
+})
+
+
+def _remove_undeclared_jobs(scheduler) -> None:
+    """Remove every job whose id is in neither PLATFORM_JOBS nor TENANT_JOBS.
+
+    Runs after ``add_job`` calls in ``init_scheduler`` / ``init_abacus_scheduler``.
+    An undeclared job is always a defect: it means no reviewer decided whether it
+    should be tenant-scoped or a named platform job, so it would run unfiltered.
+    """
+    all_declared = PLATFORM_JOBS | TENANT_JOBS
+    for job in scheduler.get_jobs():
+        if job.id not in all_declared:
+            logger.error(
+                "Job id %r is in neither PLATFORM_JOBS nor TENANT_JOBS — "
+                "removing it. Every registered job must be declared in "
+                "app/jobs/tenant_safe_job.py",
+                job.id,
+            )
+            try:
+                scheduler.remove_job(job.id)
+            except Exception:
+                logger.exception("Failed to remove undeclared job %r", job.id)
 
 
 # --------------------------------------------------------------------------- #
@@ -180,14 +244,71 @@ def tenant_scope(organization_id: int) -> Iterator[int]:
         raise ValueError("tenant_scope requires a concrete organization_id")
 
     _reset_session()                      # nothing inherited from the previous tenant
+    # A tenant block never runs with the fence open: park any enclosing
+    # platform scope for the block and restore it afterwards. The reset above
+    # already rolled back the transaction that carried the database setting
+    # (it is transaction-local), and with the flag cleared a transaction begun
+    # inside the block does not set it again.
+    previous_platform_scope = getattr(g, "_platform_scope", None)
+    g.pop("_platform_scope", None)
     previous = getattr(g, "current_org_id", None)
+    previous_scope_org = getattr(g, "_tenant_scope_organization_id", None)
     g.current_org_id = organization_id
+    g._tenant_scope_organization_id = organization_id
     g.current_org = None                  # jobs must not rely on the ORM object
     try:
         yield organization_id
     finally:
         _reset_session()                  # nothing leaks forward to the next tenant
+        if previous_platform_scope is not None:
+            g._platform_scope = previous_platform_scope
         g.current_org_id = previous
+        if previous_scope_org is None:
+            g.pop("_tenant_scope_organization_id", None)
+        else:
+            g._tenant_scope_organization_id = previous_scope_org
+
+
+@contextmanager
+def platform_scope(reason: str) -> Iterator[str]:
+    """Let a block read and write fenced tables with no single organisation.
+
+    PostgreSQL row-level security (migration 20261008_row_level_security) shows
+    the runtime role only the session organisation's rows, so a lookup that
+    resolves the organisation itself (a password-reset token, an SSO mapping),
+    a platform-administrator aggregate across organisations, or a genuinely
+    platform-wide job has nothing to read without this. Inside the block every
+    transaction on the session carries ``archie.platform_scope = 'on'``, which
+    each policy admits. Nothing else changes: the ORM tenant filter still keys
+    off ``g.current_org_id``.
+
+    ``reason`` is mandatory and is kept on ``g._platform_scope`` so a
+    call site is greppable and a log line can say why. Anything that can run
+    per organisation must use ``tenant_scope`` / ``run_for_each_tenant``
+    instead. The setting is transaction-local; it is cleared on exit from the
+    open transaction, and a transaction begun after the block never carries it.
+    """
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("platform_scope requires a reason")
+
+    previous = getattr(g, "_platform_scope", None)
+    g._platform_scope = reason
+    if db.session().in_transaction():
+        db.session.execute(db.text("SELECT set_config('archie.platform_scope', 'on', true)"))
+    try:
+        yield reason
+    finally:
+        if previous is None:
+            g.pop("_platform_scope", None)
+        else:
+            g._platform_scope = previous
+        if previous is None and db.session().in_transaction():
+            try:
+                db.session.execute(
+                    db.text("SELECT set_config('archie.platform_scope', '', true)")
+                )
+            except Exception:  # a failed transaction is rolled back by the caller
+                logger.debug("platform_scope: could not clear the setting", exc_info=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -277,6 +398,32 @@ def active_organization_ids() -> list[int]:
     return [int(row[0]) for row in rows]
 
 
+def organization_id_of(model, record_id) -> int | None:
+    """The organisation that owns one record, for work handed off to run later.
+
+    A background worker (a spawned process, a Celery task) is given a record id
+    by the request that started it, and runs with no request and therefore no
+    tenant. It resolves the owner here, then does its real work inside
+    ``tenant_scope(owner)``, so every read is filtered and every new row is
+    stamped exactly as the originating request would have done.
+
+    Like ``active_organization_ids`` this is a deliberate, single-column global
+    read by primary key, taken before any tenant is entered. It returns a plain
+    int, never an ORM object, so nothing enters an identity map that a later
+    ``get()`` under the tenant could be served from. ``None`` means there is no
+    such record (or it has no owner); callers refuse rather than run unscoped.
+    """
+    table = model.__table__
+    # Resolving the owner is the one read that has no organisation to scope by;
+    # under row-level security it needs the platform scope, and it returns only
+    # the owner's id.
+    with platform_scope("resolve the owning organisation of a record handed to a background worker"):
+        value = db.session.execute(
+            db.select(table.c.organization_id).where(table.c.id == record_id)
+        ).scalar()
+    return int(value) if value is not None else None
+
+
 # --------------------------------------------------------------------------- #
 # The harness
 # --------------------------------------------------------------------------- #
@@ -307,14 +454,14 @@ def run_for_each_tenant(
       * one tenant's failure never aborts the others, and never disappears —
         it is logged with a traceback and returned in the ``JobRun``.
     """
-    run = JobRun(job_name=job_name, started_at=_dt.datetime.utcnow())
+    run = JobRun(job_name=job_name, started_at=_dt.datetime.now(_dt.UTC))
 
     with app.app_context():
         lock_cm = job_lock(job_name, required=False) if use_lock else _always_acquired()
         with lock_cm as acquired:
             if not acquired:
                 run.skipped_locked = True
-                run.finished_at = _dt.datetime.utcnow()
+                run.finished_at = _dt.datetime.now(_dt.UTC)
                 return run
 
             # Enumerate BEFORE entering any tenant scope, and materialise to a
@@ -336,7 +483,7 @@ def run_for_each_tenant(
             for organization_id in ids:
                 started = time.monotonic()
                 try:
-                    with tenant_scope(organization_id):
+                    with tenant_scope(organization_id), trace_scope("job", job_name):
                         value = func(organization_id)
                         # Commit inside the tenant scope so the flush still
                         # carries this tenant's stamp from before_flush.
@@ -376,7 +523,7 @@ def run_for_each_tenant(
                             organization_id,
                         )
 
-            run.finished_at = _dt.datetime.utcnow()
+            run.finished_at = _dt.datetime.now(_dt.UTC)
             logger.info(
                 "tenant_safe_job: %s finished — %d ok, %d failed, %d ms",
                 job_name,
@@ -424,10 +571,14 @@ def tenant_job(job_name: str, **harness_kwargs):
 __all__ = [
     "JobLockUnavailable",
     "JobRun",
+    "PLATFORM_JOBS",
+    "TENANT_JOBS",
     "TenantResult",
     "active_organization_ids",
     "job_lock",
+    "platform_scope",
     "run_for_each_tenant",
     "tenant_job",
     "tenant_scope",
+    "_remove_undeclared_jobs",
 ]

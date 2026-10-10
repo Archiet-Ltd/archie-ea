@@ -75,8 +75,17 @@ def test_invite_invalid_role(app, db_session, login_as, client):
     assert "invalid role" in resp.get_data(as_text=True)
 
 
-def test_invite_user_not_found(app, db_session, login_as, client):
-    """Inviting a non-existent email returns 404."""
+def test_invite_unknown_address_without_mail_server_creates_nothing(app, db_session, login_as, client, monkeypatch):
+    """An address with no account is invited by e-mail; with no mail server
+    configured the page says so and nothing is created.
+
+    (Inviting an address with no account used to answer 404 "No user found";
+    it now opens an invitation by e-mail -- see tests/test_account_mail_flows.py.)
+    """
+    from app.models.user import User
+
+    monkeypatch.setitem(app.config, "MAIL_DEFAULT_SENDER", None)
+    monkeypatch.setitem(app.config, "MAIL_USERNAME", None)
     org = _make_org(db_session, "A")
     admin = _make_user(db_session, org, org_admin=True)
     db_session.commit()
@@ -84,8 +93,9 @@ def test_invite_user_not_found(app, db_session, login_as, client):
     login_as(client, admin)
     resp = client.post("/admin/team/invite",
                        data={"email": "nobody@example.test", "role": "viewer"})
-    assert resp.status_code == 404
-    assert "No user found" in resp.get_data(as_text=True)
+    assert resp.status_code == 503
+    assert "E-mail is not available on this server" in resp.get_data(as_text=True)
+    assert User.find_by_email("nobody@example.test") is None
 
 
 def test_duplicate_invite_refused(app, db_session, login_as, client):

@@ -5,7 +5,7 @@ segment_id: S1
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /startups/canvas-on-one-page
+url_slug: /use-cases/business-model-canvas-on-one-page
 ---
 
 # Put our business model on one page we can keep current
@@ -26,11 +26,10 @@ get you from blank page to something real faster than typing every box from scra
 
 ## Before you ask "we already have this in Miro or Notion"
 
-Keep it there. What's different here is a canvas that's linked to what you actually run, so it can
-say which of your assumptions have nothing real behind them yet.
+Keep it there. What's different here is that every block gets an AI-drafted suggestion pulled from
+your own model data, so you start from something real instead of a blank box.
 
 ## Related
 
-- [If our one cloud platform or payment provider goes down, what stops?](/startups/single-point-of-failure)
-- [What must be true for our revenue stream?](/startups/revenue-stream-risk)
-- [Which boxes on my canvas depend on things we haven't built yet?](/startups/canvas-dependencies)
+- [If our one cloud platform or payment provider goes down, what stops?](/use-cases/single-point-of-failure)
+- [What must be true for our revenue stream?](/use-cases/value-streams-at-risk)

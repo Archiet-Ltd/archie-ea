@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
             {# Architecture Requirements (TOGAF Phases B-D) — Alpine-driven CRUD #}
             <div id="phase-bcd" class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all relative "
                  x-show="isSectionActive('B')" x-cloak
@@ -233,7 +234,7 @@
                 {# Phase B — Business Elements (ArchiMate 3.2) #}
                 <div class="mt-4">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">ArchiMate 3.2 Elements</span>
+                        <span class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Architecture Elements</span>
                         {# SAD-07: ArchiMate Auto-Generation button #}
                         <button type="button"
                                 x-data="{ archiLoading: false, archiDone: false }"
@@ -695,7 +696,7 @@
                     <div class="flex items-center justify-between mb-3">
                         <h4 class="text-sm font-semibold text-foreground flex items-center gap-2">
                             <i data-lucide="layers" class="w-4 h-4 text-muted-foreground"></i>
-                            ArchiMate Element Review
+                            Architecture Element Review
                             <span class="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full"
                                   x-text="linkedArchimateElements.length + ' elements'"></span>
                         </h4>

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-from jinja2 import BaseLoader, ChoiceLoader, Environment, FileSystemLoader, TemplateNotFound
+from jinja2 import BaseLoader, ChoiceLoader, Environment, FileSystemLoader, TemplateNotFound, select_autoescape
 
 
 class _DbTemplateLoader(BaseLoader):
@@ -528,12 +528,14 @@ class DeterministicCodeGenerator:
             # generated app's own UI templates are escaped, while every
             # non-HTML template is untouched. Found 11 Sep 2026 while
             # triaging the raw-html-escaping gate: this Environment had no
-            # autoescape configuration at all.
-            autoescape=lambda name: bool(name) and name.endswith((".html.j2", ".htm.j2")),
+            # autoescape configuration at all. Every other generator
+            # Environment in this module carries the same setting.
+            autoescape=select_autoescape(("html.j2", "htm.j2"), default_for_string=False, default=False),
         )
         # Shared templates (Terraform, seed SQL, Makefile, README, .env) used by both languages
         shared_dir = os.path.join(templates_root, "shared")
         self._shared_env = Environment(
+            autoescape=select_autoescape(("html.j2", "htm.j2"), default_for_string=False, default=False),
             loader=FileSystemLoader(shared_dir),
             keep_trailing_newline=True,
         )
@@ -1509,7 +1511,7 @@ class DeterministicCodeGenerator:
                 _os.path.dirname(_os.path.dirname(__file__)), "templates", "shared",
             )
             from jinja2 import Environment as _J2Env, FileSystemLoader as _FSL
-            _shared_env = _J2Env(loader=_FSL(_shared_dir), keep_trailing_newline=True)
+            _shared_env = _J2Env(loader=_FSL(_shared_dir), keep_trailing_newline=True, autoescape=select_autoescape(("html.j2", "htm.j2"), default_for_string=False, default=False))
             _motivation = self._build_motivation_context(bundle.solution_id) or {}
             _confirmed = getattr(bundle, "confirmed_fields", {}) or {}
             _svc_list = bundle.services or []
@@ -3932,6 +3934,7 @@ with a real, working implementation.
             return files
 
         spring_env = Environment(
+            autoescape=select_autoescape(("html.j2", "htm.j2"), default_for_string=False, default=False),
             loader=FileSystemLoader(spring_dir),
             keep_trailing_newline=True,
         )
@@ -6377,6 +6380,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
             os.path.dirname(os.path.dirname(__file__)), "templates", "nextjs_shadcn",
         )
         fe_env = Environment(
+            autoescape=select_autoescape(("html.j2", "htm.j2"), default_for_string=False, default=False),
             loader=FileSystemLoader(templates_root),
             keep_trailing_newline=True,
         )
@@ -7027,7 +7031,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
                 _fe_os.path.dirname(_fe_os.path.dirname(__file__)), "templates", "shared",
             )
             from jinja2 import Environment as _J2Env, FileSystemLoader as _FSLFE
-            _shared_env = _J2Env(loader=_FSLFE(_shared_dir), keep_trailing_newline=True)
+            _shared_env = _J2Env(loader=_FSLFE(_shared_dir), keep_trailing_newline=True, autoescape=select_autoescape(("html.j2", "htm.j2"), default_for_string=False, default=False))
             _motivation = self._build_motivation_context(bundle.solution_id) or {}
             _entity_fe = [
                 {"name": _pascal(e), "snake_name": _snake(e), "table": _pluralize(_snake(e)), "key_fields": ""}
@@ -7845,7 +7849,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
             os.path.dirname(os.path.dirname(__file__)), "templates", "react_native_expo",
         )
         from jinja2 import Environment as _JinjaEnv, FileSystemLoader as _FSL
-        rn_test_env = _JinjaEnv(loader=_FSL(rn_templates_root), keep_trailing_newline=True)
+        rn_test_env = _JinjaEnv(loader=_FSL(rn_templates_root), keep_trailing_newline=True, autoescape=select_autoescape(("html.j2", "htm.j2"), default_for_string=False, default=False))
 
         for tpl, out in [
             ("jest.config.js.j2", "mobile/jest.config.js"),
@@ -7897,7 +7901,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
                 _os.path.dirname(_os.path.dirname(__file__)), "templates", "shared",
             )
             from jinja2 import Environment as _J2Env, FileSystemLoader as _FSLRN
-            _shared_env = _J2Env(loader=_FSLRN(_shared_dir), keep_trailing_newline=True)
+            _shared_env = _J2Env(loader=_FSLRN(_shared_dir), keep_trailing_newline=True, autoescape=select_autoescape(("html.j2", "htm.j2"), default_for_string=False, default=False))
             _motivation = self._build_motivation_context(bundle.solution_id) or {}
             _confirmed = getattr(bundle, "confirmed_fields", {}) or {}
             _svc_list = bundle.services or []
@@ -8587,6 +8591,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
             "app", "modules", "solutions_product", "templates", "sap_btp_integration",
         )
         btp_env = Environment(
+            autoescape=select_autoescape(("html.j2", "htm.j2"), default_for_string=False, default=False),
             loader=FileSystemLoader(os.path.abspath(btp_templates_dir)),
             trim_blocks=True,
             lstrip_blocks=True,

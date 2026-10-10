@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/filter_bar.html" import filter_bar %}
 {% from 'components/status_badge.html' import status_badge, status_badge_auto %}
@@ -297,7 +298,7 @@
                                 <div class="flex flex-wrap gap-1.5 max-w-xs">
                                     <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.capability_count or 0 }} capabilities</span>
                                     <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.application_count or 0 }} apps</span>
-                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.archimate_count or 0 }} ArchiMate</span>
+                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.archimate_count or 0 }} elements</span>
                                     <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.risk_count or 0 }} risks</span>
                                 </div>
                             </td>
@@ -422,7 +423,6 @@
                   </a>
                   {% endif %}
                 </div>
-              </div>
             </div>
     </div>
     {% else %}

@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Set
 
+from app.models.constants import ArchiMateLayer
+
 # =============================================================================
 # Element Type Data Classes
 # =============================================================================
@@ -1020,7 +1022,7 @@ class ArchiMateElementTypes:
     IMPLEMENTATION_ELEMENTS = {
         "WorkPackage": ElementTypeDefinition(
             name="WorkPackage",
-            layer="implementation_migration",
+            layer=ArchiMateLayer.IMPLEMENTATION,
             aspect="behavior",
             description="A series of actions designed to achieve specific results",
             notation_symbol="Pink rounded rectangle with arrow",
@@ -1037,7 +1039,7 @@ class ArchiMateElementTypes:
         ),
         "Deliverable": ElementTypeDefinition(
             name="Deliverable",
-            layer="implementation_migration",
+            layer=ArchiMateLayer.IMPLEMENTATION,
             aspect="passive",
             description="A precisely-defined outcome of a work package",
             notation_symbol="Pink rectangle",
@@ -1053,7 +1055,7 @@ class ArchiMateElementTypes:
         ),
         "ImplementationEvent": ElementTypeDefinition(
             name="ImplementationEvent",
-            layer="implementation_migration",
+            layer=ArchiMateLayer.IMPLEMENTATION,
             aspect="behavior",
             description="A state change that marks a transition or a release",
             notation_symbol="Pink rounded rectangle with lightning",
@@ -1069,7 +1071,7 @@ class ArchiMateElementTypes:
         ),
         "Plateau": ElementTypeDefinition(
             name="Plateau",
-            layer="implementation_migration",
+            layer=ArchiMateLayer.IMPLEMENTATION,
             aspect="passive",
             description="A relatively stable state of the architecture that exists during a period",
             notation_symbol="Pink rectangle with horizontal lines",
@@ -1085,7 +1087,7 @@ class ArchiMateElementTypes:
         ),
         "Gap": ElementTypeDefinition(
             name="Gap",
-            layer="implementation_migration",
+            layer=ArchiMateLayer.IMPLEMENTATION,
             aspect="passive",
             description="A statement of difference between two plateaus",
             notation_symbol="Pink rectangle with gap indicator",
@@ -1677,7 +1679,7 @@ class ArchiMateElementTypes:
             "technology": cls.TECHNOLOGY_ELEMENTS,
             "physical": cls.PHYSICAL_ELEMENTS,
             "motivation": cls.MOTIVATION_ELEMENTS,
-            "implementation_migration": cls.IMPLEMENTATION_ELEMENTS,
+            ArchiMateLayer.IMPLEMENTATION: cls.IMPLEMENTATION_ELEMENTS,
         }
         return layer_map.get(layer, {})
 
@@ -1836,11 +1838,132 @@ class ArchiMateElementTypes:
         if layer == "motivation":
             valid_relationships.append("influence")  # Motivation elements use influence
 
-        if layer == "implementation_migration":
+        if layer in {ArchiMateLayer.IMPLEMENTATION, "implementation_migration"}:
             valid_relationships.extend(["realization", "triggering"])
 
         # Remove duplicates and return sorted list
         return sorted(list(set(valid_relationships)))
+
+
+# =============================================================================
+# Plain-language display names for element types
+# =============================================================================
+# Maps PascalCase ArchiMate type names to plain-language labels so a user who
+# has never heard of ArchiMate can read every screen. The "Show ArchiMate names"
+# user setting (default off) swaps every display back to the standard names.
+# Read by the |plain_name Jinja filter (app/template_helpers.py).
+
+PLAIN_LANGUAGE_NAMES: dict[str, str] = {
+    # Strategy layer
+    "Resource": "Resource",
+    "Capability": "Capability",
+    "CourseOfAction": "Option",
+    "ValueStream": "Value stream",
+    # Business layer
+    "BusinessActor": "Person or team",
+    "BusinessRole": "Role",
+    "BusinessCollaboration": "Collaboration",
+    "BusinessInterface": "Business interface",
+    "BusinessProcess": "Business process",
+    "BusinessFunction": "Business function",
+    "BusinessInteraction": "Business interaction",
+    "BusinessEvent": "Business event",
+    "BusinessService": "Business service",
+    "BusinessObject": "Business information",
+    "Contract": "Contract",
+    "Representation": "Representation",
+    "Product": "Product",
+    # Application layer
+    "ApplicationComponent": "Application",
+    "ApplicationCollaboration": "Application collaboration",
+    "ApplicationInterface": "Application interface",
+    "ApplicationFunction": "Application function",
+    "ApplicationProcess": "Application process",
+    "ApplicationInteraction": "Application interaction",
+    "ApplicationEvent": "Application event",
+    "ApplicationService": "Application service",
+    "DataObject": "Data",
+    # Technology layer
+    "Node": "Platform",
+    "Device": "Device",
+    "SystemSoftware": "Software platform",
+    "TechnologyCollaboration": "Technology collaboration",
+    "TechnologyInterface": "Technology interface",
+    "Path": "Network path",
+    "CommunicationNetwork": "Communication network",
+    "TechnologyFunction": "Technology function",
+    "TechnologyProcess": "Technology process",
+    "TechnologyInteraction": "Technology interaction",
+    "TechnologyEvent": "Technology event",
+    "TechnologyService": "Infrastructure service",
+    "Artifact": "Artifact",
+    # Physical layer
+    "Equipment": "Equipment",
+    "Facility": "Facility",
+    "DistributionNetwork": "Distribution network",
+    "Material": "Material",
+    # Motivation layer
+    "Stakeholder": "Stakeholder",
+    "Driver": "Driver",
+    "Assessment": "Finding",
+    "Goal": "Goal",
+    "Outcome": "Outcome",
+    "Principle": "Principle",
+    "Requirement": "Requirement",
+    "Constraint": "Constraint",
+    "Meaning": "Meaning",
+    "Value": "Value",
+    # Implementation & Migration layer
+    "WorkPackage": "Project",
+    "Deliverable": "Deliverable",
+    "ImplementationEvent": "Milestone",
+    "Plateau": "Stage",
+    "Gap": "Gap",
+}
+
+# Layer display names
+PLAIN_LAYER_NAMES: dict[str, str] = {
+    "strategy": "Strategy",
+    "business": "Business",
+    "application": "Applications",
+    "technology": "Technology",
+    "physical": "Physical",
+    "motivation": "Motivation",
+    "implementation": "Projects and change",
+    "implementation_migration": "Projects and change",
+    "other": "Other",
+}
+
+
+def plain_name_for(element_type: str | None) -> str:
+    """Return the plain-language display name for an ArchiMate element type.
+
+    Returns the original value unchanged when no plain name is
+    registered (e.g. for Location, Grouping, Junction, or any future type).
+    Handles snake_case input by converting to PascalCase before lookup.
+    """
+    if not element_type:
+        return "\u2014"
+    if element_type in PLAIN_LANGUAGE_NAMES:
+        return PLAIN_LANGUAGE_NAMES[element_type]
+    # Try snake_case -> PascalCase conversion
+    pascal = "".join(word.capitalize() for word in element_type.split("_"))
+    if pascal in PLAIN_LANGUAGE_NAMES:
+        return PLAIN_LANGUAGE_NAMES[pascal]
+    return element_type
+
+
+def plain_layer_name(layer: str | None) -> str:
+    """Return the plain-language display name for an ArchiMate layer."""
+    if not layer:
+        return "\u2014"
+    if layer in PLAIN_LAYER_NAMES:
+        return PLAIN_LAYER_NAMES[layer]
+    # Try snake_case -> PascalCase conversion
+    pascal = "".join(word.capitalize() for word in layer.split("_"))
+    if pascal.lower() in PLAIN_LAYER_NAMES:
+        return PLAIN_LAYER_NAMES[pascal.lower()]
+    return layer
 
 
 # =============================================================================

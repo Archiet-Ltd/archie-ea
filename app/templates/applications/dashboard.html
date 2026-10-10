@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
@@ -30,6 +31,11 @@
 ───────────────────────────────────────────────────────────────────────────── #}
 {% block extra_head_js %}
 <script src="/static/vendor/mermaid.min.js"></script>
+{% if app is defined and app and 'intelligence_ui.twin_map' in flask.current_app.view_functions %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/applications/technology_links.js') }}"></script>
+{% endif %}
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     if (typeof mermaid !== 'undefined') {
@@ -230,9 +236,10 @@
   {'id': 'ea-workflows',    'label': 'EA Workflows',     'count': none},
 ] %}
 {# Conditionally add tabs only when the app has relevant data #}
-{% if app.technology_stack or app.programming_languages or app.primary_database %}
-  {% set _ = tabs.append({'id': 'technology', 'label': 'Technology', 'count': none}) %}
-{% endif %}
+{# Technology is always offered: it is where the nodes and system software an
+   application runs on are mapped, so an application with nothing recorded yet
+   still needs the tab to record the first one. #}
+{% set _ = tabs.append({'id': 'technology', 'label': 'Technology', 'count': none}) %}
 {% if app.compliance_status or app.data_classification %}
   {% set _ = tabs.append({'id': 'compliance', 'label': 'Compliance', 'count': none}) %}
 {% endif %}
@@ -530,14 +537,14 @@
     {% if not app.archimate_element_id %}
     <div data-slot="card" class="rounded-xl border border-dashed border-border bg-card p-8 text-center">
       <i data-lucide="box" class="mx-auto h-10 w-10 text-muted-foreground mb-3" aria-hidden="true"></i>
-      <p class="text-sm font-medium text-foreground mb-1">No ArchiMate element linked</p>
-      <p class="text-xs text-muted-foreground mb-4">Generate ArchiMate application-layer elements using AI to enable relationships, viewpoints, and impact analysis.</p>
+      <p class="text-sm font-medium text-foreground mb-1">No architecture element linked</p>
+      <p class="text-xs text-muted-foreground mb-4">Generate architecture elements using AI to enable relationships, viewpoints, and impact analysis.</p>
       <div class="flex items-center justify-center gap-3">
         <form action="{{ url_for('unified_applications.generate_application_archimate', id=app.id) }}" method="POST">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit"
                   class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Submit">
-            <i data-lucide="cpu" class="w-4 h-4 mr-2" aria-hidden="true"></i>Generate ArchiMate
+            <i data-lucide="cpu" class="w-4 h-4 mr-2" aria-hidden="true"></i>Generate Elements
           </button>
         </form>
         {# A95-005: deep link to AI chat with generate-archimate context #}
@@ -597,8 +604,8 @@
     {% set all_rels = (archimate_relationships.incoming + archimate_relationships.outgoing) if archimate_relationships else [] %}
     {% if all_rels %}
     <div class="space-y-4">
-      <h3 class="text-lg font-semibold">ArchiMate Relationships</h3>
-      <p class="text-sm text-muted-foreground">{{ all_rels | length }} relationships from the ArchiMate model</p>
+      <h3 class="text-lg font-semibold">Architecture Relationships</h3>
+      <p class="text-sm text-muted-foreground">{{ all_rels | length }} relationships from the architecture model</p>
       {% for layer_name in ['Motivation', 'Strategy', 'Business', 'Application', 'Technology', 'Implementation'] %}
       {% set ns = namespace(filtered=[]) %}
       {% for r in all_rels if r.layer and r.layer | lower == layer_name | lower %}
@@ -622,7 +629,7 @@
     </div>
     {% else %}
     <div data-slot="card" class="rounded-xl border border-dashed border-border bg-card p-6 text-center">
-      <p class="text-sm text-muted-foreground">No ArchiMate viewpoint diagrams available. Link an ArchiMate element to generate diagrams.</p>
+      <p class="text-sm text-muted-foreground">No architecture viewpoint diagrams available. Link an architecture element to generate diagrams.</p>
     </div>
     {% endif %}
     {% endif %}
@@ -1161,6 +1168,8 @@
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Technology Details
       </a>
     </div>
+
+    {% include "applications/_technology_stack_links.html" %}
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 

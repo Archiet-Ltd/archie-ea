@@ -722,15 +722,60 @@ def run_cutover(
     if apply:
         _lock_cutover_tables(connection, foreign_keys)
     before = _snapshot(connection)
+
+    # A row an authoritative writer already classified at write time --
+    # `project-capabilities` and `backfill-capability-catalogs` both set
+    # `scope`/`organization_id` directly on INSERT, and so does the ordinary
+    # tenant-scoped ORM create path (`_protect_reference_capability_writes`)
+    # -- needs no reclassification here. Re-deriving one from relationships
+    # and provenance alone is a *weaker* signal than the authoritative write
+    # itself, and for a reference-scope row with no relationship owners (every
+    # row `backfill-capability-catalogs` creates via its one positive
+    # catalogue marker) it used to fall all the way through to 'ambiguous'
+    # even though nothing about the row was ever actually ambiguous --
+    # blocking the whole cutover on rows that were already correctly done.
+    #
+    # Trusting an already-set scope is only safe if it is self-consistent, so
+    # that is checked explicitly rather than assumed: a row with
+    # scope='reference' but a real organization_id (or the reverse) would
+    # otherwise sail through unexamined and could surface as a tenant row
+    # visible to every organisation, or a reference row no one can reach.
+    malformed = connection.execute(
+        text(
+            "SELECT id, scope, organization_id FROM unified_capabilities "
+            "WHERE retired_into_id IS NULL AND scope IS NOT NULL "
+            "AND NOT ("
+            "(scope = 'reference' AND organization_id IS NULL) OR "
+            "(scope = 'tenant' AND organization_id IS NOT NULL)) "
+            "ORDER BY id"
+        )
+    ).mappings().all()
+    if apply and malformed:
+        example = malformed[0]
+        raise CutoverBlocked(
+            f"{len(malformed)} capabilities already carry an inconsistent "
+            f"scope/organization_id pairing (e.g. id={example['id']} "
+            f"scope={example['scope']!r} organization_id={example['organization_id']!r}); "
+            "fix the writer that produced them before the cutover can proceed"
+        )
+
     capability_ids = [
         int(row[0])
         for row in connection.execute(
             text(
                 "SELECT id FROM unified_capabilities "
-                "WHERE retired_into_id IS NULL ORDER BY id"
+                "WHERE retired_into_id IS NULL AND scope IS NULL ORDER BY id"
             )
         )
     ]
+    already_classified = connection.execute(
+        text(
+            "SELECT count(*) FROM unified_capabilities "
+            "WHERE retired_into_id IS NULL AND scope IS NOT NULL "
+            "AND ((scope = 'reference' AND organization_id IS NULL) OR "
+            "(scope = 'tenant' AND organization_id IS NOT NULL))"
+        )
+    ).scalar_one()
     classifications = [classify_capability(connection, capability_id) for capability_id in capability_ids]
     counts = {
         "classified": len(classifications),
@@ -743,6 +788,12 @@ def run_cutover(
         "mode": "apply" if apply else "dry-run",
         "writes": 0,
         "counts": counts,
+        # Rows an authoritative writer already scoped correctly, left alone
+        # rather than reclassified from weaker relationship/provenance
+        # evidence -- not counted in `counts["classified"]`, which is only
+        # the rows this run actually had to classify.
+        "already_classified": int(already_classified),
+        "malformed_existing_scope": len(malformed),
         "before": before,
         "after": before.copy(),
         "classifications": [

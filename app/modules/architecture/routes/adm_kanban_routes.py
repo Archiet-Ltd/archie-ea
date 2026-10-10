@@ -13,6 +13,7 @@ Provides:
 """
 
 from datetime import datetime
+from types import SimpleNamespace
 
 from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user, login_required
@@ -21,6 +22,8 @@ from app.decorators import audit_log
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
+from app.middleware.tenant_context import current_org_id
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.adm_kanban import (
     ARCHIMATE_ELEMENTS,
     ADMPhase,
@@ -29,6 +32,7 @@ from app.models.adm_kanban import (
     create_adm_phases,
 )
 from app.models.user import User
+from app.utils.tenant_users import same_user_id, user_in_org
 
 # ============================================================================
 # ADM WORKFLOW VALIDATION FUNCTIONS
@@ -229,7 +233,7 @@ def get_adm_phases():
 def init_adm_phases():
     """Initialize ADM phases in database"""
     try:
-        if not current_user.is_admin:
+        if not is_active_org_admin():
             return jsonify({"success": False, "error": "Admin required"}), 403
 
         create_adm_phases()
@@ -356,12 +360,44 @@ def get_board(board_id):
             if not has_access:
                 return jsonify({"success": False, "error": "Access denied"}), 403
 
+        # Batch-resolve assignees: one query for every assigned id on the board,
+        # restricted to each card's own organisation, instead of the one
+        # query per card user_in_org would run below. Same fail-closed
+        # predicate as user_in_org (id match AND organisation match), just
+        # evaluated for the whole board at once.
+        cards = list(board.cards)
+        assigned_pairs = {
+            (card.assigned_to_id, card.organization_id)
+            for card in cards
+            if card.assigned_to_id
+        }
+        assignees_by_pair = {}
+        org_ids = {org_id for _, org_id in assigned_pairs if org_id is not None}
+        if assigned_pairs and org_ids:
+            user_ids = {user_id for user_id, _ in assigned_pairs}
+            candidates = User.query.filter(
+                User.id.in_(user_ids), User.organization_id.in_(org_ids)
+            ).all()  # model-safety-ok
+            users_by_id = {u.id: u for u in candidates}
+            for user_id, org_id in assigned_pairs:
+                u = users_by_id.get(user_id)
+                if u is not None and u.organization_id == org_id:
+                    assignees_by_pair[(user_id, org_id)] = u
+
         # Group cards by ADM phase
         cards_by_phase = {}
-        for card in board.cards:
+        for card in cards:
             phase_code = card.adm_phase.code if card.adm_phase else "unknown"
             if phase_code not in cards_by_phase:
                 cards_by_phase[phase_code] = []
+            # assigned_to_id is request-supplied (see create_card/update_card), so
+            # the assignee is named only when it resolves inside the card's own
+            # organisation — a foreign id shows no name.
+            assignee = (
+                assignees_by_pair.get((card.assigned_to_id, card.organization_id))
+                if card.assigned_to_id
+                else None
+            )
             cards_by_phase[phase_code].append(
                 {
                     "id": card.id,
@@ -374,10 +410,10 @@ def get_board(board_id):
                     "depends_on": card.depends_on,
                     "blocks": card.blocks,
                     "assigned_to": {
-                        "id": card.assigned_to.id,
-                        "name": card.assigned_to.full_name(),
+                        "id": assignee.id,
+                        "name": assignee.full_name(),
                     }
-                    if card.assigned_to
+                    if assignee
                     else None,
                     "created_at": card.created_at.isoformat()
                     if card.created_at
@@ -427,7 +463,7 @@ def create_card(board_id):
         board = KanbanBoard.query.get_or_404(board_id)
 
         # Check permissions
-        if board.created_by_id != current_user.id and not current_user.is_admin:
+        if board.created_by_id != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Access denied"}), 403
 
         data = request.get_json()
@@ -479,6 +515,8 @@ def create_card(board_id):
 
         # Normalize nullable integer FK fields — empty string from form should be None
         assigned_to_id = data.get("assigned_to_id") or None
+        if assigned_to_id and not user_in_org(assigned_to_id, current_org_id()):
+            return jsonify({"success": False, "error": "Invalid assigned_to_id"}), 400
         arb_review_id = data.get("arb_review_id") or None
 
         card = KanbanCard(
@@ -582,7 +620,7 @@ def update_card(card_id):
             card.created_by_id != current_user.id
             and card.assigned_to_id != current_user.id
             and card.board.created_by_id != current_user.id
-            and not current_user.is_admin
+            and not is_active_org_admin()
         ):
             return jsonify({"success": False, "error": "Access denied"}), 403
 
@@ -622,27 +660,21 @@ def update_card(card_id):
         # Normalize nullable integer FK fields to None if empty string
         if "assigned_to_id" in data:
             data["assigned_to_id"] = data["assigned_to_id"] or None
-        for field in [
-            "title",
-            "description",
-            "card_type",
-            "status",
-            "priority",
-            "archimate_element_ids",
-            "application_ids",
-            "system_ids",
-            "initiative_ids",
-            "affects_applications",
-            "affects_systems",
-            "implements_capabilities",
-            "depends_on",
-            "blocks",
-            "assigned_to_id",
-        ]:
-            if field in data:
-                setattr(card, field, data[field])
+            if same_user_id(data["assigned_to_id"], card.assigned_to_id):
+                # The edit form sends the stored assignee back unchanged. A card
+                # written before the organisation check may hold another
+                # organisation's user id; that must not block editing the other
+                # fields, so an unchanged value is left as it is (the board API
+                # still names it only inside the card's own organisation).
+                data.pop("assigned_to_id")
+            elif data["assigned_to_id"] and not user_in_org(
+                data["assigned_to_id"], current_org_id()
+            ):
+                return jsonify({"success": False, "error": "Invalid assigned_to_id"}), 400
 
-        # Handle ADM phase change with intelligent validation
+        # Validate an ADM phase change before any field is changed: the audit
+        # decorator commits the session after this view returns, refusals
+        # included, so a field set before one of these 400s would be saved.
         if "adm_phase_id" in data:
             new_phase = ADMPhase.query.get(data["adm_phase_id"])
             if not new_phase:
@@ -674,8 +706,14 @@ def update_card(card_id):
 
             # Validate dependencies before phase change
             if card.adm_phase_id != data["adm_phase_id"]:
+                # Judge the card as it will be after this edit (depends_on /
+                # blocks from the request win) without touching it yet.
                 dependency_result = validate_card_dependencies(
-                    card, data["adm_phase_id"]
+                    SimpleNamespace(
+                        blocks=data.get("blocks", card.blocks),
+                        depends_on=data.get("depends_on", card.depends_on),
+                    ),
+                    data["adm_phase_id"],
                 )
                 if not dependency_result["valid"]:
                     return (
@@ -691,6 +729,28 @@ def update_card(card_id):
                         400,
                     )
 
+        for field in [
+            "title",
+            "description",
+            "card_type",
+            "status",
+            "priority",
+            "archimate_element_ids",
+            "application_ids",
+            "system_ids",
+            "initiative_ids",
+            "affects_applications",
+            "affects_systems",
+            "implements_capabilities",
+            "depends_on",
+            "blocks",
+            "assigned_to_id",
+        ]:
+            if field in data:
+                setattr(card, field, data[field])
+
+        # Apply the phase change validated above
+        if "adm_phase_id" in data:
             card.adm_phase_id = data["adm_phase_id"]
 
         # Handle status changes
@@ -732,7 +792,7 @@ def delete_card(card_id):
         if (
             card.created_by_id != current_user.id
             and card.board.created_by_id != current_user.id
-            and not current_user.is_admin
+            and not is_active_org_admin()
         ):
             return jsonify({"success": False, "error": "Access denied"}), 403
 
@@ -759,7 +819,7 @@ def get_board_analytics(board_id):
         board = KanbanBoard.query.get_or_404(board_id)
 
         # Check permissions
-        if board.created_by_id != current_user.id and not current_user.is_admin:
+        if board.created_by_id != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Access denied"}), 403
 
         total_cards = len(board.cards)

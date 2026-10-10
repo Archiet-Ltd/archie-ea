@@ -8,7 +8,7 @@ Addresses Gap #3: No Cost Control or Budget Management
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, Optional, Tuple
 
@@ -17,6 +17,7 @@ from sqlalchemy import func
 
 from app import db
 from app.models import LLMInteraction
+from app.utils.tenant_sql import current_org_id
 
 # from app.services.decorators import transactional  # Temporarily disabled
 
@@ -52,6 +53,7 @@ class LLMCostTracker:
         user_id: Optional[int] = None,
         project_id: Optional[int] = None,
         department: Optional[str] = None,
+        organization_id: Optional[int] = None,
     ) -> Decimal:
         """
         Calculate and track cost for an LLM interaction.
@@ -64,11 +66,18 @@ class LLMCostTracker:
             user_id: User making the request
             project_id: Project/architecture ID
             department: Department name (e.g., 'Enterprise Architecture')
+            organization_id: The organisation the call was made for. Defaults to
+                the caller's own organisation inside a request; a job with no
+                tenant request context must pass it explicitly or the
+                interaction records no organisation.
 
         Returns:
             Cost in GBP
         """
         cost = self._calculate_cost(provider, model_name, input_tokens, output_tokens)
+
+        if organization_id is None:
+            organization_id = current_org_id()
 
         # Persist interaction to database for budget tracking and analytics
         try:
@@ -80,6 +89,7 @@ class LLMCostTracker:
                 cost=cost,
                 user_id=user_id,
                 pipeline_stage_id=project_id,
+                organization_id=organization_id,
             )
             db.session.add(interaction)
             db.session.commit()
@@ -115,7 +125,7 @@ class LLMCostTracker:
             Tuple of (allowed: bool, message: Optional[str])
         """
         # Get current month's spending
-        month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         # Calculate spending by user
         if user_id:
@@ -246,9 +256,16 @@ class LLMCostTracker:
 
     def _get_organization_spending(self, since: datetime) -> Decimal:
         """Get total organization spending since a given date."""
+        org_id = current_org_id()
+        if org_id is None:
+            return Decimal("0")
+
         result = (
             db.session.query(func.sum(LLMInteraction.cost))
-            .filter(LLMInteraction.created_at >= since)
+            .filter(
+                LLMInteraction.created_at >= since,
+                LLMInteraction.organization_id == org_id,
+            )
             .scalar()
         )
 
@@ -276,6 +293,7 @@ class LLMCostTracker:
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         group_by: str = "provider",
+        organization_id: Optional[int] = None,  # TRNT-072: tenant scoping
     ) -> Dict:
         """
         Generate cost report for specified time period.
@@ -294,9 +312,12 @@ class LLMCostTracker:
             end_date = datetime.utcnow()
 
         # Get all interactions in period
-        interactions = LLMInteraction.query.filter(
+        interactions_q = LLMInteraction.query.filter(
             LLMInteraction.created_at >= start_date, LLMInteraction.created_at <= end_date
-        ).all()
+        )
+        if organization_id is not None:
+            interactions_q = interactions_q.filter(LLMInteraction.organization_id == organization_id)
+        interactions = interactions_q.all()
 
         # Calculate totals
         total_cost = sum(i.cost for i in interactions if i.cost)

@@ -32,17 +32,15 @@ _log = logging.getLogger(__name__)
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
 from app.security.audit import audit_logger
+from app.services import buy_intent
 from app.services.rate_limiter import rate_limit
 
 from app.modules.account.forms.account_forms import (
     ChangeEmailForm,
     ChangePasswordForm,
-    CreatePasswordForm,
     LoginForm,
-    RegistrationForm,
-    RequestResetPasswordForm,
-    ResetPasswordForm,
 )
+from app.modules.account.routes import mail_views
 from app.modules.account.services.account_service import AccountService
 
 # Blueprint name MUST be "account" (not "account_v2") because the shared
@@ -75,7 +73,7 @@ def login():
         from app.utils.safe_redirect import safe_next_url
 
         return redirect(
-            safe_next_url(request.args.get("next"), url_for("dashboard.overview"))
+            safe_next_url(buy_intent.next_candidate(consume=True), url_for("dashboard.overview"))
         )
     form = LoginForm()
     if form.validate_on_submit():
@@ -94,7 +92,25 @@ def login():
 
         user = _svc.authenticate(form.email.data, form.password.data)
         if user is not None:
+            # R1-B12 PR 2 (TB-0144/PB-0100): an administrator must complete
+            # multi-factor before the login finishes, whether they are
+            # enrolling for the first time or entering a code from an
+            # already-enrolled authenticator app. Checked before the
+            # session-fixation reset below so a password alone never mints
+            # a real session for an administrator account. Mirrors the v1
+            # account_routes.py login() gate exactly -- USE_ACCOUNT_GUARDRAILS
+            # chooses which of the two is registered, so both must agree.
+            from app.services import mfa_service
+
+            if mfa_service.required_for(user):
+                session["_mfa_pending_user_id"] = user.id
+                session["_mfa_pending_remember"] = bool(form.remember_me.data)
+                session["_mfa_pending_next"] = buy_intent.next_candidate(consume=True) or ""
+                return redirect(url_for("account.mfa_challenge"))
+
             # Fix Session Fixation: Regenerate session ID after successful authentication
+            # Read before the session is cleared: the chosen plan lives in it.
+            _landing = buy_intent.next_candidate(consume=True)
             session.clear()
             session.modified = True
             _svc.login(user, form.remember_me.data)
@@ -118,7 +134,7 @@ def login():
             from app.utils.safe_redirect import safe_next_url
 
             return redirect(
-                safe_next_url(request.args.get("next"), url_for("dashboard.overview"))
+                safe_next_url(_landing, url_for("dashboard.overview"))
             )
         else:
             try:
@@ -134,22 +150,103 @@ def login():
     return render_template("account/login.html", form=form)
 
 
+def _mfa_pending_user():
+    """Return the User this request is mid-MFA for, or None.
+
+    Mirrors the v1 account_routes.py helper exactly -- see its docstring.
+    """
+    from app.models.user import User
+
+    user_id = session.get("_mfa_pending_user_id")
+    if not user_id:
+        return None
+    # tenant-scoping-ok: pre-login MFA step, no org context yet -- this is
+    # the one user the signed session cookie names as mid-login, the same
+    # posture as the pre-auth SSO callback lookup below.
+    return User.query.get(user_id)
+
+
+def _complete_login_after_mfa(user):
+    """Finish the login that _mfa_pending_user_id was holding open, mirroring
+    login()'s own session-fixation reset and audit trail."""
+    from app.services import auth_audit
+
+    remember = bool(session.pop("_mfa_pending_remember", False))
+    next_url = session.pop("_mfa_pending_next", "") or ""
+    session.pop("_mfa_pending_user_id", None)
+
+    session.clear()
+    session.modified = True
+    _svc.login(user, remember)
+    session.permanent = True
+    try:
+        audit_logger.log_authentication(success=True)
+    except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
+        pass
+    _login_entry = auth_audit.record_login_success(user)
+    if _login_entry is not None:
+        session["_login_audit_id"] = _login_entry.id
+    flash("You are now logged in. Welcome back!", "success")
+
+    from app.utils.safe_redirect import safe_next_url
+
+    return redirect(safe_next_url(next_url, url_for("dashboard.overview")))
+
+
+@account_bp_v2.route("/mfa-challenge", methods=["GET", "POST"])
+@rate_limit(10, "1m", methods=("POST",))  # SECURITY: brute-force protection on code submits
+@timed_route
+def mfa_challenge():
+    """Multi-factor step for an administrator mid-login (R1-B12 PR 2,
+    TB-0144/PB-0100). Mirrors the v1 account_routes.py route exactly --
+    see its docstring.
+    """
+    user = _mfa_pending_user()
+    if user is None:
+        flash("Your sign-in attempt expired. Please sign in again.", "error")
+        return redirect(url_for("account.login"))
+
+    from app.services import mfa_service
+
+    if not user.mfa_enabled:
+        secret = session.get("_mfa_enroll_secret")
+        if not secret:
+            secret = mfa_service.generate_secret()
+            session["_mfa_enroll_secret"] = secret
+        if request.method == "POST":
+            code = request.form.get("code", "")
+            try:
+                mfa_service.enroll(user, secret, code)
+            except mfa_service.MFAError as exc:
+                flash(str(exc), "form-error")
+                return render_template(
+                    "account/mfa_enroll.html",
+                    secret=secret,
+                    provisioning_uri=mfa_service.provisioning_uri(user, secret),
+                )
+            session.pop("_mfa_enroll_secret", None)
+            return _complete_login_after_mfa(user)
+        return render_template(
+            "account/mfa_enroll.html",
+            secret=secret,
+            provisioning_uri=mfa_service.provisioning_uri(user, secret),
+        )
+
+    if request.method == "POST":
+        code = request.form.get("code", "")
+        if mfa_service.verify_login_code(user, code):
+            return _complete_login_after_mfa(user)
+        flash("That code was not accepted. Try again.", "form-error")
+
+    return render_template("account/mfa_challenge.html")
+
+
 @account_bp_v2.route("/register", methods=["GET", "POST"])
 @rate_limit(5, "1m", methods=("POST",))  # SECURITY: Anti-abuse on registration submits only
 @timed_route
 def register():
     """Register a new user, and send them a confirmation email."""
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        (_svc.register_user(
-            first_name=form.first_name.data,
-            last_name=form.last_name.data,
-            email=form.email.data,
-            password=form.password.data,
-        ))
-        flash(f"Account created successfully. Welcome to {current_app.config['APP_NAME']}!", "success")
-        return redirect(url_for("main.index"))
-    return render_template("account/register.html", form=form)
+    return mail_views.register_view()
 
 
 @account_bp_v2.route("/logout")
@@ -195,6 +292,18 @@ def manage():
     )
 
 
+@account_bp_v2.route("/switch-organization", methods=["POST"])
+@login_required
+@timed_route
+def switch_organization():
+    """Switch the signed-in user's active organisation."""
+    success, message = _svc.switch_active_organization(
+        current_user, request.form.get("organization_id", type=int)
+    )
+    flash(message, "success" if success else "error")
+    return redirect(url_for("account.manage"))
+
+
 @account_bp_v2.route("/session/keepalive", methods=["GET"])
 @login_required
 @timed_route
@@ -221,38 +330,19 @@ def session_keepalive():
 
 
 @account_bp_v2.route("/reset-password", methods=["GET", "POST"])
+@rate_limit(5, "1m", methods=("POST",))  # SECURITY: each POST can send mail
 @timed_route
 def reset_password_request():
     """Respond to existing user's request to reset their password."""
-    if not current_user.is_anonymous:
-        return redirect(url_for("main.index"))
-    form = RequestResetPasswordForm()
-    if form.validate_on_submit():
-        from flask import current_app as _ca
-        try:
-            _svc.request_password_reset(form.email.data)
-        except Exception:
-            _ca.logger.exception("password reset request failed for %s", form.email.data)
-        flash("If an account exists for {}, a password reset link has been sent.".format(form.email.data), "info")
-        return redirect(url_for("account.login"))
-    return render_template("account/reset_password.html", form=form)
+    return mail_views.reset_request_view()
 
 
 @account_bp_v2.route("/reset-password/<token>", methods=["GET", "POST"])
+@rate_limit(10, "1m", methods=("POST",))
 @timed_route
 def reset_password(token):
     """Reset an existing user's password."""
-    if not current_user.is_anonymous:
-        return redirect(url_for("main.index"))
-    form = ResetPasswordForm()
-    if form.validate_on_submit():
-        success, message = _svc.reset_password(token, form.email.data, form.new_password.data)
-        flash_cat = "form-success" if success else "form-error"
-        flash(message, flash_cat)
-        if success:
-            return redirect(url_for("account.login"))
-        return redirect(url_for("main.index"))
-    return render_template("account/reset_password.html", form=form)
+    return mail_views.reset_view(token)
 
 
 @account_bp_v2.route("/manage/change-password", methods=["GET", "POST"])
@@ -320,68 +410,41 @@ def change_email(token):
     return redirect(url_for("main.index"))
 
 
-@account_bp_v2.route("/confirm-account")
+@account_bp_v2.route("/confirm-account", methods=["GET", "POST"])
 @login_required
+@rate_limit(3, "1m", methods=("POST",))  # SECURITY: each POST sends mail
 @timed_route
 def confirm_request():
     """Respond to new user's request to confirm their account."""
-    from flask import current_app as _ca
-    if _ca.config.get("MAIL_USERNAME") or _ca.config.get("MAIL_PASSWORD"):
-        try:
-            _svc.send_confirmation_email(current_user)
-        except Exception:
-            _ca.logger.warning("confirmation email send failed")
-    else:
-        _ca.logger.info("mail not configured; skipping confirmation email")
-    flash("A new confirmation link has been sent to {}.".format(current_user.email), "warning")
-    return redirect(url_for("main.index"))
+    return mail_views.confirm_request_view()
 
 
 @account_bp_v2.route("/confirm-account/<token>")
-@login_required
 @timed_route
 def confirm(token):
     """Confirm new user's account with provided token."""
-    if current_user.confirmed:
-        return redirect(url_for("main.index"))
-    success, message = _svc.confirm_account(current_user, token)
-    flash_cat = "success" if success else "error"
-    flash(message, flash_cat)
-    return redirect(url_for("main.index"))
+    return mail_views.confirm_view(token)
+
+
+@account_bp_v2.route("/join/<token>", methods=["GET", "POST"])
+@rate_limit(10, "1m", methods=("POST",))
+@timed_route
+def join(token):
+    """Accept an e-mailed invitation into an organisation by setting a password."""
+    return mail_views.join_view(token)
 
 
 @account_bp_v2.route("/join-from-invite/<int:user_id>/<token>", methods=["GET", "POST"])
+@rate_limit(10, "1m")
 @timed_route
 def join_from_invite(user_id, token):
-    """Confirm new user's account with provided token and prompt them to set a password."""
-    if current_user is not None and current_user.is_authenticated:
-        flash("You are already logged in.", "error")
-        return redirect(url_for("main.index"))
+    """Retired invitation link: it is served by the one invitation flow.
 
-    new_user, token_valid, message = _svc.join_from_invite(user_id, token)
-
-    if new_user is None:
-        return redirect(404)
-
-    if not token_valid and new_user.password_hash is not None:
-        flash(message, "error")
-        return redirect(url_for("main.index"))
-
-    if token_valid:
-        form = CreatePasswordForm()
-        if form.validate_on_submit():
-            _svc.set_password(new_user, form.password.data)
-            flash(
-                "Your password has been set. After you log in, you can "
-                'go to the "Your Account" page to review your account '
-                "information and settings.",
-                "success",
-            )
-            return redirect(url_for("account.login"))
-        return render_template("account/join_invite.html", form=form)
-    else:
-        flash(message, "error")
-    return redirect(url_for("main.index"))
+    Links of this shape carried a reusable signed token that was never
+    stored. They set no password and send no mail any more; the token is
+    handed to ``/join/<token>``, which refuses anything it did not issue.
+    """
+    return redirect(url_for("account.join", token=token))
 
 
 @account_bp_v2.route("/invitation/<int:invitation_id>/accept", methods=["POST"])
@@ -417,13 +480,14 @@ def before_request():
         return redirect(url_for("account.unconfirmed"))
 
 
-@account_bp_v2.route("/manage/notification-preferences", methods=["POST"])
+@account_bp_v2.route("/manage/preferences", methods=["POST"])
 @login_required
 @timed_route
-def save_notification_preferences():
-    """PLT-017: Save in-app notification preferences for the current user."""
+def save_preferences():
+    """Save user preferences (notifications and display) for the current user."""
     from app import db
 
+    form_type = request.form.get("form_type", "")
     known_keys = [
         "arb_decisions",
         "solution_updates",
@@ -431,14 +495,20 @@ def save_notification_preferences():
         "weekly_digest",
         "mention_notifications",
     ]
-    prefs = {key: (request.form.get(key) == "on") for key in known_keys}
     try:
-        current_user.set_notification_preferences(prefs)
+        if form_type == "notifications":
+            prefs = {key: (request.form.get(key) == "on") for key in known_keys}
+            current_user.set_notification_preferences(prefs)
+        elif form_type == "display":
+            current_user.show_archimate_names = (request.form.get("show_archimate_names") == "on")
+        else:
+            flash("Unknown preference form type.", "error")
+            return redirect(url_for("account.manage"))
         db.session.add(current_user)
         db.session.commit()
-        flash("Notification preferences saved.", "success")
+        flash("Preferences saved.", "success")
     except Exception as exc:
-        _log.error("Failed to save notification preferences for user %s: %s", current_user.id, exc)
+        _log.error("Failed to save preferences for user %s: %s", current_user.id, exc)
         db.session.rollback()
         flash("Could not save preferences. Please try again.", "error")
     return redirect(url_for("account.manage"))
@@ -448,9 +518,7 @@ def save_notification_preferences():
 @timed_route
 def unconfirmed():
     """Catch users with unconfirmed emails."""
-    if current_user.is_anonymous or current_user.confirmed:
-        return redirect(url_for("main.index"))
-    return render_template("account/unconfirmed.html")
+    return mail_views.unconfirmed_view()
 
 
 # ---------------------------------------------------------------------------
@@ -551,24 +619,107 @@ def sso_callback(provider):
     from app.models import User
     from app.services import session_registry
 
+    # external_id is derived per-provider: Azure uses a tenant-qualified
+    # oid+tid composite rather than the raw `sub` claim (see
+    # app/auth/sso.py); Okta keeps using `sub`.
+    from app.auth.sso import (
+        external_id_for,
+        find_linked_user,
+        sso_email_claim_is_trusted_for,
+    )
+
     email = userinfo.get("email")
     if not email:
         flash("SSO provider did not return an email address.", "error")
         return redirect(url_for("account.login"))
 
+    external_id = external_id_for(provider, userinfo)
+
     # tenant-scoping-ok: pre-auth SSO callback, no org context yet --
     # User.email is globally unique.
-    user = User.query.filter_by(email=email).first()
+    #
+    # First try the immutable-subject path (added by the nOAuth fix): a
+    # user already linked to this (external_id, provider) pair signs in
+    # unaffected by the email-claim trust checks below, exactly like
+    # account_routes.py v1's sso_callback. Previously this route had no
+    # subject-based lookup at all and re-resolved by email on every login.
+    user = find_linked_user(provider, userinfo, User) if external_id else None
     if user is None:
-        user = User(
-            email=email,
-            first_name=userinfo.get("given_name", ""),
-            last_name=userinfo.get("family_name", ""),
-            confirmed=True,
-        )
-        db.session.add(user)
-        db.session.commit()
+        candidate = User.find_by_email(email)
+        if candidate is not None:
+            # No existing subject-based link. Falling back to the email
+            # claim is only safe when the provider's claims prove the
+            # signing-in party actually controls that mailbox -- otherwise
+            # an attacker who controls their own IdP tenant/account could
+            # claim any victim's email and be logged in as them (nOAuth).
+            if not sso_email_claim_is_trusted_for(provider, userinfo, candidate):
+                flash(
+                    "SSO sign-in could not be completed. If you already have "
+                    "an account under this email, sign in with your password "
+                    "and link SSO from your account settings instead.",
+                    "error",
+                )
+                try:
+                    audit_logger.log_authentication(success=False, method=f"sso:{provider}")
+                except Exception:
+                    _log.warning("Audit log failed on SSO refusal for %s", provider)
+                return redirect(url_for("account.login"))
+            if external_id:
+                candidate.external_id = external_id
+                candidate.sso_provider = provider
+            user = candidate
+        else:
+            user = User(
+                email=email,
+                first_name=userinfo.get("given_name", ""),
+                last_name=userinfo.get("family_name", ""),
+                external_id=external_id or None,
+                sso_provider=provider if external_id else None,
+                confirmed=True,
+            )
+            db.session.add(user)
+
+    # Commit unconditionally: find_linked_user may have migrated a
+    # pre-fix Azure link's external_id to the new oid+tid composite even
+    # when `user` was already resolved above.
+    db.session.commit()
+
+    # R1-B12 PR 2 (TB-0144/PB-0100): the same MFA gate login() applies to a
+    # password sign-in, applied here too -- an administrator must complete
+    # multi-factor before SSO can finish the login, whether enrolling for
+    # the first time or entering a code from an already-enrolled
+    # authenticator app. Checked before login_and_register() below mints a
+    # real session, so an IdP response alone never mints a real session for
+    # an administrator account. There is no "remember me" checkbox in an SSO
+    # flow in either case, so this pending value matches this route's own
+    # non-MFA path below (session_registry.login_and_register(user), no
+    # remember= argument, defaults to False) rather than carrying a
+    # "remembered" cookie an MFA-enrolled admin never asked for;
+    # _mfa_pending_next has no equivalent "next" here either, matching
+    # _complete_login_after_mfa()'s own empty-string fallback. v1
+    # account_routes.py's sso_callback() carries the same MFA gate but
+    # keeps its own pending value at True, matching that route's own
+    # non-MFA path, which calls login_and_register(user, remember=True)
+    # explicitly -- USE_ACCOUNT_GUARDRAILS chooses which of the two is
+    # registered, so whichever is live stays internally consistent between
+    # its own MFA and non-MFA paths.
+    from app.services import mfa_service
+
+    if mfa_service.required_for(user):
+        session["_mfa_pending_user_id"] = user.id
+        session["_mfa_pending_remember"] = False
+        session["_mfa_pending_next"] = ""
+        return redirect(url_for("account.mfa_challenge"))
 
     session_registry.login_and_register(user)
-    audit_logger.log("sso_login", user_id=user.id, detail=f"provider={provider}")
+    # Pre-existing bug, fixed here because it blocked verifying this file's
+    # own SSO success path: AuditLogger has no `log()` method (only
+    # log_event/log_authentication/...), so this line raised AttributeError
+    # on every successful SSO sign-in through this route, unconditionally,
+    # regardless of the nOAuth fix above. Matches the method= convention
+    # already used for the refusal path above and for v1's sso_callback.
+    try:
+        audit_logger.log_authentication(success=True, method=f"sso:{provider}")
+    except Exception:
+        _log.warning("Audit log failed on SSO success for %s", provider)
     return redirect(url_for("main.index"))

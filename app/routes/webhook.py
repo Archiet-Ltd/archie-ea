@@ -319,8 +319,13 @@ def receive_webhook(subscription_id):
 
         service = WebhookService()
 
-        # Verify subscription exists
-        subscription = service.get_subscription_by_id(subscription_id)
+        # Verify subscription exists. The caller is an external system with no
+        # signed-in user, so the subscription (a row-level-security fenced table)
+        # is found by its id, which names the organisation.
+        from app.jobs.tenant_safe_job import platform_scope
+
+        with platform_scope("webhook receiver: look up the subscription by id, which names the organisation"):
+            subscription = service.get_subscription_by_id(subscription_id)
         if not subscription:
             # Do not reveal whether subscription exists — use generic message
             current_app.logger.warning(
@@ -362,9 +367,10 @@ def receive_webhook(subscription_id):
             data = {"raw_payload": payload.decode("utf-8")}
 
         # Process the incoming webhook
-        result = service.process_incoming_webhook(
-            subscription_id=subscription_id, payload=data, headers=dict(request.headers)
-        )
+        with platform_scope("webhook receiver: record the event under the subscription's own organisation"):
+            result = service.process_incoming_webhook(
+                subscription_id=subscription_id, payload=data, headers=dict(request.headers)
+            )
 
         return jsonify(
             {
@@ -395,7 +401,12 @@ def slack_events():
         timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
         signature = request.headers.get("X-Slack-Signature", "")
 
-        cfg = SlackArchitectService.get_config()
+        from app.jobs.tenant_safe_job import platform_scope
+
+        # The Slack integration's settings are one platform-wide row and the
+        # caller is Slack, not a signed-in user.
+        with platform_scope("Slack events receiver: the integration's settings row; no signed-in user"):
+            cfg = SlackArchitectService.get_config()
         signing_secret = cfg.get("signing_secret", "")
 
         if signing_secret:

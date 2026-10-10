@@ -348,9 +348,14 @@ def test_requester_cancellation_mirrors_into_compliance_audit_log(db_session, te
         assert row.table_name == "ai_chat_approval:vendor"
 
 
-def test_expiry_sweep_never_executes_pending_operation(db_session, tenant_ctx, monkeypatch):
-    """A restart / expiry sweep can only move PENDING -> EXPIRED. It must
-    never execute the underlying operation and must never set approved_by_id.
+def test_overdue_approval_still_executes_when_a_real_approver_approves_it(db_session, tenant_ctx, monkeypatch):
+    """Overdue-not-expired: past expires_at is overdue, not expired. It must stay
+    actionable — a real approver's decision executes normally, it is not
+    silently blocked or auto-flipped to a dead EXPIRED state.
+
+    Superseded (2026-09-30) the previous "expiry sweep never executes"
+    version of this test, which pinned the prior behaviour this brief
+    deliberately removes (an overdue PENDING approval refusing to execute).
     """
     from datetime import datetime, timedelta
 
@@ -373,7 +378,7 @@ def test_expiry_sweep_never_executes_pending_operation(db_session, tenant_ctx, m
             operation_payload=json.dumps({"name": "Y"}),
             summary="Create capability Y",
             status=ApprovalStatus.PENDING,
-            expires_at=datetime.utcnow() - timedelta(minutes=1),  # already expired
+            expires_at=datetime.utcnow() - timedelta(minutes=1),  # overdue
             chat_session_id="s2",
         )
         db_session.add(approval)
@@ -396,11 +401,11 @@ def test_expiry_sweep_never_executes_pending_operation(db_session, tenant_ctx, m
         svc = AIChatApprovalService(user_id=approver.id)
         result = svc.approve_and_execute(approval.id, approving_user_id=approver.id)
 
-        assert result["success"] is False
-        assert executed["called"] is False, "expiry must never fall through to execution"
+        assert result["success"] is True, result
+        assert executed["called"] is True, "an overdue approval must still execute for a real approver"
         db_session.refresh(approval)
-        assert approval.status == ApprovalStatus.EXPIRED
-        assert approval.approved_by_id is None
+        assert approval.status == ApprovalStatus.APPROVED
+        assert approval.approved_by_id == approver.id
 
 
 def test_execution_refused_without_approving_user(db_session, tenant_ctx):

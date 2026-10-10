@@ -63,6 +63,10 @@
         <span class="text-foreground" x-text="item.level + ' — ' + item.label"></span>
       </span>
     </template>
+    <span x-show="data.unassessed_legend" x-cloak class="inline-flex items-center gap-1.5">
+      <span class="w-3 h-3 rounded-sm bg-muted border border-border"></span>
+      <span class="text-foreground" x-text="data.unassessed_legend?.label || 'Not assessed'"></span>
+    </span>
   </div>
 
   {# Heatmap table #}
@@ -76,18 +80,24 @@
           <th class="text-center py-2 px-2 font-semibold text-foreground w-16">3</th>
           <th class="text-center py-2 px-2 font-semibold text-foreground w-16">4</th>
           <th class="text-center py-2 px-2 font-semibold text-foreground w-16">5</th>
+          <th class="text-center py-2 px-2 font-semibold text-foreground w-20">Not assessed</th>
           <th class="text-center py-2 px-3 font-semibold text-foreground">Health</th>
           <th class="text-center py-2 px-3 font-semibold text-foreground">Caps</th>
           <th x-show="viewMode === 'investment'" x-cloak class="text-right py-2 px-3 font-semibold text-foreground">Investment</th>
         </tr>
       </thead>
       <tbody>
-        <template x-for="domain in (data.domains || [])" :key="domain.code">
-          <tr class="border-b border-border/50 hover:bg-muted/30 cursor-pointer"
-              @click="selectedDomain = selectedDomain?.code === domain.code ? null : domain">
+        <template x-for="domain in (data.domains || [])" :key="domain.code ?? '__no_domain__'">
+          <tr class="border-b border-border/50 hover:bg-muted/30 cursor-pointer focus:ring-2 focus:ring-ring"
+              tabindex="0" role="button"
+              @click="selectedDomain = selectedDomain === domain ? null : domain"
+              @keydown.enter.prevent="selectedDomain = selectedDomain === domain ? null : domain"
+              @keydown.space.prevent="selectedDomain = selectedDomain === domain ? null : domain"
+              :aria-expanded="(selectedDomain === domain).toString()"
+              :aria-label="'Show detail for ' + domain.name">
             <td class="py-2 px-3">
               <span class="font-medium text-foreground" x-text="domain.name"></span>
-              <span class="text-muted-foreground ml-1" x-text="'(' + domain.code + ')'"></span>
+              <span x-show="domain.code" x-cloak class="text-muted-foreground ml-1" x-text="'(' + domain.code + ')'"></span>
             </td>
             <template x-for="level in [1,2,3,4,5]" :key="level">
               <td class="text-center py-2 px-2">
@@ -99,14 +109,37 @@
                       class="text-muted-foreground/40">-</span>
               </td>
             </template>
+            <td class="text-center py-2 px-2">
+              <span x-show="domain.unassessed_count > 0" x-cloak
+                    class="inline-flex items-center justify-center w-8 h-8 rounded text-xs font-medium bg-muted text-muted-foreground border border-border"
+                    :aria-label="domain.unassessed_count + ' capabilities not assessed'"
+                    x-text="domain.unassessed_count"></span>
+              <span x-show="!domain.unassessed_count || domain.unassessed_count === 0" x-cloak
+                    class="text-muted-foreground/40">-</span>
+            </td>
             <td class="text-center py-2 px-3">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
+              <span x-show="domain.health_score !== null" x-cloak
+                    class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
                     :class="getHealthClass(domain.health_score)"
-                    x-text="domain.health_score + '%'"></span>
+                    x-text="domain.health_score !== null ? (domain.health_score + '%') : ''"></span>
+              <span x-show="domain.health_score === null" x-cloak
+                    class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground"
+                    title="Health needs a recorded current and a recorded target maturity">
+                <span aria-hidden="true">—</span>
+                <span class="sr-only">Health not available: needs a recorded current and a recorded target maturity</span>
+              </span>
             </td>
             <td class="text-center py-2 px-3 text-muted-foreground" x-text="domain.total_capabilities"></td>
-            <td x-show="viewMode === 'investment'" x-cloak class="text-right py-2 px-3 font-medium text-foreground"
-                x-text="'{{ currency_symbol }}' + formatNumber(domain.total_investment || 0)"></td>
+            <td x-show="viewMode === 'investment'" x-cloak class="text-right py-2 px-3 font-medium text-foreground">
+              <span x-show="domain.total_investment !== undefined" x-cloak
+                    x-text="domain.total_investment !== undefined ? ('{{ currency_symbol }}' + formatNumber(domain.total_investment)) : ''"></span>
+              <span x-show="domain.total_investment === undefined" x-cloak
+                    class="text-muted-foreground"
+                    title="No investment figure for capabilities with no domain">
+                <span aria-hidden="true">—</span>
+                <span class="sr-only">Investment not available for this group</span>
+              </span>
+            </td>
           </tr>
         </template>
       </tbody>
@@ -134,21 +167,44 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
       <div>
         <p class="text-xs text-muted-foreground">Avg Maturity</p>
-        <p class="text-lg font-bold text-foreground" x-text="selectedDomain?.avg_maturity"></p>
+        <p class="text-lg font-bold text-foreground" x-show="selectedDomain?.avg_maturity !== null" x-cloak
+           x-text="selectedDomain?.avg_maturity !== null && selectedDomain?.avg_maturity !== undefined ? (selectedDomain.avg_maturity + ' (' + selectedDomain.avg_maturity_denominator + ' measured)') : ''"></p>
+        <p class="text-lg font-bold text-muted-foreground" x-show="selectedDomain?.avg_maturity === null" x-cloak
+           title="No recorded current maturity for this group">
+          <span aria-hidden="true">—</span>
+          <span class="sr-only">Not available: no recorded current maturity</span>
+        </p>
       </div>
       <div>
         <p class="text-xs text-muted-foreground">Avg Target</p>
-        <p class="text-lg font-bold text-foreground" x-text="selectedDomain?.avg_target"></p>
+        <p class="text-lg font-bold text-foreground" x-show="selectedDomain?.avg_target !== null" x-cloak
+           x-text="selectedDomain?.avg_target !== null && selectedDomain?.avg_target !== undefined ? (selectedDomain.avg_target + ' (' + selectedDomain.avg_target_denominator + ' measured)') : ''"></p>
+        <p class="text-lg font-bold text-muted-foreground" x-show="selectedDomain?.avg_target === null" x-cloak
+           title="No recorded target maturity for this group">
+          <span aria-hidden="true">—</span>
+          <span class="sr-only">Not available: no recorded target maturity</span>
+        </p>
       </div>
       <div>
         <p class="text-xs text-muted-foreground">Health Score</p>
         <p class="text-lg font-bold" :class="getHealthTextClass(selectedDomain?.health_score)"
-           x-text="selectedDomain?.health_score + '%'"></p>
+           x-show="selectedDomain?.health_score !== null" x-cloak
+           x-text="selectedDomain?.health_score !== null && selectedDomain?.health_score !== undefined ? (selectedDomain.health_score + '%') : ''"></p>
+        <p class="text-lg font-bold text-muted-foreground" x-show="selectedDomain?.health_score === null" x-cloak
+           title="Health needs a recorded current and a recorded target maturity">
+          <span aria-hidden="true">—</span>
+          <span class="sr-only">Health not available: needs a recorded current and a recorded target maturity</span>
+        </p>
       </div>
       <div x-show="viewMode === 'investment'" x-cloak>
         <p class="text-xs text-muted-foreground">Investment</p>
-        <p class="text-lg font-bold text-foreground"
-           x-text="'{{ currency_symbol }}' + formatNumber(selectedDomain?.total_investment || 0)"></p>
+        <p class="text-lg font-bold text-foreground" x-show="selectedDomain?.total_investment !== undefined" x-cloak
+           x-text="selectedDomain?.total_investment !== undefined ? ('{{ currency_symbol }}' + formatNumber(selectedDomain.total_investment)) : ''"></p>
+        <p class="text-lg font-bold text-muted-foreground" x-show="selectedDomain?.total_investment === undefined" x-cloak
+           title="No investment figure for capabilities with no domain">
+          <span aria-hidden="true">—</span>
+          <span class="sr-only">Investment not available for this group</span>
+        </p>
       </div>
     </div>
 
@@ -170,7 +226,7 @@
     {# Capabilities by maturity level #}
     <div class="mt-4">
       <h4 class="text-sm font-medium text-foreground mb-2">Capabilities by Maturity Level</h4>
-      <div class="grid grid-cols-5 gap-2">
+      <div class="grid grid-cols-3 md:grid-cols-6 gap-2">
         <template x-for="level in [1,2,3,4,5]" :key="level">
           <div class="text-center">
             <p class="text-xs font-medium text-muted-foreground mb-1" x-text="'Level ' + level"></p>
@@ -181,6 +237,14 @@
                class="text-xs text-muted-foreground/40">None</p>
           </div>
         </template>
+        <div class="text-center">
+          <p class="text-xs font-medium text-muted-foreground mb-1">Not assessed</p>
+          <template x-for="name in (selectedDomain?.unassessed_capability_names || [])" :key="name">
+            <p class="text-xs text-foreground truncate py-0.5" x-text="name"></p>
+          </template>
+          <p x-show="!(selectedDomain?.unassessed_capability_names || []).length" x-cloak
+             class="text-xs text-muted-foreground/40">None</p>
+        </div>
       </div>
     </div>
   </div>

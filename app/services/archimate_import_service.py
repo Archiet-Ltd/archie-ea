@@ -1,8 +1,21 @@
-"""ArchiMate Open Exchange Format (OEF) XML import service (ENT-067).
+"""ArchiMate Open Exchange Format (OEF) XML import engine (ENT-067).
 
-Parses ArchiMate 3.2 OEF XML documents and imports elements/relationships
-into the platform's ArchiMate element store.  Supports three import
-strategies: skip_duplicates, update_existing, create_all.
+This is the one engine that imports an OEF model into the platform's
+ArchiMate element store (ADR 0008: one accessor per concept). Every entry
+point calls it: the model-import screen (``architect_ui.import_oef`` and its
+preview endpoint), the composer's JSON endpoint (``/archimate/api/import/oef``)
+and brownfield programme setup.
+
+What it does, in order:
+
+- ``load`` refuses anything over ``MAX_UPLOAD_BYTES``, decodes bytes as UTF-8
+  with a Latin-1 fallback, and parses the XML (entity-expansion safe).
+- ``preview_import`` classifies each element against the store (new / exists
+  / conflict / invalid) and each relationship against the ArchiMate
+  relationship matrix, writing nothing.
+- ``execute_import`` writes under one of three strategies --
+  ``skip_duplicates``, ``update_existing`` or ``create_all`` -- refusing
+  (never storing) a relationship the matrix does not allow.
 
 Duplicate detection is by (name, element_type) case-insensitive match
 against the ``archimate_elements`` table.
@@ -11,7 +24,7 @@ against the ``archimate_elements`` table.
 from app.utils import safe_xml  # untrusted XML: entity-expansion safe
 import logging
 import xml.etree.ElementTree as ET
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 
 from app import db
 
@@ -20,6 +33,49 @@ logger = logging.getLogger(__name__)
 # OEF namespaces — must match export service
 _OEF_NS = "http://www.opengroup.org/xsd/archimate/3.0/"
 _XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
+
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB, for every entry point
+STRATEGIES = ("skip_duplicates", "update_existing", "create_all")
+
+
+class ImportRequestError(ValueError):
+    """An import the engine refuses before writing anything.
+
+    ``status_code`` is the HTTP status a route should answer with: 413 for
+    an oversized file, 400 for everything else (empty, malformed, no
+    elements, unknown strategy).
+    """
+
+    def __init__(self, message: str, status_code: int = 400):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def read_xml_from_request(req, file_fields=("oef_file", "file")) -> Optional[Union[bytes, str]]:
+    """Return the OEF document carried by a Flask request, or ``None``.
+
+    Accepted, in order: a multipart upload in any of ``file_fields``; a JSON
+    body with an ``xml_content`` string; a raw ``application/xml`` /
+    ``text/xml`` body. Bytes are returned undecoded so ``load`` applies the
+    one size limit and the one decoding rule.
+    """
+    for field in file_fields:
+        uploaded = req.files.get(field) if req.files else None
+        if uploaded is not None and uploaded.filename:
+            return uploaded.read()
+
+    if req.is_json:
+        payload = req.get_json(silent=True) or {}
+        content = payload.get("xml_content") if isinstance(payload, dict) else None
+        if isinstance(content, str) and content:
+            return content
+
+    if "xml" in (req.content_type or ""):
+        raw = req.get_data(as_text=False)
+        if raw:
+            return raw
+
+    return None
 
 
 class ArchiMateImportService:
@@ -90,8 +146,7 @@ class ArchiMateImportService:
         # Implementation & Migration layer. DOGFOOD-002: the stored key must
         # be the one the Element Catalog counts and filters on
         # (``layer_order`` in app/modules/architecture/routes/archimate_routes.py
-        # and the OEF exporter's map in app/services/archimate_oef_service.py
-        # both use "Implementation"). Writing "Implementation & Migration"
+        # uses "Implementation"). Writing "Implementation & Migration"
         # here made 35 of customer zero's 168 elements land and vanish.
         "WorkPackage": "Implementation",
         "Deliverable": "Implementation",
@@ -116,6 +171,72 @@ class ArchiMateImportService:
     # by the element-type-keyed matrix in
     # `app/config/archimate_relationship_matrix.py` — see `_classify_relationships`
     # below, which is the only place this service classifies relationships.
+
+    # ------------------------------------------------------------------
+    # Entry points -- every route and service calls these, never the
+    # parser on its own, so the size limit and decoding rule apply
+    # everywhere.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def decode_xml(content: Union[bytes, str]) -> str:
+        """Apply the size limit and decode to text.
+
+        Raises ``ImportRequestError`` (413) above ``MAX_UPLOAD_BYTES``. Bytes
+        that are not UTF-8 are read as Latin-1, which is what OEF files
+        exported by older Windows tools usually are.
+        """
+        if content is None:
+            raise ImportRequestError(
+                "No XML content provided. Upload a .xml file or send XML in the request body."
+            )
+        size = len(content) if isinstance(content, bytes) else len(content.encode("utf-8"))
+        if size > MAX_UPLOAD_BYTES:
+            raise ImportRequestError(
+                f"File too large. Maximum size is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+                status_code=413,
+            )
+        if isinstance(content, str):
+            return content
+        try:
+            return content.decode("utf-8")
+        except UnicodeDecodeError:
+            return content.decode("latin-1")
+
+    def load(self, content: Union[bytes, str]) -> Dict[str, Any]:
+        """Size-check, decode and parse an OEF document."""
+        xml_content = self.decode_xml(content)
+        try:
+            return self.parse_oef_xml(xml_content)
+        except ValueError as exc:
+            raise ImportRequestError(str(exc)) from exc
+
+    def preview_xml(self, content: Union[bytes, str]) -> Dict[str, Any]:
+        """What ``import_xml`` would do with this document, writing nothing."""
+        parsed = self.load(content)
+        preview = self.preview_import(parsed)
+        return {"model_name": parsed.get("model_name", ""), **preview}
+
+    def import_xml(
+        self,
+        content: Union[bytes, str],
+        strategy: str = "skip_duplicates",
+    ) -> Dict[str, Any]:
+        """Import an OEF document under ``strategy``.
+
+        Raises ``ImportRequestError`` for an unknown strategy, an oversized,
+        empty or malformed document, or one with no importable elements --
+        all before anything is written.
+        """
+        if strategy not in STRATEGIES:
+            raise ImportRequestError(
+                f"Invalid strategy: {strategy}. Must be one of: {', '.join(STRATEGIES)}"
+            )
+        parsed = self.load(content)
+        if not parsed["elements"]:
+            raise ImportRequestError("No valid elements found in the XML file.")
+        result = self.execute_import(parsed, strategy=strategy)
+        return {"model_name": parsed.get("model_name", ""), **result}
 
     # ------------------------------------------------------------------
     # Parsing
@@ -333,6 +454,7 @@ class ArchiMateImportService:
             "elements": elements,
             "relationships": relationships,
             "errors": errors,
+            "source_xml": xml_content,
         }
 
     # ------------------------------------------------------------------
@@ -565,7 +687,29 @@ class ArchiMateImportService:
                 "relationships_failed": [
                     {"identifier", "type", "source", "target", "reason"}, ...
                 ],
+                "created_ids": [int, ...],
+                "model_id": int | None,
+                "element_results": [
+                    {"identifier", "id", "name", "type", "layer",
+                     "custom_properties", "status"}, ...
+                ],
+                "relationship_results": [
+                    {"identifier", "id", "source_id", "target_id", "type",
+                     "status"}, ...
+                ],
             }
+
+        ``status`` on an element result is ``created`` / ``updated`` /
+        ``skipped``; on a relationship result ``created`` / ``skipped``
+        (already stored). Refusals are in ``errors`` and
+        ``relationships_failed``, never in these lists.
+
+        Each run is recorded as an ``ArchitectureModel`` (the imported XML in
+        ``model_data``) and every element or relationship it creates carries
+        that ``architecture_id``. A created Driver, Goal or
+        ApplicationComponent element also gets its domain row, linked by
+        ``archimate_element_id``, each inside its own savepoint so a domain
+        row the database refuses never costs the element.
 
         DOGFOOD-001: every element is written inside its own savepoint
         (``db.session.begin_nested()``). An element the parser flagged as
@@ -575,9 +719,13 @@ class ArchiMateImportService:
         """
         from datetime import datetime, timezone
 
-        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+        from app.models.archimate_core import (
+            ArchiMateElement,
+            ArchiMateRelationship,
+            ArchitectureModel,
+        )
 
-        if strategy not in ("skip_duplicates", "update_existing", "create_all"):
+        if strategy not in STRATEGIES:
             raise ValueError(f"Invalid strategy: {strategy}")
 
         elements = parsed_data.get("elements", [])
@@ -592,6 +740,32 @@ class ArchiMateImportService:
         # name+type under skip_duplicates/update_existing — otherwise every
         # relationship touching a pre-existing element would fail to resolve.
         id_map: Dict[str, Dict[str, Any]] = {}
+        created_ids: List[int] = []
+        element_results: List[Dict[str, Any]] = []
+        relationship_results: List[Dict[str, Any]] = []
+
+        # Snapshot for restore: opened before anything is written, on the
+        # import's own session-log row; None outside a signed-in request.
+        from app.services import import_snapshot_service
+
+        snapshot = import_snapshot_service.begin(
+            strategy=strategy, model_name=(parsed_data.get("model_name") or "")[:100]
+        )
+        model_id = self._record_model(ArchitectureModel, parsed_data)
+        if snapshot is not None:
+            snapshot.note_model(model_id)
+        created_relationship_ids: List[int] = []
+
+        def _element_result(row, identifier: str, status: str) -> None:
+            element_results.append({
+                "identifier": identifier,
+                "id": row.id,
+                "name": row.name,
+                "type": row.type,
+                "layer": row.layer,
+                "custom_properties": dict(row.custom_properties or {}),
+                "status": status,
+            })
 
         def _write_properties(target_row, props: Dict[str, str], merge: bool) -> None:
             """Persist parsed <properties> onto custom_properties (DOGFOOD-004).
@@ -648,6 +822,7 @@ class ArchiMateImportService:
                             type=elem_type,
                             layer=layer,
                             description=description,
+                            architecture_id=model_id,
                         )
                         db.session.add(new_elem)
                         _write_properties(new_elem, props, merge=False)
@@ -655,7 +830,14 @@ class ArchiMateImportService:
                         if identifier:
                             id_map[identifier] = {"db_id": new_elem.id, "type": elem_type}
                         created += 1
+                        created_ids.append(new_elem.id)
+                        if snapshot is not None:
+                            snapshot.note_created_element(new_elem.id)
+                        _element_result(new_elem, identifier, "created")
+                        created_row = new_elem
                     elif strategy == "update_existing":
+                        if snapshot is not None:
+                            snapshot.note_updated_element(existing)
                         if description is not None:
                             existing.description = description
                         _write_properties(existing, props, merge=True)
@@ -663,6 +845,8 @@ class ArchiMateImportService:
                         if identifier:
                             id_map[identifier] = {"db_id": existing.id, "type": existing.type}
                         updated += 1
+                        _element_result(existing, identifier, "updated")
+                        created_row = None
                     else:
                         # skip_duplicates — element itself is untouched, but it
                         # still needs an id-map entry so relationships that
@@ -670,6 +854,8 @@ class ArchiMateImportService:
                         if identifier:
                             id_map[identifier] = {"db_id": existing.id, "type": existing.type}
                         skipped += 1
+                        _element_result(existing, identifier, "skipped")
+                        created_row = None
 
             except Exception as exc:
                 logger.warning(
@@ -686,6 +872,17 @@ class ArchiMateImportService:
                     "the database refused this element. It was skipped; the rest of the model "
                     "was still imported."
                 )
+                continue
+
+            if created_row is not None:
+                domain = self._create_domain_row(created_row)
+                if domain is not None and snapshot is not None:
+                    if domain["created"]:
+                        snapshot.note_domain_created(domain["table"], domain["id"])
+                    else:
+                        snapshot.note_domain_linked(
+                            domain["table"], domain["id"], domain["previous_element_id"]
+                        )
 
         # --- Relationships (second pass, after every element has an id) ---
         type_by_identifier = {ident: info["type"] for ident, info in id_map.items()}
@@ -733,6 +930,7 @@ class ArchiMateImportService:
                     ).first()
                     if existing_rel is not None:
                         relationships_skipped += 1
+                        stored_rel, rel_status = existing_rel, "skipped"
                     else:
                         new_rel = ArchiMateRelationship(
                             type=rel["type"],
@@ -742,10 +940,21 @@ class ArchiMateImportService:
                             # "ruling constrains offer" is the reason the edge
                             # exists, and it must survive the import.
                             description=rel.get("description"),
+                            architecture_id=model_id,
                         )
                         db.session.add(new_rel)
                         db.session.flush()
                         relationships_created += 1
+                        created_relationship_ids.append(new_rel.id)
+                        stored_rel, rel_status = new_rel, "created"
+                relationship_results.append({
+                    "identifier": rel["identifier"],
+                    "id": stored_rel.id,
+                    "source_id": stored_rel.source_id,
+                    "target_id": stored_rel.target_id,
+                    "type": stored_rel.type,
+                    "status": rel_status,
+                })
             except Exception as exc:
                 logger.warning(
                     "Failed to import relationship %s (%s -> %s): %s",
@@ -760,6 +969,12 @@ class ArchiMateImportService:
                 })
 
         try:
+            if snapshot is not None:
+                snapshot.note_created_relationships(created_relationship_ids)
+                snapshot.finish({
+                    "created": created, "updated": updated,
+                    "skipped": skipped, "failed": failed,
+                })
             db.session.commit()
         except Exception as exc:
             db.session.rollback()
@@ -773,6 +988,10 @@ class ArchiMateImportService:
                 "relationships_created": 0,
                 "relationships_skipped": 0,
                 "relationships_failed": [],
+                "created_ids": [],
+                "model_id": None,
+                "element_results": [],
+                "relationship_results": [],
             }
 
         logger.info(
@@ -791,101 +1010,137 @@ class ArchiMateImportService:
             "relationships_created": relationships_created,
             "relationships_skipped": relationships_skipped,
             "relationships_failed": relationships_failed,
+            "created_ids": created_ids,
+            "model_id": model_id,
+            "element_results": element_results,
+            "relationship_results": relationship_results,
         }
 
-    def import_with_ids(
-        self,
-        parsed_data: dict,
-        strategy: str = "skip_duplicates",
-    ) -> dict:
-        """Import ArchiMate elements preserving their original source IDs.
+    # ------------------------------------------------------------------
+    # Provenance and domain rows
+    # ------------------------------------------------------------------
 
-        DOGFOOD-003 note: nothing calls this method — the route
-        (``/solutions/import/archimate/execute``) calls ``execute_import``.
-        Its docstring is also misleading: despite claiming ``source_id``
-        matching it still matches existing rows by ``name/type/layer``
-        (``.filter_by(name=name, type=elem_type, layer=layer)`` below), never
-        by the OEF identifier. ``execute_import`` now builds its own
-        identifier -> db-id map directly (id_map, above) rather than reusing
-        this method, per the task brief's instruction not to build on it
-        without fixing it first. Left in place, unfixed, as dead code — a
-        follow-up should either repair or delete it rather than let a third
-        near-duplicate importer accumulate.
+    @staticmethod
+    def _record_model(model_cls, parsed_data: Dict[str, Any]) -> Optional[int]:
+        """Record this import run as an ArchitectureModel; return its id.
 
-        Unlike ``execute_import``, this method stores the original ``source_id``
-        from the OEF XML so that subsequent re-imports can match on it rather
-        than on name+type, enabling round-trip fidelity.
+        A refused row costs the provenance record only, never the import.
+        """
+        from datetime import datetime, timezone
 
-        Args:
-            parsed_data: Output of ``parse_oef_xml`` (dict with ``elements``
-                         and ``relationships`` lists).
-            strategy: One of ``"skip_duplicates"`` (default), ``"update_existing"``,
-                      or ``"create_all"``.
+        name = (parsed_data.get("model_name") or "").strip() or (
+            "Imported Model " + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        )
+        try:
+            with db.session.begin_nested():
+                record = model_cls(
+                    name=name[:100],
+                    version="1.0",
+                    model_data=parsed_data.get("source_xml"),
+                )
+                db.session.add(record)
+                db.session.flush()
+                return record.id
+        except Exception as exc:
+            logger.warning("Could not record the imported model: %s", exc)
+            return None
 
-        Returns:
-            dict with ``created``, ``updated``, ``skipped``, ``errors``, and
-            ``id_map`` (mapping source_id → new DB id).
+    @staticmethod
+    def _create_domain_row(element) -> Optional[Dict[str, Any]]:
+        """Give a newly created Driver / Goal / ApplicationComponent element
+        its domain row, linked back by ``archimate_element_id``.
+
+        Idempotent per organisation, whatever the strategy: a domain row the
+        organisation already holds for this element, or under the same name
+        (case-insensitive), is linked rather than duplicated. ``create_all``
+        creates a fresh element on every run; without this, every repeat of
+        the same file added another portfolio row for the same application.
         """
         from app.models.archimate_core import ArchiMateElement
 
-        elements = parsed_data.get("elements", [])
-        created = updated = skipped = 0
-        errors: list = []
-        id_map: dict = {}
+        if element.type in ("Driver", "Goal"):
+            from app.models.motivation import Driver, Goal
 
-        for elem in elements:
-            source_id = elem.get("id") or elem.get("identifier", "")
-            name = elem.get("name", "").strip()
-            elem_type = elem.get("type", "")
-            layer = elem.get("layer") or self.TYPE_TO_LAYER.get(elem_type, "Application")
-            description = elem.get("documentation") or elem.get("description") or None
+            cls = Driver if element.type == "Driver" else Goal
+        elif element.type == "ApplicationComponent":
+            from app.models.application_portfolio import ApplicationComponent
 
-            if not name or not elem_type:
-                errors.append(f"Skipping element with missing name or type: {elem}")
-                continue
+            cls = ApplicationComponent
+        else:
+            return
+        is_portfolio = element.type == "ApplicationComponent"
 
-            try:
-                # Prefer matching by source_id if available, else fall back to name+type
-                existing = None
-                if source_id:
-                    existing = ArchiMateElement.query.filter_by(
-                        name=name, type=elem_type, layer=layer
-                    ).first()
-
-                if existing is None:
-                    new_elem = ArchiMateElement(
-                        name=name,
-                        type=elem_type,
-                        layer=layer,
-                        description=description,
-                    )
-                    db.session.add(new_elem)
-                    db.session.flush()
-                    id_map[source_id] = new_elem.id
-                    created += 1
-                elif strategy == "update_existing":
-                    if description is not None:
-                        existing.description = description
-                    id_map[source_id] = existing.id
-                    updated += 1
-                else:
-                    id_map[source_id] = existing.id
-                    skipped += 1
-            except Exception as exc:
-                logger.warning("import_with_ids: failed on '%s' (%s): %s", name, elem_type, exc)
-                errors.append(f"Failed to import '{name}' ({elem_type}): {exc}")
-
+        org_id = element.organization_id
+        name_key = (element.name or "").strip().lower()
         try:
-            db.session.commit()
-        except Exception as exc:
-            db.session.rollback()
-            logger.error("import_with_ids commit failed: %s", exc)
-            return {"created": 0, "updated": 0, "skipped": 0, "errors": [str(exc)], "id_map": {}}
+            with db.session.begin_nested():
+                if is_portfolio:
+                    # Explicit organisation predicate: imports also run
+                    # outside a request (programme setup, CLI), where the
+                    # TenantMixin filter is absent.
+                    existing = cls.query.filter(  # model-safety-ok: one row per imported element
+                        cls.organization_id == org_id,
+                        db.or_(
+                            cls.archimate_element_id == element.id,
+                            db.func.lower(cls.name) == name_key,
+                        ),
+                    ).order_by(
+                        (cls.archimate_element_id == element.id).desc(), cls.id
+                    ).first()
+                else:
+                    # Driver and Goal carry no organization_id of their own;
+                    # their organisation is that of the element they realise,
+                    # so a row with no element is never matched across tenants.
+                    existing = (
+                        cls.query.join(  # model-safety-ok: one row per imported element
+                            ArchiMateElement, ArchiMateElement.id == cls.archimate_element_id
+                        )
+                        .filter(
+                            ArchiMateElement.organization_id == org_id,
+                            ArchiMateElement.type == element.type,
+                            db.or_(
+                                cls.archimate_element_id == element.id,
+                                db.func.lower(cls.name) == name_key,
+                            ),
+                        )
+                        .order_by((cls.archimate_element_id == element.id).desc(), cls.id)
+                        .first()
+                    )
 
-        return {
-            "created": created,
-            "updated": updated,
-            "skipped": skipped,
-            "errors": errors,
-            "id_map": id_map,
-        }
+                if existing is not None:
+                    linked = existing.archimate_element_id
+                    if linked is None or db.session.get(ArchiMateElement, linked) is None:
+                        existing.archimate_element_id = element.id
+                        db.session.flush()
+                        return {
+                            "table": cls.__table__.name, "id": existing.id,
+                            "created": False, "previous_element_id": linked,
+                        }
+                    return None
+
+                if is_portfolio:
+                    row = cls(
+                        name=element.name,
+                        description=element.description,
+                        archimate_element_id=element.id,
+                    )
+                else:
+                    row = cls(
+                        name=element.name,
+                        description=element.description,
+                        archimate_element_id=element.id,
+                        architecture_id=element.architecture_id,
+                        status="active",
+                    )
+                db.session.add(row)
+                db.session.flush()
+                return {
+                    "table": cls.__table__.name, "id": row.id,
+                    "created": True, "previous_element_id": None,
+                }
+        except Exception as exc:
+            logger.warning(
+                "Could not create the %s domain row for element %s: %s",
+                element.type, element.id, exc,
+            )
+        return None

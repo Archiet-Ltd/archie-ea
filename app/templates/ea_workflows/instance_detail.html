@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: plain-language filter wiring — el.layer, el.element_type, el.type now use |plain_layer and |plain_name filters #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
@@ -302,7 +303,7 @@
                         <div class="flex items-center gap-2 py-1 px-2 rounded bg-warning/5 border border-warning/10">
                             <i data-lucide="type" class="h-3 w-3 text-warning shrink-0" aria-hidden="true"></i>
                             <span class="font-medium">{{ el.name }}</span>
-                            <span class="text-muted-foreground">{{ el.layer }} &middot; {{ el.element_type or 'No type' }}</span>
+                            <span class="text-muted-foreground">{{ el.layer | plain_layer(current_user) }} &middot; {{ (el.element_type or 'No type') | plain_name(current_user) }}</span>
                         </div>
                         {% endfor %}
                     </div>
@@ -375,8 +376,8 @@
                             {% for el in orphans %}
                             <tr class="border-b border-input/30">
                                 <td class="py-1.5 pr-3 font-medium">{% set _h = am_href(el.layer, el.id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
-                                <td class="py-1.5 pr-3">{{ el.layer }}</td>
-                                <td class="py-1.5 pr-3 text-muted-foreground">{{ el.element_type or '—' }}</td>
+                                <td class="py-1.5 pr-3">{{ el.layer | plain_layer(current_user) }}</td>
+                                <td class="py-1.5 pr-3 text-muted-foreground">{{ el.element_type | plain_name(current_user) }}</td>
                                 <td class="py-1.5 text-muted-foreground">Add at least one serving or composition relationship</td>
                             </tr>
                             {% endfor %}
@@ -398,8 +399,8 @@
                             {% for el in undocumented_els %}
                             <tr class="border-b border-input/30">
                                 <td class="py-1.5 pr-3 font-medium">{% set _h = am_href(el.layer, el.id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
-                                <td class="py-1.5 pr-3">{{ el.layer }}</td>
-                                <td class="py-1.5 pr-3 text-muted-foreground">{{ el.element_type or '—' }}</td>
+                                <td class="py-1.5 pr-3">{{ el.layer | plain_layer(current_user) }}</td>
+                                <td class="py-1.5 pr-3 text-muted-foreground">{{ el.element_type | plain_name(current_user) }}</td>
                                 <td class="py-1.5 text-muted-foreground">Add a description explaining this element's purpose</td>
                             </tr>
                             {% endfor %}
@@ -564,7 +565,7 @@
                             <tr class="border-b border-input/30 bg-destructive/[0.03]">
                                 <td class="py-2 pr-2"><input type="checkbox" x-model="selected" value="{{ el.element_id }}" aria-label="Select {{ el.name }}" class="rounded"></td>
                                 <td class="py-2 pr-3 font-medium">{% set _h = am_href(el.layer, el.element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
-                                <td class="py-2 pr-3">{{ el.layer }}</td>
+                                <td class="py-2 pr-3">{{ el.layer | plain_layer(current_user) }}</td>
                                 <td class="py-2 pr-3 font-bold text-destructive-emphasis">{{ el.quality_score }}</td>
                                 {% for crit_key in ['has_description', 'connectivity', 'has_cross_layer_rel', 'naming_convention', 'proper_type', 'metamodel_conformant'] %}
                                 {% set c = el.get('criteria', {}).get(crit_key, {}) %}
@@ -607,7 +608,7 @@
                             {% for el in attention_elements %}
                             <tr class="border-b border-input/30 bg-destructive/[0.03]">
                                 <td class="py-2 pr-3 font-medium">{% set _h = am_href(el.layer, el.element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ el.name }}</a>{% else %}{{ el.name }}{% endif %}</td>
-                                <td class="py-2 pr-3">{{ el.layer }}</td>
+                                <td class="py-2 pr-3">{{ el.layer | plain_layer(current_user) }}</td>
                                 <td class="py-2 pr-3 font-bold text-destructive-emphasis">{{ el.quality_score }}</td>
                                 {% for crit_key in ['has_description', 'connectivity', 'has_cross_layer_rel', 'naming_convention', 'proper_type', 'metamodel_conformant'] %}
                                 {% set c = el.get('criteria', {}).get(crit_key, {}) %}
@@ -637,7 +638,7 @@
                                 <span class="font-medium">{{ el.name }}</span>
                                 <span class="font-bold {% if el.quality_score >= 70 %}text-success{% elif el.quality_score >= 50 %}text-warning{% else %}text-destructive{% endif %}">{{ el.quality_score }}/100</span>
                             </div>
-                            <div class="text-xs text-muted-foreground mb-1.5">{{ el.layer }} &middot; {{ el.element_type or 'No type' }} &middot; {{ el.relationship_count }} rel{{ 's' if el.relationship_count != 1 else '' }}</div>
+                            <div class="text-xs text-muted-foreground mb-1.5">{{ el.layer | plain_layer(current_user) }} &middot; {{ (el.element_type or 'No type') | plain_name(current_user) }} &middot; {{ el.relationship_count }} rel{{ 's' if el.relationship_count != 1 else '' }}</div>
                             {% if el.get('criteria') %}
                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-1">
                                 {% for crit_name, crit in el.criteria.items() %}
@@ -2118,14 +2119,14 @@
                     {% set color = layer_colors.get((el.layer or '').lower(), 'bg-muted text-muted-foreground border-input') %}
                     <a href="{{ url_for('archimate_crud.dashboard') }}#element-{{ el.id }}"
                        class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:shadow-sm {{ color }}"
-                       title="{{ el.type }} · {{ el.layer }} · {{ 'Input' if el.element_role == 'input' else 'Output' }}">
+                       title="{{ el.type | plain_name(current_user) }} · {{ el.layer | plain_layer(current_user) }} · {{ 'Input' if el.element_role == 'input' else 'Output' }}">
                         {% if el.element_role == 'input' %}
                         <i data-lucide="arrow-right-circle" class="h-3 w-3 opacity-60" aria-hidden="true"></i>
                         {% else %}
                         <i data-lucide="arrow-left-circle" class="h-3 w-3 opacity-60" aria-hidden="true"></i>
                         {% endif %}
                         <span>{{ el.name }}</span>
-                        <span class="opacity-60">{{ el.type }}</span>
+                        <span class="opacity-60">{{ el.type | plain_name(current_user) }}</span>
                         {% if el.adm_phase %}
                         <span class="rounded bg-black/10 px-1 font-mono text-xs">{{ el.adm_phase }}</span>
                         {% endif %}

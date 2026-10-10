@@ -23,12 +23,12 @@ import pytest
 from sqlalchemy import event
 
 # Fixtures (app, db_session, make_org, tenant_ctx, client, login_as) come from
-# app/modules/intelligence/tests/conftest.py's import of tests.conftest.
+# app/modules/conftest.py's import of tests.conftest.
 
 FOUR_KEYS = {"id", "name", "type", "layer"}
 
 # The row and relation shapes the impact endpoint returns.
-ROW_KEYS = {"element_id", "relation", "owner", "reason"}
+ROW_KEYS = {"element_id", "relation", "owner", "reason", "health"}
 RELATION_KEYS = {
     "kind", "type", "depth", "rule_id", "chain", "chain_elements", "confidence",
     "provenance", "computed_at", "stale", "derived_id", "engine_version", "plain_terms",
@@ -235,7 +235,7 @@ def test_http_data_carries_elements_beside_rows_summary_reasons(app, db_session,
     body = resp.get_json()
     assert body["success"] is True
     data = body["data"]
-    assert set(data.keys()) == {"rows", "summary", "reasons", "elements"}
+    assert set(data.keys()) == {"rows", "summary", "reasons", "elements", "maturity_flags", "total", "next_cursor"}
     assert set(data["elements"]) == {str(a.id), str(b.id)}
     assert data["elements"][str(b.id)]["name"] == "Bravo"
 

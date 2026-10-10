@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: account settings page — display preferences toggle is a non-visual preference, tested by tests/test_plain_language.py unit tests #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Account Settings{% endblock %}
 {% from 'components/page_header.html' import page_header %}
@@ -43,6 +44,58 @@
                     </dd>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm mt-6" data-testid="organization-memberships-card">
+        <div class="p-6">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h3 class="text-sm font-semibold">Organisation memberships</h3>
+                    <p class="text-xs text-muted-foreground">Choose the organisation you are currently working in.</p>
+                </div>
+                {% if active_organization_name %}
+                <span class="inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+                      data-testid="active-organization-badge">
+                    Active: {{ active_organization_name }}
+                </span>
+                {% endif %}
+            </div>
+
+            {% if organization_memberships %}
+            <form method="POST" action="{{ url_for('account.switch_organization') }}" class="mt-5 space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <fieldset class="space-y-3">
+                    <legend class="sr-only">Select active organisation</legend>
+                    {% for org in organization_memberships %}
+                    <label class="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3 transition-colors hover:bg-accent/40">
+                        <span class="flex min-w-0 items-center gap-3">
+                            <input type="radio"
+                                   name="organization_id"
+                                   value="{{ org.id }}"
+                                   class="h-4 w-4 border-input text-primary focus:ring-ring"
+                                   {% if active_organization and org.id == active_organization.id %}checked{% endif %}>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-medium text-foreground">{{ org.name }}</span>
+                                <span class="block text-xs text-muted-foreground">{{ org.slug }}</span>
+                            </span>
+                        </span>
+                        {% if active_organization and org.id == active_organization.id %}
+                        <span class="rounded-md bg-success/10 px-2 py-1 text-xs font-medium text-success">Current</span>
+                        {% endif %}
+                    </label>
+                    {% endfor %}
+                </fieldset>
+                <div class="flex justify-end">
+                    <button type="submit"
+                            class="inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground h-9 px-4 py-2 text-sm font-medium transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                        Switch organisation
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <p class="mt-4 text-sm text-muted-foreground">No organisation memberships are available for this account.</p>
+            {% endif %}
         </div>
     </div>
 
@@ -108,8 +161,9 @@
         <div class="p-6">
             <h3 class="text-sm font-semibold mb-1">Notification Preferences</h3>
             <p class="text-xs text-muted-foreground mb-5">Choose which in-app notifications you want to receive.</p>
-            <form method="POST" action="{{ url_for('account.save_notification_preferences') }}">
+            <form method="POST" action="{{ url_for('account.save_preferences') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="form_type" value="notifications">
                 <div class="space-y-4">
                     {% for pref_key, pref_label, pref_desc in notif_prefs %}
                         {% set is_enabled = user.get_notification_preference(pref_key) %}
@@ -147,6 +201,60 @@
                             </div>
                         </div>
                     {% endfor %}
+                </div>
+                <div class="mt-6 flex justify-end">
+                    <button type="submit"
+                            class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                        Save preferences
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# Display Preferences #}
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm mt-6">
+        <div class="p-6">
+            <h3 class="text-sm font-semibold mb-1">Display Preferences</h3>
+            <p class="text-xs text-muted-foreground mb-5">Control how architecture terms are shown throughout the application.</p>
+            <form method="POST" action="{{ url_for('account.save_preferences') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="form_type" value="display">
+                <div class="space-y-4">
+                    {% set show_archimate = user.show_archimate_names %}
+                    <div class="flex items-start justify-between gap-4 py-3">
+                        <div class="flex-1 min-w-0">
+                            <label id="pref_show_archimate_label" for="pref_show_archimate" class="text-sm font-medium cursor-pointer">Show ArchiMate names</label>
+                            <p class="text-xs text-muted-foreground mt-0.5">When off, element types use plain language (e.g. "Application" instead of "ApplicationComponent"). Turn on to see the standard ArchiMate names.</p>
+                        </div>
+                        <div class="flex-shrink-0 pt-0.5">
+                            <button type="button"
+                                    id="pref_show_archimate_btn"
+                                    role="switch"
+                                    aria-checked="{{ 'true' if show_archimate else 'false' }}"
+                                    aria-labelledby="pref_show_archimate_label"
+                                    @click="
+                                        const btn = $el;
+                                        const checked = btn.getAttribute('aria-checked') === 'true';
+                                        btn.setAttribute('aria-checked', (!checked).toString());
+                                        const inp = document.getElementById('pref_show_archimate');
+                                        if (inp) inp.checked = !checked;
+                                        btn.classList.toggle('bg-primary', !checked);
+                                        btn.classList.toggle('bg-muted', checked);
+                                        btn.querySelector('span').classList.toggle('translate-x-5', !checked);
+                                        btn.querySelector('span').classList.toggle('translate-x-0', checked);
+                                    "
+                                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if show_archimate else 'bg-muted' }}">
+                                <span class="inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform {{ 'translate-x-5' if show_archimate else 'translate-x-0' }} ml-0.5"></span>
+                            </button>
+                            <input type="checkbox"
+                                   id="pref_show_archimate"
+                                   name="show_archimate_names"
+                                   value="on"
+                                   class="sr-only"
+                                   {% if show_archimate %}checked{% endif %}>
+                        </div>
+                    </div>
                 </div>
                 <div class="mt-6 flex justify-end">
                     <button type="submit"

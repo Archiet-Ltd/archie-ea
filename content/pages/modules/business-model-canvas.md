@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S1-02, segment: S1}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Business Model Canvas
@@ -21,7 +22,7 @@ you go from blank page to something real fast.
 
 ## Where you'll meet it
 
-- [Put our business model on one page we can keep current](/startups/canvas-on-one-page)
+- [Put our business model on one page we can keep current](/use-cases/business-model-canvas-on-one-page)
 
 ## Related modules
 

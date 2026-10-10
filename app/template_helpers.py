@@ -27,6 +27,48 @@ def safe_url_for_with_fallback(endpoint, fallback_url="#", **values):
         return fallback_url
 
 
+def _get_show_archimate(user=None):
+    """Read show_archimate_names from a user-like object, returning False
+    when the attribute is absent or an error occurs."""
+    if user is None:
+        return False
+    try:
+        return bool(getattr(user, "show_archimate_names", False))
+    except Exception:
+        import logging
+        _log = logging.getLogger(__name__)
+        _log.warning("Could not read show_archimate_names from user %r", user, exc_info=True)
+        return False
+
+
+def _plain_name(element_type, user=None):
+    """Return the plain-language display name for an ArchiMate element type.
+
+    Module-level helper so tests can import it directly. The Jinja filter
+    ``|plain_name`` delegates here.
+    """
+    from app.models.archimate_element_types import plain_name_for
+
+    show_archimate = _get_show_archimate(user)
+    if show_archimate:
+        return element_type or "\u2014"
+    return plain_name_for(element_type)
+
+
+def _plain_layer(layer, user=None):
+    """Return the plain-language display name for an ArchiMate layer.
+
+    Module-level helper so tests can import it directly. The Jinja filter
+    ``|plain_layer`` delegates here.
+    """
+    from app.models.archimate_element_types import plain_layer_name
+
+    show_archimate = _get_show_archimate(user)
+    if show_archimate:
+        return layer or "\u2014"
+    return plain_layer_name(layer)
+
+
 def register_template_filters(app):
     """Register all template filters with the Flask app"""
 
@@ -233,6 +275,36 @@ def register_template_filters(app):
         slug = re.sub(r"[\s-]+", "-", slug)
         return slug.strip("-")
 
+    @app.template_filter("plain_name")
+    def plain_name_filter(element_type, user=None):
+        """Return the plain-language display name for an ArchiMate element type.
+
+        When the current user has ``show_archimate_names`` enabled, the
+        original PascalCase name is returned unchanged. Otherwise the
+        plain-language name from PLAIN_LANGUAGE_NAMES is used.
+
+        Usage in templates:
+            {{ element.element_type | plain_name }}
+            {{ element.element_type | plain_name(current_user) }}
+
+        The ``user`` argument is optional; when omitted or None the filter
+        defaults to plain names (the default setting is off).
+        """
+        return _plain_name(element_type, user)
+
+    @app.template_filter("plain_layer")
+    def plain_layer_filter(layer, user=None):
+        """Return the plain-language display name for an ArchiMate layer.
+
+        Same behaviour as ``plain_name``: respects the user's
+        ``show_archimate_names`` setting.
+
+        Usage in templates:
+            {{ layer | plain_layer }}
+            {{ layer | plain_layer(current_user) }}
+        """
+        return _plain_layer(layer, user)
+
     # Global template functions
     @app.context_processor
     def currency_context():
@@ -247,6 +319,48 @@ def register_template_filters(app):
             "get_supported_currency_codes": service.get_supported_currency_codes,
             "is_supported_currency": service.is_supported_currency,
             "default_currency": current_app.config.get("DEFAULT_CURRENCY", "GBP"),
+        }
+
+    @app.context_processor
+    def plain_language_context():
+        """Make plain-language vocabulary and user setting available to JS.
+
+        Only injected when a user is signed in — public pages (landing,
+        login, password reset) never render these values, so building
+        ~3 KB of vocabulary data on every unauthenticated request is wasted
+        work. Returned as plain Python objects, not pre-serialised JSON: the
+        template renders them with ``|tojson|safe``, which does the
+        escaping Jinja's autoescape otherwise can't see through a bare
+        ``|safe`` (see tests/test_template_escaping.py).
+        """
+        from flask_login import current_user
+
+        try:
+            if not (
+                current_user
+                and hasattr(current_user, "is_authenticated")
+                and current_user.is_authenticated
+            ):
+                return {
+                    "plain_language_names": {},
+                    "plain_layer_names": {},
+                    "show_archimate_names": False,
+                }
+        except Exception:
+            return {
+                "plain_language_names": {},
+                "plain_layer_names": {},
+                "show_archimate_names": False,
+            }
+
+        from app.models.archimate_element_types import PLAIN_LANGUAGE_NAMES, PLAIN_LAYER_NAMES
+
+        show_archimate = _get_show_archimate(current_user)
+
+        return {
+            "plain_language_names": PLAIN_LANGUAGE_NAMES,
+            "plain_layer_names": PLAIN_LAYER_NAMES,
+            "show_archimate_names": show_archimate,
         }
 
 

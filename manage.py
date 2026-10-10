@@ -2,6 +2,7 @@
 import os
 import subprocess
 import sys
+import logging
 
 # Force UTF-8 on stdout/stderr before anything prints.
 #
@@ -82,13 +83,8 @@ def register_cli_commands(app):
         # create_all() then emits a duplicate "CREATE INDEX" and fails on an empty
         # database. (Production never hit this because its schema was built
         # incrementally.) Drop duplicate same-named indexes per table before creating.
-        for _table in db.metadata.tables.values():
-            _seen = {}
-            for _idx in list(_table.indexes):
-                if _idx.name in _seen:
-                    _table.indexes.discard(_idx)
-                else:
-                    _seen[_idx.name] = _idx
+        from app.commands.schema_migrations import dedupe_metadata_indexes
+        dedupe_metadata_indexes(db.metadata)
         db.create_all()
         # LEGACY WORKAROUNDS: These ALTER TABLE statements add columns that predate
         # alembic tracking. They are idempotent (IF NOT EXISTS) and remain here to
@@ -123,13 +119,10 @@ def register_cli_commands(app):
                 "ALTER TABLE unified_application_capability_mapping "
                 "ADD COLUMN IF NOT EXISTS notes TEXT"
             ))
-        # VA-005: Add enforcement_status and adm_phase columns to principles
-        db.session.execute(text(
-            "ALTER TABLE principles ADD COLUMN IF NOT EXISTS enforcement_status VARCHAR(20) NOT NULL DEFAULT 'advisory'"
-        ))
-        db.session.execute(text(
-            "ALTER TABLE principles ADD COLUMN IF NOT EXISTS adm_phase VARCHAR(5)"
-        ))
+        # VA-005 principles columns and the RAT-114 created_at index. No model
+        # declares them, so the schema baseline creates them from the same list.
+        from app.commands.schema_migrations import ensure_undeclared_schema
+        ensure_undeclared_schema(db.session.connection())
 
         # SA-003: Add Phase C lifecycle planning columns to application_components
         for col_ddl in [
@@ -333,10 +326,6 @@ def register_cli_commands(app):
                 "CREATE INDEX IF NOT EXISTS idx_rat_audit_app_action "
                 "ON rationalization_audit_entries(application_id, action)"
             ))
-            db.session.execute(db.text(
-                "CREATE INDEX IF NOT EXISTS idx_rat_audit_created "
-                "ON rationalization_audit_entries(created_at)"
-            ))
             db.session.commit()
             print("  \u2713 RAT-114: Created rationalization_audit_entries table")
         except Exception:
@@ -377,6 +366,17 @@ def register_cli_commands(app):
             except Exception:  # column already exists in SQLite
                 db.session.rollback()
         print("  \u2713 PLT-017: users.notification_preferences column ensured")
+
+        # Add encryption key versioning columns for org credential store
+        if db.engine.dialect.name == "postgresql":
+            db.session.execute(text(
+                "ALTER TABLE organization_encryption_keys "
+                "ADD COLUMN IF NOT EXISTS previous_encrypted_key BYTEA"
+            ))
+            db.session.execute(text(
+                "ALTER TABLE org_connector_credentials "
+                "ADD COLUMN IF NOT EXISTS key_version INTEGER NOT NULL DEFAULT 1"
+            ))
 
         db.session.commit()
         _seed_requirement_templates()
@@ -447,6 +447,194 @@ def register_cli_commands(app):
         print("ArchiMate enterprise architecture commands registered")
     except ImportError as e:
         print(f"Warning: Could not register ArchiMate commands: {e}")
+
+    # Register Credential Management Commands
+    @app.cli.command()
+    @click.option("--dry-run", is_flag=True, help="Show counts without making changes")
+    def migrate_connector_credentials(dry_run):
+        """Migrate credentials from retired stores into ``OrgConnectorCredential``.
+
+        Copies every row from ``OrgConnectorConfig`` and
+        ``LucidchartConnectorConfig`` into the new per-organisation store,
+        under the same discrete ``credential_type`` keys the live readers
+        use -- not a combined JSON blob, which those readers never look for:
+
+        * ServiceNow (``OrgConnectorConfig``): ``client_secret``, read by
+          ``ServiceNowConnectorService._get_token``.
+        * Lucidchart (``LucidchartConnectorConfig``): ``client_secret``,
+          ``access_token`` and ``refresh_token``, read by
+          ``LucidchartConnectorService.get_access_token`` /
+          ``get_refresh_token`` / ``_require_client_credentials``.
+
+        ``DevOpsConnectorConfig`` has no live writer or vault-based reader
+        yet (see app/services/devops_push_service.py), so its token is still
+        copied as a JSON blob under credential_type="credentials" -- nothing
+        reads it that way today, but this preserves it for whenever a reader
+        is added, rather than dropping it.
+
+        Reports counts before and after; never logs a credential value.
+        Idempotent: a (organisation, connector_type, credential_type) already
+        present in the vault is skipped, so re-running after a partial
+        migration only fills in what is still missing.
+
+        Use ``--dry-run`` to preview what would be migrated.
+        """
+        from app.models.connector_config import (
+            OrgConnectorConfig, DevOpsConnectorConfig,
+            LucidchartConnectorConfig, OrgConnectorCredential,
+        )
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+        import json
+
+        vault = OrgCredentialVault()
+        migrations = []
+        total_before = 0
+
+        # Scan OrgConnectorConfig -- one discrete client_secret entry per row.
+        for row in OrgConnectorConfig.query.all():
+            secret = row.client_secret
+            if secret:
+                migrations.append({
+                    "source_table": "org_connector_configs",
+                    "source_id": row.id,
+                    "org_id": row.organization_id,
+                    "connector_type": row.connector_type,
+                    "credential_type": "client_secret",
+                    "value": secret,
+                })
+            total_before += 1
+
+        # Scan DevOpsConnectorConfig -- no live reader yet; kept as a single
+        # blob entry under credential_type="credentials" (unchanged shape).
+        for row in DevOpsConnectorConfig.query.all():
+            token = row.access_token
+            if token:
+                migrations.append({
+                    "source_table": "devops_connector_configs",
+                    "source_id": row.id,
+                    "org_id": row.organization_id,
+                    "connector_type": "devops",
+                    "credential_type": "credentials",
+                    "value": json.dumps({"access_token": token, "provider": row.provider}),
+                })
+            total_before += 1
+
+        # Scan LucidchartConnectorConfig -- one discrete entry per secret
+        # field actually stored on the row.
+        for row in LucidchartConnectorConfig.query.all():
+            for credential_type, value in (
+                ("client_secret", row.client_secret),
+                ("access_token", row.access_token),
+                ("refresh_token", row.refresh_token),
+            ):
+                if value:
+                    migrations.append({
+                        "source_table": "lucidchart_connector_configs",
+                        "source_id": row.id,
+                        "org_id": row.organization_id,
+                        "connector_type": "lucidchart",
+                        "credential_type": credential_type,
+                        "value": value,
+                    })
+            total_before += 1
+
+        print(f"Found {total_before} rows across retired stores, "
+              f"{len(migrations)} credential value(s) to migrate.")
+
+        if dry_run:
+            for m in migrations:
+                print(f"  would migrate: {m['source_table']}[{m['source_id']}] "
+                      f"org={m['org_id']} type={m['connector_type']}/{m['credential_type']}")
+            print(f"Dry run: {len(migrations)} credentials would be migrated.")
+            return
+
+        migrated = 0
+        skipped = 0
+        errors = 0
+        for m in migrations:
+            try:
+                # Check if already migrated
+                existing = OrgConnectorCredential.query.filter_by(
+                    organization_id=m["org_id"],
+                    connector_type=m["connector_type"],
+                    credential_type=m["credential_type"],
+                ).first()
+                if existing:
+                    skipped += 1
+                    continue
+                vault.store(m["org_id"], m["connector_type"], m["credential_type"], m["value"])
+                migrated += 1
+            except Exception as exc:
+                logger = logging.getLogger(__name__)
+                logger.error("Failed to migrate %s[%s] credential_type=%s: %s",
+                             m["source_table"], m["source_id"], m["credential_type"], exc)
+                errors += 1
+
+        from app.extensions import db
+        db.session.commit()
+
+        total_after = OrgConnectorCredential.query.count()
+        print(f"Migrated: {migrated}, skipped (already present): {skipped}, "
+              f"errors: {errors}")
+        print(f"OrgConnectorCredential rows before: {total_before} source rows | "
+              f"after: {total_after}")
+
+    @app.cli.command()
+    @click.option("--org", "org_id", type=int, required=True, help="Organisation id")
+    def rotate_credential_key(org_id):
+        """Rotate the encryption key for one organisation.
+
+        Generates a new Fernet key, stores it encrypted under the master key,
+        and re-encrypts every credential row. All operations are atomic.
+        """
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        vault = OrgCredentialVault()
+        try:
+            new_version = vault.rotate_all_credentials(org_id)
+            print(f"Key rotated for org {org_id}: new version {new_version}")
+        except Exception as exc:
+            print(f"Error rotating key for org {org_id}: {exc}")
+            raise
+
+    @app.cli.command()
+    @click.option("--dry-run", is_flag=True, help="Show what would change without making changes")
+    def rewrap_org_keys(dry_run):
+        """Re-wrap every organisation's Fernet key under the current master key.
+
+        Idempotent: organisations already encrypted with the current master key
+        are unchanged. Use after ``ORG_ENCRYPTION_MASTER_KEY`` is changed.
+        """
+        from app.models.connector_config import OrganizationEncryptionKey
+        from app.modules.codegen.services.credential_encryption import _get_master_fernet
+        from app.extensions import db
+
+        master = _get_master_fernet()
+        rows = OrganizationEncryptionKey.query.all()
+        rewrapped = 0
+
+        for row in rows:
+            if dry_run:
+                print(f"  would rewrap org {row.organization_id} key version {row.key_version}")
+                continue
+            # Decrypt with old master, re-encrypt with current master
+            try:
+                raw_key = master.decrypt(row.encrypted_key)
+                row.encrypted_key = master.encrypt(raw_key)
+                rewrapped += 1
+            except Exception as exc:
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    "Could not rewrap key for org %s: %s. "
+                    "The key may already use the current master key.",
+                    row.organization_id, exc,
+                )
+
+        db.session.commit()
+        if dry_run:
+            print(f"Dry run: {len(rows)} org keys would be checked.")
+        else:
+            print(f"Rewrapped: {rewrapped} of {len(rows)} org keys.")
 
     @app.cli.command()
     def setup_dev():
@@ -559,14 +747,18 @@ def register_cli_commands(app):
     @app.cli.command()
     def format():
         """Runs the yapf and isort formatters over the project."""
-        isort = "isort -rc *.py app/"
-        yapf = "yapf -r -i *.py app/"
+        import glob
 
-        print("Running {}".format(isort))
-        subprocess.call(isort, shell=True)
+        # The shell used to expand *.py; glob does it without one.
+        top_level = sorted(glob.glob("*.py"))
+        isort = ["isort", "-rc", *top_level, "app/"]
+        yapf = ["yapf", "-r", "-i", *top_level, "app/"]
 
-        print("Running {}".format(yapf))
-        subprocess.call(yapf, shell=True)
+        print("Running {}".format(" ".join(isort)))
+        subprocess.call(isort)
+
+        print("Running {}".format(" ".join(yapf)))
+        subprocess.call(yapf)
 
     # ===== FEATURE FLAGS COMMANDS =====
 
@@ -911,6 +1103,15 @@ def register_cli_commands(app):
         """Seed enterprise-standard ArchiMate Driver, Stakeholder, and Constraint vocabulary records. Safe to run multiple times."""
         from app.commands.seed_motivation_elements import seed_motivation_elements
         seed_motivation_elements()
+
+    # ===== REGULATORY FRAMEWORK CATALOGUE SEEDING =====
+
+    @app.cli.command()
+    def seed_framework_catalogue():
+        """Seed the shared regulatory framework catalogue with ISO 27001, SOC 2 and DORA. Safe to run multiple times."""
+        from app.services.compliance.regulatory_framework_service import RegulatoryFrameworkService
+        seeded = RegulatoryFrameworkService.seed_manufacturing_frameworks()
+        print(f"Framework catalogue: {seeded} frameworks seeded")
 
     # ===== BUSINESS CAPABILITY SEEDING =====
 
@@ -1518,9 +1719,8 @@ def register_cli_commands(app):
             # documented command reported "60 capabilities seeded" on a fresh
             # install and left the flagship screen showing zero. That is the
             # five-capability-stores problem costing an evaluator their first hour.
-            from flask import g as _g
-
             from app.commands.seed_capabilities import seed_business_caps
+            from app.jobs.tenant_safe_job import tenant_scope
             from app.models.organization import Organization
 
             # An explicit tenant, because TenantMixin fills organization_id
@@ -1536,13 +1736,10 @@ def register_cli_commands(app):
                 )
                 _business = {"created": 0}
             else:
-                _previous = getattr(_g, "current_org_id", None)
-                _g.current_org_id = _org.id
-                try:
+                _org_id, _org_name = _org.id, _org.name
+                with tenant_scope(_org_id):
                     _business = seed_business_caps()
-                finally:
-                    _g.current_org_id = _previous
-                print(f"    seeded into organisation {_org.id} ({_org.name})")
+                print(f"    seeded into organisation {_org_id} ({_org_name})")
 
             print(
                 "\n[OK] Seeding complete! Unified capabilities: "
@@ -1902,17 +2099,16 @@ if __name__ == "__main__":
         if platform.system() == "Windows":
             import subprocess as _sp
             try:
-                out = _sp.check_output(
-                    f"netstat -ano | findstr :{_port}",
-                    shell=True, text=True, stderr=_sp.DEVNULL
-                )
+                # Filtered here rather than piped through findstr, so no shell
+                # is involved; findstr's match was this same substring test.
+                out = _sp.check_output(["netstat", "-ano"], text=True, stderr=_sp.DEVNULL)
                 for line in out.splitlines():
                     parts = line.split()
-                    if parts and "LISTENING" in line:
+                    if parts and "LISTENING" in line and f":{_port}" in line:
                         pid = int(parts[-1])
                         if pid and pid != os.getpid():
                             try:
-                                _sp.call(f"taskkill /F /PID {pid}", shell=True,
+                                _sp.call(["taskkill", "/F", "/PID", str(pid)],
                                          stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
                                 killed.append(pid)
                             except Exception:

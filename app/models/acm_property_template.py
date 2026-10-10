@@ -21,6 +21,20 @@ class AcmPropertyTemplate(db.Model):
     conditional_on_value = db.Column(db.String(256), nullable=True)
     help_text = db.Column(db.Text, nullable=True)
     sort_order = db.Column(db.Integer, default=0)
+    # Governed definitions an organisation adds to its own metamodel. NULL is
+    # a shared platform template every organisation reads; a value is that
+    # organisation's own definition, read by that organisation only (see
+    # PropertyService.template_query). Both columns are nullable so
+    # reconcile-schema adds them to existing databases and every older row
+    # keeps its meaning.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    # NULL and False both mean "may be left empty".
+    is_mandatory = db.Column(db.Boolean, nullable=True)
 
     def __repr__(self):
         return "<AcmPropertyTemplate %s.%s (%s)>" % (
@@ -42,4 +56,6 @@ class AcmPropertyTemplate(db.Model):
             "conditional_on_value": self.conditional_on_value,
             "help_text": self.help_text,
             "sort_order": self.sort_order,
+            "organization_id": self.organization_id,
+            "is_mandatory": bool(self.is_mandatory),
         }

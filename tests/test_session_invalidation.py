@@ -374,8 +374,10 @@ class TestPasswordChangeRevokesOtherSessions:
         client_a = app.test_client()
         cookie_a = _login_via_form(client_a, user.email, _PASSWORD)
 
-        token = user.generate_password_reset_token()
-        success, message = AccountService.reset_password(token, user.email, "Reset-Correct-Horse-9!")
+        from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
+
+        _row, token = AccountToken.issue(user, PURPOSE_PASSWORD_RESET)
+        success, message = AccountService.reset_password(token, "Reset-Correct-Horse-9!")
         assert success, message
         _clear_g_cache()
 

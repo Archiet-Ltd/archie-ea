@@ -15,6 +15,8 @@ Usage:
         description = db.Column(db.String(FieldLength.DESCRIPTION))
 """
 
+import re
+
 
 # =============================================================================
 # String Field Lengths
@@ -207,10 +209,41 @@ class ArchiMateLayer:
     APPLICATION = "application"
     TECHNOLOGY = "technology"
     PHYSICAL = "physical"
-    IMPLEMENTATION = "implementation_migration"
+    IMPLEMENTATION = "implementation"
     MOTIVATION = "motivation"
 
     ALL = [STRATEGY, BUSINESS, APPLICATION, TECHNOLOGY, PHYSICAL, IMPLEMENTATION, MOTIVATION]
+
+    ALIASES = {
+        "implementation & migration": IMPLEMENTATION,
+        "implementation&migration": IMPLEMENTATION,
+        "implementation/migration": IMPLEMENTATION,
+        "implementation migration": IMPLEMENTATION,
+        "implementation and migration": IMPLEMENTATION,
+        "implementation_migration": IMPLEMENTATION,
+        "implementation-migration": IMPLEMENTATION,
+        "implementationmigration": IMPLEMENTATION,
+    }
+
+    DISPLAY_NAMES = {
+        STRATEGY: "Strategy",
+        BUSINESS: "Business",
+        APPLICATION: "Application",
+        TECHNOLOGY: "Technology",
+        PHYSICAL: "Physical",
+        IMPLEMENTATION: "Implementation",
+        MOTIVATION: "Motivation",
+    }
+
+    @classmethod
+    def normalize(cls, layer: str | None) -> str | None:
+        """Return the canonical lower-case layer key for *layer*."""
+
+        if not isinstance(layer, str):
+            return layer
+        key = layer.strip().lower()
+        key = re.sub(r"[\s\-]+", "_", key)
+        return cls.ALIASES.get(key.replace("_", " "), cls.ALIASES.get(key, key))
 
 
 class ArchiMateRelationshipType:
@@ -248,6 +281,69 @@ class ArchiMateRelationshipType:
         SPECIALIZATION,
         ASSOCIATION,
     ]
+
+    ALIASES = {
+        "compositionrelationship": COMPOSITION,
+        "composes": COMPOSITION,
+        "aggregationrelationship": AGGREGATION,
+        "aggregates": AGGREGATION,
+        "assignmentrelationship": ASSIGNMENT,
+        "assigns": ASSIGNMENT,
+        "realizationrelationship": REALIZATION,
+        "realisationrelationship": REALIZATION,
+        "realisation": REALIZATION,
+        "realizes": REALIZATION,
+        "realises": REALIZATION,
+        "servingrelationship": SERVING,
+        "serves": SERVING,
+        "uses": SERVING,
+        "accessrelationship": ACCESS,
+        "accesses": ACCESS,
+        "influencerelationship": INFLUENCE,
+        "influences": INFLUENCE,
+        "triggeringrelationship": TRIGGERING,
+        "triggers": TRIGGERING,
+        "flowrelationship": FLOW,
+        "flows": FLOW,
+        "specializationrelationship": SPECIALIZATION,
+        "specialisationrelationship": SPECIALIZATION,
+        "specialisation": SPECIALIZATION,
+        "specialises": SPECIALIZATION,
+        "specializes": SPECIALIZATION,
+        "associationrelationship": ASSOCIATION,
+        "associates": ASSOCIATION,
+    }
+
+    PASCAL_CASE = {
+        COMPOSITION: "Composition",
+        AGGREGATION: "Aggregation",
+        ASSIGNMENT: "Assignment",
+        REALIZATION: "Realization",
+        SERVING: "Serving",
+        ACCESS: "Access",
+        INFLUENCE: "Influence",
+        TRIGGERING: "Triggering",
+        FLOW: "Flow",
+        SPECIALIZATION: "Specialization",
+        ASSOCIATION: "Association",
+    }
+
+    @classmethod
+    def normalize(cls, relationship_type: str | None, *, pascal_case: bool = False) -> str | None:
+        """Return the canonical ArchiMate relationship spelling."""
+
+        if not isinstance(relationship_type, str):
+            return relationship_type
+        key = relationship_type.strip()
+        if not key:
+            return ""
+        key = re.sub(r"(?i)relationship$", "", key).strip().lower()
+        key = cls.ALIASES.get(key, key)
+        if key not in cls.ALL:
+            return relationship_type.strip()
+        if pascal_case:
+            return cls.PASCAL_CASE[key]
+        return key
 
 
 # =============================================================================
