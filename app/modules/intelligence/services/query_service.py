@@ -80,6 +80,7 @@ NO_POLICY_SCAN_RECORDED_REASON = validate_reason_code("no_policy_scan_recorded")
 NO_PLATEAU_RECORDED_REASON = validate_reason_code("no_plateau_recorded")
 NO_GAP_RECORDED_REASON = validate_reason_code("no_gap_recorded")
 NO_CAPABILITY_IN_CHAIN_REASON = validate_reason_code("no_capability_in_chain")
+NO_RACI_RECORDED_REASON = validate_reason_code("no_raci_recorded")
 # The component block's three independent absence conditions -- no cost
 # figures entered, no owner-recorded health status, no licence entitlement
 # rows -- each distinct from NO_APPLICATION_COMPONENT_REASON above (which
@@ -1567,6 +1568,157 @@ class IntelligenceQueryService:
         return {"work_packages": wp_payloads, "reasons": [], "elements": all_elements}
 
     @staticmethod
+    def strategy_for_element(
+        element_id: int,
+        *,
+        max_depth: int = 3,
+        include_derived: bool = True,
+    ) -> Dict[str, Any]:
+        """L2, "what are we trying to achieve, and how's it tracking?": every
+        ``PortfolioInitiative`` seeded directly on the picked element
+        (``archimate_element_id`` FK), each with the SAME blast-radius
+        traversal L1/L5/L6 already run -- no second traversal algorithm.
+
+        Tenant-safety note, verified not assumed: ``PortfolioInitiative``
+        carries no ``TenantMixin``/``organization_id`` of its own, the same
+        gap ``UnifiedWorkPackage`` has (L5 brief). This method never lists
+        initiatives independently of an element -- every row it returns is
+        filtered by ``archimate_element_id == element_id``, and
+        ``element_id`` is only ever reached here after the element itself
+        was confirmed to belong to the caller's tenant (below). A
+        cross-tenant initiative cannot share a seed element id with the
+        wrong org's element, since ``archimate_elements.id`` is a real
+        primary key each row of which belongs to exactly one tenant. This
+        does not make ``PortfolioInitiative`` itself tenant-safe for any
+        OTHER read path against it -- a separate, pre-existing gap, not
+        fixed here (same category already flagged once for
+        ``UnifiedWorkPackage`` in the L5 brief).
+
+        Budget variance is read from the model's own ``total_budget``/
+        ``spent_to_date`` fields directly -- ``PortfolioInitiative`` has no
+        wrapping helper method to avoid, unlike L5's
+        ``calculate_budget_variance()``, but the same not-computed-vs-
+        measured-zero discipline still applies: variance is only reported
+        when ``total_budget`` is a real positive number, else the row
+        carries the honest ``no_budget_recorded`` reason.
+        """
+        from app.models import ArchiMateElement
+        from app.models.enterprise_intelligence import PortfolioInitiative
+
+        org_id = current_org_id()
+
+        with record_query_latency("strategy_for_element") as scope:
+            scope.organization_id = org_id
+
+            if org_id is None:
+                return {
+                    "initiatives": [],
+                    "reasons": [NO_TENANT_CONTEXT_REASON],
+                    "elements": {},
+                }
+
+            element = db.session.execute(
+                db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
+            ).scalar_one_or_none()
+            if element is None:
+                return {
+                    "initiatives": [],
+                    "reasons": [ELEMENT_NOT_FOUND_REASON],
+                    "elements": {},
+                }
+
+            seed_initiatives = (
+                db.session.execute(
+                    db.select(PortfolioInitiative).where(
+                        PortfolioInitiative.archimate_element_id == element_id
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            if not seed_initiatives:
+                return {
+                    "initiatives": [],
+                    "reasons": [NO_INITIATIVE_LINKED_REASON],
+                    "elements": {},
+                }
+
+            all_elements: Dict[str, Dict[str, Any]] = {}
+            initiative_payloads: List[Dict[str, Any]] = []
+            for initiative in seed_initiatives:
+                blast = IntelligenceQueryService.cross_layer_impact(
+                    element_id,
+                    include_derived=include_derived,
+                    max_depth=max_depth,
+                    with_owner=True,
+                )
+                all_elements.update(blast.get("elements") or {})
+
+                if initiative.total_budget and initiative.total_budget > 0:
+                    # total_budget/spent_to_date are Numeric (Decimal) columns,
+                    # unlike UnifiedWorkPackage's Float cost fields -- cast to
+                    # float before arithmetic so the response carries a plain
+                    # JSON number, not a string (Flask's JSON provider
+                    # serialises Decimal as str, which would silently break
+                    # every numeric consumer of this field, front end
+                    # included).
+                    total_budget = float(initiative.total_budget)
+                    spent_to_date = float(initiative.spent_to_date or 0.0)
+                    budget_variance_pct = (spent_to_date - total_budget) / total_budget * 100
+                    budget_reason = None
+                else:
+                    budget_variance_pct = None
+                    budget_reason = NO_BUDGET_RECORDED_REASON
+
+                initiative_payloads.append(
+                    {
+                        "initiative_id": initiative.id,
+                        "name": initiative.name,
+                        "status": initiative.status,
+                        "priority": initiative.priority,
+                        "health_status": initiative.health_status,
+                        "completion_percentage": initiative.completion_percentage,
+                        "start_date": initiative.start_date.isoformat()
+                        if initiative.start_date
+                        else None,
+                        "target_end_date": initiative.target_end_date.isoformat()
+                        if initiative.target_end_date
+                        else None,
+                        "executive_sponsor": initiative.executive_sponsor,
+                        "program_manager": initiative.program_manager,
+                        "budget_variance_pct": budget_variance_pct,
+                        "budget_reason": budget_reason,
+                        "success_metrics": [
+                            {
+                                "metric_name": m.metric_name,
+                                "metric_type": m.metric_type,
+                                "target_value": m.target_value,
+                                "actual_value": m.actual_value,
+                                "status": m.status,
+                            }
+                            for m in initiative.success_metrics
+                        ],
+                        "affected_rows": blast.get("rows", []),
+                        "affected_summary": blast.get("summary", {}),
+                    }
+                )
+
+        return {"initiatives": initiative_payloads, "reasons": [], "elements": all_elements}
+
+    @staticmethod
+    def _raci_tenant_predicate(model, organization_id: int):
+        """The explicit ``organization_id ==`` predicate on both RACI selects.
+
+        For ``UnifiedCapability`` this is the strict predicate: a shared
+        reference-catalogue row (``organization_id IS NULL``) is not this
+        organisation's capability and must never supply rows. Kept as its own
+        seam so the cross-tenant mutation proof can replace exactly this one
+        function with a no-op and confirm the named test goes red.
+        """
+        return model.organization_id == organization_id
+
+    @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:
         """L4, "who's accountable for ___, and can they take on more?":
         WITHDRAWN -- the ownership data source is decided, but no shared,
@@ -1599,16 +1751,120 @@ class IntelligenceQueryService:
         one. The route, question card and tests stay in place so the lens
         is easy to re-enable once a shared, tenant-safe reader exists;
         only the query itself is disabled.
+
+        What is answered instead, for a ``Capability`` element only: who is
+        recorded against the capability that mirrors it, from the
+        organisation's ``EnterpriseRaciAssignment`` rows -- a different table
+        with its own tenant column, not the ownership tables above, and never
+        presented as an application owner. The answer then carries a ``raci``
+        block; for every other element type, and when there is no tenant
+        context or the element is not found, the answer is exactly the
+        withdrawn one and carries no ``raci`` key (not applicable is not an
+        absence).
+
+        The ``raci`` block has exactly six keys: ``capability_id``, ``rows``,
+        ``accountable_count``, ``no_accountable``, ``reason`` and ``source``.
+        Each row is as recorded (assignment id, stakeholder type, id and
+        label, and the RACI letter); a null letter is carried as null and does
+        not count as ``A``. A capability with rows but no ``A`` is a listed
+        absence (``no_accountable`` true), not a defect and not a score. The
+        stakeholder label is the recorded one; nothing is resolved to a person
+        or role row.
         """
-        # No record_query_latency wrapper -- there is no query to time, and
-        # sampling a constant into the NFR-5 latency series would only
-        # dilute it with meaningless near-zero readings.
-        del element_id  # withdrawn; kept for a stable call signature
-        return {
+        # No record_query_latency wrapper -- the withdrawn answer has no
+        # query to time, and sampling a constant into the NFR-5 latency series
+        # would only dilute it with meaningless near-zero readings.
+        answer: Dict[str, Any] = {
             "owners": [],
             "capacity_not_available": True,
             "reasons": [OWNERSHIP_READER_NOT_BUILT_REASON, CAPACITY_NOT_AVAILABLE_REASON],
         }
+
+        org_id = current_org_id()
+        if org_id is None:
+            return answer
+
+        from app.models import ArchiMateElement
+
+        element = db.session.execute(
+            db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
+        ).scalar_one_or_none()
+        if element is None or (element.type or "") != "Capability":
+            return answer
+
+        from app.models.organization_model import EnterpriseRaciAssignment
+        from app.models.unified_capability import UnifiedCapability
+
+        capability_id = db.session.execute(
+            db.select(UnifiedCapability.id)
+            .where(
+                UnifiedCapability.archimate_element_id == element_id,
+                IntelligenceQueryService._raci_tenant_predicate(UnifiedCapability, org_id),
+            )
+            .order_by(UnifiedCapability.id)
+        ).scalars().first()
+
+        if capability_id is None:
+            answer["raci"] = {
+                "capability_id": None,
+                "rows": None,
+                "accountable_count": None,
+                "no_accountable": None,
+                "reason": NO_CAPABILITY_IN_CHAIN_REASON,
+                "source": "enterprise_raci_assignments",
+            }
+            return answer
+
+        raci_rows = db.session.execute(
+            db.select(
+                EnterpriseRaciAssignment.id,
+                EnterpriseRaciAssignment.stakeholder_type,
+                EnterpriseRaciAssignment.stakeholder_id,
+                EnterpriseRaciAssignment.stakeholder_name,
+                EnterpriseRaciAssignment.raci,
+            )
+            .where(
+                EnterpriseRaciAssignment.capability_id == capability_id,
+                IntelligenceQueryService._raci_tenant_predicate(EnterpriseRaciAssignment, org_id),
+            )
+            .order_by(
+                EnterpriseRaciAssignment.raci,
+                EnterpriseRaciAssignment.stakeholder_name,
+                EnterpriseRaciAssignment.id,
+            )
+        ).all()
+
+        if not raci_rows:
+            answer["raci"] = {
+                "capability_id": capability_id,
+                "rows": None,
+                "accountable_count": None,
+                "no_accountable": None,
+                "reason": NO_RACI_RECORDED_REASON,
+                "source": "enterprise_raci_assignments",
+            }
+            return answer
+
+        entries = [
+            {
+                "assignment_id": row.id,
+                "stakeholder_type": row.stakeholder_type,
+                "stakeholder_id": row.stakeholder_id,
+                "stakeholder_name": row.stakeholder_name,
+                "raci": row.raci,
+            }
+            for row in raci_rows
+        ]
+        accountable_count = sum(1 for entry in entries if entry["raci"] == "A")
+        answer["raci"] = {
+            "capability_id": capability_id,
+            "rows": entries,
+            "accountable_count": accountable_count,
+            "no_accountable": accountable_count == 0,
+            "reason": None,
+            "source": "enterprise_raci_assignments",
+        }
+        return answer
 
     # ------------------------------------------------------------------ #
     # L7: the Data lens.
