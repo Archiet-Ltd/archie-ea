@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.public_pages import load_page
+from app.services.public_pages import HELD_PAGE_URLS, MERGED_PAGES, load_page
 
 SITE_PAGES = [
     "about",
@@ -26,6 +26,14 @@ SITE_PAGES = [
     "pricing",
     "docs",
 ]
+
+# The shared footer intentionally does not link /docs: it is a HELD_PAGE_URLS
+# page (noindex, "Coming in an upcoming release"), and D-28 removed its
+# site-wide footer link so no public page points visitors at a held
+# placeholder from every page's footer. The navbar's own /docs link
+# (public_navbar.html) is untouched -- D-28 scoped the fix to the footer,
+# which this PR's diff touches; the navbar does not.
+FOOTER_LINKED_SITE_PAGES = [slug for slug in SITE_PAGES if slug != "docs"]
 
 
 def test_every_site_page_returns_200(app):
@@ -47,24 +55,50 @@ def test_every_site_page_has_title_and_h1(app):
 
 
 def test_every_site_page_has_footer_with_all_links(app):
-    """Every site page renders the shared footer linking to every other site page."""
+    """Every site page renders the shared footer linking to every other live site page."""
     with app.test_client() as client:
         for slug in SITE_PAGES:
             rv = client.get(f"/{slug}")
             html = rv.data.decode()
-            for other_slug in SITE_PAGES:
+            for other_slug in FOOTER_LINKED_SITE_PAGES:
                 assert f'href="/{other_slug}"' in html, (
                     f"/{slug}: footer is missing a link to /{other_slug}"
                 )
 
 
 def test_home_page_footer_links_every_site_page(app):
-    """The home page's footer links to every new page (no dead links from the entry point)."""
+    """The home page's footer links to every live new page (no dead links from the entry point)."""
     with app.test_client() as client:
         rv = client.get("/")
         html = rv.data.decode()
-        for slug in SITE_PAGES:
+        for slug in FOOTER_LINKED_SITE_PAGES:
             assert f'href="/{slug}"' in html, f"home page footer missing link to /{slug}"
+
+
+def test_no_footer_link_points_at_a_held_or_merged_page(app):
+    """No public-facing footer href is ever a HELD_PAGE_URLS or MERGED_PAGES page (D-28).
+
+    D-28 found /docs (HELD) still linked from app/templates/components/public_footer.html
+    on every public page. This asserts the fix generally, across every rendered site page
+    and the home page, rather than pinning the one slug found -- so a future PR relinking
+    /docs, or linking a different held/merged page, fails here instead of shipping again.
+    """
+    import re
+
+    with app.test_client() as client:
+        for path in ["/"] + [f"/{slug}" for slug in SITE_PAGES]:
+            html = client.get(path).data.decode()
+            footer_match = re.search(r"<footer\b.*?</footer>", html, re.DOTALL)
+            assert footer_match, f"{path}: no <footer> element rendered"
+            footer_html = footer_match.group(0)
+            footer_hrefs = re.findall(r'href="([^"]+)"', footer_html)
+            for href in footer_hrefs:
+                assert href not in HELD_PAGE_URLS, (
+                    f"{path}: footer links held page {href!r}"
+                )
+                assert href not in MERGED_PAGES, (
+                    f"{path}: footer links merged (301) page {href!r}"
+                )
 
 
 def test_home_page_navbar_links_key_site_pages(app):
@@ -129,7 +163,7 @@ def test_contact_page_has_no_invented_email(app):
         assert "mailto:" not in html, "/contact invents an email address; no support mailbox exists"
         assert "support@example.com" not in html
         assert "https://reqarchitect.com" in html
-        assert "https://archiet.com" in html
+        assert "https://archiet.dev" in html
 
 
 def test_contact_page_has_no_waiting_list_or_launch_framing(app):
@@ -164,10 +198,18 @@ def test_load_page_site_family_known_and_unknown_slug():
 
 @pytest.mark.parametrize("slug", SITE_PAGES)
 def test_site_pages_included_in_sitemap_and_llms_txt(app, slug):
-    """Each new page is discoverable through the existing sitemap and llms.txt, unchanged."""
+    """Each new page is discoverable through the existing sitemap and
+    llms.txt -- except /docs, a SEO/GEO audit HOLD-verdict page (no
+    documentation is published yet, so it stays reachable but out of
+    every crawler file and nav/index listing until it is -- see
+    app/services/public_pages.py HELD_PAGE_URLS)."""
     with app.test_client() as client:
         sitemap = client.get("/sitemap.xml").data.decode()
         llms = client.get("/llms.txt").data.decode()
+        if slug == "docs":
+            assert "/docs" not in sitemap, "/sitemap.xml should not list held page /docs"
+            assert "/docs" not in llms, "/llms.txt should not list held page /docs"
+            return
         assert f"/{slug}" in sitemap, f"/sitemap.xml missing /{slug}"
         assert f"/{slug}" in llms, f"/llms.txt missing /{slug}"
 
@@ -185,6 +227,10 @@ def test_no_page_links_to_the_private_repository(app):
             assert "archiet-ltd/entelim" not in html, (
                 f"{path} links to the private archiet-ltd/entelim repository"
             )
-            assert "github.com" not in html, (
-                f"{path} links to github.com; the repository is not public"
+            # The open-source repository (Archiet-Ltd/archie-ea) is public, and the
+            # pricing page's self-hosting band links to it. Any other GitHub link
+            # is still a dead-link risk.
+            other = html.replace("github.com/Archiet-Ltd/archie-ea", "")
+            assert "github.com" not in other, (
+                f"{path} links to a github.com repository other than the public archie-ea one"
             )

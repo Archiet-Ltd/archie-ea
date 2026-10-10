@@ -486,7 +486,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 66 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 68 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -512,6 +512,7 @@ to reconfirm the count before trusting it:**
 | `unfenced-tables` | a database table with no `TenantMixin` that is not listed in `scripts/unfenced_tables.txt` (a new one is a decision) | ratchet @ 0 |
 | `llm-boundary` | a codegen emitter calling an LLM directly | ratchet @ 0 |
 | `evidence-contract` | behavioural changes/checkers missing evidence or provenance | ratchet @ 29 |
+| `untyped-property-writes` | direct ArchiMate element property writes bypassing the typed writer | ratchet @ 1 |
 | `role-gate-coverage` | a declared delivery role resolving to no verifier gate | ratchet @ 7 |
 | `ai-evidence-rules` | an AI persona missing evidence/no-fabrication rules | must be 0 |
 | `ai-tool-guard` | an AI mutating tool bypassing permission/approval classification | must be 0 |
@@ -528,6 +529,7 @@ to reconfirm the count before trusting it:**
 | `ui-contract` | a native dialog / `onclick=` / typeless button / arbitrary `px` (DESIGN.md) | ratchet @ 0 |
 | `unrendered-model-fields` | a detail-view template never rendering a real Text/JSON model field | ratchet @ 387 |
 | `error-signalling` | an API error path that answers `200` | must be 0 |
+| `is-admin-called` | a `*.is_admin` reference used without calling it (a bound method, always truthy) | must be 0 |
 | `silent-data` | a server failure returned to the caller as data | must be 0 |
 | `dead-interactions` | a control that silently does nothing | must be 0 |
 | `macro-import-context` | a script-bearing macro imported without `with context` | must be 0 |
@@ -563,7 +565,8 @@ Per-line escape hatches, each of which makes the exception reviewable rather tha
 silent — every one greppable as `<name>-ok` in `scripts/verify.py`/`scripts/check_*.py`:
 `fabricated-ok`, `air-gap-ok`, `tenancy-ok`, `tenant-scoping-ok`, `llm-boundary-ok`,
 `raw-fetch-ok`, `shell-ok`, `breadcrumb-ok`, `stale-model-ok`, `error-signalling-ok`,
-`silent-data-ok`, `ui-contract-ok`, `fetch-guard-ok`, `token-migration-ok`
+`silent-data-ok`, `ui-contract-ok`, `fetch-guard-ok`, `token-migration-ok`,
+`is-admin-called-ok`
 (design-tokens only), each taking `: <reason>` where the gate requires one.
 
 `pre-commit install` gives the same feedback at commit time on changed files only.

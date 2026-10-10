@@ -1026,12 +1026,14 @@ _GAPS = [
 # ═════════════════════════════════════════════════════════════════════════════
 
 def _resolve_elements(org_id):
-    """Return {name: ArchiMateElement} for all elements in this org."""
+    """Return {name: ArchiMateElement} for all elements in this org; where a work package's own
+    element shares a seeded element's name, the first-created (seeded) element wins."""
     from app.models import ArchiMateElement
 
     rows = (
         db.session.query(ArchiMateElement)
         .filter(ArchiMateElement.organization_id == org_id)
+        .order_by(ArchiMateElement.id.desc())
         .all()
     )
     return {r.name: r for r in rows}
@@ -1088,6 +1090,7 @@ def seed_demo_company() -> dict:
     from app.models.risk import Risk, RiskStatus
     from app.models.enterprise_intelligence import PortfolioInitiative
     from app.models.unified_work_package import UnifiedWorkPackage
+    from app.services import work_package_service
     from app.models.implementation_migration import Plateau, Gap
     from app.jobs.tenant_safe_job import tenant_scope
     from werkzeug.security import generate_password_hash
@@ -1384,25 +1387,20 @@ def seed_demo_company() -> dict:
              estimated, actual, el_name, cap_code) in _WORK_PACKAGES:
             if name in existing_wps:
                 continue
-            el = elements.get(el_name)
             cap = caps.get(cap_code)
-            wp = UnifiedWorkPackage(
+            work_package_service.create_work_package(
+                organization_id=org_id,
                 name=name,
                 status=status,
                 priority=priority,
                 start_date=today + _dt.timedelta(days=start_offset),
                 end_date=today + _dt.timedelta(days=start_offset + duration),
-                duration_days=duration,
                 estimated_cost=estimated,
                 actual_cost=actual,
-                archimate_element_id=el.id if el else None,
                 capability_id=cap.id if cap else None,
                 business_capability=cap.name if cap else "",
                 assigned_to="Ivo Reed",
-                scope="enterprise",
-                organization_id=org_id,
             )
-            db.session.add(wp)
             wps_created += 1
         if wps_created:
             db.session.flush()

@@ -2186,8 +2186,24 @@ class MultiDomainChatService:
             if detected_entity_type:
                 # Admin gate — check at intent detection time
                 # tenant-scoping-ok: user_id here is the acting/chatting user's own id.
+                #
+                # D-4 (admin-rbac-active-org continuation): ``actor.is_admin()``
+                # is a global ``Permission.ADMINISTER`` flag, independent of
+                # which organisation is active in the session
+                # (``g.current_org_id``) -- see the matching fix and comment
+                # in app/modules/ai_chat/services/ai_chat_approval_service.py
+                # (the execution-time guard this is a "double guard" alongside).
                 actor = User.query.get(user_id) if user_id else None
-                if not actor or not actor.is_admin():
+                from flask import g
+
+                from app.middleware.tenant_decorators import is_platform_admin
+                from app.services.rbac_service import rbac_service
+
+                active_org_id = getattr(g, "current_org_id", None)
+                if not actor or not (
+                    is_platform_admin(actor)
+                    or rbac_service.is_org_admin(actor, active_org_id)
+                ):
                     return {
                         "success": True,
                         "response": (

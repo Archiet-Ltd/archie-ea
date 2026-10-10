@@ -25,7 +25,7 @@ Curated reference packs for major platforms, adopted through a guided questionna
 CMDB, Jira, or spreadsheet data onto the pack's elements through a review queue that flags anything
 uncertain — with version upgrades that preserve your own customisations.
 
-Coming December 2026 to February 2027. Join the waiting list and we'll tell you the day it ships.
+Coming in an upcoming release. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 
