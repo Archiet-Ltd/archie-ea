@@ -660,6 +660,7 @@ def sso_callback(provider):
     # than the raw `sub` claim, because `sub` is not guaranteed stable
     # across apps for the same Azure user (see app/auth/sso.py).
     from app.auth.sso import (
+        create_sso_user,
         external_id_for,
         find_linked_user,
         sso_email_claim_is_trusted_for,
@@ -682,6 +683,17 @@ def sso_callback(provider):
     # tenant-scoping-ok: pre-auth SSO callback, no org context yet -- scoped
     # by the (external_id, sso_provider) pair, which is unique per IdP.
     user = find_linked_user(provider, userinfo, User)
+    if user is not None and User.normalize_email(email) != User.normalize_email(user.email):
+        # Subject match, but the IdP's current email claim no longer
+        # matches the stored address -- informational (the subject anchor
+        # already proved identity above, so this never blocks sign-in),
+        # but worth a record: never the addresses themselves.
+        from app.services import auth_audit
+
+        try:
+            auth_audit.record_sso_email_mismatch(user.organization_id, user, provider)
+        except Exception as _exc:
+            _log.warning("Audit log failed on SSO email-mismatch record: %s", _exc)
     if user is None:
         # No existing subject-based link. Falling back to matching by email
         # is only safe when the provider's claims prove the signing-in
@@ -702,18 +714,21 @@ def sso_callback(provider):
                 except Exception as _exc:
                     _log.warning("Audit log failed on SSO refusal: %s", _exc)
                 return redirect(url_for("account.login"))
-            candidate.external_id = external_id
-            candidate.sso_provider = provider
+            # D-03: a trusted email match never replaces a pair this account
+            # is already linked to under a different provider -- only a
+            # still-unlinked account gets one written here.
+            if not candidate.external_id:
+                candidate.external_id = external_id
+                candidate.sso_provider = provider
             user = candidate
         else:
             # Create new user
-            user = User(
+            user = create_sso_user(
                 email=email,
                 first_name=first_name,
                 last_name=last_name,
                 external_id=external_id,
                 sso_provider=provider,
-                confirmed=True,
             )
             db.session.add(user)
 

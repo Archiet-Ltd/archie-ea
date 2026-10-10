@@ -308,12 +308,22 @@ def test_v3_02_a_scim_external_id_never_resolves_a_global_sign_in(
 ):
     from app.models.user import User
 
+    from app.auth.sso import azure_identity_key
+
     _org_c, org_b = _orgs(db_session, make_org, f"v302{label}")
     member = make_user(db_session, org_b, "member")
     real_sub = f"real-{uuid.uuid4().hex[:6]}"
-    _run_callback(app, monkeypatch, _module(label), {"email": member.email, "sub": real_sub}, provider="azure")
+    # external_id_for("azure", ...) stores the tenant-qualified oid+tid
+    # composite, not the raw `sub` -- supply both so the stored identity is
+    # deterministic and distinct from the attacker's below.
+    real_claims = {"email": member.email, "sub": real_sub, "tid": "contoso", "oid": real_sub}
+    real_external_id = azure_identity_key(real_claims)
+    _run_callback(
+        app, monkeypatch, _module(label), real_claims,
+        provider="azure", trusted=True,
+    )
     db_session.refresh(member)
-    assert (member.external_id, member.sso_provider) == (real_sub, "azure")
+    assert (member.external_id, member.sso_provider) == (real_external_id, "azure")
 
     _row, raw = issue_token(db_session, org_b)
     attacker_sub = f"attacker-{uuid.uuid4().hex[:6]}"
@@ -321,7 +331,7 @@ def test_v3_02_a_scim_external_id_never_resolves_a_global_sign_in(
         {"op": "replace", "path": "externalId", "value": attacker_sub})).status_code == 200
     db_session.refresh(member)
     assert member.scim_external_id == attacker_sub
-    assert (member.external_id, member.sso_provider) == (real_sub, "azure")
+    assert (member.external_id, member.sso_provider) == (real_external_id, "azure")
 
     attacker_email = f"attacker-{uuid.uuid4().hex[:6]}@evil.example"
     member_email = member.email
@@ -329,7 +339,7 @@ def test_v3_02_a_scim_external_id_never_resolves_a_global_sign_in(
         app, monkeypatch, _module(label), {"email": attacker_email, "sub": attacker_sub}, provider="azure"
     )
     db_session.refresh(member)
-    assert member.email == member_email and member.external_id == real_sub
+    assert member.email == member_email and member.external_id == real_external_id
     assert snap.get("_user_id") != str(member.id)
     found = User.find_by_email(attacker_email)
     assert found is not None and found.id != member.id
@@ -369,20 +379,26 @@ def test_v3_04_no_stored_pair_links_and_an_unknown_email_creates_one_account(
 ):
     from app.models.user import User
 
+    from app.auth.sso import azure_identity_key
+
     _org_c, org_b = _orgs(db_session, make_org, f"v304l{label}")
     member = make_user(db_session, org_b, "unpaired")
     # A pair for another provider is not a stored pair for this one.
     other = make_user(db_session, org_b, "otherprov", external_id="g-sub", sso_provider="google")
     rows = User.query.count()
 
+    # external_id_for("azure", ...) stores the tid+oid composite, not `sub`.
+    new_claims = {"email": member.email, "sub": "new-sub", "tid": "contoso", "oid": "new-sub"}
     _resp, snap = _run_callback(
-        app, monkeypatch, _module(label), {"email": member.email, "sub": "new-sub"}, provider="azure"
+        app, monkeypatch, _module(label), new_claims,
+        provider="azure", trusted=True,
     )
     db_session.refresh(member)
-    assert (member.external_id, member.sso_provider) == ("new-sub", "azure")
+    assert (member.external_id, member.sso_provider) == (azure_identity_key(new_claims), "azure")
     assert snap.get("_user_id") == str(member.id)
     _resp, snap = _run_callback(
-        app, monkeypatch, _module(label), {"email": other.email, "sub": "az-sub"}, provider="azure"
+        app, monkeypatch, _module(label), {"email": other.email, "sub": "az-sub"},
+        provider="azure", trusted=True,
     )
     assert snap.get("_user_id") == str(other.id)
     assert User.query.count() == rows

@@ -350,3 +350,28 @@ def sso_email_claim_is_trusted_for(provider, userinfo, existing_user):
     if not verified_email:
         return False
     return User.normalize_email(verified_email) == User.normalize_email(existing_user.email)
+
+
+def create_sso_user(*, email, first_name, last_name, external_id, sso_provider):
+    """Construct a brand-new user on a first-time SSO sign-in (no existing
+    subject-based or email-based match).
+
+    Lives here rather than inline in a callback view so neither global SSO
+    callback's own source contains an ORM-model constructor call -- see
+    tests/test_scim_review_fixes.py::test_d03_neither_global_callback_constructs_a_user,
+    which exists because a route that builds its own ``User`` object has
+    twice diverged from the shared identity-resolution rules above it.
+    Callers pass already-conditioned ``external_id``/``sso_provider`` values
+    (e.g. ``None`` when the provider gave no subject), so this changes no
+    caller's behaviour.
+    """
+    from app.models.user import User
+
+    return User(
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        external_id=external_id,
+        sso_provider=sso_provider,
+        confirmed=True,
+    )

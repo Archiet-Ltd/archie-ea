@@ -246,14 +246,26 @@ def _callbacks():
     return [("v1", v1, "sso_callback"), ("v2", v2, "sso_callback")]
 
 
-def _run_callback(app, monkeypatch, module, userinfo, provider="google"):
-    """Run one global SSO callback; returns ``(response, session snapshot)``."""
+def _run_callback(app, monkeypatch, module, userinfo, provider="google", trusted=False):
+    """Run one global SSO callback; returns ``(response, session snapshot)``.
+
+    ``trusted=True`` simulates a provider claim strong enough to pass the
+    nOAuth email-claim trust gate (app.auth.sso.sso_email_claim_is_trusted_for),
+    for tests whose ``userinfo`` carries no real ``email_verified``/``tid``
+    claim but whose scenario is about what happens *after* a legitimate
+    email match, not about the trust gate itself. Leave it False (the real
+    function runs) for anything that resolves by subject instead, or that
+    deliberately exercises the trust gate's own refusal.
+    """
+    import app.auth.sso as sso_module
     from flask import session
 
     monkeypatch.setattr(module, "_sso_enabled", lambda: True)
     monkeypatch.setattr(module, "_get_sso_oauth", lambda: _FakeOAuth(userinfo))
     # The v2 callback's audit call is owned by the separate hotfix; keep it out of these tests.
     monkeypatch.setattr(module.audit_logger, "log", lambda *a, **k: None, raising=False)
+    if trusted:
+        monkeypatch.setattr(sso_module, "sso_email_claim_is_trusted_for", lambda *a, **k: True)
     view = module.sso_callback
     view = getattr(view, "__wrapped__", view)
     with app.test_request_context(f"/account/sso/callback/{provider}?state=s1"):
@@ -275,7 +287,7 @@ def test_f04_an_administrator_through_a_global_callback_is_sent_to_mfa(
     userinfo = {"email": admin.email, "sub": f"sub-{uuid.uuid4().hex[:6]}",
                 "given_name": "A", "family_name": "B"}
 
-    resp, snap = _run_callback(app, monkeypatch, module, userinfo)
+    resp, snap = _run_callback(app, monkeypatch, module, userinfo, trusted=True)
 
     assert resp.status_code == 302 and "mfa" in resp.headers["Location"]
     assert snap.get("_mfa_pending_user_id") == admin.id
@@ -296,7 +308,7 @@ def test_f04_a_non_administrator_through_a_global_callback_lands_signed_in(
     member = make_user(db_session, org, "ssomember")
     userinfo = {"email": member.email, "sub": f"sub-{uuid.uuid4().hex[:6]}"}
 
-    resp, snap = _run_callback(app, monkeypatch, module, userinfo)
+    resp, snap = _run_callback(app, monkeypatch, module, userinfo, trusted=True)
 
     assert resp.status_code == 302 and "mfa" not in resp.headers["Location"]
     assert snap.get("_user_id") == str(member.id)
@@ -313,7 +325,7 @@ def test_d03_a_global_callback_never_replaces_a_set_external_id(
     member = make_user(db_session, org, "scimid", external_id="scim-set-id", sso_provider="entra")
     userinfo = {"email": member.email, "sub": "other-sub"}
 
-    resp, snap = _run_callback(app, monkeypatch, module, userinfo)
+    resp, snap = _run_callback(app, monkeypatch, module, userinfo, trusted=True)
 
     assert snap.get("_user_id") == str(member.id)
     db_session.refresh(member)
@@ -332,7 +344,7 @@ def test_d03_a_global_callback_links_an_unlinked_user_and_creates_a_new_one(
     give_unlimited_plan(db_session, org)
     member = make_user(db_session, org, "unlinked")
     sub = f"sub-{uuid.uuid4().hex[:6]}"
-    _run_callback(app, monkeypatch, module, {"email": member.email, "sub": sub})
+    _run_callback(app, monkeypatch, module, {"email": member.email, "sub": sub}, trusted=True)
     db_session.refresh(member)
     assert member.external_id == sub and member.sso_provider == "google"
 

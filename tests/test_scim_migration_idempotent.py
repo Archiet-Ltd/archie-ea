@@ -26,7 +26,13 @@ from tests.test_schema_migrations import (
 )
 
 REVISION = "20261007_scim_provisioning"
-PREVIOUS = "20261007_public_visitor_events"
+# REVISION's own down_revision has moved as the branch re-chained onto main's
+# head across several merges -- read the current one directly rather than
+# re-hardcoding it every time main grows a new head.
+PREVIOUS = "20261010_arb_change_requests_rls"
+# 20261010_scim_group_members_rls fences scim_group_memberships with RLS on top
+# of REVISION -- it is now the real chain head, one step past REVISION.
+HEAD = "20261010_scim_group_members_rls"
 USER_COLUMNS = {"deactivated_at", "deactivation_reason", "provisioned_via"}
 
 
@@ -72,26 +78,29 @@ def test_there_is_exactly_one_head_and_it_chains_onto_the_previous_head():
     config = Config(str(REPO_ROOT / "migrations" / "alembic.ini"))
     config.set_main_option("script_location", str(REPO_ROOT / "migrations"))
     script = ScriptDirectory.from_config(config)
-    assert script.get_heads() == [REVISION]
-    assert _true_head() == REVISION
+    assert script.get_heads() == [HEAD]
+    assert _true_head() == HEAD
+    assert script.get_revision(HEAD).down_revision == REVISION
     assert script.get_revision(REVISION).down_revision == PREVIOUS
 
 
 def test_upgrade_reaches_head_downgrade_one_and_upgrade_again(empty_db):
     _flask(empty_db, ["schema-upgrade"])
-    assert _recorded(empty_db) == [REVISION]
+    assert _recorded(empty_db) == [HEAD]
     snapshot = _snapshot(empty_db)
     assert {"scim_tokens", "scim_group_memberships"} <= _tables(snapshot)
     assert _user_columns(empty_db) == USER_COLUMNS
 
+    # -1 from HEAD only undoes the RLS-fencing revision stacked on top of
+    # REVISION; the SCIM tables/columns REVISION itself built are untouched.
     _flask(empty_db, ["db", "downgrade", "--", "-1"])
-    assert _recorded(empty_db) == [PREVIOUS]
+    assert _recorded(empty_db) == [REVISION]
     after_down = _snapshot(empty_db)
-    assert not ({"scim_tokens", "scim_group_memberships"} & _tables(after_down))
-    assert _user_columns(empty_db) == set()
+    assert {"scim_tokens", "scim_group_memberships"} <= _tables(after_down)
+    assert _user_columns(empty_db) == USER_COLUMNS
 
     _flask(empty_db, ["db", "upgrade"])
-    assert _recorded(empty_db) == [REVISION]
+    assert _recorded(empty_db) == [HEAD]
     # what the revision builds is exactly what the models build
     assert _scim_part(_snapshot(empty_db)) == _scim_part(snapshot)
 
