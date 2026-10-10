@@ -171,39 +171,50 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
     if getattr(obj, "archimate_element_id", None):
         return None  # already on the backbone
 
-    element_type, layer = mapping
-    name = _first_attr(obj, NAME_FIELDS)
-    if not name:
-        raise ValueError(
-            "%s has no name/title to mirror into the ArchiMate model; the "
-            "element IS the field, so an unnamed motivation row cannot join "
-            "the backbone" % type_name
+    # Re-entry guard: prevent the before_flush hook from creating a second
+    # element when create_backbone_element flushes while this object is
+    # still in session.new.
+    obj_id = id(obj)
+    if obj_id in _SYNCING:
+        return None
+    _SYNCING.add(obj_id)
+
+    try:
+        element_type, layer = mapping
+        name = _first_attr(obj, NAME_FIELDS)
+        if not name:
+            raise ValueError(
+                "%s has no name/title to mirror into the ArchiMate model; the "
+                "element IS the field, so an unnamed motivation row cannot join "
+                "the backbone" % type_name
+            )
+
+        org_id = _resolve_org_id(obj)
+        if org_id is None:
+            raise ValueError(
+                "%s(%r) has no organization to attach its ArchiMate element to. "
+                "Inside a request this comes from the row or g.current_org_id; in "
+                "a CLI/scheduler path it must be passed explicitly."
+                % (type_name, name[:60])
+            )
+
+        properties = dict(provenance or {})
+        properties["source_model"] = type_name
+
+        element = create_backbone_element(
+            element_type=element_type,
+            layer=layer,
+            name=name,
+            description=getattr(obj, "description", None),
+            organization_id=org_id,
+            session=session,
+            provenance=properties,
+            flush=flush,
         )
-
-    org_id = _resolve_org_id(obj)
-    if org_id is None:
-        raise ValueError(
-            "%s(%r) has no organization to attach its ArchiMate element to. "
-            "Inside a request this comes from the row or g.current_org_id; in "
-            "a CLI/scheduler path it must be passed explicitly."
-            % (type_name, name[:60])
-        )
-
-    properties = dict(provenance or {})
-    properties["source_model"] = type_name
-
-    element = create_backbone_element(
-        element_type=element_type,
-        layer=layer,
-        name=name,
-        description=getattr(obj, "description", None),
-        organization_id=org_id,
-        session=session,
-        provenance=properties,
-        flush=flush,
-    )
-    obj.archimate_element_id = element.id
-    return element
+        obj.archimate_element_id = element.id
+        return element
+    finally:
+        _SYNCING.discard(obj_id)
 
 
 # ============================================================================
@@ -223,6 +234,23 @@ from sqlalchemy import event as _sa_event  # noqa: E402 — late import safe her
 # Per-session storage for the before_flush -> after_flush handoff.
 # Maps session_id -> {source_obj: element}
 _PENDING: dict = {}
+
+# Objects currently being processed by sync_archimate_element.
+# Prevents the before_flush hook from creating a second element
+# when sync_archimate_element flushes (via create_backbone_element) while
+# the source row is still in session.new.
+_SYNCING = set()  # type: ignore[var-annotated]
+
+# Types that the flush listener auto-creates elements for.  Every other type
+# in ELEMENT_TYPES (Goal, Driver, Requirement, Constraint, Metric, Plateau,
+# Gap, Solution* variants) behaves exactly as on main — no automatic element
+# creation during flush.
+FLUSH_LISTENER_ALLOW_LIST = frozenset({
+    "WorkPackage",
+    "UnifiedWorkPackage",
+    "Risk",
+    "ApplicationComplianceControl",
+})
 
 
 def _pending_map(session):
@@ -247,13 +275,16 @@ def _on_before_flush(session, flush_context, instances):
     pending = _pending_map(session)
     for obj in list(session.new):
         type_name = type(obj).__name__
-        if type_name not in ELEMENT_TYPES:
+        if type_name not in FLUSH_LISTENER_ALLOW_LIST:
             continue
         if getattr(obj, "archimate_element_id", None):
             continue
-        # Skip objects with no organisation — they cannot own an element.
+        # Skip objects without an organisation — they cannot own an element.
         org_id = getattr(obj, "organization_id", None)
         if org_id is None:
+            continue
+        # Skip objects that sync_archimate_element is already handling.
+        if id(obj) in _SYNCING:
             continue
         element = sync_archimate_element(obj, session=session, flush=False)
         if element is not None:
@@ -299,3 +330,17 @@ def register_archimate_listeners():
         _sa_event.listen(db.session, "before_flush", _on_before_flush)
     if not _sa_event.contains(db.session, "after_flush", _on_after_flush):
         _sa_event.listen(db.session, "after_flush", _on_after_flush)
+    if not _sa_event.contains(db.session, "after_rollback", _on_after_rollback):
+        _sa_event.listen(db.session, "after_rollback", _on_after_rollback)
+
+
+def _on_after_rollback(session):
+    """Clear the pending map on rollback so stale entries are never reused.
+
+    A flush that fails leaves entries in _PENDING for a session object that
+    may be reused; discarding them here prevents stale state.
+    """
+    sid = id(session)
+    _PENDING.pop(sid, None)
+    # Also clear _SYNCING entries that might have been left behind.
+    _SYNCING.clear()
