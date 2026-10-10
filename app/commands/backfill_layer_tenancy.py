@@ -188,6 +188,53 @@ _DERIVABLE_ORG = {
            AND i.organization_id IS NULL
            AND a.organization_id IS NOT NULL
     """,
+    # A vendor option belongs to its analysis. Ordering is load-bearing in the
+    # same way as above: "options_analysis" < "vendor_options", so the analysis
+    # is derived (or left NULL) before this reads it.
+    "vendor_options": """
+        UPDATE vendor_options o
+           SET organization_id = a.organization_id
+          FROM options_analysis a
+         WHERE o.analysis_id = a.id
+           AND o.organization_id IS NULL
+           AND a.organization_id IS NOT NULL
+    """,
+    # An analysis recommendation belongs to its analysis.
+    "analysis_recommendations": """
+        UPDATE analysis_recommendations r
+           SET organization_id = a.organization_id
+          FROM options_analysis a
+         WHERE r.analysis_id = a.id
+           AND r.organization_id IS NULL
+           AND a.organization_id IS NOT NULL
+    """,
+    # An analysis scenario belongs to its analysis.
+    "analysis_scenarios": """
+        UPDATE analysis_scenarios s
+           SET organization_id = a.organization_id
+          FROM options_analysis a
+         WHERE s.analysis_id = a.id
+           AND s.organization_id IS NULL
+           AND a.organization_id IS NOT NULL
+    """,
+    # A required capability belongs to its analysis.
+    "required_capabilities": """
+        UPDATE required_capabilities c
+           SET organization_id = a.organization_id
+          FROM options_analysis a
+         WHERE c.analysis_id = a.id
+           AND c.organization_id IS NULL
+           AND a.organization_id IS NOT NULL
+    """,
+    # An analysis audit log belongs to its analysis.
+    "analysis_audit_logs": """
+        UPDATE analysis_audit_logs l
+           SET organization_id = a.organization_id
+          FROM options_analysis a
+         WHERE l.analysis_id = a.id
+           AND l.organization_id IS NULL
+           AND a.organization_id IS NOT NULL
+    """,
 
     # --- Motivation, requirements, strategic and technology
     # layer tables. Every entry below derives from a table that is already
@@ -464,6 +511,8 @@ _PURGE_ORPHANS = {}
 # could belong to, so the ordinary single-organisation rule still applies.
 _PROVENANCE_ONLY = {
     "application_ownership", "options_analysis", "organization_units", "stakeholder_inputs",
+    "vendor_options", "analysis_recommendations", "analysis_scenarios",
+    "required_capabilities", "analysis_audit_logs",
     # Every table above whose _DERIVABLE_ORG entry can leave
     # a genuine remainder (a row whose own attribution columns are all NULL,
     # or all point at rows that are themselves unattributed) -- the fenced,
