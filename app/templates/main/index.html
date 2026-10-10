@@ -1,20 +1,20 @@
 {% extends 'layouts/public_base.html' %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
-{% block full_title %}Entelim — Enterprise Intelligence Management{% endblock %}
+{% block full_title %}Entelim — The Company Brain for every enterprise{% endblock %}
 {% block meta_description %}
 <link rel="canonical" href="https://entelim.org/">
-<meta name="description" content="Enterprise Intelligence Management: one living, explainable model of your enterprise. Entelim is an open-source enterprise architecture and intelligence platform built on ArchiMate 3.2. Self-host free under AGPL-3.0.">
-<meta property="og:title" content="Entelim — Enterprise Intelligence Management">
-<meta property="og:description" content="One living, explainable model of your enterprise. Open source, self-host free, forever.">
+<meta name="description" content="Entelim is the company brain: one living, explainable model of your enterprise that your people and your AI agents can both query and trust. Enterprise Intelligence Management, open source, self-host free under AGPL-3.0.">
+<meta property="og:title" content="Entelim — The Company Brain for every enterprise">
+<meta property="og:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
 <meta property="og:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Entelim — Enterprise Intelligence Management">
-<meta name="twitter:description" content="One living, explainable model of your enterprise. Open source, self-host free, forever.">
+<meta name="twitter:title" content="Entelim — The Company Brain for every enterprise">
+<meta name="twitter:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
 <meta name="twitter:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Enterprise Intelligence Management: the open-source enterprise architecture and intelligence platform."}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Entelim is the company brain: Enterprise Intelligence Management, the open-source enterprise architecture and intelligence platform."}</script>
 {% if config.GOOGLE_SITE_VERIFICATION %}
 <meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">
 {% endif %}
@@ -46,14 +46,15 @@
       </div>
 
       <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
-        Enterprise Intelligence Management for every enterprise.
+        The company brain for every enterprise.
       </h1>
 
       <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
         One living, explainable model of your enterprise: its strategy, systems, data, people, money, risk,
-        suppliers and AI, kept current and turned into cited answers. Entelim is an open-source enterprise
-        architecture and intelligence platform built on ArchiMate 3.2. Import your model and get a free, cited
-        answer to what breaks if a system fails, in minutes.
+        suppliers and AI, kept current and turned into cited answers &mdash; built so that when your AI agents
+        need to know how your company actually works, there is a governed source to ask, not a guess. Entelim is
+        an open-source enterprise architecture and intelligence platform built on ArchiMate 3.2. Import your
+        model and get a free, cited answer to what breaks if a system fails, in minutes.
       </p>
 
       <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
@@ -81,16 +82,26 @@
         carries and the people who own each piece. That knowledge is spread across spreadsheets, diagrams,
         contracts, tickets and people's heads. When someone asks "what breaks if this fails?", "what does this
         really cost?" or "are we doing what we said we would?", the answer is assembled by hand, late, and rarely
-        trusted.
+        trusted. An AI assistant asked the same question, with no grounded source to check, guesses &mdash;
+        confidently and wrongly.
       </p>
       <p>
-        <strong class="text-foreground">Enterprise Intelligence Management is the capability that fixes this.</strong>
-        Customer relationship management gave every company one record of its customers. Enterprise resource
-        planning gave it one record of its operations and finances. Enterprise Intelligence Management gives it
-        one record of the enterprise itself: a living digital twin of strategy, business, applications, data,
-        technology, people, money, risk, suppliers, operations and AI, kept current from the systems that master
-        each fact, and turned into answers, insights, recommendations and simulations for every person who runs
-        the business, and for the machines that work for them.
+        <strong class="text-foreground">This isn't a search problem, and it isn't a chatbot problem.</strong>
+        Searching your documents faster doesn't fix knowledge that was never written down in a structured,
+        checkable form in the first place, and a chatbot trained on whatever it can find repeats the same gaps
+        with more confidence. What's missing is a living, explainable model of how the enterprise actually works
+        &mdash; its strategy, systems, data, people, money, risk and suppliers &mdash; kept current, and built so
+        both the people who run the business and the AI assistants working alongside them have one governed
+        source to ask instead of guessing.
+      </p>
+      <p>
+        <strong class="text-foreground">Enterprise Intelligence Management is the capability that builds that
+        model.</strong> Customer relationship management gave every company one record of its customers.
+        Enterprise resource planning gave it one record of its operations and finances. Enterprise Intelligence
+        Management gives it one record of the enterprise itself: a company brain holding strategy, business,
+        applications, data, technology, people, money, risk, suppliers, operations and AI, kept current from the
+        systems that master each fact, and turned into answers, insights, recommendations and simulations for
+        every person who runs the business, and for the machines that work for them.
       </p>
       <p>
         <strong class="text-foreground">It is a capability, not a department.</strong> A startup is an
@@ -237,9 +248,10 @@
     </h2>
     <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
       Your teams already ask AI assistants about your systems, suppliers, risks and plans. Without a source of
-      truth, those assistants guess. Entelim connects to AI assistants through the Model Context Protocol, the
-      open standard for linking assistants to tools and data, so an assistant asks the same governed questions
-      the platform's own screens ask and gets back answers that cite the records they came from.
+      truth, those assistants guess. A company brain closes that loop: Entelim connects to AI assistants through
+      the Model Context Protocol, the open standard for linking assistants to tools and data, so an assistant
+      asks the same governed questions the platform's own screens ask and gets back answers that cite the
+      records they came from.
     </p>
     <ul class="mx-auto max-w-xl text-left space-y-2 text-muted-foreground">
       <li class="rounded-lg border border-border bg-card p-4"><strong class="text-foreground">Your administrator decides.</strong> Each assistant is approved for your organisation and access can be revoked at any time.</li>
@@ -253,12 +265,12 @@
   </div>
 </section>
 
-<!-- 6. How the twin grows -->
+<!-- 6. How the company brain grows -->
 <section class="relative py-20 sm:py-32">
   <div class="mx-auto max-w-5xl px-4 sm:px-6">
     <div class="text-center mb-12 space-y-4">
       <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-        How the twin grows.
+        How the company brain grows.
       </h2>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-5 gap-4 text-center text-sm">
@@ -416,7 +428,11 @@
     <div class="space-y-6">
       <details class="rounded-lg border border-border bg-card p-6">
         <summary class="font-semibold text-foreground cursor-pointer">What is Enterprise Intelligence Management?</summary>
-        <p class="text-muted-foreground text-sm mt-3">One living, explainable model of your enterprise, kept current from the systems that master each fact, and turned into cited answers for every person who runs the business.</p>
+        <p class="text-muted-foreground text-sm mt-3">The capability that builds your company brain: one living, explainable model of your enterprise, kept current from the systems that master each fact, and turned into cited answers for every person who runs the business.</p>
+      </details>
+      <details class="rounded-lg border border-border bg-card p-6">
+        <summary class="font-semibold text-foreground cursor-pointer">How is this different from a company-wide search or a chatbot over your documents?</summary>
+        <p class="text-muted-foreground text-sm mt-3">Search finds documents faster; it doesn't fix knowledge that was never written down in a structured, checkable form. A chatbot trained on whatever it can find repeats the same gaps with more confidence. Entelim builds a living, explainable model of how your enterprise actually works, and every answer cites the record it came from.</p>
       </details>
       <details class="rounded-lg border border-border bg-card p-6">
         <summary class="font-semibold text-foreground cursor-pointer">How is it different from enterprise architecture management?</summary>
