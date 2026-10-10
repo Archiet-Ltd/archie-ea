@@ -13,8 +13,9 @@ background tasks, unauthenticated requests).
 
 import logging
 
-from flask import g
-from sqlalchemy import text
+from flask import g, has_app_context
+from sqlalchemy import event, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import with_loader_criteria
 
 from app.extensions import db
@@ -29,8 +30,16 @@ def set_database_tenant_context(connection, organization_id):
     ``set_config(..., true)`` is PostgreSQL's transaction-local equivalent of
     ``SET LOCAL``.  Commit/rollback clears it before a pooled connection can be
     reused by another request.
+
+    Inside ``app.jobs.tenant_safe_job.platform_scope`` the same call also sets
+    ``archie.platform_scope`` for this transaction, which the row-level
+    security policies admit (see ``migrations/versions/20261008_row_level_security.py``).
+    It does that even when there is no organisation, which is the point of a
+    platform scope.
     """
 
+    if _platform_scope_active():
+        connection.execute(text("SELECT set_config('archie.platform_scope', 'on', true)"))
     if organization_id is None:
         return
     connection.execute(
@@ -39,13 +48,45 @@ def set_database_tenant_context(connection, organization_id):
     )
 
 
+def _platform_scope_active() -> bool:
+    return has_app_context() and bool(getattr(g, "_platform_scope", None))
+
+
+_engine_hook_installed = False
+
+
+def _install_platform_scope_engine_hook() -> None:
+    """Carry ``archie.platform_scope`` onto connections the ORM session never opens.
+
+    A few runtime paths open ``db.engine.connect()`` or ``Session(db.engine)``
+    directly (the capability projection job, the typed-ARB waiver expiry), so the
+    session ``after_begin`` listener never sees them. Inside ``platform_scope``
+    each transaction they begin gets the same transaction-local setting. Outside
+    one this does nothing, and it never sets an organisation.
+    """
+    global _engine_hook_installed
+    if _engine_hook_installed:
+        return
+    _engine_hook_installed = True
+
+    @event.listens_for(Engine, "begin")
+    def _platform_scope_on_begin(connection):
+        if connection.dialect.name == "postgresql" and _platform_scope_active():
+            connection.exec_driver_sql(
+                "SELECT set_config('archie.platform_scope', 'on', true)"
+            )
+
+
 def install_tenant_filter(app):
     """Wire SQLAlchemy event listeners for automatic tenant scoping."""
 
+    _install_platform_scope_engine_hook()
+
     @db.event.listens_for(db.session, "after_begin")
     def _set_database_tenant_after_begin(session, transaction, connection):
-        if hasattr(g, "current_org_id") and g.current_org_id is not None:
-            set_database_tenant_context(connection, g.current_org_id)
+        current_org_id = getattr(g, "current_org_id", None)
+        if current_org_id is not None or _platform_scope_active():
+            set_database_tenant_context(connection, current_org_id)
 
     @db.event.listens_for(db.session, "do_orm_execute")
     def _add_soft_delete_filter(orm_execute_state):

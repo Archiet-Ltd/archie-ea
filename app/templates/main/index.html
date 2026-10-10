@@ -1,13 +1,20 @@
 {% extends 'layouts/public_base.html' %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
-{% block full_title %}Entelim — your whole company, one model you can ask{% endblock %}
+{% block full_title %}Entelim — Enterprise Intelligence Management{% endblock %}
 {% block meta_description %}
-<meta name="description" content="Entelim is the open-source Enterprise Intelligence Model: enter your website address and see your company's architecture, applications, risks and gaps as one model you can ask. Self-host free under AGPL-3.0.">
 <link rel="canonical" href="https://entelim.org/">
-<meta property="og:title" content="Entelim — your whole company, one model you can ask">
-<meta property="og:description" content="Enter your website address and see your company as one model you can ask. Open source, self-host free, forever.">
+<meta name="description" content="Enterprise Intelligence Management: one living, explainable model of your enterprise. Entelim is an open-source enterprise architecture and intelligence platform built on ArchiMate 3.2. Self-host free under AGPL-3.0.">
+<meta property="og:title" content="Entelim — Enterprise Intelligence Management">
+<meta property="og:description" content="One living, explainable model of your enterprise. Open source, self-host free, forever.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "The open-source Enterprise Intelligence Model."}</script>
+<meta property="og:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Entelim — Enterprise Intelligence Management">
+<meta name="twitter:description" content="One living, explainable model of your enterprise. Open source, self-host free, forever.">
+<meta name="twitter:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Enterprise Intelligence Management: the open-source enterprise architecture and intelligence platform."}</script>
 {% if config.GOOGLE_SITE_VERIFICATION %}
 <meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">
 {% endif %}
@@ -23,7 +30,7 @@
 {% endblock %}
 
 {% block content %}
-<!-- Hero Section -->
+<!-- Hero: category name first, product-in-search-terms second -->
 <section class="relative min-h-screen flex items-center justify-center overflow-hidden bg-background">
   <div class="absolute inset-0 -z-10">
     <div class="absolute inset-0 bg-background opacity-80"></div>
@@ -39,95 +46,324 @@
       </div>
 
       <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
-        Your whole company, one model you can ask.
+        Enterprise Intelligence Management for every enterprise.
       </h1>
 
       <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
-        Enter your website address. Entelim reads your public pages, proposes your canvas, the products you run and the tools that could feed it, then waits for you to confirm. Ask what breaks if something fails, who is on the hook, and what you pay for twice.
+        One living, explainable model of your enterprise: its strategy, systems, data, people, money, risk,
+        suppliers and AI, kept current and turned into cited answers. Entelim is an open-source enterprise
+        architecture and intelligence platform built on ArchiMate 3.2. Import your model and get a free, cited
+        answer to what breaks if a system fails, in minutes.
       </p>
 
       <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-        <a href="#waitlist" class="inline-flex items-center justify-center px-6 py-3 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all duration-200">
-          Join the waiting list
+        <a href="{{ url_for('account.register') }}" class="public-btn bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-all duration-200">
+          Start free
         </a>
-        <a href="{{ url_for('account.login') }}" class="inline-flex items-center justify-center px-6 py-3 rounded-md border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
-          Sign in
+        <a href="/pricing" class="public-btn border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
+          See pricing
         </a>
       </div>
     </div>
   </div>
 </section>
 
-<!-- What it answers: six questions -->
+<!-- 1. The category: the problem, the analogy, a capability not a department -->
+<section class="relative py-20 sm:py-32 bg-muted/30">
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 space-y-8 text-center">
+    <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+      Every enterprise runs on knowledge it cannot see in one place.
+    </h2>
+    <div class="space-y-6 text-left text-lg text-muted-foreground">
+      <p>
+        Every company, from a five-person startup to a global group, has a strategy, the capabilities that
+        deliver it, the systems and suppliers those capabilities depend on, the money it spends, the risks it
+        carries and the people who own each piece. That knowledge is spread across spreadsheets, diagrams,
+        contracts, tickets and people's heads. When someone asks "what breaks if this fails?", "what does this
+        really cost?" or "are we doing what we said we would?", the answer is assembled by hand, late, and rarely
+        trusted.
+      </p>
+      <p>
+        <strong class="text-foreground">Enterprise Intelligence Management is the capability that fixes this.</strong>
+        Customer relationship management gave every company one record of its customers. Enterprise resource
+        planning gave it one record of its operations and finances. Enterprise Intelligence Management gives it
+        one record of the enterprise itself: a living digital twin of strategy, business, applications, data,
+        technology, people, money, risk, suppliers, operations and AI, kept current from the systems that master
+        each fact, and turned into answers, insights, recommendations and simulations for every person who runs
+        the business, and for the machines that work for them.
+      </p>
+      <p>
+        <strong class="text-foreground">It is a capability, not a department.</strong> A startup is an
+        enterprise. So is a 200-person family business, a scale-up preparing for its first audit and a
+        multinational with ten thousand applications. Each of them needs to know what it runs on, what that
+        costs, what could go wrong and whether its plans are working. What changes with size is the depth of the
+        model, not the need for it.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- 2. Proof today: one cross-layer question, answered and cited -->
+<section class="relative py-20 sm:py-32">
+  <div class="mx-auto max-w-5xl px-4 sm:px-6">
+    <div class="text-center mb-16 space-y-4">
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+        Ask a question. Get an answer that shows its working.
+      </h2>
+      <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
+        Pick any element in your model and ask: what breaks if it fails, which strategy it serves, which
+        programmes touch it, and which risks reach it. Every row shows its source and how it was derived, and you
+        can see the model as it stood on any past date.
+      </p>
+    </div>
+    <div class="grid sm:grid-cols-2 gap-6 lg:gap-8">
+      <div class="rounded-lg border border-border bg-card p-6" data-testid="home-proof-what-breaks">
+        <h3 class="text-lg font-semibold text-foreground mb-2">What breaks if this fails?</h3>
+        <p class="text-muted-foreground text-sm">Everything that depends on it, across every layer, cited back to the record it came from.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6" data-testid="home-proof-strategy">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Which strategy does it serve?</h3>
+        <p class="text-muted-foreground text-sm">The goals and value streams this element carries, traced back to the motivation model.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6" data-testid="home-proof-programmes">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Which programmes touch it?</h3>
+        <p class="text-muted-foreground text-sm">Every gap, roadmap and work package that changes it, in the same model as the estate it changes.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6" data-testid="home-proof-risk">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Which risks reach it?</h3>
+        <p class="text-muted-foreground text-sm">Every recorded risk on the path to this element, not only the risk written directly on it.</p>
+      </div>
+    </div>
+    <p class="text-center mt-8">
+      <a href="{{ url_for('account.register') }}" class="text-primary underline hover:no-underline">Start free and ask your own model</a>
+    </p>
+  </div>
+</section>
+
+<!-- 3. The five groups and eighteen capabilities -->
 <section class="relative py-20 sm:py-32 bg-muted/30">
   <div class="mx-auto max-w-7xl px-4 sm:px-6">
     <div class="text-center mb-16 space-y-4">
       <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-        Ask in plain words. Get the working, not just the answer.
+        The eighteen capabilities of Enterprise Intelligence Management.
       </h2>
+      <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
+        Grouped by the question each one answers.
+      </p>
     </div>
 
-    <div class="grid md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
       <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">What breaks if this fails, and who gets called?</h3>
-        <p class="text-muted-foreground text-sm">Everything that depends on it, across every layer, with the owner on record.</p>
+        <h3 class="text-lg font-semibold text-foreground mb-1">Set direction</h3>
+        <p class="text-sm text-muted-foreground mb-4">Where are we going, and is the money following the plan?</p>
+        <ul class="space-y-2 text-sm">
+          <li><a href="/features#strategy-management" class="text-primary underline hover:no-underline">Strategy Management</a></li>
+          <li><a href="/features#portfolio-management" class="text-primary underline hover:no-underline">Portfolio Management</a></li>
+          <li><a href="/features#transformation-management" class="text-primary underline hover:no-underline">Transformation Management</a></li>
+          <li><a href="/features#investment-and-financial-management" class="text-primary underline hover:no-underline">Investment and Financial Management</a></li>
+        </ul>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">Which value streams are at risk, and why?</h3>
-        <p class="text-muted-foreground text-sm">The capabilities under each stream, how mature they are, and what that puts at risk.</p>
+        <h3 class="text-lg font-semibold text-foreground mb-1">Know what you run</h3>
+        <p class="text-sm text-muted-foreground mb-4">What does the business actually run on, and who owns it?</p>
+        <ul class="space-y-2 text-sm">
+          <li><a href="/features#architecture-management" class="text-primary underline hover:no-underline">Architecture Management</a></li>
+          <li><a href="/features#data-management" class="text-primary underline hover:no-underline">Data Management</a></li>
+          <li><a href="/features#people-and-organisation-management" class="text-primary underline hover:no-underline">People and Organisation Management</a></li>
+          <li><a href="/features#operations-and-service-management" class="text-primary underline hover:no-underline">Operations and Service Management</a></li>
+        </ul>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">What are we paying for twice?</h3>
-        <p class="text-muted-foreground text-sm">Overlapping applications and contracts, gathered into one list you can act on.</p>
+        <h3 class="text-lg font-semibold text-foreground mb-1">Stay in control</h3>
+        <p class="text-sm text-muted-foreground mb-4">What could hurt us, what must we prove, and what are we committed to?</p>
+        <ul class="space-y-2 text-sm">
+          <li><a href="/features#risk-management" class="text-primary underline hover:no-underline">Risk Management</a></li>
+          <li><a href="/features#compliance-and-governance" class="text-primary underline hover:no-underline">Compliance and Governance</a></li>
+          <li><a href="/features#vendor-and-procurement-management" class="text-primary underline hover:no-underline">Vendor and Procurement Management</a></li>
+          <li><a href="/features#ai-management" class="text-primary underline hover:no-underline">AI Management</a></li>
+        </ul>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">What are we trying to achieve here, and how is it tracking?</h3>
-        <p class="text-muted-foreground text-sm">The initiatives on an element, their budget and their measures.</p>
+        <h3 class="text-lg font-semibold text-foreground mb-1">Get answers before you need them</h3>
+        <p class="text-sm text-muted-foreground mb-4">What does it mean, what happens next, and what should we do?</p>
+        <ul class="space-y-2 text-sm">
+          <li><a href="/features#enterprise-intelligence" class="text-primary underline hover:no-underline">Enterprise Intelligence</a></li>
+          <li><a href="/features#simulation-and-scenario-planning" class="text-primary underline hover:no-underline">Simulation and Scenario Planning</a></li>
+          <li><a href="/features#agentic-automation" class="text-primary underline hover:no-underline">Agentic Automation</a></li>
+        </ul>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">What could hurt this, and what does it touch?</h3>
-        <p class="text-muted-foreground text-sm">Every recorded risk and how far its effects reach.</p>
+        <h3 class="text-lg font-semibold text-foreground mb-1">Connect and trust</h3>
+        <p class="text-sm text-muted-foreground mb-4">Does it fit how we work, and can we trust it with our data?</p>
+        <ul class="space-y-2 text-sm">
+          <li><a href="/features#collaboration-and-communication" class="text-primary underline hover:no-underline">Collaboration and Communication</a></li>
+          <li><a href="/features#integration-and-interoperability" class="text-primary underline hover:no-underline">Integration and Interoperability</a></li>
+          <li><a href="/features#administration-and-trust" class="text-primary underline hover:no-underline">Administration and Trust</a></li>
+        </ul>
       </div>
-      <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">Who is accountable for this?</h3>
-        <p class="text-muted-foreground text-sm">The owner and the team behind every system.</p>
+    </div>
+
+    <p class="text-center text-muted-foreground text-sm mt-10">
+      Every capability is in the product today or has a quarter on the published roadmap.
+      <a href="/features" class="text-primary underline hover:no-underline">See all eighteen in full</a>.
+    </p>
+  </div>
+</section>
+
+<!-- 4. A startup is an enterprise too -->
+<section class="relative py-20 sm:py-32">
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 text-center space-y-6">
+    <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+      A startup is an enterprise too.
+    </h2>
+    <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
+      A startup has a strategy, a handful of systems it cannot live without, suppliers it pays every month and
+      risks nobody has written down. Entelim puts all of it in one place on a free plan for up to three people, or
+      on the Startup plan for a team of ten at $49 a month.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+      <a href="/use-cases" class="public-btn border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
+        See it for startups and growing businesses
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Give your AI assistants one true source -->
+<section class="relative py-20 sm:py-32 bg-muted/30">
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 text-center space-y-6">
+    <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+      Give your AI assistants one true source about your company.
+    </h2>
+    <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
+      Your teams already ask AI assistants about your systems, suppliers, risks and plans. Without a source of
+      truth, those assistants guess. Entelim connects to AI assistants through the Model Context Protocol, the
+      open standard for linking assistants to tools and data, so an assistant asks the same governed questions
+      the platform's own screens ask and gets back answers that cite the records they came from.
+    </p>
+    <ul class="mx-auto max-w-xl text-left space-y-2 text-muted-foreground">
+      <li class="rounded-lg border border-border bg-card p-4"><strong class="text-foreground">Your administrator decides.</strong> Each assistant is approved for your organisation and access can be revoked at any time.</li>
+      <li class="rounded-lg border border-border bg-card p-4"><strong class="text-foreground">Read first, change only with approval.</strong> Assistants start with read access; a suggested change arrives in your approval queue, and nothing changes until a person approves it.</li>
+      <li class="rounded-lg border border-border bg-card p-4"><strong class="text-foreground">Every call on the record.</strong> Each request is logged with the assistant, the grant and the person it acted for.</li>
+    </ul>
+    <p class="text-muted-foreground text-sm">
+      Read access for your AI assistants opens in Q1 2027. Today, Entelim's own assistant already works this way:
+      every action passes one permission check and every change waits for approval.
+    </p>
+  </div>
+</section>
+
+<!-- 6. How the twin grows -->
+<section class="relative py-20 sm:py-32">
+  <div class="mx-auto max-w-5xl px-4 sm:px-6">
+    <div class="text-center mb-12 space-y-4">
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+        How the twin grows.
+      </h2>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-5 gap-4 text-center text-sm">
+      <div class="rounded-lg border border-border bg-card p-4">
+        <p class="font-semibold text-foreground mb-1">Today</p>
+        <p class="text-muted-foreground">Modelled</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-4">
+        <p class="font-semibold text-foreground mb-1">Q1 2027</p>
+        <p class="text-muted-foreground">Synchronised</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-4">
+        <p class="font-semibold text-foreground mb-1">Q2 2027</p>
+        <p class="text-muted-foreground">Operational</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-4">
+        <p class="font-semibold text-foreground mb-1">Q3 2027</p>
+        <p class="text-muted-foreground">Predictive</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-4">
+        <p class="font-semibold text-foreground mb-1">Q1 2028</p>
+        <p class="text-muted-foreground">Self-maintaining</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Who it is for: four personas -->
+<!-- 7. Open source and self-hosting -->
+<section class="relative py-20 sm:py-32 bg-muted/30">
+  <div class="mx-auto max-w-4xl px-4 sm:px-6 text-center space-y-6">
+    <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+      Licensed under AGPL-3.0.
+    </h2>
+    <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
+      Every question, the Business Model Canvas and the twin map run on software licensed under AGPL-3.0. Run it
+      on your own servers at any size, free, for as long as you like. Pay us when you want us to run it for you,
+      support it under contract, or connect it to your systems.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+      <a href="/contact" class="public-btn border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
+        Get in touch
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- 8. Pricing summary: four tiers plus both fixed-price offers -->
 <section class="relative py-20 sm:py-32">
   <div class="mx-auto max-w-7xl px-4 sm:px-6">
     <div class="text-center mb-16 space-y-4">
       <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-        One product, four ways in.
+        Priced per company, never per application.
       </h2>
     </div>
 
     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
       <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">Startup founders</h3>
-        <p class="text-muted-foreground text-sm">Your business on one page, filled in from your own words. Your canvas drafted from your own site, every line with its source. Ready for the diligence request before it arrives.</p>
+        <h3 class="text-lg font-semibold text-foreground mb-1">Community</h3>
+        <p class="text-2xl font-bold text-foreground mb-1">Free</p>
+        <p class="text-sm text-muted-foreground mb-3">No trial clock.</p>
+        <p class="text-sm text-muted-foreground">For evaluation, one-person companies and self-hosters. One organisation, three people. Every question, the Business Model Canvas, the twin map. File import. Community support.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">Scale-up CTOs</h3>
-        <p class="text-muted-foreground text-sm">Know what breaks and who gets called, before the outage. Blast radius and ownership for every service. Tool sprawl and duplicate spend in one list.</p>
+        <h3 class="text-lg font-semibold text-foreground mb-1">Startup</h3>
+        <p class="text-2xl font-bold text-foreground mb-1">$49<span class="text-sm font-normal text-muted-foreground">/month</span></p>
+        <p class="text-sm text-muted-foreground mb-3">$490/year.</p>
+        <p class="text-sm text-muted-foreground">For founders and small services firms, 5 to 50 people. Ten people and email support, everything in Community included.</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-6 ring-2 ring-primary">
+        <h3 class="text-lg font-semibold text-foreground mb-1">Team</h3>
+        <p class="text-2xl font-bold text-foreground mb-1">$29<span class="text-sm font-normal text-muted-foreground">/editor/month</span></p>
+        <p class="text-sm text-muted-foreground mb-3">$290/editor/year. Askers free.</p>
+        <p class="text-sm text-muted-foreground">For scale-ups and services companies, 50 to 500 people. Single sign-on, the review-board workflow, and your own model key.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">Enterprise architects</h3>
-        <p class="text-muted-foreground text-sm">An architecture model your whole company can question, and you can check. Every suggestion traced to its source. One annual platform fee: no per-application true-up, ever.</p>
+        <h3 class="text-lg font-semibold text-foreground mb-1">Enterprise</h3>
+        <p class="text-2xl font-bold text-foreground mb-1">From $24,000<span class="text-sm font-normal text-muted-foreground">/year</span></p>
+        <p class="text-sm text-muted-foreground mb-3">Annual contract.</p>
+        <p class="text-sm text-muted-foreground">For enterprise architecture teams. Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</p>
+      </div>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-6 lg:gap-8 mt-8">
+      <div class="rounded-lg border border-border bg-card p-6">
+        <h3 class="text-lg font-semibold text-foreground mb-1">Architecture health check</h3>
+        <p class="text-2xl font-bold text-foreground mb-1">$4,500<span class="text-sm font-normal text-muted-foreground"> one-time</span></p>
+        <p class="text-sm text-muted-foreground">A fixed-price assessment of your application landscape on your own data in Entelim, with a written report and read-out.</p>
+        <a href="/architecture-health-check" class="text-primary underline hover:no-underline text-sm">See what is included</a>
       </div>
       <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-2">Operations leads</h3>
-        <p class="text-muted-foreground text-sm">Who does what, and what happens if they can't. Key-person and supplier risk in plain words. Never a guess about your people or your contracts.</p>
+        <h3 class="text-lg font-semibold text-foreground mb-1">Team annual with onboarding</h3>
+        <p class="text-2xl font-bold text-foreground mb-1">$290<span class="text-sm font-normal text-muted-foreground">/editor/year + $1,500 one-time</span></p>
+        <p class="text-sm text-muted-foreground">At the end, your landscape is modelled, your existing data imported and your team able to keep it current.</p>
+        <a href="/team-annual-onboarding" class="text-primary underline hover:no-underline text-sm">See what is included</a>
       </div>
+    </div>
+
+    <div class="text-center mt-10">
+      <p class="text-muted-foreground"><a href="/pricing" class="text-primary underline hover:no-underline">See the full comparison and FAQ</a></p>
     </div>
   </div>
 </section>
 
-<!-- See it for your segment: curated use cases, plus the comparison hub -->
-<section class="relative py-20 sm:py-32 bg-muted/30">
+<!-- See it for your segment: curated use cases per persona -->
+<section class="relative py-20 sm:py-32">
   <div class="mx-auto max-w-7xl px-4 sm:px-6">
     <div class="text-center mb-16 space-y-4">
       <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
@@ -148,113 +384,57 @@
       {% endfor %}
     </div>
 
-    <div class="text-center mt-10 space-y-3">
+    <div class="text-center mt-10">
       <p class="text-muted-foreground">
         <a href="/use-cases" class="text-primary underline hover:no-underline">See every use case</a>
-        or
-        <a href="/vs" class="text-primary underline hover:no-underline">compare Entelim to other enterprise architecture tools</a>.
       </p>
     </div>
   </div>
 </section>
 
-<!-- Open source and self-hosting -->
+<!-- 9. Comparisons -->
 <section class="relative py-20 sm:py-32 bg-muted/30">
-  <div class="mx-auto max-w-4xl px-4 sm:px-6 text-center space-y-6">
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 text-center space-y-4">
     <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-      Licensed under AGPL-3.0.
+      How Entelim compares.
     </h2>
     <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
-      Every question, every canvas and the twin map run on software licensed under AGPL-3.0. Run it on your own servers at any size, free, for as long as you like. Pay us when you want us to run it for you, support it under contract, or connect it to your systems.
+      See how Enterprise Intelligence Management compares to the enterprise architecture tools you already know.
     </p>
-    <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-      <a href="/contact" class="inline-flex items-center justify-center px-6 py-3 rounded-md border border-border bg-card text-foreground font-medium hover:bg-muted transition-all duration-200">
-        Get in touch
-      </a>
-    </div>
+    <p><a href="/vs" class="text-primary underline hover:no-underline">Compare Entelim to other tools</a></p>
   </div>
 </section>
 
-<!-- Pricing summary: four tiers -->
+<!-- 10. FAQ -->
 <section class="relative py-20 sm:py-32">
-  <div class="mx-auto max-w-7xl px-4 sm:px-6">
-    <div class="text-center mb-16 space-y-4">
+  <div class="mx-auto max-w-3xl px-4 sm:px-6">
+    <div class="text-center mb-12 space-y-4">
       <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-        Priced per company, never per application.
+        Questions.
       </h2>
     </div>
-
-    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-      <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-1">Community</h3>
-        <p class="text-2xl font-bold text-foreground mb-1">Free</p>
-        <p class="text-sm text-muted-foreground mb-3">No trial clock.</p>
-        <p class="text-sm text-muted-foreground">For evaluation, one-person companies and self-hosters. One organisation, three people. Every question, every canvas, the twin map. File import. Community support.</p>
-      </div>
-      <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-1">Startup</h3>
-        <p class="text-2xl font-bold text-foreground mb-1">$49<span class="text-sm font-normal text-muted-foreground">/month</span></p>
-        <p class="text-sm text-muted-foreground mb-3">$490/year. Ten people.</p>
-        <p class="text-sm text-muted-foreground">For founders and small services firms, 5 to 50 people. Everything in Community plus webhook feed, export and share, email support.</p>
-      </div>
-      <div class="rounded-lg border border-border bg-card p-6 ring-2 ring-primary">
-        <h3 class="text-lg font-semibold text-foreground mb-1">Team</h3>
-        <p class="text-2xl font-bold text-foreground mb-1">$29<span class="text-sm font-normal text-muted-foreground">/editor/month</span></p>
-        <p class="text-sm text-muted-foreground mb-3">$290/editor/year. Askers free.</p>
-        <p class="text-sm text-muted-foreground">For scale-ups and services companies, 50 to 500 people. SSO, review-board workflow, own model key, usage history.</p>
-      </div>
-      <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-1">Enterprise</h3>
-        <p class="text-2xl font-bold text-foreground mb-1">From $24,000<span class="text-sm font-normal text-muted-foreground">/year</span></p>
-        <p class="text-sm text-muted-foreground mb-3">Annual contract.</p>
-        <p class="text-sm text-muted-foreground">For enterprise architecture teams. Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</p>
-      </div>
+    <div class="space-y-6">
+      <details class="rounded-lg border border-border bg-card p-6">
+        <summary class="font-semibold text-foreground cursor-pointer">What is Enterprise Intelligence Management?</summary>
+        <p class="text-muted-foreground text-sm mt-3">One living, explainable model of your enterprise, kept current from the systems that master each fact, and turned into cited answers for every person who runs the business.</p>
+      </details>
+      <details class="rounded-lg border border-border bg-card p-6">
+        <summary class="font-semibold text-foreground cursor-pointer">How is it different from enterprise architecture management?</summary>
+        <p class="text-muted-foreground text-sm mt-3">Enterprise architecture management models your systems. Enterprise Intelligence Management models the whole enterprise, keeps that model current, and answers plain-language questions across it, for every person who runs the business, not only architects.</p>
+      </details>
+      <details class="rounded-lg border border-border bg-card p-6">
+        <summary class="font-semibold text-foreground cursor-pointer">Is it only for large companies?</summary>
+        <p class="text-muted-foreground text-sm mt-3">No. A startup is an enterprise too. What changes with size is the depth of the model, not the need for it: a free plan covers up to three people, and the paid plans grow with you.</p>
+      </details>
+      <details class="rounded-lg border border-border bg-card p-6">
+        <summary class="font-semibold text-foreground cursor-pointer">What works today?</summary>
+        <p class="text-muted-foreground text-sm mt-3">Import an existing architecture model and get a cited answer to what breaks if a system fails, in minutes. <a href="/features" class="text-primary underline hover:no-underline">See all eighteen capabilities</a> for what each one delivers today.</p>
+      </details>
+      <details class="rounded-lg border border-border bg-card p-6">
+        <summary class="font-semibold text-foreground cursor-pointer">Can my AI assistant use it?</summary>
+        <p class="text-muted-foreground text-sm mt-3">Read access for your own AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today, Entelim's own assistant already works through the same permission and approval model.</p>
+      </details>
     </div>
-  </div>
-</section>
-
-<!-- Waiting list form -->
-<section id="waitlist" class="relative py-20 sm:py-32 bg-muted/30">
-  <div class="mx-auto max-w-lg px-4 sm:px-6">
-    <div class="text-center mb-10 space-y-4">
-      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-        Join the waiting list
-      </h2>
-      <p class="text-muted-foreground">
-        Be the first to know when Entelim launches. We will only use your email for launch news.
-      </p>
-    </div>
-
-    {% if thanks %}
-    <div class="rounded-md bg-success/5 border border-success/20 p-6 text-center">
-      <p class="text-success-emphasis font-medium">Thank you. You are on the list.</p>
-    </div>
-    {% else %}
-    <form method="POST" action="{{ url_for('main.index') }}" class="space-y-6">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="space-y-2">
-        <label for="email" class="text-sm font-medium leading-none block mb-2">Email address</label>
-        <input type="email" id="email" name="email" required
-               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-               placeholder="you@example.com">
-      </div>
-      <div class="flex items-center space-x-2">
-        <input type="checkbox" id="consent" name="consent" value="1" required
-               class="h-4 w-4 rounded border border-primary text-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-        <label for="consent" class="text-sm font-medium leading-none">
-          I agree that my email will be used only for launch news about Entelim.
-        </label>
-      </div>
-      {% if error %}
-      <div class="rounded-md bg-destructive/15 border border-destructive p-4">
-        <p class="text-sm text-destructive-emphasis">{{ error }}</p>
-      </div>
-      {% endif %}
-      <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full">
-        Join the waiting list
-      </button>
-    </form>
-    {% endif %}
   </div>
 </section>
 

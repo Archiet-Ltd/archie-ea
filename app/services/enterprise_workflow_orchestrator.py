@@ -13,7 +13,8 @@ from typing import Dict, List, Tuple
 
 from app import db
 from app.models.application_layer import Application
-from app.models.roadmap_models import RoadmapDeliverable, RoadmapWorkPackage
+from app.models.roadmap_models import RoadmapWorkPackage
+from app.services import work_package_service
 from app.models.unified_capability import UnifiedCapability
 from app.models.vendor.vendor_organization import VendorOrganization
 from app.services.advanced_tco_engine import AdvancedTCOEngine
@@ -220,32 +221,34 @@ class EnterpriseWorkflowOrchestrator:
 
         # Add default deliverables
         deliverables = [
-            RoadmapDeliverable(
+            dict(
                 name="Requirements Specification",
                 description=f"Detailed requirements for {application.name}",
                 deliverable_type="documentation",
-                status="pending",
-                due_date=work_package.start_date + timedelta(days=14),
+                delivery_status="pending",
+                target_date=work_package.start_date + timedelta(days=14),
             ),
-            RoadmapDeliverable(
+            dict(
                 name="Technical Design",
                 description=f"Architecture and technical design for {application.name}",
                 deliverable_type="technical",
-                status="pending",
-                due_date=work_package.start_date + timedelta(days=30),
+                delivery_status="pending",
+                target_date=work_package.start_date + timedelta(days=30),
             ),
-            RoadmapDeliverable(
+            dict(
                 name="Application Deployment",
                 description=f"Production deployment of {application.name}",
                 deliverable_type="milestone",
-                status="pending",
-                due_date=work_package.end_date,
+                delivery_status="pending",
+                target_date=work_package.end_date,
             ),
         ]
 
-        work_package.deliverables.extend(deliverables)
-
         db.session.add(work_package)
+        # The flush lets the bridge copy the row into the one work package store;
+        # the deliverables belong to that copy (the one deliverable store).
+        db.session.flush()
+        work_package_service.create_deliverables_for_roadmap_copy(work_package, deliverables)
         return work_package
 
     # ========================================================================
@@ -456,32 +459,34 @@ class EnterpriseWorkflowOrchestrator:
 
         # Add standard vendor onboarding deliverables
         deliverables = [
-            RoadmapDeliverable(
+            dict(
                 name="Vendor Contract Signed",
                 description="Legal and commercial terms finalized",
                 deliverable_type="milestone",
-                status="pending",
-                due_date=datetime.utcnow() + timedelta(days=30),
+                delivery_status="pending",
+                target_date=datetime.utcnow() + timedelta(days=30),
             ),
-            RoadmapDeliverable(
+            dict(
                 name="Technical Integration Complete",
                 description="API integration and data migration",
                 deliverable_type="technical",
-                status="pending",
-                due_date=datetime.utcnow() + timedelta(days=90),
+                delivery_status="pending",
+                target_date=datetime.utcnow() + timedelta(days=90),
             ),
-            RoadmapDeliverable(
+            dict(
                 name="User Training Completed",
                 description="End-user training and documentation",
                 deliverable_type="business",
-                status="pending",
-                due_date=datetime.utcnow() + timedelta(days=120),
+                delivery_status="pending",
+                target_date=datetime.utcnow() + timedelta(days=120),
             ),
         ]
 
-        work_package.deliverables.extend(deliverables)
-
         db.session.add(work_package)
+        # The flush lets the bridge copy the row into the one work package store;
+        # the deliverables belong to that copy (the one deliverable store).
+        db.session.flush()
+        work_package_service.create_deliverables_for_roadmap_copy(work_package, deliverables)
         return work_package
 
     # ========================================================================

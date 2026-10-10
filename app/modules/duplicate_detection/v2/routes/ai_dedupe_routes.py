@@ -13,6 +13,7 @@ import json
 import logging
 
 from flask import Blueprint, jsonify, render_template, request
+from app.middleware.tenant_decorators import platform_admin_required
 from flask_login import login_required
 
 from app.core.compat import mark_blueprint_guardrailed
@@ -139,6 +140,7 @@ def ai_analyze():
 @ai_dedupe_bp_v2.route("/insights/<int:run_id>")
 @timed_route
 @login_required
+@platform_admin_required
 def ai_insights(run_id):
     """View AI insights for a specific detection run"""
     try:
