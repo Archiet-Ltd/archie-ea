@@ -1,7 +1,7 @@
 """Add archimate_element_id to application_compliance_controls
 
 Revision ID: 20261009_app_compliance_element
-Revises: 20261008_uwp_element_unique
+Revises: 20261010_arb_change_requests_rls
 Create Date: 2026-10-09 11:41:33.126014
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20261009_app_compliance_element'
-down_revision = '20261008_uwp_element_unique'
+down_revision = '20261010_arb_change_requests_rls'
 branch_labels = None
 depends_on = None
 
