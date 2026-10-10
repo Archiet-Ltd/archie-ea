@@ -87,6 +87,11 @@
 
   {% if page.cta == 'plans' %}
   {{ plan_buy_section() }}
+  <section aria-labelledby="demo-heading" class="mt-8 rounded-lg border border-border bg-card p-5 space-y-2" data-testid="pricing-demonstration">
+    <h2 id="demo-heading" class="text-lg font-semibold text-foreground">Not ready to choose?</h2>
+    <p class="text-sm text-muted-foreground">Look around a fictional company with invented data, then start a trial with your own.</p>
+    <a href="{{ url_for('main.demonstration') }}" class="text-sm text-primary underline" data-testid="try-demonstration">Try the demonstration</a>
+  </section>
   {% endif %}
 
   {% if page.cta == 'waiting_list' %}

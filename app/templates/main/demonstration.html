@@ -1,0 +1,37 @@
+{% extends "layouts/public_base.html" %}<!-- smoke-coverage-ok: public entry page; behaviour covered by tests/test_demonstration_onboarding.py -->
+{% block title %}Try the demonstration{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-12" data-testid="demonstration-entry">
+  <h1 class="text-3xl font-bold text-foreground mb-4">Try the demonstration</h1>
+  <p class="text-foreground leading-relaxed mb-4">
+    Look around a fictional company, Lantern Quay Systems, before you put in any
+    data of your own. Everything in it is invented: the applications, costs,
+    risks and people are not real, and none of it describes your organisation.
+    You can read and ask questions; you cannot change anything.
+  </p>
+  {% if real_user %}
+  <p class="text-sm text-muted-foreground mb-6" data-testid="demonstration-signed-in">
+    You are signed in to your own organisation. Sign out first to open the demonstration.
+  </p>
+  {% elif available %}
+  <form method="post" action="{{ url_for('main.demonstration') }}" class="mb-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit"
+            class="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-5 bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            data-testid="demonstration-enter">Open the demonstration</button>
+  </form>
+  {% else %}
+  <p class="text-sm text-muted-foreground mb-6" role="status" data-testid="demonstration-unavailable">
+    The demonstration is not available right now. You can still start a trial with your own organisation.
+  </p>
+  {% endif %}
+  {% if not real_user %}
+  <p class="text-sm text-muted-foreground">
+    Ready to use your own data?
+    <a href="{{ url_for('main.demonstration_trial') }}" class="text-primary underline" data-testid="demonstration-start-trial">Start a trial</a>.
+    It creates a separate, empty organisation.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -25,11 +25,14 @@ from app import db
 # ── organisation ───────────────────────────────────────────────────────────
 
 _ORG_NAME = "Lantern Quay Systems"
-_ORG_SLUG = "lantern-quay"
+from app.services.demonstration_service import (  # noqa: E402
+    DEMO_SLUG as _ORG_SLUG,
+    DEMO_USER_EMAIL as _DEMO_USER_EMAIL,
+    mark_demonstration as _mark_demonstration,
+)
 
 # ── demo user ──────────────────────────────────────────────────────────────
 
-_DEMO_USER_EMAIL = "demo@lantern-quay.example.com"
 _DEMO_USER_FIRST = "Demo"
 _DEMO_USER_LAST = "User"
 
@@ -1107,6 +1110,8 @@ def seed_demo_company() -> dict:
         stats["organization_created"] = 1
     else:
         stats["organization_created"] = 0
+    # Every screen of this organisation says it is a demonstration.
+    _mark_demonstration(org)
     org_id = org.id
     # Commit the org row before tenant_scope, which calls db.session.remove()
     # and would otherwise detach the org, breaking FK validation downstream.

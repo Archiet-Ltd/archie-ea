@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: rendered-HTML route tests in tests/test_demonstration_onboarding.py cover the banner and trial form #}
 {% extends 'layouts/public_base.html' %}
 {% block title %}Create Account{% endblock %}
 {% import 'macros/form_macros.html' as f %}
@@ -13,8 +14,12 @@
         <div class="w-full max-w-md">
             <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
                 <div class="flex flex-col space-y-1.5 p-6">
-                    <h1 class="text-2xl font-semibold leading-none tracking-tight">Create an account</h1>
+                    <h1 class="text-2xl font-semibold leading-none tracking-tight">{% if trial %}Start your trial{% else %}Create an account{% endif %}</h1>
+                    {% if trial %}
+                    <p class="text-sm text-muted-foreground">This creates your own organisation, empty and separate from the demonstration. None of the demonstration's figures come with you.</p>
+                    {% else %}
                     <p class="text-sm text-muted-foreground">Sign up to get started</p>
+                    {% endif %}
                 </div>
                 <div class="p-6 pt-0">
                     {% set flashes = {

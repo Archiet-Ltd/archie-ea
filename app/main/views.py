@@ -1267,6 +1267,41 @@ from app.main import routes_ea_workflows
 routes_ea_workflows.register_ea_workflow_routes(main)
 
 
+# ── the demonstration organisation: entry and trial ───────────────────────
+
+
+@main.route("/demonstration", methods=["GET", "POST"])
+@rate_limit(20, "1m", methods=("POST",))
+def demonstration():
+    """Public entry to the labelled demonstration organisation.
+
+    GET explains what it is. POST signs the visitor in as its read-only viewer.
+    Someone already signed in to a real organisation keeps their own session.
+    """
+    from app.services import demonstration_service as demo
+
+    available = demo.demonstration_org() is not None
+    real_user = current_user.is_authenticated and not demo.is_demonstration_org_id(
+        current_user.organization_id
+    )
+    if request.method == "POST" and not real_user:
+        if demo.enter_demonstration() is not None:
+            return redirect(url_for("dashboard.overview"))
+        available = False
+    return render_template(
+        "main/demonstration.html", available=available, real_user=real_user
+    )
+
+
+@main.route("/demonstration/trial", methods=["GET", "POST"])
+@rate_limit(5, "1m", methods=("POST",))
+def demonstration_trial():
+    """Start a trial: the ordinary sign-up, into a new organisation on a trial."""
+    from app.modules.account.routes import mail_views
+
+    return mail_views.register_view(trial=True)
+
+
 # ── demo company website page ──────────────────────────────────────────────
 
 
