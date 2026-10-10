@@ -20,7 +20,6 @@ import time
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.models.mixins.core import TenantMixin, _default_org_id
 
 
 def _new_client_id(prefix: str = "cl") -> str:
@@ -33,7 +32,7 @@ def hash_secret(value: str) -> str:
     return hashlib.sha256(value.encode("ascii")).hexdigest()
 
 
-class OAuthAuthorizationCode(TenantMixin, db.Model):
+class OAuthAuthorizationCode(db.Model):
     """A single-use authorization code, stored in the database so every
     worker process in a multi-worker deployment can redeem codes issued by
     any other worker.
@@ -41,6 +40,12 @@ class OAuthAuthorizationCode(TenantMixin, db.Model):
     ``code`` holds ``hash_secret(<plaintext code>)``, not the plaintext —
     the plaintext is returned to the caller once, by :meth:`issue`, and
     never persisted.
+
+    Deliberately not ``TenantMixin``: the token endpoint redeems a code with
+    no organisation known yet (the caller is an assistant backend with no
+    session), so a tenant fence would make every redemption see zero rows.
+    The row still records the issuing organisation, and the lookup key is a
+    256-bit hash. Listed in ``scripts/unfenced_tables.txt`` for that reason.
     """
 
     __tablename__ = "oauth_authorization_codes"
@@ -56,16 +61,13 @@ class OAuthAuthorizationCode(TenantMixin, db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
-    # TenantMixin's column is non-nullable by default; this table is an
-    # ADD-only rollout onto an already-existing table (reconcile-schema can
-    # only add nullable columns), so the organization is recorded from the
-    # user at issue time but earlier/legacy rows are tolerated NULL.
+    # The issuing organisation, set explicitly at issue time (nullable for
+    # an ADD-only rollout onto an already-existing table).
     organization_id = db.Column(
         db.Integer,
         db.ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
-        default=_default_org_id,
     )
 
     @classmethod
@@ -222,15 +224,13 @@ class OAuthToken(db.Model):
     revoked_at = db.Column(db.DateTime, nullable=True)
     last_used_at = db.Column(db.DateTime, nullable=True)
 
-    # ADD-only rollout onto an already-existing table (see
-    # OAuthAuthorizationCode above for the same reasoning) — nullable
-    # override of TenantMixin's normally non-nullable column.
+    # The organisation the token was issued for, set explicitly at issue
+    # time (nullable for an ADD-only rollout onto an existing table).
     organization_id = db.Column(
         db.Integer,
         db.ForeignKey("organizations.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
-        default=_default_org_id,
     )
 
     user = db.relationship("User", backref="oauth_tokens", lazy="select")
