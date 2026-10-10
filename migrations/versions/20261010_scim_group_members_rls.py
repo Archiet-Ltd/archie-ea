@@ -16,14 +16,14 @@ that resolves a SCIM request to its organisation runs before any tenant context 
 (keyed by ``token_hash`` alone), so row-level security on that table would make the
 lookup itself always return zero rows. See app/models/scim.py's own docstring.
 
-Revision ID: 20261010_scim_group_memberships_rls
+Revision ID: 20261010_scim_group_members_rls
 Revises: 20261007_scim_provisioning
 Create Date: 2026-10-10
 """
 from alembic import op
 from sqlalchemy import text
 
-revision = "20261010_scim_group_memberships_rls"
+revision = "20261010_scim_group_members_rls"
 down_revision = "20261007_scim_provisioning"
 branch_labels = None
 depends_on = None
