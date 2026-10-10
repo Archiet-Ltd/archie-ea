@@ -203,6 +203,7 @@ element_templates
 enterprise_capabilities
 equipment
 error_events
+exchange_rates
 exception_process
 experience_elements
 external_systems
