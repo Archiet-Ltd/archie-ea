@@ -156,6 +156,19 @@ class TestContractApplicationLinks:
         db_session.add(app2)
         db_session.flush()
 
+        # audit_middleware's SQLAlchemy event listener on ApplicationComponent
+        # reads flask_login's current_user during that flush() above -- with
+        # no HTTP request context open mid-test, that resolves anonymous and
+        # Flask-Login caches the anonymous result on g for the rest of this
+        # app context (db_session's fixture keeps one app context open for
+        # the whole test, so g is not refreshed per request the way a real
+        # request would be). Every later client.post() in this test would
+        # then see g._login_user already cached as anonymous and get
+        # redirected to login instead of reaching the route. Re-running
+        # _login()'s own g-clearing step (see its docstring) re-establishes
+        # the real user before the next request.
+        _login(client, setup["user_a"].id)
+
         # Link both
         for app_comp in [setup["app_a"], app2]:
             resp = client.post(
@@ -190,6 +203,12 @@ class TestContractApplicationLinks:
         )
         db_session.add(app2)
         db_session.flush()
+
+        # See the matching comment in test_link_two_applications_and_list:
+        # audit_middleware's flush-time listener caches an anonymous
+        # current_user on g for the rest of this app context, so the real
+        # user needs re-establishing before the next request.
+        _login(client, setup["user_a"].id)
 
         for app_comp in [setup["app_a"], app2]:
             client.post(
