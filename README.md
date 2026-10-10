@@ -78,7 +78,7 @@ on Entelim:
 |---|---|---|---|
 | What | Self-hosted EA platform | Managed multi-tenant EA SaaS, SSO, real-time collaboration, premium AI, connectors | PRD → production code across 12+ stacks + 7 compliance frameworks |
 | For | Architects who self-host | Enterprises that want governed EA without ops | Founders/CTOs shipping compliant apps |
-| Link | — | **[reqarchitect.com](https://reqarchitect.com)** | **[archiet.com](https://archiet.com)** |
+| Link | — | **[reqarchitect.com](https://reqarchitect.com)** | **[archiet.dev](https://archiet.dev)** |
 
 Need to embed Entelim in a proprietary product or offer it as a service without AGPL
 obligations? A **[commercial license](COMMERCIAL-LICENSE.md)** is available.

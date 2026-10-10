@@ -1,0 +1,51 @@
+{# Plan buy buttons -- the one "choose a plan / start free / buy now" CTA
+   block, shared by every pricing-driven content page
+   (public/page.html, page.cta == 'plans') and the homepage
+   (main/index.html). Do not duplicate this markup a third time; call this
+   macro instead and pass a different heading/heading_id/testid if the
+   calling page needs one (ids must stay unique within a page).
+
+   A visitor who is not signed in goes to registration with the plan and
+   interval carried, and lands on that plan's checkout step on the billing
+   page afterwards (signing in instead leads to the same place). Uses only
+   Jinja globals (url_for, the injected `flask` object) so it needs no
+   `with context` import -- see scripts/check_macro_import_context.py. #}
+{% macro plan_buy_section(
+  heading='Choose a plan',
+  heading_id='buy-heading',
+  testid='pricing-buy',
+  intro='Annual billing is selected; monthly is one click away. Any tax due is shown on the payment page before you pay.'
+) %}
+{% set _billing = 'billing.billing_index' in flask.current_app.view_functions %}
+{% set _btn = 'public-btn transition-colors' %}
+<section aria-labelledby="{{ heading_id }}" class="mt-12 space-y-4" data-testid="{{ testid }}">
+  <h2 id="{{ heading_id }}" class="text-2xl font-semibold text-foreground">{{ heading }}</h2>
+  <p class="text-sm text-muted-foreground">{{ intro }}</p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
+      <p class="font-semibold text-foreground">Community</p>
+      <p class="text-sm text-muted-foreground">Free, with no trial clock.</p>
+      <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Start free</a>
+    </div>
+    {% for key, name in [('startup', 'Startup'), ('team', 'Team')] %}
+    <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
+      <p class="font-semibold text-foreground">{{ name }}</p>
+      {% if _billing %}
+      <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
+         class="{{ _btn }} mt-auto bg-primary text-primary-foreground hover:bg-primary/90"
+         data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
+      <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
+         class="text-sm text-primary underline text-center">or pay monthly</a>
+      {% else %}
+      <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Contact us to buy {{ name }}</a>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
+      <p class="font-semibold text-foreground">Enterprise</p>
+      <p class="text-sm text-muted-foreground">Sold by annual contract.</p>
+      <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent" data-testid="buy-enterprise">Contact sales</a>
+    </div>
+  </div>
+</section>
+{% endmacro %}

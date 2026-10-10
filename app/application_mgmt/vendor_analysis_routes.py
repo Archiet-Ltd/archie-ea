@@ -14,6 +14,7 @@ from flask_login import current_user, login_required
 
 from .. import db
 from . import application_mgmt
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.utils.pagination import safe_int_arg
 
 
@@ -98,7 +99,7 @@ def _check_analysis_access(analysis):
     if not analysis:
         return jsonify({"error": "Analysis not found"}), 404
     if analysis.created_by_id != current_user.id:
-        if not (hasattr(current_user, "is_admin") and current_user.is_admin()):
+        if not is_active_org_admin(current_user):
             return jsonify({"error": "Access denied"}), 403
     return None
 
@@ -133,9 +134,7 @@ def vendor_analysis_detail(analysis_id):
     analysis = load_entity(OptionsAnalysis, analysis_id)
     if analysis is None:
         abort(404, description="Analysis not found")
-    if analysis.created_by_id != current_user.id and not (
-        hasattr(current_user, "is_admin") and current_user.is_admin()
-    ):
+    if analysis.created_by_id != current_user.id and not is_active_org_admin(current_user):
         abort(403)
     return render_template(
         "application_mgmt/vendor_analysis_detail.html", analysis_id=analysis_id
@@ -2433,9 +2432,9 @@ def api_submit_stakeholder_scores(analysis_id, input_id):
         if not si:
             return jsonify({"error": "Stakeholder input not found"}), 404
 
-        # Only the stakeholder themselves (or admin) can submit. is_admin is a method:
-        # testing the bare attribute is always truthy, so this never used to deny anyone.
-        if si.stakeholder_id != current_user.id and not current_user.is_admin():
+        # Only the stakeholder themselves (or an admin of the active
+        # organisation -- see tenant_decorators.is_active_org_admin) can submit.
+        if si.stakeholder_id != current_user.id and not is_active_org_admin(current_user):
             return jsonify({"error": "Only the invited stakeholder can submit scores"}), 403
 
         data = request.get_json()

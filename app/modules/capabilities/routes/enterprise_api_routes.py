@@ -29,6 +29,7 @@ from sqlalchemy import or_
 
 from app import db
 from app.decorators import require_roles
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.adm_kanban import KanbanCard
 from app.models.application_portfolio import ApplicationComponent
 from app.models.audit_log import AuditLog
@@ -1272,7 +1273,7 @@ def patch_requirement_status(req_id):
     if req.solution_id:
         from app.models.solution_models import Solution
         sol = Solution.query.get(req.solution_id)
-        if sol and sol.created_by_id != current_user.id and not current_user.is_admin:
+        if sol and sol.created_by_id != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Forbidden: you do not own this solution"}), 403
 
     data = request.get_json() or {}
@@ -1341,7 +1342,7 @@ def enrich_requirement(req_id):
     if req.solution_id:
         from app.models.solution_models import Solution
         sol = Solution.query.get(req.solution_id)
-        if sol and sol.created_by_id != current_user.id and not current_user.is_admin:
+        if sol and sol.created_by_id != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Forbidden: you do not own this solution"}), 403
 
     data = request.get_json() or {}
@@ -2166,8 +2167,26 @@ def link_work_package(req_id):
     """Link or unlink a requirement to a kanban work package (REQ-013)."""
     req = SolutionRequirement.query.get_or_404(req_id)
 
-    # RBAC: solution owner or admin
-    if not current_user.is_admin():
+    # RBAC: solution owner or admin OF THE ACTIVE organisation.
+    #
+    # D-4 (admin-rbac-active-org continuation): this used to be
+    # ``current_user.is_admin()`` -- a global Permission.ADMINISTER flag,
+    # independent of which organisation is active in the session. Since
+    # every self-registered user is Administrator of their own
+    # organisation, a user who merely accepted a Viewer invitation into
+    # another organisation and switched their session into it bypassed the
+    # solution-owner check for any requirement there too -- the exact bug
+    # admin_required/org_admin_required already fix elsewhere in this PR.
+    from flask import g
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    _active_org_id = getattr(g, "current_org_id", None)
+    _is_admin_here = is_platform_admin(current_user) or rbac_service.is_org_admin(
+        current_user, _active_org_id
+    )
+    if not _is_admin_here:
         if req.solution_id:
             from app.models.solution_models import Solution
             sol = Solution.query.get(req.solution_id)

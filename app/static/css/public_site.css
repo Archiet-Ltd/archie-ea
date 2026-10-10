@@ -1,0 +1,46 @@
+/* Public marketing site: shared craft layer (loaded by layouts/public_base.html only).
+   Scoped under .public-site so the authenticated app shell is untouched. */
+
+/* P-01: the legacy Semantic-UI rule `nav { margin-bottom: 40px !important }` in app.css
+   pushed the public header nav links up out of the row's vertical centre. */
+.public-site nav { margin-bottom: 0 !important; }
+
+/* P-13: one primary button system, 44px tall, one radius, for navbar, hero and cards. */
+.public-site .public-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 2.75rem; height: 2.75rem; padding: 0 1.25rem;
+  border-radius: 0.5rem; font-size: 0.9375rem; font-weight: 500; line-height: 1;
+  text-decoration: none; white-space: nowrap;
+}
+
+/* P-15: wide container for hero/figure sections; prose keeps a ~680px measure. */
+.public-site .public-container { max-width: 72rem; margin-inline: auto; padding: 4rem 1rem; }
+@media (min-width: 640px) { .public-site .public-container { padding-inline: 1.5rem; } }
+@media (min-width: 768px) { .public-site .public-container { padding-block: 6rem; } }
+.public-site .public-page-content > * { max-width: 42.5rem; margin-inline: auto; }
+.public-site .public-page-content > table,
+.public-site .public-page-content > pre,
+.public-site .public-page-content > figure,
+.public-site .public-page-content > .public-wide { max-width: none; }
+.public-site .public-figure { max-width: 72rem; margin-inline: auto; }
+/* Full-bleed tinted band, a section-break option. */
+.public-site .public-band { background: var(--color-muted, #f3f4f6); border-block: 1px solid var(--color-border, #e5e7eb); }
+
+/* P-13: one type scale for inner pages (home is the same family at larger display sizes). */
+.public-site .public-page-content h1 { font-size: 2.25rem; line-height: 1.15; }
+.public-site .public-page-content h2 { font-size: 1.5rem; line-height: 1.25; margin-top: 4rem; }
+.public-site .public-page-content h3 { font-size: 1.25rem; }
+@media (min-width: 768px) {
+  .public-site .public-page-content h1 { font-size: 3rem; }
+  .public-site .public-page-content h2 { font-size: 1.875rem; margin-top: 6rem; }
+}
+.public-site .public-page-content h1 + h2,
+.public-site .public-page-content h1 + p + h2 { margin-top: 3rem; }
+
+/* P-18: one standard sub-line under the H1 instead of a one-off italic line. */
+.public-site .public-page-content h1 + p > em:only-child {
+  font-style: normal; font-size: 1.125rem; color: var(--color-muted-foreground, #6b7280);
+}
+
+/* P-18: footer entries that are not links read as plain text, not as disabled links. */
+.public-site .public-footer-plain { color: inherit; cursor: text; }

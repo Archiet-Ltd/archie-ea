@@ -43,6 +43,7 @@ from app.models.architecture_review_board import (
     TOGAFPhase,
 )
 from app.decorators import audit_log, require_roles
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.services.arb_analytics_service import ARBAnalyticsService
 from app.services.rate_limiter import rate_limit
 from app.services.arb_governance_service import (
@@ -1975,12 +1976,16 @@ def reopen_decision(id):
             flash("No decision has been recorded for this review item.", "warning")
             return redirect(url_for("arb.review_detail", id=id))
 
-        # Authorization: only the original decision maker or admin can reopen
+        # Authorization: only the original decision maker or admin of the
+        # ACTIVE organisation can reopen. R3-1 (PR 428 round 4):
+        # ``getattr(current_user, "is_admin", False)`` with no call returns
+        # the bound method, which is always truthy -- the same bug class as
+        # the round-3 ``.is_admin`` fix, written a different way. Any
+        # signed-in member, Viewer included, could reopen another user's
+        # recorded ARB decision. Judged the same way as the rest of this PR,
+        # against ``g.current_org_id`` rather than a global flag.
         is_decision_maker = review.decided_by_id == current_user.id
-        is_admin = (
-            getattr(current_user, "is_admin", False)
-            or getattr(current_user, "role", "") == "admin"
-        )
+        is_admin = is_active_org_admin()
 
         if not is_decision_maker and not is_admin:
             flash(

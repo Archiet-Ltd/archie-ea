@@ -361,7 +361,7 @@ def api_create_architecture_element(id):
 
 
 @application_mgmt.route(
-    "/api/applications/<string:id>/architecture/elements/<string:element_id>",
+    "/api/applications/<int:id>/architecture/elements/<int:element_id>",
     methods=["PUT"],
 )
 @login_required
@@ -374,14 +374,22 @@ def api_update_architecture_element(id, element_id):
     """
     Update existing ArchiMate element (inline editing support).
     """
-    ApplicationComponent.query.get_or_404(id)
+    from app.modules.architecture_assistant.property_service import PropertyValidationError
+
+    ApplicationComponent.query.filter_by(
+        id=id,
+        organization_id=current_user.organization_id,
+    ).first_or_404()
     data = request.get_json()
 
     if not data:
         return jsonify({"error": "Request body required"}), 400
 
     try:
-        element = ArchiMateElement.query.get(element_id)
+        element = ArchiMateElement.query.filter_by(
+            id=element_id,
+            organization_id=current_user.organization_id,
+        ).first()
         if not element:
             return jsonify({"error": "Element not found"}), 404
 
@@ -390,9 +398,8 @@ def api_update_architecture_element(id, element_id):
         if "description" in data:
             element.description = data["description"]
         if "properties" in data:
-            element.properties = (
-                json.dumps(data["properties"]) if data["properties"] else None
-            )
+            from app.modules.architecture_assistant.property_service import PropertyService
+            PropertyService().merge_element_properties(element, data["properties"] or {})
 
         db.session.commit()
 
@@ -409,6 +416,10 @@ def api_update_architecture_element(id, element_id):
                 "model_type": "archimate",
             }
         )
+
+    except PropertyValidationError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
 
     except Exception as e:
         db.session.rollback()
