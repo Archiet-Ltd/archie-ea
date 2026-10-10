@@ -132,11 +132,6 @@ _MORE_TOOLS = [
     ("Chief Architect Synthesis", "solution_design.architect_synthesis", "layout-dashboard"),
     # Hidden from this list on 30 Aug 2026 after every entry was requested with
     # a logged-in client and its status recorded:
-    #   implementation_planning.implementation_dashboard - 404 for everyone. Its
-    #     blueprint's before_request aborts 404 unless a feature flag row exists
-    #     AND is active, and the module is marked DEPRECATED in its own
-    #     docstring. "Work Packages" (enterprise.work_packages) is the live
-    #     surface and is already listed.
     #   main.capability_framework.dashboard - 302 to /framework-management/,
     #     already listed as "Framework Management".
     #   dashboard.index - 302 to /dashboard/overview, already a Home zone link.
@@ -153,6 +148,8 @@ _MORE_TOOLS = [
     # and requires each to be known here — deleting them would report five
     # brand-new "orphan modules" that are not orphans. `_NOT_RENDERED` below is
     # what keeps them out of the page and out of global search.
+    # Serves a real page again since the work package store rewrite, so it is
+    # listed (it is no longer in _NOT_RENDERED).
     ("Implementation Planning", "implementation_planning.implementation_dashboard", "package"),
     ("Capability Framework", "main.capability_framework.dashboard", "map"),
     ("Dashboard", "dashboard.index", "layout-dashboard"),
@@ -208,10 +205,6 @@ _MORE_TOOLS = [
 # one of them, so an entry that becomes live again fails the suite instead of
 # staying invisible.
 _NOT_RENDERED = {
-    # Hard 404 for every user: the blueprint's before_request aborts unless a
-    # feature-flag row exists AND is active, and the module's own docstring
-    # says DEPRECATED. "Work Packages" (enterprise.work_packages) is live.
-    "implementation_planning.implementation_dashboard": "404 - deprecated module",
     # 302 aliases onto a page this directory already lists under its own name.
     "main.capability_framework.dashboard": "302 -> Framework Management",
     "dashboard.index": "302 -> Dashboard Overview",

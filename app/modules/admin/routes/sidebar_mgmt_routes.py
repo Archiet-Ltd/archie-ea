@@ -24,6 +24,12 @@ sidebar_mgmt_bp = Blueprint("sidebar_mgmt", __name__, url_prefix="/api/admin/sid
 
 @sidebar_mgmt_bp.route("/items", methods=["GET"])
 @login_required
+# SidebarMenuItem carries no organization_id -- it is platform-wide sidebar
+# config. Every mutating route below (toggle/toggle_section/toggle_subsection/
+# reset_all_items) already requires platform_admin_required; this read-only
+# listing was the one left on admin_required, letting any tenant's own admin
+# read it (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def list_sidebar_items():
     """List all sidebar menu items with hierarchical grouping."""

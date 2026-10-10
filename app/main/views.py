@@ -18,8 +18,13 @@ from flask_login import current_user, login_required
 
 from app import db
 
+# D-5 (admin-rbac-active-org continuation): repointed from
+# app.core.auth.decorators.admin_required (one of three duplicate
+# admin_required implementations; that one never carried the active-org
+# fix at all) to the canonical, now-fixed implementation.
+from app.decorators import admin_required
+
 # Import capability framework blueprint
-from app.core.auth.decorators import admin_required
 from app.main.capability_framework_routes import capability_framework_bp
 from app.main.framework_management_routes import framework_management_bp
 from app.middleware.tenant_decorators import platform_admin_required
@@ -34,6 +39,22 @@ main = Blueprint("main", __name__)
 # Register sub-blueprints
 main.register_blueprint(capability_framework_bp)
 main.register_blueprint(framework_management_bp)
+
+
+@main.before_app_request
+def _redirect_www_to_apex():
+    """301 any request to www.entelim.org to the same path on entelim.org.
+
+    A host check, not server config -- the app owns this redirect the same
+    way it owns every other canonicalisation decision in this module. Only
+    ever fires for that exact host, so local/dev/test requests (localhost,
+    127.0.0.1, the test client's default "localhost") are untouched.
+    """
+    host = (request.host or "").split(":", 1)[0].lower()
+    if host == "www.entelim.org":
+        target = request.url.replace("www.entelim.org", "entelim.org", 1)
+        return redirect(target, code=301)
+    return None
 
 
 def _csv_safe(value):
@@ -52,17 +73,25 @@ def _csv_safe(value):
     return text
 
 
-# The home page's "see it for your segment" section: three use-case pages
-# curated per segment to match that segment's existing persona blurb above
-# it on the page (see main/index.html, "Who it is for"), not every page in
-# the family -- the full, generated list lives at /use-cases. Each page's
-# own title (loaded live, not copied here) is the link text, so this never
-# drifts from the page it points to.
+# The home page's "see it for your segment" section: use-case pages curated
+# per segment to match that segment's existing persona blurb above it on the
+# page (see main/index.html, "Who it is for"), not every page in the family
+# -- the full, generated list lives at /use-cases. Each page's own title
+# (loaded live, not copied here) is the link text, so this never drifts from
+# the page it points to.
+#
+# Every slug below must be a REWRITE-verdict page in the SEO/GEO audit (live,
+# ranking, not folded into another page) -- never a HOLD slug (not built yet)
+# or a MERGE slug (its own URL now 301s elsewhere): a curated "see it
+# answered" showcase should never be the dead end or extra redirect hop
+# those two verdicts exist to avoid. Startup founders and Operations leads
+# each only have two REWRITE use cases today, so those two groups list two,
+# not three -- a short, accurate list over padding it with a page that isn't
+# ready yet.
 _HOME_USE_CASE_HIGHLIGHTS = {
     "Startup founders": [
         "business-model-canvas-on-one-page",
-        "website-full-profile",
-        "show-investors-what-we-run",
+        "single-point-of-failure",
     ],
     "Scale-up CTOs": [
         "what-breaks-and-who-gets-called",
@@ -72,11 +101,10 @@ _HOME_USE_CASE_HIGHLIGHTS = {
     "Enterprise architects": [
         "import-archimate-model",
         "value-streams-at-risk",
-        "derivation-yield",
+        "architecture-review-board",
     ],
     "Operations leads": [
         "what-happens-if-a-supplier-fails",
-        "key-person-risk",
         "contract-renewals",
     ],
 }
@@ -217,26 +245,42 @@ def _notify_sales_of_inquiry(inquiry, page):
 @main.route("/offers/inquire", methods=["POST"])
 @rate_limit(10, "1m", methods=("POST",))
 def product_inquiry_submit():
-    """Submit an inquiry from one of the fixed-price offer pages.
+    """Submit an inquiry from one of the fixed-price offer pages, or a
+    "tell us you need this" enquiry from a HOLD-verdict (not built yet)
+    page's waiting-list box.
 
-    One route serves every offer page; hidden fields say which page and
-    family to reload. The offer identifier and the consent sentence shown
-    next to the checkbox both come from that page's own front-matter, so
+    One route serves both: hidden fields say which page and family to
+    reload. For an offer page (``cta: inquiry``) the offer identifier and
+    the consent sentence both come from that page's own front-matter, so
     what gets stored can never say something the visitor was not shown.
+    For a waiting-list page (``cta: waiting_list``) there is no per-page
+    front-matter for either -- PublicPage.feature_interest_offer and
+    FEATURE_INTEREST_CONSENT_TEXT supply the same two things generically,
+    one named offer per page so a second, different request from the same
+    address is never silently dropped as a duplicate (product_inquiries
+    has a UNIQUE(email, offer) constraint).
     """
     from flask import abort
 
     from app.models.product_inquiry import ProductInquiry
-    from app.services.public_pages import build_jsonld, load_page
+    from app.services.public_pages import (
+        FEATURE_INTEREST_CONSENT_TEXT,
+        build_jsonld,
+        load_page,
+    )
 
     page_family = request.form.get("family", "")
     page_slug = request.form.get("slug", "")
     page = load_page(page_family, slug=page_slug) if page_family and page_slug else None
-    if page is None or page.cta != "inquiry":
+    if page is None or page.cta not in ("inquiry", "waiting_list"):
         abort(404)
 
-    offer = page.front_matter.get("offer")
-    consent_text = page.front_matter.get("inquiry_consent_text")
+    if page.cta == "inquiry":
+        offer = page.front_matter.get("offer")
+        consent_text = page.front_matter.get("inquiry_consent_text")
+    else:
+        offer = page.feature_interest_offer
+        consent_text = FEATURE_INTEREST_CONSENT_TEXT
     submitted_offer = request.form.get("offer", "")
 
     thanks = False
@@ -396,29 +440,26 @@ def robots_txt():
 
 @main.route("/sitemap.xml")
 def sitemap_xml():
-    """Serve sitemap.xml for SEO — generated from public content pages."""
-    from app.services.public_pages import load_all_pages
+    """Serve sitemap.xml for SEO — generated from public content pages.
 
-    pages = load_all_pages()
+    Built from feed_page_paths(), the one path list shared with the
+    IndexNow CLI (app/commands/indexnow_commands.py), so the two cannot
+    drift apart: it already excludes a HOLD-verdict page, a MERGE-verdict
+    page (301s elsewhere -- the old URL is not a second entry for content
+    that now lives at the target) and a page withdrawn from discovery
+    (front matter ``state: not_planned``) -- see
+    app/services/public_pages.py::load_feed_pages / feed_page_paths.
+    """
+    from html import escape
+
+    from app.services.public_pages import feed_page_paths
+
     base_url = "https://entelim.org"
     urls = []
-    # Homepage is not a content page but is the most important URL
-    urls.append(
-        f"  <url><loc>{base_url}/</loc><priority>1.0</priority></url>"
-    )
-    # The /vs comparison hub and the /use-cases index are views, not content
-    # pages from load_all_pages(), so each needs its own entry here, same as
-    # the homepage above.
-    urls.append(
-        f"  <url><loc>{base_url}/vs</loc></url>"
-    )
-    urls.append(
-        f"  <url><loc>{base_url}/use-cases</loc></url>"
-    )
-    for p in pages:
-        urls.append(
-            f"  <url><loc>{base_url}{p.url}</loc></url>"
-        )
+    for path in feed_page_paths():
+        # Homepage is not a content page but is the most important URL.
+        priority = "<priority>1.0</priority>" if path == "/" else ""
+        urls.append(f"  <url><loc>{base_url}{escape(path)}</loc>{priority}</url>")
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
     from flask import Response
     return Response(xml, mimetype="application/xml")
@@ -444,16 +485,18 @@ def indexnow_key_file(key):
 
 @main.route("/llms.txt")
 def llms_txt():
-    """Serve llms.txt listing every public content page with a Capabilities section."""
-    from app.services.public_pages import load_all_pages
+    """Serve llms.txt listing every public content page with a Capabilities
+    section. Held, merged and withdrawn pages are excluded, same as
+    sitemap.xml -- see app/services/public_pages.py::load_feed_pages."""
+    from app.services.public_pages import load_feed_pages
 
-    pages = load_all_pages()
+    pages = load_feed_pages()
     base_url = "https://entelim.org"
     lines = ["# Entelim"]
     lines.append("")
     lines.append(
-        "> Entelim is the open-source Enterprise Intelligence Model: "
-        "enter your website address and see your company."
+        "> Enterprise Intelligence Management: one living, explainable model of your "
+        "enterprise, for every company that has a strategy, systems, suppliers and risks."
     )
     lines.append("")
 
@@ -479,16 +522,19 @@ def llms_txt():
 
 @main.route("/llms-full.txt")
 def llms_full_txt():
-    """Serve llms-full.txt with the full text of every public module, use-case and comparison page."""
-    from app.services.public_pages import load_all_pages
+    """Serve llms-full.txt with the full text of every public module,
+    use-case and comparison page. Held, merged and withdrawn pages are
+    excluded, same as sitemap.xml -- see
+    app/services/public_pages.py::load_feed_pages."""
+    from app.services.public_pages import load_feed_pages
 
-    pages = load_all_pages()
+    pages = load_feed_pages()
     base_url = "https://entelim.org"
     lines = ["# Entelim — Full Content"]
     lines.append("")
     lines.append(
-        "> Entelim is the open-source Enterprise Intelligence Model: "
-        "enter your website address and see your company."
+        "> Enterprise Intelligence Management: one living, explainable model of your "
+        "enterprise, for every company that has a strategy, systems, suppliers and risks."
     )
     lines.append("")
 
@@ -606,8 +652,16 @@ def _html_to_plain_text(html: str) -> str:
 
 @main.route("/vision")
 def public_vision():
-    """The vision / home narrative page."""
-    from app.services.public_pages import build_jsonld, load_page
+    """The vision / home narrative page.
+
+    MERGE verdict (SEO/GEO audit): /vision duplicates /about and the home
+    page, so it 301s to /about rather than rendering -- see MERGED_PAGES.
+    """
+    from app.services.public_pages import MERGED_PAGES, build_jsonld, load_page
+
+    merge_target = MERGED_PAGES.get("/vision")
+    if merge_target:
+        return redirect(merge_target, code=301)
 
     page = load_page("vision")
     if page is None:
@@ -618,8 +672,22 @@ def public_vision():
 
 @main.route("/modules/<slug>")
 def public_module(slug):
-    """A module content page."""
-    from app.services.public_pages import build_jsonld, get_page_screenshot, load_page
+    """A module content page.
+
+    MERGE-verdict modules (SEO/GEO audit) 301 to their parent page instead
+    of rendering, checked against MERGED_PAGES by this exact URL before
+    the file is even loaded -- see MERGED_PAGES.
+    """
+    from app.services.public_pages import (
+        MERGED_PAGES,
+        build_jsonld,
+        get_page_screenshot,
+        load_page,
+    )
+
+    merge_target = MERGED_PAGES.get(f"/modules/{slug}")
+    if merge_target:
+        return redirect(merge_target, code=301)
 
     page = load_page("module", slug=slug)
     if page is None:
@@ -641,10 +709,17 @@ _USE_CASE_SEGMENT_LABELS = {
 
 @main.route("/use-cases")
 def public_use_cases_index():
-    """The /use-cases index: every live use-case page, grouped by segment."""
-    from app.services.public_pages import load_all_pages
+    """The /use-cases index: every live use-case page, grouped by segment.
 
-    pages = [p for p in load_all_pages() if p.family == "function-per-segment"]
+    Built from load_feed_pages(): a HOLD-verdict page and a MERGE-verdict
+    page (its own URL now 301s to a parent page, so listing it here would
+    just be an extra redirect hop for a nav link) are both left out of this
+    listing, same as every other nav/index listing -- see
+    app/services/public_pages.py::load_feed_pages.
+    """
+    from app.services.public_pages import load_feed_pages
+
+    pages = [p for p in load_feed_pages() if p.family == "function-per-segment"]
 
     groups: dict[str, list] = {}
     for page in pages:
@@ -664,18 +739,24 @@ def public_use_cases_index():
 def public_use_case(slug):
     """A function-per-segment content page.
 
-    A slug that no longer resolves is checked against the family's old,
-    internal uc-sN-NN-* filename slugs before 404ing: some of those URLs are
-    already indexed, so a page that moved gets a real redirect, not a dead
-    link.
+    MERGE-verdict use cases (SEO/GEO audit) 301 to their parent page
+    instead of rendering -- see MERGED_PAGES. A slug that no longer
+    resolves is checked against the family's old, internal uc-sN-NN-*
+    filename slugs before 404ing: some of those URLs are already indexed,
+    so a page that moved gets a real redirect, not a dead link.
     """
     from app.services.public_pages import (
+        MERGED_PAGES,
         build_jsonld,
         get_page_recording,
         get_page_screenshot,
         load_page,
         use_case_redirect_target,
     )
+
+    merge_target = MERGED_PAGES.get(f"/use-cases/{slug}")
+    if merge_target:
+        return redirect(merge_target, code=301)
 
     page = load_page("function-per-segment", slug=slug)
     if page is None:
@@ -699,21 +780,26 @@ def public_comparison_hub():
     a comparison page's own front-matter `routing` decides its real address — most
     carry an archiet.ai canonical URL, so the hub links there rather than assuming
     every comparison page lives on entelim.org.
+
+    load_feed_pages(), not load_all_pages(): a comparison page withdrawn from
+    discovery (state: not_planned) still renders at its own URL but must drop
+    out of this hub automatically, the same as the sitemap, llms.txt and the
+    /use-cases index.
     """
-    from app.services.public_pages import load_all_pages
+    from app.services.public_pages import load_feed_pages
 
     site_url = "https://entelim.org"
-    pages = [p for p in load_all_pages() if p.family == "comparison"]
+    pages = [p for p in load_feed_pages() if p.family == "comparison"]
     entries = [
         {
             "competitor": p.front_matter.get("competitor", p.title),
-            "real_url": p.canonical_url or f"{site_url}{p.url}",
+            "real_url": p.external_url or f"{site_url}{p.url}",
             # The entelim.org page itself, so a visitor who stays on this
             # site (and a crawler following only entelim.org links) can
             # still reach it even when real_url points at archiet.ai --
             # only shown when it differs from real_url, to avoid a second,
             # identical link.
-            "same_origin_url": p.url if p.canonical_url else None,
+            "same_origin_url": p.url if p.external_url else None,
         }
         for p in pages
     ]
@@ -1069,6 +1155,7 @@ def integrations():
 
 @main.route("/settings")
 @login_required
+@platform_admin_required
 @admin_required
 def settings():
     """System Settings - Application configuration and user preferences.
@@ -1086,6 +1173,13 @@ def settings():
 # any authenticated user of any tenant could read it. The page that consumes it
 # (settings/index.html) is linked only from the Administration sidebar section,
 # so gating it on admin matches how it is actually reached.
+#
+# admin_required alone was not enough either: it is satisfied by
+# Permission.ADMINISTER, a GLOBAL flag every self-registered user holds for
+# their own organisation, so any tenant's own admin -- not just a platform
+# admin -- could read this platform-wide table. platform_admin_required
+# closes that (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def get_system_settings():
     """Return all saved system settings as JSON."""
@@ -1115,6 +1209,11 @@ def get_system_settings():
 @login_required
 # The write half of the same global table: with @login_required alone, any
 # authenticated user could rewrite platform-wide configuration for every tenant.
+#
+# Same gap as get_system_settings above: admin_required alone let any
+# tenant's own admin rewrite this platform-wide table. platform_admin_required
+# closes that (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def save_system_settings():
     """Persist system settings to the database."""

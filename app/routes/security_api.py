@@ -19,6 +19,7 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
+from app.middleware.tenant_decorators import platform_admin_required
 
 from app import db
 from app.decorators import audit_log
@@ -141,6 +142,7 @@ def check_user_permission():
 
 @security_bp.route("/audit/events", methods=["GET"])
 @login_required
+@platform_admin_required
 def get_audit_events():
     """
     Query audit trail events.

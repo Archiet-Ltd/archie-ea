@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify, render_template, request
 
 from app import db
 from app.decorators import audit_log
+from app.jobs.tenant_safe_job import platform_scope
 from app.models.framework_configuration import (
     CapabilityFrameworkConfiguration,
     FrameworkConfigurationTemplate,
@@ -349,12 +350,15 @@ def apply_template():
                 if hasattr(configuration, key):
                     setattr(configuration, key, value)
 
-        db.session.add(configuration)
+        # The new configuration and the template's usage count are both
+        # platform-wide catalogue rows.
+        with platform_scope("platform administrator applies a shared framework template"):
+            db.session.add(configuration)
 
-        # Update template usage count
-        template.usage_count = template.usage_count + 1
+            # Update template usage count
+            template.usage_count = template.usage_count + 1
 
-        db.session.commit()
+            db.session.commit()
 
         return jsonify(
             {

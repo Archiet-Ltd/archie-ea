@@ -37,6 +37,7 @@
     "nav_verified": 0,
     "console_reporting": 0,
     "evidence_contract": 30,
+    "untyped_property_writes": 1,
     "role_gate_coverage": 7,
     "unregistered_checks": 33,
     "duplicate_breadcrumb": 0,
