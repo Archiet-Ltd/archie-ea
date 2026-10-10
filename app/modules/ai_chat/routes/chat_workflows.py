@@ -540,7 +540,7 @@ def actionable_gap_analysis():
 
         elif analysis_type == "process":
             # Find APQC processes without application support
-            from app.models.apqc_process import APQCProcess, ProcessApplicationMapping
+            from app.models.apqc_process import APQCProcess
 
             # Hierarchy level <= 3 in SQL terms: process_code has at most 3
             # dot-separated segments (level 4+ has 3+ dots, e.g. "4.1.1.1").
@@ -554,8 +554,17 @@ def actionable_gap_analysis():
                 .limit(100)
                 .all()
             )
+            # ProcessApplicationMapping has no organization_id of its own --
+            # fence through ApplicationComponent (its owning application),
+            # or every organisation's mapped processes count as "mapped"
+            # here, hiding real gaps for the caller's own organisation
+            # (pr306-v1 review, DEFECT D4).
+            from app.services.apqc_mapping_tenant_fence import (
+                fenced_application_mappings_query,
+            )
+
             mapped_process_ids = set(
-                m.apqc_process_id for m in ProcessApplicationMapping.query.all()
+                m.apqc_process_id for m in fenced_application_mappings_query().all()
             )
 
             for proc in all_processes:

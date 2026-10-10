@@ -1921,7 +1921,7 @@
                 }).then(function(data) {
                     self.ganttPushLoading = false;
                     if (data && data.success) {
-                        self.card.work_package_id = data.work_package_id;
+                        self.card.unified_work_package_id = data.work_package_id;
                         window.dispatchEvent(new CustomEvent('adm-board-refresh'));
                     }
                 }).catch(function(err) {

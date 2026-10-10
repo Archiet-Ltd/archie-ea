@@ -7,7 +7,7 @@ url_slug: /
 capture_status: not_applicable_vision_page
 ---
 
-# Enter your website address. See your company.
+# Build your company as one model. Ask it anything.
 
 Every organisation, large or small, needs architecture — and the intelligence that architecture
 provides. Until now, that's been priced and built for the largest companies in the world. Entelim
@@ -21,15 +21,15 @@ months ago and never opened again.
 
 ## Your twin is also what your AI assistants have been missing
 
-A general assistant can guess at your architecture. It can't know it. Entelim's twin is built to be
-the context large language models actually need: through MCP, your team's own AI assistants can work
-directly over your twin, or you can ask Entelim itself.
+A general assistant can guess at your architecture. It can't know it. Entelim's own AI chat already
+works directly over your twin today. Connecting an external AI assistant to your twin through MCP is
+coming soon.
 
 Archiet Ltd, the company behind Entelim, is the first proof of that. We run our own operating model
-in Entelim, and when we need to know who to hire next, what to build, or what to stop — we ask
-Entelim, not a general chat assistant that knows nothing about our company. Every project we run
-traces back to the gap it closes and the stage it moves us toward, because that trace is built into
-the model, not bolted on afterward.
+in Entelim, and when we need to know what to build, or what to stop, we ask Entelim, not a general
+chat assistant that knows nothing about our company. Every project we run traces back to the gap it
+closes and the stage it moves us toward, because that trace is built into the model, not bolted on
+afterward.
 
 ## Built by the kind of user it's for
 
@@ -47,9 +47,14 @@ the ArchiMate 3.2 open standard, so your model is never locked in.
 
 ## What you can ask today
 
-What breaks if this fails, and who gets called. What we're paying for twice. Which value streams are
-at risk and why. Who's accountable, and where that trail runs cold. Every answer carries its own
-reasoning — open it, check it, never just trust a number because a page said so.
+What breaks if this fails, and who gets called. Which value streams are at risk and why. Every
+answer carries its own reasoning — open it, check it, never just trust a number because a page
+said so.
+
+## Also built in
+
+**Find what you're paying for twice.** Run duplicate detection across your whole application list,
+review the overlapping groups it finds, and add them to a consolidation plan.
 
 [Explore what Entelim answers for your team](/modules/applications) — or see it built for exactly
 where you are: [startup founders](/use-cases/single-point-of-failure),

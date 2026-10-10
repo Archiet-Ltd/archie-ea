@@ -188,6 +188,18 @@ class DuplicateDetectionUtils:
         """
         Find duplicate names in a list.
 
+        Groups indices of identical normalised names (exact mode) or
+        near-duplicate names (fuzzy mode). Pure in-memory list grouping:
+        the caller supplies the candidate names, and receives the indices of
+        every name that is a duplicate of another member of the same list.
+
+        This is NOT delegated to MatcherService: the matcher matches one
+        incoming name against the acting organisation's persisted records and
+        returns element ids, so it cannot produce list-index groups for a
+        caller-supplied list without changing this function's contract and its
+        caller's behaviour (the caller buckets already-org-scoped element names
+        and needs indices back into its own bucket).
+
         Args:
             names: List of names to check
             mode: "exact" or "fuzzy"
