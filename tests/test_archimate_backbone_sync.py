@@ -82,9 +82,9 @@ def test_every_mapping_names_a_real_archimate_layer(layer_expected):
 def test_a_risk_joins_the_backbone_when_synced(db_session, make_org):
     """End to end on the model that had no link column until now.
 
-    The backbone's before_flush listener creates the element automatically
-    when the Risk is flushed.  sync_archimate_element is idempotent and
-    returns None when the element already exists.
+    sync_archimate_element creates the element before any flush, and the
+    backbone's before_flush listener is idempotent and creates nothing extra.
+    Only one ArchiMateElement row exists after the flush.
 
     Uses the shared fixtures from tests/conftest.py -- db_session runs inside a
     transaction that is always rolled back, so this cannot leave residue in the
@@ -103,21 +103,25 @@ def test_a_risk_joins_the_backbone_when_synced(db_session, make_org):
         impact=5,
     )
     db_session.add(risk)
-    db_session.flush()
 
-    # The before_flush listener created the element during flush.
-    assert risk.archimate_element_id is not None
-    element = db_session.get(ArchiMateElement, risk.archimate_element_id)
+    # sync creates the element before any flush — exercises sync's own path.
+    element = sync_archimate_element(risk, session=db_session)
     assert element is not None
     assert element.type == "Assessment"
     assert element.layer == "Motivation"
     assert element.organization_id == org.id
 
-    # Idempotent: sync_archimate_element returns None when already linked.
-    assert sync_archimate_element(risk, session=db_session) is None
+    db_session.flush()
+
+    # After flush the risk has its element linked.
+    assert risk.archimate_element_id == element.id
+    # Exactly one element for this org — no duplicate from the listener.
     assert db_session.query(ArchiMateElement).filter_by(
         organization_id=org.id, name="Unencrypted PII at rest"
     ).count() == 1
+
+    # Idempotent: sync_archimate_element returns None when already linked.
+    assert sync_archimate_element(risk, session=db_session) is None
 
 
 def test_an_unnamed_motivation_row_raises_rather_than_skipping(db_session, make_org):
@@ -266,8 +270,8 @@ def test_create_backbone_element_raises_valueerror_on_non_string_name(db_session
 def test_sync_archimate_element_unchanged_for_existing_mapped_type(db_session, make_org):
     """The refactor to call create_backbone_element must be non-breaking.
 
-    The before_flush listener creates the element during flush, so
-    sync_archimate_element returns None (idempotent) when called after.
+    sync_archimate_element creates the element before any flush; the
+    before_flush listener sees it already linked and creates nothing extra.
     """
     from app.models.archimate_core import ArchiMateElement
     from app.models.implementation_migration import WorkPackage
@@ -280,15 +284,21 @@ def test_sync_archimate_element_unchanged_for_existing_mapped_type(db_session, m
         description="Move invoicing off the legacy mainframe.",
     )
     db_session.add(wp)
-    db_session.flush()
 
-    # The before_flush listener created the element during flush.
-    assert wp.archimate_element_id is not None
-    element = db_session.get(ArchiMateElement, wp.archimate_element_id)
+    # sync creates the element before any flush.
+    element = sync_archimate_element(wp, session=db_session)
     assert element is not None
     assert element.type == "WorkPackage"
     assert element.layer == "Implementation"
     assert element.organization_id == org.id
+
+    db_session.flush()
+
+    # After flush the link is set and exactly one element exists.
+    assert wp.archimate_element_id == element.id
+    assert db_session.query(ArchiMateElement).filter_by(
+        organization_id=org.id, name="Migrate legacy invoicing"
+    ).count() == 1
 
     # Idempotent: sync_archimate_element returns None when already linked.
     assert sync_archimate_element(wp, session=db_session) is None
