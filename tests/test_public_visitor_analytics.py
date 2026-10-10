@@ -72,7 +72,11 @@ class TestPageViewLogging:
         resp = _visit(client, "/")
         assert resp.status_code == 200
 
-        rows = PublicVisitorEvent.query.filter_by(event_type="page_view").all()
+        rows = (
+            PublicVisitorEvent.query.filter_by(event_type="page_view")
+            .order_by(PublicVisitorEvent.id)
+            .all()
+        )
         assert len(rows) == before + 1
         assert rows[-1].path == "/"
 
