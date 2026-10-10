@@ -197,7 +197,7 @@ def issued_refresh_token(app, _schema, login_as):
             # user_sessions.user_id — see app/models/user_session.py), so the
             # login-registry row login_as/mint_test_sid wrote is removed by
             # the database itself when the user row goes.
-            User.query.filter_by(id=state["user_id"]).delete(synchronize_session=False)
+            User.query.filter_by(id=state["user_id"]).delete(synchronize_session=False)  # tenant-scoping-ok: test cleanup of the user it created
             Organization.query.filter_by(id=state["org_id"]).delete(synchronize_session=False)
             db.session.commit()
 

@@ -12,6 +12,31 @@ from typing import Any, Callable
 TOOL_REGISTRY: dict[str, ToolHandler] = {}
 
 
+_SENSITIVE_KEY_PARTS = (
+    "password", "passwd", "secret", "token", "api_key", "apikey",
+    "credential", "private_key", "authorization", "client_secret",
+)
+REDACTED = "[withheld]"
+
+
+def scrub_credentials(value: Any) -> Any:
+    """Remove anything credential-shaped from a tool result before it leaves.
+
+    A tool wraps an ordinary REST route whose payload may carry a field a
+    browser user never sees on screen; the assistant connector is a wider
+    door, so any key that names a secret is withheld whatever the route sent.
+    """
+    if isinstance(value, dict):
+        return {
+            k: (REDACTED if isinstance(k, str) and any(p in k.lower() for p in _SENSITIVE_KEY_PARTS)
+                else scrub_credentials(v))
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [scrub_credentials(v) for v in value]
+    return value
+
+
 class ToolHandler:
     """A registered MCP tool — name, schema, and execution callback."""
 
@@ -26,7 +51,7 @@ class ToolHandler:
         self.required_scope = required_scope
 
     def execute(self, arguments: dict) -> Any:
-        return self._execute(arguments)
+        return scrub_credentials(self._execute(arguments))
 
 
 def register_tool(name: str, description: str, input_schema: dict,

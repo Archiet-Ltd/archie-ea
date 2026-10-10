@@ -154,6 +154,25 @@ def _csrf_guard():
     return None
 
 
+def _audit_tool_call(tool_name, org_id, user_id, status) -> None:
+    """Record the call in the one audit log. Never raises."""
+    try:
+        from app.models.audit_log import AuditLog
+
+        AuditLog.log(
+            action="mcp_tool_call",
+            entity_type="mcp_tool",
+            entity_name=tool_name,
+            organization_id=org_id,
+            user_id=user_id,
+            ip_address=request.remote_addr,
+            description=f"Assistant connector called {tool_name}",
+            status=status,
+        )
+    except Exception:
+        logger.warning("mcp audit write failed", exc_info=True)
+
+
 @mcp_bp.route("", methods=["POST"])
 @csrf.exempt
 def mcp_endpoint():
@@ -245,8 +264,19 @@ def mcp_endpoint():
         except Exception:
             pass  # Metering never raises
 
+        org_id = g.current_org_id
+        user_id = current_user.id
         start = time.monotonic()
         try:
+            # The tenant middleware has already put this request in the
+            # token's organisation scope (it sets g.current_org_id and the
+            # database setting the row-level policies read). Refuse to run any
+            # tool if that scope is missing or is not the caller's own
+            # organisation, so no query ever runs unscoped.
+            if org_id is None or org_id != getattr(current_user, "organization_id", None):
+                return jsonify(_jsonrpc_error(
+                    req_id, JSONRPC_INTERNAL_ERROR, "Organisation scope unavailable.",
+                )), 403
             result = handler.execute(arguments)
             elapsed_ms = int((time.monotonic() - start) * 1000)
 
@@ -255,13 +285,17 @@ def mcp_endpoint():
                 tool_name, g.current_org_id, current_user.id, elapsed_ms,
             )
 
+            _audit_tool_call(tool_name, org_id, user_id, "success")
             return jsonify(_jsonrpc_result(req_id, {
                 "content": [{"type": "text", "text": json.dumps(result)}],
             }))
-        except Exception as exc:
+        except Exception:
             logger.exception("mcp_tool_call tool=%s failed", tool_name)
+            _audit_tool_call(tool_name, org_id, user_id, "failure")
+            # The exception text is never returned: it can carry SQL, paths
+            # or another tenant's identifiers.
             return jsonify(_jsonrpc_error(req_id, JSONRPC_INTERNAL_ERROR,
-                                          str(exc))), 500
+                                          "The tool failed.")), 500
 
     # Unknown method
     return jsonify(_jsonrpc_error(req_id, JSONRPC_METHOD_NOT_FOUND,
