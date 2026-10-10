@@ -23,6 +23,11 @@
 .public-site .public-page-content > figure,
 .public-site .public-page-content > .public-wide { max-width: none; }
 .public-site .public-figure { max-width: 72rem; margin-inline: auto; }
+/* P-06: product screenshots are shown at their captured CSS width and never stretched past
+   it; a narrower viewport shrinks nothing below 1:1 because the template swaps in the
+   phone-width capture instead (public/page.html <picture>). */
+.public-site .public-figure img { display: block; margin-inline: auto; width: auto; height: auto; max-width: 100%; }
+.public-site .public-figure figcaption { text-align: center; }
 /* Full-bleed tinted band, a section-break option. */
 .public-site .public-band { background: var(--color-muted, #f3f4f6); border-block: 1px solid var(--color-border, #e5e7eb); }
 
@@ -44,3 +49,27 @@
 
 /* P-18: footer entries that are not links read as plain text, not as disabled links. */
 .public-site .public-footer-plain { color: inherit; cursor: text; }
+
+/* P-03: home hero. Text left, product right in a browser frame at 1280px and up; stacked below.
+   The hero figure is a 2x capture shown at its own CSS width (644px desktop, 358px phone). */
+.public-site .home-hero__grid { max-width: 80rem; display: grid; gap: 2.5rem; padding-block: 3rem 4rem; }
+.public-site .home-hero__text { max-width: 42rem; margin-inline: auto; }
+.public-site .home-hero__figure { margin: 0; justify-self: center; max-width: 100%; }
+.public-site .home-frame {
+  border: 1px solid hsl(var(--border)); border-radius: 0.75rem; overflow: hidden;
+  background: hsl(var(--card)); box-shadow: 0 20px 45px -12px rgb(15 23 42 / 0.22), 0 4px 10px -4px rgb(15 23 42 / 0.12);
+  max-width: 100%;
+}
+.public-site .home-frame__bar {
+  display: flex; align-items: center; gap: 0.375rem; height: 2.25rem; padding-inline: 0.75rem;
+  background: hsl(var(--muted)); border-bottom: 1px solid hsl(var(--border));
+}
+.public-site .home-frame__dot { width: 0.625rem; height: 0.625rem; border-radius: 9999px; background: hsl(var(--border)); }
+.public-site .home-frame__url { margin-left: 0.75rem; font-size: 0.75rem; color: hsl(var(--muted-foreground)); }
+.public-site .home-frame__img { display: block; width: auto; height: auto; max-width: 100%; }
+@media (min-width: 640px) { .public-site .home-hero__text { text-align: left; } }
+@media (min-width: 1280px) {
+  .public-site .home-hero__grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: center; gap: 3rem; padding-block: 4rem 5rem; }
+  .public-site .home-hero__text { margin-inline: 0; }
+  .public-site .home-hero__figure { justify-self: end; }
+}

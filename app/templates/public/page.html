@@ -61,10 +61,20 @@
      app/services/public_pages.py:get_page_screenshot(). Only ever set for a
      capture_status: live page whose captured file exists on disk. #}
   <figure class="public-figure mt-10" data-testid="page-screenshot">
-    <img src="{{ screenshot.url }}" alt="{{ screenshot.alt }}"
-         width="{{ screenshot.width }}" height="{{ screenshot.height }}"
-         loading="lazy" decoding="async"
-         class="w-full rounded-lg border border-border shadow-sm">
+    {# Captured at 2x and shown at its own CSS width (1:1), so the UI text in
+       it stays 12px or larger. Below 1100px the desktop crop would have to
+       shrink, so the phone-width crop of the same screen is shown instead, at
+       its natural size (public_site.css .public-figure img: never stretched). #}
+    <picture>
+      {% if screenshot.mobile %}
+      <source media="(max-width: 1099px)" srcset="{{ screenshot.mobile.url }}"
+              width="{{ screenshot.mobile.width }}" height="{{ screenshot.mobile.height }}">
+      {% endif %}
+      <img src="{{ screenshot.url }}" alt="{{ screenshot.alt }}"
+           width="{{ screenshot.width }}" height="{{ screenshot.height }}"
+           loading="lazy" decoding="async"
+           class="rounded-lg border border-border shadow-sm">
+    </picture>
     <figcaption class="mt-2 text-sm text-muted-foreground">{{ screenshot.caption }}</figcaption>
   </figure>
   {% endif %}
