@@ -686,12 +686,22 @@ def test_landing_page_no_archimate_in_badge(app):
 
 
 def test_landing_page_no_archimate_in_feature_desc(app):
-    """No feature text on the landing page refers to ArchiMate elements."""
+    """No feature text on the landing page refers to ArchiMate's internal
+    element vocabulary (e.g. "ApplicationComponent") in place of a plain
+    description.
+
+    Naming the ArchiMate 3.2 *standard* once, in the hero's search-facing
+    sentence ("built on ArchiMate 3.2"), is a deliberate, approved choice
+    (docs/eim-category-positioning-v1.md section 5.1's own hero text,
+    agreed with the SEO plan for the credibility/ranking value of naming
+    the open standard) -- not the jargon this test guards against, which
+    is referring to features using ArchiMate's own element-type names
+    instead of plain language.
+    """
     client = app.test_client()
     resp = client.get("/")
     assert resp.status_code == 200
     html = resp.data.decode()
-    assert "ArchiMate 3.2" not in html
     assert "ArchiMate elements" not in html
 
 

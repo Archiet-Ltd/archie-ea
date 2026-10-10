@@ -1,46 +1,17 @@
 ---
 page_family: site
 title: "Pricing"
-page_role: "The pricing page — mirrors the four tiers on the home page, in full."
-source: app/templates/main/index.html (pricing section, read 2026-09-25)
-cta: plans
+description: "Enterprise Intelligence Management priced per company, not per application: free for up to three people, $49/month for a team of ten, $29/editor/month for larger teams, and Enterprise from $24,000/year. Self-hosting is always free."
+page_role: "The pricing page: four plan cards, a comparison table, what every plan gains as the platform grows, and billing answers."
+template: pricing
 ---
 
-# Priced per company, never per application
+# Pricing
 
-Every tier includes every question Entelim answers, the Business Model Canvas, and the twin map. What changes is
-who can edit, and what your organisation needs on top.
+Enterprise Intelligence Management priced per company, not per application: free for up to three people,
+$49 a month for a team of ten, $29 per editor a month for larger teams with people who only ask questions
+free, and Enterprise from $24,000 a year. Self-host the open-source edition free.
 
-## Community — Free
-
-No trial clock. For evaluation, one-person companies and self-hosters: one organisation, three
-people. Every question, the Business Model Canvas, the twin map, file import, and community support.
-
-## Startup — $49/month ($490/year)
-
-For founders and small services firms, 5 to 50 people. Ten people and email support, everything in
-Community included.
-
-## Team — $29/editor/month ($290/editor/year)
-
-People who only ask questions are free. For scale-ups and
-services companies, 50 to 500 people. Single sign-on, the review-board workflow, and your own model
-key.
-
-## Enterprise — from $24,000/year
-
-Annual contract. For enterprise architecture teams: unlimited editors, SAML, audit export, your own
-key by default, supported self-hosting, and a named contact.
-
-## On the way
-
-Export any answer as a spreadsheet or PDF, and share it with a link.
-
-## Self-hosting is always free
-
-Entelim is licensed under AGPL-3.0. Self-hosting your own infrastructure, at any size, for as long
-as you want, is always free — that path is not a trial, it is the product. A commercial licence
-exists for organisations that want Entelim run for them or need different terms;
-[get in touch](/contact) either way.
-
-Start on Community for free, or buy Startup or Team below. [Sign in if you already have an account](/account/login).
+Startups run on the free plan or on Startup: the business model canvas, the value streams behind your
+revenue and the twin map, set up in minutes. Companies of 50 to 500 people move to Team, where owners,
+architects and the review board work in one model and everyone else asks questions at no cost.
