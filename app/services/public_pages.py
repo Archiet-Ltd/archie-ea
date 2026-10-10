@@ -301,6 +301,10 @@ _ALLOWED_ATTRS = {
     "img": ["src", "alt", "title"],
     "th": ["align"],
     "td": ["align"],
+    # id is not an XSS vector; allowed so a page's own headings can carry a
+    # deep-link anchor (e.g. /features#strategy-management) for other pages
+    # to link into, without needing the markdown "toc" extension.
+    "h1": ["id"], "h2": ["id"], "h3": ["id"], "h4": ["id"], "h5": ["id"], "h6": ["id"],
 }
 
 
