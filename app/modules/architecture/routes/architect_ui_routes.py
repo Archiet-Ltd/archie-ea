@@ -737,10 +737,12 @@ def element_traceability(element_id):
     from app.services.archimate_impact_service import ArchiMateImpactService
     from app.services.archimate_traceability_service import ArchiMateTraceabilityService
     from app.models.archimate_core import ArchiMateElement
+    from app.utils.route_guards import require_entity
+
+    element = require_entity(ArchiMateElement, element_id, description="ArchiMate element not found")
 
     service = ArchiMateTraceabilityService()
     impact_service = ArchiMateImpactService()
-    element = ArchiMateElement.query.get_or_404(element_id)
     chain = service.get_element_chain(element_id)
     impact_summary = impact_service.get_impact_summary(element_id)
     return render_template(
@@ -777,9 +779,10 @@ def impact_analysis(element_id):
     """Impact Analysis page — change propagation for an ArchiMate element."""
     from app.services.archimate_impact_service import ArchiMateImpactService
     from app.models.archimate_core import ArchiMateElement
+    from app.utils.route_guards import require_entity
 
+    element = require_entity(ArchiMateElement, element_id, description="ArchiMate element not found")
     service = ArchiMateImpactService()
-    element = ArchiMateElement.query.get_or_404(element_id)
     analysis = service.analyze_impact(element_id)
     capability_gaps = service.get_capability_gaps(element_id)
     return render_template(
