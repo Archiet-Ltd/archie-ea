@@ -10,9 +10,12 @@ always rolled back, so no test can leave residue even if it fails mid-way.
 
 Backwards compatibility
 -----------------------
-The eight pre-existing test modules define their own module-scoped ``app``
-fixture. pytest resolves the *closest* definition, so those keep working
-untouched — the fixtures below are opt-in for new tests.
+36 pre-existing test modules (re-counted 2026-09-22 against
+``@pytest.fixture(scope="module")`` immediately followed by ``def app(``; this
+grows as the suite does, so re-run that search before relying on the number)
+define their own module-scoped ``app`` fixture. pytest resolves the *closest*
+definition, so those keep working untouched — the fixtures below are opt-in
+for new tests.
 
 Requires PostgreSQL: ``TestingConfig`` rejects SQLite outright. Set
 ``TEST_DATABASE_URL`` before running.

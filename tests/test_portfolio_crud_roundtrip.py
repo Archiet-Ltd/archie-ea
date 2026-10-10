@@ -15,73 +15,51 @@ logged-in session and then re-queries the database to see what actually landed.
 
 Conventions borrowed from tests/test_ba_tenant_and_authz.py, for the reasons
 documented there at length:
-  - _login must clear flask_login's g._login_user cache, or a second login in
+  - Login must clear flask_login's g._login_user cache, or a second login in
     the same app context silently keeps the first user and every cross-tenant
-    assertion exercises the wrong actor.
-  - Helpers hand back plain ids, never live ORM instances, because
-    expire_on_commit + per-request scoped sessions detach objects across
-    context boundaries.
+    assertion exercises the wrong actor. Use the shared ``login_as`` fixture
+    (tests/conftest.py) for this — it does exactly that.
+  - Helpers hand back plain ids, never live ORM instances, so a test can carry
+    an id across a request/response boundary without caring which session
+    last touched the row.
   - Only redirect-only form endpoints are exercised over HTTP; routes that
     render layouts/admin_base.html are checked separately for status only,
     since full-page rendering pulls in sidebar context processors this suite
     does not otherwise exercise.
+
+Fixtures: this file used to hand-roll its own module-scoped ``app``/``client``,
+its own ``_login``, and its own ``_make_org_id`` — all committing real rows
+with no cleanup, and all duplicating fixtures tests/conftest.py already
+provides for exactly this purpose. It now uses the shared ``db_session``,
+``make_org`` and ``login_as`` fixtures throughout: every row a test creates
+sits inside the per-test savepoint that ``db_session`` always rolls back, so
+nothing survives the test regardless of how it ends. The per-request round
+trip through ``client.post(...)`` still behaves like a real commit from the
+app's point of view (that is what ``db_session``'s savepoint join is for) —
+only the outer, test-owning transaction is discarded.
+
+One rule that matters for anyone adding a ``with app.app_context(): ...``
+block of their own: that block opens its own, separate database session (see
+``db_session`` and ``flask_sqlalchemy``'s per-app-context session scope) — a
+write made inside it is invisible everywhere else, including to the test's own
+``db_session``-held identity map, until that block's session commits before
+the block exits. An object read earlier through ``db_session`` can also still
+look stale afterwards (its attributes were cached before the nested block's
+commit); call ``db_session.expire_all()`` once the nested block is done, or
+re-query through ``db_session``, before relying on the mutated value again.
 """
 import uuid
 
 import pytest
 
 
-@pytest.fixture(scope="module")
-def app():
-    from app import create_app, db
-
-    app = create_app("testing")
-    app.config["TESTING"] = True
-    app.config["WTF_CSRF_ENABLED"] = False
-    with app.app_context():
-        db.create_all()
-    return app
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
-
-def _login(client, user_id):
-    """Log in as *user_id*, dropping flask_login's per-context identity cache."""
-    from flask.globals import app_ctx
-
-    from tests._session_test_helpers import mint_test_sid
-    _sid = mint_test_sid(user_id, app=client.application)
-    with client.session_transaction() as sess:
-        sess["_user_id"] = str(user_id)
-        sess["_fresh"] = True
-        if _sid:
-            sess["_sid"] = _sid
-    try:
-        ctx = app_ctx._get_current_object()
-    except RuntimeError:
-        return
-    for attr in ("_login_user", "current_org_id", "current_org"):
-        ctx.g.pop(attr, None)
-
-
-def _make_org_id(db, label):
-    from app.models.organization import Organization
-
-    suffix = uuid.uuid4().hex[:8]
-    org = Organization(name=f"{label} Org {suffix}", slug=f"{label.lower()}-org-{suffix}")
-    db.session.add(org)
-    db.session.commit()
-    return org.id
-
-
-def _make_user_id(db, org_id, label):
+def _make_user_id(db_session, org_id, label):
     """A user pinned explicitly to org_id.
 
     The User.before_insert listener reassigns an unset organization_id to the
-    shared default org, which would defeat the isolation tests below.
+    shared default org, which would defeat the isolation tests below. No
+    canonical factory for this exists in tests/conftest.py (only ``make_org``
+    does), so this stays a local helper.
     """
     from app.models.user import User
 
@@ -99,21 +77,21 @@ def _make_user_id(db, org_id, label):
     )
     if hasattr(user, "set_password"):
         user.set_password("x" * 12)
-    db.session.add(user)
-    db.session.commit()
+    db_session.add(user)
+    db_session.flush()
     return user.id
 
 
-def _make_initiative_id(db, org_id, name="Portfolio CRUD Initiative"):
+def _make_initiative_id(db_session, org_id, name="Portfolio CRUD Initiative"):
     from app.models.vendor.vendor_organization import EnterpriseInitiative
 
     init = EnterpriseInitiative(name=f"{name} {uuid.uuid4().hex[:6]}", organization_id=org_id)
-    db.session.add(init)
-    db.session.commit()
+    db_session.add(init)
+    db_session.flush()
     return init.id
 
 
-def _make_programme_id(db, org_id, owner_id, name="Portfolio CRUD Programme"):
+def _make_programme_id(db_session, org_id, owner_id, name="Portfolio CRUD Programme"):
     from app.models.strategic import StrategicInitiative
 
     programme = StrategicInitiative(
@@ -122,24 +100,21 @@ def _make_programme_id(db, org_id, owner_id, name="Portfolio CRUD Programme"):
         owner_id=owner_id,
         record_kind="transformation_programme",
     )
-    db.session.add(programme)
-    db.session.commit()
+    db_session.add(programme)
+    db_session.flush()
     return programme.id
 
 
 @pytest.fixture
-def org_a(app):
-    from app import db
-
-    with app.app_context():
-        org_id = _make_org_id(db, "CrudA")
-        user_id = _make_user_id(db, org_id, "CrudA")
-        return {
-            "org_id": org_id,
-            "user_id": user_id,
-            "initiative_id": _make_initiative_id(db, org_id),
-            "programme_id": _make_programme_id(db, org_id, user_id),
-        }
+def org_a(db_session, make_org):
+    org = make_org("CrudA")
+    user_id = _make_user_id(db_session, org.id, "CrudA")
+    return {
+        "org_id": org.id,
+        "user_id": user_id,
+        "initiative_id": _make_initiative_id(db_session, org.id),
+        "programme_id": _make_programme_id(db_session, org.id, user_id),
+    }
 
 
 # ==========================================================================
@@ -147,11 +122,11 @@ def org_a(app):
 # ==========================================================================
 
 class TestDemandIntake:
-    def test_submitting_a_demand_creates_a_row(self, app, client, org_a):
+    def test_submitting_a_demand_creates_a_row(self, app, client, org_a, login_as):
         from app import db
         from app.models.demand import Demand
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         title = f"Replace supplier onboarding {uuid.uuid4().hex[:6]}"
 
         resp = client.post("/portfolio/demands/new", data={
@@ -174,12 +149,12 @@ class TestDemandIntake:
             db.session.delete(row)
             db.session.commit()
 
-    def test_submitting_without_a_title_saves_nothing(self, app, client, org_a):
+    def test_submitting_without_a_title_saves_nothing(self, app, client, org_a, login_as):
         """Validation must refuse, not silently drop the row."""
         from app import db
         from app.models.demand import Demand
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         with app.app_context():
             before = db.session.query(Demand).count()
 
@@ -189,12 +164,12 @@ class TestDemandIntake:
         with app.app_context():
             assert db.session.query(Demand).count() == before
 
-    def test_blank_scores_are_stored_as_null_not_zero(self, app, client, org_a):
+    def test_blank_scores_are_stored_as_null_not_zero(self, app, client, org_a, login_as):
         """0 and "not given" are different facts; the form must not conflate them."""
         from app import db
         from app.models.demand import Demand
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         title = f"No scores {uuid.uuid4().hex[:6]}"
         client.post("/portfolio/demands/new", data={
             "title": title, "business_value_score": "", "urgency_score": "",
@@ -208,7 +183,7 @@ class TestDemandIntake:
             db.session.delete(row)
             db.session.commit()
 
-    def test_approving_records_the_decision(self, app, client, org_a):
+    def test_approving_records_the_decision(self, app, client, org_a, login_as):
         from app import db
         from app.models.demand import Demand
 
@@ -219,7 +194,7 @@ class TestDemandIntake:
             db.session.commit()
             did = d.id
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         client.post(f"/portfolio/demands/{did}/decide",
                     data={"status": "approved", "decision_rationale": "Funded in Q3."})
 
@@ -231,7 +206,7 @@ class TestDemandIntake:
             db.session.delete(row)
             db.session.commit()
 
-    def test_declining_without_a_rationale_is_refused(self, app, client, org_a):
+    def test_declining_without_a_rationale_is_refused(self, app, client, org_a, login_as):
         """An unexplained decline is the one that returns next quarter."""
         from app import db
         from app.models.demand import Demand
@@ -243,7 +218,7 @@ class TestDemandIntake:
             db.session.commit()
             did = d.id
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         client.post(f"/portfolio/demands/{did}/decide", data={"status": "declined"})
 
         with app.app_context():
@@ -259,11 +234,11 @@ class TestDemandIntake:
 # ==========================================================================
 
 class TestBenefitLifecycle:
-    def test_creating_a_benefit_persists_the_baseline(self, app, client, org_a):
+    def test_creating_a_benefit_persists_the_baseline(self, app, client, org_a, login_as):
         from app import db
         from app.models.benefit import Benefit
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         name = f"Retire duplicate licences {uuid.uuid4().hex[:6]}"
 
         client.post(f"/portfolio/programmes/{org_a['programme_id']}/benefits", data={
@@ -283,12 +258,12 @@ class TestBenefitLifecycle:
             db.session.commit()
 
     def test_detail_form_selected_programme_creates_canonical_benefit(
-        self, app, client, org_a
+        self, app, client, org_a, login_as
     ):
         from app import db
         from app.models.benefit import Benefit
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         name = f"Selected programme benefit {uuid.uuid4().hex[:6]}"
         response = client.post(
             "/portfolio/programmes/benefits",
@@ -304,7 +279,9 @@ class TestBenefitLifecycle:
             db.session.delete(row)
             db.session.commit()
 
-    def test_measuring_writes_the_actual_and_computes_realisation(self, app, client, org_a):
+    def test_measuring_writes_the_actual_and_computes_realisation(
+        self, app, client, org_a, login_as
+    ):
         from app import db
         from app.models.benefit import Benefit
 
@@ -316,7 +293,7 @@ class TestBenefitLifecycle:
             db.session.commit()
             bid = b.id
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         client.post(f"/portfolio/benefits/{bid}/measure", data={"actual_value": "75"})
 
         with app.app_context():
@@ -327,7 +304,7 @@ class TestBenefitLifecycle:
             db.session.delete(row)
             db.session.commit()
 
-    def test_status_becomes_realised_only_when_target_is_met(self, app, client, org_a):
+    def test_status_becomes_realised_only_when_target_is_met(self, app, client, org_a, login_as):
         from app import db
         from app.models.benefit import Benefit
 
@@ -339,7 +316,7 @@ class TestBenefitLifecycle:
             db.session.commit()
             bid = b.id
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         client.post(f"/portfolio/benefits/{bid}/measure", data={"actual_value": "50"})
 
         with app.app_context():
@@ -349,7 +326,7 @@ class TestBenefitLifecycle:
             db.session.delete(row)
             db.session.commit()
 
-    def test_measurement_without_a_value_changes_nothing(self, app, client, org_a):
+    def test_measurement_without_a_value_changes_nothing(self, app, client, org_a, login_as):
         from app import db
         from app.models.benefit import Benefit
 
@@ -361,7 +338,7 @@ class TestBenefitLifecycle:
             db.session.commit()
             bid = b.id
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         client.post(f"/portfolio/benefits/{bid}/measure", data={"actual_value": ""})
 
         with app.app_context():
@@ -377,11 +354,11 @@ class TestBenefitLifecycle:
 # ==========================================================================
 
 class TestAssumptionLifecycle:
-    def test_logging_an_assumption_persists_exposure_inputs(self, app, client, org_a):
+    def test_logging_an_assumption_persists_exposure_inputs(self, app, client, org_a, login_as):
         from app import db
         from app.models.demand import Assumption
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         statement = f"Vendor API supports bulk export {uuid.uuid4().hex[:6]}"
 
         client.post(f"/portfolio/initiatives/{org_a['initiative_id']}/assumptions", data={
@@ -396,7 +373,7 @@ class TestAssumptionLifecycle:
             db.session.delete(row)
             db.session.commit()
 
-    def test_invalidating_keeps_the_row_and_the_note(self, app, client, org_a):
+    def test_invalidating_keeps_the_row_and_the_note(self, app, client, org_a, login_as):
         """The assumption that proved false is the useful entry in the log."""
         from app import db
         from app.models.demand import Assumption
@@ -409,7 +386,7 @@ class TestAssumptionLifecycle:
             db.session.commit()
             aid = a.id
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         client.post(f"/portfolio/assumptions/{aid}/resolve",
                     data={"status": "invalidated", "note": "Vendor confirmed no bulk export."})
 
@@ -422,7 +399,7 @@ class TestAssumptionLifecycle:
             db.session.delete(row)
             db.session.commit()
 
-    def test_invalidating_without_a_note_is_refused(self, app, client, org_a):
+    def test_invalidating_without_a_note_is_refused(self, app, client, org_a, login_as):
         from app import db
         from app.models.demand import Assumption
 
@@ -434,7 +411,7 @@ class TestAssumptionLifecycle:
             db.session.commit()
             aid = a.id
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         client.post(f"/portfolio/assumptions/{aid}/resolve", data={"status": "invalidated"})
 
         with app.app_context():
@@ -450,16 +427,17 @@ class TestAssumptionLifecycle:
 # ==========================================================================
 
 class TestWritePathTenantIsolation:
-    def test_cannot_add_a_benefit_to_another_orgs_initiative(self, app, client, org_a):
+    def test_cannot_add_a_benefit_to_another_orgs_initiative(
+        self, app, client, org_a, db_session, make_org, login_as
+    ):
         """The check that stops one tenant writing into another's programme."""
         from app import db
         from app.models.benefit import Benefit
 
-        with app.app_context():
-            org_b = _make_org_id(db, "CrudB")
-            attacker = _make_user_id(db, org_b, "CrudB")
+        org_b = make_org("CrudB")
+        attacker = _make_user_id(db_session, org_b.id, "CrudB")
 
-        _login(client, attacker)
+        login_as(client, attacker)
         name = f"Injected {uuid.uuid4().hex[:6]}"
         resp = client.post(f"/portfolio/programmes/{org_a['programme_id']}/benefits",
                            data={"name": name})
@@ -471,7 +449,7 @@ class TestWritePathTenantIsolation:
             assert db.session.query(Benefit).filter_by(name=name).one_or_none() is None
 
     def test_legacy_initiative_benefit_write_blocked_until_linked(
-        self, app, client, org_a
+        self, app, client, org_a, login_as
     ):
         """Unlinked, the legacy URL still refuses to write — see
         test_legacy_initiative_benefit_write_works_once_linked for the bridged
@@ -479,7 +457,7 @@ class TestWritePathTenantIsolation:
         from app import db
         from app.models.benefit import Benefit
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         name = f"Legacy write blocked {uuid.uuid4().hex[:6]}"
         response = client.post(
             f"/portfolio/initiatives/{org_a['initiative_id']}/benefits",
@@ -491,7 +469,7 @@ class TestWritePathTenantIsolation:
             assert db.session.query(Benefit).filter_by(name=name).one_or_none() is None
 
     def test_legacy_initiative_benefit_write_works_once_linked(
-        self, app, client, org_a
+        self, app, client, org_a, db_session, login_as
     ):
         """The bridge this session added: once a human confirms this legacy
         EnterpriseInitiative and a StrategicInitiative describe the same real
@@ -505,8 +483,15 @@ class TestWritePathTenantIsolation:
             initiative = db.session.get(EnterpriseInitiative, org_a["initiative_id"])
             initiative.linked_strategic_initiative_id = org_a["programme_id"]
             db.session.commit()
+        # The block above wrote through its own, separate nested session (see
+        # the module docstring). Without this, db_session's identity map can
+        # still hand back the pre-link EnterpriseInitiative object it already
+        # held, and the assertions below would only happen to pass because
+        # login_as's own commit (via mint_test_sid) coincidentally expires it
+        # first — order-dependent and not something to rely on.
+        db_session.expire_all()
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         name = f"Bridged benefit {uuid.uuid4().hex[:6]}"
         response = client.post(
             f"/portfolio/initiatives/{org_a['initiative_id']}/benefits",
@@ -519,13 +504,13 @@ class TestWritePathTenantIsolation:
             assert benefit is not None
             assert benefit.strategic_initiative_id == org_a["programme_id"]
 
-    def test_link_programme_round_trips_via_form_and_page(self, app, client, org_a):
+    def test_link_programme_round_trips_via_form_and_page(self, app, client, org_a, login_as):
         """The picker itself: link, then confirm the link is visible both via
         an independent re-fetch and via the actual rendered detail page."""
         from app import db
         from app.models.vendor.vendor_organization import EnterpriseInitiative
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         response = client.post(
             f"/portfolio/initiatives/{org_a['initiative_id']}/link-programme",
             data={"programme_id": org_a["programme_id"]},
@@ -550,20 +535,20 @@ class TestWritePathTenantIsolation:
 # ==========================================================================
 
 class TestPagesRender:
-    def test_portfolio_index_renders(self, app, client, org_a):
-        _login(client, org_a["user_id"])
+    def test_portfolio_index_renders(self, app, client, org_a, login_as):
+        login_as(client, org_a["user_id"])
         resp = client.get("/portfolio/")
         assert resp.status_code == 200, resp.status_code
 
-    def test_initiative_detail_renders(self, app, client, org_a):
-        _login(client, org_a["user_id"])
+    def test_initiative_detail_renders(self, app, client, org_a, login_as):
+        login_as(client, org_a["user_id"])
         resp = client.get(f"/portfolio/{org_a['initiative_id']}")
         assert resp.status_code == 200, resp.status_code
 
     def test_initiative_detail_uses_canonical_programme_benefit_form(
-        self, app, client, org_a
+        self, app, client, org_a, login_as
     ):
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         response = client.get(f"/portfolio/{org_a['initiative_id']}")
 
         assert response.status_code == 200
@@ -576,7 +561,7 @@ class TestPagesRender:
         assert f'value="{org_a["programme_id"]}"'.encode() in response.data
 
     def test_initiative_detail_without_programme_has_honest_unavailable_state(
-        self, app, client, org_a
+        self, app, client, org_a, db_session, login_as
     ):
         from app import db
         from app.models.strategic import StrategicInitiative
@@ -585,8 +570,11 @@ class TestPagesRender:
             programme = db.session.get(StrategicInitiative, org_a["programme_id"])
             programme.record_kind = None
             db.session.commit()
+        # Same reason as test_legacy_initiative_benefit_write_works_once_linked
+        # above: this mutation ran through its own separate nested session.
+        db_session.expire_all()
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         response = client.get(f"/portfolio/{org_a['initiative_id']}")
 
         assert response.status_code == 200
@@ -597,12 +585,14 @@ class TestPagesRender:
         )
         assert b"no transformation programme is available" in response.data.lower()
 
-    def test_demand_queue_and_form_render(self, app, client, org_a):
-        _login(client, org_a["user_id"])
+    def test_demand_queue_and_form_render(self, app, client, org_a, login_as):
+        login_as(client, org_a["user_id"])
         assert client.get("/portfolio/demands").status_code == 200
         assert client.get("/portfolio/demands/new").status_code == 200
 
-    def test_detail_renders_with_a_measured_benefit_and_open_assumption(self, app, client, org_a):
+    def test_detail_renders_with_a_measured_benefit_and_open_assumption(
+        self, app, client, org_a, login_as
+    ):
         """The populated path — em dashes, badges and the resolve form all engage."""
         from app import db
         from app.models.benefit import Benefit
@@ -620,7 +610,7 @@ class TestPagesRender:
             db.session.commit()
             bid, aid = b.id, a.id
 
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         resp = client.get(f"/portfolio/{org_a['initiative_id']}")
         assert resp.status_code == 200, resp.status_code
 
@@ -631,13 +621,12 @@ class TestPagesRender:
                     db.session.delete(row)
             db.session.commit()
 
-    def test_index_renders_when_an_initiative_has_no_figures(self, app, client, org_a):
+    def test_index_renders_when_an_initiative_has_no_figures(
+        self, app, client, org_a, db_session, login_as
+    ):
         """The em-dash path: nulls must not raise on a comparison or a format."""
-        from app import db
+        bare = _make_initiative_id(db_session, org_a["org_id"], name="Bare")
 
-        with app.app_context():
-            bare = _make_initiative_id(db, org_a["org_id"], name="Bare")
-
-        _login(client, org_a["user_id"])
+        login_as(client, org_a["user_id"])
         assert client.get("/portfolio/").status_code == 200
         assert client.get(f"/portfolio/{bare}").status_code == 200
