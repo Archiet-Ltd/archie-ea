@@ -13,16 +13,6 @@ import uuid
 import pytest
 
 
-@pytest.fixture(scope="module")
-def app():
-    from app import create_app
-
-    app = create_app("testing")
-    app.config["TESTING"] = True
-    app.config["WTF_CSRF_ENABLED"] = False
-    return app
-
-
 class TestModelRelationships:
     """Model import + relationship wiring."""
 
@@ -128,7 +118,7 @@ class TestValueStreamServiceImports:
 class TestBizbokGridWithSeededData:
     """Build the grid end-to-end against real seeded rows in the test DB."""
 
-    def test_grid_reflects_seeded_mapping(self, app):
+    def test_grid_reflects_seeded_mapping(self, app, db_session, make_org):
         from app import db
         from app.models.unified_capability import (
             CapabilityValueStreamMapping,
@@ -147,39 +137,24 @@ class TestBizbokGridWithSeededData:
         # only an app context and passed solely because a fresh database created
         # value_streams WITHOUT the column at all; against real data it failed with
         # NotNullViolation.
+        #
+        # The row this test needs an Organization for used to be found by querying
+        # for an existing one and seeding a fallback when the table was empty, with
+        # no cleanup for that fallback — every run against an empty database left
+        # one behind. make_org (tests/conftest.py, via db_session) always creates
+        # its own, collision-free, and rolls it back with everything else this test
+        # creates.
         with app.test_request_context("/"):
-            from flask import g
-
-            org = db.session.execute(
-                db.text("SELECT id FROM organizations ORDER BY id LIMIT 1")
-            ).scalar()
-            if org is None:
-                from app.models.organization import Organization
-
-                seeded = Organization(name=f"VS Test Org {suffix}", slug=f"vs-test-{suffix}")
-                db.session.add(seeded)
-                db.session.flush()
-                org = seeded.id
-            g.current_org_id = org
+            _org = make_org("ValueStreamsTest")
             # Created via the service (Core-level insert) rather than
             # db.session.add(ValueStream(...)) directly: a pre-existing
             # after_insert event on ValueStream in app/models/strategy_layer.py
             # references a column that does not exist on this DB's
             # `value_streams` table, so an ORM-level insert raises AttributeError.
             # ValueStream is tenant-scoped (TenantMixin) as of 2026-07-30, so
-            # organization_id is NOT NULL. _default_org_id() deliberately
-            # refuses to guess when several organizations exist, so seeding
-            # outside a request would insert NULL and fail. Supply the tenant
-            # explicitly via a request context, exactly as a real request does.
+            # organization_id is NOT NULL, filled here from g.current_org_id (the
+            # column default), exactly as a real request supplies it.
             from flask import g as _g
-
-            from app.models.organization import Organization
-
-            _org = Organization.query.order_by(Organization.id.asc()).first()
-            if _org is None:
-                _org = Organization(name=f"VS Test Org {suffix}")
-                db.session.add(_org)
-                db.session.commit()
 
             with app.test_request_context():
                 _g.current_org_id = _org.id

@@ -177,42 +177,33 @@ def test_the_justification_list_has_not_gone_stale():
     )
 
 
-@pytest.fixture(scope="module")
-def app():
-    import os
-
-    os.environ.setdefault("SECRET_KEY", "x" * 32)
-    from app import create_app, db
-
-    application = create_app("testing")
-    with application.app_context():
-        db.create_all()
-    return application
-
-
-def test_tenant_mixin_actually_filters_reads(app):
+def test_tenant_mixin_actually_filters_reads(app, db_session, make_org):
     """The positive control: prove the mechanism, not a route that uses it.
 
     Isolation here is an ORM event listener. If it stopped applying, every route
     would keep returning 200 and quietly serve other tenants' rows.
+
+    Used to commit its two organisations and two components through this
+    file's own module-scoped app fixture, with no cleanup at all — every run
+    left four rows behind. That fixture (a plain create_app("testing") +
+    db.create_all(), nothing this file needs that the shared one lacks) is
+    gone; make_org/db_session (tests/conftest.py) create the same shape and
+    roll it all back with the test. test_bulk_delete_is_tenant_filtered below
+    still needs its own real commit (explained at its own cleanup) and is
+    unchanged.
     """
-    from app import db
     from app.models.application_portfolio import ApplicationComponent
-    from app.models.organization import Organization
 
     marker = uuid.uuid4().hex[:8]
-    with app.app_context():
-        org_a = Organization(name="Iso A %s" % marker, slug="iso-a-%s" % marker)
-        org_b = Organization(name="Iso B %s" % marker, slug="iso-b-%s" % marker)
-        db.session.add_all([org_a, org_b])
-        db.session.commit()
-        a_id, b_id = org_a.id, org_b.id
+    org_a = make_org("IsoA")
+    org_b = make_org("IsoB")
+    a_id, b_id = org_a.id, org_b.id
 
-        db.session.add_all([
-            ApplicationComponent(name="A-only %s" % marker, organization_id=a_id),
-            ApplicationComponent(name="B-only %s" % marker, organization_id=b_id),
-        ])
-        db.session.commit()
+    db_session.add_all([
+        ApplicationComponent(name="A-only %s" % marker, organization_id=a_id),
+        ApplicationComponent(name="B-only %s" % marker, organization_id=b_id),
+    ])
+    db_session.commit()
 
     # Inside a request bound to org A, org B's row must be invisible.
     with app.test_request_context():
