@@ -516,6 +516,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register application owners backfill CLI: {e}")
 
+    # Cost fact store backfill
+    try:
+        from app.commands import backfill_cost_facts
+        backfill_cost_facts.init_app(app)
+        app.logger.info("✅ Cost fact backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register cost fact backfill CLI: {e}")
+
     try:
         from app.commands.clear_foreign_assignees import init_app as init_clear_foreign_assignees
         init_clear_foreign_assignees(app)
