@@ -1,0 +1,28 @@
+{
+  "quarantined": [
+    {
+      "test": "tests/smoke/test_blueprint_governance_controls.py::test_governance_editor_saves_to_real_api_and_survives_reload",
+      "reason": "Flaky: intermittent Playwright wait timing in governance editor save dialog"
+    },
+    {
+      "test": "tests/test_model_viewer_back_navigation.py::test_model_viewer_navigation_and_card_contract[empty_back-firefox]",
+      "reason": "Flaky: Firefox back-navigation timing across card-rendered DOM"
+    },
+    {
+      "test": "tests/smoke/test_launch_composer_journey.py::test_application_architect_models_components_and_interfaces",
+      "reason": "Flaky: intermittent composer state after the solution-side interaction"
+    },
+    {
+      "test": "tests/test_modal_focus_return.py::test_dynamic_confirm_restores_invoking_button_after_dismissal[firefox-cancel-pointer]",
+      "reason": "Flaky: Firefox-specific focus return after pointer-cancel dismissal"
+    },
+    {
+      "test": "tests/test_smoke_console_diagnostics.py",
+      "reason": "Flaky: intermittent console diagnostic capture (two cases observed across unrelated PRs; quarantining the whole file)"
+    },
+    {
+      "test": "app/modules/intelligence/tests/test_ui_routes.py::test_nav_counts_cache_expires_empty_result_on_other_worker",
+      "reason": "Flaky: cache expiry timing with stale data on a concurrent worker"
+    }
+  ]
+}
