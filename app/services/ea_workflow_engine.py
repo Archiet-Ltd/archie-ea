@@ -4307,6 +4307,7 @@ provides foundation for subsequent architecture development phases.
                         user_id=watcher.user_id,
                         message=message,
                         url=f"/ea-workflows/instance/{instance.id}",
+                        organization_id=getattr(instance, "organization_id", None),
                     )
                 nested.commit()
             except Exception:

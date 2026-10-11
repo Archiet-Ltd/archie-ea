@@ -24,17 +24,42 @@ _ORG = "NULLIF(current_setting('archie.organization_id', true), '')::integer"
 _PLATFORM = "COALESCE(current_setting('archie.platform_scope', true), '') = 'on'"
 _TENANT_RULE = f"organization_id = {_ORG} OR {_PLATFORM}"
 
+# notifications gained organization_id by backfilling from the recipient
+# user, but legacy rows for a user with no organisation stay NULL. The runtime
+# role is NOBYPASSRLS, so a pure `organization_id = _ORG` SELECT would make
+# those rows vanish from that user's own bell. The bell still filters by
+# user_id in the app, so admitting a NULL-org row whose owning user belongs to
+# the session organisation keeps the row visible to its owner without leaking
+# it to any other organisation's context.
+_NOTIF_SELECT_RULE = (
+    f"organization_id = {_ORG} OR "
+    f"(organization_id IS NULL AND user_id IN "
+    f"(SELECT id FROM users WHERE organization_id = {_ORG})) OR "
+    f"{_PLATFORM}"
+)
+
 TENANT_POLICIES = ("tenant_select", "tenant_insert", "tenant_update", "tenant_delete")
+
+# Only the table this revision exists to fence. Its SELECT differs from the
+# standard tenant rule (see _NOTIF_SELECT_RULE above); INSERT/UPDATE/DELETE
+# keep the standard rule, so a new notification is stamped with the session
+# organisation (NotificationService.create resolves it from the recipient).
+TENANT_TABLES = ("notifications",)
+HYBRID_TABLES = ()
+
+
+def _select_rule(table: str) -> str:
+    if table == "notifications":
+        return _NOTIF_SELECT_RULE
+    return _TENANT_RULE
+
+
 _TENANT_DEFINITIONS = (
-    ("SELECT", _TENANT_RULE, None),
+    ("SELECT", None, None),   # USING filled per-table by _fence via _select_rule
     ("INSERT", None, _TENANT_RULE),
     ("UPDATE", _TENANT_RULE, _TENANT_RULE),
     ("DELETE", _TENANT_RULE, None),
 )
-
-# Only the table this revision exists to fence.
-TENANT_TABLES = ("notifications",)
-HYBRID_TABLES = ()
 
 
 def _skip_reason(bind, table: str):
@@ -70,6 +95,8 @@ def _skip_reason(bind, table: str):
 def _fence(bind, table: str) -> None:
     for name, (command, using, check) in zip(TENANT_POLICIES, _TENANT_DEFINITIONS):
         bind.execute(text(f"DROP POLICY IF EXISTS {name} ON public.{table}"))  # nosec B608 - table names from a literal constant
+        if command == "SELECT":
+            using = _select_rule(table)
         clause = ""
         if using is not None:
             clause += f" USING ({using})"

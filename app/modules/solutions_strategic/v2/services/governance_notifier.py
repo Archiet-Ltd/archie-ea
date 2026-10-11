@@ -127,7 +127,12 @@ class GovernanceNotifier:
             recent = q.first()
             if recent:
                 continue
-            NotificationService.create(user_id=uid, message=message, url=url)
+            NotificationService.create(
+                user_id=uid,
+                message=message,
+                url=url,
+                organization_id=org_id,
+            )
             created += 1
         return created
 

@@ -36,9 +36,22 @@ class NotificationService:
     ):
         """Create and persist one in-app notification.
 
+        When ``organization_id`` is not supplied it is resolved from the
+        recipient user's own organisation. The notifications table is under
+        row-level security and the application runs as a NON-BYPASSRLS role, so
+        a row must carry the session organisation or the INSERT is refused and
+        the bell query hides it. Resolving from the recipient user keeps a
+        caller that has not (or cannot) supply an organisation from silently
+        producing a notification nobody can see.
+
         Returns the new ``Notification`` instance.
         """
         from app.models.models import Notification
+        from app.models.user import User
+
+        if organization_id is None:
+            recipient = db.session.get(User, user_id)
+            organization_id = recipient.organization_id if recipient else None
 
         notif = Notification(
             user_id=user_id,
