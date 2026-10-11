@@ -528,7 +528,7 @@ def test_notification_service_creates_a_bell_notification_visible_to_its_owner_u
     """A bell notification created for a user is visible to that user when the
     application runs as the non-owner, NOBYPASSRLS runtime role.
 
-    Fails without the HIGH-1 fix: NotificationService.create used to leave
+    Fails without the fix: NotificationService.create used to leave
     organization_id NULL, and the notifications INSERT policy refuses a NULL
     organisation, so the row was never created (it was silently swallowed by
     the caller's try/except or a savepoint rollback) and the bell never showed
