@@ -30,7 +30,7 @@ _CANONICAL_RE = re.compile(r'<link\s+rel="canonical"\s+href="([^"]*)"')
 # Views that render a public page but are not backed by a PublicPage from
 # load_all_pages(): the home page and the two hub indexes. Each is
 # self-referencing by construction -- see main/index.html, public/vs_hub.html
-# and public/use_cases_index.html.
+# and public/hub_index.html.
 _NON_CONTENT_PAGE_PATHS = {"/", "/vs", "/use-cases"}
 
 

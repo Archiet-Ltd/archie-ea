@@ -54,6 +54,29 @@
 
   <article class="public-page-content prose max-w-none">
     {{ page.body_html }}
+
+    {% if hub_groups %}
+    {% set groups = hub_groups %}
+    {% set show_descriptions = true %}
+    {% include 'public/_hub_groups.html' %}
+    {% endif %}
+
+    {% if siblings %}
+    <h2>Other roles</h2>
+    <ul>
+      {% for group in siblings %}
+      {% if group.label %}
+      <li>{{ group.label }}:
+        {% for entry in group.pages %}<a href="{{ entry.url }}">{{ entry.title }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+      </li>
+      {% else %}
+      {% for entry in group.pages %}
+      <li><a href="{{ entry.url }}">{{ entry.title }}</a></li>
+      {% endfor %}
+      {% endif %}
+      {% endfor %}
+    </ul>
+    {% endif %}
   </article>
 
   {% if screenshot %}

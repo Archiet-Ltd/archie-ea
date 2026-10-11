@@ -1,0 +1,18 @@
+{# smoke-coverage-ok: covered by tests/test_public_content_pages.py (hub lists for /use-cases, /roles, /connectors and /features).
+   Partial: public/_hub_groups.html -- the one grouped list every hub renders.
+   Receives `groups` (each {label, pages}) and `show_descriptions` (when true,
+   each entry is the page title linked, then its description). Included by
+   public/hub_index.html and public/page.html (the /features hub list).
+#}
+{% for group in groups %}
+<h2>{{ group.label }}</h2>
+<ul>
+  {% for page in group.pages %}
+  {% if show_descriptions %}
+  <li><a href="{{ page.url }}">{{ page.title }}</a>{% if page.description %} {{ page.description }}{% endif %}</li>
+  {% else %}
+  <li><a href="{{ page.url }}">{{ page.title }}</a></li>
+  {% endif %}
+  {% endfor %}
+</ul>
+{% endfor %}

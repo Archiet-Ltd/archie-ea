@@ -717,22 +717,142 @@ def public_use_cases_index():
     listing, same as every other nav/index listing -- see
     app/services/public_pages.py::load_feed_pages.
     """
-    from app.services.public_pages import load_feed_pages
+    from app.services.public_pages import family_hub_groups
 
-    pages = [p for p in load_feed_pages() if p.family == "function-per-segment"]
+    groups = family_hub_groups(
+        "function-per-segment",
+        group_key="segment_id",
+        labels=_USE_CASE_SEGMENT_LABELS,
+    )
+    return render_template(
+        "public/hub_index.html",
+        title="Use cases",
+        canonical_url="https://entelim.org/use-cases",
+        description=(
+            "What Entelim answers for startup founders, scale-up CTOs, "
+            "enterprise architecture teams and operations leads."
+        ),
+        intro_text=(
+            "What Entelim answers, grouped by where you sit: startup founders, "
+            "scale-up CTOs, enterprise architecture teams, and operations leads."
+        ),
+        groups=groups,
+        show_descriptions=False,
+    )
 
-    groups: dict[str, list] = {}
-    for page in pages:
-        segment_id = page.front_matter.get("segment_id", "")
-        groups.setdefault(segment_id, []).append(page)
 
-    ordered_groups = []
-    for segment_id in sorted(groups):
-        label = _USE_CASE_SEGMENT_LABELS.get(segment_id, segment_id or "More")
-        entries = sorted(groups[segment_id], key=lambda p: p.title.lower())
-        ordered_groups.append({"label": label, "pages": entries})
+def _render_family_hub(family: str, path: str, fallback_title: str, extra_entries):
+    """/roles and /connectors: one hub view for both families.
 
-    return render_template("public/use_cases_index.html", groups=ordered_groups)
+    The intro is the site-family page of the same name when its file exists
+    (content/pages/site/roles.md, connectors.md); until then, or while that
+    page is held, the hub shows a plain H1 and its feed-built groups with
+    noindex. The lists come from family_hub_groups(), i.e. load_feed_pages().
+    """
+    from markupsafe import Markup
+
+    from app.services.public_pages import (
+        build_hub_jsonld,
+        family_hub_groups,
+        hub_extra_entries,
+        load_page,
+    )
+
+    intro = load_page("site", path.lstrip("/"))
+    live_intro = intro is not None and not intro.is_held
+    groups = family_hub_groups(family)
+    extra_groups = hub_extra_entries(extra_entries)
+    title = intro.title if live_intro else fallback_title
+    description = intro.description if live_intro else None
+    listed = [p for g in groups for p in g["pages"]]
+    seen = {p.url for p in listed}
+    for group in extra_groups:
+        for p in group["pages"]:
+            if p.url not in seen:
+                seen.add(p.url)
+                listed.append(p)
+    return render_template(
+        "public/hub_index.html",
+        title=title,
+        canonical_url=f"https://entelim.org{path}",
+        description=description,
+        intro_html=Markup(intro.body_html) if live_intro else None,
+        groups=groups,
+        extra_groups=extra_groups,
+        show_descriptions=True,
+        noindex=not live_intro,
+        jsonld=build_hub_jsonld(
+            title, path, description, listed,
+            intro.body_html if live_intro else None,
+        ),
+    )
+
+
+@main.route("/roles")
+def public_roles_index():
+    """The /roles hub: every live role page, grouped, from the feed."""
+    from app.services.public_pages import ROLE_HUB_EXTRA_ENTRIES
+
+    return _render_family_hub("role", "/roles", "Roles", ROLE_HUB_EXTRA_ENTRIES)
+
+
+@main.route("/roles/<slug>")
+def public_role(slug):
+    """A role content page, with the other roles linked after its body."""
+    from app.services.public_pages import (
+        MERGED_PAGES,
+        build_jsonld,
+        get_page_screenshot,
+        load_page,
+        role_siblings,
+    )
+
+    merge_target = MERGED_PAGES.get(f"/roles/{slug}")
+    if merge_target:
+        return redirect(merge_target, code=301)
+
+    page = load_page("role", slug=slug)
+    if page is None:
+        from flask import abort
+        abort(404)
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        screenshot=get_page_screenshot(page), siblings=role_siblings(page),
+    )
+
+
+@main.route("/connectors")
+def public_connectors_index():
+    """The /connectors hub: every live connector page, grouped, from the feed."""
+    from app.services.public_pages import CONNECTOR_HUB_EXTRA_ENTRIES
+
+    return _render_family_hub(
+        "connector", "/connectors", "Entelim integrations", CONNECTOR_HUB_EXTRA_ENTRIES,
+    )
+
+
+@main.route("/connectors/<slug>")
+def public_connector(slug):
+    """A connector content page."""
+    from app.services.public_pages import (
+        MERGED_PAGES,
+        build_jsonld,
+        get_page_screenshot,
+        load_page,
+    )
+
+    merge_target = MERGED_PAGES.get(f"/connectors/{slug}")
+    if merge_target:
+        return redirect(merge_target, code=301)
+
+    page = load_page("connector", slug=slug)
+    if page is None:
+        from flask import abort
+        abort(404)
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        screenshot=get_page_screenshot(page),
+    )
 
 
 @main.route("/use-cases/<slug>")
@@ -853,12 +973,41 @@ def public_dogfood():
 )
 def public_site_page(slug):
     """A fixed top-level marketing/legal page (one file per page under content/pages/site/)."""
-    from app.services.public_pages import build_jsonld, load_page
+    from app.services.public_pages import (
+        build_hub_jsonld,
+        build_jsonld,
+        load_feed_pages,
+        load_page,
+    )
 
     page = load_page("site", slug=slug)
     if page is None:
         from flask import abort
         abort(404)
+    if slug == "features":
+        # /features is the module and connector hub: both lists are built
+        # from the feed, so a new module or connector file appears with no
+        # edit here. The connectors' file-import entries are not repeated.
+        feed = load_feed_pages()
+        modules = sorted(
+            (p for p in feed if p.family == "module"), key=lambda p: p.title.lower()
+        )
+        connectors = sorted(
+            (p for p in feed if p.family == "connector"), key=lambda p: p.title.lower()
+        )
+        hub_groups = [
+            group for group in (
+                {"label": "Every module", "pages": modules},
+                {"label": "Connectors", "pages": connectors},
+            ) if group["pages"]
+        ]
+        return render_template(
+            "public/page.html", page=page, hub_groups=hub_groups,
+            jsonld=build_hub_jsonld(
+                page.title, page.url, page.description, modules + connectors,
+                page.body_html,
+            ),
+        )
     # A page may name its own layout in front-matter (`template: pricing`),
     # for pages whose structure is not a single prose column.
     template = "public/page.html"

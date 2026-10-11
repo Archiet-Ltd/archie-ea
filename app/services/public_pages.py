@@ -49,6 +49,7 @@ MERGED_PAGES: dict[str, str] = {
     "/modules/batch-import": "/modules/architecture-model",
     "/modules/duplicate-detection": "/modules/rationalization",
     "/modules/gap-analysis": "/modules/roadmaps",
+    "/modules/integrations": "/connectors",
     "/modules/investment-analysis": "/modules/business-case",
     "/modules/my-applications": "/use-cases/what-i-own",
     "/modules/projects": "/use-cases/programme-tracking",
@@ -63,7 +64,7 @@ HELD_PAGE_URLS: frozenset[str] = frozenset({
     "/modules/capability-maturity",
     "/use-cases/capability-maturity-heatmap",
     "/modules/industry-apqc",
-    "/modules/integrations",
+    "/connectors/ai-assistants",
     "/use-cases/canvas-dependencies",
     "/use-cases/lean-canvas",
     "/use-cases/reference-packs",
@@ -271,6 +272,8 @@ FAMILY_DIR_MAP = {
     "dogfood": "dogfood",
     "site": "site",
     "legal": "legal",
+    "role": "roles",
+    "connector": "connectors",
 }
 
 FAMILY_URL_PREFIX = {
@@ -284,6 +287,8 @@ FAMILY_URL_PREFIX = {
     "site": "",
     # Same shape as "site", but only published while LEGAL_PAGES_ENABLED is on.
     "legal": "",
+    "role": "/roles",
+    "connector": "/connectors",
 }
 
 _md = markdown.Markdown(extensions=["extra"])
@@ -799,6 +804,8 @@ _BREADCRUMB_PARENTS: dict[str, tuple[str, str]] = {
     "module": ("Features", "/features"),
     "function-per-segment": ("Use cases", "/use-cases"),
     "comparison": ("Compare", "/vs"),
+    "role": ("Roles", "/roles"),
+    "connector": ("Connectors", "/connectors"),
 }
 
 
@@ -820,6 +827,184 @@ def _breadcrumb_list_items(page: PublicPage, site_url: str) -> list[dict[str, An
         }
         for position, (name, path) in enumerate(trail, start=1)
     ]
+
+
+# ── Hubs: /roles, /connectors, /features (feed-built lists) ─────────────────
+# One ordered label table per family (front-matter key -> heading), and one
+# grouping function every hub shares. A page with a missing or unknown key
+# lands in a final "More" group.
+
+ROLE_GROUPS: tuple[tuple[str, str], ...] = (
+    ("architecture", "Architecture"),
+    ("technology-leadership", "Technology leadership"),
+    ("portfolio-procurement-finance", "Portfolio, procurement and finance"),
+    ("security-risk-compliance", "Security, risk and compliance"),
+    ("owners", "Owners"),
+)
+
+CONNECTOR_GROUPS: tuple[tuple[str, str], ...] = (
+    ("ai-assistants", "AI assistants"),
+    ("sign-in", "Sign-in"),
+    ("service-management-and-delivery", "Service management and delivery"),
+    ("collaboration", "Collaboration"),
+)
+
+# family -> (front-matter key, ordered label table)
+_HUB_GROUP_TABLES: dict[str, tuple[str, tuple[tuple[str, str], ...]]] = {
+    "role": ("role_group", ROLE_GROUPS),
+    "connector": ("connector_group", CONNECTOR_GROUPS),
+}
+
+# Non-page entries: (heading, target URLs). Link text is each target page's
+# own title from load_feed_pages(); a target not in the feed is dropped.
+ROLE_HUB_EXTRA_ENTRIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Architecture review board members", (
+        "/modules/arb",
+        "/use-cases/architecture-review-board",
+    )),
+    ("IT operations", (
+        "/use-cases/what-breaks-and-who-gets-called",
+        "/use-cases/what-happens-if-a-supplier-fails",
+        "/use-cases/contract-renewals",
+    )),
+)
+
+CONNECTOR_HUB_EXTRA_ENTRIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("File imports", (
+        "/use-cases/import-archimate-model",
+        "/modules/architecture-model",
+    )),
+)
+
+
+def _title_key(page: PublicPage) -> str:
+    return page.title.lower()
+
+
+def family_hub_groups(
+    family: str,
+    *,
+    group_key: str | None = None,
+    labels: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """The one grouping function behind every hub: the feed pages of *family*
+    grouped by a front-matter key, pages sorted by title (case-insensitive),
+    empty groups omitted.
+
+    Roles and connectors use their own ordered tables, with anything whose
+    key is missing or unknown in a final "More" group. /use-cases passes
+    ``group_key="segment_id"`` and its segment labels (a mapping): groups in
+    sorted key order, an unknown key labelled by itself ("More" when empty).
+    """
+    pages = [p for p in load_feed_pages() if p.family == family]
+    by_key: dict[str, list[PublicPage]] = {}
+
+    if group_key is not None:
+        for page in pages:
+            by_key.setdefault(str(page.front_matter.get(group_key) or ""), []).append(page)
+        mapping = labels or {}
+        return [
+            {"label": mapping.get(key, key or "More"), "pages": sorted(by_key[key], key=_title_key)}
+            for key in sorted(by_key)
+        ]
+
+    group_key, table = _HUB_GROUP_TABLES[family]
+    known = {key for key, _ in table}
+    extra: list[PublicPage] = []
+    for page in pages:
+        key = str(page.front_matter.get(group_key) or "")
+        if key in known:
+            by_key.setdefault(key, []).append(page)
+        else:
+            extra.append(page)
+    groups = [
+        {"label": label, "pages": sorted(by_key[key], key=_title_key)}
+        for key, label in table
+        if by_key.get(key)
+    ]
+    if extra:
+        groups.append({"label": "More", "pages": sorted(extra, key=_title_key)})
+    return groups
+
+
+def hub_extra_entries(
+    entries: tuple[tuple[str, tuple[str, ...]], ...],
+) -> list[dict[str, Any]]:
+    """Resolve non-page entries against the feed: only targets that are live
+    feed pages are linked, titled with their own page title."""
+    by_url = {p.url: p for p in load_feed_pages()}
+    resolved = []
+    for label, urls in entries:
+        pages = [by_url[u] for u in urls if u in by_url]
+        if pages:
+            resolved.append({"label": label, "pages": pages})
+    return resolved
+
+
+def role_siblings(page: PublicPage) -> list[dict[str, Any]]:
+    """The "Other roles" strip for a role page: every other role-family feed
+    page (sorted by title) as one group, then the non-page role entries as
+    further groups. Never the page itself."""
+    others = sorted(
+        (p for p in load_feed_pages() if p.family == "role" and p.url != page.url),
+        key=_title_key,
+    )
+    groups = hub_extra_entries(ROLE_HUB_EXTRA_ENTRIES)
+    if others:
+        groups.insert(0, {"label": "", "pages": others})
+    return groups
+
+
+def build_hub_jsonld(
+    name: str,
+    path: str,
+    description: str | None,
+    pages: list[PublicPage],
+    body_html: str | None = None,
+) -> str:
+    """Structured data for a hub: CollectionPage with an ItemList of every
+    linked page, a BreadcrumbList (Home > hub) and an FAQPage only when the
+    hub's own intro has a real FAQ section. One @graph, one script block."""
+    site_url = SITE_URL
+    collection: dict[str, Any] = {
+        "@type": "CollectionPage",
+        "url": f"{site_url}{path}",
+        "name": name,
+    }
+    if description:
+        collection["description"] = description
+    collection["mainEntity"] = {
+        "@type": "ItemList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": position,
+                "url": f"{site_url}{page.url}",
+                "name": page.title,
+            }
+            for position, page in enumerate(pages, start=1)
+        ],
+    }
+    nodes: list[dict[str, Any]] = [
+        collection,
+        {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": f"{site_url}/"},
+                {"@type": "ListItem", "position": 2, "name": name, "item": f"{site_url}{path}"},
+            ],
+        },
+    ]
+    if body_html:
+        faq_questions = _extract_faq_questions(body_html)
+        if faq_questions:
+            nodes.append({
+                "@type": "FAQPage",
+                "url": f"{site_url}{path}",
+                "mainEntity": faq_questions,
+            })
+    ld = {"@context": "https://schema.org", "@graph": nodes}
+    return Markup(_escape_for_script_block(json.dumps(ld, indent=2, ensure_ascii=False)))
 
 
 def _escape_for_script_block(serialised: str) -> str:
