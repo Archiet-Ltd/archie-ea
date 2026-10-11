@@ -6,14 +6,14 @@ the SCIM group membership table. Every statement is idempotent so a second
 run is a no-op, and the downgrade drops with IF EXISTS.
 
 Revision ID: 20261007_scim_provisioning
-Revises: 20261010_oauth_token_grants
+Revises: 20261012_api_token_scopes
 Create Date: 2026-10-07
 """
 from alembic import op
 from sqlalchemy import text
 
 revision = "20261007_scim_provisioning"
-down_revision = "20261010_oauth_token_grants"
+down_revision = "20261012_api_token_scopes"
 branch_labels = None
 depends_on = None
 
