@@ -453,3 +453,5 @@ class TestCreateServiceClientCommand:
         assert user.is_service_user is True
         assert user.organization_id == org.id
         assert user.password_hash is None
+        assert user.role_name == "Viewer"
+        assert (user.role.permissions or 0) == 0

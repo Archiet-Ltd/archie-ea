@@ -41,7 +41,7 @@ def _slugify(value: str) -> str:
 def create_service_client(org_id: int, name: str, scope: str):
     from app.extensions import db
     from app.models.organization import Organization
-    from app.models.user import Role, User
+    from app.models.user import ROLE_NON_TECHNICAL_OWNER, Role, User
     from app.modules.oauth_provider.models import OAuthClient, _new_client_id, hash_secret
 
     organization = db.session.get(Organization, org_id)
@@ -71,6 +71,7 @@ def create_service_client(org_id: int, name: str, scope: str):
         role=viewer,
         confirmed=True,
         is_service_user=True,
+        enterprise_role=ROLE_NON_TECHNICAL_OWNER,
     )
     db.session.add(service_user)
     db.session.flush()
