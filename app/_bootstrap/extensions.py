@@ -716,6 +716,49 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # Webhook dispatch: fans new event-log entries out to each subscription
+        # and attempts the head-of-line delivery, per organisation.
+        def run_webhook_dispatch():
+            with app.app_context():
+                import logging
+
+                from app.jobs.tenant_safe_job import run_for_each_tenant
+
+                log = logging.getLogger(__name__)
+
+                def _dispatch_one_tenant(organization_id):
+                    from app.services.webhook_service import WebhookService
+
+                    service = WebhookService()
+                    service.fan_out(organization_id)
+                    return service.dispatch_due(organization_id)
+
+                def _log_result(result):
+                    if not result.ok:
+                        log.error(
+                            "webhook dispatch failed for org %s: %s",
+                            result.organization_id, result.error,
+                        )
+
+                try:
+                    run_for_each_tenant(
+                        app,
+                        "webhook-dispatch",
+                        _dispatch_one_tenant,
+                        on_result=_log_result,
+                    )
+                except Exception as exc:
+                    log.error("webhook dispatch error: %s", exc)
+
+        scheduler.add_job(
+            func=run_webhook_dispatch,
+            trigger=IntervalTrigger(seconds=10),
+            id="webhook_dispatch",
+            name="Webhook Dispatch",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # Event-log partition maintenance: creates the next three months'
         # partitions if missing. Runs daily so partitions exist before any
         # outbox event needs them.  Platform job — partitions are shared

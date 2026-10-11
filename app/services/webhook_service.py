@@ -1,28 +1,190 @@
 """
-Webhook service for managing event-driven notifications
+Webhook service: subscriptions, signed ordered delivery from the event log,
+replay and redelivery.
+
+Delivery reads the organisation's event log (``event_log``) in ordinal order.
+``fan_out`` turns log events into ``pending`` delivery rows per subscription,
+``dispatch_due`` attempts the oldest undelivered row of each subscription (head
+of line) and backs off on failure, and ``replay`` / ``redeliver`` create new
+rows from the log. Nothing here starts a thread or sleeps; the scheduled job
+``webhook_dispatch`` calls ``fan_out`` and ``dispatch_due`` per organisation.
 """
 
+from __future__ import annotations
+
+import calendar
+import hashlib
+import hmac
 import json
-import threading
-import time
+import random
+import secrets as _secrets
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 import requests
-from flask import current_app
+from flask import current_app, g
 
 from app.extensions import db
+from app.models.event_log import EventLogRecord
 from app.models.webhook import WebhookDelivery, WebhookEvent, WebhookSubscription
+from app.services import event_catalogue
+from app.services.event_log_service import max_ordinal, read_from_offset, replay_from
+from app.utils.ssrf_guard import BlockedOutboundURL, validate_outbound_url
+
+SIGNATURE_TOLERANCE_SECONDS = 300
+REPLAY_CAP = 10_000
+FAN_OUT_PAGE = 200
+ATTEMPTS_PER_RUN = 50
+DEAD_AFTER = timedelta(hours=24)
+REQUEST_TIMEOUT = (5, 10)
+_BACKOFF_SECONDS = (30, 60, 120, 300, 600)
+_BACKOFF_CAP_SECONDS = 900
+_FORBIDDEN_HEADERS = {"host", "content-length", "transfer-encoding"}
+_SIGNED_STATUSES = ("delivered", "success")
+_OPEN_STATUSES = ("pending", "retrying")
+
+
+class WebhookError(ValueError):
+    """A request the service refuses, with a plain-words message."""
+
+
+class WebhookValidationError(WebhookError):
+    """Input that is not acceptable (a bad URL, header or event list)."""
+
+
+class WebhookSecretUnavailable(WebhookError):
+    """Secret storage is not configured, so nothing can be stored."""
+
+
+# --------------------------------------------------------------------------- #
+# Signing primitives
+# --------------------------------------------------------------------------- #
+
+
+def hmac_sha256_hex(secret: str, message: bytes) -> str:
+    """The one HMAC-SHA256 primitive used to sign and to verify webhooks."""
+    return hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
+
+
+def _unix(moment: datetime) -> int:
+    return calendar.timegm(moment.utctimetuple())
+
+
+def sign_body(secret: str, timestamp: int, body: bytes) -> str:
+    """``v1`` signature: HMAC-SHA256(secret, "<t>." + body)."""
+    return hmac_sha256_hex(secret, f"{timestamp}.".encode("ascii") + body)
+
+
+def verify_signature(
+    secret: str,
+    header: str,
+    body,
+    *,
+    now: Optional[int] = None,
+    tolerance: int = SIGNATURE_TOLERANCE_SECONDS,
+) -> bool:
+    """True only for a matching ``v1`` signature whose timestamp is within tolerance.
+
+    *header* is ``t=<unix seconds>,v1=<hex>``; *body* is the exact bytes received.
+    """
+    if not secret or not header:
+        return False
+    if isinstance(body, str):
+        body = body.encode("utf-8")
+    parts: Dict[str, List[str]] = {}
+    for item in str(header).split(","):
+        key, sep, value = item.strip().partition("=")
+        if sep:
+            parts.setdefault(key, []).append(value)
+    try:
+        timestamp = int(parts.get("t", [""])[0])
+    except ValueError:
+        return False
+    current = int(now if now is not None else _unix(datetime.utcnow()))
+    if abs(current - timestamp) > tolerance:
+        return False
+    expected = sign_body(secret, timestamp, body)
+    return any(hmac.compare_digest(expected, candidate) for candidate in parts.get("v1", []))
+
+
+def next_backoff(attempt_number: int, *, jitter: bool = True) -> float:
+    """Seconds to wait after the *attempt_number*-th failed attempt.
+
+    30 s, 1 min, 2 min, 5 min, 10 min, then every 15 min, plus up to 10% jitter.
+    """
+    n = max(int(attempt_number), 1)
+    base = _BACKOFF_SECONDS[n - 1] if n <= len(_BACKOFF_SECONDS) else _BACKOFF_CAP_SECONDS
+    return base * (1 + random.uniform(0, 0.10)) if jitter else float(base)  # fabricated-ok: retry back-off jitter, never displayed as data
+
+
+def display_status(status: Optional[str]) -> str:
+    """Map legacy delivery statuses onto the current ones for display."""
+    return {"success": "delivered", "failed": "dead"}.get(status or "", status or "pending")
+
+
+def _clean_headers(headers) -> Dict[str, str]:
+    if headers in (None, ""):
+        return {}
+    if not isinstance(headers, dict):
+        raise WebhookValidationError("headers must be an object of header names and values")
+    cleaned: Dict[str, str] = {}
+    for name, value in headers.items():
+        lowered = str(name).strip().lower()
+        if lowered in _FORBIDDEN_HEADERS or lowered.startswith("entelim-"):
+            raise WebhookValidationError(f"header {name!r} cannot be set on a subscription")
+        if not isinstance(value, (str, int, float)):
+            raise WebhookValidationError(f"header {name!r} must have a text value")
+        cleaned[str(name)] = str(value)
+    return cleaned
+
+
+def _clean_events(events) -> List[str]:
+    if not isinstance(events, list) or not events:
+        return ["*"]
+    cleaned = []
+    for pattern in events:
+        if not isinstance(pattern, str) or not pattern.strip() or len(pattern) > 100:
+            raise WebhookValidationError(
+                "events must be a list of event types, prefixes ending .* or *"
+            )
+        cleaned.append(pattern.strip())
+    return cleaned
+
+
+def _check_url(url) -> str:
+    if not isinstance(url, str) or not url.strip():
+        raise WebhookValidationError("A webhook URL is required.")
+    url = url.strip()
+    try:
+        validate_outbound_url(url, require_https=True)
+    except BlockedOutboundURL as exc:
+        raise WebhookValidationError(f"This URL cannot be used: {exc}") from exc
+    return url
+
+
+def _ensure_secret_storage() -> None:
+    """Refuse early when secrets cannot be stored encrypted."""
+    from app.modules.codegen.services.credential_encryption import encrypt_credential
+
+    try:
+        encrypt_credential("probe")
+    except RuntimeError as exc:
+        raise WebhookSecretUnavailable(
+            "Webhook signing secrets cannot be stored right now because encryption is not configured."
+        ) from exc
+
+
+def _current_org_id() -> Optional[int]:
+    return getattr(g, "current_org_id", None)
 
 
 class WebhookService:
-    """Service for managing webhook subscriptions and event delivery"""
+    """The only writer of webhook subscriptions and deliveries."""
 
-    def __init__(self):
-        self.max_retries = current_app.config.get("WEBHOOK_MAX_RETRIES", 3)
-        self.retry_delay = current_app.config.get("WEBHOOK_RETRY_DELAY", 60)  # seconds
-        self.timeout = current_app.config.get("WEBHOOK_TIMEOUT", 30)  # seconds
+    # ------------------------------------------------------------------
+    # Subscriptions
+    # ------------------------------------------------------------------
 
     def create_subscription(
         self,
@@ -34,54 +196,89 @@ class WebhookService:
         filters: Optional[Dict] = None,
         headers: Optional[Dict] = None,
         webhook_type: str = "generic",
+        organization_id: Optional[int] = None,
     ) -> WebhookSubscription:
-        """Create a new webhook subscription"""
+        """Create a subscription.
+
+        A secret is generated when none is supplied; the generated value is on
+        the returned object as ``one_time_secret`` (and nowhere else).
+        """
+        url = _check_url(url)
+        headers = _clean_headers(headers)
+        events = _clean_events(events)
+        _ensure_secret_storage()
+
+        org_id = organization_id if organization_id is not None else _current_org_id()
+        generated = None
+        if not secret:
+            generated = secret = _secrets.token_hex(32)
+
         subscription = WebhookSubscription(
             id=str(uuid.uuid4()),
-            user_id=user_id,
+            user_id=str(user_id),
             url=url,
             events=events,
-            secret=secret,
             description=description or "",
-            webhook_type=webhook_type if webhook_type in ("generic", "teams", "slack") else "generic",
+            webhook_type=webhook_type
+            if webhook_type in ("generic", "teams", "slack")
+            else "generic",
             filters=filters or {},
-            headers=headers or {},
+            headers=headers,
             is_active=True,
+            # A new subscription does not receive history unless it is replayed.
+            last_ordinal=max_ordinal(org_id) if org_id is not None else 0,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
-
+        if org_id is not None:
+            subscription.organization_id = org_id
+        subscription.set_secret(secret)
         db.session.add(subscription)
         db.session.commit()
+        subscription.one_time_secret = generated
 
         current_app.logger.info(
-            f"Created webhook subscription {subscription.id} for user {user_id}"
+            "Created webhook subscription %s for user %s", subscription.id, user_id
         )
         return subscription
+
+    def _find(
+        self, subscription_id: str, user_id: Optional[str] = None
+    ) -> Optional[WebhookSubscription]:
+        query = WebhookSubscription.query.filter_by(id=subscription_id, is_active=True)
+        if user_id is not None:
+            query = query.filter_by(user_id=str(user_id))
+        return query.first()
 
     def get_user_subscriptions(self, user_id: str) -> List[WebhookSubscription]:
         """Get all subscriptions for a user"""
         # user_id column is varchar; current_user.id is int -> cast to avoid
         # "operator does not exist: character varying = integer".
-        return WebhookSubscription.query.filter_by(
-            user_id=str(user_id), is_active=True
-        ).all()
+        return WebhookSubscription.query.filter_by(user_id=str(user_id), is_active=True).all()
 
-    def get_subscription(self, subscription_id: str, user_id: str) -> Optional[WebhookSubscription]:
-        """Get a specific subscription for a user"""
-        return WebhookSubscription.query.filter_by(
-            id=subscription_id, user_id=user_id, is_active=True
-        ).first()
+    def list_subscriptions(self) -> List[WebhookSubscription]:
+        """Every active subscription of the caller's organisation, newest first."""
+        return (
+            WebhookSubscription.query.filter_by(is_active=True)
+            .order_by(WebhookSubscription.created_at.desc())
+            .all()
+        )
+
+    def get_subscription(
+        self, subscription_id: str, user_id: Optional[str] = None
+    ) -> Optional[WebhookSubscription]:
+        """One subscription; scoped to *user_id* when given, else to the organisation."""
+        return self._find(subscription_id, user_id)
 
     def get_subscription_by_id(self, subscription_id: str) -> Optional[WebhookSubscription]:
         """Get a subscription by ID (internal use)"""
-        return WebhookSubscription.query.filter_by(id=subscription_id, is_active=True).first()
+        return self._find(subscription_id)
 
     def update_subscription(
-        self, subscription_id: str, user_id: str, updates: Dict
+        self, subscription_id: str, user_id: Optional[str], updates: Dict
     ) -> Optional[WebhookSubscription]:
-        """Update a webhook subscription"""
-        subscription = self.get_subscription(subscription_id, user_id)
+        """Update a subscription. *user_id* None means any user of the organisation."""
+        subscription = self._find(subscription_id, user_id)
         if not subscription:
             return None
 
@@ -95,97 +292,494 @@ class WebhookService:
             "headers",
             "is_active",
         ]
+        clean: Dict = {}
         for field, value in updates.items():
-            if field in allowed_fields:
+            if field not in allowed_fields:
+                continue
+            if field == "url":
+                value = _check_url(value)
+            elif field == "headers":
+                value = _clean_headers(value)
+            elif field == "events":
+                value = _clean_events(value)
+            elif field == "webhook_type" and value not in ("generic", "teams", "slack"):
+                value = "generic"
+            clean[field] = value
+        if "secret" in clean:
+            _ensure_secret_storage()
+        for field, value in clean.items():
+            if field == "secret":
+                if value:
+                    subscription.set_secret(str(value))
+            else:
                 setattr(subscription, field, value)
 
         subscription.updated_at = datetime.utcnow()
         db.session.commit()
-
-        current_app.logger.info(f"Updated webhook subscription {subscription_id}")
+        current_app.logger.info("Updated webhook subscription %s", subscription_id)
         return subscription
 
-    def delete_subscription(self, subscription_id: str, user_id: str) -> bool:
-        """Delete a webhook subscription"""
-        subscription = self.get_subscription(subscription_id, user_id)
+    def rotate_secret(self, subscription_id: str, user_id: Optional[str] = None) -> Optional[str]:
+        """Generate a new secret, store it encrypted, return it once. None if not found."""
+        subscription = self._find(subscription_id, user_id)
+        if not subscription:
+            return None
+        _ensure_secret_storage()
+        new_secret = _secrets.token_hex(32)
+        subscription.set_secret(new_secret)
+        subscription.updated_at = datetime.utcnow()
+        db.session.commit()
+        current_app.logger.info("Rotated secret of webhook subscription %s", subscription_id)
+        return new_secret
+
+    def delete_subscription(self, subscription_id: str, user_id: Optional[str] = None) -> bool:
+        """Deactivate a subscription."""
+        subscription = self._find(subscription_id, user_id)
         if not subscription:
             return False
-
         subscription.is_active = False
         subscription.updated_at = datetime.utcnow()
         db.session.commit()
-
-        current_app.logger.info(f"Deleted webhook subscription {subscription_id}")
+        current_app.logger.info("Deleted webhook subscription %s", subscription_id)
         return True
 
-    def test_subscription(self, subscription_id: str, user_id: str) -> Optional[Dict]:
-        """Test a webhook subscription by sending a test event"""
-        subscription = self.get_subscription(subscription_id, user_id)
-        if not subscription:
-            return None
+    # ------------------------------------------------------------------
+    # Bodies
+    # ------------------------------------------------------------------
 
-        test_event = {
-            "event_type": "webhook.test",
-            "payload": {
-                "message": "This is a test webhook",
-                "timestamp": datetime.utcnow().isoformat(),
-                "subscription_id": subscription_id,
-            },
-            "metadata": {"test": True},
+    def build_body(self, subscription: WebhookSubscription, event: Dict) -> str:
+        """Serialise *event* once for *subscription*; these exact bytes are signed and sent.
+
+        *event* has ``event_type``, ``event_id``, ``payload``, ``ordinal``,
+        ``created_at`` (ISO text), ``organization_id`` and optionally
+        ``entity_type`` / ``entity_id``.
+        """
+        webhook_type = subscription.webhook_type or "generic"
+        timestamp = event.get("created_at") or datetime.utcnow().isoformat()
+        if webhook_type in ("teams", "slack"):
+            event_data = {
+                "event_type": event["event_type"],
+                "payload": event.get("payload") or {},
+                "metadata": {},
+                "event_id": event.get("event_id"),
+                "timestamp": timestamp,
+            }
+            formatted = (
+                self.format_teams_payload(event_data)
+                if webhook_type == "teams"
+                else self.format_slack_payload(event_data)
+            )
+            return json.dumps(formatted, sort_keys=True, separators=(",", ":"))
+
+        subject = None
+        if event.get("entity_type") and event.get("entity_id") is not None:
+            subject = f"/{event['entity_type']}/{event['entity_id']}"
+        org_id = event.get("organization_id")
+        envelope = {
+            "specversion": "1.0",
+            "id": event.get("event_id"),
+            "type": event["event_type"],
+            "source": f"/organisations/{org_id}/entelim",
+            "subject": subject,
+            "time": timestamp,
+            "datacontenttype": "application/json",
+            "organisationid": str(org_id),
+            "sequence": str(event.get("ordinal") or 0),
+            "data": event.get("payload") or {},
         }
+        return json.dumps(envelope, sort_keys=True, separators=(",", ":"))
 
-        return self._deliver_webhook(subscription, test_event)
+    # ------------------------------------------------------------------
+    # Fan-out and delivery
+    # ------------------------------------------------------------------
 
-    def publish_event(
-        self, event_type: str, payload: Dict, user_id: str, metadata: Optional[Dict] = None
-    ) -> WebhookEvent:
-        """Publish an event to all subscribed webhooks"""
-        event = WebhookEvent(
+    def _matches(self, subscription: WebhookSubscription, event: Dict) -> bool:
+        patterns = subscription.events or ["*"]
+        if not any(event_catalogue.matches(p, event["event_type"]) for p in patterns):
+            return False
+        if subscription.filters and not self._matches_filters(
+            event.get("payload") or {}, subscription.filters
+        ):
+            return False
+        return True
+
+    def _new_delivery(
+        self,
+        subscription: WebhookSubscription,
+        event: Dict,
+        *,
+        is_replay=False,
+        replay_of_id=None,
+        is_test=False,
+    ) -> WebhookDelivery:
+        return WebhookDelivery(
             id=str(uuid.uuid4()),
-            event_type=event_type,
-            payload=payload,
-            user_id=user_id,
-            event_metadata=metadata or {},
+            subscription_id=subscription.id,
+            organization_id=subscription.organization_id,
+            log_event_id=event.get("event_id"),
+            event_ordinal=event.get("ordinal"),
+            event_type=event["event_type"],
+            payload=event.get("payload") or {},
+            request_body=self.build_body(subscription, event),
+            status="pending",
+            attempt_count=0,
+            is_replay=is_replay,
+            replay_of_id=replay_of_id,
+            is_test=is_test,
             created_at=datetime.utcnow(),
         )
 
-        db.session.add(event)
-        db.session.commit()
-
-        # Find matching subscriptions
-        subscriptions = self._find_matching_subscriptions(event_type, payload)
-
-        # Deliver to subscriptions asynchronously
-        if subscriptions:
-            threading.Thread(
-                target=self._deliver_to_subscriptions, args=(event, subscriptions), daemon=True
-            ).start()
-
-        current_app.logger.info(
-            f"Published event {event_type} with {len(subscriptions)} subscriptions"
+    def _active_subscriptions(self, org_id: int) -> List[WebhookSubscription]:
+        return (
+            WebhookSubscription.query.filter(
+                WebhookSubscription.organization_id == org_id,
+                WebhookSubscription.is_active.is_(True),
+            )
+            .order_by(WebhookSubscription.created_at, WebhookSubscription.id)
+            .all()
         )
-        return event
 
-    def _find_matching_subscriptions(
-        self, event_type: str, payload: Dict
-    ) -> List[WebhookSubscription]:
-        """Find subscriptions that match the event"""
-        subscriptions = WebhookSubscription.query.filter_by(is_active=True).all()
-        matching = []
-
-        for subscription in subscriptions:
-            # Check if event type matches
-            if event_type not in subscription.events and "*" not in subscription.events:
+    def fan_out(self, org_id: int) -> int:
+        """Create pending deliveries from new event-log entries; returns how many."""
+        created = 0
+        for sub_id in [s.id for s in self._active_subscriptions(org_id)]:
+            subscription = (
+                WebhookSubscription.query.filter(
+                    WebhookSubscription.id == sub_id,
+                    WebhookSubscription.organization_id == org_id,
+                    WebhookSubscription.is_active.is_(True),
+                )
+                .with_for_update(skip_locked=True)
+                .first()
+            )
+            if subscription is None:
                 continue
+            events = read_from_offset(org_id, subscription.last_ordinal or 0, limit=FAN_OUT_PAGE)
+            if not events:
+                db.session.commit()  # releases the row lock; nothing is pending
+                continue
+            for event in events:
+                if self._matches(subscription, event):
+                    db.session.add(self._new_delivery(subscription, event))
+                    created += 1
+            subscription.last_ordinal = events[-1]["ordinal"]
+            db.session.commit()
+        return created
 
-            # Check filters
-            if subscription.filters:
-                if not self._matches_filters(payload, subscription.filters):
-                    continue
+    def _head_of_line(self, subscription_id: str, org_id: int) -> Optional[WebhookDelivery]:
+        return (
+            WebhookDelivery.query.filter(
+                WebhookDelivery.subscription_id == subscription_id,
+                WebhookDelivery.organization_id == org_id,
+                WebhookDelivery.is_test.is_(False),
+                WebhookDelivery.status.in_(_OPEN_STATUSES),
+            )
+            .order_by(
+                WebhookDelivery.is_replay,
+                WebhookDelivery.event_ordinal,
+                WebhookDelivery.created_at,
+                WebhookDelivery.id,
+            )
+            .first()
+        )
 
-            matching.append(subscription)
+    def dispatch_due(self, org_id: int, *, now: Optional[datetime] = None) -> int:
+        """Attempt due deliveries, head of line per subscription; returns attempts made."""
+        attempts = 0
+        for sub_id in [s.id for s in self._active_subscriptions(org_id)]:
+            while attempts < ATTEMPTS_PER_RUN:
+                subscription = (
+                    WebhookSubscription.query.filter(
+                        WebhookSubscription.id == sub_id,
+                        WebhookSubscription.organization_id == org_id,
+                        WebhookSubscription.is_active.is_(True),
+                    )
+                    .with_for_update(skip_locked=True)
+                    .first()
+                )
+                if subscription is None:
+                    break
+                head = self._head_of_line(sub_id, org_id)
+                moment = now or datetime.utcnow()
+                if head is None or (head.next_attempt_at and head.next_attempt_at > moment):
+                    db.session.commit()  # releases the row lock; nothing is pending
+                    break
+                self.attempt(head, now=moment)
+                attempts += 1
+                if head.status in _OPEN_STATUSES:
+                    break  # failed and waiting: nothing behind it may go first
+        return attempts
 
-        return matching
+    def attempt(self, delivery: WebhookDelivery, *, now: Optional[datetime] = None) -> bool:
+        """Make one signed attempt and record it. True when the subscriber answered 2xx."""
+        moment = now or datetime.utcnow()
+        subscription = WebhookSubscription.query.filter(
+            WebhookSubscription.id == delivery.subscription_id,
+            WebhookSubscription.organization_id == delivery.organization_id,
+        ).first()
+        delivery.attempt_count = (delivery.attempt_count or 0) + 1
+        delivery.last_attempt_at = moment
+        if delivery.first_attempt_at is None:
+            delivery.first_attempt_at = moment
+        delivery.response_status = None
+        delivery.response_body = None
+        delivery.error_message = None
+
+        if subscription is None:
+            return self._record_failure(delivery, moment, "subscription no longer exists")
+
+        body = (delivery.request_body or "").encode("utf-8")
+        secret = subscription.get_secret()
+        if not secret:
+            # Every delivery is signed. A row with no usable secret (an old row
+            # created without one, or a stored secret that no longer decrypts)
+            # is not sent unsigned; rotating the secret on the screen fixes it.
+            return self._record_failure(
+                delivery, moment, "no usable signing secret: rotate the secret"
+            )
+        custom = {
+            name: value
+            for name, value in (subscription.headers or {}).items()
+            if str(name).lower() not in _FORBIDDEN_HEADERS
+            and not str(name).lower().startswith("entelim-")
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Entelim-Webhook/1.0",
+            **custom,
+            "Entelim-Webhook-Id": delivery.id,
+            "Entelim-Event-Id": delivery.log_event_id or "",
+            "Entelim-Event-Type": delivery.event_type,
+        }
+        timestamp = _unix(moment)
+        delivery.signature_timestamp = timestamp
+        delivery.signature = None
+        headers["Entelim-Timestamp"] = str(timestamp)
+        delivery.signature = sign_body(secret, timestamp, body)
+        headers["Entelim-Signature"] = f"t={timestamp},v1={delivery.signature}"
+
+        try:
+            validate_outbound_url(subscription.url, require_https=not subscription.is_plain_http)
+        except BlockedOutboundURL:
+            return self._record_failure(delivery, moment, "target address not allowed")
+
+        try:
+            response = requests.post(
+                subscription.url,
+                data=body,
+                headers=headers,
+                timeout=REQUEST_TIMEOUT,
+                allow_redirects=False,
+            )
+        except requests.RequestException as exc:
+            return self._record_failure(delivery, moment, f"request failed: {type(exc).__name__}")
+
+        delivery.response_status = response.status_code
+        delivery.response_body = (response.text or "")[:1000]
+        if 200 <= response.status_code < 300:
+            delivery.status = "delivered"
+            delivery.delivered_at = moment
+            delivery.next_attempt_at = None
+            db.session.commit()
+            return True
+        if 300 <= response.status_code < 400:
+            return self._record_failure(delivery, moment, "redirects are not followed")
+        return self._record_failure(delivery, moment, f"HTTP {response.status_code}")
+
+    def _record_failure(self, delivery: WebhookDelivery, moment: datetime, reason: str) -> bool:
+        delivery.error_message = reason
+        first = delivery.first_attempt_at or moment
+        if delivery.is_test or moment - first >= DEAD_AFTER:
+            delivery.status = "dead"
+            delivery.dead_lettered_at = moment
+            delivery.next_attempt_at = None
+        else:
+            delivery.status = "retrying"
+            delivery.next_attempt_at = moment + timedelta(
+                seconds=next_backoff(delivery.attempt_count)
+            )
+        db.session.commit()
+        return False
+
+    def test_subscription(
+        self, subscription_id: str, user_id: Optional[str] = None
+    ) -> Optional[Dict]:
+        """Send one synchronous ``webhook.test`` attempt and record it (no retry)."""
+        subscription = self._find(subscription_id, user_id)
+        if not subscription:
+            return None
+        now = datetime.utcnow()
+        event = {
+            "event_type": "webhook.test",
+            "event_id": str(uuid.uuid4()),
+            "ordinal": 0,
+            "organization_id": subscription.organization_id,
+            "created_at": now.isoformat(),
+            "payload": {
+                "action": "test",
+                "id": None,
+                "message": "This is a test webhook",
+                "subscription_id": subscription_id,
+            },
+        }
+        delivery = self._new_delivery(subscription, event, is_test=True)
+        delivery.event_ordinal = None
+        db.session.add(delivery)
+        db.session.commit()
+        success = self.attempt(delivery, now=now)
+        return {
+            "delivery_id": delivery.id,
+            "success": success,
+            "attempts": delivery.attempt_count,
+            "status": delivery.status,
+        }
+
+    # ------------------------------------------------------------------
+    # Replay and redelivery
+    # ------------------------------------------------------------------
+
+    def replay(
+        self,
+        subscription_id: str,
+        *,
+        from_ordinal: Optional[int] = None,
+        since: Optional[datetime] = None,
+        actor=None,
+    ) -> Optional[Dict]:
+        """Queue matching log events again for one subscription, in ordinal order.
+
+        Returns ``{"count", "capped", "cap"}`` or None when the subscription is
+        not found in the caller's organisation. ``last_ordinal`` is not moved.
+        """
+        subscription = self._find(subscription_id)
+        if subscription is None:
+            return None
+        org_id = subscription.organization_id
+        if (from_ordinal is None) == (since is None):
+            raise WebhookValidationError("Give either a sequence number or a time to replay from.")
+
+        if since is not None and since.tzinfo is None:
+            # The log's timestamps are timezone-aware; a bare time means UTC.
+            since = since.replace(tzinfo=timezone.utc)
+
+        events: List[Dict] = []
+        if from_ordinal is not None:
+            cursor = max(int(from_ordinal) - 1, 0)
+            while len(events) <= REPLAY_CAP:
+                page = read_from_offset(org_id, cursor, limit=1000)
+                if not page:
+                    break
+                events.extend(page)
+                cursor = page[-1]["ordinal"]
+        else:
+            events = replay_from(org_id, since, limit=REPLAY_CAP + 1)
+        capped = len(events) > REPLAY_CAP
+        events = events[:REPLAY_CAP]
+
+        count = 0
+        for event in events:
+            if self._matches(subscription, event):
+                db.session.add(self._new_delivery(subscription, event, is_replay=True))
+                count += 1
+        db.session.commit()
+        current_app.logger.info(
+            "Webhook replay of %s queued %s deliveries (actor %s)", subscription_id, count, actor
+        )
+        return {"count": count, "capped": capped, "cap": REPLAY_CAP}
+
+    def redeliver(self, delivery_id: str, *, actor=None) -> Optional[WebhookDelivery]:
+        """Queue a copy of one delivery as a new pending replay; None if not found."""
+        original = WebhookDelivery.query.filter_by(id=delivery_id).first()
+        if original is None or original.is_test or not original.request_body:
+            return None
+        subscription = self._find(original.subscription_id)
+        if subscription is None or subscription.organization_id != original.organization_id:
+            return None
+        copy = WebhookDelivery(
+            id=str(uuid.uuid4()),
+            subscription_id=original.subscription_id,
+            organization_id=original.organization_id,
+            log_event_id=original.log_event_id,
+            event_ordinal=original.event_ordinal,
+            event_type=original.event_type,
+            payload=original.payload,
+            request_body=original.request_body,
+            status="pending",
+            attempt_count=0,
+            is_replay=True,
+            replay_of_id=original.id,
+            created_at=datetime.utcnow(),
+        )
+        db.session.add(copy)
+        db.session.commit()
+        current_app.logger.info(
+            "Webhook redelivery of %s queued as %s (actor %s)", delivery_id, copy.id, actor
+        )
+        return copy
+
+    def retry_event(self, event_id: str, *, actor=None) -> Optional[int]:
+        """Redeliver this event's dead or retrying deliveries; None when the event is unknown."""
+        known = EventLogRecord.query.filter(EventLogRecord.event_id == event_id).first()
+        if known is None:
+            return None
+        rows = (
+            WebhookDelivery.query.filter(
+                WebhookDelivery.log_event_id == event_id,
+                WebhookDelivery.status.in_(("dead", "retrying", "failed")),
+                WebhookDelivery.is_test.is_(False),
+            )
+            .order_by(WebhookDelivery.event_ordinal, WebhookDelivery.created_at)
+            .all()
+        )
+        count = 0
+        for row in rows:
+            if self.redeliver(row.id, actor=actor) is not None:
+                count += 1
+        return count
+
+    def list_deliveries(self, subscription_id: str, *, limit: int = 50, offset: int = 0):
+        """Newest deliveries of one subscription (None when it is not in the caller's organisation)."""
+        subscription = self._find(subscription_id)
+        if subscription is None:
+            return None
+        return (
+            WebhookDelivery.query.filter(
+                WebhookDelivery.subscription_id == subscription.id,
+                WebhookDelivery.organization_id == subscription.organization_id,
+            )
+            .order_by(WebhookDelivery.created_at.desc(), WebhookDelivery.id.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
+    def signature_status(self, subscription: WebhookSubscription, delivery: WebhookDelivery) -> str:
+        """Plain-words signature state of a delivery's last attempt."""
+        if not delivery.signature or delivery.signature_timestamp is None:
+            return "Not signed yet"
+        secret = subscription.get_secret()
+        body = (delivery.request_body or "").encode("utf-8")
+        when = datetime.utcfromtimestamp(delivery.signature_timestamp).strftime(
+            "%Y-%m-%d %H:%M:%S UTC"
+        )
+        if secret and hmac.compare_digest(
+            sign_body(secret, delivery.signature_timestamp, body), delivery.signature
+        ):
+            return f"Signed at {when}, verifies with the current secret"
+        return f"Signed at {when} with a previous secret"
+
+    def get_events(self, limit: int = 50, offset: int = 0) -> List[EventLogRecord]:
+        """The caller organisation's event log, newest first."""
+        return (
+            EventLogRecord.query.order_by(EventLogRecord.ordinal.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
+    # ------------------------------------------------------------------
+    # Filters and formatters
+    # ------------------------------------------------------------------
 
     def _matches_filters(self, payload: Dict, filters: Dict) -> bool:
         """Check if payload matches the subscription filters"""
@@ -205,31 +799,6 @@ class WebhookService:
 
         return True
 
-    def _deliver_to_subscriptions(
-        self, event: WebhookEvent, subscriptions: List[WebhookSubscription]
-    ):
-        """Deliver event to multiple subscriptions"""
-        for subscription in subscriptions:
-            try:
-                self._deliver_webhook(
-                    subscription,
-                    {
-                        "event_type": event.event_type,
-                        "payload": event.payload,
-                        "metadata": event.event_metadata,
-                        "event_id": event.id,
-                        "timestamp": event.created_at.isoformat(),
-                    },
-                )
-            except Exception as e:
-                current_app.logger.error(
-                    f"Failed to deliver event {event.id} to subscription {subscription.id}: {str(e)}"
-                )
-
-    # ------------------------------------------------------------------
-    # Payload formatters for Teams and Slack
-    # ------------------------------------------------------------------
-
     def format_teams_payload(self, event_data: Dict) -> Dict:
         """Format event data as a Microsoft Teams Adaptive Card payload.
 
@@ -242,7 +811,7 @@ class WebhookService:
 
         # Build a human-readable summary from the inner payload dict
         summary_lines = []
-        for key, value in (payload.items() if isinstance(payload, dict) else []):
+        for key, value in payload.items() if isinstance(payload, dict) else []:
             if isinstance(value, (str, int, float, bool)) and value not in ("", None):
                 label = key.replace("_", " ").title()
                 summary_lines.append(f"**{label}:** {value}")
@@ -297,7 +866,7 @@ class WebhookService:
 
         # Build field lines from the inner payload dict
         field_lines = []
-        for key, value in (payload.items() if isinstance(payload, dict) else []):
+        for key, value in payload.items() if isinstance(payload, dict) else []:
             if isinstance(value, (str, int, float, bool)) and value not in ("", None):
                 label = key.replace("_", " ").title()
                 field_lines.append(f"*{label}:* {value}")
@@ -331,135 +900,6 @@ class WebhookService:
                 },
             ]
         }
-
-    def _build_payload_for_subscription(
-        self, subscription: WebhookSubscription, event_data: Dict
-    ) -> Dict:
-        """Return the payload formatted for the subscription's webhook_type."""
-        webhook_type = getattr(subscription, "webhook_type", "generic") or "generic"  # model-safety-ok
-        if webhook_type == "teams":
-            return self.format_teams_payload(event_data)
-        if webhook_type == "slack":
-            return self.format_slack_payload(event_data)
-        return event_data
-
-    def _deliver_webhook(self, subscription: WebhookSubscription, event_data: Dict) -> Dict:
-        """Deliver webhook to a single subscription"""
-        headers = {
-            "Content-Type": "application/json",
-            "User-Agent": "Enterprise-Architecture-Webhook/1.0",
-            **subscription.headers,
-        }
-
-        # Format payload according to webhook_type (teams/slack/generic)
-        formatted_payload = self._build_payload_for_subscription(subscription, event_data)
-
-        # Add signature if secret is configured (sign the formatted payload)
-        if subscription.secret:
-            payload_str = json.dumps(formatted_payload, sort_keys=True)
-            import hashlib
-            import hmac
-
-            signature = hmac.new(
-                subscription.secret.encode(), payload_str.encode(), hashlib.sha256
-            ).hexdigest()
-            headers["X-Webhook-Signature"] = signature
-
-        delivery = WebhookDelivery(
-            id=str(uuid.uuid4()),
-            subscription_id=subscription.id,
-            # Explicit, not the column default: this runs on a background thread
-            # (see _deliver_to_subscriptions) with no request context, so
-            # TenantMixin's g.current_org_id-reading default can't resolve it.
-            # The subscription itself was already org-scoped before the thread
-            # started, so it's the trustworthy source here.
-            organization_id=subscription.organization_id,
-            event_type=event_data.get("event_type"),
-            payload=formatted_payload,
-            status="pending",
-            attempt_count=0,
-            created_at=datetime.utcnow(),
-        )
-
-        db.session.add(delivery)
-        db.session.commit()
-
-        # Attempt delivery
-        success = self._attempt_delivery(delivery, subscription.url, headers, formatted_payload)
-
-        return {"delivery_id": delivery.id, "success": success, "attempts": delivery.attempt_count}
-
-    def _attempt_delivery(
-        self, delivery: WebhookDelivery, url: str, headers: Dict, payload: Dict
-    ) -> bool:
-        """Attempt to deliver webhook with retries"""
-        for attempt in range(self.max_retries):
-            try:
-                delivery.attempt_count = attempt + 1
-                delivery.last_attempt_at = datetime.utcnow()
-
-                response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
-
-                delivery.response_status = response.status_code
-                delivery.response_body = response.text[:1000]  # Limit response size
-
-                if response.status_code >= 200 and response.status_code < 300:
-                    delivery.status = "success"
-                    delivery.delivered_at = datetime.utcnow()
-                    db.session.commit()
-                    current_app.logger.info(f"Successfully delivered webhook to {url}")
-                    return True
-                else:
-                    delivery.status = "failed"
-                    delivery.error_message = f"HTTP {response.status_code}: {response.text[:200]}"
-                    db.session.commit()
-
-                    if attempt < self.max_retries - 1:
-                        time.sleep(self.retry_delay * (attempt + 1))  # Exponential backoff
-
-            except requests.RequestException as e:
-                delivery.status = "failed"
-                delivery.error_message = str(e)
-                db.session.commit()
-
-                if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay * (attempt + 1))
-
-        current_app.logger.error(
-            f"Failed to deliver webhook to {url} after {self.max_retries} attempts"
-        )
-        return False
-
-    def get_events(self, limit: int = 50, offset: int = 0) -> List[WebhookEvent]:
-        """Get webhook events (admin function)"""
-        return (
-            WebhookEvent.query.order_by(WebhookEvent.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-            .all()
-        )
-
-    def retry_event(self, event_id: str) -> bool:
-        """Retry delivering a failed event"""
-        event = WebhookEvent.query.get(event_id)
-        if not event:
-            return False
-
-        # Find failed deliveries for this event
-        failed_deliveries = WebhookDelivery.query.filter_by(
-            event_type=event.event_type, status="failed"
-        ).all()
-
-        for delivery in failed_deliveries:
-            subscription = self.get_subscription_by_id(delivery.subscription_id)
-            if subscription:
-                threading.Thread(
-                    target=self._attempt_delivery,
-                    args=(delivery, subscription.url, {}, delivery.payload),
-                    daemon=True,
-                ).start()
-
-        return True
 
     def process_incoming_webhook(self, subscription_id: str, payload: Dict, headers: Dict) -> Dict:
         """Process an incoming webhook from external services"""

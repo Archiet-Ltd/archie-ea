@@ -420,8 +420,8 @@ class TestDirectOutboxEmit:
 
         event = emit_event(
             organization_id=org_a.id,
-            event_type="test.custom.event",
-            payload={"hello": "world"},
+            event_type="archimate_element.created",
+            payload={"action": "created", "id": 1},
             entity_type="test_entity",
             entity_id=42,
         )
@@ -430,7 +430,7 @@ class TestDirectOutboxEmit:
         # Outbox row exists.
         outbox = db_session.get(OperationOutboxEvent, event.id)
         assert outbox is not None
-        assert outbox.event_type == "test.custom.event"
+        assert outbox.event_type == "archimate_element.created"
         assert outbox.entity_type == "test_entity"
         assert outbox.entity_id == 42
 
@@ -444,7 +444,7 @@ class TestDirectOutboxEmit:
         ).all()
         assert len(log_rows) == 1
         assert log_rows[0].ordinal == 1
-        assert log_rows[0].payload_json == {"hello": "world"}
+        assert log_rows[0].payload_json == {"action": "created", "id": 1}
 
     def test_relay_increments_delivery_attempts(self, db_session, two_orgs):
         """After relay, delivery_attempts must be an integer, not a BinaryExpression."""
@@ -452,8 +452,8 @@ class TestDirectOutboxEmit:
 
         event = emit_event(
             organization_id=org_a.id,
-            event_type="test.delivery.count",
-            payload={"n": 1},
+            event_type="archimate_element.created",
+            payload={"action": "created", "id": 1},
             entity_type="test_entity",
             entity_id=99,
         )
@@ -629,8 +629,8 @@ class TestRelayFailureReporting:
         # Create a valid outbox row.
         event = emit_event(
             organization_id=org_a.id,
-            event_type="test.failure.reporting",
-            payload={"test": True},
+            event_type="archimate_element.updated",
+            payload={"action": "updated", "id": 1},
             entity_type="test_entity",
             entity_id=1,
         )
@@ -713,8 +713,8 @@ class TestConcurrentOrdinalAllocation:
             for i in range(10):
                 event = emit_event(
                     organization_id=org_id,
-                    event_type="test.concurrent.event",
-                    payload={"seq": i},
+                    event_type="archimate_element.created",
+                    payload={"action": "created", "id": i},
                     entity_type="test_entity",
                     entity_id=i,
                 )
@@ -1091,15 +1091,15 @@ class TestRelayBatchContinuesPastFailureRegression:
         # Create two outbox rows.
         event1 = emit_event(
             organization_id=org_a.id,
-            event_type="test.batch.good",
-            payload={"seq": 1},
+            event_type="archimate_element.created",
+            payload={"action": "created", "id": 1},
             entity_type="test_entity",
             entity_id=1,
         )
         _event2 = emit_event(
             organization_id=org_a.id,
-            event_type="test.batch.good2",
-            payload={"seq": 2},
+            event_type="archimate_element.updated",
+            payload={"action": "updated", "id": 2},
             entity_type="test_entity",
             entity_id=2,
         )
@@ -1141,7 +1141,7 @@ class TestRelayBatchContinuesPastFailureRegression:
             f"At least one event_log row must exist, got {len(log_rows)}"
         )
         good_event_types = {r.event_type for r in log_rows}
-        assert "test.batch.good2" in good_event_types, (
+        assert "archimate_element.updated" in good_event_types, (
             "The good row must be in event_log"
         )
 

@@ -42,10 +42,19 @@ def emit_event(
         operation_result_id: For command-framework events produced by
             transformation-room services. Omitted for entity events.
 
+    Raises ``UnknownEventType`` / ``EventSchemaError`` (both
+    ``EventCatalogueError``) when the type is not catalogued or the payload fails
+    its schema; nothing is queued in that case.
+
     Returns the new ``OperationOutboxEvent`` instance (its ``id`` is
     populated after the next flush).
     """
     from app.models.transformation_execution import OperationOutboxEvent
+    from app.services.event_catalogue import validate
+
+    # A producer whose payload fails the catalogue schema is refused before a
+    # row exists; EventCatalogueError propagates to the caller.
+    validate(event_type, payload)
 
     event = OperationOutboxEvent(
         event_id=str(uuid.uuid4()),

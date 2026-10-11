@@ -64,6 +64,13 @@ POLICY = {
     "/my-applications/health": {"application_manager"},
     "/applications/ownership-coverage": {"cto", "portfolio_manager"},
     "/ai-chat":                set(ARCHETYPES),
+    # R1-B28 (TB-0079/TB-0080): the webhook screen is admin_required, so only
+    # platform_admin reaches it; the event log read is org_admin_required (only
+    # platform_admin is an organisation administrator among the archetypes);
+    # the published catalogue is @require_auth only, so every persona reaches it.
+    "/admin/webhook-settings": set(),
+    "/api/webhooks/events":    set(),
+    "/api/webhooks/catalogue": set(ARCHETYPES),
     # Ask and Twin map: both pages carry @login_required and no role gate, so
     # every archetype is expected to reach them. Stating that in two rows is
     # what makes a role gate added later show up here as a row change, and what

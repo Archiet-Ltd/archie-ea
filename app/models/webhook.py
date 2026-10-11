@@ -3,7 +3,9 @@ Webhook models for event-driven notifications
 """
 
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional
+
+from flask import current_app
 
 from app.extensions import db
 from app.models.mixins.core import TenantMixin
@@ -27,7 +29,12 @@ class WebhookSubscription(TenantMixin, db.Model):
     user_id = db.Column(db.String(36), nullable=False, index=True)
     url = db.Column(db.String(500), nullable=False)
     events = db.Column(db.JSON, nullable=False)  # List of event types to subscribe to
-    secret = db.Column(db.String(255), nullable=True)  # For signature verification
+    # Legacy plaintext secret. New secrets are stored only in secret_encrypted;
+    # get_secret() moves a legacy value across on first use.
+    secret = db.Column(db.String(255), nullable=True)
+    secret_encrypted = db.Column(db.LargeBinary, nullable=True)
+    # Cursor: the highest event-log ordinal already fanned out to this subscription.
+    last_ordinal = db.Column(db.BigInteger, nullable=False, default=0, server_default="0")
     description = db.Column(db.String(500), nullable=True)
     filters = db.Column(db.JSON, nullable=True)  # Additional filtering criteria
     headers = db.Column(db.JSON, nullable=True)  # Custom headers to send
@@ -43,12 +50,69 @@ class WebhookSubscription(TenantMixin, db.Model):
     # Relationships
     deliveries = db.relationship("WebhookDelivery", backref="subscription", lazy=True)
 
+    def set_secret(self, raw: str) -> None:
+        """Store *raw* encrypted and clear the legacy plaintext column."""
+        from app.modules.codegen.services.credential_encryption import encrypt_credential
+
+        self.secret_encrypted = encrypt_credential(raw)
+        self.secret = None
+        self.__dict__.pop("_usable_secret_cache", None)
+
+    def get_secret(self) -> Optional[str]:
+        """The signing secret, or None when there is none.
+
+        A row that only has the legacy plaintext ``secret`` is encrypted into
+        ``secret_encrypted`` here and the plaintext column cleared (the caller's
+        commit persists it). If encryption is not configured the plaintext is
+        returned for this call and left in place; nothing is logged with it.
+        """
+        from app.modules.codegen.services.credential_encryption import decrypt_credential
+
+        if self.secret_encrypted:
+            return decrypt_credential(bytes(self.secret_encrypted))
+        legacy = self.secret
+        if not legacy:
+            return None
+        try:
+            self.set_secret(legacy)
+        except RuntimeError:
+            current_app.logger.warning(
+                "webhook subscription %s still holds a plaintext secret: "
+                "CREDENTIAL_ENCRYPTION_KEY is not configured",
+                self.id,
+            )
+        return legacy
+
+    @property
+    def has_usable_secret(self) -> bool:
+        """True when a signing secret exists and can be read now.
+
+        Decrypts at most once per loaded row (the answer is kept on the
+        instance), so a template loop or ``to_dict`` can ask freely. The
+        secret itself is never kept or returned.
+        """
+        cached = self.__dict__.get("_usable_secret_cache")
+        if cached is None:
+            try:
+                cached = bool(self.get_secret())
+            except Exception:  # unreadable ciphertext or no encryption key
+                cached = False
+            self.__dict__["_usable_secret_cache"] = cached
+        return cached
+
+    @property
+    def is_plain_http(self) -> bool:
+        return (self.url or "").lower().startswith("http://")
+
     def to_dict(self) -> Dict:
-        """Convert to dictionary representation"""
+        """Convert to dictionary representation. Never includes the secret."""
         return {
             "id": self.id,
             "user_id": self.user_id,
             "url": self.url,
+            "has_secret": bool(self.secret_encrypted or self.secret),
+            "has_usable_secret": self.has_usable_secret,
+            "last_ordinal": self.last_ordinal or 0,
             "events": self.events,
             "description": self.description,
             "webhook_type": getattr(self, "webhook_type", "generic") or "generic",  # model-safety-ok
@@ -114,7 +178,8 @@ class WebhookDelivery(TenantMixin, db.Model):
     )
     event_type = db.Column(db.String(100), nullable=False)
     payload = db.Column(db.JSON, nullable=False)
-    status = db.Column(db.String(20), nullable=False, default="pending")  # pending, success, failed
+    # pending, retrying, delivered, dead (legacy rows read success/failed)
+    status = db.Column(db.String(20), nullable=False, default="pending")
     attempt_count = db.Column(db.Integer, default=0, nullable=False)
     response_status = db.Column(db.Integer, nullable=True)
     response_body = db.Column(db.Text, nullable=True)
@@ -123,12 +188,37 @@ class WebhookDelivery(TenantMixin, db.Model):
     last_attempt_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
+    # Event-log delivery (the legacy event_id above points at webhook_events,
+    # whose ids are not event-log ids, so the log event id has its own column).
+    log_event_id = db.Column(db.String(36), nullable=True, index=True)
+    event_ordinal = db.Column(db.BigInteger, nullable=True)
+    next_attempt_at = db.Column(db.DateTime, nullable=True)
+    first_attempt_at = db.Column(db.DateTime, nullable=True)
+    dead_lettered_at = db.Column(db.DateTime, nullable=True)
+    is_replay = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    replay_of_id = db.Column(db.String(36), nullable=True)
+    is_test = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    request_body = db.Column(db.Text, nullable=True)
+    signature_timestamp = db.Column(db.Integer, nullable=True)
+    signature = db.Column(db.String(64), nullable=True)
+
+    __table_args__ = (
+        db.Index("ix_webhook_deliveries_sub_next_attempt", "subscription_id", "next_attempt_at"),
+    )
+
     def to_dict(self) -> Dict:
         """Convert to dictionary representation"""
         return {
             "id": self.id,
             "subscription_id": self.subscription_id,
             "event_type": self.event_type,
+            "event_id": self.log_event_id,
+            "sequence": self.event_ordinal,
+            "is_replay": bool(self.is_replay),
+            "is_test": bool(self.is_test),
+            "replay_of_id": self.replay_of_id,
+            "next_attempt_at": self.next_attempt_at.isoformat() if self.next_attempt_at else None,
+            "dead_lettered_at": self.dead_lettered_at.isoformat() if self.dead_lettered_at else None,
             "status": self.status,
             "attempt_count": self.attempt_count,
             "response_status": self.response_status,
