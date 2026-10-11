@@ -293,6 +293,8 @@ def _record_test_result(org_id, status: str, message: str, claims_preview: dict 
 @admin_required
 def admin_sso():
     """Show and save SSO configuration for the current user's organisation."""
+    from sqlalchemy.exc import IntegrityError
+
     from app import db
     from app.models.sso_config import SSOConfig
 
@@ -323,6 +325,16 @@ def admin_sso():
             )
             return redirect(url_for("sso.admin_sso"))
 
+        email_domain = ",".join(_svc.normalise_email_domains(email_domain))
+        if email_domain and _svc.find_domain_conflicts(email_domain, org_id):
+            flash(
+                "This email domain is already in use for single sign-on by "
+                "another organisation and cannot be saved here. Contact "
+                "support if you own this domain.",
+                "error",
+            )
+            return redirect(url_for("sso.admin_sso"))
+
         if config is None:
             if not org_id:
                 flash("Cannot save SSO config: no organisation associated.", "error")
@@ -344,6 +356,14 @@ def admin_sso():
         try:
             db.session.commit()
             flash("SSO configuration saved.", "success")
+        except IntegrityError:
+            db.session.rollback()
+            flash(
+                "This email domain is already in use for single sign-on by "
+                "another organisation and cannot be saved here. Contact "
+                "support if you own this domain.",
+                "error",
+            )
         except Exception as exc:
             db.session.rollback()
             _log.error("Failed to save SSO config: %s", exc)
