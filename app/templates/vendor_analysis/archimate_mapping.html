@@ -1,13 +1,14 @@
+{# smoke-coverage-ok: plain-language rename only — layout restored to main's structure #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% block title %}Vendor-ArchiMate Mapping Analysis{% endblock %}
+{% block title %}Vendor Mapping Analysis{% endblock %}
 
-{% block page_title %}Vendor-ArchiMate Mapping Analysis{% endblock %}
+{% block page_title %}Vendor Mapping Analysis{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
     <!-- Header -->
-    {{ page_shell(title='Vendor-ArchiMate Mapping Analysis', breadcrumb=[('Home', '/'), ('Vendor-ArchiMate Mapping Analysis', none)], subtitle='Analyze and resolve vendor-to-ArchiMate element mapping issues') }}
+    {{ page_shell(title='Vendor Mapping Analysis', breadcrumb=[('Home', '/'), ('Vendor Mapping Analysis', none)], subtitle='Analyze and resolve vendor-to-architecture element mapping issues') }}
 
     <!-- Key Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -35,7 +36,7 @@
         <div class="p-4 bg-card border border-border rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-muted-foreground">ArchiMate Elements</p>
+                    <p class="text-sm text-muted-foreground">Architecture Elements</p>
                     <p class="text-2xl font-semibold text-foreground">{{ archimate_elements|dash }}</p>
                     <p class="text-xs text-muted-foreground">{{ with_source_product|dash }} with vendor mapping</p>
                 </div>
@@ -57,7 +58,7 @@
             
             <div class="space-y-3">
                 <div class="flex justify-between text-sm">
-                    <span class="text-muted-foreground">Mapped to ArchiMate</span>
+                    <span class="text-muted-foreground">Mapped to Architecture</span>
                     <span class="font-medium">{{ with_archimate|dash }}</span>
                 </div>
                 {# A bar drawn at 0% is a claim; when coverage is unknown there is no bar. #}
@@ -74,10 +75,10 @@
             </div>
         </div>
 
-        <!-- ArchiMate Elements Coverage -->
+        <!-- Architecture Elements Coverage -->
         <div class="bg-card border border-border rounded-lg p-6">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-foreground">ArchiMate Elements Coverage</h3>
+                <h3 class="text-lg font-semibold text-foreground">Architecture Elements Coverage</h3>
                 <div class="text-2xl font-bold {% if archimate_coverage is none %}text-muted-foreground{% elif archimate_coverage >= 80 %}text-success{% elif archimate_coverage >= 50 %}text-warning{% else %}text-destructive{% endif %}">
                     {{ archimate_coverage|dash('%') }}
                 </div>
@@ -114,10 +115,10 @@
                 <div class="mt-2 text-destructive-emphasis">
                     <ul class="list-disc list-inside space-y-1">
                         {% if (orphaned_elements or 0) > 0 %}
-                        <li><strong>{{ orphaned_elements }}</strong> ArchiMate elements reference non-existent vendor products</li>
+                        <li><strong>{{ orphaned_elements }}</strong> architecture elements reference non-existent vendor products</li>
                         {% endif %}
                         {% if (without_archimate or 0) > 0 %}
-                        <li><strong>{{ without_archimate }}</strong> vendor products have no ArchiMate element mapping</li>
+                        <li><strong>{{ without_archimate }}</strong> vendor products have no architecture element mapping</li>
                         {% endif %}
                         {% if vendor_coverage is not none and vendor_coverage < 100 %}<li>Overall mapping coverage is only {{ vendor_coverage }}% for vendor products</li>{% endif %}
                     </ul>
@@ -129,10 +130,10 @@
 
     <!-- Detailed Analysis Sections -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Orphaned ArchiMate Elements -->
+<!-- Orphaned Architecture Elements -->
         <div class="bg-card border border-border rounded-lg">
             <div class="p-4 border-b border-border">
-                <h3 class="text-lg font-semibold text-foreground">Orphaned ArchiMate Elements</h3>
+                <h3 class="text-lg font-semibold text-foreground">Orphaned Architecture Elements</h3>
                 <p class="text-sm text-muted-foreground">Elements referencing non-existent vendor products</p>
             </div>
             <div class="p-4">
@@ -155,7 +156,7 @@
                 <div class="text-center py-8">
                     <i data-lucide="check-circle" class="h-12 w-12 text-success mx-auto mb-4" aria-hidden="true"></i>
                     <h4 class="text-lg font-semibold text-foreground">No Orphaned Elements</h4>
-                    <p class="text-muted-foreground">All ArchiMate elements reference valid vendor products</p>
+                    <p class="text-muted-foreground">All architecture elements reference valid vendor products</p>
                 </div>
                 {% endif %}
             </div>
@@ -165,7 +166,7 @@
         <div class="bg-card border border-border rounded-lg">
             <div class="p-4 border-b border-border">
                 <h3 class="text-lg font-semibold text-foreground">Unmapped Vendor Products</h3>
-                <p class="text-sm text-muted-foreground">Products without ArchiMate element mapping</p>
+                <p class="text-sm text-muted-foreground">Products without architecture element mapping</p>
             </div>
             <div class="p-4">
                 {% if unmapped_products %}
@@ -189,7 +190,7 @@
                 <div class="text-center py-8">
                     <i data-lucide="check-circle" class="h-12 w-12 text-success mx-auto mb-4" aria-hidden="true"></i>
                     <h4 class="text-lg font-semibold text-foreground">All Products Mapped</h4>
-                    <p class="text-muted-foreground">Every vendor product has an ArchiMate element mapping</p>
+                    <p class="text-muted-foreground">Every vendor product has an architecture element mapping</p>
                 </div>
                 {% endif %}
             </div>
@@ -217,11 +218,11 @@
         </div>
         {% endif %}
 
-        <!-- ArchiMate Elements by Type -->
+        <!-- Architecture Elements by Type -->
         {% if element_types %}
         <div class="bg-card border border-border rounded-lg">
             <div class="p-4 border-b border-border">
-                <h3 class="text-lg font-semibold text-foreground">ArchiMate Elements with Vendor Mapping</h3>
+                <h3 class="text-lg font-semibold text-foreground">Architecture Elements with Vendor Mapping</h3>
             </div>
             <div class="p-4">
                 <div class="space-y-2">
@@ -241,7 +242,7 @@
     <div class="mt-6 flex justify-between items-center bg-card border border-border rounded-lg p-4">
         <div class="text-sm text-muted-foreground">
             <i data-lucide="info" class="h-4 w-4 inline mr-1" aria-hidden="true"></i>
-            Use this analysis to identify and resolve vendor-ArchiMate mapping inconsistencies
+            Use this analysis to identify and resolve vendor-architecture mapping inconsistencies
         </div>
         <div class="flex gap-2">
             <button type="button" @click="exportAnalysis()"

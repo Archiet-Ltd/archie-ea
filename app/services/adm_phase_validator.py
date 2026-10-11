@@ -161,6 +161,7 @@ class ADMPhaseValidator:
                 target_phase_id=target_phase.id,
                 new_values={"errors": self.errors, "warnings": self.warnings},
                 justification="Phase transition validation failed",
+                organization_id=card.organization_id,
             )
 
         return result

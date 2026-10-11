@@ -16,6 +16,8 @@ from .solution_design_routes import (
     solution_design_bp,
 )
 from app.utils.pagination import safe_int_arg
+from app.utils.tenant_users import escape_like_literal
+from app.middleware.tenant_decorators import is_active_org_admin
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +200,7 @@ def api_solution_activity(solution_id: int):
     """Chronological activity feed: comments and entity changes (ENT-022)."""
     from app.models.solution_models import SolutionComment
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not is_active_org_admin():
         abort(403)
     limit = min(safe_int_arg('limit', 50, minimum=1, maximum=500), 100)
     activities = []
@@ -638,7 +640,7 @@ def search_adrs():
         return jsonify({"results": []})
     try:
         from app.models.adr import ArchitectureDecisionRecord
-        safe_q = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        safe_q = escape_like_literal(q)
         results = ArchitectureDecisionRecord.query.filter(
             or_(
                 ArchitectureDecisionRecord.title.ilike(f"%{safe_q}%", escape="\\"),

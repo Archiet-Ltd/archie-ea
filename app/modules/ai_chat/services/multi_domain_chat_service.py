@@ -23,7 +23,7 @@ Features:
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from flask import g
@@ -565,7 +565,7 @@ class MultiDomainChatService:
             "domain_usage": {domain: 0 for domain in self.domains},
             "average_response_time": 0,
             "error_count": 0,
-            "last_reset": datetime.utcnow(),
+            "last_reset": datetime.now(timezone.utc),
         }
 
         # Initialize AI Chat Extension Services
@@ -2186,8 +2186,24 @@ class MultiDomainChatService:
             if detected_entity_type:
                 # Admin gate — check at intent detection time
                 # tenant-scoping-ok: user_id here is the acting/chatting user's own id.
+                #
+                # D-4 (admin-rbac-active-org continuation): ``actor.is_admin()``
+                # is a global ``Permission.ADMINISTER`` flag, independent of
+                # which organisation is active in the session
+                # (``g.current_org_id``) -- see the matching fix and comment
+                # in app/modules/ai_chat/services/ai_chat_approval_service.py
+                # (the execution-time guard this is a "double guard" alongside).
                 actor = User.query.get(user_id) if user_id else None
-                if not actor or not actor.is_admin():
+                from flask import g
+
+                from app.middleware.tenant_decorators import is_platform_admin
+                from app.services.rbac_service import rbac_service
+
+                active_org_id = getattr(g, "current_org_id", None)
+                if not actor or not (
+                    is_platform_admin(actor)
+                    or rbac_service.is_org_admin(actor, active_org_id)
+                ):
                     return {
                         "success": True,
                         "response": (
@@ -4597,7 +4613,21 @@ Use enterprise architecture terminology appropriate for this role."""
             if context_filter and "layer" in context_filter:
                 target_layer = context_filter["layer"]
 
-            elements_query = ArchiMateElement.query
+            # Ordered by name, the same ordering the element list pages already
+            # use (api_elements_search) -- with no explicit order the database
+            # is free to return an organisation's rows in whatever order its
+            # physical layout happens to put them in, which is stable within
+            # one run but not across two (confirmed: the same organisation,
+            # captured the same way, listed a different element in an early
+            # visible slot depending on how much unrelated data existed
+            # elsewhere in the table). LIMIT then a possible re-sort by
+            # rel_counts both need a deterministic starting order to mean
+            # anything -- which 100 (or 200) rows the limit keeps, and which
+            # element wins a tie in the rel_counts sort below, both depend on
+            # it.
+            elements_query = ArchiMateElement.query.order_by(
+                ArchiMateElement.name, ArchiMateElement.id
+            )
             if target_layer:
                 elements_query = elements_query.filter(ArchiMateElement.layer == target_layer)
                 detail_elements = elements_query.limit(200).all()
@@ -6267,7 +6297,7 @@ Instructions:
                     f"{portfolio.get('total_vendors', 0)} vendors\n"
                 )
 
-            prompt = f"""You are an Intelligent Search Assistant for an Enterprise Architecture platform (A.R.C.H.I.E.).
+            prompt = f"""You are an Intelligent Search Assistant for an Enterprise Architecture platform (Entelim).
 The user is searching for information across the organisation's architecture portfolio.
 
 USER SEARCH QUERY: {message}
@@ -6366,7 +6396,7 @@ Instructions:
 
             # Build a system instruction mentioning the attached diagram
             system_instruction = (
-                "You are A.R.C.H.I.E., an AI Architecture Assistant specialising in "
+                "You are Entelim, an AI Architecture Assistant specialising in "
                 "enterprise architecture (TOGAF 9.2, ArchiMate 3.2). "
                 "The user has attached an architecture diagram for analysis. "
                 "Describe the diagram contents, identify architectural elements, "
@@ -6421,6 +6451,12 @@ Instructions:
         Each provider has a slightly different multi-content message format.
         Returns the assistant's text response.
         """
+        provider, model, _ = LLMService._guard_provider_call(
+            provider,
+            model,
+            prompt=system_prompt + "\n\n" + user_message,
+        )
+
         if provider == "openai":
             from openai import OpenAI
             client = OpenAI(api_key=api_key)
@@ -6595,7 +6631,7 @@ Instructions:
                     if _apps:
                         blast_radius_block = self._compute_capability_blast_radius(_apps[0])
 
-            prompt = f"""You are A.R.C.H.I.E., an AI Architecture Assistant for Enterprise Architecture. You have deep knowledge of TOGAF, ArchiMate 3.2, and the organisation's live portfolio data.
+            prompt = f"""You are Entelim, an AI Architecture Assistant for Enterprise Architecture. You have deep knowledge of TOGAF, ArchiMate 3.2, and the organisation's live portfolio data.
 
 USER QUESTION: {message}
 
@@ -6677,11 +6713,7 @@ Instructions:
             if not explicit_record and not implicit_decision:
                 return
 
-            from app.models.adr import ArchitectureDecisionRecord
-            from sqlalchemy import func
-
-            # Get next ADR number
-            max_num = db.session.query(func.max(ArchitectureDecisionRecord.adr_number)).scalar() or 0
+            from app.models.architecture_decision import ArchitectureDecision
 
             # Extract decision title from message
             title = message[:150].strip()
@@ -6701,20 +6733,25 @@ Instructions:
             for cap_info in resolved.get("capabilities", [])[:5]:
                 affected.append({"type": "capability", "id": cap_info["id"], "name": cap_info["name"]})
 
-            adr = ArchitectureDecisionRecord(
-                adr_number=max_num + 1,
+            from flask import g as _g
+            org_id = getattr(_g, "current_org_id", None)
+
+            adr = ArchitectureDecision(
+                decision_id=ArchitectureDecision.next_decision_id(),
                 title=title[:200],
                 status="accepted" if explicit_record else "proposed",
                 context=f"Decision recorded via AI chat by user {self.user_id}",
                 decision=message[:1000] if explicit_record else response_text[:1000],
                 rationale="Recorded from AI chat conversation",
                 consequences="To be assessed",
-                affected_systems=json.dumps(affected) if affected else None,
-                decision_date=datetime.utcnow().date(),
+                affected_systems=affected or None,
+                decided_at=datetime.utcnow() if explicit_record else None,
+                organization_id=org_id,
             )
             db.session.add(adr)
+            db.session.flush()
             db.session.commit()
-            logger.info(f"AIC-307: ADR #{adr.adr_number} recorded: {title[:60]}")
+            logger.info(f"AIC-307: decision {adr.decision_id} recorded: {title[:60]}")
         except Exception as e:
             logger.debug(f"AIC-307: Decision recording failed: {e}")
             db.session.rollback()
@@ -6833,7 +6870,7 @@ Instructions:
                 """ + _org_clause), {"vid": vid, **_org_params}).scalar() or 0
 
                 # Capability coverage
-                # tenant-filtered: scoped via parent FK (vendor_product_capabilities)
+                # tenancy-ok: scoped via vendor_organization_id in the WHERE clause
                 cap_count = db.session.execute(text(  # tenant-filtered: scoped via parent FK (vendor_product_capabilities)
                     """
                     SELECT COUNT(DISTINCT vpc.business_capability_id)
@@ -7465,6 +7502,7 @@ End with: "Type **'next'** to complete the design workflow."
             from app.models import LLMInteraction
             from sqlalchemy import func, distinct, cast, Date
 
+            # tenant-scoping-ok: user_id is already per-user; user belongs to one org
             base = LLMInteraction.query.filter(LLMInteraction.user_id == user_id)
             total_messages = base.count()
             active_days = db.session.query(
@@ -7486,10 +7524,22 @@ End with: "Type **'next'** to complete the design workflow."
         try:
             from app.models import LLMInteraction
             from sqlalchemy import func
+            from flask import g, has_app_context, has_request_context  # TRNT-072
+
+            # TRNT-072: tenant scoping
+            org_id = None
+            if has_request_context() or has_app_context():
+                org_id = getattr(g, "current_org_id", None)
+
+            if org_id is None:
+                # Fail closed: without a known organisation this route would
+                # otherwise sum every tenant's interactions.
+                return {"domains": [], "total_domains": 0, "total_messages": 0}
 
             # Count interactions per provider as a proxy (domain not stored directly)
             rows = (
                 db.session.query(LLMInteraction.provider, func.count(LLMInteraction.id))
+                .filter(LLMInteraction.organization_id == org_id)
                 .group_by(LLMInteraction.provider)
                 .all()
             )
@@ -7510,14 +7560,34 @@ End with: "Type **'next'** to complete the design workflow."
         try:
             from app.models import LLMInteraction
             from sqlalchemy import func
+            from app.middleware.tenant_context import current_org_id
 
-            total = LLMInteraction.query.count()
+            # Reached from a @login_required route with no admin check
+            # (analytics_routes.py /analytics/quality); scope to the caller's
+            # own organisation rather than let it read every tenant's quality.
+            org_id = current_org_id()
+
+            if org_id is None:
+                return {
+                    "response_quality_score": None,
+                    "avg_response_time_ms": None,
+                    "success_rate": 0,
+                    "feedback_count": None,
+                    "total_interactions": 0,
+                }
+
+            quality_base = LLMInteraction.query.filter(LLMInteraction.organization_id == org_id)
+
+            total = quality_base.count()
             if total == 0:
                 return {"response_quality_score": None, "avg_response_time_ms": None, "success_rate": 0, "feedback_count": 0}
 
-            avg_latency = db.session.query(func.avg(LLMInteraction.latency_ms)).scalar()
+            latency_query = db.session.query(func.avg(LLMInteraction.latency_ms)).filter(
+                LLMInteraction.organization_id == org_id
+            )
+            avg_latency = latency_query.scalar()
             # Success = has a non-empty response
-            success_count = LLMInteraction.query.filter(
+            success_count = quality_base.filter(
                 LLMInteraction.response.isnot(None),
                 LLMInteraction.response != "",
             ).count()

@@ -726,3 +726,93 @@ Return JSON:
 
 Only map requirements that genuinely address stakeholder concerns.
 """
+
+
+
+# ============================================================================
+# Transformation programme stakeholder map (no model call)
+# ============================================================================
+
+
+def programme_for_map(programme_id):
+    """The transformation programme with this id in the caller's organisation,
+    or ``None``. StrategicInitiative is tenant-scoped, so another
+    organisation's programme is simply not found."""
+    from app.models.strategic import StrategicInitiative
+
+    if not programme_id:
+        return None
+    return StrategicInitiative.query.filter(
+        StrategicInitiative.id == programme_id,
+        StrategicInitiative.record_kind == "transformation_programme",
+    ).first()
+
+
+def programmes_for_map():
+    """The organisation's live transformation programmes, by name."""
+    from app.models.strategic import StrategicInitiative
+
+    return (
+        StrategicInitiative.query.filter(
+            StrategicInitiative.record_kind == "transformation_programme",
+            StrategicInitiative.archived_at.is_(None),
+        )
+        .order_by(StrategicInitiative.name)
+        .all()
+    )
+
+
+def programme_owner_suggestions(programme_id) -> Dict:
+    """People the programme's records name as owners of what it affects.
+
+    What a programme affects is recorded on its transformation options, as
+    the business capabilities each option changes; a capability records its
+    business owner and IT owner by name. Each suggestion says which
+    capability and which ownership it comes from. Names already on the
+    programme's map are left out. Nothing is inferred: a programme with no
+    options, or whose affected capabilities record no owner, gets no
+    suggestions, and ``affected_count`` says how many affected capabilities
+    were looked at.
+    """
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.solution_stakeholder import SolutionStakeholder, SolutionStakeholderMapping
+    from app.models.transformation_decision import TransformationOption
+    from app.models.transformation_programme import ProgrammeWorkstream
+
+    options = (
+        TransformationOption.query.join(
+            ProgrammeWorkstream, ProgrammeWorkstream.id == TransformationOption.workstream_id
+        )
+        .filter(ProgrammeWorkstream.programme_id == programme_id)
+        .all()
+    )
+    capability_ids = sorted({
+        int(cid) for option in options for cid in (option.affected_capability_ids or [])
+        if str(cid).isdigit()
+    })
+    capabilities = (
+        BusinessCapability.query.filter(BusinessCapability.id.in_(capability_ids))
+        .order_by(BusinessCapability.name)
+        .all()
+        if capability_ids else []
+    )
+    on_map = {
+        (name or "").strip().lower()
+        for (name,) in db.session.query(SolutionStakeholder.name)
+        .join(SolutionStakeholderMapping, SolutionStakeholderMapping.stakeholder_id == SolutionStakeholder.id)
+        .filter(SolutionStakeholderMapping.programme_id == programme_id)
+        .all()
+    }
+    by_name: Dict[str, Dict] = {}
+    for capability in capabilities:
+        for label, owner in (("Business owner", capability.business_owner),
+                             ("IT owner", capability.it_owner)):
+            name = (owner or "").strip()
+            if not name or name.lower() in on_map:
+                continue
+            entry = by_name.setdefault(name.lower(), {"name": name, "basis": []})
+            entry["basis"].append("%s of %s" % (label, capability.name))
+    return {
+        "affected_count": len(capabilities),
+        "suggestions": sorted(by_name.values(), key=lambda s: s["name"].lower()),
+    }

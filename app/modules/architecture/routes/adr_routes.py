@@ -18,9 +18,16 @@ the same `architecture_decisions` table through the TenantMixin mapping and
 has real templates, so it is both the working and the tenant-safe surface —
 these URLs are kept as redirects into it rather than deleted, so existing
 links and bookmarks keep working.
-- POST /architecture/adrs/<id> - Update ADR
+- POST /architecture/adrs/<id> - Retired: redirects to the canonical edit form (see `update_adr`)
 - POST /architecture/adrs/<id>/approve - Approve ADR
 - POST /architecture/adrs/<id>/reject - Reject ADR
+
+architecture_decisions is the only writer (lead ruling): approve and
+reject already wrote only the canonical `ArchitectureDecision` row through
+`ADRService`, never `ArchitectureDecisionRecord`, so they needed no change.
+`update_adr` did duplicate `arch_decisions.edit_decision` over that same
+canonical row through a second code path and is now a redirect, like the
+GET routes above it.
 """
 
 import logging
@@ -151,7 +158,26 @@ def view_adr(adr_id: int):
 @adr_bp.route("/records/<int:adr_id>", methods=["GET"])
 @login_required
 def view_record(adr_id: int):
-    """View the canonical tenant-scoped ArchitectureDecisionRecord."""
+    """This record's own detail, plus, when paired, the one canonical
+    register's id so a caller can also reach it at
+    `arch_decisions.view_decision`.
+
+    architecture_decisions is the only writer (lead ruling): once
+    this record is paired (`retired_into_id` set), its shared fields
+    (title/status/context/decision/rationale/consequences) are a frozen
+    snapshot from pairing time, not live state -- the canonical register at
+    `canonical_decision_url` is what changes after that. It stays the
+    system of record only for the review-board-only fields the canonical
+    register has no columns for (capability/process links,
+    governance_decision_id, implementation_plan, risk_register,
+    cost_analysis, arb_review, decision_matrix and the rest), which this
+    consolidation never touches.
+
+    Redirects were not possible here (this is a JSON API, not a page GET) --
+    the pairing is surfaced in the response instead, completing "ADR routes
+    point at the one register" for the one route that still reads
+    architecture_decision_records directly.
+    """
     adr = db.session.execute(
         db.select(ArchitectureDecisionRecord).where(
             ArchitectureDecisionRecord.id == adr_id,
@@ -160,7 +186,15 @@ def view_record(adr_id: int):
     ).scalar_one_or_none()
     if adr is None:
         abort(404)
-    return jsonify({"adr": adr.to_dict(include_content=True)})
+    payload = adr.to_dict(include_content=True)
+    payload["canonical_decision_id"] = adr.retired_into_id
+    payload["canonical_decision_url"] = (
+        url_for("arch_decisions.view_decision", decision_id=adr.retired_into_id)
+        if adr.retired_into_id
+        else None
+    )
+    payload["historical_snapshot"] = adr.retired_into_id is not None
+    return jsonify({"adr": payload})
 
 
 @adr_bp.route("/<int:adr_id>/edit", methods=["GET"])
@@ -178,48 +212,17 @@ def edit_adr(adr_id: int):
 @adr_bp.route("/<int:adr_id>", methods=["POST"])
 @login_required
 def update_adr(adr_id: int):
-    """Update an existing ADR."""
-    try:
-        # Parse alternatives and constraints
-        alternatives = []
-        constraints = []
-        
-        for key in request.form:
-            if key.startswith("alt_name_"):
-                idx = key.split("_")[-1]
-                alt = {
-                    "name": request.form.get(f"alt_name_{idx}", ""),
-                    "pros": request.form.get(f"alt_pros_{idx}", "").split("\n"),
-                    "cons": request.form.get(f"alt_cons_{idx}", "").split("\n"),
-                    "rejected_reason": request.form.get(f"alt_reason_{idx}", "")
-                }
-                alternatives.append(alt)
-            elif key.startswith("constraint_name_"):
-                idx = key.split("_")[-1]
-                constraint = {
-                    "constraint_name": request.form.get(f"constraint_name_{idx}", ""),
-                    "impact": request.form.get(f"constraint_impact_{idx}", "")
-                }
-                constraints.append(constraint)
-        
-        adr = ADRService.update_adr(
-            adr_id=adr_id,
-            title=request.form.get("title"),
-            context=request.form.get("context"),
-            decision=request.form.get("decision"),
-            rationale=request.form.get("rationale"),
-            alternatives=alternatives,
-            constraints=constraints,
-            consequences=request.form.get("consequences")
-        )
-        
-        flash(f"ADR '{adr.title}' updated successfully", "success")
-        return redirect(url_for("adrs.view_adr", adr_id=adr.id))
-        
-    except Exception as e:
-        logger.error(f"Failed to update ADR {adr_id}: {e}", exc_info=True)
-        flash(f"Failed to update ADR: {str(e)}", "error")
-        return redirect(url_for("adrs.edit_adr", adr_id=adr_id))
+    """Retired: redirect to the canonical Architecture Decision edit form.
+
+    Same defect and same fix as `edit_adr`/`view_adr` below: this used to
+    write core fields through `ADRService.update_adr` straight onto the
+    canonical `ArchitectureDecision` row, a second writable implementation
+    of the same job `arch_decisions.edit_decision` already does over the
+    same row. architecture_decisions is the only writer (lead ruling) --
+    not just the only table, the one code path -- so this route
+    no longer processes form data itself.
+    """
+    return redirect(url_for("arch_decisions.edit_decision", decision_id=adr_id))
 
 
 @adr_bp.route("/<int:adr_id>/approve", methods=["POST"])

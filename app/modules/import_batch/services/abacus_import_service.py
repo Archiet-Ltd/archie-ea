@@ -19,6 +19,7 @@ Key Features:
 import logging
 import re
 from datetime import datetime
+from decimal import Decimal
 from difflib import SequenceMatcher
 from typing import Dict, List, Optional, Tuple
 
@@ -30,6 +31,7 @@ from app.connectors.abacus import AbacusConnector
 from app.models.application_capability import ApplicationCapabilityMapping
 from app.models.application_portfolio import ApplicationComponent
 from app.models.business_capabilities import BusinessCapability
+from app.services.application_cost_accessor import set_annual_cost
 
 try:
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
@@ -282,9 +284,13 @@ class AbacusImportService:
             technical_risk=(app_data.get("risk_level") or "").lower() or None,
             abacus_properties=app_data.get("abacus_properties") or None,
             # Financial data extracted from Abacus properties
-            total_cost_of_ownership=app_data.get("annual_cost") or None,
             user_count=user_count_val,
         )
+
+        # Set annual cost through the accessor
+        abacus_cost = app_data.get("annual_cost")
+        if abacus_cost is not None:
+            set_annual_cost(app, Decimal(str(abacus_cost)))
 
         return app
 
@@ -349,8 +355,8 @@ class AbacusImportService:
         # total_cost_of_ownership is an enrichment field — only backfill when blank
         # (preserve any value set manually by architects)
         abacus_cost = app_data.get("annual_cost")
-        if abacus_cost and not getattr(app, "total_cost_of_ownership", None):
-            app.total_cost_of_ownership = abacus_cost
+        if abacus_cost is not None and not getattr(app, "total_cost_of_ownership", None):
+            set_annual_cost(app, Decimal(str(abacus_cost)))
 
         # Always persist raw Abacus properties for future field discovery
         raw_props = app_data.get("abacus_properties")

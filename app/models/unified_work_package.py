@@ -15,16 +15,20 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.orm import relationship
 
 from .. import db
+from .mixins import TenantMixin
+from .mixins.core import _default_org_id
 
 
-class UnifiedWorkPackage(db.Model):
+class UnifiedWorkPackage(TenantMixin, db.Model):
     """
     Unified Work Package Model - ArchiMate 3.2 Compliant with Roadmap Capabilities
 
@@ -37,9 +41,40 @@ class UnifiedWorkPackage(db.Model):
     """
 
     __tablename__ = "unified_work_packages"
+    __table_args__ = (
+        # One copy per row of a retired store; the merge and the session bridge
+        # insert with ON CONFLICT DO NOTHING on this key.
+        Index(
+            "uq_unified_wp_source_copy", "source_table", "source_id",
+            unique=True, postgresql_where=text("source_table IS NOT NULL"),
+        ),
+        # One copy per ArchiMate element (the rule is element_refusal_sql in work_package_service).
+        Index(
+            "uq_unified_wp_archimate_element", "archimate_element_id",
+            unique=True, postgresql_where=text("archimate_element_id IS NOT NULL"),
+        ),
+    )
 
     # === Primary Key ===
     id = Column(BigInteger, primary_key=True)
+
+    # === Tenancy ===
+    # This table predates TenantMixin: `flask reconcile-schema` can only ADD a
+    # nullable column to a live table (ADR 0002), so organization_id has to stay
+    # nullable at the ORM level too, or the model would disagree with the
+    # database and trip the schema-drift gate. Isolation still keys on
+    # isinstance(TenantMixin), not on nullability (same override as
+    # EnterpriseInitiative in app/models/vendor/vendor_organization.py). A row
+    # that cannot be attributed an organisation (see
+    # backfill-work-package-org) is left NULL: the tenant filter's `=`
+    # comparison then matches no organisation, which is the quarantine.
+    organization_id = Column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     # === Core Attributes ===
     name = Column(String(255), nullable=False, index=True)
@@ -72,9 +107,22 @@ class UnifiedWorkPackage(db.Model):
     context = Column(String(20), default="architecture", nullable=False, index=True)
     context_id = Column(Integer, nullable=True)
 
+    # === Enterprise create screen fields (R1-B04 PR 2, round 3) ===
+    # Carried by the enterprise work package form; nullable, nothing is
+    # backfilled. The screen's architecture is ``context_id`` above.
+    summary = Column(Text, nullable=True)
+    estimated_effort_hours = Column(Float, nullable=True)
+    actual_effort_hours = Column(Float, nullable=True)
+    level = Column(Integer, nullable=True)
+    color = Column(String(20), nullable=True)
+
     # === Capability Context (from RoadmapWorkPackage) ===
+    # Nullable: a row merged in from technology_roadmap_initiatives,
+    # implementation_work_packages or work_packages may carry no capability
+    # link at all. Forcing a value here would be inventing one; the merge
+    # command drops the historical NOT NULL rather than fabricate a name.
     business_capability = Column(
-        String(100), nullable=False, index=True
+        String(100), nullable=True, index=True
     )  # Primary/legacy capability name
     capability_id = Column(
         BigInteger, ForeignKey("unified_capabilities.id", ondelete="SET NULL"), index=True
@@ -102,8 +150,9 @@ class UnifiedWorkPackage(db.Model):
     duration_days = Column(Integer)  # Calculated field
 
     # === Progress and Status ===
+    # 50 wide to match roadmap_work_packages.status, the widest store merged in.
     status = Column(
-        String(30), default="planned", index=True
+        String(50), default="planned", index=True
     )  # planned, in_progress, completed, cancelled, on_hold
     progress_percentage = Column(Float, default=0.0)
 
@@ -133,7 +182,18 @@ class UnifiedWorkPackage(db.Model):
     auto_generated = Column(Boolean, default=False, index=True)
     source_data = Column(Text)  # JSON string with source information
     source_type = Column(String(50))  # capability, gap, application, manual, ai
-    source_id = Column(BigInteger)  # ID of source entity
+    source_id = Column(BigInteger)  # ID of source entity; see source_table below
+    # === Consolidation provenance (ADR 0008 rule 2) ===
+    # `source_table` names the pre-consolidation store a merged row came from
+    # (work_packages, roadmap_work_packages, technology_roadmap_initiatives,
+    # implementation_work_packages). A row merged this way carries both
+    # source_table and source_id (that store's own primary key), so "where did
+    # this row come from" is answered by query. A row that was never merged
+    # (created directly here, or auto-generated from a capability/gap per the
+    # source_type field above) leaves source_table NULL; source_id keeps its
+    # pre-existing "AI generation source entity" meaning in that case, since
+    # the two usages never occur on the same row.
+    source_table = Column(String(128), index=True)
     confidence_score = Column(Float, default=1.0)
     generation_method = Column(String(100))  # AI, template, rule_based, manual
     complexity_score = Column(Float, default=1.0)
@@ -143,6 +203,22 @@ class UnifiedWorkPackage(db.Model):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
     created_by = Column(Integer, ForeignKey("users.id"), index=True)
     updated_by = Column(Integer, ForeignKey("users.id"))
+
+    # Set once work_dependencies hold unified ids (merge remap, or created by the
+    # writer). Lets the merge's dependency remap run exactly once per row.
+    dependencies_remapped_at = Column(DateTime, nullable=True)
+
+    # Set once the plateau and gap links held in the old store's association tables
+    # (gap_work_packages, work_package_plateaus) have become relationships. A marked
+    # row is never migrated again, so a link removed on a new screen cannot return.
+    # Bookkeeping for the deploy migration (IW-85); PR 3 drops it with the tables.
+    association_links_migrated_at = Column(DateTime, nullable=True)
+
+    # Hierarchy (a child work package under a parent), carried from the
+    # work_packages store; filled by the merge and the bridge.
+    parent_id = Column(
+        BigInteger, ForeignKey("unified_work_packages.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # === Sync and Automation Status ===
     last_sync_at = Column(DateTime)

@@ -35,14 +35,11 @@ def _compute_capability_mapping_counts():
     fabricated red one, and the legend only appears when this returned a
     real dict.
 
-    ``ApplicationCapabilityMapping`` is not ``TenantMixin`` (see the model),
-    so the org predicate here is deliberate, not defence-in-depth. It is
-    applied via the FK parent ``BusinessCapability`` (which *is*
-    ``TenantMixin``), not ``ApplicationCapabilityMapping.organization_id`` --
-    that column is NULL on every row in production (added nullable by
-    reconcile-schema, never backfilled), so a predicate directly on it would
-    report every capability as having 0 mapped apps for every org. See
-    e622d36 / rationalization_scoring_service.py for the precedent.
+    Uses ``UnifiedApplicationCapabilityMapping`` joined with
+    ``UnifiedCapability`` (the canonical store PR 1 built). Only the
+    tenant's own capabilities (``organization_id == org_id``) are counted;
+    shared reference capabilities (``organization_id IS NULL``) are
+    excluded from per-organisation mapping counts.
     """
     org_id = getattr(g, "current_org_id", None)
     if org_id is None:
@@ -51,21 +48,21 @@ def _compute_capability_mapping_counts():
     from sqlalchemy import func
 
     from app import db
-    from app.models.application_capability import ApplicationCapabilityMapping
-    from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+    from app.models.unified_capability import UnifiedCapability
 
     try:
         rows = (
             db.session.query(
-                ApplicationCapabilityMapping.business_capability_id,
-                func.count(ApplicationCapabilityMapping.id),
+                UnifiedApplicationCapabilityMapping.unified_capability_id,
+                func.count(UnifiedApplicationCapabilityMapping.id),
             )
             .join(
-                BusinessCapability,
-                ApplicationCapabilityMapping.business_capability_id == BusinessCapability.id,
+                UnifiedCapability,
+                UnifiedApplicationCapabilityMapping.unified_capability_id == UnifiedCapability.id,
             )
-            .filter(BusinessCapability.organization_id == org_id)
-            .group_by(ApplicationCapabilityMapping.business_capability_id)
+            .filter(UnifiedCapability.organization_id == org_id)
+            .group_by(UnifiedApplicationCapabilityMapping.unified_capability_id)
             .all()
         )
     except Exception:
@@ -81,11 +78,11 @@ def _compute_capability_mapping_counts():
 def index():
     """Main capability mapping page"""
     from app.modules.capabilities.services.capability_count_service import (
-        count_business_capabilities,
+        count_capabilities,
     )
 
     try:
-        total_capabilities = count_business_capabilities()
+        total_capabilities = count_capabilities()
     except Exception:
         current_app.logger.exception("Could not count business capabilities")
         total_capabilities = None
@@ -117,30 +114,40 @@ def mapping_modal_partial(variant):
     return render_template("capability_map/_lazy_mapping_modals.html", variant=variant)
 
 
-@capability_map.route("/hierarchy")
-@login_required
 @cached(
     ttl=300,
     key_prefix="capability_map:hierarchy",
     key_func=lambda: getattr(g, "current_org_id", None),
 )
-def hierarchy():
-    """Capability hierarchy visualization — uses real BusinessCapability data."""
+def _hierarchy_context():
+    """Build the hierarchy page's template context (the query results only).
+
+    This is what gets cached — never the rendered HTML. ``render_template``
+    bakes the current request's CSP nonce into ``<script nonce="...">`` /
+    ``<style nonce="...">`` attributes (see CspNonceExtension in
+    app/_bootstrap/security.py). Caching that rendered string, as this used
+    to, meant a cache hit on request 2 served request 1's nonce inside a
+    response whose Content-Security-Policy header carried request 2's own
+    (freshly generated, per-request) nonce — the two never matched, so the
+    browser refused every nonce'd tag on the page. Caching only the data and
+    calling ``render_template`` fresh on every request keeps the nonce and
+    the header in the same response, cache hit or not.
+    """
     from app.modules.capabilities.services.capability_count_service import (
-        count_business_capabilities,
+        count_capabilities,
     )
 
     try:
-        total_capabilities = count_business_capabilities()
+        total_capabilities = count_capabilities()
     except Exception:
-        current_app.logger.exception("Could not count business capabilities")
+        current_app.logger.exception("Could not count capabilities")
         total_capabilities = None
 
     try:
-        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.order_by(
-            BusinessCapability.level, BusinessCapability.name
+        capabilities = UnifiedCapability.query.order_by(
+            UnifiedCapability.level, UnifiedCapability.name
         ).all()
 
         # Build parent lookup
@@ -164,7 +171,7 @@ def hierarchy():
                 "level": cap.level,
                 # Falsy values hide the badge in the template; "Unknown" and a
                 # hardcoded "core" pill were fabricated labels on every row.
-                "domain": cap.business_domain or "",
+                "domain": cap.domain.name if cap.domain else "",
                 "category": cap.category or "",
                 "capability_type": getattr(cap, "capability_type", None) or "",
                 "functions": [],
@@ -176,28 +183,42 @@ def hierarchy():
         roots = [c for c in capabilities if c.level == 1]
         catalog = {"children": [cap_to_dict(r) for r in roots]}
 
-        return render_template(
-            "capability_map/hierarchy.html",
-            catalog=catalog,
-            total_capabilities=total_capabilities,
-            has_coverage_data=mapping_counts is not None,
-        )
+        return {
+            "catalog": catalog,
+            "total_capabilities": total_capabilities,
+            "has_coverage_data": mapping_counts is not None,
+            "load_error": None,
+        }
     except Exception as e:
         from app import db
 
         db.session.rollback()
         current_app.logger.exception("Unexpected error loading hierarchy: %s", e)
-        flash("Error loading the capability hierarchy. Please try again.", "error")
         # The catalog shape is required by the Alpine tree, so it stays a dict
         # with an empty children list - no invented nodes. load_error is what
         # tells the user the tree is empty because nothing could be read.
-        return render_template(
-            "capability_map/hierarchy.html",
-            catalog={"children": []},
-            load_error="The capability hierarchy could not be read.",
-            total_capabilities=total_capabilities,
-            has_coverage_data=False,
-        )
+        return {
+            "catalog": {"children": []},
+            "total_capabilities": total_capabilities,
+            "has_coverage_data": False,
+            "load_error": "The capability hierarchy could not be read.",
+        }
+
+
+@capability_map.route("/hierarchy")
+@login_required
+def hierarchy():
+    """Capability hierarchy visualization — uses real UnifiedCapability data."""
+    context = _hierarchy_context()
+    if context["load_error"]:
+        flash("Error loading the capability hierarchy. Please try again.", "error")
+    return render_template(
+        "capability_map/hierarchy.html",
+        catalog=context["catalog"],
+        total_capabilities=context["total_capabilities"],
+        has_coverage_data=context["has_coverage_data"],
+        load_error=context["load_error"],
+    )
 
 
 @capability_map.route("/network")
@@ -207,28 +228,24 @@ def network():
     return render_template("capability_map/network.html")
 
 
-@capability_map.route("/simple")
-@login_required
 @cached(
     ttl=300,
     key_prefix="capability_map:simple",
     key_func=lambda: getattr(g, "current_org_id", None),
 )
-def simple_view():
-    """Simple flat view of capabilities — real BusinessCapability data.
+def _simple_view_context():
+    """Build the simple view's template context (the query results only).
 
-    Was previously a 612-line static template with no context at all: a
-    hardcoded "38 capabilities / 124 functions / 11 domains" and a fictional
-    "Digital Application Platform" taxonomy, shown identically to every
-    tenant. Rebuilt on the same query pattern as ``hierarchy()`` above —
-    level-1 roots with their direct children — but flattened for a page
-    that is meant to be simple, not a recursive tree.
+    Cached separately from the render — see ``_hierarchy_context`` above for
+    why: caching ``render_template``'s output bakes in that request's CSP
+    nonce, which a later cache hit then serves under a different response's
+    (freshly generated) nonce, and the browser blocks the mismatch.
     """
     try:
-        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.order_by(
-            BusinessCapability.level, BusinessCapability.name
+        capabilities = UnifiedCapability.query.order_by(
+            UnifiedCapability.level, UnifiedCapability.name
         ).all()
 
         children_by_parent = {}
@@ -241,7 +258,7 @@ def simple_view():
                 "name": cap.name,
                 "description": cap.description or "",
                 "level": cap.level,
-                "domain": cap.business_domain or "",
+                "domain": cap.domain.name if cap.domain else "",
             }
 
         roots = [c for c in capabilities if c.level == 1]
@@ -250,7 +267,7 @@ def simple_view():
                 "name": root.name,
                 "description": root.description or "",
                 "level": root.level,
-                "domain": root.business_domain or "",
+                "domain": root.domain.name if root.domain else "",
                 "children": [
                     child_to_dict(child) for child in children_by_parent.get(root.id, [])
                 ],
@@ -259,7 +276,7 @@ def simple_view():
         ]
 
         levels = [c.level for c in capabilities if c.level is not None]
-        domains = {c.business_domain for c in capabilities if c.business_domain}
+        domains = {c.domain.name for c in capabilities if c.domain}
 
         stats = {
             "total": len(capabilities),
@@ -268,34 +285,61 @@ def simple_view():
             "domain_count": len(domains),
         }
 
-        return render_template(
-            "capability_map/simple.html",
-            capability_groups=capability_groups,
-            stats=stats,
-        )
+        return {
+            "capability_groups": capability_groups,
+            "stats": stats,
+            "load_error": None,
+        }
     except Exception:
         from app import db
 
         db.session.rollback()
         current_app.logger.exception("Could not load the simple capability view")
-        flash("Error loading the capability view. Please try again.", "error")
-        return render_template(
-            "capability_map/simple.html",
-            capability_groups=[],
-            stats={"total": None, "l1_count": None, "max_depth": None, "domain_count": None},
-            load_error="The capability list could not be read.",
-        )
+        return {
+            "capability_groups": [],
+            "stats": {"total": None, "l1_count": None, "max_depth": None, "domain_count": None},
+            "load_error": "The capability list could not be read.",
+        }
 
 
-@capability_map.route("/dashboard")
+@capability_map.route("/simple")
 @login_required
+def simple_view():
+    """Simple flat view of capabilities — real UnifiedCapability data.
+
+    Was previously a 612-line static template with no context at all: a
+    hardcoded "38 capabilities / 124 functions / 11 domains" and a fictional
+    "Digital Application Platform" taxonomy, shown identically to every
+    tenant. Rebuilt on the same query pattern as ``hierarchy()`` above —
+    level-1 roots with their direct children — but flattened for a page
+    that is meant to be simple, not a recursive tree.
+    """
+    context = _simple_view_context()
+    if context["load_error"]:
+        flash("Error loading the capability view. Please try again.", "error")
+    return render_template(
+        "capability_map/simple.html",
+        capability_groups=context["capability_groups"],
+        stats=context["stats"],
+        load_error=context["load_error"],
+    )
+
+
 @cached(
     ttl=300,
     key_prefix="capability_map:dashboard",
     key_func=lambda: getattr(g, "current_org_id", None),
 )
-def dashboard():
-    """Comprehensive dashboard with multiple visualization types"""
+def _dashboard_context():
+    """Build the dashboard's template context (the query results only).
+
+    Cached separately from the render — see ``_hierarchy_context`` above for
+    why: caching ``render_template``'s output bakes in that request's CSP
+    nonce, which a later cache hit then serves under a different response's
+    (freshly generated) nonce, and the browser blocks the mismatch. Returns
+    ``None`` on failure so the route can fall back to the (uncached)
+    error template exactly as before.
+    """
     try:
         # Get statistics
         from app.services.application_capability_catalog import (
@@ -313,19 +357,34 @@ def dashboard():
 
         mappings = ApplicationCapabilityCoverage.query.count()
 
-        return render_template(
-            "capability_map/index.html",
-            catalog=catalog,
-            validation=validation,
-            app_count=applications,
-            mapping_count=mappings,
-        )
+        return {
+            "catalog": catalog,
+            "validation": validation,
+            "app_count": applications,
+            "mapping_count": mappings,
+        }
     except Exception as e:
         current_app.logger.error(f"Error loading capability map: {e}")
+        return None
+
+
+@capability_map.route("/dashboard")
+@login_required
+def dashboard():
+    """Comprehensive dashboard with multiple visualization types"""
+    context = _dashboard_context()
+    if context is None:
         return render_template(
             "capability_map/error.html",
             error="An unexpected error occurred. Please try again.",
         )
+    return render_template(
+        "capability_map/index.html",
+        catalog=context["catalog"],
+        validation=context["validation"],
+        app_count=context["app_count"],
+        mapping_count=context["mapping_count"],
+    )
 
 
 # ---------------------------------------------------------------------------

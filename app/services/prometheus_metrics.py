@@ -12,6 +12,8 @@ Usage:
 """
 
 
+import os
+
 from prometheus_client import (
     Counter,
     Histogram,
@@ -51,6 +53,10 @@ HTTP_REQUEST_DURATION = Histogram(
         0.5,
         0.75,
         1.0,
+        # An explicit 2.0s edge so the "answers" objective's 2-second
+        # p95 target (app/services/platform_slo_service.py) lands on a real
+        # declared bucket boundary rather than only ever reading the 2.5s one.
+        2.0,
         2.5,
         5.0,
         7.5,
@@ -284,3 +290,35 @@ def get_metrics_response():
     from flask import Response
 
     return Response(generate_latest(REGISTRY), mimetype=CONTENT_TYPE_LATEST)
+
+
+# Platform SLOs read HTTP_REQUESTS_TOTAL / HTTP_REQUEST_DURATION --
+# the existing counters above, populated by the one request hook in
+# app/_bootstrap/security.py -- rather than adding a second metrics store
+# (CLAUDE.md ADR 0008, "one system of record per concept").
+
+
+def get_http_metrics_registry() -> tuple[CollectorRegistry, bool]:
+    """Return the registry to read HTTP_REQUESTS_TOTAL/HTTP_REQUEST_DURATION
+    from, plus whether it is the multiprocess-aggregated view.
+
+    Gunicorn runs several worker processes (``gunicorn.conf.py``), each with
+    its own in-memory ``REGISTRY`` -- a counter incremented in one worker is
+    invisible to another. When ``PROMETHEUS_MULTIPROC_DIR`` is set,
+    ``prometheus_client``'s multiprocess mode combines every worker's counter
+    files from that directory into one registry; this is the correct read
+    path in that deployment. When it is not set (the case today -- nothing in
+    this repo sets it), this returns the single process-local ``REGISTRY``,
+    and the caller must treat attainment as reflecting only the worker that
+    served the request, not the whole fleet (documented in
+    ``docs/platform-slos.md``).
+    """
+    multiproc_dir = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
+    if not multiproc_dir:
+        return REGISTRY, False
+
+    from prometheus_client import multiprocess
+
+    combined = CollectorRegistry()
+    multiprocess.MultiProcessCollector(combined, path=multiproc_dir)
+    return combined, True

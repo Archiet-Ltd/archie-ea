@@ -41,25 +41,34 @@
                     <p class="mt-1 text-xs text-muted-foreground">URL-safe identifier. Auto-generated from name if left blank.</p>
                 </div>
 
-                <!-- Plan -->
+                <!-- Plan: read from and written to the organisation's subscription -->
+                {% if paid_online %}
+                <div>
+                    <p class="block text-sm font-medium mb-1">Plan</p>
+                    <p class="text-sm" data-testid="org-plan-paid-online">{{ {'free': 'Community', 'startup': 'Startup', 'team': 'Team', 'enterprise': 'Enterprise'}[plan_key] }}{% if plan_key == 'team' %} ({{ seats }} seats){% endif %}</p>
+                    <p class="mt-1 text-xs text-muted-foreground">Paid online. The organisation changes its plan from its own billing page.</p>
+                </div>
+                {% else %}
                 <div>
                     <label for="org-plan" class="block text-sm font-medium mb-1">Plan</label>
                     <select name="plan" id="org-plan"
                             class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-                        <option value="free" {% if org and org.plan == 'free' %}selected{% endif %}>Free</option>
-                        <option value="pro" {% if org and org.plan == 'pro' %}selected{% endif %}>Pro</option>
-                        <option value="enterprise" {% if org and org.plan == 'enterprise' %}selected{% endif %}>Enterprise</option>
+                        <option value="free" {% if plan_key == 'free' %}selected{% endif %}>Community (3 people)</option>
+                        <option value="startup" {% if plan_key == 'startup' %}selected{% endif %}>Startup (10 people)</option>
+                        <option value="team" {% if plan_key == 'team' %}selected{% endif %}>Team (seats below)</option>
+                        <option value="enterprise" {% if plan_key == 'enterprise' %}selected{% endif %}>Enterprise (no limit)</option>
                     </select>
                 </div>
 
-                <!-- Max Users -->
+                <!-- Team seats -->
                 <div>
-                    <label for="org-max-users" class="block text-sm font-medium mb-1">Max Users</label>
-                    <input type="number" name="max_users" id="org-max-users" min="1" max="10000"
-                           value="{{ org.max_users if org else 10 }}"
+                    <label for="org-seats" class="block text-sm font-medium mb-1">Team seats</label>
+                    <input type="number" name="seats" id="org-seats" min="1" max="10000"
+                           value="{{ seats if plan_key == 'team' and seats else 15 }}"
                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
-                    <p class="mt-1 text-xs text-muted-foreground">Maximum number of users allowed in this organization.</p>
+                    <p class="mt-1 text-xs text-muted-foreground">Editor seats on Team. Community and Startup have fixed limits and Enterprise has none.</p>
                 </div>
+                {% endif %}
             </div>
 
             <!-- Actions -->

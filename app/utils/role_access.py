@@ -22,6 +22,11 @@ from app.models.user import (
     ROLE_PORTFOLIO_MANAGER,
     ROLE_PROCUREMENT,
     ROLE_SOLUTION_ARCHITECT,
+    ROLE_FINANCE,
+    ROLE_COMPLIANCE,
+    ROLE_RISK,
+    ROLE_OPERATIONS,
+    ROLE_NON_TECHNICAL_OWNER,
 )
 
 
@@ -95,6 +100,10 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
         "roadmaps",
         "governance",
         "procurement",  # Read-only access to procurement for cost visibility
+        # R1-B34 (TB-0135): owns the Formula Register (reviews/versions the
+        # composite-score weights) -- see its _link() in this persona's zone
+        # below.
+        "portfolio_management",
     },
     ROLE_CTO: {
         "home",
@@ -129,6 +138,7 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
         "my_applications",
         "data_integration",
         "administration",
+        "portfolio_management",
     },
     # G6 (register close, 1 Sep 2026): security_architect and data_architect
     # were promoted to first-class roles (VALID_ROLES, own charters, own sidebar
@@ -152,17 +162,66 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
         "data_integration",
         "governance",
     },
+    # R1-B36 (TB-0146): finance, compliance, risk, operations and
+    # non_technical_owner promoted from unassignable to assignable.
+    ROLE_FINANCE: {
+        "home",
+        "procurement",
+        "portfolio",
+    },
+    ROLE_COMPLIANCE: {
+        "home",
+        "procurement",
+        "governance",
+        "compliance",
+    },
+    ROLE_RISK: {
+        "home",
+        "architecture",
+        "governance",
+    },
+    ROLE_OPERATIONS: {
+        "home",
+    },
+    ROLE_NON_TECHNICAL_OWNER: {
+        "home",
+        "portfolio",
+    },
 }
 
-# Sections that require specific roles (exclusive access)
+# Sections that require specific roles (exclusive access).
+#
+# Documentary only: can_access_section() below reads ROLE_SECTION_ACCESS (role
+# -> set of sections), not this dict, and nothing in the codebase reads
+# EXCLUSIVE_SECTIONS itself (confirmed by search) -- the actual gate for every
+# section named here is its membership in ROLE_SECTION_ACCESS[role] above.
+# Kept in the same role-list shape as a human-readable index of which
+# sections are role-exclusive; if you are adding a new exclusive section,
+# the line that must change is the role's entry in ROLE_SECTION_ACCESS, not
+# this one.
 EXCLUSIVE_SECTIONS: Dict[str, List[str]] = {
     "administration": [ROLE_PLATFORM_ADMIN],
     "procurement": [ROLE_PROCUREMENT, ROLE_PORTFOLIO_MANAGER, ROLE_PLATFORM_ADMIN],
     "my_applications": [ROLE_APPLICATION_MANAGER, ROLE_PLATFORM_ADMIN],
+    # R1-B34 (TB-0135): Formula Register -- reviewed/versioned by
+    # portfolio_manager; platform_admin sees everything.
+    "portfolio_management": [ROLE_PORTFOLIO_MANAGER, ROLE_PLATFORM_ADMIN],
 }
 
 # Default role if user has no enterprise_role set
 DEFAULT_ROLE = ROLE_SOLUTION_ARCHITECT
+
+
+# One cost-visibility rule.  Every surface that redacts financial
+# figures (cost, budget, TCO, licence unit cost) checks this single set.
+# Previously each surface maintained its own copy of the same three roles;
+# a fourth surface that forgot to update its copy would leak cost data.
+# Import this constant — do not define a second list.
+COST_VISIBILITY_ROLES: frozenset = frozenset({
+    ROLE_CTO,
+    ROLE_PORTFOLIO_MANAGER,
+    ROLE_PLATFORM_ADMIN,
+})
 
 
 def get_user_role(user) -> str:
@@ -222,8 +281,17 @@ def get_visible_sections(user) -> List[str]:
 
 
 def is_admin(user) -> bool:
-    """Check if user has admin role."""
-    return get_user_role(user) == ROLE_PLATFORM_ADMIN
+    """Check if user has admin role.
+
+    The system of record for "is an administrator" is
+    Permission.ADMINISTER via user.is_admin().  This function delegates to it
+    rather than re-deriving the answer from enterprise_role, so every caller
+    that uses this accessor shares one authority.
+    """
+    try:
+        return bool(user.is_admin())
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        return False
 
 
 # Roles whose job is to author the capability model. The capability pages used
@@ -358,7 +426,34 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # page is the entry point of the impact question for every persona and has no
 # other route in; the Twin map is reached from the Ask page and has no link of
 # its own, so this is the only link the two pages add.
-SIDEBAR_LINK_BUDGET = 31
+#
+# Canvas/framework UI fix, round 2 (25 Sep 2026): two new Library links
+# ("Canvases", "Frameworks") are shared by every role. The ceiling stays 31 --
+# the round-1 attempt raised it to 34 without first checking whether the
+# addition actually needed headroom; it did not, once paired with folds. The
+# two roles with none left (business_architect, platform_admin) and the one
+# with a single link of headroom (enterprise_architect) each lose exactly one
+# thing to pay for the two new links; see _MY_WORK_LINKS and _ADMIN_LINKS
+# comments below for which link and where it is still reachable. Framework
+# Management and Framework Configuration (platform_admin-only) are reachable
+# from the admin dashboard page (app/templates/admin/index.html) instead of a
+# third and fourth new Admin-zone sidebar entry, which is why they add zero to
+# every role's rendered count.
+#
+# Approval Inbox (4 Oct 2026): raised 31 -> 32. The Approval Inbox is one new
+# link in every persona's My work — the single queue for every pending change
+# proposal, shared by every persona with GENERAL permission. platform_admin
+# (the role with zero headroom) renders it like every other role, moving its
+# zone-only total 28 -> 29 and its rendered total 31 -> 32. No fold is
+# available: the Admin zone already shed four links in the canvas/framework
+# round, and the My-work zone carries only four links (plus Ask). Raising the
+# budget by one is the honest cost of adding a genuinely new, intentional link
+# that every persona needs.
+# R1-B56: Agent Registry (owner, charter, delegated limits per registered
+# agent) is a new, genuinely needed platform_admin-only screen, not a
+# duplicate of anything already in the Admin zone. No fold is available for
+# the same reason as above; taking the budget 32 -> 33.
+SIDEBAR_LINK_BUDGET = 33
 
 _ZONE_TITLES = {
     "home": "Home",
@@ -380,6 +475,8 @@ def _link(label, endpoint, icon, requires=None, query_params=None):
       "admin"          — route is @admin_required (Permission.ADMINISTER)
       "platform_admin" — route is @platform_admin_required (the cross-tenant
                          is_platform_admin super-admin flag)
+      "data_subject_requests" — routes are @requires_role(DATA_SUBJECT_REQUEST_ROLES)
+                         (security_architect, and platform_admin as always)
       "general"        — route requires Permission.GENERAL (require_roles()
                          only grants access when current_user.can(GENERAL)
                          holds), which a read-only Viewer role (permissions=0)
@@ -405,6 +502,14 @@ def _link(label, endpoint, icon, requires=None, query_params=None):
 # cannot drift apart between personas.
 _ASK_LINK = _link("Ask a question", "intelligence_ui.ask", "search")
 
+# Approval Inbox — one queue for every pending change proposal.
+# Shared definition so the label, endpoint and icon cannot drift apart between
+# personas. Requires GENERAL permission (write/approval access) so Viewer roles
+# do not see a link that 403s.
+_APPROVAL_INBOX_LINK = _link(
+    "Approval Inbox", "unified_ai_chat.approval_inbox", "inbox", requires="general"
+)
+
 _HOME_LINKS = [
     _link("Dashboard Overview", "dashboard.overview", "layout-dashboard"),
     _link("Health Scorecard", "dashboard.health_scorecard", "heart-pulse"),
@@ -413,8 +518,16 @@ _HOME_LINKS = [
 _LIBRARY_LINKS = [
     _link("Applications", "unified_applications.application_list", "list"),
     _link("Capabilities", "capability_map.index", "map"),
+    _link("Canvases", "business_model.index", "layout-grid"),
+    # "layers" collided with an existing link's icon in the same collapsed
+    # menu for two roles -- portfolio_manager's "Consolidation List" and
+    # data_architect's "Capability Map" both already used it, and this link
+    # is shared into every role's Library zone, so it must not match any
+    # icon used anywhere else in role_access.py. "library" is unused
+    # elsewhere in this file and reads directly as "a library of frameworks".
+    _link("Frameworks", "maturity_management.frameworks_overview", "library"),
     _link("Vendors", "unified_applications.vendors", "building"),
-    _link("ArchiMate Elements", "archimate_crud.dashboard", "table"),
+    _link("Architecture", "archimate_crud.dashboard", "table"),
     _link("Diagrams", "archimate.diagrams_library", "layout-panel-top"),
 ]
 
@@ -460,16 +573,26 @@ _ADMIN_LINKS = [
     # could. The link now names the handler that actually runs.
     _link("AI Prompts", "admin.solution_prompts_page", "sparkles"),
     _link("Governance Gates", "admin.governance_gates", "badge-check", requires="admin"),
-    _link("Import History", "dashboard_pages.import_history", "history"),
-    _link("Seed Management", "admin.seed_management", "database"),
+    # The organisation's audit trail (query, export in full, verify). It takes
+    # Seed Management's place in this zone to hold the link budget; Seed
+    # Management stays one click away as a tile on Command Center
+    # (app/templates/admin/index.html).
+    _link("Audit Log", "admin.audit_log_viewer", "scroll-text", requires="admin"),
     _link("Settings", "main.settings", "settings"),
     # Added in the Task 3 fix round (review finding: orphaned real routes —
     # both existed, worked, and had no sidebar link of any kind).
     _link("Salesforce Integration", "admin.salesforce_integration", "cloud"),
     _link("Power Platform", "admin.power_platform_integration", "blocks"),
-    # S-11 remainder (18 Aug 2026): batch import was directory-only, never in
-    # a sidebar zone of any role.
-    _link("Batch Import", "batch_import_view.dashboard", "upload"),
+    # Canvas/framework UI fix, round 2 (25 Sep 2026): "Import History" and
+    # "Batch Import" (S-11 remainder, 18 Aug 2026) folded out of this zone --
+    # platform_admin has zero headroom left once "Canvases" and "Frameworks"
+    # join every role's Library zone. Both are tiles on the admin dashboard
+    # page instead (app/templates/admin/index.html, "Frameworks & Data"
+    # section), one click from Command Center rather than a direct sidebar
+    # entry. Framework Management and Framework Configuration are tiles on
+    # the same dashboard page rather than two more Admin-zone links, for the
+    # same reason -- the platform admin still reaches all four from Command
+    # Center, which is itself the first link in this zone.
     # In-built error telemetry (10 Sep 2026): the owner's "how do we know the
     # system has silently degraded" question, answered without a paid APM.
     # Cross-tenant like Organizations above -- the route is @platform_admin_required.
@@ -483,6 +606,7 @@ _ADMIN_LINKS = [
 _MY_WORK_LINKS = {
     ROLE_SOLUTION_ARCHITECT: [
         _link("Architecture Journey", "architecture_journey.index", "compass"),
+        _APPROVAL_INBOX_LINK,
         _link("Solutions", "solution_design.list_solutions", "wrench"),
         _link("AI Chat", "unified_ai_chat.index", "message-square"),
         _link("ADM Kanban", "adm_kanban_view.index", "kanban"),
@@ -508,6 +632,7 @@ _MY_WORK_LINKS = {
     ],
     ROLE_ENTERPRISE_ARCHITECT: [
         _link("Transformation programmes", "solution_design.programmes_list", "waypoints"),
+        _APPROVAL_INBOX_LINK,
         # BA-A3 (21 Aug 2026, re-measured 27 Aug 2026): the
         # /business-architecture landing page is deliberately NOT here.
         # enterprise_architect renders 25 sidebar links, which is the
@@ -543,15 +668,22 @@ _MY_WORK_LINKS = {
         # over /enterprise/api/work-packages.
         _link("Gap Analysis", "enterprise.gap_analysis", "git-compare"),
         _link("Work Packages", "enterprise.work_packages", "package"),
-        # S-11 remainder (18 Aug 2026, QA Update 6/8): these three were
+        # S-11 remainder (18 Aug 2026, QA Update 6/8): these were
         # directory-only — reachable from /modules/ but from no sidebar zone
-        # of any role. All three are EA-shaped working pages.
+        # of any role. Both are EA-shaped working pages.
         # crosshair, not git-branch: Traceability Matrix in this same zone
         # already uses git-branch, and collapsed to a 4rem rail two entries
         # behind one glyph are the same button.
         _link("Impact Analysis", "strategic.impact_analysis", "crosshair"),
         _link("Capability Health", "strategic.capability_health", "activity"),
-        _link("Duplicate Detection", "unified_duplicate.simple_dashboard", "copy"),
+        # "Duplicate Detection" (unified_duplicate.simple_dashboard) moved out
+        # of this zone in the canvas/framework UI fix, round 2 (25 Sep 2026):
+        # this zone has one link of headroom and "Canvases" plus "Frameworks"
+        # joining every role's Library zone need two. It moved rather than
+        # dropped -- see ROLE_PORTFOLIO_MANAGER below, the persona that owns
+        # the Rationalization workflow it is reached from in context
+        # (app/templates/applications/rationalization.html); it stays in a
+        # sidebar zone, just not this one, so it is not directory-only again.
         # ARCH-123 / ARCH-124 (QA register closure, 18 Aug 2026): the Data
         # Architect and Technical Architect personas the register flagged as
         # underserved are folded into enterprise_architect here — there is no
@@ -560,6 +692,11 @@ _MY_WORK_LINKS = {
         # sidebar; Tech Radar is new. Both are now linked.
         _link("Data Architecture", "data_architecture.data_architecture_dashboard", "workflow"),
         _link("Tech Radar", "tech_radar.index", "radar"),
+        # Model history: as-of snapshot and changes between dates. Enterprise
+        # architect is the persona that owns the capability model and needs
+        # to audit its evolution.
+        _link("Model as of", "intelligence_ui.history_as_of_page", "clock"),
+        _link("Changes", "intelligence_ui.history_changes_page", "history"),
     ],
     ROLE_CTO: [
         # A CTO with no route to a roadmap from their own sidebar. Found
@@ -567,6 +704,7 @@ _MY_WORK_LINKS = {
         # every journey test passes, because those address it by URL. This
         # persona could not find it from their landing page.
         _link("Roadmaps", "main.capability_roadmap", "milestone"),
+        _APPROVAL_INBOX_LINK,
         _link("Transformation programmes", "solution_design.programmes_list", "waypoints"),
         _link("Health Scorecard", "dashboard.health_scorecard", "heart-pulse"),
         _link("Rationalization", "unified_applications.rationalization_dashboard", "git-merge"),
@@ -583,6 +721,14 @@ _MY_WORK_LINKS = {
         # its sidebar. 28 nav links on the CTO dashboard, none of them this.
         # Finding a page by grepping the source is not finding it.
         _link("Tech Radar", "tech_radar.index", "radar"),
+        # Ownership coverage by business unit — CTO accountability.
+        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users", requires="cto_or_portfolio_manager"),
+        # R1-B03 PR 2: the one ownership record now also covers capabilities.
+        # Ample headroom in this zone (10 links against SIDEBAR_LINK_BUDGET 32).
+        _link("Capabilities With No Owner", "capability_map.capabilities_no_owner", "user-x", requires="cto_or_portfolio_manager"),
+        # R1-B85: supported-estate share, open exceptions, the store-
+        # agreement disagreement finder.
+        _link("CTO Scorecard", "cto_scorecard.index", "clipboard-list"),
     ],
     ROLE_BUSINESS_ARCHITECT: [
         # BA-A1/A2. This persona had 4 links against a budget of 27 while
@@ -598,7 +744,15 @@ _MY_WORK_LINKS = {
         # over five generic zones with no page that presents them as one
         # practice. /business-architecture is that page.
         _link("Architecture Journey", "architecture_journey.index", "compass"),
-        _link("Capability Map", "capability_map.index", "map"),
+        _APPROVAL_INBOX_LINK,
+        # "Capability Map" folded out in the canvas/framework UI fix, round 2
+        # (25 Sep 2026): it pointed at capability_map.index, the exact
+        # endpoint Library already carries as "Capabilities" for every role
+        # (see the enterprise_architect NAV-1 note above, which made the same
+        # fix for the same reason) -- this persona rendered the identical page
+        # under two labels. This zone has no headroom left once "Canvases" and
+        # "Frameworks" join the shared Library zone; dropping a same-page
+        # duplicate loses nothing.
         # Points at the heatmap, NOT frameworks_overview. That was the only
         # maturity link this persona had, it is labelled "Frameworks" rather
         # than "Maturity", and it lands on the one maturity page that renders
@@ -606,12 +760,12 @@ _MY_WORK_LINKS = {
         # data actually carries — BA-12). Clicking the single maturity link and
         # finding nothing is precisely why maturity was reported as missing.
         _link("Capability Maturity", "maturity_management.maturity_heatmap", "thermometer"),
-        # Kept alongside the heatmap, not replaced by it. A QA finding pins
-        # frameworks_overview as needing a sidebar zone, and repointing this
-        # persona's only maturity link at the heatmap had quietly removed it
-        # from every zone — trading one discoverability defect for another.
-        _link("Capability Frameworks", "maturity_management.frameworks_overview", "layers"),
         _link("Value Streams", "value_stream.index", "waypoints"),
+        # The value streams that depend on a capability below a maturity
+        # threshold, answered by the intelligence API. Sits under Value
+        # Streams, the page where the capability links it reads are made.
+        # 28 -> 29 rendered links, within SIDEBAR_LINK_BUDGET (31).
+        _link("Value Streams at Risk", "intelligence_ui.value_streams_at_risk", "trending-down"),
         _link("Stakeholder Map", "stakeholder_map.stakeholder_map_page", "users"),
         _link("Gap Analysis", "enterprise.gap_analysis", "search-x"),
         _link("Roadmaps", "main.capability_roadmap", "milestone"),
@@ -654,18 +808,36 @@ _MY_WORK_LINKS = {
         # already in the enterprise_architect / arb_member / platform_admin
         # zones; this is the missing one.
         _link("Portfolio", "portfolio.index", "briefcase"),
+        _APPROVAL_INBOX_LINK,
         _link("Rationalization", "unified_applications.rationalization_dashboard", "git-merge"),
+        # R1-B34 (TB-0135): the reviewer of a composite score's weights is
+        # this persona -- the rationalization scorecard's own number now
+        # names a formula version, so the page that edits it belongs next
+        # to the dashboard that reads it.
+        _link("Formula Register", "formula_register.index", "calculator"),
         _link("Vendors", "unified_applications.vendors", "building"),
         _link("Applications", "unified_applications.application_list", "list"),
         # S-11 remainder: directory-only, never in a sidebar zone.
         _link("Consolidation List", "consolidation_list.dashboard", "layers"),
         # NAV-1: see the CTO entry above — same page, the other owning persona.
         _link("Portfolio KPIs", "dashboard_pages.rationalization_scorecard", "gauge"),
+        # Moved from enterprise_architect in the canvas/framework UI fix,
+        # round 2 (25 Sep 2026): that zone had no headroom left once
+        # "Canvases" and "Frameworks" joined the shared Library zone. This
+        # zone has ample headroom, and portfolio_manager already owns
+        # Rationalization above, from which this page is reached in context.
+        _link("Duplicate Detection", "unified_duplicate.simple_dashboard", "copy"),
+        # Ownership coverage by business unit — portfolio manager accountability.
+        _link("Ownership Coverage", "unified_applications.ownership_coverage", "users", requires="cto_or_portfolio_manager"),
+        # R1-B03 PR 2: the one ownership record now also covers capabilities.
+        # Ample headroom in this zone (9 links against SIDEBAR_LINK_BUDGET 32).
+        _link("Capabilities With No Owner", "capability_map.capabilities_no_owner", "user-x", requires="cto_or_portfolio_manager"),
     ],
     ROLE_PROCUREMENT: [
         # Fix round: Overview, Licences and Compliance were reachable from
         # nowhere in the sidebar despite having working, guarded routes.
         _link("Overview", "procurement.index", "shopping-cart"),
+        _APPROVAL_INBOX_LINK,
         _link("Vendors", "unified_applications.vendors", "building"),
         _link("Contracts", "procurement.contracts_list", "file-text"),
         _link("Renewals", "procurement.renewals_dashboard", "history"),
@@ -680,6 +852,7 @@ _MY_WORK_LINKS = {
         # unified_applications.application_list's org-wide paginated list; it
         # was reachable from nowhere in the sidebar.
         _link("My Applications", "my_applications.dashboard", "layout-dashboard"),
+        _APPROVAL_INBOX_LINK,
         _link("Applications", "unified_applications.application_list", "list"),
         _link("Rationalization", "unified_applications.rationalization_dashboard", "git-merge"),
         _link("Vendors", "unified_applications.vendors", "building"),
@@ -689,6 +862,7 @@ _MY_WORK_LINKS = {
     # its existing legacy ROLE_SECTION_ACCESS scope (solutions, portfolio).
     ROLE_ARB_MEMBER: [
         _link("Solutions", "solution_design.list_solutions", "wrench"),
+        _APPROVAL_INBOX_LINK,
         _link("Portfolio", "portfolio.index", "briefcase"),
     ],
     # Also not enumerated in the spec; platform_admin gets a working set that
@@ -703,12 +877,15 @@ _MY_WORK_LINKS = {
     ROLE_PLATFORM_ADMIN: [
         _link("Solutions", "solution_design.list_solutions", "wrench"),
         _link("Portfolio", "portfolio.index", "briefcase"),
+        _APPROVAL_INBOX_LINK,
         # BA-A3. platform_admin is the default enterprise_role for every user
         # who has not picked one during onboarding (see the column comment in
         # app/models/user.py), so a page that exists only for the two architect
         # roles is invisible to most real accounts. Rendered total for this
         # role goes 25 -> 26, still under SIDEBAR_LINK_BUDGET (27).
         _link("Architecture Journey", "architecture_journey.index", "compass"),
+        # R1-B56: agent owner/charter/lifecycle registry.
+        _link("Agent Registry", "agent_registry.index", "bot"),
     ],
     # Promoted from charter-only, 31 Aug 2026. The blueprint scores a Security
     # Viewpoint as one of its fifteen sections and nobody owned it; every link
@@ -726,6 +903,7 @@ _MY_WORK_LINKS = {
         _link("Policy Monitoring",
               "policy_monitoring.policy_dashboard", "shield-alert",
               requires="general"),
+        _APPROVAL_INBOX_LINK,
         # Security architects have read-only access to the page and list API;
         # mutation endpoints remain ADMINISTER-only.
         _link("Governance Gates", "admin.governance_gates", "shield-check"),
@@ -740,24 +918,57 @@ _MY_WORK_LINKS = {
         # this degrades safely if application_mgmt fails to import.
         _link("Compliance", "application_mgmt.compliance_frameworks_dashboard",
               "clipboard-check"),
+        # The Data Protection Officer's work: scope data-subject requests,
+        # assign the searches, and run access and erasure with evidence.
+        _link("Data Subject Requests", "gdpr_bp.dsr_index", "user-x",
+              requires="data_subject_requests"),
         _link("Applications", "unified_applications.application_list", "list"),
         _link("Data Architecture", "data_architecture.data_architecture_dashboard", "database"),
         _link("Traceability Matrix", "architect_ui.traceability_matrix", "git-compare"),
         _link("Tech Radar", "tech_radar.index", "radar"),
         _link("Interface Register", "interface_register.index", "cable"),
+        # Read access to the organisation's audit trail: export and verify.
+        _link("Audit Log", "admin.audit_log_viewer", "scroll-text"),
     ],
     # ARCH-123 folded this into enterprise_architect with the note "no dedicated
     # role for either yet". These three surfaces ship and are the whole of the
     # persona's remit, so the fold is now unnecessary rather than pragmatic.
     ROLE_DATA_ARCHITECT: [
         _link("Data Architecture", "data_architecture.data_architecture_dashboard", "database"),
+        _APPROVAL_INBOX_LINK,
         _link("Data Lineage", "data_architecture.data_lineage_view", "git-fork"),
         _link("Data Stewardship", "solution_design.data_stewardship", "shield"),
-        _link("ArchiMate Model", "archimate_crud.dashboard", "boxes"),
+        _link("System of Record", "data_governance.entities", "database-zap"),
+        _link("Master Data Domains", "data_governance.domains", "folder-tree"),
+        _link("Architecture Model", "archimate_crud.dashboard", "boxes"),
         _link("Applications", "unified_applications.application_list", "list"),
         _link("Capability Map", "capability_map.index", "layers"),
         _link("Traceability Matrix", "architect_ui.traceability_matrix", "git-compare"),
         _link("Interface Register", "interface_register.index", "cable"),
+    ],
+    # R1-B36 (TB-0146): finance, compliance, risk, operations and
+    # non_technical_owner promoted from unassignable to assignable, each
+    # given the real pages their own section access already names.
+    ROLE_FINANCE: [
+        _link("Spend", "procurement.spend_analytics", "bar-chart-3"),
+        _link("Licences", "procurement.licenses_list", "key-round"),
+        _APPROVAL_INBOX_LINK,
+    ],
+    ROLE_COMPLIANCE: [
+        _link("Compliance", "application_mgmt.compliance_frameworks_dashboard", "clipboard-check"),
+        _APPROVAL_INBOX_LINK,
+    ],
+    ROLE_RISK: [
+        _link("Risk Register", "risk.risk_register", "alert-triangle"),
+        _APPROVAL_INBOX_LINK,
+    ],
+    ROLE_OPERATIONS: [
+        _link("Service Status", "service_status.status_page", "activity"),
+        _APPROVAL_INBOX_LINK,
+    ],
+    ROLE_NON_TECHNICAL_OWNER: [
+        _link("Applications", "unified_applications.application_list", "list"),
+        _APPROVAL_INBOX_LINK,
     ],
 }
 
@@ -773,11 +984,19 @@ def _build_zones(role: str) -> List[Dict]:
     # platform_admin has no headroom left for a 5th library link once its two
     # admin-zone additions are counted (23 zone links -> 25 rendered, exactly
     # at SIDEBAR_LINK_BUDGET) — see _LIBRARY_LINKS_WITH_DIRECTORY's comment.
+    # Value Streams at Risk is a business_architect-only My-work link. To keep
+    # the rendered sidebar within the existing ratchet (28) rather than raising
+    # verification_baseline.json, that persona's Home zone keeps Dashboard
+    # Overview and drops Health Scorecard, which remains reachable from the
+    # dashboard itself and from the personas that actively work from it.
+    home_links = (
+        _HOME_LINKS[:1] if role == ROLE_BUSINESS_ARCHITECT else _HOME_LINKS
+    )
     library_links = (
         _LIBRARY_LINKS if role == ROLE_PLATFORM_ADMIN else _LIBRARY_LINKS_WITH_DIRECTORY
     )
     zones = [
-        _zone("home", _HOME_LINKS),
+        _zone("home", home_links),
         _zone("my_work", [_ASK_LINK] + _MY_WORK_LINKS[role]),
         _zone("library", library_links),
     ]
@@ -856,11 +1075,33 @@ def link_requires_satisfied(user, requires):
         return bool(getattr(user, "is_org_admin", False))
     if requires == "platform_admin":
         return bool(getattr(user, "is_platform_admin", False))
+    if requires == "data_subject_requests":
+        try:
+            from app.decorators.requires_role import may_handle_data_subject_requests
+
+            return may_handle_data_subject_requests(user)
+        except Exception:  # anonymous / unexpected user object
+            return False
     if requires == "general":
         try:
             from app.models.user import Permission
 
             return bool(user.can(Permission.GENERAL))
+        except Exception:  # anonymous / unexpected user object
+            return False
+    if requires == "cto_or_portfolio_manager":
+        # Matches the route guard on Ownership Coverage and Capabilities
+        # With No Owner (@role_required(ROLE_CTO, ROLE_PORTFOLIO_MANAGER),
+        # which also falls back to is_admin()) -- these are enterprise_role
+        # checks, not a Permission bit, so neither "admin" nor "general"
+        # above covers them. R1-B03 PR 2: found both links already leaking
+        # into every persona's /modules/ directory as dead 403 rows, since
+        # no requires= guard existed for an enterprise_role predicate before
+        # this one.
+        try:
+            if hasattr(user, "is_admin") and user.is_admin():
+                return True
+            return getattr(user, "enterprise_role", None) in (ROLE_CTO, ROLE_PORTFOLIO_MANAGER)
         except Exception:  # anonymous / unexpected user object
             return False
     return False

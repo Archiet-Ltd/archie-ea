@@ -173,7 +173,7 @@ class SlackArchitectService:
         thread_ts = event.get("thread_ts") or event.get("ts")
         blocks = cls._portfolio_mention_blocks(mentions)
         cls.post_message(channel, blocks,
-                         "A.R.C.H.I.E. detected portfolio applications in this message.",
+                         "Entelim detected portfolio applications in this message.",
                          bot_token, thread_ts=thread_ts)
 
     # ------------------------------------------------------------------ #
@@ -182,7 +182,7 @@ class SlackArchitectService:
 
     @classmethod
     def _ai_response(cls, question: str) -> Tuple[str, List[Dict]]:
-        answer = "I couldn't generate a response right now. Check the A.R.C.H.I.E. dashboard."
+        answer = "I couldn't generate a response right now. Check the Entelim dashboard."
         try:
             from app.modules.solutions_strategic.v2.services.chief_architect_service import (
                 ChiefArchitectService,
@@ -204,7 +204,7 @@ class SlackArchitectService:
                 f"Highest priority: {worst_text}."
             )
             prompt = (
-                "You are A.R.C.H.I.E., an enterprise architecture AI advisor embedded in Slack. "
+                "You are Entelim, an enterprise architecture AI advisor embedded in Slack. "
                 "Answer in 2-4 plain sentences. No markdown, no bullet points, no headers. "
                 f"Live portfolio context: {context}\n\nQuestion: {question}"
             )
@@ -241,7 +241,7 @@ class SlackArchitectService:
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f":building_construction: *A.R.C.H.I.E. Architecture Advisor*\n{answer}",
+                    "text": f":building_construction: *Entelim Architecture Advisor*\n{answer}",
                 },
             },
         ]
@@ -348,7 +348,7 @@ class SlackArchitectService:
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": ":mag: *A.R.C.H.I.E. detected portfolio apps in this message:*\n"
+                    "text": ":mag: *Entelim detected portfolio apps in this message:*\n"
                             + "\n".join(lines),
                 },
             }

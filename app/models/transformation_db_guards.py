@@ -564,25 +564,36 @@ BEGIN
                 USING ERRCODE = '55000';
         END IF;
     ELSIF TG_TABLE_NAME = 'transformation_outbox_events' THEN
-        IF NOT EXISTS (
-            SELECT 1
-              FROM public.operation_results AS result
-              JOIN public.command_idempotency_records AS receipt
-                ON receipt.id = result.receipt_id
-               AND receipt.organization_id = result.organization_id
-               AND receipt.actor_id = result.actor_id
-               AND receipt.operation = result.operation
-               AND receipt.natural_key = result.natural_key
-               AND receipt.request_digest = result.request_digest
-               AND receipt.lease_generation = result.receipt_generation
-             WHERE result.id = NEW.operation_result_id
-               AND result.organization_id = NEW.organization_id
-               AND receipt.status = 'in_progress'
-               AND receipt.claim_token IS NOT NULL
-               AND receipt.lease_expires_at > clock_timestamp()
-        ) THEN
-            RAISE EXCEPTION 'outbox insert is outside its live command fence'
-                USING ERRCODE = '55000';
+        IF NEW.operation_result_id IS NULL THEN
+            -- Entity event: produced by app/services/outbox.py for
+            -- element / relationship / etc. mutations.  Must carry
+            -- an entity_type; the relay copies these into event_log.
+            IF NEW.entity_type IS NULL THEN
+                RAISE EXCEPTION 'entity outbox event requires entity_type'
+                    USING ERRCODE = '55000';
+            END IF;
+        ELSE
+            -- Command event: must still be inside its live command fence.
+            IF NOT EXISTS (
+                SELECT 1
+                  FROM public.operation_results AS result
+                  JOIN public.command_idempotency_records AS receipt
+                    ON receipt.id = result.receipt_id
+                   AND receipt.organization_id = result.organization_id
+                   AND receipt.actor_id = result.actor_id
+                   AND receipt.operation = result.operation
+                   AND receipt.natural_key = result.natural_key
+                   AND receipt.request_digest = result.request_digest
+                   AND receipt.lease_generation = result.receipt_generation
+                 WHERE result.id = NEW.operation_result_id
+                   AND result.organization_id = NEW.organization_id
+                   AND receipt.status = 'in_progress'
+                   AND receipt.claim_token IS NOT NULL
+                   AND receipt.lease_expires_at > clock_timestamp()
+            ) THEN
+                RAISE EXCEPTION 'outbox insert is outside its live command fence'
+                    USING ERRCODE = '55000';
+            END IF;
         END IF;
     ELSE
         RAISE EXCEPTION 'unsupported command envelope table'
@@ -1388,7 +1399,9 @@ BEGIN
     IF TG_TABLE_NAME = 'transformation_outbox_events' AND TG_OP = 'UPDATE' THEN
         IF NEW.id = OLD.id
            AND NEW.organization_id = OLD.organization_id
-           AND NEW.operation_result_id = OLD.operation_result_id
+           AND NEW.operation_result_id IS NOT DISTINCT FROM OLD.operation_result_id
+           AND NEW.entity_type IS NOT DISTINCT FROM OLD.entity_type
+           AND NEW.entity_id IS NOT DISTINCT FROM OLD.entity_id
            AND NEW.event_id = OLD.event_id
            AND NEW.ordinal = OLD.ordinal
            AND NEW.event_type = OLD.event_type
@@ -3732,7 +3745,7 @@ def _render_guard_sql(connection, create_sql: str, quoted_schema: str) -> str:
             "  * On PostgreSQL 12 or older, or wherever it is missing, run "
             "this once as a superuser against the target database:" "\n"
             "        CREATE EXTENSION IF NOT EXISTS pgcrypto;" "\n"
-            "Archie tried to create the extension itself and could not, "
+            "Entelim tried to create the extension itself and could not, "
             "which usually means the connecting role lacks permission."
         )
     preparer = connection.dialect.identifier_preparer

@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 
@@ -104,7 +105,7 @@
                         <th scope="col" class="px-4 py-3 text-left font-semibold text-foreground">Level</th>
                         <th scope="col" class="px-4 py-3 text-left font-semibold text-foreground">Requirements</th>
                         <th scope="col" class="px-4 py-3 text-left font-semibold text-foreground">Applications</th>
-                        <th scope="col" class="px-4 py-3 text-left font-semibold text-foreground">ArchiMate</th>
+                        <th scope="col" class="px-4 py-3 text-left font-semibold text-foreground">Architecture</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">{# actionable-rows-ok: coverage summary — the tick columns are computed roll-ups, and these capability ids are BusinessCapability rows for which the product has no detail page (the only per-capability page, /arb/capabilities/<id>/governance, is keyed to UnifiedCapability and would open the wrong record). The user acts by linking or unlinking capabilities on the solution detail page; the matrix below links the applications that cover them. #}

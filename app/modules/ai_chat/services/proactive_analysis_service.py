@@ -8,6 +8,8 @@ Target: < 200ms per solution analysis.
 import logging
 from datetime import datetime, timedelta
 
+from app import db
+
 logger = logging.getLogger(__name__)
 
 COMPLETENESS_GAP_THRESHOLD_DAYS = 14
@@ -154,7 +156,8 @@ class ProactiveAnalysisService:
             from app.models.solution_models import Solution
             domain = getattr(sol, 'business_domain', None)
             phase = getattr(sol, 'adm_phase', None)
-            if not domain or not phase:
+            org_id = getattr(sol, 'organization_id', None)
+            if not domain or not phase or org_id is None:
                 return []
             first_word = (sol.name or '').split()[0].lower() if sol.name else ''
             if len(first_word) < 4:
@@ -162,6 +165,7 @@ class ProactiveAnalysisService:
             candidates = (
                 Solution.query
                 .filter(
+                    Solution.organization_id == org_id,
                     Solution.business_domain == domain,
                     Solution.adm_phase == phase,
                     Solution.id != sol.id,
@@ -195,10 +199,17 @@ class ProactiveAnalysisService:
     def _check_available_patterns(self, sol) -> list:
         from app.models.copilot_insight import CopilotInsight, InsightType, InsightSeverity
         try:
-            from app.models.solution_models import SolutionApplication, Solution
+            from app.models.solution_models import Solution, solution_applications
+            org_id = getattr(sol, 'organization_id', None)
+            if org_id is None:
+                return []
             my_apps = {
-                r.application_id
-                for r in SolutionApplication.query.filter_by(solution_id=sol.id).all()
+                row.application_component_id
+                for row in db.session.execute(
+                    solution_applications.select().where(
+                        solution_applications.c.solution_id == sol.id
+                    )
+                ).fetchall()
             }
             if not my_apps:
                 return []
@@ -206,6 +217,7 @@ class ProactiveAnalysisService:
             if not domain:
                 return []
             candidate_solutions = Solution.query.filter(
+                Solution.organization_id == org_id,
                 Solution.business_domain == domain,
                 Solution.id != sol.id,
             ).limit(20).all()
@@ -219,8 +231,12 @@ class ProactiveAnalysisService:
             matches = []
             for s in high_completeness_solutions:
                 their_apps = {
-                    r.application_id
-                    for r in SolutionApplication.query.filter_by(solution_id=s.id).all()
+                    row.application_component_id
+                    for row in db.session.execute(
+                        solution_applications.select().where(
+                            solution_applications.c.solution_id == s.id
+                        )
+                    ).fetchall()
                 }
                 if len(my_apps & their_apps) >= 2:
                     matches.append(s)

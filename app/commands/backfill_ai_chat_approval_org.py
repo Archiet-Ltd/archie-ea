@@ -40,6 +40,7 @@ def run_backfill(*, dry_run: bool = False):
         ).scalar() or 0
     else:
         backfilled = conn.execute(
+            # tenancy-ok: one-time backfill, retirement 2026-12-31
             text(
                 "UPDATE ai_chat_crud_approvals AS a "
                 "SET organization_id = u.organization_id "

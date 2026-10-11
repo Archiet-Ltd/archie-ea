@@ -1,0 +1,336 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/provenance.html' import provenance_badge %}
+{% from 'components/loading_state.html' import loading_inline %}
+
+{% block title %}Changes{% endblock %}
+
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+{% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+<div class="p-6 space-y-6" x-data="changesPage()">
+    {{ page_shell(
+        title='Changes',
+        subtitle='What changed between two dates, who changed it, and why.',
+        breadcrumb=[('Home', home_url), ('Intelligence', url_for('intelligence_ui.ask')), ('Changes', none)],
+    ) }}
+
+    <section class="rounded-xl border border-border bg-card p-6">
+        <form @submit.prevent="loadChanges" class="space-y-4">
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label for="from-date" class="block text-sm font-medium text-foreground mb-1">From date</label>
+                    <input type="datetime-local" id="from-date" x-model="fromDate"
+                           class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                           required>
+                </div>
+                <div>
+                    <label for="to-date" class="block text-sm font-medium text-foreground mb-1">To date</label>
+                    <input type="datetime-local" id="to-date" x-model="toDate"
+                           class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                           required>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button type="submit"
+                        :disabled="loading"
+                        class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none">
+                    <template x-if="loading">
+                        {{ loading_inline(size='sm', text='Loading...') }}
+                    </template>
+                    <template x-if="!loading">Show changes</template>
+                </button>
+                <template x-if="lastLoaded">
+                    <span class="text-sm text-muted-foreground" x-text="'Last loaded: ' + formatDateTime(lastLoaded)"></span>
+                </template>
+            </div>
+        </form>
+    </section>
+
+    <template x-if="loading">
+        <div role="status" aria-label="Loading changes" class="h-32 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+    </template>
+
+    <template x-if="error">
+        <section class="rounded-xl border border-destructive/50 bg-destructive/10 p-6">
+            <p class="text-sm text-destructive" x-text="error"></p>
+        </section>
+    </template>
+
+    <template x-if="!loading && !error && changes.length === 0">
+        <section class="rounded-xl border border-border bg-card p-6">
+            <p class="text-sm text-muted-foreground">No changes recorded in this date range.</p>
+        </section>
+    </template>
+
+    <template x-if="!loading && !error && changes.length > 0">
+        <section class="rounded-xl border border-border bg-card p-6">
+            <header class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-foreground" x-text="changes.length + ' change' + (changes.length === 1 ? '' : 's')"></h2>
+                <div class="flex items-center gap-2">
+                    <label class="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                        <input type="checkbox" x-model="showOnlyUpdates" class="h-4 w-4 rounded border-input">
+                        <span>Only updates</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                        <input type="checkbox" x-model="groupByElement" class="h-4 w-4 rounded border-input">
+                        <span>Group by element</span>
+                    </label>
+                </div>
+            </header>
+
+            <template x-if="!groupByElement">
+                <div class="space-y-3" role="list" aria-label="Changes">
+                    <template x-for="change in filteredChanges" :key="change.table_name + '_' + change.record_id + '_' + change.valid_from">
+                        <article class="rounded-lg border border-border bg-background p-4" role="listitem">
+                            <header class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground"
+                                          x-text="change.action.toUpperCase()"></span>
+                                    <span class="text-sm font-medium text-foreground" x-text="change.table_name.replace('archimate_', '').replace('_', ' ') + ' #' + change.record_id"></span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <template x-if="change.recorded_at">
+                                        <span x-text="formatDateTime(change.recorded_at)"></span>
+                                    </template>
+                                    <template x-if="!change.recorded_at">
+                                        <span>—</span>
+                                    </template>
+                                </div>
+                            </header>
+
+                            <div class="grid gap-2 text-sm sm:grid-cols-3">
+                                <div>
+                                    <dt class="text-muted-foreground">Valid from</dt>
+                                    <dd class="text-foreground font-mono text-xs" x-text="formatDateTime(change.valid_from)"></dd>
+                                </div>
+                                <div>
+                                    <dt class="text-muted-foreground">Valid to</dt>
+                                    <dd class="text-foreground font-mono text-xs" x-text="change.valid_to ? formatDateTime(change.valid_to) : 'current'"></dd>
+                                </div>
+                                <template x-if="change.changed_by_name">
+                                    <div>
+                                        <dt class="text-muted-foreground">Changed by</dt>
+                                        <dd class="text-foreground" x-text="change.changed_by_name"></dd>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <template x-if="change.change_reason">
+                                <div class="mt-2">
+                                    <dt class="text-muted-foreground text-sm">Reason</dt>
+                                    <dd class="text-foreground text-sm" x-text="change.change_reason"></dd>
+                                </div>
+                            </template>
+
+                            <div class="mt-3">
+                                <button type="button"
+                                        @click="toggleSnapshot(change.table_name + '_' + change.record_id + '_' + change.valid_from)"
+                                        class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                                    <i data-lucide="chevron-down" class="h-4 w-4" :class="{ 'rotate-180': openSnapshots.includes(change.table_name + '_' + change.record_id + '_' + change.valid_from) }" aria-hidden="true"></i>
+                                    <span>Show snapshot</span>
+                                </button>
+                                <template x-if="openSnapshots.includes(change.table_name + '_' + change.record_id + '_' + change.valid_from)">
+                                    <div class="mt-2 overflow-x-auto rounded-md border border-border bg-muted p-3">
+                                        <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(change.snapshot, null, 2)"></pre>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <template x-if="change.previous_snapshot">
+                                <div class="mt-3">
+                                    <button type="button"
+                                            @click="togglePreviousSnapshot(change.table_name + '_' + change.record_id + '_' + change.valid_from)"
+                                            class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                                        <i data-lucide="chevron-down" class="h-4 w-4" :class="{ 'rotate-180': openPreviousSnapshots.includes(change.table_name + '_' + change.record_id + '_' + change.valid_from) }" aria-hidden="true"></i>
+                                        <span>Show diff</span>
+                                    </button>
+                                    <template x-if="openPreviousSnapshots.includes(change.table_name + '_' + change.record_id + '_' + change.valid_from)">
+                                        <div class="mt-2 space-y-2">
+                                            <div class="rounded-md border border-border bg-muted p-3">
+                                                <p class="text-xs font-medium text-muted-foreground mb-1">Previous version</p>
+                                                <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(change.previous_snapshot, null, 2)"></pre>
+                                            </div>
+                                            <div class="rounded-md border border-border bg-muted p-3">
+                                                <p class="text-xs font-medium text-muted-foreground mb-1">Current version</p>
+                                                <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(change.snapshot, null, 2)"></pre>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </article>
+                    </template>
+                </div>
+            </template>
+
+            <template x-if="groupByElement">
+                <div class="space-y-4" role="list" aria-label="Changes grouped by element">
+                    <template x-for="(groupChanges, groupKey) in groupedChanges" :key="groupKey">
+                        <div class="rounded-lg border border-border bg-background" x-data="{ expanded: true }">
+                            <div class="p-4 cursor-pointer flex items-center justify-between" @click="expanded = !expanded">
+                                <span class="font-medium text-foreground" x-text="groupKey"></span>
+                                <span class="text-sm text-muted-foreground" x-text="groupChanges.length + ' change' + (groupChanges.length === 1 ? '' : 's')"></span>
+                            </div>
+                            <div x-show="expanded" x-cloak class="px-4 pb-4 space-y-3 border-t border-border">
+                                <template x-for="change in groupChanges" :key="change.table_name + '_' + change.record_id + '_' + change.valid_from">
+                                    <article class="rounded-lg border border-border bg-card p-3" role="listitem">
+                                        <header class="flex flex-wrap items-start justify-between gap-3 mb-2">
+                                            <div class="flex items-center gap-2">
+                                                <span class="inline-flex h-5 items-center rounded-full border border-border px-1.5 text-[10px] font-medium text-foreground"
+                                                      x-text="change.action.toUpperCase()"></span>
+                                                <span class="text-sm text-foreground" x-text="change.table_name.replace('archimate_', '').replace('_', ' ') + ' #' + change.record_id"></span>
+                                            </div>
+                                            <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                                                <template x-if="change.recorded_at">
+                                                    <span x-text="formatDateTime(change.recorded_at)"></span>
+                                                </template>
+                                            </div>
+                                        </header>
+                                        <div class="grid gap-1 text-xs sm:grid-cols-3">
+                                            <div>
+                                                <dt class="text-muted-foreground">From</dt>
+                                                <dd class="text-foreground font-mono text-[10px]" x-text="formatDateTime(change.valid_from)"></dd>
+                                            </div>
+                                            <div>
+                                                <dt class="text-muted-foreground">To</dt>
+                                                <dd class="text-foreground font-mono text-[10px]" x-text="change.valid_to ? formatDateTime(change.valid_to) : 'current'"></dd>
+                                            </div>
+                                            <template x-if="change.changed_by_name">
+                                                <div>
+                                                    <dt class="text-muted-foreground">By</dt>
+                                                    <dd class="text-foreground" x-text="change.changed_by_name"></dd>
+                                                </div>
+                                            </template>
+                                        </div>
+                                        <template x-if="change.change_reason">
+                                            <div class="mt-1 text-xs">
+                                                <span class="text-muted-foreground">Reason: </span>
+                                                <span class="text-foreground" x-text="change.change_reason"></span>
+                                            </div>
+                                        </template>
+                                    </article>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </section>
+    </template>
+</div>
+
+<script>
+function changesPage() {
+    return {
+        fromDate: '',
+        toDate: '',
+        loading: false,
+        error: null,
+        changes: [],
+        lastLoaded: null,
+        showOnlyUpdates: false,
+        groupByElement: false,
+        openSnapshots: [],
+        openPreviousSnapshots: [],
+
+        init() {
+            // Set default dates: last 30 days
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            this.toDate = this.formatForInput(now);
+            this.fromDate = this.formatForInput(thirtyDaysAgo);
+        },
+
+        async loadChanges() {
+            if (!this.fromDate || !this.toDate) return;
+            if (new Date(this.fromDate) >= new Date(this.toDate)) {
+                this.error = 'From date must be before to date';
+                return;
+            }
+
+            this.loading = true;
+            this.error = null;
+            try {
+                const params = new URLSearchParams({
+                    from: this.fromDate,
+                    to: this.toDate,
+                });
+                const response = await fetch(`/intelligence/api/history/changes?${params}`, { // raw-fetch-ok: Alpine.js component, Platform.fetch not available in template context
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || `HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                this.changes = data.changes || [];
+                this.lastLoaded = new Date().toISOString();
+            } catch (e) {
+                this.error = 'Could not load changes: ' + e.message;
+            } finally {
+                this.loading = false;
+                this.$nextTick(() => lucide.createIcons());
+            }
+        },
+
+        get filteredChanges() {
+            let result = this.changes;
+            if (this.showOnlyUpdates) {
+                result = result.filter(c => c.action === 'update');
+            }
+            return result;
+        },
+
+        get groupedChanges() {
+            const groups = {};
+            for (const change of this.filteredChanges) {
+                const key = `${change.table_name.replace('archimate_', '').replace('_', ' ')} #${change.record_id}`;
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(change);
+            }
+            return groups;
+        },
+
+        toggleSnapshot(key) {
+            if (this.openSnapshots.includes(key)) {
+                this.openSnapshots = this.openSnapshots.filter(k => k !== key);
+            } else {
+                this.openSnapshots.push(key);
+            }
+        },
+
+        togglePreviousSnapshot(key) {
+            if (this.openPreviousSnapshots.includes(key)) {
+                this.openPreviousSnapshots = this.openPreviousSnapshots.filter(k => k !== key);
+            } else {
+                this.openPreviousSnapshots.push(key);
+            }
+        },
+
+        formatForInput(date) {
+            // Convert to YYYY-MM-DDTHH:MM format for datetime-local input
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        },
+
+        formatDateTime(iso) {
+            if (!iso) return '—';
+            const d = new Date(iso);
+            return d.toLocaleString(undefined, {
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+    }
+}
+</script>
+{% endblock %}

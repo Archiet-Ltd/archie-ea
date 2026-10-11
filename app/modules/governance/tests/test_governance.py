@@ -32,25 +32,25 @@ class TestGovernanceModuleImports:
 
     def test_consolidation_list_bp_importable(self):
         """consolidation_list_bp has name 'consolidation_list'."""
-        from app.routes.consolidation_list_routes import consolidation_list_bp
+        from app.modules.governance.routes.consolidation_list_routes import consolidation_list_bp
 
         assert consolidation_list_bp.name == "consolidation_list"
 
     def test_policy_monitoring_bp_importable(self):
         """policy_monitoring_bp has name 'policy_monitoring'."""
-        from app.routes.policy_monitoring_routes import policy_monitoring_bp
+        from app.modules.governance.routes.policy_monitoring_routes import policy_monitoring_bp
 
         assert policy_monitoring_bp.name == "policy_monitoring"
 
     def test_capability_management_importable(self):
         """capability_management has name 'capability_management'."""
-        from app.routes.capability_management_routes import capability_management
+        from app.modules.governance.routes.capability_management_routes import capability_management
 
         assert capability_management.name == "capability_management"
 
     def test_capability_governance_importable(self):
         """capability_governance has name 'capability_governance'."""
-        from app.routes.capability_governance_routes import capability_governance
+        from app.modules.governance.routes.capability_governance_routes import capability_governance
 
         assert capability_governance.name == "capability_governance"
 
@@ -60,13 +60,13 @@ class TestGovernanceBlueprintConfig:
 
     def test_consolidation_list_prefix(self):
         """consolidation_list_bp has url_prefix='/consolidation-list'."""
-        from app.routes.consolidation_list_routes import consolidation_list_bp
+        from app.modules.governance.routes.consolidation_list_routes import consolidation_list_bp
 
         assert consolidation_list_bp.url_prefix == "/consolidation-list"
 
     def test_policy_monitoring_prefix(self):
         """policy_monitoring_bp has url_prefix='/policy-monitoring'."""
-        from app.routes.policy_monitoring_routes import policy_monitoring_bp
+        from app.modules.governance.routes.policy_monitoring_routes import policy_monitoring_bp
 
         assert policy_monitoring_bp.url_prefix == "/policy-monitoring"
 
@@ -76,7 +76,7 @@ class TestGovernanceRouteCount:
 
     def test_consolidation_list_route_count(self):
         """consolidation_list_bp should have at least 8 routes."""
-        from app.routes.consolidation_list_routes import consolidation_list_bp
+        from app.modules.governance.routes.consolidation_list_routes import consolidation_list_bp
 
         count = len(consolidation_list_bp.deferred_functions)
         assert count >= 8, (
@@ -85,7 +85,7 @@ class TestGovernanceRouteCount:
 
     def test_policy_monitoring_route_count(self):
         """policy_monitoring_bp should have at least 7 routes."""
-        from app.routes.policy_monitoring_routes import policy_monitoring_bp
+        from app.modules.governance.routes.policy_monitoring_routes import policy_monitoring_bp
 
         count = len(policy_monitoring_bp.deferred_functions)
         assert count >= 7, (
@@ -94,7 +94,7 @@ class TestGovernanceRouteCount:
 
     def test_capability_governance_route_count(self):
         """capability_governance should have at least 6 routes."""
-        from app.routes.capability_governance_routes import capability_governance
+        from app.modules.governance.routes.capability_governance_routes import capability_governance
 
         count = len(capability_governance.deferred_functions)
         assert count >= 6, (
@@ -103,7 +103,7 @@ class TestGovernanceRouteCount:
 
     def test_capability_management_route_count(self):
         """capability_management should have at least 7 routes."""
-        from app.routes.capability_management_routes import capability_management
+        from app.modules.governance.routes.capability_management_routes import capability_management
 
         count = len(capability_management.deferred_functions)
         assert count >= 7, (

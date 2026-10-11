@@ -29,8 +29,10 @@ _GUARDRAIL_HANDLERS_REGISTERED = False
 
 
 def _request_id() -> str:
-    """Extract or generate a request ID for tracing."""
-    return getattr(request, "request_id", None) or request.headers.get(
+    """The request's trace id (``app/utils/tracing.py``), the one the logs carry."""
+    from app.utils.tracing import current_trace_id
+
+    return current_trace_id() or getattr(request, "request_id", None) or request.headers.get(
         "X-Request-ID", f"req-{int(time.time() * 1000)}"
     )
 
@@ -82,7 +84,8 @@ def _handle_app_exception(exc) -> Tuple:
         "AppException %s: %s",
         exc.error_code,
         exc.message,
-        extra={"error_code": exc.error_code, "request_id": _request_id(), **exc.log_context},
+        # request_id and organization_id are on every record already.
+        extra={"error_code": exc.error_code, **exc.log_context},
     )
 
     body = _build_error_body(
@@ -116,7 +119,6 @@ def _handle_unhandled_exception(exc: Exception) -> Tuple:
     logger.exception(
         "Unhandled exception in new module: %s",
         str(exc),
-        extra={"request_id": _request_id()},
     )
 
     body = _build_error_body(

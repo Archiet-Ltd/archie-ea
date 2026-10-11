@@ -1,0 +1,32 @@
+{# Canvas box — the shared per-box rendering business_model/detail.html and
+    business_case/detail.html use for one CANVAS_TEMPLATES zone.
+
+    Renders structure only: the entries list exists and is always empty here
+    (a later change adds the projection that fills it), so every box carries
+    its `empty_reason` as a labelled hint outside the input rather than any
+    placeholder content inside it. Once entries exist, the same list gains
+    rows, each with up to three flag chips and an "Open" link — nothing here
+    invents that state early.
+
+    Empty boxes show a single short line "Nothing here yet" above the typing
+    area — no large repeated icon. #}
+
+{% macro canvas_box_entries(zone) %}
+{# The entries list itself: present, empty. A later change is the only
+    thing that ever puts a row in it. #}
+<ul data-testid="canvas-entries-{{ zone.box_key }}" class="sr-only" aria-hidden="true"></ul>
+{% if zone.empty_reason == 'canvas_box_not_derived' %}
+<p data-testid="canvas-box-reason-{{ zone.box_key }}" data-reason="canvas_box_not_derived" role="status" class="text-xs text-muted-foreground mb-2">Composed from the other sections — nothing to show yet</p>
+{% else %}
+<p data-testid="canvas-box-reason-{{ zone.box_key }}" data-reason="canvas_box_empty" role="status" class="text-xs text-muted-foreground mb-2">Nothing here yet</p>
+{% endif %}
+{% endmacro %}
+
+{% macro canvas_unclassified(count) %}
+{# The side list: "N not yet classified". No projection exists yet to count
+   from, so this reads a genuine 0 for every tenant — not a fabricated
+   figure, the honest state before one exists. #}
+<div class="rounded-lg border border-border bg-card p-4" data-testid="canvas-unclassified" role="status">
+    <p class="text-sm text-muted-foreground">{{ count }} not yet classified</p>
+</div>
+{% endmacro %}

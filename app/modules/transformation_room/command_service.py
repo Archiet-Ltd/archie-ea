@@ -883,10 +883,17 @@ class CommandService:
         ).scalar_one_or_none()
         if result is None:
             raise StaleClaim("operation_result_outside_claim", receipt_id=claim.receipt_id)
+        # Read the completion timestamp before touching the receipt: once any
+        # field below is assigned, the receipt is dirty, and a query run while
+        # it is dirty in that half-updated state can autoflush an UPDATE the
+        # guard trigger has to reject (status advanced, completed_at still
+        # unset). Computing now first keeps every field assignment together
+        # with nothing but the explicit flush after them.
+        now = cls._database_now(session)
         receipt.status = "succeeded"
         receipt.operation_result_id = result.id
         receipt.lease_expires_at = None
-        receipt.completed_at = cls._database_now(session)
+        receipt.completed_at = now
         session.flush()
 
     @classmethod

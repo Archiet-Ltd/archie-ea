@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 
 
 def _make_element(db_session, org_id, name_hint, type_="ApplicationComponent"):
@@ -181,6 +183,38 @@ def test_different_tenant_recompute_proceeds_while_one_tenant_is_locked(
 
     assert run.results[0].ok is True
     assert run.results[0].value.get("skipped_locked") is False
+
+
+def test_on_demand_recompute_records_non_zero_wall_clock_duration(
+    app, db_session, make_org, monkeypatch
+):
+    from app.modules.intelligence.services.derivation_runner import DerivationRunner
+    from app.modules.intelligence.services.recompute_job import (
+        recompute_derived_facts_on_demand,
+    )
+
+    org = make_org("rc-duration")
+    a = _make_element(db_session, org.id, "a")
+    b = _make_element(db_session, org.id, "b")
+    c = _make_element(db_session, org.id, "c")
+    _make_relationship(db_session, org.id, a, b, "Serving")
+    _make_relationship(db_session, org.id, b, c, "Serving")
+    db_session.commit()
+
+    original = DerivationRunner.run_and_persist
+
+    def _slow_real_run(self, organization_id, *, trigger):
+        time.sleep(0.02)
+        return original(self, organization_id, trigger=trigger)
+
+    monkeypatch.setattr(DerivationRunner, "run_and_persist", _slow_real_run)
+
+    run = recompute_derived_facts_on_demand(app, org.id)
+
+    assert run.results[0].ok is True
+    assert run.results[0].duration_ms > 0
+    assert run.results[0].value["duration_ms"] > 0
+    assert run.results[0].duration_ms >= run.results[0].value["duration_ms"]
 
 
 # --- Acceptance item 5 (brief 16): job registration parity ------------------

@@ -14,6 +14,17 @@ sprint_bp = Blueprint("sprint", __name__, url_prefix="/api/sprints")
 sprint_view_bp = Blueprint("sprint_view", __name__, url_prefix="/sprints")
 
 
+def _board_or_404(board_id):
+    """The kanban board, only when it belongs to the caller's organisation.
+
+    ``KanbanBoard`` carries the tenant filter, so a board id from another
+    organisation is a 404 before a sprint is listed under it or attached to it.
+    """
+    from app.models.adm_kanban import KanbanBoard
+
+    return KanbanBoard.query.get_or_404(board_id)
+
+
 @sprint_bp.route("", methods=["POST"])
 @login_required
 def create_sprint():
@@ -24,6 +35,7 @@ def create_sprint():
         return jsonify({"error": "board_id is required"}), 400
     if not data.get("name"):
         return jsonify({"error": "name is required"}), 400
+    _board_or_404(board_id)
     sprint = sprint_service.create_sprint(board_id, data)
     return jsonify(sprint.to_dict()), 201
 
@@ -35,6 +47,7 @@ def list_sprints():
     board_id = request.args.get("board_id", type=int)
     if not board_id:
         return jsonify({"error": "board_id query parameter is required"}), 400
+    _board_or_404(board_id)
     sprints = sprint_service.get_sprints(board_id)
     return jsonify([s.to_dict() for s in sprints]), 200
 
@@ -93,6 +106,7 @@ def assign_card(sprint_id: int):
 @login_required
 def get_burndown(sprint_id: int):
     """GET /api/sprints/<id>/burndown — burndown chart data."""
+    sprint_service.get_sprint_or_404(sprint_id)
     data = sprint_analytics_service.get_burndown_data(sprint_id)
     if not data:
         return jsonify({"error": "Sprint not found"}), 404
@@ -109,6 +123,7 @@ def get_sprint_analytics(sprint_id: int):
       - cycle_time: mean days from started_at to completed_at
       - cfd: daily snapshot of cards per status column
     """
+    sprint_service.get_sprint_or_404(sprint_id)
     data = sprint_analytics_service.get_sprint_analytics(sprint_id)
     if data is None:
         return jsonify({"error": "Sprint not found"}), 404
@@ -119,8 +134,7 @@ def get_sprint_analytics(sprint_id: int):
 @login_required
 def sprint_analytics_page(sprint_id: int):
     """GET /sprints/<id>/analytics — sprint analytics dashboard page."""
-    from app.models.sprint import Sprint
-    sprint = Sprint.query.get_or_404(sprint_id)
+    sprint = sprint_service.get_sprint_or_404(sprint_id)
     return render_template("adm_kanban/sprint_analytics.html", sprint=sprint)
 
 

@@ -1,0 +1,52 @@
+{# The application's technology stack: the nodes and system software it runs on.
+
+   Each row is an ArchiMate realization relationship read back from the server,
+   so the impact answer on the Twin map follows the same link. Requires
+   intelligence/core.js, intelligence/picker.js and
+   applications/technology_links.js on the page. #}
+{% if 'intelligence_ui.twin_map' in flask.current_app.view_functions %}
+{% from 'intelligence/_entity_picker.html' import entity_picker with context %}
+<section data-slot="card" class="rounded-xl border bg-card shadow-sm"
+         x-data="technologyLinks({{ app.id }})" data-technology-links
+         aria-labelledby="techstack-heading">
+  <div class="flex flex-col space-y-1.5 p-6 pb-3">
+    <h3 id="techstack-heading" class="text-lg font-semibold">Runs on</h3>
+    <p class="text-sm text-muted-foreground">The nodes and system software this application runs on. Each one you add is a relationship in the architecture model.</p>
+  </div>
+  <div class="p-6 pt-0 space-y-4">
+    {{ entity_picker('techstack', prompt='Type a node or system software name') }}
+
+    <p x-show="loading" x-cloak class="text-sm text-muted-foreground" role="status">Loading technology links…</p>
+
+    <div x-show="!loading && loadError" x-cloak role="alert"
+         class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis">
+      <span x-text="loadError"></span>
+    </div>
+
+    <p x-show="!loading && !loadError && links.length === 0" x-cloak
+       class="text-sm text-muted-foreground" data-technology-empty>No technology mapped</p>
+
+    <ul x-show="!loading && !loadError && links.length > 0" x-cloak class="divide-y divide-border" data-technology-list>
+      <template x-for="link in links" :key="link.relationship_id">
+        <li class="flex items-center justify-between gap-3 py-2 text-sm">
+          <div class="min-w-0">
+            <span class="font-medium text-foreground" x-text="link.name"></span>
+            <span class="ml-2 text-xs text-muted-foreground" x-text="link.type_label"></span>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <a :href="'{{ url_for('intelligence_ui.twin_map') }}?element=' + link.element_id"
+               class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              What depends on it
+            </a>
+            <button type="button" @click="remove(link)"
+                    :aria-label="'Remove ' + link.name"
+                    class="inline-flex h-8 items-center rounded-md border border-input bg-background px-2 text-xs font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              Remove
+            </button>
+          </div>
+        </li>
+      </template>
+    </ul>
+  </div>
+</section>
+{% endif %}

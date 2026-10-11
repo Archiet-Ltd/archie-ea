@@ -333,11 +333,16 @@ def test_expanded_chain_marks_an_unresolved_link_instead_of_dropping_it(
     assert "source_id" not in expanded[1]
 
 
-def test_module_registers_exactly_nine_routes(app):
-    """The impact, risk, portfolio, programme, strategy, accountability and
-    yield routes all mount on this same existing blueprint rather than a
-    new one each. Still exactly one blueprint, now nine routes on it -- all
-    six lenses of the catalogue plus recompute/derived/yield.
+def test_module_registers_exactly_sixteen_routes(app):
+    """The impact, risk, portfolio, programme, strategy, accountability,
+    data, compliance, traceability, value-streams-at-risk, yield, catalogue
+    list, catalogue run and ask routes all mount on this same existing
+    blueprint rather than a new one each. Still exactly one blueprint, now
+    sixteen routes on it -- all six lenses of the catalogue, the L7 data
+    lens, the L6 compliance lens, the traceability check over the impact
+    walk, the Strategic value-streams-at-risk surface,
+    recompute/derived/yield, and R1-B39's query catalogue (list + run) and
+    plain-language ask endpoints.
     """
     rules = [
         rule for rule in app.url_map.iter_rules() if rule.endpoint.startswith("intelligence_api.")
@@ -346,13 +351,20 @@ def test_module_registers_exactly_nine_routes(app):
     assert endpoints == {
         "intelligence_api.recompute_derivation",
         "intelligence_api.get_derived_fact_provenance",
+        "intelligence_api.value_streams_at_risk",
         "intelligence_api.cross_layer_impact",
         "intelligence_api.risk_for_element",
         "intelligence_api.portfolio_component_for_element",
         "intelligence_api.programme_for_element",
         "intelligence_api.strategy_for_element",
         "intelligence_api.accountability_for_element",
+        "intelligence_api.data_for_element",
+        "intelligence_api.compliance_for_element",
+        "intelligence_api.traceability_check",
         "intelligence_api.derivation_yield",
+        "intelligence_api.query_catalogue_list",
+        "intelligence_api.query_catalogue_run",
+        "intelligence_api.ask_nl_question",
     }
 
 
@@ -603,6 +615,7 @@ def test_programme_endpoint_returns_work_package_with_its_own_blast_radius(
     wp = UnifiedWorkPackage(
         name="Migrate A",
         archimate_element_id=a.id,
+        organization_id=org.id,
         business_capability="Test",
         status="in_progress",
         progress_percentage=25.0,
@@ -635,7 +648,8 @@ def test_programme_endpoint_redacts_cost_for_a_role_without_budget_authority(
     user = _make_user(db_session, org, enterprise_role="solution_architect")
     a = _make_element(db_session, org.id, "A")
     db_session.add(UnifiedWorkPackage(
-        name="Migrate A", archimate_element_id=a.id, business_capability="Test",
+        name="Migrate A", archimate_element_id=a.id, organization_id=org.id,
+        business_capability="Test",
         estimated_cost=50000.0, actual_cost=45000.0,
     ))
     db_session.commit()
@@ -656,7 +670,8 @@ def test_programme_endpoint_does_not_redact_cost_for_cto(
     user = _make_user(db_session, org, enterprise_role="cto")
     a = _make_element(db_session, org.id, "A")
     db_session.add(UnifiedWorkPackage(
-        name="Migrate A", archimate_element_id=a.id, business_capability="Test",
+        name="Migrate A", archimate_element_id=a.id, organization_id=org.id,
+        business_capability="Test",
         estimated_cost=50000.0, actual_cost=45000.0,
     ))
     db_session.commit()
@@ -678,7 +693,8 @@ def test_programme_endpoint_cross_tenant_element_is_404_not_leak(
     user_b = _make_user(db_session, org_b)
     a = _make_element(db_session, org_a.id, "A")
     wp = UnifiedWorkPackage(
-        name="Tenant A's work", archimate_element_id=a.id, business_capability="Test",
+        name="Tenant A's work", archimate_element_id=a.id, organization_id=org_a.id,
+        business_capability="Test",
     )
     db_session.add(wp)
     db_session.commit()
@@ -835,12 +851,16 @@ def test_accountability_endpoint_unknown_element_is_404(app, db_session, make_or
     assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
 
 
-def test_accountability_endpoint_element_with_no_ownership_returns_honest_empty(
+def test_accountability_endpoint_returns_the_withdrawn_reason(
     app, db_session, make_org, client, login_as
 ):
+    """The ownership read is withdrawn (a tenant-isolation gap found in
+    external review of the original PR, see
+    IntelligenceQueryService.accountability_for_element's docstring) --
+    every real element returns this honest reason, not owner data."""
     from app.models.application_portfolio import ApplicationComponent
 
-    org = make_org("accountability-route-empty")
+    org = make_org("accountability-route-withdrawn")
     user = _make_user(db_session, org)
     a = _make_element(db_session, org.id, "A")
     component = ApplicationComponent(name="A App", organization_id=org.id, archimate_element_id=a.id)
@@ -853,27 +873,31 @@ def test_accountability_endpoint_element_with_no_ownership_returns_honest_empty(
     data = resp.get_json()["data"]
     assert data["owners"] == []
     assert data["capacity_not_available"] is True
-    assert "no_ownership_records" in data["reasons"]
-    assert "capacity_not_available" in data["reasons"]
+    assert "ownership_reader_not_built" in data["reasons"]
 
 
-def test_accountability_endpoint_returns_owner_with_organization_unit(
+def test_accountability_endpoint_never_returns_seeded_ownership_data(
     app, db_session, make_org, client, login_as
 ):
+    """The regression guard that matters: a real, well-formed ownership
+    graph exists -- exactly the shape the original (unsafe) implementation
+    would have served over HTTP, including the cross-tenant-leakable
+    organization_unit fields -- and the endpoint must still return nothing
+    from it."""
     from app.models.application_portfolio import ApplicationComponent
     from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
 
-    org = make_org("accountability-route-owner")
+    org = make_org("accountability-route-guard")
     user = _make_user(db_session, org)
     a = _make_element(db_session, org.id, "A")
     component = ApplicationComponent(name="A App", organization_id=org.id, archimate_element_id=a.id)
     db_session.add(component)
     db_session.flush()
-    unit = OrganizationUnit(name="Finance", unit_type="Department")
+    unit = OrganizationUnit(organization_id=org.id, name="Finance", unit_type="Department", head_of_unit="Pat Head")
     db_session.add(unit)
     db_session.flush()
     ownership = ApplicationOwnership(
-        application_id=component.id, organization_unit_id=unit.id,
+        organization_id=org.id, application_id=component.id, organization_unit_id=unit.id,
         ownership_type="Business Owner", primary_contact="Jordan Owner",
     )
     db_session.add(ownership)
@@ -883,11 +907,8 @@ def test_accountability_endpoint_returns_owner_with_organization_unit(
     resp = client.get(f"/api/v1/intelligence/accountability/{a.id}")
     assert resp.status_code == 200
     data = resp.get_json()["data"]
-    assert data["capacity_not_available"] is True
-    assert len(data["owners"]) == 1
-    row = data["owners"][0]
-    assert row["ownership_type"] == "Business Owner"
-    assert row["organization_unit"]["name"] == "Finance"
+    assert data["owners"] == []
+    assert data["reasons"] == ["ownership_reader_not_built", "capacity_not_available"]
 
 
 def test_accountability_endpoint_cross_tenant_element_is_404_not_leak(
@@ -903,11 +924,11 @@ def test_accountability_endpoint_cross_tenant_element_is_404_not_leak(
     component = ApplicationComponent(name="A App", organization_id=org_a.id, archimate_element_id=a.id)
     db_session.add(component)
     db_session.flush()
-    unit = OrganizationUnit(name="Tenant A Finance", unit_type="Department")
+    unit = OrganizationUnit(organization_id=org_a.id, name="Tenant A Finance", unit_type="Department")
     db_session.add(unit)
     db_session.flush()
     db_session.add(ApplicationOwnership(
-        application_id=component.id, organization_unit_id=unit.id, ownership_type="Business Owner",
+        organization_id=org_a.id, application_id=component.id, organization_unit_id=unit.id, ownership_type="Business Owner",
     ))
     db_session.commit()
 
@@ -915,3 +936,123 @@ def test_accountability_endpoint_cross_tenant_element_is_404_not_leak(
     resp = client.get(f"/api/v1/intelligence/accountability/{a.id}")
     assert resp.status_code == 404
     assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
+
+
+# --- L7: the Data lens ---------------------------------------------------------
+
+
+def test_data_endpoint_requires_login(client):
+    resp = client.get("/api/v1/intelligence/data/1")
+    assert resp.status_code in (302, 401)
+
+
+def test_data_endpoint_unknown_element_is_404(app, db_session, make_org, client, login_as):
+    org = make_org("data-route-404")
+    user = _make_user(db_session, org)
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get("/api/v1/intelligence/data/999999999")
+    assert resp.status_code == 404
+    assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
+
+
+def test_data_endpoint_foreign_element_reads_the_same_as_a_missing_one(
+    app, db_session, make_org, client, login_as
+):
+    org_a, org_b = make_org("data-route-a"), make_org("data-route-b")
+    user = _make_user(db_session, org_a)
+    foreign = _make_element(db_session, org_b.id, "foreign")
+    db_session.commit()
+    user_id, foreign_id = user.id, foreign.id
+    db_session.expunge_all()
+
+    from app.models.user import User
+
+    # tenant-scoping-ok: test fixture reloading the user this test just created, after expunge_all
+    login_as(client, db_session.get(User, user_id))
+    resp = client.get(f"/api/v1/intelligence/data/{foreign_id}")
+
+    assert resp.status_code == 404
+    assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
+
+
+def test_data_endpoint_returns_objects_and_flows_for_a_real_element(
+    app, db_session, make_org, client, login_as
+):
+    from app.models.all_missing_models import DataLineage
+    from app.models.application_layer import DataObject
+
+    org = make_org("data-route-ok")
+    user = _make_user(db_session, org)
+    a = _make_element(db_session, org.id, "A")
+    b = _make_element(db_session, org.id, "B")
+    db_session.add(DataObject(name="Orders", archimate_element_id=a.id, organization_id=org.id,
+                              data_steward="Sam", pii_fields='["email"]'))
+    db_session.add(DataLineage(name="A to B", archimate_element_id=a.id,
+                               target_archimate_element_id=b.id, organization_id=org.id))
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get(f"/api/v1/intelligence/data/{a.id}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert [o["name"] for o in data["data_objects"]] == ["Orders"]
+    assert data["data_objects"][0]["steward"] == "Sam"
+    assert [f["direction"] for f in data["flows"]] == ["out"]
+    assert data["reasons"] == []
+    assert "pii_fields" not in resp.get_data(as_text=True) and "email" not in str(data["data_objects"])
+
+
+# --- Compliance (under L6) -----------------------------------------------------
+
+
+def test_compliance_endpoint_requires_login(client):
+    resp = client.get("/api/v1/intelligence/compliance/1")
+    assert resp.status_code in (302, 401)
+
+
+def test_compliance_endpoint_unknown_element_is_404(app, db_session, make_org, client, login_as):
+    org = make_org("compliance-route-404")
+    user = _make_user(db_session, org)
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get("/api/v1/intelligence/compliance/999999999")
+    assert resp.status_code == 404
+    assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
+
+
+def test_compliance_endpoint_returns_controls_for_a_real_application(
+    app, db_session, make_org, client, login_as
+):
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+
+    org = make_org("compliance-route-ok")
+    user = _make_user(db_session, org)
+    a = _make_element(db_session, org.id, "A")
+    component = ApplicationComponent(name="A App", organization_id=org.id, archimate_element_id=a.id)
+    framework = RegulatoryFramework(code="RT-FW", name="Route framework", category="security")
+    db_session.add_all([component, framework])
+    db_session.flush()
+    control = ComplianceControl(framework_id=framework.id, control_code="R-1", title="Route control")
+    db_session.add(control)
+    db_session.flush()
+    db_session.add(ApplicationComplianceControl(
+        organization_id=org.id, application_id=component.id, control_id=control.id,
+        implementation_status="planned", evidence_url="https://secret.example/x",
+    ))
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get(f"/api/v1/intelligence/compliance/{a.id}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert [c["code"] for c in data["controls"]] == ["R-1"]
+    assert data["controls"][0]["evidence_url_recorded"] is True
+    assert "no_policy_scan_recorded" in data["reasons"]
+    assert "secret.example" not in resp.get_data(as_text=True)

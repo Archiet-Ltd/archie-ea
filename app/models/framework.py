@@ -19,9 +19,10 @@ from sqlalchemy.orm import validates
 from app.datetime_helpers import utcnow
 
 from .. import db
+from .mixins import HybridTenantMixin
 
 
-class EnterpriseArchitectureFramework(db.Model):
+class EnterpriseArchitectureFramework(HybridTenantMixin, db.Model):
     """
     Enterprise Architecture Framework Model
 
@@ -142,7 +143,7 @@ class EnterpriseArchitectureFramework(db.Model):
         return f"<EnterpriseArchitectureFramework {self.name} ({self.code})>"
 
 
-class QualityFramework(db.Model):
+class QualityFramework(HybridTenantMixin, db.Model):
     """
     Quality and Standards Framework Model
 
@@ -260,7 +261,7 @@ class QualityFramework(db.Model):
         return f"<QualityFramework {self.name} ({self.code})>"
 
 
-class IndustryFramework(db.Model):
+class IndustryFramework(HybridTenantMixin, db.Model):
     """
     Industry-Specific Framework Model
 

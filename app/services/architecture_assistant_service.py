@@ -360,16 +360,23 @@ class ArchitectureAssistantService:
         logger.info("Comparing solution options")
 
         try:
-            from ..models.vendor_analysis import VendorOption
+            from ..models.vendor_analysis import OptionsAnalysis, VendorOption
 
             weights = weights or self.DEFAULT_SCORING_WEIGHTS
             options = []
 
-            # Load options from database if IDs provided
+            # Load options from database if IDs provided. option_ids comes from the request body,
+            # and VendorOption has no organisation column of its own: an id outside the caller's
+            # organisation is skipped rather than resolved, the same fence as vendor_catalog_routes.
             if option_ids:
                 for opt_id in option_ids:
+                    # tenant-scoping-ok: the fenced select two lines below is the tenant check.
+                    # Not db.session.get() -- it bypasses the ORM tenant filter on an identity-map hit.
                     vo = db.session.get(VendorOption, opt_id)
-                    if vo:
+                    fenced_analysis = db.session.execute(
+                        db.select(OptionsAnalysis).where(OptionsAnalysis.id == vo.analysis_id)
+                    ).scalar_one_or_none() if vo and vo.analysis_id else None
+                    if vo and fenced_analysis:
                         option = self._convert_vendor_option(vo)
                         options.append(option)
 

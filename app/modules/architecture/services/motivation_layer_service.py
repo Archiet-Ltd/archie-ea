@@ -1302,3 +1302,347 @@ Focus on QUALITY and SPECIFICITY - each requirement must be measurable and testa
                 "quality_attributes": [],
                 "project_constraints": [],
             }
+
+    # ------------------------------------------------------------------ #
+    # Driver, Assessment and Goal-trace write paths (strategy traceability)
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def create_driver(data: Dict, organization_id: int):
+        """Create a Driver record with source, date and owner.
+
+        Args:
+            data: Dict with name, description, driver_type, source,
+                  identified_date, and optional fields.
+            organization_id: The tenant organisation id.
+
+        Returns:
+            The created Driver instance.
+        """
+        from app.models.motivation import Driver
+
+        driver = Driver(
+            name=data["name"],
+            description=data.get("description"),
+            driver_type=data.get("driver_type"),
+            source=data.get("source"),
+            identified_date=data.get("identified_date"),
+            organization_id=organization_id,
+        )
+        db.session.add(driver)
+        db.session.flush()
+        return driver
+
+    @staticmethod
+    def create_assessment(driver_id: int, data: Dict, organization_id: int):
+        """Create an Assessment row against a Driver.
+
+        Args:
+            driver_id: The Driver this assessment is conducted against.
+            data: Dict with name, description, assessment_type, result_score,
+                  assessor, date_assessed.
+            organization_id: The tenant organisation id.
+
+        Returns:
+            The created Assessment instance.
+        """
+        from app.models.motivation import Assessment, Driver
+
+        driver = Driver.query.filter_by(id=driver_id, organization_id=organization_id).first()
+        if driver is None:
+            raise ValueError(f"Driver {driver_id} not found in organisation {organization_id}")
+
+        assessment = Assessment(
+            name=data["name"],
+            description=data.get("description"),
+            assessment_type=data.get("assessment_type"),
+            result_score=data.get("result_score"),
+            assessor=data.get("assessor"),
+            date_assessed=data.get("date_assessed"),
+            driver_id=driver_id,
+            organization_id=organization_id,
+        )
+        db.session.add(assessment)
+        db.session.flush()
+        return assessment
+
+    @staticmethod
+    def get_goal_trace(goal_id: int, organization_id: int) -> Dict:
+        """Walk the traceability chain from a Goal.
+
+        Goal → Capability (ArchiMate Realization) →
+        Initiative (initiative_goals / strategic_initiative_goals) →
+        Work Package / Application.
+
+        Each hop cites its relationship row.
+
+        Args:
+            goal_id: The Goal id.
+            organization_id: The tenant organisation id.
+
+        Returns:
+            Dict with goal, capabilities, initiatives, work_packages,
+            applications, and a trace chain.
+        """
+        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+        from app.models.motivation import Goal
+        from app.models.strategic import StrategicInitiative
+        from app.models.unified_capability import UnifiedCapability
+        from app.models.unified_work_package import UnifiedWorkPackage
+        from app.models.implementation_migration import WorkPackage
+
+        goal = Goal.query.filter_by(id=goal_id, organization_id=organization_id).first()
+        if goal is None:
+            return {"goal": None, "reason": "not_found"}
+
+        goal_dict = {
+            "id": goal.id,
+            "name": goal.name,
+            "description": goal.description,
+            "goal_type": goal.goal_type,
+            "status": goal.status,
+            "archimate_element_id": goal.archimate_element_id,
+        }
+
+        # Hop 1: Goal → Capability through ArchiMate Realization relationships.
+        # A Goal's archimate_element is the source of a Realization whose
+        # target is a Capability's archimate_element.
+        capabilities = []
+        capability_hops = []
+        if goal.archimate_element_id:
+            realizations = ArchiMateRelationship.query.filter_by(
+                source_id=goal.archimate_element_id,
+                type="realization",
+            ).all()
+            for rel in realizations:
+                target_elem = ArchiMateElement.query.filter_by(
+                    id=rel.target_id
+                ).first()
+                if target_elem is None:
+                    continue
+                caps = UnifiedCapability.query.filter_by(
+                    archimate_element_id=target_elem.id
+                ).all()
+                for cap in caps:
+                    capabilities.append({
+                        "id": cap.id,
+                        "name": cap.name,
+                        "code": getattr(cap, "code", None),
+                        "current_maturity_level": getattr(cap, "current_maturity_level", None),
+                    })
+                    capability_hops.append({
+                        "relationship_type": "realization",
+                        "relationship_id": rel.id,
+                        "source": f"Goal:{goal.id}",
+                        "target": f"UnifiedCapability:{cap.id}",
+                    })
+
+        # Hop 2: Goal → Initiative through junction tables.
+        enterprise_initiatives = []
+        strategic_initiatives = []
+        initiative_hops = []
+
+        # EnterpriseInitiative via initiative_goals
+        for ei in goal.initiatives:
+            enterprise_initiatives.append({
+                "id": ei.id,
+                "name": ei.name,
+                "status": getattr(ei, "status", None),
+            })
+            initiative_hops.append({
+                "relationship_type": "initiative_goals",
+                "source": f"Goal:{goal.id}",
+                "target": f"EnterpriseInitiative:{ei.id}",
+            })
+
+        # StrategicInitiative via strategic_initiative_goals
+        for si in StrategicInitiative.query.filter(
+            StrategicInitiative.goals.any(id=goal.id)
+        ).all():
+            strategic_initiatives.append({
+                "id": si.id,
+                "name": si.name,
+                "status": si.status,
+                "record_kind": si.record_kind,
+            })
+            initiative_hops.append({
+                "relationship_type": "strategic_initiative_goals",
+                "source": f"Goal:{goal.id}",
+                "target": f"StrategicInitiative:{si.id}",
+            })
+
+        # Hop 3: Initiative → Work Package / Application.
+        work_packages = []
+        application_components = []
+        wp_hops = []
+
+        all_initiative_ids = [ei["id"] for ei in enterprise_initiatives]
+
+        # WorkPackage rows linked to EnterpriseInitiative
+        for wp in WorkPackage.query.filter(
+            WorkPackage.enterprise_initiative_id.in_(all_initiative_ids),
+            WorkPackage.organization_id == organization_id,
+        ).all():
+            work_packages.append({
+                "id": wp.id,
+                "name": wp.name,
+                "status": getattr(wp, "status", None),
+            })
+            wp_hops.append({
+                "relationship_type": "work_package_enterprise_initiative",
+                "source": f"EnterpriseInitiative:{wp.enterprise_initiative_id}",
+                "target": f"WorkPackage:{wp.id}",
+            })
+
+        # UnifiedWorkPackage rows linked to EnterpriseInitiative
+        for uwp in UnifiedWorkPackage.query.filter(
+            UnifiedWorkPackage.enterprise_initiative_id.in_(all_initiative_ids),
+        ).all():
+            work_packages.append({
+                "id": uwp.id,
+                "name": uwp.name,
+                "status": getattr(uwp, "status", None),
+            })
+            wp_hops.append({
+                "relationship_type": "unified_work_package_enterprise_initiative",
+                "source": f"EnterpriseInitiative:{uwp.enterprise_initiative_id}",
+                "target": f"UnifiedWorkPackage:{uwp.id}",
+            })
+
+        # Application components linked to initiatives
+        for ei in goal.initiatives:
+            if hasattr(ei, "application_components") and ei.application_components:
+                for ac in ei.application_components:
+                    application_components.append({
+                        "id": ac.id,
+                        "name": getattr(ac, "name", None) or getattr(ac, "application_name", str(ac.id)),
+                    })
+                    wp_hops.append({
+                        "relationship_type": "initiative_application",
+                        "source": f"EnterpriseInitiative:{ei.id}",
+                        "target": f"ApplicationComponent:{ac.id}",
+                    })
+
+        has_trace = bool(
+            goal.archimate_element_id
+            or goal.initiatives
+            or StrategicInitiative.query.filter(
+                StrategicInitiative.goals.any(id=goal.id)
+            ).first()
+        )
+
+        return {
+            "goal": goal_dict,
+            "trace_status": "recorded" if has_trace else "not_recorded",
+            "capabilities": capabilities,
+            "capability_hops": capability_hops,
+            "enterprise_initiatives": enterprise_initiatives,
+            "strategic_initiatives": strategic_initiatives,
+            "initiative_hops": initiative_hops,
+            "work_packages": work_packages,
+            "application_components": application_components,
+            "work_package_hops": wp_hops,
+        }
+
+    @staticmethod
+    def suggest_goals_for_driver(driver_id: int, organization_id: int) -> Dict:
+        """Suggest candidate goals for a driver by text similarity.
+
+        Never auto-links; returns a list of candidate goals with similarity
+        scores for the strategy officer to confirm.
+
+        Args:
+            driver_id: The Driver id.
+            organization_id: The tenant organisation id.
+
+        Returns:
+            Dict with driver info and a list of candidate goals.
+        """
+        from app.models.motivation import Driver, Goal
+
+        driver = Driver.query.filter_by(id=driver_id, organization_id=organization_id).first()
+        if driver is None:
+            return {"driver": None, "reason": "not_found"}
+
+        # Collect driver text for matching
+        driver_text = " ".join(
+            filter(None, [driver.name, driver.description or ""])
+        ).lower()
+
+        # Get all goals in the tenant
+        goals = Goal.query.filter_by(organization_id=organization_id).all()
+
+        candidates = []
+        for goal in goals:
+            goal_text = " ".join(
+                filter(None, [goal.name, goal.description or ""])
+            ).lower()
+
+            # Simple word-overlap similarity
+            driver_words = set(driver_text.split())
+            goal_words = set(goal_text.split())
+            if not driver_words or not goal_words:
+                score = 0.0
+            else:
+                intersection = driver_words & goal_words
+                score = len(intersection) / max(len(driver_words), 1)
+
+            if score > 0:
+                candidates.append({
+                    "goal_id": goal.id,
+                    "goal_name": goal.name,
+                    "goal_type": goal.goal_type,
+                    "similarity_score": round(score, 3),
+                })
+
+        # Sort by similarity descending
+        candidates.sort(key=lambda c: c["similarity_score"], reverse=True)
+
+        return {
+            "driver": {
+                "id": driver.id,
+                "name": driver.name,
+                "driver_type": driver.driver_type,
+            },
+            "candidates": candidates,
+        }
+
+    @staticmethod
+    def link_driver_to_goal(driver_id: int, goal_id: int, organization_id: int) -> Dict:
+        """Link a Driver to a Goal.
+
+        Sets the Goal's driver_id FK. The strategy officer confirms the link;
+        this is never automatic.
+
+        Args:
+            driver_id: The Driver id.
+            goal_id: The Goal id.
+            organization_id: The tenant organisation id.
+
+        Returns:
+            Dict with the linked driver and goal info.
+        """
+        from app.models.motivation import Driver, Goal
+
+        driver = Driver.query.filter_by(id=driver_id, organization_id=organization_id).first()
+        if driver is None:
+            raise ValueError(f"Driver {driver_id} not found in organisation {organization_id}")
+
+        goal = Goal.query.filter_by(id=goal_id, organization_id=organization_id).first()
+        if goal is None:
+            raise ValueError(f"Goal {goal_id} not found in organisation {organization_id}")
+
+        if goal.driver_id is not None:
+            raise ValueError(
+                f"Goal {goal_id} is already linked to driver {goal.driver_id}. "
+                "Unlink it first before linking to a different driver."
+            )
+
+        goal.driver_id = driver_id
+        db.session.flush()
+
+        return {
+            "driver": {"id": driver.id, "name": driver.name},
+            "goal": {"id": goal.id, "name": goal.name},
+            "linked": True,
+        }

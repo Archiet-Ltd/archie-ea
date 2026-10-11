@@ -1,27 +1,42 @@
 {% extends 'layouts/public_base.html' %}
 {% block title %}Confirm Your Email{% endblock %}
-{% import 'macros/form_macros.html' as f %}
 
 {% block content %}
-    <div class="flex justify-center">
+    <div class="flex justify-center px-4 py-10">
         <div class="w-full max-w-2xl">
             <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
                 <div class="p-6">
-                    <h3 class="text-xl font-semibold mb-4">You need to confirm your account before continuing.</h3>
+                    <h1 class="text-xl font-semibold mb-4">Confirm your e-mail address to continue</h1>
 
+                    {% if mail_is_available %}
                     <p class="text-sm text-muted-foreground mb-6">
-                        When you created an account, you should have received an email from us at {{ current_user.email }}
-                        with a link to confirm your email address.
+                        We sent a confirmation link to
+                        <span class="font-medium text-foreground break-words">{{ current_user.email }}</span>.
+                        Open it to finish setting up your account. The link works once and for seven days.
                     </p>
 
                     <div class="border-t border-border my-6"></div>
 
-                    <h3 class="text-xl font-semibold mb-4">I didn't receive an email!</h3>
+                    <h2 class="text-base font-semibold mb-2">No message?</h2>
+                    <p class="text-sm text-muted-foreground mb-4">Check your spam folder, or send a new link. Only the newest link works.</p>
+                    <form method="POST" action="{{ url_for('account.confirm_request') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit"
+                                class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                            Send a new confirmation link
+                        </button>
+                    </form>
+                    {% else %}
+                    <div role="alert" class="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+                        E-mail is not available on this server, so no confirmation link can be sent to
+                        <span class="font-medium break-words">{{ current_user.email }}</span>.
+                        Ask your organisation's administrator for help.
+                    </div>
+                    {% endif %}
 
-                    <p class="text-sm text-muted-foreground mb-4">No problem! Just click the button below and we'll send you another one.</p>
-                    <a href="{{ url_for('account.confirm_request') }}" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
-                        Resend confirmation email
-                    </a>
+                    <p class="text-sm text-muted-foreground mt-6">
+                        Wrong account? <a href="{{ url_for('account.logout') }}" class="text-primary hover:underline">Sign out</a>
+                    </p>
                 </div>
             </div>
         </div>

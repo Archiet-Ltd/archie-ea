@@ -13,6 +13,7 @@ from flask_login import login_required
 from sqlalchemy import func
 
 from app.decorators import audit_log, require_roles
+from app.utils.tenant_users import escape_like_literal
 
 from .. import db
 from ..models.custom_fields import ApplicationCustomFieldValue, CustomFieldDefinition
@@ -96,7 +97,7 @@ def custom_fields_list():
         query = query.filter_by(field_group=group_filter)
 
     if search_query:
-        _escaped = search_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        _escaped = escape_like_literal(search_query)
         search_pattern = f"%{_escaped}%"
         query = query.filter(
             db.or_(

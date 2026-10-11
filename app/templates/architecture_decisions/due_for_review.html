@@ -1,0 +1,63 @@
+{% extends "layouts/admin_base.html" %}
+{% from "components/page_header.html" import page_header %}
+
+{% block title %}Decisions Due For Review{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {{ page_header(
+        title='Decisions Due For Review',
+        description='Decisions whose review date has arrived, with no outcome recorded yet',
+        breadcrumbs=[
+            {'label': 'Dashboard', 'href': url_for('main.index')},
+            {'label': 'Governance'},
+            {'label': 'Architecture Decisions', 'href': url_for('arch_decisions.list_decisions')},
+            {'label': 'Due For Review'}
+        ]
+    ) }}
+
+    <div class="bg-card border border-border rounded-lg overflow-hidden">
+        {% if decisions %}
+        <table class="w-full text-sm">
+            <thead class="bg-muted/50 border-b border-border">
+                <tr>
+                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Decision ID</th>
+                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Title</th>
+                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Review Date</th>
+                    <th class="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                    <th class="text-right px-4 py-3 font-medium text-muted-foreground">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                {% for d in decisions %}
+                <tr class="hover:bg-muted/30 transition-colors">
+                    <td class="px-4 py-3">
+                        <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
+                           class="font-mono text-primary hover:underline text-sm font-semibold">{{ d.decision_id }}</a>
+                    </td>
+                    <td class="px-4 py-3">
+                        <a href="{{ url_for('arch_decisions.view_decision', decision_id=d.id) }}"
+                           class="text-foreground hover:text-primary font-medium">{{ d.title }}</a>
+                    </td>
+                    <td class="px-4 py-3 text-destructive-emphasis font-medium">{{ d.review_date.isoformat() }}</td>
+                    <td class="px-4 py-3 text-muted-foreground">{{ d.status|title }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <a href="{{ url_for('arch_decisions.record_outcome', decision_id=d.id) }}"
+                           class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                            Record Outcome
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-16">
+            <i data-lucide="check-circle-2" class="h-10 w-10 text-success-emphasis mx-auto mb-3" aria-hidden="true"></i>
+            <h3 class="text-lg font-semibold text-foreground mb-1">Nothing is due for review</h3>
+            <p class="text-sm text-muted-foreground">Every decision with a review date is either in the future or already reviewed.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

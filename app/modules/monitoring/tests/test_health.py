@@ -5,7 +5,35 @@ Verifies that the migrated health routes produce identical responses
 to the original app/routes/health_routes.py implementation.
 """
 
+import pytest
+
 from app.modules.monitoring.services.health_service import HealthService
+
+
+@pytest.fixture(scope="module")
+def monitoring_app():
+    """An app with this module's health and metrics blueprints mounted.
+
+    The product app does not mount them (``app/_bootstrap/blueprints.py``
+    serves ``/health`` from ``app/routes/health_routes.py`` and leaves these
+    ops blueprints out), so the route tests below mount them on an app of
+    their own, under names that cannot collide with the product's blueprints.
+    """
+    from app import create_app
+    from app.modules.monitoring.routes.health_routes import health_bp
+    from app.modules.monitoring.routes.metrics_routes import metrics_bp
+
+    application = create_app("testing")
+    application.config["TESTING"] = True
+    application.config["WTF_CSRF_ENABLED"] = False
+    application.register_blueprint(health_bp, name="monitoring_module_health")
+    application.register_blueprint(metrics_bp, name="monitoring_module_metrics")
+    return application
+
+
+@pytest.fixture
+def client(monitoring_app):
+    return monitoring_app.test_client()
 
 
 class TestHealthService:

@@ -5,6 +5,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.application_mgmt import application_mgmt
+from app.decorators import require_roles
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.utils.route_guards import require_entity
@@ -63,6 +64,7 @@ def compliance_frameworks_dashboard():
         total_controls=total_controls,
         total_mappings=len(mappings),
         mapped_by_status=mapped_by_status,
+        load_error=False,
     )
 
 
@@ -140,6 +142,7 @@ def get_application_compliance(app_id):
 
 @application_mgmt.route("/api/applications/<string:app_id>/compliance/map", methods=["POST"])
 @login_required
+@require_roles("admin", "architect", "business_architect")
 def map_compliance_control(app_id):
     """Map a compliance control to an application component."""
     data = request.get_json()
@@ -178,6 +181,7 @@ def map_compliance_control(app_id):
 
 @application_mgmt.route("/api/compliance/mappings/<int:mapping_id>", methods=["PUT"])
 @login_required
+@require_roles("admin", "architect", "business_architect")
 def update_compliance_mapping(mapping_id):
     """Update a compliance mapping."""
     mapping = ApplicationComplianceControl.query.get_or_404(mapping_id)
@@ -211,6 +215,7 @@ def update_compliance_mapping(mapping_id):
 
 @application_mgmt.route("/api/compliance/mappings/<int:mapping_id>", methods=["DELETE"])
 @login_required
+@require_roles("admin", "architect", "business_architect")
 def delete_compliance_mapping(mapping_id):
     """Remove a compliance mapping."""
     mapping = ApplicationComplianceControl.query.get_or_404(mapping_id)

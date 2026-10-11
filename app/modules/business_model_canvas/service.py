@@ -5,6 +5,8 @@ Kept deliberately thin — the model already carries most of the logic
 business logic that don't belong on the ORM model itself.
 """
 
+from flask_login import current_user
+
 from app import db
 from app.models.business_model import (
     CANVAS_BLOCKS,
@@ -22,7 +24,13 @@ def list_canvases():
 
 
 def get_canvas_or_none(canvas_id):
-    return BusinessModelCanvas.query.get(canvas_id)
+    # A primary-key .query.get(id) does not reliably carry the ORM tenant
+    # listener's WHERE clause the way a filtered query does, so a guessed id
+    # belonging to another organisation would still be found. Filter
+    # explicitly, the same two-layer rule applied elsewhere in this codebase.
+    return BusinessModelCanvas.query.filter_by(
+        id=canvas_id, organization_id=current_user.organization_id
+    ).first()
 
 
 def create_canvas(name, description=None, operating_model_type=None):

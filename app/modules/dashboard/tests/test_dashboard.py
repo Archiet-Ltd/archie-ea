@@ -77,14 +77,14 @@ class TestDashboardRouteCount:
         )
 
     def test_dashboard_pages_route_count(self):
-        """dashboard_pages_bp should have 40 routes."""
+        """dashboard_pages_bp has its 30 routes; a change to the page set changes this."""
         from app.modules.dashboard.routes.dashboard_pages_routes import (
             dashboard_pages_bp,
         )
 
         route_count = len(dashboard_pages_bp.deferred_functions)
-        assert route_count == 40, (
-            f"Expected 40 deferred functions on dashboard_pages_bp, got {route_count}"
+        assert route_count == 30, (
+            f"Expected 30 deferred functions on dashboard_pages_bp, got {route_count}"
         )
 
 

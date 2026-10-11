@@ -38,11 +38,47 @@ _ROLE_HIERARCHY = ["viewer", "architect", "org_admin", "super_admin"]
 
 
 def _get_user_role(user):
-    """Map the current *user* to a role name in ``_ROLE_HIERARCHY``."""
-    if getattr(user, "is_platform_admin", False):
+    """Map the current *user* to a role name in ``_ROLE_HIERARCHY``.
+
+    D-4 (admin-rbac-active-org continuation): ``org_admin`` used to derive
+    from ``user.is_admin()`` -- a global ``Permission.ADMINISTER`` flag,
+    independent of which organisation is active in the session
+    (``g.current_org_id``). Since every self-registered user is
+    Administrator of their own organisation, a user who merely accepted a
+    Viewer invitation into another organisation and switched their session
+    into it was mapped to ``org_admin`` (and so passed every
+    ``@require_role("org_admin")`` check) there too -- the exact bug
+    ``admin_required``/``org_admin_required`` already fix elsewhere in this
+    PR. Also switched the platform-admin check to the canonical
+    ``is_platform_admin`` predicate (both the flag AND
+    ``Permission.ADMINISTER``), matching ``app/middleware/tenant_decorators.
+    py`` rather than re-deriving a slightly looser version of the same
+    check from the bare column.
+
+    The pre-fix "legacy role via Role model (permissions bitfield 0xFF)"
+    fallback below used to run UNCONDITIONALLY whenever the (correctly
+    active-org-scoped) ``is_org_admin`` check above returned False -- not
+    only when it raised, despite the comment that used to sit on it. That
+    silently reintroduced the exact bug this function otherwise fixes: it
+    re-derives "org_admin" from the same global
+    ``Role.permissions == Permission.ADMINISTER`` bitfield for every ordinary
+    non-admin request, for any user whose Role happens to be "Administrator"
+    (every self-registered user, in their own organisation) -- confirmed by
+    instrumenting this function directly, which is how this got caught
+    before landing. Removed outright: the active-org check above is the one
+    source of truth for "org_admin" now, with no legacy bypass behind it.
+    """
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    if is_platform_admin(user):
         return "super_admin"
-    if getattr(user, "is_org_admin", False):
-        return "org_admin"
+    try:
+        active_org_id = getattr(g, "current_org_id", None)
+        if rbac_service.is_org_admin(user, active_org_id):
+            return "org_admin"
+    except Exception:  # noqa: BLE001
+        pass
 
     er = (getattr(user, "enterprise_role", "") or "").lower()
     _ARCHITECT_ROLES = {
@@ -53,11 +89,6 @@ def _get_user_role(user):
     }
     if er in _ARCHITECT_ROLES:
         return "architect"
-
-    # Legacy role via Role model (permissions bitfield 0xFF = admin)
-    role_obj = getattr(user, "role", None)
-    if role_obj and getattr(role_obj, "permissions", 0) == 0xFF:
-        return "super_admin"
 
     return "viewer"
 
@@ -136,6 +167,21 @@ def require_role(*roles):
                 )
 
             return f(*args, **kwargs)
+
+        # R2-5 (PR 428 round 3): discoverability marker for the url_map
+        # sweep (tests/test_admin_rbac_active_org_enforcement.py), set only
+        # when this instance actually requires more than the "viewer"
+        # floor -- a no-op require_role() (or one that only ever asks for
+        # "viewer") passes every authenticated user by design, and marking
+        # that would make the sweep expect a 403 the decorator was never
+        # meant to produce.
+        _required_level = (
+            min(_ROLE_HIERARCHY.index(r) for r in roles if r in _ROLE_HIERARCHY)
+            if any(r in _ROLE_HIERARCHY for r in roles)
+            else 0
+        )
+        if _required_level > 0:
+            wrapper._active_org_rbac_gate = "require_role"
 
         return wrapper
 

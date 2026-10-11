@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}{{ vendor.name }}{% endblock %}
 {% from "components/page_header.html" import page_header %}
@@ -81,9 +82,9 @@
         {% endif %}
         <button type="button" @click="openUnifiedMappingModalDiscovery({ context: 'archimate' })"
                 class="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
-                aria-label="Map to ArchiMate elements">
+                aria-label="Map to architecture elements">
             <i data-lucide="layers" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
-            Map to ArchiMate
+            Map to Architecture
         </button>
         <button type="button" @click="openUnifiedMappingModalDiscovery({ context: 'apqc' })"
                 class="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
@@ -103,7 +104,7 @@
         {{ data_card(icon='package', icon_color='blue', value=product_count, label='Products', subtitle='In this vendor portfolio') }}
         {{ data_card(icon='shield-check', icon_color='green', value=capability_count, label='Capability Mappings', subtitle='Mapped business capabilities') }}
         {{ data_card(icon='network', icon_color='purple', value=deployed_count, label='Deployed Applications', subtitle='Linked application components') }}
-        {{ data_card(icon='blocks', icon_color='amber', value=archimate_count, label='ArchiMate Elements', subtitle='Architecture elements linked') }}
+        {{ data_card(icon='blocks', icon_color='amber', value=archimate_count, label='Architecture Elements', subtitle='Architecture elements linked') }}
     </div>
 
     {# FRAG-036: Vendor Score Card (lazy-loaded) #}
@@ -573,7 +574,7 @@
 
     {% call card() %}
         {% call card_header() %}
-            <h2 class="text-lg font-semibold leading-none tracking-tight">ArchiMate 3.2 Layer View</h2>
+            <h2 class="text-lg font-semibold leading-none tracking-tight">Architecture Layer View</h2>
             {% call card_description() %}Elements organized by architecture layer for vendor traceability.{% endcall %}
         {% endcall %}
         {% call card_content() %}
@@ -599,7 +600,7 @@
                     {% for element in elements %}
                     <li class="flex items-center justify-between text-sm">
                         <span class="font-medium">{{ element.name }}</span>
-                        <span class="text-xs text-muted-foreground">{{ element.element_type or element.type or 'Element' }}</span>
+                        <span class="text-xs text-muted-foreground">{{ (element.element_type or element.type or 'Element') | plain_name(current_user) }}</span>
                     </li>
                     {% endfor %}
                 </ul>

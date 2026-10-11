@@ -17,7 +17,7 @@ A clear description of the bug.
 What you expected instead.
 
 **Environment**
-- Archie version / commit:
+- Entelim version / commit:
 - Deployment: docker compose / manual / other
 - Browser (if a UI bug):
 

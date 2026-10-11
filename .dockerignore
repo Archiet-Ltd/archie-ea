@@ -72,7 +72,8 @@ audit/
 docs/
 agents/
 scripts/guardrails/
-migrations/versions/
+# migrations/versions/ is NOT excluded: schema-upgrade (ADR 0002) applies these
+# revisions on deploy from inside the built image, so the image must ship them.
 .claude/
 .serena/
 .cursor/

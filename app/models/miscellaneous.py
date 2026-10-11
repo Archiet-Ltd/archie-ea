@@ -99,7 +99,10 @@ class ApplicationDocument(db.Model):
     file_extension = db.Column(db.String(10), nullable=False)
     file_path = db.Column(db.String(500))  # For future use when files are actually saved
     file_size = db.Column(db.Integer)  # File size in bytes
-    uploaded_by = db.Column(db.String(100))  # Username of uploader
+    uploaded_by = db.Column(db.String(100))  # Display name of uploader (kept for templates)
+    uploaded_by_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=True, index=True
+    )
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships
@@ -107,6 +110,7 @@ class ApplicationDocument(db.Model):
     application = db.relationship(
         "ApplicationComponent", backref=db.backref("documents", lazy="dynamic")
     )
+    uploader = db.relationship("User", foreign_keys=[uploaded_by_id])
 
     def __repr__(self):
         return f"<ApplicationDocument {self.title}>"

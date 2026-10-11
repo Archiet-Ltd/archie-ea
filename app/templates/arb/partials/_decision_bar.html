@@ -87,6 +87,13 @@
                         class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Enter conditions that must be met..."></textarea>
                 </div>
+                <div class="mb-3">
+                    <label for="decision_review_date" class="block text-sm font-medium text-foreground/80 mb-1">Review date <span class="font-normal text-muted-foreground">(optional)</span></label>
+                    <input type="date" id="decision_review_date" name="review_date"
+                        aria-describedby="decision_review_date_hint"
+                        class="w-full sm:w-56 px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+                    <p id="decision_review_date_hint" class="mt-1 text-xs text-muted-foreground">When the board looks at this decision again. Leave blank if none is set.</p>
+                </div>
                 <div class="flex items-center gap-2">
                     <button type="submit"
                         class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 transition-colors"

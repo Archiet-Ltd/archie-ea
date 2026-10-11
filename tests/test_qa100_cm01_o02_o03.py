@@ -212,18 +212,49 @@ def test_oef_export_includes_views_with_node_geometry(app, db_session, make_org,
     assert 'y="340' in xml_str
 
 
-def test_oef_export_direction_validation_untouched(app, db_session):
+def test_oef_export_direction_validation_untouched(app, db_session, make_org, tenant_ctx):
     """Guardrail: O-01's relationship-direction validation (commit 6aaf0b5)
     must keep working after the O-02 additions — it is owned by another
-    agent's work and this wave must not regress it."""
+    agent's work and this wave must not regress it.
+
+    Seeds its own tenant's relationships rather than relying on rows other
+    tests left in the shared database: one valid control and one stored
+    backwards, which must be emitted reversed and reported."""
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
     from app.services.archimate_oef_service import ArchiMateOEFService
 
-    # export_model_validated must still return the (xml, errors) tuple shape
-    xml_str, errors = ArchiMateOEFService().export_model_validated()
+    org = make_org("oef-export-direction")
+    with tenant_ctx(org.id):
+        comp = ArchiMateElement(name="Direction Component", type="ApplicationComponent", layer="Application")
+        svc = ArchiMateElement(name="Direction Service", type="ApplicationService", layer="Application")
+        goal = ArchiMateElement(name="Direction Goal", type="Goal", layer="Motivation")
+        requirement = ArchiMateElement(name="Direction Requirement", type="Requirement", layer="Motivation")
+        db_session.add_all([comp, svc, goal, requirement])
+        db_session.flush()
+
+        valid = ArchiMateRelationship(type="realization", source_id=comp.id, target_id=svc.id)
+        # A Requirement realises a Goal, never the reverse: stored backwards here.
+        backwards = ArchiMateRelationship(type="realization", source_id=goal.id, target_id=requirement.id)
+        db_session.add_all([valid, backwards])
+        db_session.flush()
+
+        # export_model_validated must still return the (xml, errors) tuple shape
+        xml_str, errors = ArchiMateOEFService().export_model_validated()
+
     assert isinstance(xml_str, str)
     assert isinstance(errors, list)
     assert "<elements>" in xml_str
     assert "<relationships>" in xml_str
+    assert (
+        f'identifier="id-rel-{valid.id}" xsi:type="Realization" '
+        f'source="id-{comp.id}" target="id-{svc.id}"'
+    ) in xml_str
+    assert (
+        f'identifier="id-rel-{backwards.id}" xsi:type="Realization" '
+        f'source="id-{requirement.id}" target="id-{goal.id}"'
+    ) in xml_str
+    assert any(f"id-rel-{backwards.id}" in e and "emitted reversed" in e for e in errors)
+    assert not any(f"id-rel-{valid.id}" in e for e in errors)
 
 
 # ---------------------------------------------------------------------------

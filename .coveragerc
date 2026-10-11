@@ -1,0 +1,5 @@
+# Backend-test shards run on different CI machines, each with its own checkout
+# directory. Recording paths relative to the checkout lets `coverage combine`
+# merge the shards' data into one entry per file, instead of one per machine.
+[run]
+relative_files = True

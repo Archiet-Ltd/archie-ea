@@ -3,7 +3,7 @@ Architecture governance service — imports from inlined canonical sources.
 
 Consolidates governance, monitoring, gaps, and implementation:
 - app.services.architecture_governance_service (ArchitectureGovernanceService — 26KB)
-- app.services.architecture_monitoring_service (ArchitectureMonitoringService — 56KB)
+- app.modules.architecture.services.architecture_monitoring_service (ArchitectureMonitoringService)
 - app.services.architecture_validation_service (ArchitectureValidationService — 7KB)
 - app.services.architecture_import_export_service (ArchitectureImportExportService — 7KB)
 - app.services.architecture_search_service (ArchitectureSearchService — 2KB)

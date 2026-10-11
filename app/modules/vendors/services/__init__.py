@@ -35,6 +35,7 @@ from app.modules.vendors.services.vendor_service import (  # noqa: F401
     UnifiedVendorServices,
     VendorProductService,
 )
+from app.modules.vendors.services.vendor_merge_service import VendorMergeService  # noqa: F401
 
 __all__ = [
     "UnifiedVendorServices",
@@ -45,4 +46,5 @@ __all__ = [
     "VendorDiscoveryEngine",
     "VendorMDMService",
     "VendorProcessMappingService",
+    "VendorMergeService",
 ]

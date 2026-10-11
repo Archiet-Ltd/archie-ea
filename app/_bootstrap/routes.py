@@ -380,9 +380,11 @@ def _register_api_auth(app, csrf):
           Authenticate with email and password to establish a session.
           After successful login, all subsequent API requests will be authenticated via session cookie.
 
-          **Default Admin Credentials:**
-          - Email: flask-base-admin@example.com
-          - Password: password
+          An administrator account enrolled in (or required to enrol in)
+          multi-factor authentication cannot complete sign-in through this
+          endpoint: it always refuses with 401 and error "mfa_required"
+          rather than establishing a session, since this API path has no
+          multi-factor challenge step of its own.
         consumes:
           - application/json
         parameters:
@@ -433,7 +435,10 @@ def _register_api_auth(app, csrf):
                     is_admin:
                       type: boolean
           401:
-            description: Invalid credentials
+            description: |
+              Invalid credentials, or the account requires multi-factor
+              authentication this endpoint cannot complete (two distinct
+              causes sharing this status code; see error for which one).
             schema:
               type: object
               properties:
@@ -442,6 +447,9 @@ def _register_api_auth(app, csrf):
                   example: false
                 error:
                   type: string
+                  enum:
+                    - "Invalid email or password"
+                    - "mfa_required"
                   example: "Invalid email or password"
           400:
             description: Bad request - missing email or password
@@ -449,7 +457,7 @@ def _register_api_auth(app, csrf):
         from flask import jsonify, request
 
         from app.models import User
-        from app.services import session_registry
+        from app.services import mfa_service, session_registry
 
         data = request.get_json()
         if not data:
@@ -473,6 +481,22 @@ def _register_api_auth(app, csrf):
         ):
             return jsonify(
                 {"success": False, "error": "Invalid email or password"}
+            ), 401
+
+        # CRITICAL fix: an administrator with MFA required must never get a
+        # real session from a password alone. This endpoint is a pure JSON
+        # API with no API-based TOTP-code submission step (out of scope to
+        # add here), so the only safe behaviour is to refuse the login
+        # outright -- never call login_and_register -- and tell the caller
+        # why. Mirrors the gate app/modules/account/v2/routes/account_routes.py's
+        # login() already applies to the form-based login.
+        if mfa_service.required_for(user):
+            return jsonify(
+                {
+                    "success": False,
+                    "error": "mfa_required",
+                    "message": "This account requires multi-factor authentication, which this API endpoint does not support. Sign in through the web application instead.",
+                }
             ), 401
 
         # Fix Session Fixation: Regenerate session ID after successful authentication
@@ -692,14 +716,28 @@ def _register_metrics(app, csrf):
 
         from app.core.observability.metrics import metrics_collector
 
-        # Protect metrics — require admin auth or localhost
+        # Protect metrics — require PLATFORM admin auth or localhost.
+        #
+        # D-4 (admin-rbac-active-org continuation): this used to accept any
+        # ``current_user.is_admin()`` -- a global Permission.ADMINISTER
+        # flag that every self-registered user holds for their own
+        # organisation, not a platform-wide authority. Operational metrics
+        # span every tenant on the instance, so this was arguably the more
+        # severe end of the admin-anywhere bug class this PR fixes
+        # elsewhere: an ordinary organisation's own admin (no org-switching
+        # needed at all) could read cross-tenant operational metrics.
+        # Tightened to the canonical is_platform_admin predicate rather
+        # than the org-aware admin_required/org_admin_required check used
+        # elsewhere in this PR, since metrics are a genuinely platform-wide
+        # resource, not a per-organisation one.
+        from app.middleware.tenant_decorators import is_platform_admin
+
         is_local = request.remote_addr in ("127.0.0.1", "::1", "localhost")
         is_admin = (
             current_user
             and hasattr(current_user, "is_authenticated")
             and current_user.is_authenticated
-            and hasattr(current_user, "is_admin")
-            and current_user.is_admin()
+            and is_platform_admin(current_user)
         )
 
         if not is_local and not is_admin:

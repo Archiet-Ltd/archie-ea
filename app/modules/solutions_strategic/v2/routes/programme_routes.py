@@ -734,7 +734,11 @@ def programme_snapshots(initiative_id):
 @login_required
 def programme_delete_snapshot(initiative_id, snapshot_id):
     """Delete a snapshot (test hygiene / mistaken captures)."""
-    from app.models.strategic import ProgrammeSnapshot
+    from app.models.strategic import ProgrammeSnapshot, StrategicInitiative
+    from app.utils.route_guards import require_entity
+
+    # A snapshot carries no organisation of its own; its programme does.
+    require_entity(StrategicInitiative, initiative_id, description="Programme not found.")
 
     snap = db.session.get(ProgrammeSnapshot, snapshot_id)
     if snap is None or snap.initiative_id != initiative_id:

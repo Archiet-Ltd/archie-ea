@@ -20,6 +20,12 @@ from app.modules.import_batch.v2.services.unified_import.duplicate_detector_v2 i
     DuplicateDetector,
 )
 from app.modules.import_batch.v2.services.unified_import.file_parser_v2 import FileParser, FileStats
+from app.services.application_cost_accessor import (
+    apply_cost_to_application,
+    detect_cost_columns,
+    get_reporting_currency,
+    map_import_cost_columns,
+)
 
 if TYPE_CHECKING:
     from app.models.application_portfolio import ApplicationComponent
@@ -738,6 +744,14 @@ class ImportOrchestrator:
 
         return context
 
+    def _extract_cost_mapping(self, columns: List[str]) -> Dict[str, str]:
+        """
+        Build a cost column mapping from the available columns.
+
+        Delegates to the shared detect_cost_columns in the accessor module.
+        """
+        return detect_cost_columns(columns)
+
     def _create_application(
         self, row: Dict, columns: List[str], user_id: int
     ) -> "ApplicationComponent":
@@ -755,6 +769,12 @@ class ImportOrchestrator:
             business_criticality=context.get("criticality"),
             created_by_id=user_id,
         )
+
+        # Apply cost fields through the accessor
+        cost_mapping = self._extract_cost_mapping(columns)
+        if cost_mapping:
+            parsed = map_import_cost_columns(row, cost_mapping, reporting_currency=get_reporting_currency())
+            apply_cost_to_application(app, parsed["cost_fields"])
 
         return app
 
@@ -791,6 +811,14 @@ class ImportOrchestrator:
                 # Merge: only update if the import data has a non-empty value
                 if value:
                     setattr(app, attr_name, value)
+
+        # Apply cost fields through the accessor (only in overwrite mode or when cost is provided)
+        cost_mapping = self._extract_cost_mapping(columns)
+        if cost_mapping:
+            parsed = map_import_cost_columns(row, cost_mapping, reporting_currency=get_reporting_currency())
+            # In merge mode, only apply cost if the import has a value for it
+            if mode == "overwrite" or parsed["cost_fields"]:
+                apply_cost_to_application(app, parsed["cost_fields"])
 
     def _store_elements(self, app: "ApplicationComponent", elements: List[Dict[str, Any]]) -> None:
         """Store generated ArchiMate elements for an application."""

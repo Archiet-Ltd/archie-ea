@@ -35,6 +35,7 @@ def register(app: Flask) -> None:
     from app.modules.architecture.routes.architect_ui_routes import architect_ui_bp
     from app.modules.architecture.routes.architecture_monitoring_routes import (
         architecture_monitoring_bp,
+        monitoring_api_enabled,
     )
     from app.modules.architecture.routes.arb_routes import arb_bp
     from app.modules.architecture.routes.arb_workflow_routes import arb_workflow_bp
@@ -56,7 +57,6 @@ def register(app: Flask) -> None:
         architecture_assistant_bp,
         archimate_export_bp,
         architect_ui_bp,
-        architecture_monitoring_bp,
         arb_bp,
         arb_workflow_bp,
         adm_kanban_view_bp,
@@ -78,7 +78,6 @@ def register(app: Flask) -> None:
     app.register_blueprint(architecture_assistant_bp)
     app.register_blueprint(archimate_export_bp)
     app.register_blueprint(architect_ui_bp)
-    app.register_blueprint(architecture_monitoring_bp)
     app.register_blueprint(arb_bp)
     app.register_blueprint(arb_workflow_bp)
     app.register_blueprint(adm_kanban_view_bp)
@@ -87,6 +86,14 @@ def register(app: Flask) -> None:
     app.register_blueprint(archimate_bp)
     app.register_blueprint(adr_bp)
 
+    if monitoring_api_enabled(app):
+        mark_blueprint_guardrailed(architecture_monitoring_bp)
+        app.register_blueprint(architecture_monitoring_bp)
+    else:
+        app.logger.info(
+            "[MODULE-V2] architecture monitoring API not mounted (ARCHITECTURE_MONITORING_API_ENABLED off)"
+        )
+
     app.logger.info(
-        "[MODULE-V2] architecture v2 registered (guardrail-enabled, ~215 routes, 15 blueprints)"
+        "[MODULE-V2] architecture v2 registered (guardrail-enabled, ~215 routes, 15 or 16 blueprints)"
     )

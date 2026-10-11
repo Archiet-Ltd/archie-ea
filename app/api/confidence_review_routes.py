@@ -516,8 +516,9 @@ def get_review_item_details(review_item_id: int):
     """
     try:
         from app.models.confidence_review import ReviewQueueItem
+        from app.utils.route_guards import load_entity
 
-        review_item = ReviewQueueItem.query.get(review_item_id)
+        review_item = load_entity(ReviewQueueItem, review_item_id)
         if not review_item:
             return jsonify({"success": False, "error": "Review item not found"}), 404
 

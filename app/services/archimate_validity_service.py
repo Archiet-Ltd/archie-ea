@@ -505,6 +505,42 @@ class ArchimateValidityService:
                 "description": f"{source_type} realises {target_type}",
             })
 
+        # Active -> Active (same layer): Serving, Triggering, Flow.
+        # ArchiMate 3.2 Appendix B permits the dynamic and dependency
+        # relationships between active structure elements of one layer (an
+        # application component serving, triggering or passing data to another,
+        # an interface serving the component that uses it) -- the basis of the
+        # Application Cooperation viewpoint. The Appendix B table in
+        # app/config/archimate_relationship_matrix.py already lists them; without
+        # this rule the Composer refused the most common application-landscape
+        # connection there is.
+        if src_aspect == "active" and tgt_aspect == "active":
+            results.append({
+                "type": "serving",
+                "tier": "standard",
+                "description": f"{source_type} serves {target_type}",
+            })
+            results.append({
+                "type": "flow",
+                "tier": "standard",
+                "description": f"Transfer of data from {source_type} to {target_type}",
+            })
+            results.append({
+                "type": "triggering",
+                "tier": "standard",
+                "description": f"{source_type} triggers {target_type}",
+            })
+
+        # Behaviour -> Active: Serving. A service serves the active structure
+        # element that uses it (ArchiMate 3.2 §5.4.1, e.g. an application
+        # service serves an application component).
+        if src_aspect == "behaviour" and tgt_aspect == "active":
+            results.append({
+                "type": "serving",
+                "tier": "standard",
+                "description": f"{source_type} serves {target_type}",
+            })
+
         # CMP-060: active→behaviour realization (ArchiMate 3.2 §5.3.1)
         # An active structure element can realize a behaviour element of the same layer
         # (e.g. ApplicationComponent realizes ApplicationService,
@@ -716,7 +752,21 @@ class ArchimateValidityService:
         return results
 
     def _strategy_rules(self, source_type, target_type, src_layer, tgt_layer):
-        """Strategy layer relationship patterns."""
+        """Strategy layer relationship patterns.
+
+        Canvas relationship keys ("aggregation","strategy","strategy") and
+        ("assignment","strategy","strategy") added to VALID_RELATIONSHIPS
+        (app/models/archimate_core.py) need no new rule here: the same-type
+        block below already grants aggregation between two elements of the
+        same strategy type (Capability/Capability, Resource/Resource — the
+        "hierarchies" ArchiMate 3.2 §5.1.2 describes), and the Resource ->
+        Capability assignment rule two lines down already grants assignment
+        for that pair (§7.4). The six new "association" keys (option ↔ plan
+        item, outcome ↔ work package, key partner ↔ resource/capability)
+        likewise need no rule here: ``is_valid`` treats association as
+        always valid (ArchiMate 3.2 §5.2.4: "association may connect any two
+        concepts"), unconditionally, before any layer rule runs.
+        """
         results = []
 
         # Within strategy layer

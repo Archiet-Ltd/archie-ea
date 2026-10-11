@@ -4,7 +4,7 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || ""
 // NEXT_PUBLIC_BASE_PATH controls the subpath prefix for API calls and redirects.
 // Standalone deployment: set NEXT_PUBLIC_BASE_PATH="" in .env.local before npm run build.
-// Default falls back to the subpath baked in at generation time (ARCHIE preview).
+// Default falls back to the subpath baked in at generation time (Entelim preview).
 const _BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "{{ base_path }}"
 
 // Prevent concurrent token refresh races

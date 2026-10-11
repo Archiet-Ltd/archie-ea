@@ -270,8 +270,28 @@ def api_application_solutions(app_id):
 
         app = ApplicationComponent.query.get_or_404(app_id)
 
-        # Build query: admin sees all, others see own solutions only
-        if hasattr(current_user, "is_admin") and current_user.is_admin():
+        # Build query: an admin OF THE ACTIVE organisation sees all, others
+        # see own solutions only.
+        #
+        # D-4 (admin-rbac-active-org continuation): this used to be
+        # ``hasattr(current_user, "is_admin") and current_user.is_admin()``
+        # -- a global Permission.ADMINISTER flag, independent of which
+        # organisation is active in the session. Since every
+        # self-registered user is Administrator of their own organisation,
+        # a user who merely accepted a Viewer invitation into another
+        # organisation and switched their session into it saw every
+        # solution there too, not just their own -- the exact bug
+        # admin_required/org_admin_required already fix elsewhere in this
+        # PR.
+        from flask import g
+
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
+        _active_org_id = getattr(g, "current_org_id", None)
+        if is_platform_admin(current_user) or rbac_service.is_org_admin(
+            current_user, _active_org_id
+        ):
             base = Solution.query
         else:
             base = Solution.query.filter_by(created_by_id=current_user.id)
@@ -1137,6 +1157,9 @@ def api_process_link_ops(app_id, link_id):
     """
     Delete a process link.
     """
+    # The link carries no organisation of its own; the application does. Resolve it
+    # outside the try below, whose broad except would turn the 404 into a 500.
+    ApplicationComponent.query.get_or_404(app_id)
     try:
         from app.models.relationship_tables import ApplicationProcessSupport
 

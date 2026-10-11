@@ -184,6 +184,7 @@ class AcmDomainService:
 
         # Create baseline proposals with pre-filled properties
         from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
+        from app.services.solution_blueprint_service import create_solution_blueprint_proposal
         from app.modules.architecture_assistant.property_service import PropertyService
         prop_svc = PropertyService()
 
@@ -201,7 +202,7 @@ class AcmDomainService:
                 default_props = prop_svc.get_default_properties(
                     el["archimate_type"], tier="standard"
                 )
-                proposal = SolutionBlueprintProposal(
+                create_solution_blueprint_proposal(
                     solution_id=solution_id,
                     archimate_type=el["archimate_type"],
                     name=el["name"],
@@ -215,7 +216,6 @@ class AcmDomainService:
                     default_rel_type=el.get("default_rel_type"),
                     acm_properties=default_props if default_props else None,
                 )
-                db.session.add(proposal)
         db.session.commit()
 
         # Create NFR proposals from NFR templates
@@ -240,7 +240,7 @@ class AcmDomainService:
             # NFRs are Requirements — set priority to should-have by default
             if "priority" not in nfr_props:
                 nfr_props["priority"] = {"value": "should-have", "source": "default"}
-            proposal = SolutionBlueprintProposal(
+            create_solution_blueprint_proposal(
                 solution_id=solution_id,
                 archimate_type=nfr.archimate_type,
                 name=nfr.name,
@@ -253,7 +253,6 @@ class AcmDomainService:
                 default_rel_type=nfr.default_rel_type,
                 acm_properties=nfr_props if nfr_props else None,
             )
-            db.session.add(proposal)
         db.session.commit()
 
         # LLM call for solution-specific elements
@@ -279,7 +278,7 @@ class AcmDomainService:
                     # Guard: existing_id must be an integer (LLM may return a name string)
                     raw_existing_id = el.get("existing_id")
                     existing_element_id = raw_existing_id if isinstance(raw_existing_id, int) else None
-                    proposal = SolutionBlueprintProposal(
+                    create_solution_blueprint_proposal(
                         solution_id=solution_id,
                         archimate_type=el.get("type", "Unknown"),
                         name=el.get("name", "Unnamed"),
@@ -293,7 +292,6 @@ class AcmDomainService:
                         status="proposed",
                         acm_properties=acm_props if acm_props else None,
                     )
-                    db.session.add(proposal)
             db.session.commit()
 
         # LLM pass: fill properties on ALL elements (baseline + LLM)

@@ -1,6 +1,6 @@
 """Project `business_capability` rows into the canonical `unified_capabilities` store.
 
-`unified_capabilities` is Archie's canonical capability store, but nothing in the
+`unified_capabilities` is Entelim's canonical capability store, but nothing in the
 codebase ever *projected* an existing capability store into it — the seven writers
 (`app/commands/seed_capabilities.py:2175`, `app/services/manufacturing_seed_service.py:51`,
 and five others) are seeders, importers and per-row UI creates. Production therefore

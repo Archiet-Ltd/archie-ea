@@ -85,6 +85,13 @@ Return ONLY valid JSON:
 {{"name": "...", "description": "..."}}"""
 
     try:
+        from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+        LLMService._guard_provider_call(
+            provider_type,
+            model,
+            prompt=prompt,
+        )
         if provider_type == 'anthropic':
             response = client.messages.create(
                 model=model,

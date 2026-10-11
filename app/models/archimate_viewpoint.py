@@ -367,6 +367,10 @@ class ArchimateAuditLog(db.Model):
     new_value = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
 
+    # Set when this row has been copied into the one audit store
+    # (soc2_audit_log); points at the copy. NULL until copied.
+    retired_into_id = db.Column(db.BigInteger, db.ForeignKey("soc2_audit_log.id"), nullable=True)
+
     actor = db.relationship("User", foreign_keys=[user_id], lazy="joined")
 
     def __repr__(self):

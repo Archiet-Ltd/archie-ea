@@ -38,6 +38,9 @@ class UserPreference(db.Model):
     notify_on_suggestions = db.Column(db.Boolean, default=True)
     notify_on_gaps_detected = db.Column(db.Boolean, default=True)
     notify_on_policy_violations = db.Column(db.Boolean, default=True)
+    # Service-status subscription: tell this user when a platform incident
+    # opens or resolves. NULL (never chosen) reads as not subscribed.
+    notify_on_service_status = db.Column(db.Boolean, nullable=True)
 
     # Per-workflow mode overrides (JSON)
     workflow_mode_overrides = db.Column(db.JSON, default=dict)

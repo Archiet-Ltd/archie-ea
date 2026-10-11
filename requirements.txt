@@ -36,6 +36,8 @@ itsdangerous>=2.1.0,<3.0.0
 MarkupSafe>=2.1.0,<3.0.0
 email-validator>=2.0.0
 PyYAML>=6.0,<7.0.0
+markdown>=3.7,<4.0.0              # public content pages (Markdown → HTML)
+bleach>=6.1,<7.0.0                # public content pages (strips unsafe HTML from rendered Markdown)
 beautifulsoup4>=4.12.0           # HTML parsing (required to boot)
 faiss-cpu>=1.7.4                 # vector index for semantic search (required to boot)
 sentence-transformers>=2.2.0     # local embeddings for semantic search (required to boot)
@@ -193,7 +195,15 @@ opentelemetry-exporter-otlp-proto-http>=1.20.0,<2.0.0
 
 # Enterprise Identity / SSO (S0-01)
 # COM-005: OIDC federation for enterprise SSO — no existing OIDC library in codebase
-authlib>=1.3.0
+authlib>=1.8.0,<2
+joserfc>=1.7,<2
+# R1-B12 PR 2: SAML 2.0 assertion signature verification. signxml builds on
+# lxml + cryptography (both already present) rather than python3-saml's
+# xmlsec1 system library, which this platform's containers do not install.
+signxml>=4.0.0,<6
+# R1-B12 PR 2: TOTP multi-factor authentication for administrators — no
+# existing MFA library in codebase.
+pyotp>=2.9.0,<3
 
 # Load Testing (S1-04)
 locust>=2.20.0

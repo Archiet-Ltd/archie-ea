@@ -52,6 +52,29 @@ class ResourceDomain(Enum):
     SECURITY = "security"
 
 
+# Baseline (non-admin) permission bits per domain -- see
+# ``RBACManager._get_role_permissions`` for why this excludes any
+# admin-only escalation. Hoisted to module scope (R2-5, PR 428 round 3) so
+# ``require_permission`` can tell, at decoration time, whether a given
+# (domain, permission) pair is already open to every authenticated user --
+# the `_active_org_rbac_gate` url_map sweep marker belongs only on the
+# domain/permission pairs baseline access does NOT already grant, since
+# marking one everyone legitimately passes (e.g. ResourceDomain.ARCHITECTURE,
+# Permission.READ) would make the sweep expect a 403 the permission model
+# was never meant to produce for a mere Viewer.
+_NON_ADMIN_BASELINE_PERMISSIONS = {
+    ResourceDomain.ARCHITECTURE: Permission.READ.value | Permission.WRITE.value,
+    ResourceDomain.APPLICATIONS: Permission.READ.value | Permission.WRITE.value,
+    ResourceDomain.VENDORS: Permission.READ.value | Permission.WRITE.value,
+    ResourceDomain.CAPABILITIES: Permission.READ.value | Permission.WRITE.value,
+    ResourceDomain.ROADMAP: Permission.READ.value | Permission.WRITE.value,
+    ResourceDomain.COMPLIANCE: Permission.READ.value,
+    ResourceDomain.ADMIN: Permission.NONE.value,
+    ResourceDomain.AUDIT: Permission.NONE.value,
+    ResourceDomain.SECURITY: Permission.NONE.value,
+}
+
+
 class RBACManager:
     """
     Centralized RBAC authorization manager.
@@ -85,8 +108,30 @@ class RBACManager:
         if not user or not user.is_authenticated:
             return False
 
-        # Admin users have all permissions
-        if user.is_admin():
+        # D-4 (admin-rbac-active-org continuation): this used to be
+        # ``user.is_admin()`` -- a global ``Permission.ADMINISTER`` flag,
+        # independent of which organisation is active in the session
+        # (``g.current_org_id``). Since every self-registered user is
+        # Administrator of their own organisation, a user who merely
+        # accepted a Viewer invitation into another organisation and
+        # switched their session into it was granted every permission on
+        # every resource domain there too (architecture, applications,
+        # vendors, capabilities, roadmap, compliance, ...) -- the exact bug
+        # ``admin_required``/``org_admin_required`` already fix elsewhere in
+        # this PR. Admin users in the ACTIVE organisation still have all
+        # permissions. _get_role_permissions' own, separate "Administrator
+        # role -> Permission.all()" escalation is removed below rather than
+        # also made active-org-aware in place, so this is the one and only
+        # place that grants it -- threading g.current_org_id through
+        # _get_user_permissions' cache (keyed only by user id and domain,
+        # not by organisation) would silently serve one organisation's
+        # cached admin-level permissions to another.
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+        from flask import g
+
+        active_org_id = getattr(g, "current_org_id", None)
+        if is_platform_admin(user) or rbac_service.is_org_admin(user, active_org_id):
             return True
 
         # Get user's effective permissions for this domain
@@ -179,46 +224,24 @@ class RBACManager:
 
     def _get_role_permissions(self, role: Role, resource_domain: ResourceDomain) -> int:
         """
-        Get permissions for a role in a specific domain.
+        Get permissions for a role in a specific domain, for a user who is
+        NOT an admin of the organisation currently active in their session
+        (``check_permission`` above already returns early -- with all
+        permissions -- for one who is).
 
-        Maps legacy permission system to new domain-based system.
+        D-4 (admin-rbac-active-org continuation): this used to ALSO grant
+        every permission (``Permission.all()``) whenever ``role.permissions
+        == Permission.ADMINISTER`` or ``role.name == "Administrator"`` --
+        the same global, not-active-org-scoped flag ``check_permission``'s
+        own bypass used, reachable independently of it (a caller that
+        reaches this method at all has already been refused that bypass).
+        Removed rather than re-derived here: ``_get_user_permissions``'
+        cache is keyed only by user id and domain, not by organisation, so
+        threading ``g.current_org_id`` through to this layer would risk
+        serving one organisation's cached admin-level permissions to
+        another the next time the same user is checked in a different one.
         """
-        # For backward compatibility, map old permission system
-        if role.permissions & 0xFF == 0xFF:  # Admin permission
-            return Permission.all()
-
-        # Domain-specific permission mapping
-        domain_permissions = {
-            ResourceDomain.ARCHITECTURE: Permission.all()
-            if role.name == "Administrator"
-            else Permission.READ.value | Permission.WRITE.value,
-            ResourceDomain.APPLICATIONS: Permission.all()
-            if role.name == "Administrator"
-            else Permission.READ.value | Permission.WRITE.value,
-            ResourceDomain.VENDORS: Permission.all()
-            if role.name == "Administrator"
-            else Permission.READ.value | Permission.WRITE.value,
-            ResourceDomain.CAPABILITIES: Permission.all()
-            if role.name == "Administrator"
-            else Permission.READ.value | Permission.WRITE.value,
-            ResourceDomain.ROADMAP: Permission.all()
-            if role.name == "Administrator"
-            else Permission.READ.value | Permission.WRITE.value,
-            ResourceDomain.COMPLIANCE: Permission.all()
-            if role.name == "Administrator"
-            else Permission.READ.value,
-            ResourceDomain.ADMIN: Permission.all()
-            if role.name == "Administrator"
-            else Permission.NONE.value,
-            ResourceDomain.AUDIT: Permission.READ.value
-            if role.name == "Administrator"
-            else Permission.NONE.value,
-            ResourceDomain.SECURITY: Permission.READ.value
-            if role.name == "Administrator"
-            else Permission.NONE.value,
-        }
-
-        return domain_permissions.get(resource_domain, Permission.NONE.value)
+        return _NON_ADMIN_BASELINE_PERMISSIONS.get(resource_domain, Permission.NONE.value)
 
     def get_user_domains(self, user: User) -> List[ResourceDomain]:
         """
@@ -307,6 +330,17 @@ def require_permission(
             return f(*args, **kwargs)
 
         wrapper.__name__ = f.__name__
+
+        # R2-5 (PR 428 round 3): discoverability marker for the url_map
+        # sweep (tests/test_admin_rbac_active_org_enforcement.py), set only
+        # when this (domain, permission) pair is NOT already part of the
+        # non-admin baseline -- see _NON_ADMIN_BASELINE_PERMISSIONS above.
+        # Only then is check_permission's active-org admin bypass the one
+        # path that can grant it, which is exactly what this PR fixed.
+        baseline = _NON_ADMIN_BASELINE_PERMISSIONS.get(resource_domain, Permission.NONE.value)
+        if (baseline & permission.value) != permission.value:
+            wrapper._active_org_rbac_gate = "require_permission"
+
         return wrapper
 
     return decorator

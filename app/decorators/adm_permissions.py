@@ -46,8 +46,10 @@ def _check_role(user, required_roles: List[str]) -> bool:
     if not user or not user.is_authenticated:
         return False
 
-    # Admin always has access
-    if user.is_admin or "admin" in required_roles:
+    # Admin always has access (judged in the active organisation)
+    from app.middleware.tenant_decorators import is_active_org_admin
+
+    if is_active_org_admin(user) or "admin" in required_roles:
         return True
 
     # Check user's roles

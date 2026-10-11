@@ -10,6 +10,5 @@ Modules:
 Usage:
     from app.modules.ai_chat.services.chat_service import MultiDomainChatService
     from app.modules.ai_chat.services.llm_service import LLMService, LLMModelRouter
-    from app.modules.ai_chat.services.ai_analysis_service import AIRecommendationEngine
     from app.modules.ai_chat.services.ai_assistant_service import UnifiedAIAssistant
 """

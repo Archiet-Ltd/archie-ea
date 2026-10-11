@@ -147,6 +147,12 @@
                 {{ dash(_orm_review.decision_date.strftime('%d %b %Y') if _orm_review.decision_date else none) }}
             </dd>
         </div>
+        <div class="min-w-0">
+            <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Review date</dt>
+            <dd class="break-words text-sm text-foreground" data-testid="decision-review-date">
+                {{ dash(_orm_review.follow_up_date.strftime('%d %b %Y') if _orm_review.follow_up_date else none) }}
+            </dd>
+        </div>
         <div class="min-w-0 sm:col-span-3">
             <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Rationale</dt>
             <dd class="whitespace-pre-line break-words text-sm text-foreground">{{ dash(_orm_review.decision_rationale) }}</dd>

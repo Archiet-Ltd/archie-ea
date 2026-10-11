@@ -1,0 +1,117 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% block title %}Data Subject Requests — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    {{ page_header(
+        title='Data Subject Requests',
+        description='Record a request, see which systems and suppliers hold the personal data it concerns, and give each search to an owner. Every step is kept in the audit trail.',
+        breadcrumbs=[
+            {'label': 'Home', 'href': url_for('main.index')},
+            {'label': 'Data Subject Requests'}
+        ],
+        actions=[{'text': 'Trace a personal-data category', 'icon': 'git-fork', 'href': url_for('gdpr_bp.dsr_trace'), 'variant': 'outline'}]
+    ) }}
+
+    <div class="rounded-xl border border-border bg-card overflow-hidden">
+        <div class="p-4 border-b border-border bg-muted/30">
+            <h2 class="text-lg font-semibold">New request</h2>
+            <p class="text-xs text-muted-foreground mt-1">Choose a person in your organisation for access or erasure of what this platform holds about them, or name an outside data subject to scope the search of your own systems.</p>
+        </div>
+        <form method="POST" action="{{ url_for('gdpr_bp.dsr_create') }}" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="dsr-create-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label for="dsr-type" class="block text-sm font-medium mb-1">Request type</label>
+                <select id="dsr-type" name="request_type" required data-testid="dsr-type"
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                    <option value="" selected disabled>Select…</option>
+                    {% for value, label in request_types.items() %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="dsr-subject-user" class="block text-sm font-medium mb-1">Person in your organisation</label>
+                <select id="dsr-subject-user" name="subject_user_id" data-testid="dsr-subject-user"
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                    <option value="">Not a platform user</option>
+                    {% for p in people %}
+                    <option value="{{ p.id }}">{{ p.email }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="dsr-subject-reference" class="block text-sm font-medium mb-1">Outside data subject</label>
+                <input id="dsr-subject-reference" name="subject_reference" type="text" maxlength="255"
+                    data-testid="dsr-subject-reference" placeholder="Reference or description of the person"
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+            </div>
+            <div>
+                <span class="block text-sm font-medium mb-1">Personal-data categories</span>
+                {% if categories %}
+                <div class="flex flex-wrap gap-3 text-sm">
+                    {% for c in categories %}
+                    <label class="inline-flex items-center gap-1.5">
+                        <input type="checkbox" name="category_ids" value="{{ c.id }}" class="rounded border-input">
+                        {{ c.name }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <p class="text-xs text-muted-foreground mt-1">Leave all unticked to scope every category.</p>
+                {% else %}
+                <p class="text-sm text-muted-foreground">No data entity is recorded as holding personal data yet. Mark one in the data entity catalogue to scope requests against it.</p>
+                {% endif %}
+            </div>
+            <div class="md:col-span-2">
+                <button type="submit" data-testid="dsr-create-submit"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                    Record and scope
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="dsr-list">
+        <div class="p-4 border-b border-border bg-muted/30">
+            <h2 class="text-lg font-semibold">Requests</h2>
+        </div>
+        {% if requests %}
+        <table class="w-full text-sm">
+            <thead class="text-left text-muted-foreground">
+                <tr>
+                    <th class="px-4 py-2 font-medium">Recorded</th>
+                    <th class="px-4 py-2 font-medium">Type</th>
+                    <th class="px-4 py-2 font-medium">Subject</th>
+                    <th class="px-4 py-2 font-medium">In scope</th>
+                    <th class="px-4 py-2 font-medium">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                {% for r in requests %}
+                {% set items = (r.scope_json or {}).get('items') or [] %}
+                <tr>
+                    <td class="px-4 py-2">
+                        <a class="text-primary hover:underline" href="{{ url_for('gdpr_bp.dsr_detail', request_id=r.id) }}" data-testid="dsr-row-{{ r.id }}">{{ r.requested_at.strftime('%Y-%m-%d %H:%M') if r.requested_at else '—' }}</a>
+                    </td>
+                    <td class="px-4 py-2">{{ r.type_label }}</td>
+                    <td class="px-4 py-2">{{ r.subject_reference or ('Platform user' if r.has_platform_account else '—') }}</td>
+                    <td class="px-4 py-2">{{ items | length if r.scope_json else '—' }}</td>
+                    <td class="px-4 py-2">{{ r.status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        {{ empty_state(
+            icon='inbox',
+            title='No requests recorded yet',
+            description='Record a request above to see which systems and suppliers to search.',
+            cta_text=None
+        ) }}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

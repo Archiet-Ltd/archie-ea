@@ -190,7 +190,7 @@ function blueprintChat() {
                                administrative "AI is not configured" notice was
                                painted as an ordinary assistant answer,
                                indistinguishable from real architecture advice.
-                               Archie is a system of record: that is the exact
+                               Entelim is a system of record: that is the exact
                                confusion we must not create. Check `error`
                                first, so a failed turn always reads as failed. */
                             if (event.error) {

@@ -44,6 +44,35 @@
 {% macro page_shell(title, subtitle=None, breadcrumb=[], actions_caller=None, tabs=[], icon=None, subtitle_caller=None, meta_caller=None, stack_actions=False) %}
 <div class="mb-6">
     {% if breadcrumb %}
+    {# Full breadcrumb trail on sm+; single back-link below sm when stack_actions #}
+    {% if stack_actions and breadcrumb|length > 1 %}
+    {% set _parent = breadcrumb[-2] %}
+    <nav aria-label="Breadcrumb" class="mb-3">
+        {# sm+: full trail #}
+        <ol class="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
+            {% for label, href in breadcrumb %}
+            <li class="flex items-center gap-1.5 min-w-0"{% if loop.last %} aria-current="page"{% endif %}>
+                {% if loop.last %}
+                    <span class="text-foreground font-medium break-words min-w-0">{{ crumb_label(label, loop.first) }}</span>
+                {% elif href %}
+                    <a href="{{ href }}" class="hover:text-foreground transition-colors">{{ crumb_label(label, loop.first) }}</a>
+                    <i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i>
+                {% else %}
+                    <span>{{ crumb_label(label, loop.first) }}</span>
+                    <i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ol>
+        {# Below sm: single back-link to parent #}
+        <div class="sm:hidden">
+            <a href="{{ _parent[1] }}" class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <i data-lucide="chevron-left" class="w-4 h-4" aria-hidden="true"></i>
+                {{ crumb_label(_parent[0], True) }}
+            </a>
+        </div>
+    </nav>
+    {% else %}
     <nav aria-label="Breadcrumb" class="mb-3">
         <ol class="flex items-center gap-1.5 text-sm text-muted-foreground{% if stack_actions %} flex-wrap{% endif %}">
             {% for label, href in breadcrumb %}
@@ -61,6 +90,7 @@
             {% endfor %}
         </ol>
     </nav>
+    {% endif %}
     {% endif %}
 
     {# Below xl (1280px) the actions block drops to its own full-width row and
@@ -174,7 +204,7 @@
             <i data-lucide="{{ icon }}" class="h-5 w-5 text-primary-foreground"></i>
         </div>
         <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium text-muted-foreground">{{ label }}</div>
+            <div class="text-sm font-medium text-muted-foreground line-clamp-1" title="{{ label }}">{{ label }}</div>
             <div class="mt-1 font-semibold text-foreground tabular-nums {{ value_size }}">{{ value|dash }}</div>
             {% if hint %}
             <div class="mt-1 text-xs {{ hint_classes }}">{{ hint }}</div>

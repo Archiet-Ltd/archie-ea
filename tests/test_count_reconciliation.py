@@ -404,7 +404,7 @@ def recon_client(app, db_session, make_org, login_as):
         role=role,
         confirmed=True,
     )
-    user.password = "TestPassw0rd!23"
+    user.password = uuid.uuid4().hex
     db_session.add(user)
     db_session.flush()
     client = app.test_client()
@@ -688,7 +688,7 @@ def recon_client(app, db_session, make_org, login_as):
         role=role,
         confirmed=True,
     )
-    user.password = "TestPassw0rd!23"
+    user.password = uuid.uuid4().hex
     db_session.add(user)
     db_session.flush()
     client = app.test_client()

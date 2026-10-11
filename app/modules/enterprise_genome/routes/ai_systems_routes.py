@@ -3,7 +3,7 @@
 Blueprint: ``ai_systems_genome_bp``, url_prefix ``/genome``.
 
   GET  /genome/ai-systems        the AI Systems Register
-  POST /genome/ai-systems/seed   seed the org's AI systems, incl. Archie's own
+  POST /genome/ai-systems/seed   seed the org's AI systems, incl. Entelim's own
                                  copilot (self-modelling), then re-render.
 
 Login-gated, org-scoped (the tenant middleware scopes the ArchiMateElement reads
@@ -55,7 +55,7 @@ def ai_systems():
 @ai_systems_genome_bp.route("/ai-systems/seed", methods=["POST"])
 @login_required
 def ai_systems_seed():
-    """Seed the org's AI systems, including Archie's own copilot (self-model).
+    """Seed the org's AI systems, including Entelim's own copilot (self-model).
 
     Idempotent — re-running updates the existing elements in place. Also seeds a
     couple of illustrative estate systems so the register is not empty on a
@@ -66,7 +66,7 @@ def ai_systems_seed():
         return redirect(url_for("ai_systems_genome.ai_systems"))
 
     try:
-        # Archie's own copilot — honest self-model.
+        # Entelim's own copilot — honest self-model.
         seed_archie_copilot(db.session, org_id)
 
         # Illustrative estate AI systems (real modelled elements).

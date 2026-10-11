@@ -1,4 +1,4 @@
-"""Deploy generated solutions via Docker on the ARCHIE server.
+"""Deploy generated solutions via Docker on the Entelim server.
 
 This is the ONLY file that knows about the deployment backend. If we swap to
 Coolify, CapRover, or Kubernetes later, only this file changes. The public API

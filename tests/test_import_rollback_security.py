@@ -1,6 +1,7 @@
 """Focused rollback boundary checks; pure policy tests require no database."""
 import ast
 import json
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -56,12 +57,77 @@ def test_invalid_or_conflicting_metadata_rejected(settings, details):
 
 
 @pytest.mark.parametrize('owner', [None, 99])
-def test_callable_false_admin_cannot_bypass_ownership(owner):
+def test_non_admin_cannot_bypass_ownership(owner):
     with pytest.raises(PermissionError):
         policy()['_rollback_policy'](history({'application_ids': [11]}, imported_by_id=owner),
                                      user(), datetime(2026, 9, 6))
-    assert policy()['_rollback_policy'](history({'application_ids': [11]}, imported_by_id=owner),
-                                        user(admin=True), datetime(2026, 9, 6)) == [11]
+
+
+# R3-1 (PR 428 round 4): ``is_admin()`` used to be judged globally here --
+# ANY holder of the Permission.ADMINISTER flag could roll back ANY
+# organisation's import, not just their own, because the check never
+# looked at which organisation was active. ``_rollback_policy`` now calls
+# ``is_active_org_admin(user)``, which needs a real Flask-Login user, a
+# real active organisation (``g.current_org_id``) and ``rbac_service`` --
+# none of which the plain ``SimpleNamespace`` double above can represent,
+# so the admin-override half of the old test above (now moved here) needs
+# the real app/db fixtures instead of staying a "pure, no database" check.
+@pytest.mark.parametrize('owner', [None, 99])
+def test_active_org_admin_can_override_ownership_but_a_mere_global_flag_cannot(
+    app, db_session, make_org, owner
+):
+    from app.middleware.tenant_decorators import is_active_org_admin
+    from app.models.user import Permission, Role, User
+
+    org = make_org(f"r3-1-rollback-{uuid.uuid4().hex[:8]}")
+    admin_role = Role.query.filter(
+        Role.permissions.op("&")(Permission.ADMINISTER) == Permission.ADMINISTER
+    ).first()
+
+    real_admin = User(
+        email=f"r3-1-rollback-admin-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="Org",
+        last_name="Admin",
+        organization_id=org.id,
+        confirmed=True,
+        role=admin_role,
+    )
+    real_admin.password = uuid.uuid4().hex
+    db_session.add(real_admin)
+    db_session.flush()
+
+    with app.test_request_context("/"):
+        from flask import g
+        from flask_login import login_user
+
+        login_user(real_admin)
+        g.current_org_id = org.id
+
+        assert is_active_org_admin(real_admin) is True, (
+            "fixture setup: a genuine Administrator of their own, active "
+            "organisation must be judged an active-org admin"
+        )
+        assert policy()["_rollback_policy"](
+            history({"application_ids": [11]}, imported_by_id=owner),
+            real_admin,
+            datetime(2026, 9, 6),
+        ) == [11], "a genuine active-org admin must still be able to roll back any import in their own org"
+
+        # The global ADMINISTER flag alone, with NO active-org standing
+        # (g.current_org_id pointed at a different organisation this user
+        # has no relationship to), must no longer stand in for it.
+        other_org = make_org(f"r3-1-rollback-other-{uuid.uuid4().hex[:8]}")
+        g.current_org_id = other_org.id
+        assert is_active_org_admin(real_admin) is False, (
+            "an Administrator switched to an organisation they have no "
+            "standing in must not be judged an active-org admin there"
+        )
+        with pytest.raises(PermissionError):
+            policy()["_rollback_policy"](
+                history({"application_ids": [11]}, imported_by_id=owner),
+                real_admin,
+                datetime(2026, 9, 6),
+            )
 
 
 def test_exact_seven_day_window_and_aware_utc():

@@ -52,7 +52,7 @@
                 </select>
                 <p class="mt-1 text-xs text-muted-foreground">
                     OIDC works with Entra ID, Okta, Google Workspace, and any standards-compliant IdP.
-                    SAML 2.0 support is coming soon.
+                    SAML 2.0 is also supported, with signed-assertion verification.
                 </p>
             </div>
 
@@ -116,14 +116,43 @@
 
             {# SAML fields (hidden by default) #}
             <div id="saml-fields" class="hidden space-y-4">
-                <div class="rounded-md border border-border bg-warning/5 p-4 text-sm text-foreground">
-                    <strong>SAML 2.0 support is coming soon.</strong>
-                    SAML federation requires the <code>python3-saml</code> library.
-                    For now, please use OIDC.
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-1" for="idp_sso_url">
+                        IdP SSO URL
+                        <span class="text-muted-foreground font-normal">(redirect-binding sign-in endpoint)</span>
+                    </label>
+                    <input type="url" id="idp_sso_url" name="idp_sso_url"
+                           value="{{ config.idp_sso_url if config else '' }}"
+                           placeholder="https://idp.example.com/saml/sso"
+                           class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-1" for="idp_x509_cert">
+                        IdP Signing Certificate
+                        <span class="text-muted-foreground font-normal">(PEM, used to verify every assertion)</span>
+                    </label>
+                    <textarea id="idp_x509_cert" name="idp_x509_cert" rows="6"
+                              placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                              class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-primary/50">{{ config.idp_x509_cert if config else '' }}</textarea>
+                    <p class="mt-1 text-xs text-muted-foreground">
+                        Entered here, out of band from any sign-in attempt, so a forged assertion
+                        carrying its own certificate can never be trusted.
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-1" for="sp_entity_id">
+                        Service Provider Entity ID
+                        <span class="text-muted-foreground font-normal">(optional; defaults to this platform's own URL)</span>
+                    </label>
+                    <input type="text" id="sp_entity_id" name="sp_entity_id"
+                           value="{{ config.sp_entity_id if config else '' }}"
+                           placeholder="Leave blank unless your IdP requires a specific entity id"
+                           class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-foreground mb-1" for="idp_metadata_url_saml">
                         IdP Metadata URL
+                        <span class="text-muted-foreground font-normal">(optional, for reference only)</span>
                     </label>
                     <input type="url" id="idp_metadata_url_saml" name="idp_metadata_url"
                            value="{{ config.idp_metadata_url if config else '' }}"
@@ -148,14 +177,6 @@
                         class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus:ring-2 focus:ring-primary/50">
                     Save Configuration
                 </button>
-
-                {% if config and config.email_domain %}
-                    <a href="{{ url_for('sso.sso_initiate', email='test@' + config.email_domains[0]) }}"
-                       target="_blank"
-                       class="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
-                        Test SSO →
-                    </a>
-                {% endif %}
             </div>
         </form>
     </div>
@@ -178,6 +199,38 @@
                 </dd>
             </div>
         </dl>
+    </div>
+
+    {# Test sign-in: runs the real IdP round-trip without enforcing the
+       config or signing anyone in (R1-B12 PR 2, TB-0142/PB-0129). Works
+       even while "Enable SSO" above is unchecked -- that is the point. #}
+    <div class="mt-6 bg-card border border-border rounded-lg p-5">
+        <h3 class="text-sm font-semibold text-foreground mb-2">Test sign-in</h3>
+        <p class="text-sm text-muted-foreground mb-3">
+            Try this configuration against your identity provider without enforcing it for
+            every user yet. This completes a real sign-in round-trip and verifies the
+            response, but never creates or signs in an account.
+        </p>
+        <a href="{{ url_for('sso.admin_sso_test_initiate') }}"
+           class="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
+            Run test sign-in →
+        </a>
+
+        {% if config.last_test_result %}
+        <div class="mt-4 rounded-md border p-3 text-sm
+            {% if config.last_test_result.status == 'success' %}bg-primary/10 border-primary/20 text-foreground
+            {% else %}bg-destructive/10 border-destructive/20 text-destructive-emphasis{% endif %}"
+            data-testid="sso-test-result">
+            <p class="font-medium">
+                {{ 'Success' if config.last_test_result.status == 'success' else 'Failed' }}
+                — {{ config.last_test_result.message }}
+            </p>
+            <p class="mt-1 text-xs text-muted-foreground">Tested {{ config.last_test_result.tested_at }}</p>
+            {% if config.last_test_result.claims_preview %}
+            <p class="mt-1 text-xs font-mono">{{ config.last_test_result.claims_preview }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 

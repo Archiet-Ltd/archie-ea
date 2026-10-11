@@ -454,17 +454,19 @@
                     }
 
                     if (data.success) {
+                        const wasEditing = !!this.editingGate;
                         this.dismissModal();
                         await this.loadGates();
-                        this.showMessage(
-                            this.editingGate ? 'Gate updated.' : 'Gate created.',
-                            'success'
-                        );
+                        this.showMessage(wasEditing ? 'Gate updated.' : 'Gate created.', 'success');
                     } else {
                         this.formError = data.error || 'Failed to save gate.';
                     }
                 } catch (e) {
-                    this.formError = 'Network error. Please try again.';
+                    // Platform.fetch throws on a non-2xx answer; show the server's
+                    // reason (e.g. a duplicate gate name) rather than calling it a
+                    // network error.
+                    this.formError = (e && e.data && e.data.error) || (e && e.status ? e.message : '')
+                        || 'Network error. Please try again.';
                 } finally {
                     this.saving = false;
                 }

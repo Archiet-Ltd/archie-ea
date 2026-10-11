@@ -367,14 +367,25 @@ class TestDashboardCompatWrappers:
 class TestDashboardV2ServiceInlining:
     """Ensure dashboard v2 has no direct app.services imports."""
 
+    # Shared homes a dashboard must read rather than copy: the layer map is
+    # the one system of record for ArchiMate layers (ADR 0008, also read by
+    # the composer), and the feature-flag service is the one AI feature gate.
+    # Copying either into v2 would make a second implementation.
+    SHARED_SYSTEMS_OF_RECORD = {
+        "app.services.archimate_viewpoint_service",
+        "app.services.feature_flag_service",
+        "app.services.application_cost_accessor",
+    }
+
     def test_no_direct_app_services_imports(self):
         v2_root = pathlib.Path(__file__).resolve().parents[1] / "v2"
-        pattern = re.compile(r"^\s*from\s+app\.services\.", re.MULTILINE)
+        pattern = re.compile(r"^\s*from\s+(app\.services\.[\w.]+)", re.MULTILINE)
 
         offenders = []
         for py_file in v2_root.rglob("*.py"):
             content = py_file.read_text(encoding="utf-8")
-            if pattern.search(content):
-                offenders.append(str(py_file.relative_to(v2_root.parent)))
+            for module in pattern.findall(content):
+                if module not in self.SHARED_SYSTEMS_OF_RECORD:
+                    offenders.append(f"{py_file.relative_to(v2_root.parent)}: {module}")
 
         assert offenders == [], f"Direct app.services imports found: {offenders}"

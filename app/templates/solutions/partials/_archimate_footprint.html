@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {# ArchiMate Footprint Panel (SA-002) — fetched from GET /solutions/<id>/archimate-elements #}
 <div
     x-data="{
@@ -158,7 +159,7 @@
 >
     <div class="flex items-center gap-2 mb-3">
         <i data-lucide="layers" class="w-4 h-4 text-primary" aria-hidden="true"></i>
-        <h3 class="text-sm font-semibold text-foreground">ArchiMate Footprint</h3>
+        <h3 class="text-sm font-semibold text-foreground">Architecture Footprint</h3>
         <template x-if="!amLoading && amTotal > 0">
             <div class="ml-auto flex items-center gap-3">
                 <span class="text-xs text-muted-foreground" x-text="amTotal + ' element' + (amTotal !== 1 ? 's' : '')"></span>

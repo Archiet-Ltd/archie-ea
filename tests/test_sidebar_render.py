@@ -309,3 +309,64 @@ def test_impact_analysis_is_linked_under_my_work(app, db_session, make_org, role
     assert my_work != -1 and library != -1 and my_work < link < library, (
         f"{role}: the Impact Analysis link is not under the My work heading"
     )
+
+
+@pytest.mark.parametrize(
+    "role,label",
+    [
+        ("solution_architect", "sa-canvases"),
+        ("enterprise_architect", "ea-canvases"),
+        ("business_architect", "ba-canvases"),
+        ("procurement", "proc-canvases"),
+    ],
+)
+def test_canvases_and_frameworks_in_library_zone(app, db_session, make_org, role, label):
+    """Canvas/framework UI fix: "Canvases" and "Frameworks" must appear in the
+    shared Library zone for every role."""
+    sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
+    assert "Canvases" in sidebar_html, f"{role}: no Canvases link in sidebar"
+    assert "Frameworks" in sidebar_html, f"{role}: no Frameworks link in sidebar"
+    # Both must be under the Library heading, not My work.
+    library = sidebar_html.find("Library")
+    canvases = sidebar_html.find("Canvases")
+    frameworks = sidebar_html.find("Frameworks")
+    assert library != -1 and library < canvases, f"{role}: Canvases not under Library"
+    assert library != -1 and library < frameworks, f"{role}: Frameworks not under Library"
+
+
+def test_framework_management_and_config_reachable_from_admin_dashboard(app, db_session, make_org):
+    """Canvas/framework UI fix, round 2 (25 Sep 2026): Framework Management and
+    Framework Configuration are reached from the admin dashboard page
+    (Command Center) rather than two more Admin-zone sidebar links — the
+    platform_admin sidebar has zero headroom left once "Canvases" and
+    "Frameworks" join every role's Library zone (see
+    app/utils/role_access.py's SIDEBAR_LINK_BUDGET comment). Command Center
+    itself is still the first link in the Admin zone, so both stay one click
+    away from the sidebar."""
+    client = _make_logged_in_client(app, db_session, make_org, "platform_admin", "pa-fw-dash")
+    resp = client.get("/admin/")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "Framework Management" in html
+    assert "Framework Configuration" in html
+    assert 'href="/framework-management/"' in html or 'href="/framework-management' in html
+    assert 'href="/framework-config/"' in html or 'href="/framework-config' in html
+
+    # A non-admin cannot reach the dashboard page at all (admin_required).
+    sa_client = _make_logged_in_client(app, db_session, make_org, "solution_architect", "sa-no-fw-dash")
+    sa_resp = sa_client.get("/admin/")
+    assert sa_resp.status_code in (302, 403), (
+        "solution_architect should not be able to load the admin dashboard page"
+    )
+
+
+def test_business_architect_no_duplicate_capability_frameworks(app, db_session, make_org):
+    """Canvas/framework UI fix: business_architect must not have a separate
+    "Capability Frameworks" link — it is now "Frameworks" in the shared Library."""
+    sidebar_html = _sidebar_html(app, db_session, make_org, "business_architect", "ba-no-dup-cf")
+    assert "Capability Frameworks" not in sidebar_html, (
+        "business_architect must not have a separate Capability Frameworks link"
+    )
+    assert "Frameworks" in sidebar_html, (
+        "business_architect must still see Frameworks in the Library zone"
+    )

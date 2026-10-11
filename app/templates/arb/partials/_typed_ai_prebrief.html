@@ -1,0 +1,105 @@
+{#
+  AI pre-brief (reviewer assist).
+
+  Advisory only: POST /arb/api/reviews/<id>/ai-prebrief writes nothing to the
+  review — the reviewer's actual decision still goes through the decision
+  controls in _typed_decision.html. The route and the service behind it,
+  app/modules/architecture/services/arb_review_ai_service.py, were never
+  touched by the typed consolidation; only the Alpine component that drove
+  this panel was lost when the legacy review-detail template was deleted.
+  arbPrebriefPanel is redefined in review_detail.html's extra_head_js block
+  from that same, unchanged response shape (summary, key_risks,
+  questions_for_submitter, conflicts_or_overlaps, draft_disposition,
+  draft_conditions, rationale).
+
+  Context: review (typed_arb_review_view mapping).
+#}
+{% from 'components/card.html' import card, card_header, card_title, card_content %}
+
+{% set _rid = (review.identity or {}).get('review_item_id') %}
+
+{% if _rid %}
+<section id="ai-prebrief" aria-labelledby="ai-prebrief-heading" class="mb-6" x-data="arbPrebriefPanel({{ _rid }})">
+{% call card() %}
+    {% call card_header() %}
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <i data-lucide="sparkles" class="h-4 w-4 text-primary" aria-hidden="true"></i>
+                {% call card_title(class='text-lg') %}
+                    <span id="ai-prebrief-heading">AI pre-brief</span>
+                {% endcall %}
+                <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">AI-suggested draft</span>
+            </div>
+            <button type="button" @click="generate()" :disabled="loading"
+                    class="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                    aria-label="Generate AI pre-brief">
+                <i data-lucide="loader" x-show="loading" x-cloak class="h-3.5 w-3.5 animate-spin" aria-hidden="true"></i>
+                <span x-text="loading ? 'Generating…' : (prebrief ? 'Regenerate' : 'Generate pre-brief')"></span>
+            </button>
+        </div>
+    {% endcall %}
+    {% call card_content(class='space-y-4') %}
+    <p class="text-xs text-muted-foreground">
+        AI-assembled context from this review, its linked solution, ADR and applicable principles. Advisory
+        only &#8212; it does not change the review; the board's decision is still recorded via the decision controls.
+    </p>
+
+    <div x-show="error" x-cloak role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" x-text="error"></div>
+
+    <div x-show="prebrief" x-cloak class="space-y-4">
+        <div>
+            <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Summary</h3>
+            <p class="mt-1 text-sm text-foreground" x-text="prebrief && prebrief.summary"></p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Draft disposition</span>
+            <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                  x-text="prebrief && prebrief.draft_disposition.replace(/_/g, ' ')"></span>
+        </div>
+
+        <div x-show="prebrief && prebrief.key_risks && prebrief.key_risks.length" x-cloak>
+            <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Key risks</h3>
+            <ul class="mt-1 list-disc space-y-0.5 pl-5 text-sm text-foreground">
+                <template x-for="(risk, idx) in (prebrief ? prebrief.key_risks : [])" :key="idx">
+                    <li x-text="risk"></li>
+                </template>
+            </ul>
+        </div>
+
+        <div x-show="prebrief && prebrief.conflicts_or_overlaps && prebrief.conflicts_or_overlaps.length" x-cloak>
+            <h3 class="text-xs font-medium uppercase tracking-wide text-warning-emphasis">Conflicts / overlaps</h3>
+            <ul class="mt-1 list-disc space-y-0.5 pl-5 text-sm text-foreground">
+                <template x-for="(item, idx) in (prebrief ? prebrief.conflicts_or_overlaps : [])" :key="idx">
+                    <li x-text="item"></li>
+                </template>
+            </ul>
+        </div>
+
+        <div x-show="prebrief && prebrief.questions_for_submitter && prebrief.questions_for_submitter.length" x-cloak>
+            <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Questions for submitter</h3>
+            <ul class="mt-1 list-disc space-y-0.5 pl-5 text-sm text-foreground">
+                <template x-for="(q, idx) in (prebrief ? prebrief.questions_for_submitter : [])" :key="idx">
+                    <li x-text="q"></li>
+                </template>
+            </ul>
+        </div>
+
+        <div x-show="prebrief && prebrief.draft_disposition === 'approved_with_conditions' && prebrief.draft_conditions && prebrief.draft_conditions.length" x-cloak>
+            <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Draft conditions</h3>
+            <ul class="mt-1 list-disc space-y-0.5 pl-5 text-sm text-foreground">
+                <template x-for="(c, idx) in (prebrief ? prebrief.draft_conditions : [])" :key="idx">
+                    <li x-text="c"></li>
+                </template>
+            </ul>
+        </div>
+
+        <div>
+            <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Rationale</h3>
+            <p class="mt-1 text-sm text-muted-foreground" x-text="prebrief && prebrief.rationale"></p>
+        </div>
+    </div>
+    {% endcall %}
+{% endcall %}
+</section>
+{% endif %}

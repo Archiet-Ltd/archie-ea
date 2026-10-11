@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 # Fixtures (app, db_session, make_org, tenant_ctx, client, login_as) are
-# discovered via app/modules/intelligence/tests/conftest.py's own import of
+# discovered via app/modules/conftest.py's import of
 # tests.conftest -- pytest resolves fixtures by name without this module
 # importing them itself (see test_derivation_runner.py for the same
 # pattern). No import needed here.
@@ -132,7 +132,7 @@ def test_route_parameter_validation_returns_400(app, db_session, make_org, clien
     resp = client.get(f"/api/v1/intelligence/impact/{a.id}?include_derived=maybe")
     assert resp.status_code == 400
     login_as(client, user)
-    resp2 = client.get(f"/api/v1/intelligence/impact/{a.id}?max_depth=7")
+    resp2 = client.get(f"/api/v1/intelligence/impact/{a.id}?max_depth=11")
     assert resp2.status_code == 400
     login_as(client, user)
     resp3 = client.get(f"/api/v1/intelligence/impact/{a.id}?direction=sideways")

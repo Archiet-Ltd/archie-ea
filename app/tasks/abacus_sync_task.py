@@ -9,6 +9,20 @@ Uses APScheduler for reliable scheduling with:
 - Async task execution
 - Error handling and retry logic
 - Job persistence across app restarts
+
+Named platform job, not a per-tenant one: ``ExternalSystem`` (the Abacus
+connection record this reads) carries no ``organization_id`` -- there is one
+Abacus connection for the whole platform, not one per tenant. It is listed as
+deliberately unfenced in ``scripts/unfenced_tables.txt``. ``run_abacus_sync_job``
+is therefore guarded by ``job_lock`` (a cross-process advisory lock, the same
+mechanism ``app/jobs/capability_projection_job.py`` uses for the same reason),
+not by ``tenant_scope`` -- there is no organisation to scope it by.
+
+``init_abacus_scheduler`` is a no-op: the sync job is NOT registered, neither
+by the worker process (``app/jobs/worker.py``) nor by any other caller,
+because ``run_abacus_sync_job`` calls ``sync_service.run_incremental_sync()``
+which does not exist (the real method is ``async_run_incremental_sync``).
+The scheduler registration is disabled until a working sync method exists.
 """
 
 import asyncio
@@ -20,91 +34,79 @@ from app.services.abacus_sync_service import get_sync_service
 logger = logging.getLogger(__name__)
 
 
-def run_abacus_sync_job():
+def run_abacus_sync_job(app=None):
     """
     Background job to run Abacus incremental sync.
 
-    Called by APScheduler on schedule.
-    Wraps async sync call in event loop.
+    Called by APScheduler on schedule. Wraps async sync call in event loop.
+
+    ``app`` is the Flask application the caller is running under. Reading
+    ``ExternalSystem``/config through the ORM requires an application
+    context, which APScheduler's background thread does not push on its own
+    -- ``init_abacus_scheduler`` always passes ``app`` through a closure, so
+    the ``app is None`` branch only matters for a direct unit-test call.
     """
     logger.info("Abacus scheduled sync job started")
 
-    try:
-        # Get sync service
-        sync_service = get_sync_service()
+    from app.jobs.tenant_safe_job import job_lock
 
-        # Run incremental sync in async context
-        # Create new event loop for background task
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
+    def _run_sync():
         try:
-            result = loop.run_until_complete(sync_service.run_incremental_sync())
-            logger.info(f"Scheduled sync completed: {result.get('status')}")
+            # Get sync service
+            sync_service = get_sync_service()
 
-            if result.get("status") == "error":
-                logger.error(f"Sync error: {result.get('message')}")
+            # Run incremental sync in async context
+            # Create new event loop for background task
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
-        finally:
-            loop.close()
+            try:
+                result = loop.run_until_complete(sync_service.run_incremental_sync())
+                logger.info(f"Scheduled sync completed: {result.get('status')}")
 
-    except Exception as e:
-        logger.error(f"Abacus sync job failed: {e}", exc_info=True)
+                if result.get("status") == "error":
+                    logger.error(f"Sync error: {result.get('message')}")
+
+            finally:
+                loop.close()
+
+        except Exception as e:
+            logger.error(f"Abacus sync job failed: {e}", exc_info=True)
+
+    def _run_locked():
+        with job_lock("abacus_incremental_sync", required=False) as acquired:
+            if not acquired:
+                logger.info(
+                    "Abacus sync job skipped -- advisory lock held by another process"
+                )
+                return
+            _run_sync()
+
+    if app is not None:
+        with app.app_context():
+            _run_locked()
+    else:
+        _run_locked()
 
 
-def init_abacus_scheduler(app):
+def init_abacus_scheduler(app, scheduler=None):
     """
-    Initialize APScheduler for Abacus sync.
+    Initialize the Abacus sync job on an APScheduler instance.
 
-    Args:
-        app: Flask application instance
+    .. caution::
 
-    Note: This function should be called during Flask app initialization.
+       This function is intentionally a no-op.  ``run_abacus_sync_job`` calls
+       ``sync_service.run_incremental_sync()`` which does not exist (the real
+       method on ``AbacusSyncService`` is ``async_run_incremental_sync``).
+       The job is not registered until a working sync method exists and the
+       scheduler registration path is re-enabled.
     """
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        from apscheduler.triggers.cron import CronTrigger
-
-        # Check if APScheduler is available
-        logger.info("Initializing Abacus sync scheduler...")
-
-        # Create scheduler
-        scheduler = BackgroundScheduler()
-
-        # Get sync schedule from configuration
-        # Default: Daily at 2 AM
-        sync_hour = app.config.get("ABACUS_SYNC_HOUR", 2)
-        sync_minute = app.config.get("ABACUS_SYNC_MINUTE", 0)
-
-        # Add job with cron trigger
-        scheduler.add_job(
-            func=run_abacus_sync_job,
-            trigger=CronTrigger(hour=sync_hour, minute=sync_minute),
-            id="abacus_incremental_sync",
-            name="Abacus Incremental Sync (Daily)",
-            replace_existing=True,
-        )
-
-        # Start scheduler
-        scheduler.start()
-
-        logger.info(f"Abacus sync scheduler started: Daily at {sync_hour:02d}:{sync_minute:02d}")
-
-        # Store scheduler in app context for shutdown
-        app.abacus_scheduler = scheduler
-
-        return scheduler
-
-    except ImportError:
-        logger.warning(
-            "APScheduler not installed - Abacus scheduled sync disabled. "
-            "Install with: pip install APScheduler"
-        )
-        return None
-
-    except Exception as e:
-        logger.error(f"Failed to initialize Abacus scheduler: {e}", exc_info=True)
-        return None
+    logger.warning(
+        "Abacus sync scheduler NOT started — run_abacus_sync_job calls "
+        "run_incremental_sync() which does not exist. "
+        "Re-enable init_abacus_scheduler once a working sync method is in place."
+    )
+    return None
 
 
 def shutdown_abacus_scheduler(app):

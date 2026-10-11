@@ -3,18 +3,22 @@
 import json
 import logging
 from datetime import datetime
+from decimal import Decimal
 
 from flask import current_app, jsonify, render_template, render_template_string, request
 from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import audit_log, require_roles
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.application_portfolio import ApplicationComponent
+from app.services.application_cost_accessor import set_annual_cost
 from app.services.rate_limiter import rate_limit
 
 from . import unified_applications_bp
 from app.utils.pagination import safe_int_arg
 from app.utils.route_guards import require_entity
+from app.utils.tenant_users import escape_like_literal
 
 logger = logging.getLogger(__name__)
 
@@ -365,6 +369,7 @@ def rationalization_tracking():
 
 @unified_applications_bp.route("/rationalization/api/run-detection", methods=["POST"])
 @login_required
+@platform_admin_required
 @rate_limit(3, "1h")
 @audit_log("rationalization_run_detection")
 def rationalization_run_detection():
@@ -416,6 +421,7 @@ def rationalization_get_groups():
 
 @unified_applications_bp.route("/rationalization/api/runs")
 @login_required
+@platform_admin_required
 def rationalization_get_runs():
     """Get detection run history."""
     from app.services.unified_duplicate_detection_service import (
@@ -435,6 +441,7 @@ def rationalization_get_runs():
     "/rationalization/api/auto-resolve-exact", methods=["POST"]
 )
 @login_required
+@platform_admin_required
 @audit_log("rationalization_auto_resolve")
 def rationalization_auto_resolve():
     """Auto-resolve exact match duplicate groups."""
@@ -838,7 +845,7 @@ def api_list_templates():
         if element_type:
             query = query.filter(ElementTemplate.element_type == element_type)
         if search:
-            _escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            _escaped = escape_like_literal(search)
             query = query.filter(
                 db.or_(
                     ElementTemplate.name.ilike(f"%{_escaped}%", escape="\\"),
@@ -4242,7 +4249,7 @@ def rationalization_enrich_app(app_id):
             val = payload["total_cost_of_ownership"]
             if val is not None:
                 try:
-                    app_obj.total_cost_of_ownership = float(val)
+                    set_annual_cost(app_obj, Decimal(str(val)))
                     changed.append("total_cost_of_ownership")
                 except (ValueError, TypeError):
                     logger.exception("Failed to operation")

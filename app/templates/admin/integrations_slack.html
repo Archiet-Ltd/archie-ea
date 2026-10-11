@@ -7,7 +7,7 @@
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
     {{ page_header(
         title='Slack AI Architect',
-        description='Connect A.R.C.H.I.E. to Slack. The AI Architect listens for @archie mentions and passively monitors channels for portfolio application names.',
+        description='Connect Entelim to Slack. The AI Architect listens for @entelim mentions and passively monitors channels for portfolio application names.',
         breadcrumbs=[
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Admin', 'href': url_for('admin.index')},
@@ -91,7 +91,7 @@
                                {% if config.mention_response %}checked{% endif %}
                                class="mt-0.5 h-4 w-4 rounded border-border accent-primary" />
                         <span>
-                            <span class="text-sm font-medium">@archie mention responses</span><br>
+                            <span class="text-sm font-medium">@entelim mention responses</span><br>
                             <span class="text-xs text-muted-foreground">When someone @mentions the bot, the AI Architect answers architecture questions using live portfolio context.</span>
                         </span>
                     </label>
@@ -147,7 +147,7 @@
             <div>
                 <p class="text-sm font-medium mb-1.5">Required event subscriptions</p>
                 <ul class="text-sm text-muted-foreground space-y-1">
-                    <li><code class="text-xs bg-muted px-1 py-0.5 rounded">app_mention</code> — responds when @archie is mentioned</li>
+                    <li><code class="text-xs bg-muted px-1 py-0.5 rounded">app_mention</code> — responds when @entelim is mentioned</li>
                     <li><code class="text-xs bg-muted px-1 py-0.5 rounded">message.channels</code> — scans public channel messages for portfolio app names</li>
                 </ul>
             </div>

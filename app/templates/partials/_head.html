@@ -1,8 +1,20 @@
 <meta charset="utf-8">
+{# smoke-coverage-ok: CSP nonce fix on <style>; covered by tests/test_capability_map_a11y_csp.py and tests/test_csp_nonce.py #}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+<!-- Theme init: apply dark class before first paint to prevent flash.
+     Moved from composer_base.html so both layouts share one implementation. -->
+<script>
+    (function() {
+        var stored = localStorage.getItem('theme');
+        if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+    })();
+</script>
+
 <!-- Alpine.js x-cloak: prevent flash of unstyled content -->
-<style>[x-cloak] { display: none !important; }</style>
+<style nonce="{{ csp_nonce }}">[x-cloak] { display: none !important; }</style>
 
 <!-- Tailwind CSS (local JIT build — run: python scripts/build_css.py) -->
 <link rel="stylesheet" href="{{ 'css/shadcn_tokens.css' | asset_url }}">
@@ -70,6 +82,8 @@
   // Add $screen magic property to Alpine.js for responsive breakpoint detection
   // This plugin adds $screen('lg'), $screen('md'), etc. to match Tailwind breakpoints
   document.addEventListener('alpine:init', () => {
+    // Add $screen magic property to Alpine.js for responsive breakpoint detection
+    // This plugin adds $screen('lg'), $screen('md'), etc. to match Tailwind breakpoints
     Alpine.magic('screen', () => {
       // Tailwind breakpoints: sm: 640px, md: 768px, lg: 1024px, xl: 1280px, 2xl: 1536px
       const breakpoints = {
@@ -90,6 +104,17 @@
         return window.matchMedia(query).matches;
       };
     });
+
+    // Theme store — one implementation for both admin_base and composer_base layouts.
+    // Moved from composer_base.html so the dark-theme toggle works on every page.
+    Alpine.store('theme', {
+        dark: document.documentElement.classList.contains('dark'),
+        toggle() {
+            this.dark = !this.dark;
+            document.documentElement.classList.toggle('dark', this.dark);
+            localStorage.setItem('theme', this.dark ? 'dark' : 'light');
+        }
+    });
   });
 </script>
 <!-- Currency Manager: org currency code drives the client default so it agrees
@@ -104,25 +129,6 @@
 <!-- Custom Scripts -->
 {% if app_js %}
 {# <script type="text/javascript" src="{{ ASSET_URL }}"></script> #}
-{% endif %}
-
-{% if config.GOOGLE_ANALYTICS_ID %}
-<!-- Google Analytics -->
-<script type="text/javascript">
-  (function(i, s, o, g, r, a, m) {
-    i['GoogleAnalyticsObject'] = r;
-    i[r] = i[r] || function() {
-      (i[r].q = i[r].q || []).push(arguments)
-    }, i[r].l = 1 * new Date();
-    a = s.createElement(o),
-      m = s.getElementsByTagName(o)[0];
-    a.async = 1;
-    a.src = g;
-    m.parentNode.insertBefore(a, m)
-  })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
-  ga('create', '{{ config.GOOGLE_ANALYTICS_ID }}', 'auto');
-  ga('send', 'pageview');
-</script>
 {% endif %}
 
 {% if config.SEGMENT_API_KEY %}
@@ -143,3 +149,8 @@
 </script>
 {% endif %}
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+<link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+<link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+<link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+<link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">

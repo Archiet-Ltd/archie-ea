@@ -15,7 +15,6 @@ from sqlalchemy import func
 from app import db
 from app.models.adm_audit_log import ADMAuditAction, ADMAuditLog
 from app.models.adm_kanban import ADMPhase, KanbanBoard, KanbanCard
-from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +51,16 @@ class ADMAuditService:
 
         return context
 
-    def _get_user_info(self, user_id: int) -> Dict[str, Any]:
-        """Get user information for audit."""
-        user = db.session.get(User, user_id)
+    def _get_user_info(self, user_id: int, organization_id: int = None) -> Dict[str, Any]:
+        """Get user information for audit, scoped to organization_id.
+
+        actor_id is not always the acting session's own id (see log_event
+        callers), so it is resolved only inside organization_id rather than
+        by a bare id lookup.
+        """
+        from app.utils.tenant_users import user_in_org
+
+        user = user_in_org(user_id, organization_id)
         if user:
             return {
                 "email": user.email,
@@ -79,6 +85,7 @@ class ADMAuditService:
         new_values: Dict = None,
         changed_fields: List[str] = None,
         justification: str = None,
+        organization_id: int = None,
     ) -> ADMAuditLog:
         """
         Record an audit event.
@@ -99,6 +106,9 @@ class ADMAuditService:
             new_values: New values (for updates)
             changed_fields: List of field names that changed
             justification: Business justification
+            organization_id: Organisation actor_id is resolved against (the
+                entity's own organisation, when the caller has it to hand);
+                falls back to the acting request's own organisation
 
         Returns:
             Created ADMAuditLog entry
@@ -120,8 +130,13 @@ class ADMAuditService:
         # Get request context
         request_context = self._get_request_context()
 
+        if organization_id is None and has_request_context():
+            from app.middleware.tenant_context import current_org_id
+
+            organization_id = current_org_id()
+
         # Get user info
-        user_info = self._get_user_info(actor_id)
+        user_info = self._get_user_info(actor_id, organization_id)
 
         audit_log = ADMAuditLog(
             audit_id=ADMAuditLog.generate_audit_id(),

@@ -65,11 +65,20 @@ def test_malformed_xml_still_raises_parse_error(parser_path):
 
 
 def test_upload_route_uses_the_safe_parser():
-    """Guard against a future edit reintroducing the raw parser on the upload path."""
+    """Guard against a future edit reintroducing the raw parser on the upload path.
+
+    Every model-import entry point (the import screen, its preview and the
+    composer's JSON endpoint) hands the uploaded XML to the one OEF import
+    engine, so the guard reads the engine; the routes that used to parse it
+    themselves must not start doing so again with the raw parser.
+    """
     import io as _io
 
-    src = _io.open(
+    engine = _io.open("app/services/archimate_import_service.py", encoding="utf-8").read()
+    assert "safe_xml.fromstring(xml_content)" in engine
+    assert "ET.fromstring(" not in engine
+
+    routes = _io.open(
         "app/modules/architecture/routes/archimate_routes.py", encoding="utf-8"
     ).read()
-    assert "safe_xml.fromstring(raw)" in src
-    assert "ET.fromstring(raw)" not in src
+    assert "ET.fromstring(raw)" not in routes

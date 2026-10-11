@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify
 
 from app.extensions import db
+from app.services.platform_slo_service import get_platform_slo_status
 
 health_bp = Blueprint("health", __name__)
 
@@ -38,3 +39,14 @@ def health_db():
             "detail": str(e),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }), 503
+
+
+@health_bp.route("/health/slo", methods=["GET"])
+def health_slo():
+    """Internal platform SLO attainment.
+
+    Unauthenticated like /health and /health/db — production watch alerts on
+    this. Returns only aggregate objective numbers: no organisation names,
+    user data or request paths (see app/services/platform_slo_service.py).
+    """
+    return jsonify(get_platform_slo_status()), 200

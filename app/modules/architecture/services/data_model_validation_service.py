@@ -11,6 +11,7 @@ This service validates:
 - Data governance (100% target)
 """
 
+import re
 from typing import Dict, List
 
 from sqlalchemy import inspect
@@ -33,6 +34,36 @@ from app.models import (
     TechnologyArtifact,
     TechnologyInterface,
 )
+
+
+# Data modelling standards a logical model is checked against. Each breach cites
+# the standard by id and title so the reader can see which rule was broken.
+DATA_STANDARDS = {
+    "NAMING-1": "Business names use words, not underscores or table prefixes",
+    "NAMING-2": "Technical names are lower-case snake_case",
+    "TYPING-1": "Entity type is master, transactional, reference or derived",
+    "TYPING-2": "Data classification is public, internal, confidential or restricted",
+    "KEY-1": "Every entity names the table or key it is stored under",
+    "REUSE-1": "An entity that already exists in the organisation is reused, not redefined",
+}
+ENTITY_TYPES = {"master", "transactional", "reference", "derived"}
+DATA_CLASSIFICATIONS = {"public", "internal", "confidential", "restricted"}
+_PREFIXED = re.compile(r"^(tbl|t|dim|fact)_", re.IGNORECASE)
+_SNAKE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
+
+
+def _normalise_name(value):
+    return re.sub(r"[^a-z0-9]", "", (value or "").lower())
+
+
+def _naming_breach(label, name):
+    if name and ("_" in name or _PREFIXED.match(name)):
+        return {
+            "standard": "NAMING-1",
+            "subject": label,
+            "finding": f"\u201c{name}\u201d uses underscores or a table prefix",
+        }
+    return None
 
 
 class DataModelValidationService:
@@ -161,6 +192,65 @@ class DataModelValidationService:
                 }
             }
         }
+
+    def check_logical_model_standards(self, model, organization_id) -> Dict:
+        """Check one logical data model against DATA_STANDARDS.
+
+        The model's own name is checked, and so is every data entity reached
+        through its conceptual model. Returns ``{"breaches": [...],
+        "entities_checked": n}``; each breach carries the standard's id and
+        title. The reuse check flags an entity whose name matches another
+        entity of the same organisation that is not part of this model.
+        """
+        breaches = []
+        breach = _naming_breach("Model name", model.name)
+        if breach:
+            breaches.append(breach)
+
+        entities = list(model.conceptual_model.data_entities) if model.conceptual_model else []
+        own_ids = {e.id for e in entities}
+        others = {}
+        for other in DataEntity.query.filter(DataEntity.organization_id == organization_id).all():
+            if other.id not in own_ids:
+                others.setdefault(_normalise_name(other.name), other)
+
+        for entity in entities:
+            label = f"Entity {entity.name}"
+            breach = _naming_breach(label, entity.name)
+            if breach:
+                breaches.append(breach)
+            if entity.technical_name and not _SNAKE.match(entity.technical_name):
+                breaches.append({
+                    "standard": "NAMING-2", "subject": label,
+                    "finding": f"technical name \u201c{entity.technical_name}\u201d is not snake_case",
+                })
+            if entity.entity_type not in ENTITY_TYPES:
+                breaches.append({
+                    "standard": "TYPING-1", "subject": label,
+                    "finding": "no entity type recorded" if not entity.entity_type
+                    else f"entity type \u201c{entity.entity_type}\u201d is not recognised",
+                })
+            if (entity.data_classification or "").lower() not in DATA_CLASSIFICATIONS:
+                breaches.append({
+                    "standard": "TYPING-2", "subject": label,
+                    "finding": "no data classification recorded" if not entity.data_classification
+                    else f"classification \u201c{entity.data_classification}\u201d is not recognised",
+                })
+            if not entity.technical_name:
+                breaches.append({
+                    "standard": "KEY-1", "subject": label,
+                    "finding": "no technical name (table or key) recorded",
+                })
+            match = others.get(_normalise_name(entity.name))
+            if match is not None:
+                breaches.append({
+                    "standard": "REUSE-1", "subject": label,
+                    "finding": f"already exists as \u201c{match.name}\u201d outside this model",
+                })
+
+        for item in breaches:
+            item["standard_title"] = DATA_STANDARDS[item["standard"]]
+        return {"breaches": breaches, "entities_checked": len(entities)}
 
     def validate_all_models(self) -> Dict:
         """

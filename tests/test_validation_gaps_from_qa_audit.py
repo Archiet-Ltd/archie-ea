@@ -115,6 +115,11 @@ def test_the_application_name_cannot_be_saved_empty(app, client):
         org_id = make_org(db, "SettingsVal")
         admin_id = make_user(db, org_id, "admin", enterprise_role="platform_admin",
                              role_name="Administrator")
+        # /api/system-settings writes a GLOBAL table, so it is platform-admin
+        # only (flag AND Administrator role), not any org's administrator.
+        from app.models.user import User
+        db.session.get(User, admin_id).is_platform_admin = True
+        db.session.commit()
 
     login(client, admin_id)
 

@@ -22,6 +22,19 @@ class Risk(TenantMixin, db.Model):
     description = db.Column(db.Text, nullable=True)
     likelihood = db.Column(db.Integer, nullable=False)  # 1-5
     impact = db.Column(db.Integer, nullable=False)       # 1-5
+    # Inherent (before mitigation) and residual (after mitigation) scores,
+    # each 1-5, nullable: a risk created before this consolidation, or one
+    # nobody has scored either way yet, has neither. Kept separate from the
+    # legacy likelihood/impact pair above rather than repurposing it, so
+    # every existing reader of likelihood/impact (the heat map, the register
+    # table, risk_detail_modal.html) keeps working unchanged. Each write goes
+    # through risk_service.set_risk_score, which also appends a
+    # RiskScoreHistory row (app/models/risk_score_history.py) — the score is
+    # stored, not only displayed.
+    inherent_likelihood = db.Column(db.Integer, nullable=True)
+    inherent_impact = db.Column(db.Integer, nullable=True)
+    residual_likelihood = db.Column(db.Integer, nullable=True)
+    residual_impact = db.Column(db.Integer, nullable=True)
     status = db.Column(db.Enum(RiskStatus), default=RiskStatus.OPEN, nullable=False)
     owner = db.Column(db.String(128), nullable=True)
     mitigation_plan = db.Column(db.Text, nullable=True)
@@ -43,8 +56,18 @@ class Risk(TenantMixin, db.Model):
         return self.likelihood * self.impact
 
     @property
+    def _effective_score(self):
+        """The score used for the risk_level badge: residual when available,
+        falling back to inherent, then to the base likelihood×impact pair."""
+        if self.residual_likelihood is not None and self.residual_impact is not None:
+            return self.residual_likelihood * self.residual_impact
+        if self.inherent_likelihood is not None and self.inherent_impact is not None:
+            return self.inherent_likelihood * self.inherent_impact
+        return self.likelihood * self.impact
+
+    @property
     def risk_level(self):
-        s = self.risk_score
+        s = self._effective_score
         if s >= 15:
             return "critical"
         if s >= 9:
@@ -61,6 +84,10 @@ class Risk(TenantMixin, db.Model):
             "description": self.description,
             "likelihood": self.likelihood,
             "impact": self.impact,
+            "inherent_likelihood": self.inherent_likelihood,
+            "inherent_impact": self.inherent_impact,
+            "residual_likelihood": self.residual_likelihood,
+            "residual_impact": self.residual_impact,
             "status": self.status.value,
             "owner": self.owner,
             "mitigation_plan": self.mitigation_plan,

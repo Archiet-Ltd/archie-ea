@@ -25,6 +25,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+from app.models.constants import ArchiMateLayer, ArchiMateRelationshipType
 from app.models.archimate_metamodel import ArchiMateRelationshipRule, MetamodelViolation
 
 # ---------------------------------------------------------------------------
@@ -41,19 +42,9 @@ from app.models.archimate_metamodel import ArchiMateRelationshipRule, MetamodelV
 #     any cross-layer rule for it) as invalid.
 # Both are fixed by normalizing before comparison, here in one place.
 
-_LAYER_ALIASES = {
-    "implementation & migration": "implementation",
-    "implementation and migration": "implementation",
-    "implementation&migration": "implementation",
-    "implementation/migration": "implementation",
-    "physical": "physical",
-}
-
-
 def _norm_layer(layer: str) -> str:
     """Canonical lowercase layer key (maps 'implementation & migration' etc.)."""
-    key = (layer or "").strip().lower()
-    return _LAYER_ALIASES.get(key, key)
+    return ArchiMateLayer.normalize(layer) or ""
 
 
 def _norm_rel(rel_type: str) -> str:
@@ -62,7 +53,7 @@ def _norm_rel(rel_type: str) -> str:
     Maps 'RealizationRelationship', 'Realization' and 'realization' all to
     'realization', so a rules table written either way compares correctly.
     """
-    return (rel_type or "").strip().lower().replace("relationship", "")
+    return ArchiMateRelationshipType.normalize(rel_type) or ""
 
 # Cross-layer relationship constraints (lowercase layer keys matching DB values).
 # Format: {(source_layer, target_layer): [allowed_relationship_types]}

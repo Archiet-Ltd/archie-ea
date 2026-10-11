@@ -1,0 +1,152 @@
+{# Analytics consent banner — shown on public pages when GA4 or Clarity is configured.
+   Equal-weight Accept/Reject, choice stored in first-party cookie for 12 months.
+   Footer "Cookie settings" link re-opens the banner. #}
+{% if config.GA4_MEASUREMENT_ID or config.CLARITY_PROJECT_ID %}
+<div id="analytics-consent-banner"
+     class="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-sm"
+     role="dialog"
+     aria-labelledby="consent-title"
+     aria-describedby="consent-desc"
+     data-consent-cookie="analytics_consent"
+     style="display: none;">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-4">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div class="flex-1 space-y-2">
+        <p id="consent-title" class="font-semibold text-foreground">
+          We value your privacy
+        </p>
+        <p id="consent-desc" class="text-sm text-muted-foreground">
+          We use Google Analytics 4 and Microsoft Clarity to understand how visitors use our site.
+          These tools set cookies that help us improve the experience. No personal data is sold.
+          <a href="/privacy" class="underline hover:text-foreground">Learn more</a>.
+        </p>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        <button type="button"
+                id="consent-accept"
+                class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                data-action="accept">
+          Accept analytics
+        </button>
+        <button type="button"
+                id="consent-reject"
+                class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+                data-action="reject">
+          Reject analytics
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+  (function() {
+    const COOKIE_NAME = 'analytics_consent';
+    const BANNER_ID = 'analytics-consent-banner';
+    const ACCEPT_VALUE = 'accepted';
+    const REJECT_VALUE = 'rejected';
+
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? match[2] : null;
+    }
+
+    function setCookie(name, value, days) {
+      const expires = new Date(Date.now() + days * 864e5).toUTCString();
+      const secure = location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Lax' + secure;
+    }
+
+    function showBanner() {
+      const banner = document.getElementById(BANNER_ID);
+      if (banner) banner.style.display = 'block';
+    }
+
+    function hideBanner() {
+      const banner = document.getElementById(BANNER_ID);
+      if (banner) banner.style.display = 'none';
+    }
+
+    function loadAnalytics() {
+      // Dispatch event so GA4/Clarity loaders can react
+      window.dispatchEvent(new CustomEvent('analytics:consent', { detail: { consent: ACCEPT_VALUE } }));
+    }
+
+    function withdrawConsent() {
+      // Update GA4 consent to denied if gtag exists
+      if (window.gtag) {
+        gtag('consent', 'update', {
+          'analytics_storage': 'denied'
+        });
+      }
+      // Reload so Clarity stops (Clarity has no programmatic stop)
+      location.reload();
+    }
+
+    function attachHandlers() {
+      const acceptBtn = document.getElementById('consent-accept');
+      const rejectBtn = document.getElementById('consent-reject');
+
+      if (acceptBtn) {
+        acceptBtn.addEventListener('click', function() {
+          setCookie(COOKIE_NAME, ACCEPT_VALUE, 365);
+          hideBanner();
+          loadAnalytics();
+        });
+      }
+
+      if (rejectBtn) {
+        rejectBtn.addEventListener('click', function() {
+          setCookie(COOKIE_NAME, REJECT_VALUE, 365);
+          hideBanner();
+          withdrawConsent();
+        });
+      }
+
+      // Attach click handler to footer "Cookie settings" link
+      const cookieSettingsLink = document.querySelector('[data-action="openAnalyticsConsentBanner"]');
+      if (cookieSettingsLink) {
+        cookieSettingsLink.addEventListener('click', function(event) {
+          event.preventDefault();
+          window.openAnalyticsConsentBanner();
+        });
+      }
+    }
+
+    function init() {
+      const consent = getCookie(COOKIE_NAME);
+      const banner = document.getElementById(BANNER_ID);
+
+      if (!banner) return; // No banner on this page (e.g. signed-in pages)
+
+      // Always attach handlers so reopened banner works
+      attachHandlers();
+
+      if (consent === ACCEPT_VALUE) {
+        // Already accepted — load analytics immediately, no banner
+        loadAnalytics();
+        return;
+      }
+
+      if (consent === REJECT_VALUE) {
+        // Explicitly rejected — never show banner, never load
+        return;
+      }
+
+      // No choice yet — show banner
+      showBanner();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+
+    // Expose for "Cookie settings" link in footer — always shows banner
+    window.openAnalyticsConsentBanner = function() {
+      showBanner();
+    };
+  })();
+</script>
+{% endif %}

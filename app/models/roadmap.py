@@ -12,12 +12,10 @@ class RoadmapTask(TenantMixin, db.Model):
     Pre-TenantMixin, this table (core roadmap/portfolio-planning data) had no
     tenant boundary at all: any org could read/edit every other org's roadmap
     tasks via routes_capability_roadmap.py, migration_planner.py and
-    consolidation_list_routes.py. See app/commands/reconcile_schema.py's
-    `_backfill_roadmap_task_organizations` for the existing-database migration
-    -- provenance is recovered via `archimate_element_id` (nullable, no FK by
-    this model's own long-standing convention) joined to the already-scoped
-    `archimate_elements` table; rows with no element link or an unresolvable
-    one are left NULL and reported, not guessed.
+    consolidation_list_routes.py. Pre-existing rows are given their organisation
+    by `flask backfill-layer-tenancy`, derived from the creating user, the work
+    package's creator, or the consolidation entry's application; rows with none
+    of those stay NULL and are reported.
     """
 
     __tablename__ = "roadmap_tasks"

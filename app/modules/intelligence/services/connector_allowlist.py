@@ -17,13 +17,11 @@ is exactly backwards for data that may carry personal or security
 information. Only a source that is either hard-coded below or explicitly
 approved via configuration is permitted through.
 
-This module shipped ahead of the crosswalk write path it guards (there was
-no crosswalk table or writer yet), so `assert_connector_permitted` had no
-caller for a time -- it existed so that when the crosswalk writer was built,
-the gate would already be in place rather than being retrofitted onto a
-write path that had already shipped without it. See
-`scripts/check_crosswalk_writer_gated.py`, which fails the build the day a
-crosswalk writer appears without a call to this function on its path.
+This module shipped ahead of the crosswalk write path it guards. The writer
+now lives in `CrosswalkService.write_link`, and the static gate
+`scripts/check_crosswalk_writer_gated.py` keeps that path load-bearing: if
+another crosswalk writer appears without a call to this function on its path,
+the build fails.
 
 Scoping how a connector is *configured* (credentials, endpoint URLs, etc.
 accepted at connector-setup time) through this same gate is a deliberate
@@ -33,6 +31,11 @@ before the crosswalk boundary rather than only at it. A type recognised by
 `ConnectorOrchestrator`'s own workflow-builder table (Salesforce, SAP,
 SharePoint, ...) but not on this allowlist is refused all the same -- add it
 to `COMPLIANCE_APPROVED_CONNECTOR_TYPES` once it has been reviewed.
+
+For the narrower historical question this module originally answered: it does
+not gate a passive configuration schema object or a read path. Those surfaces
+were unfenced; this function instead gates the live boundary where a connector
+is wired or where its identifier is about to be written into the crosswalk.
 """
 
 from __future__ import annotations

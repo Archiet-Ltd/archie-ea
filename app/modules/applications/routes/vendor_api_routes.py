@@ -147,12 +147,40 @@ def confirm_vendor_matches():
         # Import required models
         from app.models.vendor.vendor_organization import VendorProduct
 
+        def _as_int_id(value):
+            """Coerce a JSON match id to int, or None if it isn't one.
+
+            request.get_json() ids may arrive as JSON strings ("5") rather
+            than numbers. Passed straight into .in_() against an integer
+            column, a string id reaches PostgreSQL as
+            `id IN ('5'::VARCHAR)` under psycopg 3, which the database
+            refuses to compare against an integer column (a 500) rather
+            than coercing it. Treat a non-integer id as absent, the same as
+            this route already does for a missing id.
+            """
+            if isinstance(value, bool) or value is None:
+                return None
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return None
+
         # Batch prefetch applications and vendor products
         _match_app_ids = [
-            m.get("application_id") for m in matches if m.get("application_id")
+            _id
+            for _id in (_as_int_id(m.get("application_id")) for m in matches)
+            if _id is not None
         ]
-        _match_vendor_ids = [m.get("vendor_id") for m in matches if m.get("vendor_id")]
-        _match_product_ids = [m.get("product_id") for m in matches if m.get("product_id")]
+        _match_vendor_ids = [
+            _id
+            for _id in (_as_int_id(m.get("vendor_id")) for m in matches)
+            if _id is not None
+        ]
+        _match_product_ids = [
+            _id
+            for _id in (_as_int_id(m.get("product_id")) for m in matches)
+            if _id is not None
+        ]
 
         _apps_by_id = {}
         if _match_app_ids:
@@ -192,9 +220,12 @@ def confirm_vendor_matches():
 
         for match in matches:
             try:
-                application_id = match.get("application_id")
-                vendor_id = match.get("vendor_id")
-                product_id = match.get("product_id")
+                # Same edge-parse as the prefetch above -- keeps these ids
+                # comparable (via ==, and as dict keys against the int-keyed
+                # prefetch maps) to the integer ids SQLAlchemy returns.
+                application_id = _as_int_id(match.get("application_id"))
+                vendor_id = _as_int_id(match.get("vendor_id"))
+                product_id = _as_int_id(match.get("product_id"))
 
                 if not application_id or not vendor_id:
                     continue
@@ -604,9 +635,9 @@ def get_vendor_organizations():
 def get_capabilities():
     """Get all capabilities for analysis."""
     try:
-        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.limit(500).all()
+        capabilities = UnifiedCapability.query.limit(500).all()
         capability_list = []
 
         for capability in capabilities:
@@ -728,7 +759,20 @@ def get_architectural_analysis(id):
             application_vendor_products,
         )
 
-        app = ApplicationComponent.query.filter_by(id=id).first()
+        # Parse at the edge, before any query. The route captures id as a
+        # string; under psycopg 3, comparing that string directly against
+        # application_components.id (an integer column) reaches PostgreSQL as
+        # `id = '999999'::VARCHAR`, which the database refuses to compare
+        # against an integer column rather than coercing it, turning a bad or
+        # merely non-existent id into a 500 instead of a clean 404. A
+        # non-integer id names no application that could exist, so it gets
+        # the same 404 as a well-formed id that isn't found.
+        try:
+            application_id = int(id)
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "Application not found"}), 404
+
+        app = ApplicationComponent.query.filter_by(id=application_id).first()
         if not app:
             return jsonify({"success": False, "error": "Application not found"}), 404
 
@@ -740,7 +784,10 @@ def get_architectural_analysis(id):
                 UnifiedApplicationCapabilityMapping.unified_capability_id
                 == UnifiedCapability.id,
             )
-            .filter(UnifiedApplicationCapabilityMapping.application_component_id == id)
+            .filter(
+                UnifiedApplicationCapabilityMapping.application_component_id
+                == application_id
+            )
             .all()
         )
 

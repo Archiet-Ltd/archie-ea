@@ -20,6 +20,7 @@ from sqlalchemy import text
 from app import db
 from app.utils.framework_classifier import FrameworkClassifier
 from app.utils.pagination import safe_int_arg
+from app.utils.tenant_sql import current_org_id
 
 # Create blueprint
 maturity_management = Blueprint("maturity_management", __name__)
@@ -203,19 +204,18 @@ def edit_capability_maturity(capability_id):
             return redirect(url_for("maturity_management.search_capabilities"))
 
         # GET request - show edit form
-        _get_query = """
-            SELECT id, name, business_domain, description, current_maturity_level, target_maturity_level,
-                   maturity_gap, strategic_importance, business_owner, maturity_assessment_notes,
-                   maturity_assessment_date
-            FROM business_capability
-            WHERE id = :capability_id
-        """
-        _get_params = {"capability_id": capability_id}
+        #
+        # BusinessCapability is a TenantMixin model: the ORM listener applies the
+        # organisation predicate automatically, so a capability belonging to
+        # another organisation and one that does not exist are indistinguishable
+        # here (the same lookup capability_line_of_sight uses).
+        from app.models.capability_models import BusinessCapability
 
-        # The execute was missing: _get_query/_get_params were built and never run,
-        # so `result` was unbound and this route raised NameError on every request.
-        result = db.session.execute(text(_get_query), _get_params)  # tenant-filtered
-        capability = result.fetchone()
+        if current_org_id() is None:
+            flash("Capability not found", "error")
+            return redirect(url_for("maturity_management.search_capabilities"))
+
+        capability = BusinessCapability.query.filter_by(id=capability_id).first()
 
         if not capability:
             flash("Capability not found", "error")
@@ -390,34 +390,34 @@ def get_capability_api(capability_id):
     """API endpoint to get capability details"""
 
     try:
-        _api_query = """
-            SELECT id, name, business_domain, description, current_maturity_level, target_maturity_level,
-                   maturity_gap, strategic_importance, business_owner, maturity_assessment_notes,
-                   maturity_assessment_date
-            FROM business_capability
-            WHERE id = :capability_id
-        """
-        _api_params = {"capability_id": capability_id}
+        # Same ORM lookup as the GET branch above: another organisation's
+        # capability is filtered out by the tenant predicate and reads as not
+        # found, same as an id that does not exist.
+        from app.models.capability_models import BusinessCapability
 
-        result = db.session.execute(text(_api_query), _api_params)
-        capability = result.fetchone()
+        if current_org_id() is None:
+            return jsonify({"error": "Capability not found"}), 404
+
+        capability = BusinessCapability.query.filter_by(id=capability_id).first()
 
         if not capability:
             return jsonify({"error": "Capability not found"}), 404
 
         return jsonify(
             {
-                "id": capability[0],
-                "name": capability[1],
-                "business_domain": capability[2],
-                "description": capability[3],
-                "current_maturity_level": capability[4],
-                "target_maturity_level": capability[5],
-                "maturity_gap": capability[6],
-                "strategic_importance": capability[7],
-                "business_owner": capability[8],
-                "maturity_assessment_notes": capability[9],
-                "maturity_assessment_date": capability[10].isoformat() if capability[10] else None,
+                "id": capability.id,
+                "name": capability.name,
+                "business_domain": capability.business_domain,
+                "description": capability.description,
+                "current_maturity_level": capability.current_maturity_level,
+                "target_maturity_level": capability.target_maturity_level,
+                "maturity_gap": capability.maturity_gap,
+                "strategic_importance": capability.strategic_importance,
+                "business_owner": capability.business_owner,
+                "maturity_assessment_notes": capability.maturity_assessment_notes,
+                "maturity_assessment_date": capability.maturity_assessment_date.isoformat()
+                if capability.maturity_assessment_date
+                else None,
             }
         )
 

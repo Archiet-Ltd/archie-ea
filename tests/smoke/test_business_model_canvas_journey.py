@@ -116,3 +116,42 @@ def test_business_model_canvas_create_edit_and_delete(browser, live_server, seed
         expect(page.get_by_text("Smoke Canvas", exact=False)).to_have_count(0, timeout=PAGE_TIMEOUT)
     finally:
         context.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_business_model_canvas_grid_aligns_with_the_page_title(browser, live_server, seeded):
+    """The grid of canvas cards must start at the same left edge as the page
+    title above it -- an extra padding wrapper around the grid alone used to
+    push every card in further than the title, by about 24px."""
+    context = browser.new_context(ignore_https_errors=True)
+    page = context.new_page()
+    page.on("dialog", lambda d: d.accept())
+    try:
+        _login(page, live_server, seeded["emails"]["business_architect"])
+
+        index_url = live_server + "/business-model/"
+        page.goto(index_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_role("button", name=re.compile("New Canvas", re.I)).first.click()
+        form = page.locator('[data-testid="bmc-create-form"]')
+        expect(form).to_be_visible(timeout=PAGE_TIMEOUT)
+        form.locator("#bmc-name").fill("Alignment Smoke Canvas")
+        with page.expect_response(
+            lambda r: "/business-model/create" in r.url and r.request.method == "POST",
+            timeout=PAGE_TIMEOUT,
+        ) as created:
+            page.get_by_test_id("bmc-create-submit").click()
+        assert created.value.status < 400, f"create POST failed: {created.value.status}"
+
+        page.goto(index_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        grid = page.locator('[data-testid="bmc-canvas-grid"]')
+        expect(grid).to_be_visible(timeout=PAGE_TIMEOUT)
+
+        title_left = page.locator("h1").first.evaluate("el => el.getBoundingClientRect().left")
+        grid_left = grid.evaluate("el => el.getBoundingClientRect().left")
+        assert abs(title_left - grid_left) <= 1, (
+            f"canvas grid left edge ({grid_left}) does not match the page "
+            f"title's left edge ({title_left})"
+        )
+    finally:
+        context.close()
