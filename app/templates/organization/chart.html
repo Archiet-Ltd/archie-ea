@@ -68,7 +68,8 @@
               </div>
               <ul class="divide-y divide-border">
                 <template x-for="actor in group.actors" :key="actor.id">
-                  <li class="px-4 py-2.5 flex items-center justify-between gap-2">
+                  <li class="px-4 py-2.5 flex items-center justify-between gap-2 cursor-pointer hover:bg-muted/50"
+                      @click="selectUnit({id: actor.id, name: actor.name, actor_type: group.actor_type})">
                     <span class="text-sm text-foreground" x-text="actor.name"></span>
                     <span class="text-xs text-muted-foreground" x-text="actor.headcount ? actor.headcount + ' hc' : ''"></span>
                   </li>
@@ -86,8 +87,99 @@
         <span class="text-sm text-muted-foreground">
           <span x-text="actorCount"></span> actors, <span x-text="relationshipCount"></span> composition/aggregation links
         </span>
+        <span class="text-xs text-muted-foreground">Click a unit to see its capabilities and edit the hierarchy.</span>
       </div>
       <div id="org-chart-container" class="w-full" style="min-height: 500px;"></div>
+    </div>
+
+    <!-- Selected-unit panel: capabilities owned by the unit's people and
+         descendants, plus people with no unit, and the hierarchy edit
+         controls. Role-gated server-side exactly like the RACI cell editor
+         in this module (the edit routes refuse a caller without the roles);
+         the panel itself renders for everyone, matching that editor. -->
+    <div x-show="selectedUnit" x-cloak class="rounded-lg border border-border bg-card overflow-hidden" data-testid="org-unit-panel">
+      <div class="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <h3 class="text-sm font-semibold text-foreground truncate">
+            <span x-text="selectedUnit ? selectedUnit.name : ''"></span>
+            <span class="text-xs font-normal text-muted-foreground" x-text="selectedUnit ? selectedUnit.actor_type : ''"></span>
+          </h3>
+        </div>
+        <button type="button" @click="clearSelection()" class="text-xs text-muted-foreground hover:text-foreground">
+          Close
+        </button>
+      </div>
+
+      <div class="p-4 space-y-4" x-show="!capabilitiesLoading" x-cloak>
+        <!-- Capabilities owned by this unit's people and descendants -->
+        <div x-show="panelCapabilities && panelCapabilities.empty" class="text-sm text-muted-foreground" data-testid="org-unit-capabilities-empty">
+          No capability owned by this unit's people.
+        </div>
+        <div x-show="panelCapabilities && panelCapabilities.capabilities.length" data-testid="org-unit-capabilities">
+          <h4 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            Capabilities owned by this unit's people
+          </h4>
+          <ul class="divide-y divide-border rounded-md border border-border">
+            <template x-for="cap in panelCapabilities.capabilities" :key="cap.id">
+              <li class="px-3 py-2 flex items-start justify-between gap-3">
+                <span class="text-sm text-foreground" x-text="cap.name"></span>
+                <span class="text-xs text-muted-foreground text-right" x-text="cap.owners.map(o => o.name).join(', ')"></span>
+              </li>
+            </template>
+          </ul>
+        </div>
+
+        <!-- People with no unit (ownership never silently vanishes) -->
+        <div x-show="panelCapabilities && panelCapabilities.no_unit.length" data-testid="org-unit-no-unit">
+          <h4 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">No unit</h4>
+          <ul class="divide-y divide-border rounded-md border border-border">
+            <template x-for="person in panelCapabilities.no_unit" :key="person.user_id">
+              <li class="px-3 py-2 flex items-start justify-between gap-3">
+                <span class="text-sm text-foreground" x-text="person.name"></span>
+                <span class="text-xs text-muted-foreground text-right" x-text="person.capabilities.map(c => c.name).join(', ')"></span>
+              </li>
+            </template>
+          </ul>
+        </div>
+
+        <!-- Hierarchy editing -->
+        <div class="space-y-3 pt-3 border-t border-border">
+          <h4 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Edit hierarchy</h4>
+          <form @submit.prevent="addChild()" class="flex items-center gap-2" data-testid="org-chart-add-child-form">
+            <input type="text" x-model="addChildName" placeholder="New child unit name" required
+                   class="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+            <button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+              Add child
+            </button>
+          </form>
+          <form @submit.prevent="renameUnit()" class="flex items-center gap-2" data-testid="org-chart-rename-form">
+            <input type="text" x-model="renameName" :placeholder="'Rename to…'" required
+                   class="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+            <button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+              Rename
+            </button>
+          </form>
+          <form @submit.prevent="moveUnit()" class="flex items-center gap-2" data-testid="org-chart-move-form">
+            <select x-model="moveParentId" class="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm" data-testid="org-chart-move-select">
+              <option value="">Detach (make root)</option>
+              <template x-for="node in movableParents" :key="node.id">
+                <option :value="node.id" x-text="node.name"></option>
+              </template>
+            </select>
+            <button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+              Move
+            </button>
+          </form>
+          <div class="flex items-center gap-2">
+            <button type="button" @click="removeUnit()"
+                    class="rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90"
+                    data-testid="org-chart-remove-unit">
+              Remove unit
+            </button>
+            <span class="text-xs text-muted-foreground">Removing is refused while the unit has children or assigned people.</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

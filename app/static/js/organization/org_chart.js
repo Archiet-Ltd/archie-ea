@@ -17,6 +17,16 @@ document.addEventListener('alpine:init', () => {
         actorCount: 0,
         relationshipCount: 0,
 
+        // Selected-unit panel state.
+        selectedUnit: null,
+        panelCapabilities: null,
+        capabilitiesLoading: false,
+        addChildName: '',
+        renameName: '',
+        moveParentId: '',
+        allNodes: [],
+        movableParents: [],
+
         async init() {
             await this.loadData();
         },
@@ -45,6 +55,7 @@ document.addEventListener('alpine:init', () => {
                     this.roots = data.roots || [];
                     this.$nextTick(() => this.renderTree());
                 }
+                this.refreshMovableParents();
             } catch (e) {
                 // Counts are null, not 0: nothing was counted.
                 this.roots = [];
@@ -64,6 +75,129 @@ document.addEventListener('alpine:init', () => {
                 throw e;
             } finally {
                 this.loading = false;
+            }
+        },
+
+        // ── Selected-unit panel ────────────────────────────────────────────
+
+        selectUnit(unit) {
+            if (!unit || !unit.id) return;
+            this.selectedUnit = { id: unit.id, name: unit.name, actor_type: unit.actor_type || '' };
+            this.addChildName = '';
+            this.renameName = '';
+            this.moveParentId = '';
+            this.loadUnitCapabilities(unit.id);
+        },
+
+        clearSelection() {
+            this.selectedUnit = null;
+            this.panelCapabilities = null;
+        },
+
+        async loadUnitCapabilities(unitId) {
+            this.capabilitiesLoading = true;
+            try {
+                const raw = await Platform.fetch(`/organization/chart/api/units/${unitId}/capabilities`);
+                // The route routes capacity: {"data": {...}}
+                this.panelCapabilities = raw.data || raw;
+            } catch (e) {
+                this.panelCapabilities = null;
+                if (window.Platform && Platform.toast) {
+                    Platform.toast.error('Could not load this unit\'s capabilities.');
+                }
+            } finally {
+                this.capabilitiesLoading = false;
+            }
+        },
+
+        refreshMovableParents() {
+            const nodes = [];
+            const walk = (roots) => {
+                for (const node of roots || []) {
+                    nodes.push({ id: node.id, name: node.name, actor_type: node.actor_type });
+                    walk(node.children);
+                }
+            };
+            if (this.fallback) {
+                for (const group of this.groups || []) {
+                    for (const actor of group.actors || []) {
+                        nodes.push({ id: actor.id, name: actor.name, actor_type: group.actor_type });
+                    }
+                }
+            } else {
+                walk(this.roots);
+            }
+            this.allNodes = nodes;
+            if (this.selectedUnit) {
+                // The unit itself is not a valid move target (self-parent is a cycle).
+                this.movableParents = nodes.filter(n => n.id !== this.selectedUnit.id);
+            } else {
+                this.movableParents = nodes;
+            }
+        },
+
+        // ── Hierarchy editing ──────────────────────────────────────────────
+        // Every call goes to a role-gated route; a caller without the roles
+        // gets a 403 the same way the RACI cell editor refuses them.
+
+        async addChild() {
+            const name = (this.addChildName || '').trim();
+            if (!this.selectedUnit || !name) return;
+            try {
+                await Platform.fetch('/organization/chart/api/units', {
+                    method: 'POST',
+                    body: { name, parent_id: this.selectedUnit.id, actor_type: 'Department' },
+                });
+                this.addChildName = '';
+                await this.loadData();
+            } catch (e) {
+                if (window.Platform && Platform.toast) Platform.toast.error('Could not add the unit.');
+            }
+        },
+
+        async renameUnit() {
+            const name = (this.renameName || '').trim();
+            if (!this.selectedUnit || !name) return;
+            try {
+                await Platform.fetch(`/organization/chart/api/units/${this.selectedUnit.id}`, {
+                    method: 'PATCH',
+                    body: { name },
+                });
+                this.selectedUnit.name = name;
+                this.renameName = '';
+                await this.loadData();
+            } catch (e) {
+                if (window.Platform && Platform.toast) Platform.toast.error('Could not rename the unit.');
+            }
+        },
+
+        async moveUnit() {
+            if (!this.selectedUnit) return;
+            try {
+                await Platform.fetch(`/organization/chart/api/units/${this.selectedUnit.id}/parent`, {
+                    method: 'PATCH',
+                    body: { parent_id: this.moveParentId ? Number(this.moveParentId) : null },
+                });
+                this.moveParentId = '';
+                await this.loadData();
+            } catch (e) {
+                if (window.Platform && Platform.toast) Platform.toast.error('Could not move the unit.');
+            }
+        },
+
+        async removeUnit() {
+            if (!this.selectedUnit) return;
+            if (!window.confirm(`Remove "${this.selectedUnit.name}"? Refused while it has children or assigned people.`)) {
+                return;
+            }
+            try {
+                await Platform.fetch(`/organization/chart/api/units/${this.selectedUnit.id}`, {
+                    method: 'DELETE',
+                });
+                this.clearSelection();
+                await this.loadData();
+            } catch (e) {
+                if (window.Platform && Platform.toast) Platform.toast.error('Could not remove the unit.');
             }
         },
 
@@ -131,7 +265,8 @@ document.addEventListener('alpine:init', () => {
                 .attr('height', 44)
                 .attr('rx', 6)
                 .attr('fill', 'hsl(var(--card))')
-                .attr('stroke', 'hsl(var(--primary))');
+                .attr('stroke', 'hsl(var(--primary))')
+                .attr('style', 'cursor: pointer;');
 
             visibleNode.append('text')
                 .attr('text-anchor', 'middle')
@@ -145,6 +280,13 @@ document.addEventListener('alpine:init', () => {
                 .attr('y', 12)
                 .attr('fill', 'hsl(var(--muted-foreground))')
                 .text(d => d.data.actor_type || '');
+
+            // Clicking a unit selects it and opens the capabilities/editing
+            // panel next to the chart.
+            visibleNode.on('click', (event, d) => {
+                event.stopPropagation();
+                this.selectUnit({ id: d.data.id, name: d.data.name, actor_type: d.data.actor_type });
+            });
 
             svg.call(
                 d3.zoom().scaleExtent([0.4, 2]).on('zoom', (event) => {
