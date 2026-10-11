@@ -1375,11 +1375,15 @@ def test_comparison_faq_jsonld_has_entries():
 def test_comparison_faq_jsonld_question_count():
     """Each comparison page has the expected number of FAQ entries."""
     expected_counts = {
-        "leanix": 3,
-        "ardoq": 3,
-        "bizzdesign-hopex": 2,
-        "avolution-abacus": 4,
-        "orbus-iserver": 3,
+        "leanix": 8,
+        "ardoq": 9,
+        "archi": 8,
+        "bizzdesign-hopex": 9,
+        "avolution-abacus": 10,
+        "boc-adoit": 9,
+        "orbus-iserver": 10,
+        "servicenow-apm": 9,
+        "sparx-enterprise-architect": 9,
     }
     for slug, expected in expected_counts.items():
         page = load_page("comparison", slug=slug)
@@ -1391,6 +1395,79 @@ def test_comparison_faq_jsonld_question_count():
         assert actual == expected, (
             f"{slug}: expected {expected} FAQ entries, got {actual}"
         )
+
+
+def _faq_entries(family, slug):
+    page = load_page(family, slug=slug)
+    assert page is not None, f"{family}/{slug} not found"
+    faq = _jsonld_node_of_type(json.loads(build_jsonld(page)), "FAQPage")
+    assert faq is not None, f"{family}/{slug}: no FAQPage node"
+    return [
+        (q["name"], q["acceptedAnswer"]["text"]) for q in faq["mainEntity"]
+    ]
+
+
+_ALL_COMPARISON_SLUGS = [
+    "leanix", "ardoq", "archi", "bizzdesign-hopex", "avolution-abacus",
+    "boc-adoit", "orbus-iserver", "servicenow-apm", "sparx-enterprise-architect",
+]
+
+
+@pytest.mark.parametrize("slug", ["architecture-health-check", "team-annual-onboarding"])
+def test_offer_page_faq_is_substantive(slug):
+    """An offer page answers six to eight real buyer questions, each with a
+    full answer. The FAQPage markup tests prove validity only; this proves
+    depth: a one-line answer or a thin question list fails here."""
+    entries = _faq_entries("site", slug)
+    assert 6 <= len(entries) <= 8, f"{slug}: {len(entries)} FAQ entries"
+    assert len({q for q, _ in entries}) == len(entries), f"{slug}: duplicate question"
+    for question, answer in entries:
+        assert question.endswith("?"), f"{slug}: {question!r} is not a question"
+        words = len(answer.split())
+        assert 35 <= words <= 110, f"{slug}: {question!r} answer is {words} words"
+
+
+@pytest.mark.parametrize("slug", _ALL_COMPARISON_SLUGS)
+def test_comparison_faq_answers_switching_questions(slug):
+    """Every comparison page answers the questions a buyer weighing a switch
+    asks: migration effort, data loss, cost, what is given up, what is
+    gained. Each answer is a full paragraph, and none of them restates a
+    review-count comparison."""
+    entries = _faq_entries("comparison", slug)
+    assert len(entries) >= 8, f"{slug}: only {len(entries)} FAQ entries"
+    questions = " ".join(q.lower() for q, _ in entries)
+    for needle in ("how do we move", "lose data", "cost", "give up", "gain"):
+        assert needle in questions, f"{slug}: no FAQ question about {needle!r}"
+    for question, answer in entries:
+        assert question.endswith("?"), f"{slug}: {question!r} is not a question"
+        assert len(answer.split()) >= 20, f"{slug}: {question!r} answer is too short"
+        assert "g2" not in question.lower(), f"{slug}: FAQ restates a review count"
+
+
+@pytest.mark.parametrize("slug", _ALL_COMPARISON_SLUGS)
+def test_comparison_page_lists_its_sources_with_read_dates(slug):
+    """The comparison hub tells readers each page lists the public pages its
+    facts come from, with a read date. Every page must deliver that: a
+    Sources section whose every entry is a link followed by a read date."""
+    page = load_page("comparison", slug=slug)
+    assert page is not None
+    match = re.search(r"<h2[^>]*>Sources</h2>(.*)$", page.body_html, re.DOTALL)
+    assert match, f"{slug}: no Sources section"
+    items = re.findall(r"<li>(.*?)</li>", match.group(1), re.DOTALL)
+    assert items, f"{slug}: Sources section is empty"
+    for item in items:
+        assert 'href="https://' in item, f"{slug}: source without a link: {item[:60]}"
+        assert re.search(r"read \d{1,2} [A-Z][a-z]+ 2026", item), (
+            f"{slug}: source without a read date: {item[:60]}"
+        )
+
+
+def test_comparison_hub_promise_matches_what_pages_deliver(app):
+    """The hub's sourcing sentence is only allowed to say what the pages do."""
+    with app.test_client() as client:
+        html = client.get("/vs").get_data(as_text=True)
+    assert "read date" not in html or "Each page ends with" in html
+    assert "carries its own source" not in html
 
 
 def test_rendered_title_no_double_encoding(app):
