@@ -139,7 +139,7 @@ def send_owner_digest(organization_id: int) -> dict:
     Your Notification Digest
 </h2>
 <p style="color:#6b7280">You have {len(items)} unread notification(s):</p>
-<ul>{items_html}</ul>
+<ul>{items_html}</ul>  <!-- raw-html-ok: items_html is built entirely from escape()'d parts above -->
 <p style="font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:8px">
     This is an automated digest from Entelim. To change your notification preferences,
     visit your account settings.
