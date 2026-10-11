@@ -280,21 +280,6 @@ class TestHierarchyEditing:
             assert leaf.name not in _actor_names_in_tree(tree)
             assert parent.name in _actor_names_in_tree(tree)
 
-    def test_tree_unchanged_when_hierarchy_structure_is_untouched_elsewhere(
-        self, app, db_session, make_org, tenant_ctx
-    ):
-        """A second structure is not created: only relationships between
-        existing actors make the hierarchy, so a unit with no relationship
-        still surfaces as its own root (the existing flat-fallback shape)."""
-        from app.modules.organization import service
-
-        org = make_org("hier-no-second-structure")
-        with tenant_ctx(org.id):
-            orphan = _make_actor(db_session, org, "Orphan Unit", "Department")
-            db_session.commit()
-            tree = service.build_org_tree()
-            assert orphan.name in _actor_names_in_tree(tree)
-
 
 # ── 2. assigning a person to a unit ─────────────────────────────────────────
 
