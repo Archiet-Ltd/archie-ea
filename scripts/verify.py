@@ -1702,24 +1702,16 @@ def gate_interface_contract_unlisted() -> Result:
         return Result("interface-contract-unlisted", SKIP,
                       "no committed subset at app/config/api_contract_subset.yaml; "
                       "run scripts/generate_api_contract_subset.py first")
-    try:
-        from scripts.check_interface_contract import check_unlisted_routes, _load_subset
-    except ImportError:
-        return Result("interface-contract-unlisted", FAIL,
-                      "could not import check_interface_contract module")
-    try:
-        os.environ.setdefault("FLASK_CONFIG", "testing")
-        from app import create_app
-        app = create_app("testing")
-    except Exception as exc:
-        return Result("interface-contract-unlisted", FAIL,
-                      f"could not boot the app: {exc}")
-    subset = _load_subset(subset_path)
-    passes, violations = check_unlisted_routes(app, subset)
-    if passes:
+    proc = _run([sys.executable, "scripts/check_interface_contract.py",
+                 "--subset", str(subset_path)])
+    output = (proc.stdout + proc.stderr).strip()
+    if proc.returncode == 0:
         return Result("interface-contract-unlisted", PASS,
                       "all token-accepting routes are in the contract subset")
-    detail = "\n".join(f"  {v}" for v in violations)
+    # Parse violations from output
+    violations = [ln for ln in output.splitlines()
+                  if ln.startswith("  Route ") or ln.startswith("FAIL")]
+    detail = "\n".join(violations[:20]) if violations else output[:2000]
     return Result("interface-contract-unlisted", FAIL, detail,
                   measured=len(violations), baseline=0)
 
@@ -1731,20 +1723,13 @@ def gate_interface_contract_unimplemented(baseline: int) -> Result:
         return Result("interface-contract-unimplemented", SKIP,
                       "no committed subset at app/config/api_contract_subset.yaml; "
                       "run scripts/generate_api_contract_subset.py first")
+    proc = _run([sys.executable, "scripts/check_interface_contract.py",
+                 "--subset", str(subset_path), "--count"])
     try:
-        from scripts.check_interface_contract import count_unbuilt_operations, _load_subset
-    except ImportError:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
         return Result("interface-contract-unimplemented", FAIL,
-                      "could not import check_interface_contract module")
-    try:
-        os.environ.setdefault("FLASK_CONFIG", "testing")
-        from app import create_app
-        app = create_app("testing")
-    except Exception as exc:
-        return Result("interface-contract-unimplemented", FAIL,
-                      f"could not boot the app: {exc}")
-    subset = _load_subset(subset_path)
-    count = count_unbuilt_operations(app, subset)
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
     detail = "" if count <= baseline else f"{count} unbuilt operation(s) > baseline {baseline}"
     return Result("interface-contract-unimplemented",
                   PASS if count <= baseline else FAIL,
