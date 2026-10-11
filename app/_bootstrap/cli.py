@@ -185,6 +185,34 @@ def init_cli(app):
             f"{result['recipients']} recipient(s)."
         )
 
+    # Webhook signing secrets: move any legacy plaintext secret into encrypted storage.
+    @app.cli.command("encrypt-webhook-secrets")
+    def encrypt_webhook_secrets_cmd():
+        """Encrypt every legacy plaintext webhook secret (idempotent; prints a count only)."""
+        from app.extensions import db
+        from app.models.webhook import WebhookSubscription
+
+        rows = (
+            db.session.execute(
+                db.select(WebhookSubscription)
+                .where(WebhookSubscription.secret.isnot(None))
+                .where(WebhookSubscription.secret != "")
+            )
+            .scalars()
+            .all()
+        )
+        migrated = 0
+        for row in rows:
+            try:
+                row.set_secret(row.secret)
+                migrated += 1
+            except RuntimeError:
+                click.echo("Encryption is not configured (CREDENTIAL_ENCRYPTION_KEY); nothing changed.")
+                db.session.rollback()
+                raise SystemExit(1)
+        db.session.commit()
+        click.echo(f"Encrypted {migrated} webhook secret(s).")
+
     # ACM-001: Cloud pricing API sync CLI commands
     try:
         from app.commands.cloud_pricing_commands import register_commands as register_cloud_pricing

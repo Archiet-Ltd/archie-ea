@@ -3925,13 +3925,88 @@ def report_builder():
 # =============================================================================
 
 
-@admin_bp_v2.route("/webhook-settings", methods=["GET", "POST"])
+def _webhook_catalogue_groups():
+    """Event types grouped by channel for the subscription picker, with prefix entries."""
+    import os
+
+    from app.services import event_catalogue
+
+    catalogue = event_catalogue.get_catalogue()
+    by_channel = {}
+    for entry in catalogue["events"]:
+        by_channel.setdefault(entry.get("channel") or "other", []).append(entry["type"])
+    groups = []
+    for channel in sorted(by_channel):
+        types = sorted(by_channel[channel])
+        common = os.path.commonprefix([t.split(".") for t in types])
+        pattern = ".".join(common) + ".*" if len(common) >= 2 else None
+        groups.append({"channel": channel, "pattern": pattern, "types": types})
+    product = sorted(e["type"] for e in catalogue["product_events"] if e["type"] != "webhook.test")
+    groups.append(
+        {
+            "channel": "product",
+            "pattern": None,
+            "patterns": ["archimate_element.*", "archimate_relationship.*"],
+            "types": product,
+        }
+    )
+    return groups
+
+
+def _render_webhook_settings(*, new_secret=None, new_secret_url=None, status=200):
+    """The webhook settings page; *new_secret* is shown once, on this response only."""
+    from app.services.webhook_service import WebhookService, display_status
+
+    svc = WebhookService()
+    subscriptions = svc.list_subscriptions()
+    last_deliveries = {}
+    for sub in subscriptions:
+        recent = svc.list_deliveries(sub.id, limit=1) or []
+        last_deliveries[sub.id] = recent[0] if recent else None
+
+    selected = None
+    selected_id = request.args.get("sub", "").strip()
+    for sub in subscriptions:
+        if sub.id == selected_id:
+            selected = sub
+    page = safe_int_arg("page", 1, minimum=1, maximum=10000)
+    deliveries = []
+    has_next = False
+    if selected is not None:
+        rows = svc.list_deliveries(selected.id, limit=51, offset=(page - 1) * 50) or []
+        has_next = len(rows) > 50
+        deliveries = [
+            {
+                "row": row,
+                "status": display_status(row.status),
+                "signature": svc.signature_status(selected, row),
+            }
+            for row in rows[:50]
+        ]
+    return (
+        render_template(
+            "admin/webhook_settings.html",
+            subscriptions=subscriptions,
+            last_deliveries=last_deliveries,
+            display_status=display_status,
+            catalogue_groups=_webhook_catalogue_groups(),
+            selected=selected,
+            deliveries=deliveries,
+            page=page,
+            has_next=has_next,
+            new_secret=new_secret,
+            new_secret_url=new_secret_url,
+        ),
+        status,
+    )
+
+
+@admin_bp_v2.route("/webhook-settings", methods=["GET"])
 @timed_route
 @login_required
 @admin_required
-@audit_log("update_webhook_settings")
 def webhook_settings():
-    """PLT-015: Manage Slack/Teams webhook subscriptions and notification settings."""
+    """PLT-015: webhook subscriptions, deliveries, signature status and replay."""
     # tenant-scoping-ok: admin_required only checks the caller's own,
     # organisation-independent Permission.ADMINISTER bit, while
     # WebhookSubscription's TenantMixin scopes the query/create below to
@@ -3943,119 +4018,171 @@ def webhook_settings():
     # (commit 7ae1b168); same tenant_decorators.require_org_or_platform_admin
     # guard.
     require_org_or_platform_admin(g.current_org_id)
-    from app.models.webhook import WebhookSubscription
+    return _render_webhook_settings()
 
-    VALID_EVENTS = [
-        "solution.created",
-        "solution.updated",
-        "solution.approved",
-        "solution.rejected",
-        "solution.archived",
-        "application.created",
-        "application.updated",
-        "application.retired",
-        "arb.submitted",
-        "arb.decision",
-        "risk.raised",
-        "risk.resolved",
-    ]
 
-    if request.method == "POST":
-        action = request.form.get("action", "create")
+@admin_bp_v2.route("/webhook-settings/create", methods=["POST"])
+@timed_route
+@login_required
+@admin_required
+@audit_log("webhook_sub_create")
+def webhook_settings_create():
+    """Create a subscription through the one writer; a generated secret is shown once."""
+    # tenant-scoping-ok: see webhook_settings()'s own guard comment -- the
+    # same cross-org session-switch IDOR applies here too, since this is
+    # the endpoint that actually writes the WebhookSubscription row.
+    require_org_or_platform_admin(g.current_org_id)
+    from app.services.webhook_service import (
+        WebhookError,
+        WebhookSecretUnavailable,
+        WebhookService,
+    )
 
-        if action == "delete":
-            sub_id = request.form.get("subscription_id", "").strip()
-            if sub_id:
-                sub = WebhookSubscription.query.get(sub_id)
-                if sub:
-                    sub.is_active = False
-                    sub.updated_at = datetime.utcnow()
-                    db.session.commit()
-                    flash("Webhook subscription deleted.", "success")
-                else:
-                    flash("Subscription not found.", "error")
-            return redirect(url_for("admin.webhook_settings"))
-
-        url = request.form.get("url", "").strip()
-        description = request.form.get("description", "").strip()
-        webhook_type = request.form.get("webhook_type", "generic").strip()
-        secret = request.form.get("secret", "").strip() or None
-        selected_events = request.form.getlist("events")
-
-        if not url:
-            flash("Webhook URL is required.", "error")
-            subscriptions = WebhookSubscription.query.filter_by(is_active=True).order_by(
-                WebhookSubscription.created_at.desc()
-            ).all()
-            return render_template(
-                "admin/webhook_settings.html",
-                subscriptions=subscriptions,
-                valid_events=VALID_EVENTS,
-            )
-
-        if webhook_type not in ("generic", "teams", "slack"):
-            webhook_type = "generic"
-
-        if not selected_events:
-            selected_events = ["*"]
-
-        import uuid as _uuid
-
-        sub = WebhookSubscription(
-            id=str(_uuid.uuid4()),
+    url = request.form.get("url", "").strip()
+    if not url:
+        flash("Webhook URL is required.", "error")
+        return _render_webhook_settings(status=400)
+    supplied = request.form.get("secret", "").strip() or None
+    try:
+        sub = WebhookService().create_subscription(
             user_id=str(current_user.id),
             url=url,
-            description=description,
-            webhook_type=webhook_type,
-            events=selected_events,
-            secret=secret,
-            filters={},
-            headers={},
-            is_active=True,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            events=request.form.getlist("events") or ["*"],
+            secret=supplied,
+            description=request.form.get("description", "").strip(),
+            webhook_type=request.form.get("webhook_type", "generic").strip(),
         )
-        db.session.add(sub)
-        db.session.commit()
-        flash("Webhook subscription created successfully.", "success")
-        return redirect(url_for("admin.webhook_settings"))
-
-    subscriptions = WebhookSubscription.query.filter_by(is_active=True).order_by(
-        WebhookSubscription.created_at.desc()
-    ).all()
-    return render_template(
-        "admin/webhook_settings.html",
-        subscriptions=subscriptions,
-        valid_events=VALID_EVENTS,
+    except WebhookSecretUnavailable as exc:
+        flash(str(exc), "error")
+        return _render_webhook_settings(status=503)
+    except WebhookError as exc:
+        flash(str(exc), "error")
+        return _render_webhook_settings(status=400)
+    flash("Webhook subscription created.", "success")
+    return _render_webhook_settings(
+        new_secret=getattr(sub, "one_time_secret", None), new_secret_url=sub.url
     )
+
+
+@admin_bp_v2.route("/webhook-settings/<string:subscription_id>/rotate", methods=["POST"])
+@timed_route
+@login_required
+@admin_required
+@audit_log("webhook_sec_rotate")
+def webhook_settings_rotate(subscription_id: str):
+    """Replace the signing secret; the new one is shown once and the old one stops signing."""
+    from app.services.webhook_service import WebhookError, WebhookService
+
+    try:
+        new_secret = WebhookService().rotate_secret(subscription_id)
+    except WebhookError as exc:
+        flash(str(exc), "error")
+        return _render_webhook_settings(status=503)
+    if new_secret is None:
+        flash("Subscription not found.", "error")
+        return redirect(url_for("admin.webhook_settings"))
+    flash("Secret rotated. The previous secret no longer signs deliveries.", "success")
+    return _render_webhook_settings(new_secret=new_secret)
+
+
+@admin_bp_v2.route("/webhook-settings/<string:subscription_id>/delete", methods=["POST"])
+@timed_route
+@login_required
+@admin_required
+@audit_log("webhook_sub_delete")
+def webhook_settings_delete(subscription_id: str):
+    """Deactivate a subscription."""
+    from app.services.webhook_service import WebhookService
+
+    if WebhookService().delete_subscription(subscription_id):
+        flash("Webhook subscription deleted.", "success")
+    else:
+        flash("Subscription not found.", "error")
+    return redirect(url_for("admin.webhook_settings"))
+
+
+@admin_bp_v2.route("/webhook-settings/<string:subscription_id>/replay", methods=["POST"])
+@timed_route
+@login_required
+@admin_required
+@audit_log("webhook_replay")
+def webhook_settings_replay(subscription_id: str):
+    """Queue logged events again, from a sequence number or from a time."""
+    from app.services.webhook_service import WebhookError, WebhookService
+
+    back = url_for("admin.webhook_settings", sub=subscription_id)
+    sequence = request.form.get("from_ordinal", "").strip()
+    since_text = request.form.get("since", "").strip()
+    from_ordinal = None
+    since = None
+    try:
+        if sequence:
+            from_ordinal = int(sequence)
+            if from_ordinal < 1:
+                raise ValueError("sequence")
+        elif since_text:
+            since = datetime.fromisoformat(since_text.replace("Z", "+00:00"))
+    except ValueError:
+        flash("Enter a whole sequence number from 1, or a valid date and time.", "error")
+        return redirect(back)
+    try:
+        result = WebhookService().replay(
+            subscription_id,
+            from_ordinal=from_ordinal,
+            since=since,
+            actor=str(current_user.id),
+        )
+    except WebhookError as exc:
+        flash(str(exc), "error")
+        return redirect(back)
+    if result is None:
+        flash("Subscription not found.", "error")
+        return redirect(url_for("admin.webhook_settings"))
+    note = f" (limited to the first {result['cap']})" if result["capped"] else ""
+    flash(f"Queued {result['count']} event(s) for replay{note}.", "success")
+    return redirect(back)
+
+
+@admin_bp_v2.route("/webhook-settings/deliveries/<string:delivery_id>/redeliver", methods=["POST"])
+@timed_route
+@login_required
+@admin_required
+@audit_log("webhook_redeliver")
+def webhook_settings_redeliver(delivery_id: str):
+    """Queue one delivery to be sent again."""
+    from app.services.webhook_service import WebhookService
+
+    copy = WebhookService().redeliver(delivery_id, actor=str(current_user.id))
+    if copy is None:
+        flash("Delivery not found.", "error")
+        return redirect(url_for("admin.webhook_settings"))
+    flash("Delivery queued to be sent again.", "success")
+    return redirect(url_for("admin.webhook_settings", sub=copy.subscription_id))
 
 
 @admin_bp_v2.route("/webhook-settings/test/<string:subscription_id>", methods=["POST"])
 @timed_route
 @login_required
 @admin_required
+@audit_log("webhook_test")
 def webhook_settings_test(subscription_id: str):
-    """PLT-015: Send a test payload to a webhook subscription."""
-    from app.models.webhook import WebhookSubscription
+    """PLT-015: Send a signed test event to a webhook subscription."""
     from app.services.webhook_service import WebhookService
 
-    sub = WebhookSubscription.query.filter_by(id=subscription_id, is_active=True).first()
-    if not sub:
+    try:
+        result = WebhookService().test_subscription(subscription_id)
+    except Exception as exc:
+        logger.error("PLT-015: webhook test failed for %s: %s", subscription_id, type(exc).__name__)
+        flash("Test delivery error. Check the webhook URL and try again.", "error")
+        return redirect(url_for("admin.webhook_settings", sub=subscription_id))
+    if result is None:
         flash("Subscription not found.", "error")
         return redirect(url_for("admin.webhook_settings"))
-
-    try:
-        svc = WebhookService()
-        result = svc.test_subscription(subscription_id, str(current_user.id))
-        if result and result.get("success"):
-            flash("Test payload delivered successfully.", "success")
-        else:
-            flash("Test delivery failed — check the webhook URL and try again.", "error")
-    except Exception as exc:
-        logger.error("PLT-015: webhook test failed for %s: %s", subscription_id, exc)
-        flash(f"Test delivery error: {exc}", "error")
-
-    return redirect(url_for("admin.webhook_settings"))
+    if result.get("success"):
+        flash("Test event delivered.", "success")
+    else:
+        flash("The test event was sent but the subscriber did not accept it. See the delivery below.", "error")
+    return redirect(url_for("admin.webhook_settings", sub=subscription_id))
 
 
 # =============================================================================

@@ -234,3 +234,4 @@ stripe>=9.0.0
 posthog>=3.0.0
 defusedxml>=0.7.1                 # untrusted XML (ArchiMate uploads, SAML) - blocks entity expansion
 axe-playwright-python==0.1.8      # WCAG 2.2 AA audit in tests/smoke; pinned to an axe-core bundle that carries target-size
+jsonschema>=4.18,<5
