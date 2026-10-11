@@ -594,6 +594,27 @@ class AIChatApprovalService:
                     "permission to review and approve it."
                 )
 
+            # Connector changes require an administrator proposer (every connector
+            # route carries admin_required) but GENERAL write permission alone was
+            # enough to reach this method, so an ordinary user could approve -- and
+            # so apply -- an admin-only connector create/update/delete/sync. Refuse
+            # before the entity_type == "connectors" dispatch below ever runs.
+            if approval.entity_type == "connectors" and not actor.is_admin():
+                self._audit(
+                    approval,
+                    event="execution_refused",
+                    to_status=approval.status.value,
+                    actor_user_id=effective_approver_id,
+                    from_status=approval.status.value,
+                    reason="connector changes require an administrator approver",
+                )
+                db.session.commit()
+                return {
+                    "success": False,
+                    "code": "FORBIDDEN",
+                    "error": "Connector changes require an administrator to approve.",
+                }
+
             # Check status
             if approval.status != ApprovalStatus.PENDING:
                 return {

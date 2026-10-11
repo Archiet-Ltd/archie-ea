@@ -38,6 +38,7 @@ from flask import Blueprint, abort, flash, jsonify, redirect, render_template, r
 from flask_login import login_required
 
 from app.decorators import admin_required
+from app.models.connector_config import _is_sensitive_key
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,17 @@ def connectors_save():
         flash("Configuration must be a JSON object.", "error")
         return redirect(url_for("m365_connector.connectors_index"))
 
+    sensitive_keys = [k for k in config if _is_sensitive_key(k)]
+    if sensitive_keys:
+        flash(
+            "Configuration cannot hold a secret ("
+            + ", ".join(sorted(sensitive_keys))
+            + "). Put it in the credential field instead; it never travels as plain "
+            "text in the approval queue the way the configuration box does.",
+            "error",
+        )
+        return redirect(url_for("m365_connector.connectors_index"))
+
     if credential:
         OrgCredentialVault().store_credentials(
             org_id, connector_type, {"credential": credential}
@@ -264,7 +276,6 @@ def connectors_delete(connector_id):
     from app.services.connector_framework import (
         CONNECTOR_ACTION_DELETE,
         _load_org_connector,
-        org_has_delegated_action,
         propose_or_apply_connector_change,
     )
 
@@ -281,8 +292,6 @@ def connectors_delete(connector_id):
         summary=f"Delete connector '{cfg.name}'",
         payload={"connector_id": cfg.id, "connector_type": cfg.connector_type},
     )
-    if org_has_delegated_action(org_id, CONNECTOR_ACTION_DELETE):
-        pass  # already applied above and flushed
     db.session.commit()
 
     if result.get("queued"):

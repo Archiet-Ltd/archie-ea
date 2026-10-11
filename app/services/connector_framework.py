@@ -45,6 +45,8 @@ from app.models.connector_config import (  # noqa: F401
     ConnectorType,
     SyncLog,
     SyncMode,
+    _is_sensitive_key,
+    _mask_sensitive,
 )
 
 logger = logging.getLogger(__name__)
@@ -462,7 +464,11 @@ def _proposal_connector_view(approval, org_id: int) -> dict:
         "health": "pending_review",
         "sync_mode": None,
         "sync_schedule": None,
-        "config": payload.get("config") or {},
+        # Masked for the same reason _connector_view uses public_config(): a
+        # secret mistakenly typed into the configuration box (H1) must not
+        # reach a pending-approval listing in plain text, even while the
+        # proposal is still waiting for a decision.
+        "config": _mask_sensitive(payload.get("config") or {}),
         "credential_ref": f"vault:{org_id}:{connector_type}" if connector_type else None,
         "credential_masked": _connector_credential_mask(org_id, connector_type),
         "last_sync": None,
@@ -613,7 +619,18 @@ def apply_connector_change(
         if "description" in payload:
             cfg.description = payload["description"]
         if "config" in payload:
-            cfg.config = payload["config"]
+            new_config = dict(payload["config"] or {})
+            # A whole-config replace on update must not erase a sensitive key
+            # the new payload simply did not resend (the Jira/M365 forms now
+            # route secrets to the vault and never put them in this payload
+            # at all). Carry forward anything sensitive already on the row
+            # that the new config omits, so an update never silently wipes a
+            # token the service still reads from here. H2.
+            existing_config = cfg.config or {}
+            for key, value in existing_config.items():
+                if key not in new_config and _is_sensitive_key(key):
+                    new_config[key] = value
+            cfg.config = new_config
         if "field_mappings" in payload:
             cfg.field_mappings = payload["field_mappings"]
         if "sync_schedule" in payload:
