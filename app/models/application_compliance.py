@@ -5,6 +5,8 @@ Extends the existing compliance framework to link applications with compliance c
 
 from datetime import datetime
 
+from sqlalchemy import event
+
 from app import db
 from app.models.mixins import TenantMixin
 
@@ -41,6 +43,12 @@ class ApplicationComplianceControl(TenantMixin, db.Model):
     # Verification
     verified_date = db.Column(db.DateTime)
     verified_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
+
+    # ArchiMate mirror: every domain record must have exactly one element node.
+    archimate_element_id = db.Column(
+        db.Integer, db.ForeignKey("archimate_elements.id", ondelete="SET NULL"),
+        index=True, nullable=True,
+    )
 
     # Audit trail
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -84,3 +92,32 @@ class ApplicationComplianceControl(TenantMixin, db.Model):
 
     def __repr__(self):
         return f"<AppCompliance {self.application_id}:{self.control.control_code if self.control else self.control_id} [{self.implementation_status}]>"
+
+
+@event.listens_for(ApplicationComplianceControl, "before_insert")
+def create_compliance_archimate_element(mapper, connection, target):
+    """Automatically create ArchiMateElement when ApplicationComplianceControl is created.
+
+    Mirrors as a BusinessObject (Business layer). Idempotent: skips rows that
+    already carry an archimate_element_id.
+    """
+    if target.archimate_element_id is not None:
+        return
+    from sqlalchemy import insert
+
+    from .archimate_core import ArchiMateElement
+
+    control_name = f"ComplianceControl-{target.control_id}"
+    if target.application_id:
+        control_name = f"App-{target.application_id}-Control-{target.control_id}"
+
+    result = connection.execute(
+        insert(ArchiMateElement.__table__).values(
+            name=control_name,
+            type="BusinessObject",
+            layer="Business",
+            description=f"Compliance control mapping: app={target.application_id}, control={target.control_id}",
+            organization_id=target.organization_id,
+        )
+    )
+    target.archimate_element_id = result.inserted_primary_key[0]

@@ -926,6 +926,39 @@ ArchiMateElement.gap_links = db.relationship(
 
 
 # ============================================================================
+# Event Listeners - Auto-create ArchiMateElement on WorkPackage insert
+# ============================================================================
+
+
+@event.listens_for(WorkPackage, "before_insert")
+def create_work_package_archimate_element(mapper, connection, target):
+    """Automatically create ArchiMateElement when WorkPackage is created.
+
+    Mirrors as a WorkPackage (Implementation layer), matching the mapping in
+    app/services/archimate_backbone.py. Idempotent: skips rows that already
+    carry an archimate_element_id.
+    """
+    if target.archimate_element_id is not None:
+        return
+    from sqlalchemy import insert
+
+    from .archimate_core import ArchiMateElement
+
+    full_name = target.name or ""
+    element_name = full_name if len(full_name) <= 100 else full_name[:99] + "\u2026"
+    result = connection.execute(
+        insert(ArchiMateElement.__table__).values(
+            name=element_name,
+            type="WorkPackage",
+            layer="Implementation",
+            description=target.description or f"Work package: {full_name}",
+            organization_id=target.organization_id,
+        )
+    )
+    target.archimate_element_id = result.inserted_primary_key[0]
+
+
+# ============================================================================
 # Event Listeners - Auto-update Gap resolution when WorkPackages complete
 # ============================================================================
 
