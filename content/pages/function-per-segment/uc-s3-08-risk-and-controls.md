@@ -4,24 +4,24 @@ use_case_id: UC-S3-08
 segment_id: S3
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
-capture_status: awaiting_capture
+cta: plans
+capture_status: live
 url_slug: /use-cases/risk-and-control-gaps
 ---
 
-# Which risks and control gaps touch this goal, and who owns the mitigation?
+# Which risks touch this part of the architecture, and who owns closing them?
 
-**For enterprise architecture teams answering to a regulator or an internal audit.**
+**For enterprise architecture teams tracking risk across the model.**
 
 ## The question
 
-A goal or an objective sits somewhere in your architecture. What's harder to answer on demand is
-which risks and control gaps actually touch it, and whether anyone owns closing them.
+A risk gets logged against one element in your architecture. What's harder to answer on demand is
+everywhere else that risk actually reaches, and whether anyone owns closing it.
 
 ## What Entelim answers
 
 Ask the question directly, and Entelim traces risks across the same connections that answer what
-breaks — filtered against the compliance frameworks that matter to you, with the mitigation and its
-owner attached.
+breaks, with the mitigation and its owner attached.
 
 ## Related
 

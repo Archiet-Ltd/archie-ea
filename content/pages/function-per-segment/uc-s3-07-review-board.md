@@ -4,7 +4,8 @@ use_case_id: UC-S3-07
 segment_id: S3
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
-capture_status: awaiting_capture
+cta: plans
+capture_status: live
 url_slug: /use-cases/architecture-review-board
 ---
 
@@ -20,10 +21,10 @@ the meeting turns into a research session instead of a decision.
 ## What Entelim answers
 
 A solutions list the board reviews directly, with a full ARB dashboard, review history, sessions and
-decisions — and the impact analysis already run and attached before the meeting starts. A decision
-here is locked to the exact proposal it reviewed — a decision brief, a solution, an architecture
-model, or an architecture decision record — along with its rationale and any conditions attached, so
-governance doesn't live in a separate record nobody trusts.
+decisions — and the impact analysis already run and attached before the meeting starts. A decision here
+is locked to the exact proposal it reviewed — a decision brief, a solution, an architecture model, or an
+architecture decision record — along with its rationale and any conditions attached, so governance
+doesn't live in a separate record nobody trusts.
 
 ## Related
 
