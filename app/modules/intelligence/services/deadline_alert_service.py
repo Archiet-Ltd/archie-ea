@@ -26,65 +26,17 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from app import db
-from app.models.application_owner import ApplicationOwner
-from app.models.application_portfolio import ApplicationComponent
 from app.models.organization import Organization
 from app.models.vendor.vendor_organization import VendorProduct
+from app.services.eol_window import (
+    add_months as _add_months,
+    dependents as _dependents,
+    lead_months_for,
+    owner_summary as _owner_summary,
+)
 
-_DEFAULT_LEAD_MONTHS = 18
 _SOURCE_TABLE = "vendor_products"
 _OPERATION_TYPE = "end_of_support_alert"
-
-
-def lead_months_for(organization_id: int) -> int:
-    """The organisation's configured alert lead time, in months.
-
-    Absence (no row, or no key in `settings`) reads as the documented
-    default, never as "alerts disabled" -- an organisation that has never
-    touched this setting still gets the brief's 18-month warning.
-    """
-    org = db.session.get(Organization, organization_id)
-    if org is None or not org.settings:
-        return _DEFAULT_LEAD_MONTHS
-    value = org.settings.get("alert_eol_lead_months")
-    if not isinstance(value, int) or value <= 0:
-        return _DEFAULT_LEAD_MONTHS
-    return value
-
-
-def _add_months(start: datetime, months: int) -> datetime:
-    """Calendar-month addition without a third-party dependency.
-
-    Clamps the day to the target month's own length (e.g. 31 Jan + 1 month
-    lands on 28/29 Feb, not an invalid date) -- the one subtlety plain
-    timedelta arithmetic gets wrong for "N months from now".
-    """
-    month_index = start.month - 1 + months
-    year = start.year + month_index // 12
-    month = month_index % 12 + 1
-    day = start.day
-    while True:
-        try:
-            return start.replace(year=year, month=month, day=day)
-        except ValueError:
-            day -= 1
-
-
-def _dependents(product_id: int, organization_id: int) -> List[ApplicationComponent]:
-    return (
-        ApplicationComponent.query.filter(
-            ApplicationComponent.vendor_product_id == product_id,
-            ApplicationComponent.organization_id == organization_id,
-        )
-        .order_by(ApplicationComponent.name)
-        .all()
-    )
-
-
-def _owner_summary(application_id: int, organization_id: int) -> str:
-    rows = ApplicationOwner.get_display_rows_for_application(application_id, organization_id)
-    named = [row["user_name"] for row in rows if row.get("user_name")]
-    return ", ".join(named) if named else "no owner recorded"
 
 
 def _existing_alert(product_id: int, organization_id: int):
