@@ -248,7 +248,20 @@ def init_security(app):
                 "frame-src 'self' https://snack.expo.dev",
                 "object-src 'none'",
                 "base-uri 'self'",     # stop <base> rewriting every relative URL
-                "form-action 'self'",  # stop an injected form posting off-site
+                # ARCH-070 narrow exception: the OAuth consent page
+                # (app/modules/oauth_provider/routes.py's authorize() GET
+                # branch) sets g.csp_form_action_extra to the one, already
+                # registered redirect_uri origin its Allow/Deny form's POST
+                # redirects to -- an inherent, by-design part of the OAuth
+                # authorization-code flow, not something this blanket
+                # same-origin default should ever permit for an ordinary
+                # page. Every other response keeps the plain 'self'-only
+                # policy unchanged.
+                "form-action 'self'" + (
+                    " " + g.csp_form_action_extra
+                    if getattr(g, "csp_form_action_extra", None)
+                    else ""
+                ),  # stop an injected form posting off-site
                 # Modern equivalent of X-Frame-Options, and must agree with it:
                 # codegen preview routes set g.allow_framing to embed themselves,
                 # so a flat 'none' here would block the very pages that opt in.
