@@ -154,35 +154,57 @@ class ApplicationOwner(db.Model):
         }
 
     @classmethod
-    def get_owners_for_application(cls, application_id, organization_id):
-        """Get all owners for an application."""
-        return cls.query.filter(
-            cls.application_id == application_id,
+    def get_owners_for_applications_batch(cls, application_ids, organization_id):
+        """Get all owners for multiple applications in one query.
+
+        Returns ``{application_id: [ApplicationOwner, ...]}``.
+        """
+        if not application_ids:
+            return {}
+        rows = cls.query.filter(
+            cls.application_id.in_(application_ids),
             cls.organization_id == organization_id,
         ).all()
+        result = {}
+        for row in rows:
+            result.setdefault(row.application_id, []).append(row)
+        return result
 
     @classmethod
-    def get_display_rows_for_application(cls, application_id, organization_id):
-        """Read one application's owners with tenant-fenced user display data."""
+    def get_owners_for_application(cls, application_id, organization_id):
+        """Get all owners for an application."""
+        result = cls.get_owners_for_applications_batch([application_id], organization_id)
+        return result.get(application_id, [])
+
+    @classmethod
+    def _resolve_user_names(cls, owner_rows, organization_id):
+        """Given a list of ApplicationOwner rows, return ``{user_id: user}``
+        for their users, tenant-fenced."""
         from app.models.user import User
 
-        owner_rows = cls.get_owners_for_application(application_id, organization_id)
-        user_ids = [row.user_id for row in owner_rows if row.user_id is not None]
-        users = {}
-        if user_ids:
-            users = {
-                user.id: user
-                for user in db.session.execute(
-                    db.select(User)
-                    .where(User.organization_id == organization_id)
-                    .where(User.id.in_(user_ids))
-                ).scalars()
-            }
+        user_ids = list({row.user_id for row in owner_rows if row.user_id is not None})
+        if not user_ids:
+            return {}
+        return {
+            user.id: user
+            for user in db.session.execute(
+                db.select(User)
+                .where(User.organization_id == organization_id)
+                .where(User.id.in_(user_ids))
+            ).scalars()
+        }
 
+    @classmethod
+    def _owner_rows_to_display(cls, owner_rows, users):
+        """Convert ApplicationOwner rows to display dicts using the given
+        ``{user_id: User}`` map."""
         display_rows = []
         for row in owner_rows:
             user = users.get(row.user_id)
-            full_name = " ".join(part for part in (getattr(user, "first_name", None), getattr(user, "last_name", None)) if part).strip()
+            full_name = " ".join(
+                part for part in (getattr(user, "first_name", None), getattr(user, "last_name", None))
+                if part
+            ).strip()
             display_rows.append({
                 "id": row.id,
                 "user_id": row.user_id,
@@ -197,6 +219,23 @@ class ApplicationOwner(db.Model):
                 "assigned_by": row.assigned_by,
             })
         return display_rows
+
+    @classmethod
+    def get_display_rows_for_applications_batch(cls, application_ids, organization_id):
+        """Read multiple applications' owners with tenant-fenced user display data."""
+        owners_by_app = cls.get_owners_for_applications_batch(application_ids, organization_id)
+        all_owner_rows = [o for rows in owners_by_app.values() for o in rows]
+        users = cls._resolve_user_names(all_owner_rows, organization_id)
+        return {
+            app_id: cls._owner_rows_to_display(rows, users)
+            for app_id, rows in owners_by_app.items()
+        }
+
+    @classmethod
+    def get_display_rows_for_application(cls, application_id, organization_id):
+        """Read one application's owners with tenant-fenced user display data."""
+        result = cls.get_display_rows_for_applications_batch([application_id], organization_id)
+        return result.get(application_id, [])
 
     @classmethod
     def get_applications_for_user(cls, user_id, organization_id):
@@ -219,51 +258,46 @@ class ApplicationOwner(db.Model):
         ).first() is not None
 
     @classmethod
-    def get_owners_for_element(cls, element_type, element_id, organization_id):
-        """Get all owners for a non-application element (e.g. a capability)."""
-        return cls.query.filter(
+    def get_owners_for_elements_batch(cls, element_type, element_ids, organization_id):
+        """Get all owners for multiple elements of the same type in one query.
+
+        Returns ``{element_id: [ApplicationOwner, ...]}``.
+        """
+        if not element_ids:
+            return {}
+        rows = cls.query.filter(
             cls.element_type == element_type,
-            cls.element_id == element_id,
+            cls.element_id.in_(element_ids),
             cls.organization_id == organization_id,
         ).all()
+        result = {}
+        for row in rows:
+            result.setdefault(row.element_id, []).append(row)
+        return result
+
+    @classmethod
+    def get_owners_for_element(cls, element_type, element_id, organization_id):
+        """Get all owners for a non-application element (e.g. a capability)."""
+        result = cls.get_owners_for_elements_batch(element_type, [element_id], organization_id)
+        return result.get(element_id, [])
+
+    @classmethod
+    def get_display_rows_for_elements_batch(cls, element_type, element_ids, organization_id):
+        """Read multiple elements' owners with tenant-fenced user display data."""
+        owners_by_eid = cls.get_owners_for_elements_batch(element_type, element_ids, organization_id)
+        all_owner_rows = [o for rows in owners_by_eid.values() for o in rows]
+        users = cls._resolve_user_names(all_owner_rows, organization_id)
+        return {
+            eid: cls._owner_rows_to_display(rows, users)
+            for eid, rows in owners_by_eid.items()
+        }
 
     @classmethod
     def get_display_rows_for_element(cls, element_type, element_id, organization_id):
         """Read one element's owners with tenant-fenced user display data --
         the element-reference counterpart of get_display_rows_for_application."""
-        from app.models.user import User
-
-        owner_rows = cls.get_owners_for_element(element_type, element_id, organization_id)
-        user_ids = [row.user_id for row in owner_rows if row.user_id is not None]
-        users = {}
-        if user_ids:
-            users = {
-                user.id: user
-                for user in db.session.execute(
-                    db.select(User)
-                    .where(User.organization_id == organization_id)
-                    .where(User.id.in_(user_ids))
-                ).scalars()
-            }
-
-        display_rows = []
-        for row in owner_rows:
-            user = users.get(row.user_id)
-            full_name = " ".join(part for part in (getattr(user, "first_name", None), getattr(user, "last_name", None)) if part).strip()
-            display_rows.append({
-                "id": row.id,
-                "user_id": row.user_id,
-                "user_name": full_name or (user.email if user else "Unknown"),
-                "user_email": user.email if user else None,
-                "ownership_type": row.ownership_type,
-                "ownership_type_label": cls.OWNERSHIP_LABELS.get(
-                    row.ownership_type,
-                    (row.ownership_type or "").capitalize(),
-                ),
-                "assigned_at": row.assigned_at.isoformat() if row.assigned_at else None,
-                "assigned_by": row.assigned_by,
-            })
-        return display_rows
+        result = cls.get_display_rows_for_elements_batch(element_type, [element_id], organization_id)
+        return result.get(element_id, [])
 
     @classmethod
     def is_owner_of_element(cls, user_id, element_type, element_id, organization_id):
