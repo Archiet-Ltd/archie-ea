@@ -530,7 +530,7 @@ class TestCheckInterfaceContract:
             "--count",
         )
         assert result.returncode == 0
-        lines = [l for l in result.stdout.strip().splitlines() if l.strip()]
+        lines = [ln for ln in result.stdout.strip().splitlines() if ln.strip()]
         assert lines, "No output from --count"
         int(lines[-1])  # Must parse as int
 
