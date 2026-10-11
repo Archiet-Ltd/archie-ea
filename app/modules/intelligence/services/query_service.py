@@ -263,6 +263,112 @@ def _resolve_owners_batch(
     return results
 
 
+def _resolve_application_owners_batch(
+    element_ids: List[int],
+    org_id: int,
+    elements: Dict[str, Dict[str, Any]],
+) -> Dict[int, List[Dict[str, str]]]:
+    """Batch-resolve ApplicationOwner records for a set of element IDs.
+
+    Resolves each element id to the correct owner key:
+    - ApplicationComponent elements: resolve to ``application_id`` via
+      ``ApplicationComponent.archimate_element_id``, then query
+      ``ApplicationOwner`` by ``application_id``.
+    - Element types in ``ApplicationOwner.ELEMENT_TYPES`` (capability,
+      data_entity): query ``ApplicationOwner`` by ``element_type`` +
+      ``element_id``.
+    - Other element types: no owner store exists, return empty list.
+
+    Uses the canonical ``ApplicationOwner`` batch reader methods so the
+    single-row readers and this batch path share one implementation.
+
+    Returns ``{element_id: [{"name": str, "role": str}, ...]}``, with an
+    empty list for elements that have no ApplicationOwner record or whose
+    type has no owner store.
+    """
+    from app.models.application_owner import ApplicationOwner
+
+    distinct_ids = sorted(set(element_ids))
+    results: Dict[int, List[Dict[str, str]]] = {eid: [] for eid in distinct_ids}
+    if not distinct_ids:
+        return results
+
+    # Classify each element id by its ArchiMate type.
+    app_component_ids: List[int] = []
+    element_type_ids: Dict[str, List[int]] = {}
+    for eid in distinct_ids:
+        el_type = (elements.get(str(eid)) or {}).get("type")
+        if el_type == "ApplicationComponent":
+            app_component_ids.append(eid)
+        elif el_type and el_type.lower() in ApplicationOwner.ELEMENT_TYPES:
+            element_type_ids.setdefault(el_type.lower(), []).append(eid)
+        # Other types: no owner store, leave as empty list in results.
+
+    # Resolve ApplicationComponent elements via application_id.
+    if app_component_ids:
+        from app.models.application_portfolio import ApplicationComponent
+
+        components = (
+            db.session.execute(
+                db.select(ApplicationComponent)
+                .where(ApplicationComponent.archimate_element_id.in_(app_component_ids))
+                .order_by(ApplicationComponent.id)
+            )
+            .scalars()
+            .all()
+        )
+        comp_by_element: Dict[int, Any] = {}
+        for comp in components:
+            comp_by_element.setdefault(comp.archimate_element_id, comp)
+
+        app_ids = [comp.id for comp in comp_by_element.values()]
+        if app_ids:
+            owners_by_app = ApplicationOwner.get_owners_for_applications_batch(app_ids, org_id)
+            # Build element_id -> component_id -> owners map.
+            for eid, comp in comp_by_element.items():
+                owners = owners_by_app.get(comp.id, [])
+                if owners:
+                    results[eid] = _application_owners_to_display(owners, org_id)
+
+    # Resolve element-type owners (capability, data_entity) via element_type + element_id.
+    for el_type, type_ids in element_type_ids.items():
+        owners_by_eid = ApplicationOwner.get_owners_for_elements_batch(el_type, type_ids, org_id)
+        for eid, owners in owners_by_eid.items():
+            if owners:
+                results[eid] = _application_owners_to_display(owners, org_id)
+
+    return results
+
+
+def _application_owners_to_display(
+    owner_rows: list, org_id: int
+) -> List[Dict[str, str]]:
+    """Convert ApplicationOwner rows to display dicts ``{"name", "role"}``,
+    resolving user names in one batched query."""
+    from app.models.application_owner import ApplicationOwner
+
+    users = ApplicationOwner._resolve_user_names(owner_rows, org_id)
+    result = []
+    for row in owner_rows:
+        user = users.get(row.user_id)
+        full_name = " ".join(
+            part
+            for part in (getattr(user, "first_name", None), getattr(user, "last_name", None))
+            if part
+        ).strip()
+        display_name = full_name or (user.email if user else "Unknown")
+        result.append(
+            {
+                "name": display_name,
+                "role": ApplicationOwner.OWNERSHIP_LABELS.get(
+                    row.ownership_type,
+                    (row.ownership_type or "").capitalize(),
+                ),
+            }
+        )
+    return result
+
+
 def _resolve_elements_batch(element_ids: Iterable[int], org_id: Optional[int]) -> Dict[str, Dict[str, Any]]:
     """The element identity map -- ``{str(id): {id, name, type, layer}}``.
 
@@ -814,26 +920,11 @@ class IntelligenceQueryService:
                     # collect every distinct element id needing a lookup
                     # across the WHOLE result set first, then resolve in a
                     # small constant number of queries.
-                    owners_by_element: Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {}
-                    if with_owner and rows:
-                        owners_by_element = _resolve_owners_batch(
-                            [row["element_id"] for row in rows], org_id
-                        )
+                    # NOTE: owner resolution is moved AFTER pagination below
+                    # so the 2,400-row walk only resolves owners for the
+                    # page's rows, not the full result set (MEDIUM-1 fix).
 
                     for row in rows:
-                        if with_owner:
-                            owner, reason = owners_by_element.get(
-                                row["element_id"], (None, NO_OWNERSHIP_REASON)
-                            )
-                        else:
-                            owner, reason = None, None
-                        row["owner"] = owner
-                        # Derived rows may already carry a staleness reason
-                        # (set by _derived_row, e.g. "derivation_stale"). That
-                        # takes precedence; an owner-absence reason only fills
-                        # in when the row has no reason of its own yet.
-                        existing_reason = row.get("reason")
-                        row["reason"] = existing_reason if existing_reason else reason
                         # A Capability row carries the block the helper
                         # already computed for it, untouched; any other row
                         # carries no ``maturity`` key at all --
@@ -890,6 +981,30 @@ class IntelligenceQueryService:
             if slice_start + page_size < total:
                 next_cursor = slice_start + page_size
             rows = page
+
+        # Owner resolution for the page's rows only (MEDIUM-1: moved after
+        # pagination so the 2,400-row walk resolves owners for 50 rows, not
+        # 2,400 -- keeps latency within budget while the query count stays
+        # constant regardless of page size).
+        if with_owner and rows:
+            owners_by_element = _resolve_owners_batch(
+                [row["element_id"] for row in rows], org_id
+            )
+            application_owners_by_element = _resolve_application_owners_batch(
+                [row["element_id"] for row in rows], org_id, elements
+            )
+            for row in rows:
+                owner, reason = owners_by_element.get(
+                    row["element_id"], (None, NO_OWNERSHIP_REASON)
+                )
+                row["owner"] = owner
+                row["owners"] = application_owners_by_element.get(row["element_id"], [])
+                existing_reason = row.get("reason")
+                row["reason"] = existing_reason if existing_reason else reason
+        else:
+            for row in rows:
+                row["owner"] = None
+                row["owners"] = []
 
         return {
             "rows": rows,
@@ -1569,45 +1684,43 @@ class IntelligenceQueryService:
     @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:
         """L4, "who's accountable for ___, and can they take on more?":
-        WITHDRAWN -- the ownership data source is decided, but no shared,
-        tenant-safe reader for it exists yet, and this method's own first
-        version shipped one anyway rather than using the one that already
-        existed. Not a "still undecided" state; a "not built safely yet"
-        one, and the two must not be conflated in copy or reason naming.
 
-        The original version re-implemented the element -> component ->
-        ownership -> unit chain that ``_resolve_owners_batch``/
-        ``_sec09_tenant_check`` already provide (``cross_layer_impact``'s
-        own owner field), without that function's tenant assertion. It also
-        had a real, unreviewed tenant-isolation gap of its own:
-        ``OrganizationUnit`` carries no ``TenantMixin``/``organization_id``,
-        and the original fetched it by ``organization_unit_id`` with no
-        tenant predicate at all, so a cross-tenant-seeded
-        ``organization_unit_id`` on an otherwise correctly-scoped
-        ``ApplicationOwnership`` row would have leaked another
-        organisation's unit name/type/head-of-unit -- not caught by this
-        lens's own tests, which only exercised the element-level
-        cross-tenant case. It also showed expired ownership (no
-        ``end_date`` filter) as current, and serialised PII fields
-        (``contact_email``, ``head_of_unit``, ...) nothing in the template
-        ever rendered.
+        Answers from the canonical ``cross_layer_impact`` walk: collects
+        every unique owner from the affected elements and returns them.
+        The withdrawn empty answer (``ownership_reader_not_built``) is
+        replaced by this real answer; the old route and question card
+        are unchanged, only the query itself is re-enabled.
 
-        Withdrawing the read entirely -- no query against either table --
-        rather than patching those in place, since the underlying gap
-        (``OrganizationUnit`` has no tenant scoping of its own) needs a
-        real, separate fix before ANY reader of it is safe, not just this
-        one. The route, question card and tests stay in place so the lens
-        is easy to re-enable once a shared, tenant-safe reader exists;
-        only the query itself is disabled.
+        ``capacity_not_available`` is kept as ``True`` -- capacity data
+        is not yet connected (the same honest state the withdrawn answer
+        returned, unchanged by this redirect).
         """
-        # No record_query_latency wrapper -- there is no query to time, and
-        # sampling a constant into the NFR-5 latency series would only
-        # dilute it with meaningless near-zero readings.
-        del element_id  # withdrawn; kept for a stable call signature
+        result = IntelligenceQueryService.cross_layer_impact(
+            element_id,
+            include_derived=False,
+            max_depth=3,
+            direction="downstream",
+            with_owner=True,
+        )
+        rows = result.get("rows") or []
+
+        # Collect unique owners from every row.
+        seen: Dict[str, Dict[str, str]] = {}
+        for row in rows:
+            for owner in row.get("owners", []):
+                key = f"{owner.get('name', '')}|{owner.get('role', '')}"
+                if key not in seen:
+                    seen[key] = owner
+
+        owners = list(seen.values())
+        reasons = []
+        if not owners:
+            reasons.append(NO_OWNERSHIP_RECORDS_REASON)
+
         return {
-            "owners": [],
+            "owners": owners,
             "capacity_not_available": True,
-            "reasons": [OWNERSHIP_READER_NOT_BUILT_REASON, CAPACITY_NOT_AVAILABLE_REASON],
+            "reasons": reasons,
         }
 
     # ------------------------------------------------------------------ #
