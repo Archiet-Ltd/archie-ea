@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S3-07, segment: S3}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Solutions
@@ -20,7 +21,7 @@ context, tracked from proposal through to decision.
 
 ## Where you'll meet it
 
-- [Take a change through the review board with the impact evidence attached](/enterprise-architecture/review-board)
+- [Take a change through the review board with the impact evidence attached](/use-cases/architecture-review-board)
 
 ## Related modules
 

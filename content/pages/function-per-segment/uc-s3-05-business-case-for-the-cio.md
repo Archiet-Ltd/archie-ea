@@ -5,7 +5,7 @@ segment_id: S3
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /enterprise-architecture/business-case
+url_slug: /use-cases/business-case-for-the-cio
 ---
 
 # Build the business case for the CIO from the model's own cost and impact figures

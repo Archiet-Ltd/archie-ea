@@ -12,6 +12,7 @@ Written against the shared fixtures in tests/conftest.py.
 
 import uuid
 
+import pyotp
 import pytest
 
 pytestmark = pytest.mark.usefixtures("db_session")
@@ -74,6 +75,25 @@ def _clear_g_cache():
     for cached in ("_login_user", "_current_user", "current_org_id", "current_org"):
         if hasattr(g, cached):
             delattr(g, cached)
+
+
+def _complete_admin_mfa_enrollment(client):
+    """Finish the MFA step an administrator now hits on login (R1-B12 PR 2):
+    GET the challenge page (which stashes a fresh TOTP secret in the
+    session, exactly as a real authenticator app scanning it would expect),
+    then POST the code that secret actually produces right now. Mirrors
+    tests/test_mfa_login_gate.py::test_enrolling_with_the_right_code_completes_login
+    -- this test asserts on a completed session, so it must complete MFA for
+    real rather than bypass the gate."""
+    _clear_g_cache()
+    client.get("/account/mfa-challenge")
+    with client.session_transaction() as sess:
+        secret = sess["_mfa_enroll_secret"]
+    code = pyotp.TOTP(secret).now()
+    _clear_g_cache()
+    resp = client.post("/account/mfa-challenge", data={"code": code}, follow_redirects=False)
+    assert resp.status_code in (302, 303), resp.status_code
+    _clear_g_cache()
 
 
 def _login_via_form(client, email, password):
@@ -172,6 +192,11 @@ class TestOpeningAPageNeverSignsOut:
         org = make_org("nosignout4")
         admin = _make_admin_user(db_session, org)
         _login_via_form(client, admin.email, _PASSWORD)
+        # R1-B12 PR 2: _login_via_form's POST now only parks this admin
+        # mid-login pending MFA (still a 302, which is all that helper
+        # asserts) -- complete the real TOTP step before the session this
+        # test checks is actually a signed-in one.
+        _complete_admin_mfa_enrollment(client)
 
         _clear_g_cache()
         resp = client.get("/admin/new-user", follow_redirects=False)

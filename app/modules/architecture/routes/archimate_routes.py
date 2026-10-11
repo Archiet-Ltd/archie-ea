@@ -76,7 +76,24 @@ def _check_solution_access(solution_id):
         return  # Model not available — skip check gracefully
     if not sol:
         return  # Solution doesn't exist — let downstream handle
-    if hasattr(current_user, "is_admin") and current_user.is_admin():
+    # D-4 (admin-rbac-active-org continuation): this used to be
+    # ``hasattr(current_user, "is_admin") and current_user.is_admin()`` -- a
+    # global Permission.ADMINISTER flag, independent of which organisation
+    # is active in the session. Since every self-registered user is
+    # Administrator of their own organisation, a user who merely accepted a
+    # Viewer invitation into another organisation and switched their session
+    # into it could edit any solution's diagrams there too, not just their
+    # own -- the exact bug admin_required/org_admin_required already fix
+    # elsewhere in this PR.
+    from flask import g
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    _active_org_id = getattr(g, "current_org_id", None)
+    if is_platform_admin(current_user) or rbac_service.is_org_admin(
+        current_user, _active_org_id
+    ):
         return
     if getattr(sol, "owner_id", None) and sol.owner_id == current_user.id:
         return
@@ -109,11 +126,20 @@ def _run_archimate_llm_generation(requirements, context, target_layer="complete"
     """Run ArchiMate generation with an application-context timeout guard."""
     from app.modules.architecture.services.archimate_llm_service import ArchiMateLLMService
 
+    from contextlib import nullcontext
+
+    from flask import g
+
+    from app.jobs.tenant_safe_job import tenant_scope
+
     svc = ArchiMateLLMService()
     app_obj = current_app._get_current_object()
+    # The worker thread has its own context and so no session organisation;
+    # carry the caller's into it so row-level security shows it its rows.
+    org_id = getattr(g, "current_org_id", None)
 
     def _call_llm():
-        with app_obj.app_context():
+        with app_obj.app_context(), (tenant_scope(org_id) if org_id is not None else nullcontext()):
             try:
                 model_data, _ = svc.generate_archimate_from_requirements(
                     requirements=requirements,
@@ -302,7 +328,11 @@ def patch_element(element_id):
 @archimate_bp.route("/api/link/driver-to-goal", methods=["POST"])
 @login_required
 def link_driver_to_goal():
-    """Link an orphan driver to a goal. Body: {driver_id, goal_id}. Updates Goal.driver_id."""
+    """Link an orphan driver to a goal. Body: {driver_id, goal_id}. Updates Goal.driver_id.
+
+    Uses MotivationLayerService.link_driver_to_goal for tenant isolation and
+    overwrite protection. The old URL is preserved.
+    """
     data = request.get_json(silent=True) or {}
     driver_id = data.get("driver_id")
     goal_id = data.get("goal_id")
@@ -313,18 +343,35 @@ def link_driver_to_goal():
         goal_id = int(goal_id)
     except (ValueError, TypeError):
         return jsonify({"error": "driver_id and goal_id must be integers"}), 400
-    from app.models.motivation import Driver, Goal
-    driver = db.session.get(Driver, driver_id)
-    goal = db.session.get(Goal, goal_id)
-    if not driver or not goal:
-        return jsonify({"error": "Driver or Goal not found"}), 404
-    goal.driver_id = driver.id
+
+    from app.utils.tenant import current_organization_id
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return jsonify({"error": "no tenant context"}), 400
+
+    from app.modules.architecture.services.motivation_layer_service import (
+        MotivationLayerService,
+    )
+
     try:
+        result = MotivationLayerService.link_driver_to_goal(
+            driver_id, goal_id, organization_id
+        )
         db.session.commit()
+        return jsonify({
+            "ok": True,
+            "driver_id": result["driver"]["id"],
+            "goal_id": result["goal"]["id"],
+        }), 200
+    except ValueError as exc:
+        db.session.rollback()
+        msg = str(exc)
+        if "already linked" in msg:
+            return jsonify({"error": msg}), 409
+        return jsonify({"error": msg}), 404
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
-    return jsonify({"ok": True, "driver_id": driver.id, "goal_id": goal.id}), 200
 
 
 @archimate_bp.route("/api/link/capability-to-application", methods=["POST"])
@@ -2769,6 +2816,23 @@ def api_export_saved_viewpoint(vp_id):
     Returns:
         application/xml with ArchiMate Open Exchange Format content.
     """
+    # Hardening pass alongside the snapshot-route fix (same file, same class
+    # of gap): every exporter below reaches the diagram through
+    # load_viewpoint_dict's bare db.session.get(SavedDiagram, vp_id) rather
+    # than the tenant-scoped helper. SavedDiagram IS a TenantMixin, so a
+    # genuinely fresh request (nothing already loaded for this id) still gets
+    # the tenant predicate applied on that SELECT — this is not a currently
+    # reproducible cross-org read, unlike the snapshot routes above. But it is
+    # the same unscoped-lookup-as-authorization pattern, and relies on no
+    # earlier code in the request having already touched this exact
+    # SavedDiagram row (Session.get() answers from the identity map without
+    # re-applying the tenant filter once a row is cached). Verifying ownership
+    # explicitly here removes that dependency rather than leaving it to hold
+    # by accident.
+    vp = _get_saved_diagram_scoped(vp_id)
+    if not vp:
+        return jsonify({"error": "Diagram not found"}), 404
+
     fmt = request.args.get("format", "archimate_exchange")
     _supported = {"archimate_exchange", "mermaid", "lucid", "archi"}
     if fmt not in _supported:
@@ -2989,8 +3053,20 @@ def api_get_snapshot(vp_id, sid):
 
     from app.models.archimate_viewpoint import ArchimateViewpointSnapshot
 
-    snapshot = db.session.get(ArchimateViewpointSnapshot, sid)
-    if not snapshot or snapshot.viewpoint_id != vp_id:
+    # CMP-025/CVE-style fix: verify the viewpoint's ownership FIRST (scoped
+    # query, applies the tenant predicate), THEN load the snapshot scoped to
+    # that already-verified viewpoint in one filtered query. The previous
+    # code loaded the snapshot with a bare db.session.get() (ArchimateViewpointSnapshot
+    # carries no organization_id of its own) and only checked that the
+    # snapshot's own stored viewpoint_id equalled vp_id — an internal
+    # consistency check, not an ownership check, so any organisation's user
+    # supplying another organisation's own (vp_id, sid) pair could read it.
+    vp = _get_saved_diagram_scoped(vp_id)
+    if not vp:
+        return jsonify({"error": "Diagram not found"}), 404
+
+    snapshot = ArchimateViewpointSnapshot.query.filter_by(id=sid, viewpoint_id=vp_id).first()
+    if not snapshot:
         return jsonify({"error": "Snapshot not found"}), 404
 
     return jsonify({
@@ -3018,13 +3094,19 @@ def api_restore_snapshot(vp_id, sid):
     )
     from app.models.archimate_viewpoint import ArchimateViewpointSnapshot
 
-    snapshot = db.session.get(ArchimateViewpointSnapshot, sid)
-    if not snapshot or snapshot.viewpoint_id != vp_id:
-        return jsonify({"error": "Snapshot not found"}), 404
-
+    # CMP-025/CVE-style fix: verify the viewpoint's ownership FIRST (scoped
+    # query, applies the tenant predicate), THEN load the snapshot scoped to
+    # that already-verified viewpoint in one filtered query — see
+    # api_get_snapshot above for the full rationale. Loading the snapshot
+    # first with a bare db.session.get() and only comparing viewpoint_id
+    # afterwards was an internal consistency check, not an ownership check.
     vp = _get_saved_diagram_scoped(vp_id)
     if not vp:
         return jsonify({"error": "Diagram not found"}), 404
+
+    snapshot = ArchimateViewpointSnapshot.query.filter_by(id=sid, viewpoint_id=vp_id).first()
+    if not snapshot:
+        return jsonify({"error": "Snapshot not found"}), 404
 
     snap_data = _json.loads(snapshot.snapshot_json)
 

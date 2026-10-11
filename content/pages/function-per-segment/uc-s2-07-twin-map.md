@@ -5,7 +5,7 @@ segment_id: S2
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /scale-up/twin-map
+url_slug: /use-cases/architecture-map-for-due-diligence
 ---
 
 # Give the acquirer or the auditor a current architecture picture we did not draw by hand
@@ -27,4 +27,4 @@ table.
 ## Related
 
 - [Applications](/modules/applications)
-- [What breaks if this service fails, and who gets called?](/scale-up/what-breaks-and-who-gets-called)
+- [What breaks if this service fails, and who gets called?](/use-cases/what-breaks-and-who-gets-called)

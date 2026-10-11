@@ -8,7 +8,7 @@
 <div class="flex-1 overflow-auto p-6">
   {{ page_shell(
       title=entity.name,
-      subtitle='System of record and the applications that hold this entity.',
+      subtitle='System of record, stewards, and classification.',
       breadcrumb=[('Home', url_for('main.index')), ('Data governance', url_for('data_governance.entities')), (entity.name, None)],
       tabs=tabs
   ) }}
@@ -25,6 +25,53 @@
     <form method="post" action="{{ url_for('data_governance.declare_system_of_record', entity_id=entity.id) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       {{ app_picker('sor-application', declared.name if declared else None, declared.id if declared else None) }}
+    </form>
+  </div>
+
+  <div class="rounded-lg border border-border bg-card p-4 mb-6">
+    <h2 class="text-sm font-semibold text-foreground mb-3">Data stewards</h2>
+    {% if stewards %}
+    <ul class="divide-y divide-border mb-3" data-testid="stewards-list">
+      {% for s in stewards %}
+      <li class="py-2 flex items-center justify-between gap-4" data-testid="steward-row-{{ s.id }}">
+        <span class="text-sm font-medium">{{ s.user_name }}</span>
+        <form method="post" action="{{ url_for('data_governance.remove_steward', entity_id=entity.id, owner_id=s.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="text-xs text-muted-foreground hover:text-destructive transition-colors">Remove</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-muted-foreground mb-3" data-testid="no-steward-message">No steward assigned yet.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('data_governance.assign_steward', entity_id=entity.id) }}" class="flex items-center gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <select name="user_id" data-testid="steward-picker" class="rounded-md border border-border bg-background px-3 py-2 text-sm">
+        <option value="">Select a person...</option>
+        {% for u in org_users %}
+        <option value="{{ u.id }}">{{ u.first_name or '' }} {{ u.last_name or '' }} ({{ u.email }})</option>
+        {% endfor %}
+      </select>
+      <button type="submit" data-testid="assign-steward-button" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Assign steward</button>
+    </form>
+  </div>
+
+  <div class="rounded-lg border border-border bg-card p-4 mb-6">
+    <h2 class="text-sm font-semibold text-foreground mb-1">Classification</h2>
+    <p class="text-sm mb-3" data-testid="classification-current">
+      Current: <span class="font-medium">{{ entity.data_classification | default('Not classified', true) }}</span>
+    </p>
+    <form method="post" action="{{ url_for('data_governance.propose_classification', entity_id=entity.id) }}" class="flex items-center gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <select name="classification_label" data-testid="classification-picker" class="rounded-md border border-border bg-background px-3 py-2 text-sm">
+        <option value="">Propose a label...</option>
+        <option value="public">Public</option>
+        <option value="internal">Internal</option>
+        <option value="confidential">Confidential</option>
+        <option value="restricted">Restricted</option>
+      </select>
+      <button type="submit" data-testid="propose-classification-button" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Propose</button>
     </form>
   </div>
 

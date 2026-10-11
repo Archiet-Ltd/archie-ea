@@ -10,6 +10,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import audit_log, require_roles
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.application_portfolio import ApplicationComponent
 from app.services.application_cost_accessor import set_annual_cost
 from app.services.rate_limiter import rate_limit
@@ -368,6 +369,7 @@ def rationalization_tracking():
 
 @unified_applications_bp.route("/rationalization/api/run-detection", methods=["POST"])
 @login_required
+@platform_admin_required
 @rate_limit(3, "1h")
 @audit_log("rationalization_run_detection")
 def rationalization_run_detection():
@@ -419,6 +421,7 @@ def rationalization_get_groups():
 
 @unified_applications_bp.route("/rationalization/api/runs")
 @login_required
+@platform_admin_required
 def rationalization_get_runs():
     """Get detection run history."""
     from app.services.unified_duplicate_detection_service import (
@@ -438,6 +441,7 @@ def rationalization_get_runs():
     "/rationalization/api/auto-resolve-exact", methods=["POST"]
 )
 @login_required
+@platform_admin_required
 @audit_log("rationalization_auto_resolve")
 def rationalization_auto_resolve():
     """Auto-resolve exact match duplicate groups."""

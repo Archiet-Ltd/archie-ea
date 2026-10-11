@@ -57,7 +57,7 @@ def _back(plan=None, interval=None):
 @login_required
 @admin_required
 def billing_index():
-    from app.services import billing_plans
+    from app.services import billing_plans, monelytics_provider
     from app.services.billing_service import BillingError, BillingService
 
     org = _org()
@@ -68,8 +68,18 @@ def billing_index():
             error="No organisation found for your account.",
         )
 
+    refresh_error = None
+    if monelytics_provider.configured():
+        config = monelytics_provider.configuration_status()
+        if config["ready"]:
+            try:
+                BillingService.refresh_from_monelytics(org)
+            except BillingError as exc:
+                refresh_error = str(exc)
+    else:
+        config = billing_plans.configuration_status()
+
     sub = billing_plans.current_subscription(org)
-    config = billing_plans.configuration_status()
     selected = request.args.get("plan")
     interval = request.args.get("interval") or "year"
     if interval not in billing_plans.INTERVALS:
@@ -105,6 +115,7 @@ def billing_index():
         config=config,
         stripe_configured=config["ready"],
         has_live_subscription=BillingService.has_live_subscription(sub),
+        error=refresh_error,
         selected_plan=selected_plan,
         selected_interval=interval,
         price=price,
@@ -125,11 +136,19 @@ def billing_upgrade():
     if org is None:
         return jsonify({"error": "No organisation found"}), 400
 
+    from app.services import monelytics_provider
     from app.services.billing_service import BillingError, BillingService
 
     plan = request.form.get("plan", "")
     interval = request.form.get("interval", "year")
-    complete_url = request.host_url.rstrip("/") + url_for("billing.billing_checkout_complete")
+    if monelytics_provider.configured():
+        # Monelytics' own hosted checkout returns the administrator straight
+        # to the billing page, which refreshes the plan from Monelytics on
+        # load: there is no local checkout-session id to look up here the way
+        # there is for Stripe, so /checkout/complete is not used.
+        complete_url = request.host_url.rstrip("/") + url_for("billing.billing_index")
+    else:
+        complete_url = request.host_url.rstrip("/") + url_for("billing.billing_checkout_complete")
     cancel_url = request.host_url.rstrip("/") + url_for(
         "billing.billing_index", plan=plan, interval=interval
     )

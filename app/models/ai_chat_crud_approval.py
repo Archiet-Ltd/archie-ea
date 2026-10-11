@@ -121,6 +121,11 @@ class AIChatCRUDApproval(TenantMixin, db.Model):
     # below, none of which filter on expires_at any more.
     escalated_at = db.Column(db.DateTime, nullable=True)
 
+    # The persona under which this tool call was queued. Stored so the charter
+    # can be enforced at approval-execution time — the approver may be a
+    # different user than the requester, and the charter must still apply.
+    persona = db.Column(db.String(80), nullable=True)
+
     def to_dict(self):
         """Convert approval record to dictionary."""
         return {
@@ -142,6 +147,7 @@ class AIChatCRUDApproval(TenantMixin, db.Model):
             "executed_at": self.executed_at.isoformat() if self.executed_at else None,
             "chat_session_id": self.chat_session_id,
             "agent_turn_id": self.agent_turn_id,
+            "persona": self.persona,
         }
 
     def approve(self, user_id):

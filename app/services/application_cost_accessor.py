@@ -9,9 +9,14 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
-from flask import current_app
+from flask import current_app, g, has_request_context
+
+from sqlalchemy import event
+from sqlalchemy.orm import Session
 
 from app.models.application_portfolio import ApplicationComponent
+from app.models.cost_fact import CATEGORY_TOTAL, ELEMENT_APPLICATION, PERIOD_ANNUAL
+from app.services.cost_fact_store import clear_facts, upsert_fact, year_period
 
 
 # The canonical annual-cost column on ApplicationComponent.
@@ -34,8 +39,23 @@ COST_CATEGORIES = frozenset({
 PERIOD_VALUES = frozenset({"annual", "monthly"})
 
 
-def get_reporting_currency() -> str:
-    """Return the default reporting currency code from app config."""
+def get_reporting_currency(organization_id: Optional[int] = None) -> str:
+    """The organisation's reporting currency, else the platform default.
+
+    ``organization_id`` defaults to the signed-in organisation; with neither
+    (a CLI command with no organisation given) the platform default applies.
+    """
+    if organization_id is None and has_request_context():
+        organization_id = getattr(g, "current_org_id", None)
+    if organization_id is not None:
+        from app import db
+        from app.models.organization import Organization
+
+        code = db.session.execute(
+            db.select(Organization.reporting_currency).where(Organization.id == organization_id)
+        ).scalar_one_or_none()
+        if code:
+            return code.upper()
     return current_app.config.get("DEFAULT_CURRENCY", "GBP")
 
 
@@ -61,26 +81,135 @@ def get_annual_cost_float(app: ApplicationComponent) -> Optional[float]:
     return float(d) if d is not None else None
 
 
-def set_annual_cost(app: ApplicationComponent, value: Optional[Decimal]) -> None:
+# R1-B08 PR 2: the legacy per-category columns (license_cost, maintenance_cost,
+# infrastructure_cost) predate this accessor and are not backfilled into
+# total_cost_of_ownership for rows imported before PR 1 landed -- only rows
+# imported through set_annual_cost since then are. A caller that switched to
+# get_annual_cost() alone would read every pre-PR-1 app as having no cost data
+# at all, which is worse than the scattered-columns status quo it replaces.
+# These two helpers are the one home for "does this app have recorded cost at
+# all" and "what number, from where" during that transition; Release 2's Cost
+# Fact consolidation retires them once every row is backfilled.
+_LEGACY_COST_FIELDS = ("license_cost", "maintenance_cost", "infrastructure_cost")
+
+
+def has_recorded_cost(app: ApplicationComponent) -> bool:
+    """True if the canonical column or any pre-consolidation legacy column
+    carries a positive cost value."""
+    canonical = get_annual_cost(app)
+    if canonical is not None and canonical > 0:
+        return True
+    for field in _LEGACY_COST_FIELDS:
+        value = getattr(app, field, None)
+        if value is not None and float(value) > 0:
+            return True
+    return False
+
+
+def get_annual_cost_with_source(app: ApplicationComponent):
+    """(value, source_label). Prefers the canonical column; falls back to
+    the sum of the legacy per-category columns for a row never re-imported
+    through set_annual_cost, labelled so the caller can show its provenance."""
+    canonical = get_annual_cost(app)
+    if canonical is not None and canonical > 0:
+        return float(canonical), "ApplicationComponent.total_cost_of_ownership"
+    legacy_values = [getattr(app, field, None) for field in _LEGACY_COST_FIELDS]
+    if any(v is not None for v in legacy_values):
+        total = sum(float(v or 0) for v in legacy_values)
+        return total, "ApplicationComponent (" + " + ".join(_LEGACY_COST_FIELDS) + ")"
+    return None, None
+
+
+def set_annual_cost(app: ApplicationComponent, value: Optional[Decimal],
+                    currency: Optional[str] = None) -> None:
     """
     Write the application's annual cost through the accessor.
 
     Accepts Decimal, int, float, or numeric string. None clears the field.
     Negative values are rejected (treated as not recorded).
+
+    The cost fact store is written in step: the value is recorded as a typed
+    fact in ``currency`` (the organisation's reporting currency when omitted),
+    and clearing the value removes the fact.
     """
+    _write_column(app, _ANNUAL_COST_COLUMN, value)
+    sync_cost_fact(app, _ANNUAL_COST_COLUMN, currency)
+
+
+def _write_column(app: ApplicationComponent, column: str, value: Any) -> None:
     if value is None:
-        setattr(app, _ANNUAL_COST_COLUMN, None)
+        setattr(app, column, None)
         return
     try:
         parsed = Decimal(str(value))
         if parsed < 0:
             # Negative cost values are not accepted — treated as not recorded.
-            setattr(app, _ANNUAL_COST_COLUMN, None)
+            setattr(app, column, None)
             return
-        setattr(app, _ANNUAL_COST_COLUMN, parsed)
+        setattr(app, column, parsed)
     except (InvalidOperation, ValueError, TypeError):
         # Invalid input is treated as "not recorded" — never stored as 0.
-        setattr(app, _ANNUAL_COST_COLUMN, None)
+        setattr(app, column, None)
+
+
+# Cost columns on the application and how each is recorded as a fact:
+# column -> (category, period). The annual total is category "total"; every
+# other column is its own category so no two columns share a fact.
+FACT_COLUMNS = {
+    "total_cost_of_ownership": (CATEGORY_TOTAL, PERIOD_ANNUAL),
+    "license_cost": ("license_cost", PERIOD_ANNUAL),
+    "license_cost_annual": ("license_cost_annual", PERIOD_ANNUAL),
+    "maintenance_cost": ("maintenance_cost", PERIOD_ANNUAL),
+    "infrastructure_cost": ("infrastructure_cost", PERIOD_ANNUAL),
+    "infrastructure_cost_monthly": ("infrastructure_cost_monthly", "monthly"),
+    "support_cost": ("support_cost", PERIOD_ANNUAL),
+    "implementation_cost": ("implementation_cost", "one_time"),
+    "development_cost_annual": ("development_cost_annual", PERIOD_ANNUAL),
+}
+FACT_SOURCE = "application_cost_accessor"
+_PENDING_KEY = "pending_cost_facts"
+
+
+def sync_cost_fact(app: ApplicationComponent, column: str, currency: Optional[str] = None):
+    """Make the cost fact for one application cost column agree with the column.
+
+    Returns ``created``, ``updated``, ``unchanged``, ``cleared`` or ``None``
+    (nothing to do, or deferred until a new application has an id). This is the
+    only writer of application cost facts; the backfill calls it too.
+    """
+    from app import db
+
+    if app.id is None or app.organization_id is None:
+        # A new application has no id until it flushes; finish then.
+        db.session.info.setdefault(_PENDING_KEY, {})[(id(app), column)] = (app, column, currency)
+        return None
+    category, period = FACT_COLUMNS[column]
+    source_id = f"{app.id}:{column}"
+    value = getattr(app, column, None)
+    if value is None:
+        removed = clear_facts(app.organization_id, ELEMENT_APPLICATION, app.id, FACT_SOURCE,
+                              category=category, source_id=source_id)
+        return "cleared" if removed else None
+    start, end = year_period() if period != "one_time" else (None, None)
+    _, outcome = upsert_fact(
+        app.organization_id, ELEMENT_APPLICATION, app.id, value,
+        currency or get_reporting_currency(app.organization_id), FACT_SOURCE,
+        category=category, period=period, period_start=start, period_end=end,
+        source_table="application_components", source_id=source_id,
+        # An explicit currency is a statement about the amount; the default is not.
+        keep_currency_when_amount_unchanged=currency is None,
+    )
+    return outcome
+
+
+def _finish_new_applications(session, flush_context) -> None:
+    pending = session.info.pop(_PENDING_KEY, None)
+    for app, column, currency in (pending or {}).values():
+        if app.id is not None:
+            sync_cost_fact(app, column, currency)
+
+
+event.listen(Session, "after_flush_postexec", _finish_new_applications)
 
 
 def parse_cost_cell(
@@ -302,6 +431,8 @@ def apply_cost_to_application(
                     setattr(app, field_name, float(Decimal(str(val))))
             except (InvalidOperation, ValueError, TypeError):
                 setattr(app, field_name, None)
+            if field_name in FACT_COLUMNS:
+                sync_cost_fact(app, field_name)
 
 
 # Cost column variant definitions for case-insensitive header detection.

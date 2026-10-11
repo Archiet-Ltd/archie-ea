@@ -188,6 +188,19 @@ def get_risk_score_history(risk_id):
     return jsonify([r.to_dict() for r in rows]), 200
 
 
+@risk_bp.route("/api/entities/<entity_type>/<int:entity_id>/risks", methods=["GET"])
+@login_required
+def get_risks_for_entity(entity_type, entity_id):
+    """GET /api/entities/<type>/<id>/risks — risks linked to an Application,
+    Solution or Programme. The one reader for "which risks threaten this
+    element" used by the programme screen, the solution risk tab and the
+    risk register's detail view alike."""
+    if entity_type not in ENTITY_TYPES:
+        return jsonify({"error": f"entity_type must be one of {ENTITY_TYPES}"}), 400
+    risks = risk_service.risks_linked_to(entity_type, entity_id)
+    return jsonify([serialize_risk_row(r) for r in risks]), 200
+
+
 @risk_bp.route("/api/programmes/search", methods=["GET"])
 @login_required
 def search_programmes():

@@ -51,6 +51,8 @@ ELEMENT_TYPES: Dict[str, tuple] = {
     "Metric": ("Assessment", "Motivation"),
     "Plateau": ("Plateau", "Implementation"),
     "WorkPackage": ("WorkPackage", "Implementation"),
+    "Gap": ("Gap", "Implementation"),
+    "UnifiedWorkPackage": ("WorkPackage", "Implementation"),
     "SolutionDriver": ("Driver", "Motivation"),
     "SolutionGoal": ("Goal", "Motivation"),
     "SolutionConstraint": ("Constraint", "Motivation"),

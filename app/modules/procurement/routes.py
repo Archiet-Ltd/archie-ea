@@ -12,7 +12,7 @@ from datetime import date, timedelta
 from flask import render_template, request
 from flask_login import current_user, login_required
 
-from app.decorators import requires_procurement
+from app.decorators import requires_procurement, requires_procurement_or_finance
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
 
@@ -187,7 +187,7 @@ def renewals_dashboard():
 
 @procurement_bp.route("/licenses")
 @login_required
-@requires_procurement
+@requires_procurement_or_finance
 def licenses_list():
     """List all license entitlements for current organization."""
     org_id = current_user.organization_id
@@ -277,7 +277,7 @@ def compliance_dashboard():
 
 @procurement_bp.route("/spend")
 @login_required
-@requires_procurement
+@requires_procurement_or_finance
 def spend_analytics():
     """Spend analytics dashboard."""
     org_id = current_user.organization_id

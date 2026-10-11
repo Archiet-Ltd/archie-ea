@@ -264,8 +264,24 @@ class BusinessFunction(TenantMixin, db.Model):
     __tablename__ = "business_function"
 
     id = db.Column(db.Integer, primary_key=True)
+    # FK target repointed from business_capability.id to unified_capabilities.id:
+    # the only caller that actually constructs a BusinessFunction
+    # (ensure_function() in
+    # app/modules/applications/services/application_capability_catalog.py)
+    # passes a UnifiedCapability instance's id, not a BusinessCapability's --
+    # unified_capabilities is the single source of truth for capability
+    # modeling (see UnifiedCapability's own class docstring). The old FK let
+    # that write succeed only by coincidence (the two tables have
+    # independent id sequences) and raise a ForeignKeyViolation otherwise.
+    # Column stays Integer, matching the existing precedent for other FKs
+    # onto unified_capabilities.id (CapabilityValueStreamMapping,
+    # UnifiedCapabilityProcessMapping, CapabilityTechnologyMapping in
+    # app/models/unified_capability.py all use Integer, not BigInteger, even
+    # though unified_capabilities.id itself is a BigInteger primary key).
+    # See the migration that repoints this constraint for the data carried
+    # forward from business_capability.id.
     capability_id = db.Column(
-        db.Integer, db.ForeignKey("business_capability.id"), nullable=False
+        db.Integer, db.ForeignKey("unified_capabilities.id"), nullable=False
     )
 
     # Function identity
@@ -306,7 +322,10 @@ class BusinessFunction(TenantMixin, db.Model):
     )
 
     # Relationships
-    capability = db.relationship("BusinessCapability", backref="functions")
+    # Points at UnifiedCapability, not BusinessCapability, matching the FK
+    # above. backref="functions" is safe here: there is no pre-existing
+    # "functions" backref/attribute on UnifiedCapability to collide with.
+    capability = db.relationship("UnifiedCapability", backref="functions")
 
     def __repr__(self):
         return f"<BusinessFunction {self.name}>"

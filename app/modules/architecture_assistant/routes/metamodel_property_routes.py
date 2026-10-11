@@ -55,12 +55,29 @@ def _organization_id() -> int | None:
 def _can_define() -> bool:
     if not getattr(current_user, "is_authenticated", False):
         return False
+    # D-4 (admin-rbac-active-org continuation): this used to be
+    # ``current_user.is_admin()`` -- a global Permission.ADMINISTER flag,
+    # independent of which organisation is active in the session (the
+    # mutating route this gates the "Define" UI affordance for,
+    # ``@role_required(*DEFINING_ROLES)`` below, carries the matching fix).
     try:
-        if current_user.is_admin():
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
+        if is_platform_admin(current_user) or rbac_service.is_org_admin(
+            current_user, _organization_id()
+        ):
             return True
     except Exception:
         current_app.logger.debug("is_admin unavailable for metamodel role check")
-    return getattr(current_user, "enterprise_role", None) in DEFINING_ROLES
+    # R2-5 (PR 428 round 3): "platform_admin" is DEFINING_ROLES' literal
+    # stand-in for genuine platform authority, already judged above by
+    # is_platform_admin(); it defaults onto every legacy account's
+    # enterprise_role column regardless of real authority, so it must never
+    # be satisfied by the raw column value here (mirrors the matching fix
+    # in app.decorators.role_required).
+    persona = getattr(current_user, "enterprise_role", None)
+    return persona != "platform_admin" and persona in DEFINING_ROLES
 
 
 def _render_index(form=None, error=None, status=200):

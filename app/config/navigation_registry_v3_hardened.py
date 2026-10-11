@@ -351,8 +351,14 @@ class NavigationRegistryV3:
         if config.visibility == ItemVisibility.ADMIN_ONLY:
             if user is None:
                 return False
-            # ✅ FIX: Defensive access to is_admin
-            return bool(getattr(user, "is_admin", False))
+            # R3-1 (PR 428 round 4): the previous "defensive access" fix
+            # only guarded against a missing attribute -- it still read
+            # ``is_admin`` without calling it, so the bound method (always
+            # truthy) showed admin-only navigation to every user. Judged
+            # against the active organisation, same as the rest of this PR.
+            from app.middleware.tenant_decorators import is_active_org_admin
+
+            return is_active_org_admin(user)
         
         if config.visibility == ItemVisibility.SPECIFIC_ROLES:
             if user is None:

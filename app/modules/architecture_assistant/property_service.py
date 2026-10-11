@@ -1,9 +1,69 @@
 """Property Service — templates, visibility, scoring, and save for element properties."""
 
+import json
 import logging
 import re
 
+from app.config.property_templates import PROPERTY_TEMPLATES
+from app.models.acm_property_template import AcmPropertyTemplate
+
 logger = logging.getLogger(__name__)
+
+_NUMERIC_RE = re.compile(r"^([+-]?(?:\d+(?:\.\d+)?|\.\d+))(?:\s*(.+))?$")
+_PROPERTY_TEMPLATE_META = {
+    (row["archimate_type"], row["property_key"]): row for row in PROPERTY_TEMPLATES
+}
+
+
+class PropertyValidationError(ValueError):
+    """Raised when a typed property value cannot be stored."""
+
+
+def _coerce_number(raw, unit=None):
+    if isinstance(raw, bool):
+        raise PropertyValidationError("Expected a number, got a boolean.")
+    if isinstance(raw, (int, float)):
+        return int(raw) if isinstance(raw, int) or float(raw).is_integer() else float(raw)
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    match = _NUMERIC_RE.match(text.replace(",", ""))
+    if not match:
+        raise PropertyValidationError("Enter a number for this property.")
+    number_text, parsed_unit = match.groups()
+    if unit and parsed_unit and parsed_unit.strip() != unit:
+        raise PropertyValidationError(f"Enter a number in {unit}.")
+    number = float(number_text)
+    return int(number) if number.is_integer() else number
+
+
+def _coerce_boolean(raw):
+    if isinstance(raw, bool):
+        return raw
+    text = str(raw or "").strip().lower()
+    if text in ("", "none"):
+        return None
+    if text in ("true", "1", "yes", "y", "on"):
+        return True
+    if text in ("false", "0", "no", "n", "off"):
+        return False
+    raise PropertyValidationError("Enter true or false for this property.")
+
+
+def _coerce_enum(raw, options):
+    if raw in (None, ""):
+        return None
+    if raw in (options or []):
+        return raw
+    raise PropertyValidationError("Choose one of the allowed values for this property.")
+
+
+def _coerce_multi_select(raw):
+    if raw in (None, ""):
+        return []
+    if isinstance(raw, list):
+        return [str(item).strip() for item in raw if str(item).strip()]
+    return [part.strip() for part in str(raw).split(",") if part.strip()]
 
 
 def tiers_up_to(tier):
@@ -60,10 +120,100 @@ def template_query(organization_id=None):
 class PropertyService:
     """Manages element property templates, scoring, and persistence."""
 
+    def _template_for(self, archimate_type, key, organization_id=None):
+        return template_query(organization_id).filter_by(
+            archimate_type=archimate_type,
+            property_key=key,
+        ).first()
+
+    def _template_unit(self, archimate_type, key):
+        meta = _PROPERTY_TEMPLATE_META.get((archimate_type, key), {})
+        return meta.get("unit")
+
+    @staticmethod
+    def _legacy_properties_dict(record):
+        raw = getattr(record, "properties", None)
+        if not raw:
+            return {}
+        if isinstance(raw, dict):
+            return dict(raw)
+        if isinstance(raw, str):
+            try:
+                parsed = json.loads(raw)
+            except (TypeError, ValueError):
+                return {}
+            return parsed if isinstance(parsed, dict) else {}
+        return {}
+
+    def _coerce_value(self, *, archimate_type, key, raw_value, organization_id=None):
+        template = self._template_for(archimate_type, key, organization_id=organization_id)
+        if template is None:
+            return {"value": raw_value}
+
+        unit = self._template_unit(archimate_type, key)
+
+        if template.property_type == "number":
+            coerced = _coerce_number(raw_value, unit=unit)
+        elif template.property_type == "boolean":
+            coerced = _coerce_boolean(raw_value)
+        elif template.property_type == "enum":
+            coerced = _coerce_enum(raw_value, template.enum_options)
+        elif template.property_type == "multi-select":
+            coerced = _coerce_multi_select(raw_value)
+        else:
+            coerced = None if raw_value is None else str(raw_value).strip()
+
+        entry = {"value": coerced}
+        if unit:
+            entry["unit"] = unit
+        return entry
+
+    def _set_record_property(self, record, *, archimate_type, key, value, source="user"):
+        props = dict(getattr(record, "acm_properties", None) or {})
+        entry = self._coerce_value(
+            archimate_type=archimate_type,
+            key=key,
+            raw_value=value,
+            organization_id=getattr(record, "organization_id", None),
+        )
+        entry["source"] = source
+        props[key] = entry
+        record.acm_properties = props
+        if hasattr(record, "properties"):
+            legacy = self._legacy_properties_dict(record)
+            legacy[key] = entry.get("value")
+            record.properties = json.dumps(legacy)
+        return entry
+
+    def set_element_property(self, element, key, value, source="user"):
+        """Write one typed property onto an element through the canonical writer."""
+        return self._set_record_property(
+            element,
+            archimate_type=getattr(element, "type", None),
+            key=key,
+            value=value,
+            source=source,
+        )
+
+    def merge_element_properties(self, element, updates, source="user"):
+        """Write multiple element properties through the canonical writer."""
+        for key, value in (updates or {}).items():
+            self.set_element_property(element, key, value, source=source)
+        return getattr(element, "acm_properties", None) or {}
+
+    def merge_typed_properties(self, existing, archimate_type, updates, source="user"):
+        """Merge a dict of typed property updates for a staged record."""
+        class _Record:
+            pass
+
+        record = _Record()
+        record.acm_properties = dict(existing or {})
+        for key, value in (updates or {}).items():
+            self._set_record_property(record, archimate_type=archimate_type, key=key, value=value, source=source)
+        return record.acm_properties
+
     def get_templates_for_type(self, archimate_type, tier="standard", domain=None, tag_filter=None):
         """Get property templates for an element type, filtered by tier."""
-        from app.models.acm_property_template import AcmPropertyTemplate
-
         query = template_query().filter_by(
             archimate_type=archimate_type,
         ).filter(
@@ -79,12 +229,17 @@ class PropertyService:
         if tag_filter:
             query = query.filter(AcmPropertyTemplate.property_key.like(tag_filter + "%"))
 
-        return [t.to_dict() for t in query.order_by(AcmPropertyTemplate.sort_order).all()]
+        templates = []
+        for template in query.order_by(AcmPropertyTemplate.sort_order).all():
+            data = template.to_dict()
+            unit = self._template_unit(template.archimate_type, template.property_key)
+            if unit:
+                data["unit"] = unit
+            templates.append(data)
+        return templates
 
     def calculate_element_score(self, archimate_type, properties, tier="standard", domain=None, tag_filter=None):
         """Calculate property completeness for a single element. Returns float 0.0-1.0."""
-        from app.models.acm_property_template import AcmPropertyTemplate
-
         query = template_query().filter_by(
             archimate_type=archimate_type,
         ).filter(
@@ -180,8 +335,6 @@ class PropertyService:
         to hardcoded sensible defaults. Used to pre-fill baseline/NFR proposals
         so the architect starts with sensible values, not blanks.
         """
-        from app.models.acm_property_template import AcmPropertyTemplate
-
         props = {}
 
         # Start with hardcoded fallbacks for this type
@@ -198,17 +351,23 @@ class PropertyService:
             ).all()
             for t in templates:
                 if t.default_value is not None and t.default_value != "":
-                    props[t.property_key] = {"value": t.default_value, "source": "default"}
+                    props[t.property_key] = self._coerce_value(
+                        archimate_type=archimate_type,
+                        key=t.property_key,
+                        raw_value=t.default_value,
+                    ) | {"source": "default"}
         except Exception as e:
             logger.debug("Property template query skipped: %s", e)
 
         return props
 
-    def merge_properties(self, existing, updates):
-        """Merge user property updates. Sets source to 'user' on each update."""
+    def merge_properties(self, existing, updates, archimate_type=None, source="user"):
+        """Merge property updates, coercing via templates when a type is known."""
+        if archimate_type:
+            return self.merge_typed_properties(existing, archimate_type, updates, source=source)
         merged = dict(existing) if existing else {}
-        for key, value in updates.items():
-            merged[key] = {"value": value, "source": "user"}
+        for key, value in (updates or {}).items():
+            merged[key] = {"value": value, "source": source}
         return merged
 
     @staticmethod

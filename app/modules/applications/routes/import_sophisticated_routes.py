@@ -1656,8 +1656,10 @@ def rollback_import_by_session(session_id):
     if not audit_log:
         return jsonify({"error": "Import session not found"}), 404
 
-    # Check if user has permission (admin or original importer)
-    if not (hasattr(current_user, 'is_admin') and current_user.is_admin) and current_user.id != audit_log.user_id:
+    # Check if user has permission (admin of the active organisation, or original importer)
+    from app.middleware.tenant_decorators import is_active_org_admin
+
+    if not is_active_org_admin() and current_user.id != audit_log.user_id:
         return jsonify({"error": "Permission denied. Only admins or the original importer can rollback."}), 403
 
     # Check if audit has rollback data

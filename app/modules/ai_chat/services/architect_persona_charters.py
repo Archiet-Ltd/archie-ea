@@ -43,7 +43,6 @@ Consumed by MultiDomainChatService._get_persona_system_prompt.
 """
 
 import logging
-import re
 from typing import Callable, Dict, Optional
 
 from sqlalchemy import func
@@ -85,6 +84,21 @@ PERSONA_ALIASES: Dict[str, str] = {
     # ADM) is enterprise_architect's remit verbatim, so it is aliased rather
     # than given a duplicate charter.
     "capability_architect": "enterprise_architect",
+    # R1-B36 (TB-0146), 2026-10-05: finance/compliance/risk/operations/
+    # non_technical_owner promoted from unassignable to assignable with no
+    # dedicated charter of their own in this PR -- aliased to the closest
+    # existing persona (matches ROLE_DEFAULT_PERSONAS below) rather than
+    # left to resolve to nothing; a real charter per role is follow-up work.
+    "finance": "procurement",
+    "compliance": "security_architect",
+    "risk": "enterprise_architect",
+    # NOT platform_admin: review fix (6 Oct 2026) -- _platform_admin_context's
+    # last_import() reads ImportHistory with no organisation filter, so an
+    # operations user aliased there would see another organisation's latest
+    # import filename. enterprise_architect's live context is
+    # organisation-scoped.
+    "operations": "enterprise_architect",
+    "non_technical_owner": "application_manager",
 }
 
 # The database-backed enterprise role selects the initial chat persona. Keep
@@ -110,6 +124,16 @@ ROLE_DEFAULT_PERSONAS: Dict[str, str] = {
     # generalist charter would concede the point.
     "security_architect": "security_architect",
     "data_architect": "data_architect",
+    # R1-B36 (TB-0146), 2026-10-04: promoted from unassignable to assignable.
+    # None of the five gets a dedicated charter in this PR -- mapped to the
+    # closest existing persona's voice and data, not a generic fallback, and
+    # a real charter per persona is named as follow-up work, not silently
+    # dropped.
+    "finance": "procurement",
+    "compliance": "security_architect",
+    "risk": "enterprise_architect",
+    "operations": "enterprise_architect",
+    "non_technical_owner": "application_manager",
 }
 
 DEFAULT_CHAT_PERSONA = "enterprise_architect"
@@ -1374,12 +1398,14 @@ def _platform_admin_context() -> str:
     """Operational live data for the platform_admin persona.
 
     Reads REAL rows only. Every section is _safe()-wrapped, so a missing table
-    or empty estate degrades to an honest "unavailable"/"none" line rather than
-    a fabricated figure. User counts are scoped to the acting organisation when
-    a tenant context is present (User is not a TenantMixin model, so the org
-    predicate is applied explicitly here); import history is not org-partitioned
-    in the schema, so it is reported as the platform-wide latest, labelled as
-    such.
+    or an unexpected failure degrades to an honest "unavailable" line rather
+    than a fabricated figure. Every section — user counts, pending invites,
+    role mix and last import — is scoped to the acting organisation (User is
+    not a TenantMixin model, so the org predicate is applied explicitly here;
+    import history has no organization_id column, so it is joined through its
+    nullable user_id to that user's organization). When no organisation context
+    is present, every section reports "unavailable" rather than falling back
+    to a platform-wide figure.
     """
     lines = []
 
@@ -1391,8 +1417,14 @@ def _platform_admin_context() -> str:
             return query.filter(User.organization_id == org_id)
         return query
 
+    def _current_org_id():
+        from flask import g
+        return getattr(g, "current_org_id", None)
+
     def user_counts():
         from app.models.user import User
+        if _current_org_id() is None:
+            return "- user_counts: unavailable"
         total = _org_scope(db.session.query(func.count(User.id))).scalar() or 0  # tenant-scoping-ok: org-scoped via _org_scope() above (filters User.organization_id == g.current_org_id)
         return f"- Users provisioned: {total}"
 
@@ -1400,6 +1432,8 @@ def _platform_admin_context() -> str:
         # No persistent Invitation model exists in the schema; the honest proxy
         # for "invited but not yet activated" is an unconfirmed account.
         from app.models.user import User
+        if _current_org_id() is None:
+            return "- pending_invites: unavailable"
         pending = _org_scope(
             db.session.query(func.count(User.id)).filter(User.confirmed.is_(False))  # tenant-scoping-ok: wrapped in _org_scope() below/above (filters User.organization_id == g.current_org_id)
         ).scalar() or 0
@@ -1407,6 +1441,8 @@ def _platform_admin_context() -> str:
 
     def role_mix():
         from app.models.user import User
+        if _current_org_id() is None:
+            return "- role_mix: unavailable"
         rows = dict(
             _org_scope(
                 db.session.query(User.enterprise_role, func.count())
@@ -1421,8 +1457,15 @@ def _platform_admin_context() -> str:
 
     def last_import():
         from app.models.import_history import ImportHistory
+        from app.models.user import User
+
+        org_id = _current_org_id()
+        if org_id is None:
+            return "- last_import: unavailable"
         row = (
             ImportHistory.query
+            .join(User, ImportHistory.user_id == User.id)
+            .filter(User.organization_id == org_id)  # tenant-scoping-ok: joined through ImportHistory.user_id -> User.organization_id == org_id
             .order_by(ImportHistory.created_at.desc())
             .first()
         )
@@ -1430,7 +1473,7 @@ def _platform_admin_context() -> str:
             return "- Last data import: none recorded"
         when = row.created_at.date().isoformat() if row.created_at else "unknown date"
         return (
-            f"- Last data import (platform-wide): {row.filename} — {row.status} "
+            f"- Last data import: {row.filename} — {row.status} "
             f"on {when} ({row.records_imported or 0} imported, "
             f"{row.records_failed or 0} failed)"
         )
@@ -1495,26 +1538,7 @@ UNTRUSTED_PREAMBLE = (
 )
 
 
-_FENCE_LOOKALIKE = re.compile(r"={3,}")
-
-
-def _neutralize_fence_lookalikes(text: str) -> str:
-    """Break any byte-identical match to our own '=== BEGIN/END ... ===' fence
-    syntax that might appear inside untrusted content.
-
-    Red-teamed 4 Sep 2026: a document containing a literal
-    "=== END <label> ===" line, followed by forged instruction text and a
-    fake "=== BEGIN <label> ===", round-tripped through the original
-    fence_untrusted() completely unchanged -- the forged close marker was
-    byte-identical to a real one, so nothing (the preamble is advisory, not
-    structural) stopped retrieved content from manufacturing what looks like
-    the end of the untrusted block followed by fresh "trusted" text. Runs of
-    3+ '=' are spaced apart ("===" -> "= = =") so untrusted content can
-    describe or quote fence syntax (still legible) but can never produce the
-    exact delimiter the real fence uses, the same way user input gets HTML-
-    escaped rather than trusted not to contain "<script>".
-    """
-    return _FENCE_LOOKALIKE.sub(lambda m: " ".join("=" * len(m.group(0))), text)
+from app.utils.text_sanitization import neutralize_fence_lookalikes as _neutralize_fence_lookalikes
 
 
 def fence_untrusted(label: str, body: str) -> str:

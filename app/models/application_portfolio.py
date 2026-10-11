@@ -783,6 +783,9 @@ class VendorContract(TenantMixin, db.Model):
     # Link entities
     application_id = Column(db.Integer, db.ForeignKey("application_components.id"))
     vendor_id = Column(db.Integer, db.ForeignKey("vendor_organizations.id"))
+    archimate_contract_id = Column(
+        db.Integer, db.ForeignKey("archimate_contracts.id"), nullable=True, index=True
+    )  # Mirror link to ArchiMate Contract (consolidation of archimate_contracts)
 
     # The contract as an element of the architecture model (ArchiMate
     # business-layer Contract), created with the contract by the listener
@@ -875,6 +878,11 @@ class VendorContract(TenantMixin, db.Model):
     # SLAs under this contract (required by ServiceLevelAgreement.contract back_populates)
     slas = relationship(
         "ServiceLevelAgreement", back_populates="contract", cascade="all, delete-orphan"
+    )
+
+    # ArchiMate Contract mirror (consolidation of archimate_contracts into vendor_contracts)
+    archimate_contract = relationship(
+        "Contract", foreign_keys=[archimate_contract_id], backref="vendor_contract_mirror"
     )
 
     def __repr__(self):

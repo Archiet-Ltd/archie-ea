@@ -1,0 +1,67 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}Formula Register — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6 max-w-3xl space-y-6">
+  {{ page_shell(
+      title='Formula Register',
+      subtitle='Every composite score names the reviewed formula and version it was computed with.',
+      breadcrumb=[('Home', url_for('main.index')), ('Formula Register', None)]
+  ) }}
+
+  {% for key, label in formula_keys.items() %}
+  <div class="rounded-lg border border-border bg-card p-4" data-testid="formula-card-{{ key }}">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">{{ label }}</h2>
+
+    {% set rows = versions.get(key, []) %}
+    {% if rows %}
+      {% set active = rows | selectattr('is_active') | first %}
+      <p class="text-sm text-foreground mb-3" data-testid="formula-active-version">
+        Active version:
+        <span class="font-semibold">v{{ active.version if active else '—' }}</span>
+      </p>
+      <ul class="text-sm text-muted-foreground mb-4 space-y-1">
+        {% if active %}
+          {% for name, weight in active.inputs.items() %}
+          <li data-testid="formula-weight-row">{{ name }}: <span class="font-mono">{{ weight }}</span></li>
+          {% endfor %}
+        {% endif %}
+      </ul>
+      <details class="mb-4">
+        <summary class="text-sm text-muted-foreground cursor-pointer">Version history ({{ rows | length }})</summary>
+        <ul class="text-sm text-muted-foreground mt-2 space-y-1" data-testid="formula-version-history">
+          {% for row in rows %}
+          <li>v{{ row.version }}{% if row.is_active %} (active){% endif %} — reviewed {{ row.reviewed_at.strftime('%Y-%m-%d') if row.reviewed_at else '—' }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+    {% else %}
+      <p class="text-sm text-muted-foreground mb-4" data-testid="formula-no-version">No version registered yet — scores using this formula show "—" for their version.</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('formula_register.new_version', formula_key=key) }}"
+          class="space-y-2" data-testid="formula-new-version-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <p class="text-xs text-muted-foreground">New version's weight for each input:</p>
+      {% set current_weights = (active.inputs if active else {}) %}
+      {% for dim in formula_dimensions.get(key, []) %}
+      <div class="grid grid-cols-2 gap-2">
+        <input type="text" name="input_name" value="{{ dim }}" readonly
+               data-testid="formula-input-name"
+               class="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+        <input type="text" name="input_weight" value="{{ current_weights.get(dim, '') }}" placeholder="0.3"
+               data-testid="formula-input-weight"
+               class="rounded-md border border-border bg-background px-3 py-2 text-sm">
+      </div>
+      {% endfor %}
+      <button type="submit" data-testid="formula-activate-button"
+              class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">
+        Activate new version
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

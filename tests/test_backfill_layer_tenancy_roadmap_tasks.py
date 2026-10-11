@@ -16,6 +16,7 @@ this branch's base to extend, so this is a new module.
 
 from __future__ import annotations
 
+import click
 import pytest
 from sqlalchemy import text
 
@@ -137,6 +138,7 @@ def test_backfill_derives_roadmap_task_org_from_work_package_creator(db_session,
         name="Migrate ERP",
         business_capability="Finance",
         created_by=user_b.id,
+        organization_id=org_b.id,
     )
     db_session.add(wp)
     db_session.flush()
@@ -172,6 +174,7 @@ def test_backfill_prefers_work_package_provenance_over_moved_creator(db_session,
         name="Migrate CRM",
         business_capability="Sales",
         created_by=wp_creator.id,
+        organization_id=org_a.id,
     )
     db_session.add(wp)
     db_session.flush()
@@ -217,43 +220,6 @@ def test_backfill_derives_roadmap_task_org_from_consolidation_entry(db_session, 
     # org_a is unused by the derivation itself; it only establishes that a
     # second organisation exists so a wrong-tenant assignment would show up.
     assert org_a.id != org_b.id
-
-
-def _snapshot_org_nullability(app):
-    """Record which tables have organization_id nullable before repair_layer_tenancy runs."""
-    from app import db
-    from sqlalchemy import text
-
-    with app.app_context():
-        with db.engine.connect() as conn:
-            rows = conn.execute(
-                text(
-                    "SELECT table_name, is_nullable FROM information_schema.columns "
-                    "WHERE column_name = 'organization_id' AND table_schema = 'public'"
-                )
-            ).fetchall()
-            return {row.table_name: row.is_nullable for row in rows}
-
-
-def _restore_org_nullability(app, snapshot):
-    """Restore organization_id nullability for any table that was changed."""
-    from app import db
-    from sqlalchemy import text
-
-    with app.app_context():
-        with db.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-            current = conn.execute(
-                text(
-                    "SELECT table_name, is_nullable FROM information_schema.columns "
-                    "WHERE column_name = 'organization_id' AND table_schema = 'public'"
-                )
-            ).fetchall()
-            for table_name, is_nullable in current:
-                before = snapshot.get(table_name)
-                if before == "YES" and is_nullable == "NO":
-                    conn.execute(
-                        text(f'ALTER TABLE "{table_name}" ALTER COLUMN organization_id DROP NOT NULL')
-                    )
 
 
 def test_backfill_leaves_unprovenanced_roadmap_task_null_with_two_orgs(app):
@@ -339,7 +305,6 @@ def test_backfill_leaves_unprovenanced_roadmap_task_null_with_two_orgs(app):
         db.session.commit()
         task_ids = [orphan_task_id, provenanced_a_id, provenanced_b_id]
 
-        nullability_before = _snapshot_org_nullability(app)
         try:
             stats_no_org = repair_layer_tenancy()
 
@@ -353,16 +318,18 @@ def test_backfill_leaves_unprovenanced_roadmap_task_null_with_two_orgs(app):
             assert _org_of(provenanced_b_id) == org_b.id
             assert stats_no_org["unresolved"] == {"roadmap_tasks": 1}
 
-            stats_with_org = repair_layer_tenancy(org_id=org_a.id)
+            # Two active, non-default organisations exist (org_a, org_b), so
+            # --org-id is refused before any statement runs, not silently
+            # ignored: an unresolved row is another tenant's data, not a
+            # guess this command is allowed to make with or without one
+            # named explicitly. Row state is exactly what the first call
+            # already left it at.
+            with pytest.raises(click.ClickException):
+                repair_layer_tenancy(org_id=org_a.id)
 
-            # the orphan is still left NULL, never handed to the operator-
-            # chosen organisation, and the already-provenanced rows are
-            # untouched (their statements fill NULLs only, and they are no
-            # longer NULL)
             assert _org_of(orphan_task_id) is None
             assert _org_of(provenanced_a_id) == org_a.id
             assert _org_of(provenanced_b_id) == org_b.id
-            assert stats_with_org["unresolved"] == {"roadmap_tasks": 1}
         finally:
             db.session.rollback()
             db.session.execute(
@@ -376,7 +343,6 @@ def test_backfill_leaves_unprovenanced_roadmap_task_null_with_two_orgs(app):
                 {"a": org_a.id, "b": org_b.id},
             )
             db.session.commit()
-            _restore_org_nullability(app, nullability_before)
 
 
 def test_backfill_dry_run_changes_nothing(app):

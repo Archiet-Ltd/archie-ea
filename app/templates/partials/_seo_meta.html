@@ -1,0 +1,22 @@
+{# smoke-coverage-ok: covered by tests/test_public_content_pages.py (self-canonical,
+   description, noindex) and tests/test_vs_comparison_hub.py.
+   Shared head-tag macro for every public page: the self-referencing canonical
+   link (every public page is canonical to its own entelim.org URL -- see
+   app/services/public_pages.py PublicPage.self_canonical_url), the meta
+   description (and its og:/twitter: mirrors), and the noindex tag for a
+   HOLD-verdict page (see PublicPage.is_held). One place, so a future public
+   template reuses this instead of hand-rolling its own <head> tags.
+#}
+{% macro seo_meta(canonical_url, description=None, noindex=False) %}
+<link rel="canonical" href="{{ canonical_url }}">
+{% if noindex %}
+<meta name="robots" content="noindex">
+{% endif %}
+{% if description %}
+<meta name="description" content="{{ description }}">
+<meta property="og:description" content="{{ description }}">
+<meta name="twitter:description" content="{{ description }}">
+{% endif %}
+<meta property="og:url" content="{{ canonical_url }}">
+<meta name="twitter:card" content="summary_large_image">
+{% endmacro %}

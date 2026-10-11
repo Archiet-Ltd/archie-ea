@@ -3165,6 +3165,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             ... )
         """
         try:
+            from app.middleware.tenant_context import current_org_id
+
             # Build the decision log entry
             ({
                 "decision_type": decision_type,
@@ -3183,7 +3185,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 token_count_input=len(json.dumps(context)),  # Approximate
                 token_count_output=len(json.dumps(decision)),  # Approximate
                 cost=0.0,
+                pipeline_stage_id=project_id,
                 user_id=user_id,
+                organization_id=current_org_id(),
             )
 
             db.session.add(interaction)
@@ -3224,12 +3228,17 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             List of decision log entries
         """
         try:
+            from app.middleware.tenant_context import current_org_id
+
             query = LLMInteraction.query.filter_by(
                 provider="decision_log", model_name="audit_trail"
             )
-
-            # TRNT-072: tenant scoping
-            org_id = LLMService._resolve_org_id()
+            # tenant-scoping-ok: reached from a @login_required route with no
+            # admin check (app/main/routes_agentic_gaps.py), so scope to the
+            # caller's own organisation rather than let it aggregate every
+            # tenant's decisions; current_org_id() is None outside a request
+            # (CLI/tests), which correctly leaves that path unfiltered
+            org_id = current_org_id()
             if org_id is not None:
                 query = query.filter(LLMInteraction.organization_id == org_id)
 
@@ -3237,7 +3246,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 query = query.filter_by(user_id=user_id)
 
             if project_id:
-                query = query.filter_by(project_id=project_id)
+                query = query.filter(LLMInteraction.pipeline_stage_id == project_id)
 
             if since:
                 query = query.filter(LLMInteraction.created_at >= since)
@@ -3265,7 +3274,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                             if interaction.created_at
                             else None,
                             "user_id": interaction.user_id,
-                            "project_id": interaction.project_id,
+                            "pipeline_stage_id": interaction.pipeline_stage_id,
                         }
                     )
                 except json.JSONDecodeError:

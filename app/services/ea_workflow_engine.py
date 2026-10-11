@@ -1186,10 +1186,18 @@ class EAWorkflowEngine:
 
     def _run_workflow_in_background(self, instance_id: int):
         """Execute workflow in a background thread with its own app context."""
+        from app.jobs.tenant_safe_job import organization_id_of, tenant_scope
+
         with self.app.app_context():
-            instance = db.session.get(EAWorkflowInstance, instance_id)
-            if instance:
-                self._execute_workflow(instance)
+            # A new thread has no request and so no session organisation; run as
+            # the organisation that owns the workflow instance.
+            owner = organization_id_of(EAWorkflowInstance, instance_id)
+            if owner is None:
+                return
+            with tenant_scope(owner):
+                instance = db.session.get(EAWorkflowInstance, instance_id)
+                if instance:
+                    self._execute_workflow(instance)
 
     def _execute_workflow(self, instance: EAWorkflowInstance):
         """

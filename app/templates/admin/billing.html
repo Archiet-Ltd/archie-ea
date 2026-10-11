@@ -37,12 +37,12 @@
     {% if subscription %}
     {% set status_val = subscription.status.value %}
 
-    {% if not config.ready %}
+    {% if not stripe_configured %}
     <div class="rounded-md border p-4 text-sm bg-warning/5 border-warning/20 text-warning-emphasis" data-testid="billing-not-configured">
         <p class="font-medium">Online payment is not set up on this installation.</p>
         <p class="mt-1">Plans cannot be bought or changed here yet, and invoices cannot be shown.
             <a href="{{ contact_sales_url }}" class="underline">Contact sales</a> to buy a plan.</p>
-        {% if config.missing %}
+        {% if config.missing and current_user.is_platform_admin %}
         <p class="mt-2 text-xs">Settings the operator has not provided: {{ config.missing | join(', ') }}.</p>
         {% endif %}
     </div>

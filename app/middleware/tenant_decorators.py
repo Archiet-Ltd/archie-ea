@@ -7,7 +7,7 @@ Tenant-aware authorization decorators.
 
 from functools import wraps
 
-from flask import abort, jsonify, request
+from flask import abort, g, jsonify, request
 from flask_login import current_user, login_required
 
 
@@ -21,15 +21,35 @@ def _wants_json():
 
 
 def org_admin_required(f):
-    """Require authenticated user who is an org admin."""
+    """Require authenticated user who is an org admin of the ACTIVE organisation.
+
+    Resolves directly via ``rbac_service.is_org_admin(current_user,
+    g.current_org_id)`` rather than the ``current_user.is_org_admin``
+    property, which only ever answers for the user's HOME organisation. See
+    the admin-rbac-active-org PR description for the full rationale.
+    ``@login_required`` sits inside this decorator's own wraps, so an
+    anonymous request never reaches the check below.
+    """
     @wraps(f)
     @login_required
     def decorated(*args, **kwargs):
-        if not getattr(current_user, "is_org_admin", False):
+        from app.services.rbac_service import rbac_service
+
+        active_org_id = getattr(g, "current_org_id", None)
+        if not (
+            is_platform_admin(current_user)
+            or rbac_service.is_org_admin(current_user, active_org_id)
+        ):
             if _wants_json():
                 return jsonify({"error": "Organization admin access required"}), 403
             abort(403)
         return f(*args, **kwargs)
+
+    # Discoverability marker for tests/test_admin_rbac_active_org_enforcement.py's
+    # url_map-wide sweep -- see the matching comment on admin_required
+    # (app/_decorators_base.py) for why this survives further stacking.
+    decorated._active_org_rbac_gate = "org_admin_required"
+
     return decorated
 
 
@@ -48,15 +68,43 @@ def is_platform_admin(user):
     with both, which is how a real platform admin is meant to be set up.
 
     Extracted so every caller that needs this exact predicate — the
-    decorator below, and app/modules/admin/team_routes.py's platform-admin
-    branch — shares one implementation rather than each re-typing the same
-    two-flag check.
+    decorator below, and require_org_or_platform_admin further down, which
+    app/modules/admin/team_routes.py's platform-admin branch now calls
+    through rather than re-typing — shares one implementation rather than
+    each re-typing the same two-flag check.
     """
     from app.models import Permission
 
     is_flagged_platform_admin = getattr(user, "is_platform_admin", False)
     has_administer_permission = user.can(Permission.ADMINISTER)
     return bool(is_flagged_platform_admin and has_administer_permission)
+
+
+def is_active_org_admin(user=None) -> bool:
+    """The one predicate for "is this user an admin of the ACTIVE organisation".
+
+    R2-1/R2-2 (PR 428 round 3): the same judgement ``org_admin_required``
+    above already makes, extracted so inline checks scattered across route
+    modules can call it instead of re-typing (or mistyping, as an
+    unparenthesized ``current_user.is_admin`` bound-method reference did)
+    the active-org-vs-home-org distinction themselves.
+
+    R3-4 (PR 428 round 4): round 3 left a byte-for-byte duplicate of this
+    exact function as ``solutions_strategic.v2.routes.solution_design_routes
+    ._is_active_org_admin`` (and, found separately in this round, a second
+    one in ``app/application_mgmt/vendor_analysis_routes.py``), on the
+    grounds that it predated this shared copy. The reuse rule (ADR 0008,
+    "one system of record per concept") does not carve out an exception for
+    "it was there first" -- both duplicates are deleted and every call site
+    now imports this one.
+    """
+    user = user if user is not None else current_user
+    if not getattr(user, "is_authenticated", False):
+        return False
+    from app.services.rbac_service import rbac_service
+
+    active_org_id = getattr(g, "current_org_id", None)
+    return is_platform_admin(user) or rbac_service.is_org_admin(user, active_org_id)
 
 
 def platform_admin_required(f):
@@ -74,3 +122,28 @@ def platform_admin_required(f):
             abort(403)
         return f(*args, **kwargs)
     return decorated
+
+
+def require_org_or_platform_admin(org_id):
+    """Abort 403 unless the current user is this org's admin or a platform
+    admin.
+
+    A plain, importable function rather than a decorator: every call site
+    needs it as an inline guard with an explicit ``org_id`` argument --
+    usually ``g.current_org_id``, but a caller may also pass a path
+    parameter's org_id directly (see app/modules/admin/team_routes.py,
+    whose own private copy this replaces). Lives here, alongside
+    ``is_platform_admin``/``platform_admin_required``, which it already
+    depends on, so every caller that needs this exact two-vocabulary check
+    (platform-wide admin OR this organisation's own admin) shares one
+    implementation rather than each hand-writing the same
+    ``if not (is_platform_admin(current_user) or
+    rbac_service.is_org_admin(current_user, org_id)): abort(403)`` block.
+    """
+    from app.services.rbac_service import rbac_service
+
+    if is_platform_admin(current_user):
+        return
+    if rbac_service.is_org_admin(current_user, org_id):
+        return
+    abort(403)

@@ -1,0 +1,37 @@
+{% extends 'layouts/public_base.html' %}
+{% block title %}Set up two-factor authentication{% endblock %}
+{% from 'components/accessibility_helpers.html' import skip_to_main, live_region with context %}
+
+{% block content %}
+{{ live_region('mfa-status') }}
+<main id="main-content" class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">
+  <h1 class="text-xl font-semibold text-foreground">Set up two-factor authentication</h1>
+  <p class="mt-2 text-sm text-muted-foreground">
+    Administrator accounts require a code from an authenticator app (Google
+    Authenticator, 1Password, Authy or similar) on every sign-in. Scan this
+    code or enter the key manually, then confirm with the code it shows.
+  </p>
+
+  <div class="mt-6 rounded-md border border-border bg-muted/30 p-4">
+    <p class="text-xs text-muted-foreground">Setup key (enter manually if you cannot scan a QR code):</p>
+    <code class="mt-1 block break-all text-sm font-mono" data-testid="mfa-setup-key">{{ secret }}</code>
+    <p class="mt-3 text-xs text-muted-foreground">Or open this link on a device with your authenticator app:</p>
+    <code class="mt-1 block break-all text-xs font-mono">{{ provisioning_uri }}</code>
+  </div>
+
+  <form method="post" action="{{ url_for('account.mfa_challenge') }}" class="mt-6 space-y-4" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div>
+      <label for="mfa-code" class="block text-sm font-medium text-foreground">Enter the 6-digit code from your app</label>
+      <input
+        id="mfa-code" name="code" type="text" inputmode="numeric" pattern="[0-9]*"
+        autocomplete="one-time-code" maxlength="6" required autofocus
+        class="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-lg tracking-widest"
+      >
+    </div>
+    <button type="submit" class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+      Confirm and finish signing in
+    </button>
+  </form>
+</main>
+{% endblock %}

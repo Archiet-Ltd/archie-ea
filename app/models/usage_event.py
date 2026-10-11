@@ -24,6 +24,7 @@ class UsageEvent(db.Model):
     EVENT_CODEGEN_RUN = "codegen_run"
     EVENT_USER_LOGIN = "user_login"
     EVENT_BLUEPRINT_GENERATED = "blueprint_generated"
+    EVENT_MCP_TOOL_CALL = "mcp_tool_call"
 
     id = db.Column(db.Integer, primary_key=True)
     organization_id = db.Column(

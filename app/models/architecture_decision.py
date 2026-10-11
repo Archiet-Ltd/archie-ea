@@ -399,6 +399,9 @@ class ArchitectureChangeRequest(TenantMixin, db.Model):
     raised_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     raised_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     closed_at = db.Column(db.DateTime, nullable=True)
+    # R1-B85: the CTO scorecard escalates an open exception; nullable so an
+    # un-escalated row reads as "-", never a fabricated date.
+    escalated_at = db.Column(db.DateTime, nullable=True)
 
     raised_by = db.relationship('User', foreign_keys=[raised_by_id])
     impact_assessments = db.relationship('ChangeImpactAssessment', backref='change_request', lazy='dynamic', cascade='all, delete-orphan')
@@ -419,6 +422,7 @@ class ArchitectureChangeRequest(TenantMixin, db.Model):
             'raised_by_id': self.raised_by_id,
             'raised_at': self.raised_at.isoformat() if self.raised_at else None,
             'closed_at': self.closed_at.isoformat() if self.closed_at else None,
+            'escalated_at': self.escalated_at.isoformat() if self.escalated_at else None,
         }
 
     @classmethod

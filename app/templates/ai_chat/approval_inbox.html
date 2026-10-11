@@ -1,0 +1,249 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block title %}Approval Inbox{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        {{ page_header(
+            title='Approval Inbox',
+            breadcrumbs=[{'label': 'Home', 'href': url_for('dashboard.overview')}, {'label': 'AI Chat', 'href': url_for('unified_ai_chat.index')}, {'label': 'Approval Inbox'}],
+            description='Review and decide on pending change proposals from AI chat, suggestions, blueprints, and review items'
+        ) }}
+    </div>
+
+    <!-- Loading state -->
+    <div x-data="approvalInbox()" x-init="fetchApprovals()" x-cloak>
+        <div x-show="loading && !hasLoaded" x-cloak data-testid="approval-inbox-loading" role="status"
+             class="rounded-md border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+            Loading approval inbox…
+        </div>
+
+        <!-- Error state -->
+        <div x-show="error" x-cloak data-testid="approval-inbox-unavailable" role="alert"
+             class="rounded-md bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive-emphasis flex items-center justify-between gap-3">
+            <span x-text="error"></span>
+            <button type="button" @click="fetchApprovals()" aria-label="Retry approval inbox"
+                    class="inline-flex h-8 items-center justify-center rounded-md border border-destructive/30 bg-background px-3 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50 disabled:pointer-events-none">
+                Retry
+            </button>
+        </div>
+
+        <!-- Empty state -->
+        <template x-if="hasLoaded && !loading && !error && approvals.length === 0">
+            <div data-testid="approval-inbox-empty" class="text-center py-12 text-muted-foreground">
+                <i data-lucide="check-circle-2" class="h-12 w-12 mx-auto mb-3 opacity-50" aria-hidden="true"></i>
+                <p class="text-base">No pending approvals waiting for your review</p>
+            </div>
+        </template>
+
+        <!-- Approval cards -->
+        <template x-for="item in approvals" :key="item.id">
+            <div class="rounded-xl border border-border bg-card p-5 space-y-3">
+                <!-- Top row: operation badge + entity type + created -->
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium capitalize"
+                              :class="{
+                                'bg-success/10 text-success-emphasis border border-success/30': item.operation_type === 'create',
+                                'bg-warning/10 text-warning-emphasis border border-warning/30': item.operation_type === 'update',
+                                'bg-destructive/10 text-destructive-emphasis border border-destructive/30': item.operation_type === 'delete',
+                                'bg-info/10 text-info-emphasis border border-info/30': item.operation_type === 'tool_use',
+                                'bg-primary/10 text-primary-emphasis border border-primary/30': item.operation_type === 'link',
+                                'bg-muted/10 text-muted-foreground border border-muted/30': !['create','update','delete','tool_use','link'].includes(item.operation_type)
+                              }"
+                              x-text="item.operation_type"></span>
+                        <span class="text-sm font-medium text-foreground capitalize" x-text="item.entity_type"></span>
+                        <template x-if="item.source_table">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-muted-foreground bg-muted/50 border border-border"
+                                  x-text="'Source: ' + item.source_table + (item.source_id ? ' #' + item.source_id : '')"></span>
+                        </template>
+                    </div>
+                    <span class="text-xs text-muted-foreground whitespace-nowrap" x-text="formatDate(item.created_at)"></span>
+                </div>
+
+                <!-- Summary -->
+                <p class="text-sm text-muted-foreground" x-text="item.summary"></p>
+
+                <!-- Requester -->
+                <p class="text-xs text-muted-foreground">
+                    Requested by: <span class="text-foreground" x-text="item.requester?.display_name || 'System / backfilled'"></span>
+                </p>
+
+                <!-- Expiry / Overdue -->
+                <p class="text-xs text-muted-foreground">
+                    <template x-if="isOverdue(item)">
+                        <span class="text-destructive-emphasis font-medium" aria-label="Overdue">Overdue — </span>
+                    </template>
+                    Expires: <span x-text="formatDate(item.expires_at)"></span>
+                </p>
+
+                <!-- Technical detail disclosure -->
+                <details class="text-xs" x-show="item.arguments !== null">
+                    <summary class="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+                        View technical detail
+                    </summary>
+                    <pre class="mt-1 whitespace-pre-wrap break-all rounded-md bg-muted/50 border border-border px-2 py-1.5 text-2xs text-muted-foreground" x-text="JSON.stringify(item.arguments, null, 2)"></pre>
+                </details>
+
+                <!-- Reject reason textarea (shown when rejecting this item) -->
+                <template x-if="rejectingId === item.id">
+                    <div class="space-y-2 pt-1 border-t border-border">
+                        <label :for="'reject-reason-' + item.id" class="text-xs font-medium text-foreground">Rejection reason (optional)</label>
+                        <textarea :id="'reject-reason-' + item.id"
+                                  x-model="rejectReason"
+                                  rows="2"
+                                  class="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  placeholder="Why are you rejecting this operation?" aria-label="Why are you rejecting this operation?"></textarea>
+                        <div class="flex gap-2">
+                            <button type="button" @click="confirmReject(item.id)"
+                                    :class="busyIds[item.id] ? 'opacity-50 pointer-events-none' : ''"
+                                    class="inline-flex items-center gap-1 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50">
+                                Confirm Reject
+                            </button>
+                            <button type="button" @click="cancelReject()"
+                                    class="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Action buttons (hidden when reject textarea is open for this item) -->
+                <template x-if="rejectingId !== item.id">
+                    <div class="flex gap-2 pt-1 border-t border-border">
+                        <button type="button" @click="approve(item.id)"
+                                :class="busyIds[item.id] ? 'opacity-50 pointer-events-none' : ''"
+                                class="inline-flex items-center gap-1 rounded-md bg-success px-3 py-1.5 text-xs font-medium text-success-foreground hover:bg-success/90 transition-colors disabled:opacity-50">
+                            <i data-lucide="check" class="h-3 w-3" aria-hidden="true"></i>
+                            Approve
+                        </button>
+                        <button type="button" @click="startReject(item.id)"
+                                :class="busyIds[item.id] ? 'opacity-50 pointer-events-none' : ''"
+                                class="inline-flex items-center gap-1 rounded-md bg-destructive/10 border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive-emphasis hover:bg-destructive/20 transition-colors disabled:opacity-50">
+                            <i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>
+                            Reject
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function approvalInbox() {
+    return {
+        approvals: [],
+        loading: false,
+        error: null,
+        hasLoaded: false,
+        rejectingId: null,
+        rejectReason: "",
+        busyIds: {},
+
+        async fetchApprovals() {
+            this.loading = true;
+            try {
+                const data = await Platform.fetch("/ai-chat/approvals/queue", {
+                    credentials: "same-origin",
+                    silent: true,
+                });
+                if (!data.success) {
+                    throw new Error(data.error || "Approval inbox was unavailable");
+                }
+                this.approvals = data.approvals || [];
+                this.hasLoaded = true;
+                this.error = null;
+                this.$nextTick(() => {
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
+                });
+            } catch (err) {
+                this.error = this.hasLoaded
+                    ? "Unable to refresh approvals. Showing the last known results."
+                    : "Unable to load approvals. Approval inbox is unavailable.";
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async approve(approvalId) {
+            if (this.busyIds[approvalId]) return;
+            this.busyIds[approvalId] = true;
+            this.error = null;
+            try {
+                const data = await Platform.fetch.post(
+                    "/ai-chat/approvals/" + approvalId + "/approve",
+                    null,
+                    { credentials: "same-origin", silent: true }
+                );
+                if (data.success) {
+                    this.approvals = this.approvals.filter(a => a.id !== approvalId);
+                } else {
+                    this.error = data.error || "Approval failed";
+                }
+            } catch (err) {
+                this.error = "Network error — please try again";
+            } finally {
+                delete this.busyIds[approvalId];
+            }
+        },
+
+        startReject(approvalId) {
+            this.rejectingId = approvalId;
+            this.rejectReason = "";
+            this.error = null;
+        },
+
+        cancelReject() {
+            this.rejectingId = null;
+            this.rejectReason = "";
+        },
+
+        async confirmReject(approvalId) {
+            if (this.busyIds[approvalId]) return;
+            this.busyIds[approvalId] = true;
+            this.error = null;
+            try {
+                const data = await Platform.fetch.post(
+                    "/ai-chat/approvals/" + approvalId + "/reject",
+                    { reason: this.rejectReason },
+                    { credentials: "same-origin", silent: true }
+                );
+                if (data.success) {
+                    this.approvals = this.approvals.filter(a => a.id !== approvalId);
+                    this.rejectingId = null;
+                    this.rejectReason = "";
+                } else {
+                    this.error = data.error || "Rejection failed";
+                }
+            } catch (err) {
+                this.error = "Network error — please try again";
+            } finally {
+                delete this.busyIds[approvalId];
+            }
+        },
+
+        formatDate(iso) {
+            if (!iso) return "";
+            const d = new Date(iso);
+            return d.toLocaleString(undefined, {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        },
+
+        isOverdue(item) {
+            if (!item.expires_at) return false;
+            return item.status === "pending" && new Date(item.expires_at) < new Date();
+        },
+    };
+}
+</script>
+{% endblock %}

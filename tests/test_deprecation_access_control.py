@@ -14,17 +14,41 @@ MODULES = [
 ]
 
 
-def _test_app(monkeypatch, module_name, blueprint_name, administrator=False):
+def _test_app(monkeypatch, module_name, blueprint_name, administrator=False, admin_of=1):
     module = importlib.import_module(module_name)
     app = Flask(__name__)
     app.secret_key = "isolated-deprecation-test"
     login = LoginManager(app)
 
+    # admin_required also asks rbac_service.is_org_admin about the ACTIVE
+    # organisation (g.current_org_id). No database here, so OrgRole.get_role
+    # is the storage boundary double: an administrator holds org_admin in
+    # organisation ``admin_of``; the active organisation is 1.
+    from flask import g
+    from app.models.org_role import OrgRole
+    monkeypatch.setattr(
+        OrgRole, "get_role",
+        classmethod(lambda cls, org_id, user_id:
+                    "org_admin" if administrator and org_id == admin_of else None),
+    )
+
+    @app.before_request
+    def _active_organisation():
+        g.current_org_id = 1
+
     class User(UserMixin):
         id = "monitor-test"
+        organization_id = 1
+        # Monitoring spans every tenant, so these routes also sit behind
+        # platform_admin_required (flag AND ADMINISTER). An admin of another
+        # organisation is never a platform admin.
+        is_platform_admin = administrator and admin_of == 1
 
         def can(self, permission):
             return administrator
+
+        def is_admin(self):
+            return False
 
     login.user_loader(lambda user_id: User())
     app.register_blueprint(getattr(module, blueprint_name))
@@ -49,6 +73,17 @@ def test_non_admin_is_denied_before_monitoring_handlers(monkeypatch, module_name
     response = client.open("/admin/deprecation" + path,
                            method="POST" if path == "/api/webhook" else "GET")
     assert response.status_code == 403
+    metrics.assert_not_called()
+
+
+@pytest.mark.parametrize("module_name,blueprint_name", MODULES)
+def test_admin_of_a_different_organisation_is_denied(monkeypatch, module_name, blueprint_name):
+    """Active-org property: ADMINISTER plus org_admin of organisation 2 must not
+    open organisation 1's monitoring while organisation 1 is the active one."""
+    app, metrics = _test_app(monkeypatch, module_name, blueprint_name, administrator=True, admin_of=2)
+    client = app.test_client()
+    client.get("/test-entry")
+    assert client.get("/admin/deprecation/").status_code == 403
     metrics.assert_not_called()
 
 

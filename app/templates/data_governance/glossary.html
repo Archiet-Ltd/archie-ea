@@ -1,0 +1,27 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+
+{% block title %}Glossary — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6">
+  {{ page_shell(
+      title='Glossary',
+      subtitle='One definition per term.',
+      breadcrumb=[('Home', url_for('main.index')), ('Data governance', url_for('data_governance.entities')), ('Glossary', None)],
+      tabs=tabs
+  ) }}
+  {% if terms %}
+  <dl class="space-y-3" data-testid="glossary-terms">
+    {% for term in terms %}
+    <div class="rounded-lg border border-border bg-card p-4" data-testid="glossary-term-{{ term.id }}">
+      <dt class="text-base font-semibold text-foreground">{{ term.name }}</dt>
+      <dd class="mt-1 text-sm text-muted-foreground">{{ term.description or 'not recorded' }}</dd>
+    </div>
+    {% endfor %}
+  </dl>
+  {% else %}
+  {{ empty_state(icon='book-open', headline='No terms recorded', body='No glossary terms are recorded for this organisation yet.') }}
+  {% endif %}
+</div>
+{% endblock %}

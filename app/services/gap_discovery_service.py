@@ -29,10 +29,8 @@ from typing import Any, Dict, List, Optional
 from app.models.business_capabilities import BusinessCapability
 
 from .. import db
+from . import gap_register_service
 from ..models.application_portfolio import ApplicationComponent
-from ..models.implementation_migration import (
-    Gap as ImplementationGap,
-)
 from ..models.models import ArchiMateElement
 
 logger = logging.getLogger(__name__)
@@ -814,60 +812,74 @@ class GapDiscoveryService:
         return recommendations
 
     def save_discovered_gaps(
-        self, gaps_data: Dict[str, Any], architecture_id: Optional[int] = None
-    ) -> int:
+        self,
+        gaps_data: Dict[str, Any],
+        architecture_id: Optional[int],
+        organization_id: int,
+    ) -> Dict[str, int]:
         """
-        Save discovered gaps to database.
+        Save discovered gaps to the one gap register (gap_register_service.create_gap),
+        refusing a gap already saved for this organisation and architecture.
+
+        The previous version of this method constructed
+        app.models.implementation_migration.Gap (imported here under the
+        confusing local alias ImplementationGap) with column names that
+        belong to a different, unrelated model also named ImplementationGap
+        (app.models.implementation_planning.ImplementationGap) -- ORM columns
+        Gap does not have. Every save raised a TypeError, was swallowed by a
+        bare except, and nothing was ever saved.
 
         Args:
-            gaps_data: Dictionary containing gaps and analysis
-            architecture_id: Optional architecture model ID
+            gaps_data: Dictionary containing gaps and analysis (from discover_all_gaps)
+            architecture_id: Architecture model ID the gaps were discovered against
+            organization_id: The caller's organisation; required, never inferred
 
         Returns:
-            Number of gaps saved
+            {"saved": n, "duplicates": n, "failed": n} -- honest counts, never
+            a fabricated 0 when something was actually found.
         """
-        saved_count = 0
+        if not organization_id:
+            raise ValueError("save_discovered_gaps requires organization_id")
 
-        try:
-            for gap_data in gaps_data.get("gaps", []):
-                # Check if gap already exists
-                existing_gap = ImplementationGap.query.filter_by(
-                    name=gap_data["name"], architecture_id=architecture_id
-                ).first()
+        saved = duplicates = failed = 0
 
-                if not existing_gap:
-                    # Create new gap
-                    gap = ImplementationGap(
-                        name=gap_data["name"],
-                        description=gap_data.get("gap_description", ""),
-                        gap_type=gap_data.get("gap_type", "unknown"),
-                        baseline_state=gap_data.get("baseline_state", ""),
-                        target_state=gap_data.get("target_state", ""),
-                        gap_description=gap_data.get("gap_description", ""),
-                        impact_level=gap_data.get("impact_level", "medium"),
-                        impact_description=gap_data.get("impact_description", ""),
-                        business_risk=gap_data.get("business_risk", "medium"),
-                        business_impact=gap_data.get("business_impact", ""),
-                        urgency=gap_data.get("urgency", "medium"),
-                        resolution_strategy=gap_data.get("proposed_solution", ""),
-                        proposed_solution=gap_data.get("proposed_solution", ""),
-                        success_criteria=gap_data.get("success_criteria", ""),
-                        status="identified",
-                        priority=gap_data.get("priority", "medium"),
-                        affected_elements=gap_data.get("affected_elements", []),
-                        properties=gap_data.get("properties", {}),
-                        architecture_id=architecture_id,
-                        created_by="Gap Discovery Service",
-                    )
+        for gap_data in gaps_data.get("gaps", []):
+            description = gap_data.get("gap_description", "")
+            for label, key in (
+                ("Proposed solution", "proposed_solution"),
+                ("Success criteria", "success_criteria"),
+            ):
+                value = gap_data.get(key)
+                if value:
+                    description = f"{description}\n\n{label}: {value}" if description else f"{label}: {value}"
 
-                    db.session.add(gap)
-                    saved_count += 1
+            try:
+                gap, created = gap_register_service.create_gap(
+                    organization_id,
+                    gap_data.get("name", ""),
+                    description=description,
+                    gap_type=(gap_data.get("gap_type") or "")[:30] or None,
+                    priority=gap_data.get("priority", "medium"),
+                    severity=gap_data.get("impact_level", "medium"),
+                    architecture_id=architecture_id,
+                    current_state_ref=(gap_data.get("baseline_state") or "")[:255] or None,
+                    target_state_ref=(gap_data.get("target_state") or "")[:255] or None,
+                    auto_generated=True,
+                    generation_source="gap_discovery",
+                )
+            except ValueError as exc:
+                logger.warning("gap discovery: skipped an unsaveable gap: %s", exc)
+                failed += 1
+                continue
 
-            db.session.commit()
-            logger.info(f"Saved {saved_count} gaps to database")
+            if created:
+                saved += 1
+            else:
+                duplicates += 1
 
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error saving gaps: {e}")
-
-        return saved_count
+        db.session.commit()
+        logger.info(
+            "gap discovery: saved %d, %d already in the register, %d could not be saved",
+            saved, duplicates, failed,
+        )
+        return {"saved": saved, "duplicates": duplicates, "failed": failed}

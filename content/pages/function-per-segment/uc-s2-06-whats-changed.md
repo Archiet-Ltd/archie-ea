@@ -6,7 +6,7 @@ state: briefed
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /scale-up/whats-changed
+url_slug: /use-cases/architecture-change-tracking
 ---
 
 # What has changed around this component since we last checked, and is anything out of date?
@@ -28,4 +28,4 @@ Coming soon. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 
-- [What breaks if this service fails, and who gets called?](/scale-up/what-breaks-and-who-gets-called)
+- [What breaks if this service fails, and who gets called?](/use-cases/what-breaks-and-who-gets-called)

@@ -43,6 +43,7 @@ from app.models.architecture_review_board import (
     TOGAFPhase,
 )
 from app.decorators import audit_log, require_roles
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.services.arb_analytics_service import ARBAnalyticsService
 from app.services.rate_limiter import rate_limit
 from app.services.arb_governance_service import (
@@ -622,7 +623,20 @@ def _typed_actor():
 def _typed_queue_context():
     actor = _typed_actor()
     if actor is None:
-        return None
+        # No actor context (should not happen for authenticated users
+        # with organization_id). Return an empty queue view instead of None
+        # so the consolidated template always has a valid typed_queue.
+        return {
+            "state": "empty",
+            "reason": "no_actor_context",
+            "filters": {},
+            "filter_options": {},
+            "items": [],
+            "page": 1,
+            "page_size": 25,
+            "total_items": 0,
+            "total_pages": 0,
+        }
     try:
         from app.modules.transformation_room.arb_read_models import (
             typed_arb_queue_view,
@@ -655,7 +669,17 @@ def _typed_queue_context():
 def _typed_review_context(review_item_id):
     actor = _typed_actor()
     if actor is None:
-        return None
+        # No actor context. Return a failed view so the consolidated
+        # template renders the error state instead of crashing.
+        return {
+            "state": "failed",
+            "reason": "no_actor_context",
+            "identity": {},
+            "subject": {},
+            "evidence": {},
+            "governance": {},
+            "allowed_actions": [],
+        }
     try:
         from app.modules.transformation_room.arb_read_models import (
             typed_arb_review_view,
@@ -664,7 +688,15 @@ def _typed_review_context(review_item_id):
         return typed_arb_review_view(actor=actor, review_item_id=review_item_id)
     except Exception:
         current_app.logger.exception("typed ARB review view failed")
-        return None
+        return {
+            "state": "failed",
+            "reason": "arb_review_unavailable",
+            "identity": {},
+            "subject": {},
+            "evidence": {},
+            "governance": {},
+            "allowed_actions": [],
+        }
 
 
 @arb_bp.route("/dashboard")
@@ -958,38 +990,16 @@ def dashboard():
 
     typed_queue = _typed_queue_context()
 
-    # ADR-0008 (store agreement). The KPI tiles above count arb_review_items
-    # while the queue below reads the typed ARBReviewCycle graph, so a tenant
-    # whose reviews predate typed submission saw "Total reviews 6 / Pending 2"
-    # printed directly above "No typed ARB reviews yet" -- two queries answering
-    # the same question with different answers on one screen.
-    #
-    # The tiles are not wrong: those rows exist. The queue is not wrong either:
-    # they are not typed. So the list renders the rows the tiles counted,
-    # labelled for what they are, instead of claiming there are none. Nothing is
-    # repointed and no count is invented.
-    generic_reviews = []
-    if typed_queue and typed_queue.get("state") == "empty":
-        try:
-            generic_reviews = (
-                ARBReviewItem.query.options(joinedload(ARBReviewItem.submitter))
-                .order_by(ARBReviewItem.created_at.desc())
-                .limit(15)
-                .all()
-            )
-        except Exception:
-            # Leave the list empty rather than fabricating rows; the tiles above
-            # still show the counts and the failure is logged.
-            db.session.rollback()
-            current_app.logger.exception("ARB dashboard generic review list failed")
-
+    # Consolidated governance queue - typed queue is the single code path.
+    # The legacy generic_reviews fallback has been removed. The typed queue
+    # (arb_review_cycles graph) is the authoritative view. If the read model
+    # returns 'empty', the queue partial renders its own empty state.
+    # If the read model returns 'failed', the queue partial renders an error
+    # alert and the response status is 503.
     response_status = 503 if typed_queue and typed_queue.get("state") == "failed" else 200
     return render_template(
         "arb/dashboard.html",
-        # The dispatcher renders the typed queue whenever an actor exists. A
-        # failed read remains typed and visible; it never resurrects legacy UI.
         typed_queue=typed_queue,
-        generic_reviews=generic_reviews,
         sessions=recent_sessions,
         status=request.args.get("status", "all"),
         pending_reviews=pending_reviews,
@@ -1624,11 +1634,12 @@ def review_detail(id):
         current_app.logger.exception(f"Failed to load audit trail for review {id}")
 
     typed_review = _typed_review_context(id)
+    # Consolidated governance workspace - typed review is the single code path.
+    # The legacy branch has been removed. The typed review workspace handles all
+    # states: available, historical_unverified, legacy_generic, failed.
     response_status = 503 if typed_review and typed_review.get("state") == "failed" else 200
     return render_template(
         "arb/review_detail.html",
-        # Same dispatch contract as the queue: typed workspace when the read
-        # model resolves this review for the current tenant, legacy otherwise.
         typed_review=typed_review,
         review=review,
         application_names=application_names,
@@ -1682,6 +1693,64 @@ def review_audit_trail_csv(id):
         )
 
     filename = f"{review.review_number}-audit-trail.csv"
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@arb_bp.route("/reviews/<int:id>/history.csv")
+@login_required
+def review_typed_history_csv(id):
+    """Export the typed decision-and-provenance ledger for one review as CSV.
+
+    This is the typed-workspace counterpart to ``review_audit_trail_csv``
+    above: that route reads ``ARBAuditLog``, a mutable, untyped ledger the
+    typed read model deliberately does not use (see
+    ``arb/partials/_typed_history.html``). This route exports exactly the
+    rows ``_typed_history.html`` renders — the persisted submission,
+    decision and condition events from ``ARBReadModel._history`` — so the
+    export matches what the page shows rather than a different ledger.
+    Read-only: it writes nothing.
+    """
+    import csv
+    import io
+
+    from flask import Response
+
+    review = ARBReviewItem.query.get_or_404(id)
+
+    actor = _typed_actor()
+    history = []
+    if actor is not None:
+        from app.modules.transformation_room.arb_read_models import (
+            typed_arb_review_view,
+        )
+
+        view = typed_arb_review_view(actor=actor, review_item_id=id)
+        history = view.get("history") or []
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        ["recorded_at_utc", "kind", "event_type", "from_state", "to_state", "actor", "rationale"]
+    )
+    for entry in history:
+        recorded_at = entry.get("recorded_at")
+        writer.writerow(
+            [
+                recorded_at.isoformat() if recorded_at else "",
+                entry.get("kind") or "",
+                entry.get("event_type") or "",
+                entry.get("from_state") or "",
+                entry.get("to_state") or "",
+                entry.get("actor_display") or "",
+                entry.get("rationale") or "",
+            ]
+        )
+
+    filename = f"{review.review_number}-history.csv"
     return Response(
         buf.getvalue(),
         mimetype="text/csv",
@@ -1907,12 +1976,16 @@ def reopen_decision(id):
             flash("No decision has been recorded for this review item.", "warning")
             return redirect(url_for("arb.review_detail", id=id))
 
-        # Authorization: only the original decision maker or admin can reopen
+        # Authorization: only the original decision maker or admin of the
+        # ACTIVE organisation can reopen. R3-1 (PR 428 round 4):
+        # ``getattr(current_user, "is_admin", False)`` with no call returns
+        # the bound method, which is always truthy -- the same bug class as
+        # the round-3 ``.is_admin`` fix, written a different way. Any
+        # signed-in member, Viewer included, could reopen another user's
+        # recorded ARB decision. Judged the same way as the rest of this PR,
+        # against ``g.current_org_id`` rather than a global flag.
         is_decision_maker = review.decided_by_id == current_user.id
-        is_admin = (
-            getattr(current_user, "is_admin", False)
-            or getattr(current_user, "role", "") == "admin"
-        )
+        is_admin = is_active_org_admin()
 
         if not is_decision_maker and not is_admin:
             flash(

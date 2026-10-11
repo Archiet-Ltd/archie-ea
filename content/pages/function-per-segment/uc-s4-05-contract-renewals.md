@@ -5,7 +5,7 @@ segment_id: S4
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /services-ops/contract-renewals
+url_slug: /use-cases/contract-renewals
 ---
 
 # Which contracts renew soon, and what depends on them?
@@ -27,4 +27,4 @@ every other "what happens if" you ask.
 
 - [Procurement](/modules/procurement)
 - [Vendors](/modules/vendors)
-- [What happens to my business if this underperforms?](/services-ops/what-happens-if)
+- [What happens to my business if this underperforms?](/use-cases/what-happens-if-a-supplier-fails)

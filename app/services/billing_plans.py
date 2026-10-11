@@ -38,33 +38,75 @@ class Plan:
     counts: str = "people"
     price_env: Dict[str, str] = field(default_factory=dict)
 
+    # ----------------------------------------------------------------- #
+    # Display price: the human-facing dollar figures shown on the        #
+    # marketing site (pricing page, home page) and emitted in every       #
+    # page's JSON-LD structured data. This is the one place those        #
+    # figures live; it is never read by checkout or by the plan-limit    #
+    # enforcement above, which use price_env (the Stripe price ids) and  #
+    # user_limit/per_seat instead -- nothing about what is actually      #
+    # charged changes by adding these fields.                            #
+    # ----------------------------------------------------------------- #
+    display_currency: str = "USD"
+    # Flat price in whole dollars for that billing interval, or -- when
+    # display_price_per_unit is True -- the per-unit (e.g. per editor)
+    # price in whole dollars. None when the plan has no fixed figure to
+    # show for that interval; Enterprise has neither (see
+    # display_price_floor_annual below), since it has no flat price at all.
+    display_price_monthly: Optional[int] = None
+    display_price_annual: Optional[int] = None
+    # True when display_price_monthly/annual is a price *per seat*
+    # (e.g. per editor), not a flat plan price. A caller rendering this
+    # must use a UnitPriceSpecification with a referenceQuantity, not a
+    # bare Offer.price, so it is never read as a flat charge.
+    display_price_per_unit: bool = False
+    display_price_unit: Optional[str] = None  # e.g. "editor"
+    # Enterprise only: a floor on an annual contract price. It is not a
+    # fixed price and the plan is not purchasable online (purchasable is
+    # False above) -- a caller must represent this as a minimum / "from"
+    # price (e.g. schema.org AggregateOffer.lowPrice) or a contact-sales
+    # offer, never as a flat, purchasable Offer.price.
+    display_price_floor_annual: Optional[int] = None
+
 
 PLANS: Tuple[Plan, ...] = (
     Plan(
         key="free",
         name="Community",
-        summary="One organisation, three people. Every question, every canvas, the twin map.",
+        summary="One organisation, three people. Every question, the Business Model Canvas, the twin map.",
         purchasable=False,
         user_limit=3,
+        display_price_monthly=0,
     ),
     Plan(
         key="startup",
         name="Startup",
-        summary="Ten people. Adds the webhook feed, export and share, and email support.",
+        summary=(
+            "Ten people and email support, everything in Community included."
+        ),
         purchasable=True,
         user_limit=10,
         price_env={"month": "STRIPE_PRICE_STARTUP_MONTHLY", "year": "STRIPE_PRICE_STARTUP_ANNUAL"},
+        display_price_monthly=49,
+        display_price_annual=490,
     ),
     Plan(
         key="team",
         name="Team",
-        summary="Priced per editor; people who only ask questions are free. Single sign-on and the review-board workflow.",
+        summary=(
+            "Priced per editor; people who only ask questions are free. Single "
+            "sign-on, the review-board workflow, and your own model key."
+        ),
         purchasable=True,
         user_limit=None,
         per_seat=True,
         default_seats=15,
         counts="editors",
         price_env={"month": "STRIPE_PRICE_TEAM_MONTHLY", "year": "STRIPE_PRICE_TEAM_ANNUAL"},
+        display_price_monthly=29,
+        display_price_annual=290,
+        display_price_per_unit=True,
+        display_price_unit="editor",
     ),
     Plan(
         key="enterprise",
@@ -72,6 +114,7 @@ PLANS: Tuple[Plan, ...] = (
         summary="Annual contract. Unlimited editors, SAML, audit export, supported self-hosting.",
         purchasable=False,
         user_limit=None,
+        display_price_floor_annual=24000,
     ),
 )
 

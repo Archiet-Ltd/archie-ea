@@ -740,7 +740,8 @@ class CapabilityGapAnalysisService:
         if existing_gap:
             existing_gap.name = name
             existing_gap.description = description
-            existing_gap.properties = json.dumps(properties, default=str)
+            from app.modules.architecture_assistant.property_service import PropertyService
+            PropertyService().merge_element_properties(existing_gap, properties, source="capability_gap")
             gap_element = existing_gap
         else:
             gap_element = ArchiMateElement(
@@ -748,11 +749,12 @@ class CapabilityGapAnalysisService:
                 type="Gap",
                 layer="implementation_migration",
                 description=description,
-                properties=json.dumps(properties, default=str),
                 architecture_id=architecture_id,
             )
             db.session.add(gap_element)
             db.session.flush()
+            from app.modules.architecture_assistant.property_service import PropertyService
+            PropertyService().merge_element_properties(gap_element, properties, source="capability_gap")
 
         self._ensure_compliance_relationships(gap_element, related_compliance_gaps)
         return gap_element

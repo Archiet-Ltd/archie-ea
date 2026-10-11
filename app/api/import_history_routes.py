@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify, request, send_file
 from flask_login import current_user, login_required
 
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.application_import_history import ApplicationImportHistory
 from app.models.batch_processing import BatchJob, BatchJobStatus
 from app.services.batch_processing_service import BatchProcessingService
@@ -121,7 +122,7 @@ def get_job_details(job_id):
             return jsonify({"success": False, "error": "Job not found"}), 404
 
         # Check if user owns this job
-        if job.created_by != current_user.id and not current_user.is_admin:
+        if job.created_by != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Access denied"}), 403
 
         # Get detailed job information
@@ -163,7 +164,7 @@ def get_job_progress(job_id):
             return jsonify({"success": False, "error": "Job not found"}), 404
 
         # Check if user owns this job
-        if job.created_by != current_user.id and not current_user.is_admin:
+        if job.created_by != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Access denied"}), 403
 
         # Get progress information
@@ -201,7 +202,7 @@ def export_job_data(job_id):
             return jsonify({"success": False, "error": "Job not found"}), 404
 
         # Check if user owns this job
-        if job.created_by != current_user.id and not current_user.is_admin:
+        if job.created_by != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Access denied"}), 403
 
         # Get export format
@@ -281,7 +282,7 @@ def rollback_job(job_id):
             return jsonify({"success": False, "error": "Job not found"}), 404
 
         # Check if user owns this job
-        if job.created_by != current_user.id and not current_user.is_admin:
+        if job.created_by != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Access denied"}), 403
 
         # Check if job can be rolled back (within 7 days)
@@ -324,7 +325,7 @@ def retry_failed_items(job_id):
             return jsonify({"success": False, "error": "Job not found"}), 404
 
         # Check if user owns this job
-        if job.created_by != current_user.id and not current_user.is_admin:
+        if job.created_by != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Access denied"}), 403
 
         # Retry failed items

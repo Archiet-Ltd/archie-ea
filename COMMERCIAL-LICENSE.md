@@ -28,7 +28,7 @@ makes this commercial option possible.
 Commercial licensing, hosted deployments, and enterprise support are offered through:
 
 - **ReqArchitect** — managed, governed enterprise architecture: **https://reqarchitect.com**
-- **Archiet** — spec-driven code generation built on Entelim: **https://archiet.com**
+- **Archiet** — spec-driven code generation built on Entelim: **https://archiet.dev**
 
 Contact via either site to discuss a commercial license or hosted plan.
 

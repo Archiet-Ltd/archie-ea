@@ -27,9 +27,14 @@ jobs:
           - platform_admin
           - security_architect
           - data_architect
+          - finance
+          - compliance
+          - risk
+          - operations
+          - non_technical_owner
     services:
       postgres:
-        image: postgres:16
+        image: public.ecr.aws/docker/library/postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: archie_whole_product

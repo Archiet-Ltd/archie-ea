@@ -2,9 +2,9 @@
 
 The dependency-graph and timeline routes crashed with an AttributeError as soon as
 an organisation held any work package, because the service read attribute names the
-``WorkPackage`` model does not have (``progress_percentage``, ``end_date``,
+unified work package does not have (``progress_percentage``, ``end_date``,
 ``assigned_to``). These tests pin the fix against the model's own roadmap
-serialiser (``WorkPackage.to_roadmap_dict``) and confirm the routes stay scoped to
+serialiser (``work_package_service.to_roadmap_dict``) and confirm the routes stay scoped to
 the caller's organisation.
 
 Written against the shared fixtures in tests/conftest.py (db_session rolls
@@ -50,34 +50,30 @@ def _make_user(db_session, org):
 @pytest.fixture
 def two_org_work_packages(db_session, make_org):
     """Organisation A holds two dependent work packages; organisation B holds one."""
-    from app.models.implementation_migration import WorkPackage
+    from app.services import work_package_service as svc
 
     org_a = make_org("rb-a")
     org_b = make_org("rb-b")
     user_a = _make_user(db_session, org_a)
 
-    wp_a1 = WorkPackage(
+    wp_a1 = svc.create_work_package(
+        organization_id=org_a.id,
         name=f"A-first-{uuid.uuid4().hex[:8]}",
-        organization_id=org_a.id,
-        percent_complete=40,
-        start_date=date(2026, 1, 5),
-        target_date=date(2026, 3, 31),
-        owner=user_a,
+        progress_percentage=40,
+        start_date="2026-01-05",
+        end_date="2026-03-31",
+        owner_id=user_a.id,
     )
-    db_session.add(wp_a1)
-    db_session.flush()
-
-    wp_a2 = WorkPackage(
+    wp_a2 = svc.create_work_package(
+        organization_id=org_a.id,
         name=f"A-second-{uuid.uuid4().hex[:8]}",
-        organization_id=org_a.id,
-        dependencies=[wp_a1.id],
     )
-    wp_b1 = WorkPackage(
-        name=f"B-wp-{uuid.uuid4().hex[:8]}",
+    svc.add_dependency(wp_a2.id, wp_a1.id, organization_id=org_a.id)
+    wp_b1 = svc.create_work_package(
         organization_id=org_b.id,
-        percent_complete=90,
+        name=f"B-wp-{uuid.uuid4().hex[:8]}",
+        progress_percentage=90,
     )
-    db_session.add_all([wp_a2, wp_b1])
     db_session.flush()
 
     return {
@@ -106,7 +102,9 @@ def test_dependency_graph_reads_the_work_package_and_scopes_to_the_caller(
     first_node = next(
         n for n in data["nodes"] if n["id"] == f"wp-{seed['wp_a1'].id}"
     )["data"]
-    expected_owner_name = seed["wp_a1"].to_roadmap_dict()["owner_name"]
+    from app.services import work_package_service as svc
+
+    expected_owner_name = svc.to_roadmap_dict(seed["wp_a1"], seed["org_a"].id)["owner_name"]
     assert first_node["progress"] == 40
     assert first_node["startDate"] == "2026-01-05"
     assert first_node["endDate"] == "2026-03-31"
@@ -195,7 +193,9 @@ def test_timeline_group_by_assigned_to_and_invalid_value(
     assert resp.status_code == 200
     data = resp.get_json()["data"]
     groups_by_name = {g["name"]: g["items"] for g in data["groups"]}
-    expected_owner_name = seed["wp_a1"].to_roadmap_dict()["owner_name"]
+    from app.services import work_package_service as svc
+
+    expected_owner_name = svc.to_roadmap_dict(seed["wp_a1"], seed["org_a"].id)["owner_name"]
     assert any(
         item["id"] == seed["wp_a1"].id for item in groups_by_name[expected_owner_name]
     )

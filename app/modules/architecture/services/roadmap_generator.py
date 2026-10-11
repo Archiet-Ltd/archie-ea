@@ -14,7 +14,7 @@ Features:
 from app.services.archimate_backbone import sync_archimate_element
 
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 from app import db
@@ -23,7 +23,6 @@ from app.models.implementation_migration import (  # dead-code-ok
     Plateau,
     WorkPackage,
 )
-from app.models.relationship_tables import work_package_plateaus  # dead-code-ok
 from app.services.archimate.gap_resolution_service import GapResolutionService
 from app.services.llm_service import LLMService
 
@@ -333,13 +332,10 @@ class RoadmapGenerator:
             sync_archimate_element(plateau)
             db.session.flush()
 
-            # Link work packages to plateau
+            # Link work packages to plateau through the relationship, so the session
+            # bridge sees the link and makes the ArchiMate relationship.
             for wp in wps:
-                db.session.execute(  # tenant-filtered: scoped via parent FK (work_package_id, plateau_id)
-                    work_package_plateaus.insert().values(
-                        work_package_id=wp.id, plateau_id=plateau.id, created_at=datetime.utcnow()
-                    )
-                )
+                wp.plateaus.append(plateau)
 
             plateaus.append(plateau)
 

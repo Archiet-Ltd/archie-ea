@@ -245,7 +245,8 @@ class TestShouldQueue:
                 "raw": raw_mock,
             }
 
-        def _mock_queue_approval(self, tc):
+        def _mock_queue_approval(self, tc, persona=None):
+            assert persona == "enterprise_architect", f"persona={persona!r}"
             return 9999  # fake approval ID
 
         runner = AgentRunner(user_id=1, auto_execute=True)
