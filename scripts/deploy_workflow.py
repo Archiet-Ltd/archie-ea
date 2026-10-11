@@ -69,6 +69,7 @@ USER_RE = re.compile(r"[a-z_][a-z0-9_-]{0,31}")
 # when ci.yml gains, loses or renames a job without this list or the exclusions
 # following, so neither can rot quietly.
 REQUIRED_CHECKS = (
+    "Detect changed paths",
     "Secret scan (gitleaks)",
     "Static gates (compile + ratchets)",
     "Boot health (no database)",
