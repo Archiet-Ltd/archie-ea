@@ -657,7 +657,7 @@ def get_unmapped_archimate_elements():
         # (scoped to this organisation) rather than the nonexistent
         # unified_capability_archimate_mapping table.
         _org_ae, _org_params_ae = org_scope(prefix="ae.", keyword="AND")
-        _org_uc2, _org_params_uc2 = org_scope(prefix="uc2.", keyword="WHERE")
+        _org_uc2, _org_params_uc2 = org_scope(prefix="uc2.", keyword="AND")
         _org_params = {**_org_params_ae, **_org_params_uc2}
         result = db.session.execute(
             text(
