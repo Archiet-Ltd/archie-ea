@@ -18,8 +18,8 @@ source: app/utils/role_access.py (ROLE_ENTERPRISE_ARCHITECT, SIDEBAR_ZONES, _MY_
 Enterprise architect tools exist to answer one question honestly: what does this change touch, and
 who is accountable for it? Entelim answers that from a single shared model — ask on the Ask screen,
 trace the result on the twin map, and carry it through a roadmap's gap register to a review board
-decision, all against the same data. It is built for enterprise architecture teams and the technology
-leaders they report to, and a team can start on the free Community plan.
+decision, all against the same data. It is an enterprise architecture tool for EA teams and the
+technology leaders they report to, and a team can start on the free Community plan.
 
 **[Start free](/register)** or **[see pricing](/pricing)**.
 
@@ -133,8 +133,7 @@ a diagram and guessing. Composer still gives you the diagram, opened from the sa
 
 ## Other roles
 
-Entelim gives every other enterprise architecture role — from solution architects to procurement and
-finance — its own workspace over this same shared model.
+Entelim gives every other enterprise architecture role its own workspace over this same shared model.
 
 ## Start free
 
