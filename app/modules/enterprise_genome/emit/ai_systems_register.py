@@ -62,6 +62,14 @@ def _flags_cell(flags: list[str]) -> str:
     return " · ".join(labels)
 
 
+def _owner_cell(owner) -> str:
+    """Render an owner dict as a display name, or em dash if unset."""
+    if owner is None:
+        return EM_DASH
+    name = owner.get("user_name") or EM_DASH
+    return str(escape(name))
+
+
 def emit_ai_systems_register(slice_data: dict) -> Markup:
     """Emit the register table for a slice. Returns a ``Markup`` fragment."""
     systems = slice_data.get("systems") or []
@@ -89,6 +97,9 @@ def emit_ai_systems_register(slice_data: dict) -> Markup:
             f'<td class="px-3 py-2 text-sm">{_tri_cell(gov.get("approval_gate"))}</td>'  # raw-html-ok: _tri_cell() (defined above) returns only 'Yes'/'No'/em-dash literals
             f'<td class="px-3 py-2 text-sm">{_tri_cell(gov.get("human_review"))}</td>'  # raw-html-ok: _tri_cell() (defined above) returns only 'Yes'/'No'/em-dash literals
             f'<td class="px-3 py-2 text-sm">{_cell(s.get("data_sensitivity"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_cell(s.get("risk_class"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_cell(s.get("release_state"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_owner_cell(s.get("owner"))}</td>'  # raw-html-ok: _owner_cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm text-destructive">{_flags_cell(flags)}</td>'  # raw-html-ok: _flags_cell() (defined above) escapes internally
             "</tr>"
         )
@@ -97,7 +108,7 @@ def emit_ai_systems_register(slice_data: dict) -> Markup:
         body = "".join(rows)
     else:
         body = (
-            '<tr><td colspan="9" class="px-3 py-6 text-sm text-muted-foreground text-center">'
+            '<tr><td colspan="12" class="px-3 py-6 text-sm text-muted-foreground text-center">'
             "No AI systems modelled yet.</td></tr>"
         )
 
@@ -110,6 +121,9 @@ def emit_ai_systems_register(slice_data: dict) -> Markup:
         "Approval gate",
         "Human review",
         "Data sensitivity",
+        "Risk class",
+        "Release state",
+        "Owner",
         "Risk flags",
     ]
     head = "".join(

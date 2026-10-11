@@ -77,7 +77,8 @@ def build_ai_systems_slice(org_id: int, session) -> dict:
           "version": 1,
           "organization_id": org_id,
           "systems": [ <profile>, ... ],   # ordered by archimate_element_id
-          "counts": { total, retired, stale, current, unknown_model, flagged },
+          "counts": { total, retired, stale, current, unknown_model, flagged,
+                      high_risk, released },
           "spec_hash": "sha256:...",
         }
     """
@@ -93,6 +94,8 @@ def build_ai_systems_slice(org_id: int, session) -> dict:
         "retired": sum(1 for s in systems if s["model_currency"] == "retired"),
         "unknown_model": sum(1 for s in systems if s["model_currency"] == "unknown"),
         "flagged": sum(1 for s in systems if s["risk_flags"]),
+        "high_risk": sum(1 for s in systems if s.get("risk_class") == "high"),
+        "released": sum(1 for s in systems if s.get("release_state") == "released"),
     }
 
     return {
