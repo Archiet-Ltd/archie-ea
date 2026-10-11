@@ -123,7 +123,7 @@ def end_of_support_exposure(
     its owner summary.
 
     A read model, not a second store: the date is VendorProduct's own
-    end_of_life_date (refreshed by the end-of-support sync service) and the
+    end_of_life_date (entered or imported on the product record) and the
     window, dependents and ownership readers are the shared
     app.services.eol_window helpers the alert scanner imports too -- nothing
     is stored here a second time.

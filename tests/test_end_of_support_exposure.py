@@ -5,7 +5,7 @@ product reaching end of support within a chosen window (default: the
 organisation's configured lead time), with each application's owner and
 the product's own end-of-support date. The list is a read model: it reads
 VendorProduct.end_of_life_date (the technology-product register's own
-field, refreshed by the end-of-support sync service), reuses the alert
+field, entered or imported on the product record), reuses the alert
 scanner's window arithmetic, dependents and ownership readers, and never
 stores a date a second time.
 """
