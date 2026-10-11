@@ -12,6 +12,11 @@ module owns:
   * ``model_currency`` — current / stale / retired — reusing the model-currency
     facts already in ``app.modules.ai_chat.services.model_defaults``.
 
+New fields (risk class, release state) are stored as typed properties on the
+element's ``acm_properties``, not in ``custom_properties`` — see
+``ai_system_classification.py``. The owner is read from the one owner record
+(``ApplicationOwner``), not from a profile key.
+
 Model currency reuses the stale-models denylist
 -------------------------------------------------
 The stale-models denylist lives, as prose, in the module docstring of
@@ -43,6 +48,7 @@ AI_SYSTEM_ELEMENT_TYPE = "ApplicationComponent"
 AI_SYSTEM_ELEMENT_LAYER = "application"
 
 UNKNOWN = "unknown"
+NOT_SET = "not set"
 
 # --- Controlled vocabularies (the profile's enums) --------------------------
 AUTONOMY_LEVELS = (
@@ -123,10 +129,14 @@ def _norm_enum(value, allowed: tuple[str, ...]) -> str:
 def profile_from_element(element) -> dict:
     """Project one AI-system ``ArchiMateElement`` into a typed profile dict.
 
-    Reads only ``custom_properties`` (plus the element's own ``name``); never
-    invents a value. Governance sub-fields default to ``"unknown"`` when the
-    element carries no recorded value, so a system with no governance recorded
-    is visibly ungoverned-unknown rather than falsely "approved".
+    Reads ``custom_properties`` for the original profile fields and
+    ``acm_properties`` for the typed-property fields (risk class, release
+    state). The owner is read from the one owner record
+    (``ApplicationOwner``), never from a profile key.
+
+    Never invents a value. Governance sub-fields default to ``"unknown"`` when
+    the element carries no recorded value, so a system with no governance
+    recorded is visibly ungoverned-unknown rather than falsely "approved".
     """
     props = element.custom_properties or {}
     ai = props.get(AI_SYSTEM_MARKER) or {}
@@ -158,6 +168,10 @@ def profile_from_element(element) -> dict:
             "human_review": _tri(gov.get("human_review")),
         },
         "model_currency": model_currency(model_id),
+        # New fields: read from typed properties (acm_properties), not custom_properties.
+        "risk_class": _read_risk_class(element),
+        "release_state": _read_release_state(element),
+        "owner": _read_owner(element),
     }
     profile["risk_flags"] = risk_flags(profile)
     return profile
@@ -231,3 +245,80 @@ def build_custom_properties(
         ai["governance"] = gov
 
     return {AI_SYSTEM_MARKER: ai}
+
+
+# --- Typed-property readers (risk class, release state, owner) --------------
+
+
+def _read_risk_class(element) -> str:
+    """Read the risk class from the element's typed properties (acm_properties).
+
+    Returns the risk tier or ``"not set"`` if none recorded.
+    """
+    from .ai_system_classification import PROPKEY_RISK_CLASS, RISK_TIERS
+
+    acm = getattr(element, "acm_properties", None) or {}
+    entry = acm.get(PROPKEY_RISK_CLASS)
+    if entry is None:
+        return NOT_SET
+    if isinstance(entry, dict):
+        val = entry.get("value")
+        return val if val in RISK_TIERS else NOT_SET
+    val = str(entry) if entry else ""
+    return val if val in RISK_TIERS else NOT_SET
+
+
+def _read_release_state(element) -> str:
+    """Read the release state from the element's typed properties.
+
+    Returns ``"draft"``, ``"released"``, or ``"not set"``.
+    """
+    from .ai_system_classification import PROPKEY_RELEASE_STATE, RELEASE_STATES
+
+    acm = getattr(element, "acm_properties", None) or {}
+    entry = acm.get(PROPKEY_RELEASE_STATE)
+    if entry is None:
+        return NOT_SET
+    if isinstance(entry, dict):
+        val = entry.get("value")
+        return val if val in RELEASE_STATES else NOT_SET
+    val = str(entry) if entry else ""
+    return val if val in RELEASE_STATES else NOT_SET
+
+
+def _read_owner(element) -> dict:
+    """Read the owner from the one owner record (ApplicationOwner).
+
+    Returns a dict with ``user_id``, ``ownership_type``, ``user_name`` or
+    ``None`` if no owner is recorded. Never reads from custom_properties.
+    """
+    from app.models.application_owner import ApplicationOwner
+
+    org_id = getattr(element, "organization_id", None)
+    if org_id is None:
+        return None
+
+    owners = ApplicationOwner.get_owners_for_element(
+        element_type="ai_system",
+        element_id=element.id,
+        organization_id=org_id,
+    )
+    if not owners:
+        return None
+
+    # Return the primary owner, or the first owner if no primary.
+    primary = None
+    for o in owners:
+        if o.ownership_type == "primary":
+            primary = o
+            break
+    if primary is None:
+        primary = owners[0]
+
+    return {
+        "user_id": primary.user_id,
+        "ownership_type": primary.ownership_type,
+        "user_name": getattr(primary.user, "display_name", None)
+        or f"{getattr(primary.user, 'first_name', '') or ''} {getattr(primary.user, 'last_name', '') or ''}".strip()
+        or None,
+    }
