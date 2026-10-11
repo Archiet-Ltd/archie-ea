@@ -11,12 +11,16 @@ from typing import Optional
 from app import db
 from app.models.application_owner import ApplicationOwner
 from app.models.unified_capability import UnifiedCapability
+from app.services.element_ownership_service import (
+    CrossOrganisationElementOwner,
+    set_element_owner,
+)
 
 ELEMENT_TYPE_CAPABILITY = "capability"
 
 
-class CrossOrganisationCapabilityOwner(ValueError):
-    """The chosen owner, or the capability itself, is not in this organisation."""
+# Kept under its old name: the capability routes and tests catch this class.
+CrossOrganisationCapabilityOwner = CrossOrganisationElementOwner
 
 
 def get_tenant_capability(capability_id: int, organization_id: int) -> Optional[UnifiedCapability]:
@@ -28,15 +32,6 @@ def get_tenant_capability(capability_id: int, organization_id: int) -> Optional[
     ).first()
 
 
-def _get_tenant_capability(capability_id: int, organization_id: int) -> UnifiedCapability:
-    capability = get_tenant_capability(capability_id, organization_id)
-    if capability is None:
-        raise CrossOrganisationCapabilityOwner(
-            "That capability does not belong to this organisation."
-        )
-    return capability
-
-
 def set_capability_owner(
     *,
     capability_id: int,
@@ -46,41 +41,16 @@ def set_capability_owner(
     assigned_by: Optional[int] = None,
 ) -> ApplicationOwner:
     """Refuses (CrossOrganisationCapabilityOwner) a capability or an owner
-    from another organisation, rather than store it -- same fencing as the
-    application owner writer."""
-    from app.models.user import User
-
-    _get_tenant_capability(capability_id, organization_id)
-
-    owner = User.query.filter_by(
-        id=user_id, organization_id=organization_id,
-    ).first()
-    if owner is None:
-        raise CrossOrganisationCapabilityOwner(
-            "That user does not belong to this organisation."
-        )
-
-    existing = ApplicationOwner.query.filter_by(
+    from another organisation, and an unknown ownership type, rather than
+    store it -- same fencing as the application owner writer."""
+    return set_element_owner(
         element_type=ELEMENT_TYPE_CAPABILITY,
         element_id=capability_id,
         user_id=user_id,
-        ownership_type=ownership_type,
         organization_id=organization_id,
-    ).first()
-    if existing is not None:
-        return existing
-
-    record = ApplicationOwner(
-        element_type=ELEMENT_TYPE_CAPABILITY,
-        element_id=capability_id,
-        user_id=user_id,
         ownership_type=ownership_type,
         assigned_by=assigned_by,
-        organization_id=organization_id,
     )
-    db.session.add(record)
-    db.session.commit()
-    return record
 
 
 def remove_capability_owner(*, owner_record_id: int, organization_id: int) -> bool:
