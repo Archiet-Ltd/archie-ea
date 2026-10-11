@@ -184,13 +184,23 @@ class TestEveryConnectorChangeIsProposedOrDelegatedOrRefused:
             "is approved."
         )
 
-        # The credential is in the per-organisation vault, encrypted.
+        # M1 (cloud-review-pr448-961a0c35-v1.md): a credential must not take
+        # effect before its proposal is approved. It is staged under this
+        # approval, encrypted, and the live "credentials" key stays empty
+        # until approve_and_execute promotes it.
         vault = OrgCredentialVault()
-        assert vault.retrieve_credentials(org_a.id, "servicenow") == {
-            "credential": secret
-        }
+        assert vault.retrieve_credentials(org_a.id, "servicenow") is None, (
+            "an unapproved proposal must not make its credential live"
+        )
+        staged = vault.retrieve(org_a.id, "servicenow", f"pending:{proposal.id}:credentials")
+        assert staged is not None, "the credential must be staged under this approval"
+        import json as _json
+        assert _json.loads(staged) == {"credential": secret}
+
         row = OrgConnectorCredential.query.filter_by(
-            organization_id=org_a.id, connector_type="servicenow"
+            organization_id=org_a.id,
+            connector_type="servicenow",
+            credential_type=f"pending:{proposal.id}:credentials",
         ).first()
         assert secret.encode() not in row.encrypted_value, (
             "The credential must be stored encrypted, never plaintext."

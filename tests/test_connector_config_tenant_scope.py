@@ -364,17 +364,25 @@ class TestServiceNowConnectorRouteStoresSecretInVault:
             organization_id=org_a.id, connector_type="servicenow"
         ).first() is None
 
-        # The secret is already in the vault, encrypted, at proposal time.
+        # M1 (cloud-review-pr448-961a0c35-v1.md): at proposal time the secret
+        # is staged under this approval, encrypted, not yet the live
+        # credential -- a rejected or still-pending proposal must never make
+        # it reachable.
+        staged_type = f"pending:{queued.id}:client_secret"
         row = OrgConnectorCredential.query.filter_by(
             organization_id=org_a.id,
             connector_type="servicenow",
-            credential_type="client_secret",
+            credential_type=staged_type,
         ).first()
-        assert row is not None, "The secret must be stored via OrgConnectorCredential."
+        assert row is not None, "The secret must be staged via OrgConnectorCredential."
         assert secret.encode() not in row.encrypted_value, (
             "The secret must be stored encrypted, not as plaintext."
         )
-        assert OrgCredentialVault().retrieve(org_a.id, "servicenow", "client_secret") == secret
+        vault = OrgCredentialVault()
+        assert vault.retrieve(org_a.id, "servicenow", staged_type) == secret
+        assert vault.retrieve(org_a.id, "servicenow", "client_secret") is None, (
+            "an unapproved proposal must not make its secret live"
+        )
 
         # Approving the proposal applies the configuration to the framework row.
         admin_a2 = _make_admin(db_session, org_a.id, "AdminA2")
@@ -396,6 +404,7 @@ class TestServiceNowConnectorRouteStoresSecretInVault:
     def test_secret_is_isolated_between_organisations(
         self, db_session, org_a, org_b, admin_a, admin_b, client, login_as, tenant_ctx
     ):
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
         from app.modules.codegen.services.credential_vault import OrgCredentialVault
 
         secret_a = uuid.uuid4().hex
@@ -411,6 +420,9 @@ class TestServiceNowConnectorRouteStoresSecretInVault:
                 "enabled": "on",
             },
         )
+        proposal_a = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
 
         login_as(client, admin_b)
         client.post(
@@ -422,16 +434,26 @@ class TestServiceNowConnectorRouteStoresSecretInVault:
                 "enabled": "on",
             },
         )
+        proposal_b = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_b.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
 
+        # M1: each secret is staged under its own approval, not yet live --
+        # check isolation at the staged key, the same place a tenant leak
+        # would show up before either proposal is ever approved.
         # The test client's last request left g.current_org_id set to org B
         # (the app context is held open for the whole test, per login_as's
         # docstring) — read each org's secret back inside its own tenant
         # context, exactly as a real request for that org would.
         vault = OrgCredentialVault()
         with tenant_ctx(org_a.id):
-            assert vault.retrieve(org_a.id, "servicenow", "client_secret") == secret_a
+            assert vault.retrieve(
+                org_a.id, "servicenow", f"pending:{proposal_a.id}:client_secret"
+            ) == secret_a
         with tenant_ctx(org_b.id):
-            assert vault.retrieve(org_b.id, "servicenow", "client_secret") == secret_b, (
+            assert vault.retrieve(
+                org_b.id, "servicenow", f"pending:{proposal_b.id}:client_secret"
+            ) == secret_b, (
                 "TENANT LEAK: org B's saved secret was not the one org B submitted — "
                 "org A's save may have overwritten it."
             )

@@ -173,11 +173,6 @@ def connectors_save():
         )
         return redirect(url_for("m365_connector.connectors_index"))
 
-    if credential:
-        OrgCredentialVault().store_credentials(
-            org_id, connector_type, {"credential": credential}
-        )
-
     action = CONNECTOR_ACTION_UPDATE if existing_id else CONNECTOR_ACTION_CREATE
     payload = {
         "connector_type": connector_type,
@@ -195,6 +190,21 @@ def connectors_save():
         f"'{name or connector_type}'",
         payload=payload,
     )
+    # M1: a credential must not take effect before the change it belongs to
+    # is approved. When this organisation has delegated the action, the
+    # change above already applied, so the credential can go straight into
+    # the real row like it always did; when it is only queued, the secret
+    # is staged under this approval instead and promoted on approval
+    # (apply_connector_change) or discarded on rejection (reject_approval).
+    if credential:
+        vault = OrgCredentialVault()
+        if result.get("queued"):
+            vault.store_staged(
+                org_id, connector_type, "credentials", _json.dumps({"credential": credential}),
+                result["approval_id"],
+            )
+        else:
+            vault.store_credentials(org_id, connector_type, {"credential": credential})
     db.session.commit()
 
     if result.get("queued"):
@@ -371,14 +381,6 @@ def m365_config_save():
         flash(str(exc), "error")
         return redirect(url_for("m365_connector.m365_config"))
 
-    if client_secret_raw:
-        OrgCredentialVault().store(
-            org_id=org_id,
-            connector_type="m365",
-            credential_type="client_secret",
-            value=client_secret_raw,
-        )
-
     existing = _load_org_connector(org_id, connector_type="m365")
     action = CONNECTOR_ACTION_UPDATE if existing else "create"
     payload = {
@@ -404,6 +406,14 @@ def m365_config_save():
         else "Add Microsoft 365 connector",
         payload=payload,
     )
+    # M1: stage the secret under this approval until it is genuinely
+    # approved, unless the organisation delegates (already applied above).
+    if client_secret_raw:
+        vault = OrgCredentialVault()
+        if result.get("queued"):
+            vault.store_staged(org_id, "m365", "client_secret", client_secret_raw, result["approval_id"])
+        else:
+            vault.store(org_id=org_id, connector_type="m365", credential_type="client_secret", value=client_secret_raw)
     db.session.commit()
 
     if result.get("queued"):
@@ -506,13 +516,6 @@ def servicenow_config_save():
     client_id = (request.form.get("client_id") or "").strip()
 
     secret = (request.form.get("client_secret") or "").strip()
-    if secret:
-        OrgCredentialVault().store(
-            org_id=org_id,
-            connector_type="servicenow",
-            credential_type="client_secret",
-            value=secret,
-        )
 
     raw_mapping = (request.form.get("field_mapping") or "{}").strip()
     try:
@@ -548,6 +551,14 @@ def servicenow_config_save():
         else "Add ServiceNow connector",
         payload=payload,
     )
+    # M1: stage the secret under this approval until it is genuinely
+    # approved, unless the organisation delegates (already applied above).
+    if secret:
+        vault = OrgCredentialVault()
+        if result.get("queued"):
+            vault.store_staged(org_id, "servicenow", "client_secret", secret, result["approval_id"])
+        else:
+            vault.store(org_id=org_id, connector_type="servicenow", credential_type="client_secret", value=secret)
     db.session.commit()
 
     if result.get("queued"):
@@ -696,14 +707,6 @@ def jira_config_save():
         flash(str(exc), "error")
         return redirect(url_for("m365_connector.jira_config"))
 
-    if api_token_raw:
-        OrgCredentialVault().store(
-            org_id=org_id,
-            connector_type="jira",
-            credential_type="api_token",
-            value=api_token_raw,
-        )
-
     existing = _get_jira_config(org_id)
     action = CONNECTOR_ACTION_UPDATE if existing else "create"
     payload = {
@@ -727,6 +730,14 @@ def jira_config_save():
         else "Add Jira connector",
         payload=payload,
     )
+    # M1: stage the secret under this approval until it is genuinely
+    # approved, unless the organisation delegates (already applied above).
+    if api_token_raw:
+        vault = OrgCredentialVault()
+        if result.get("queued"):
+            vault.store_staged(org_id, "jira", "api_token", api_token_raw, result["approval_id"])
+        else:
+            vault.store(org_id=org_id, connector_type="jira", credential_type="api_token", value=api_token_raw)
     db.session.commit()
 
     if result.get("queued"):

@@ -284,6 +284,63 @@ class OrgCredentialVault:
         ).delete()
         db.session.flush()
 
+    # -- Staged credentials (M1, cloud-review-pr448-961a0c35-v1.md) -------
+    #
+    # A connector save that is queued for approval must not let the new
+    # secret take effect before a human approves it: the old code wrote
+    # straight to the real (org_id, connector_type, credential_type) row,
+    # so a rejected or still-pending proposal was already live. These four
+    # methods stage the value under its own row instead -- same unique key,
+    # with "pending:<approval_id>:" in front of the real credential_type --
+    # until apply_connector_change promotes it on approval, or the
+    # rejection path discards it. Storage mechanics are identical to the
+    # real save; only the key changes, so no new table or encryption path
+    # is introduced.
+
+    @staticmethod
+    def _staged_type(credential_type: str, approval_id: int) -> str:
+        return f"pending:{approval_id}:{credential_type}"
+
+    def store_staged(
+        self,
+        org_id: int | None,
+        connector_type: str,
+        credential_type: str,
+        value: str,
+        approval_id: int,
+    ) -> None:
+        """Hold *value* under this approval, not yet the live credential."""
+        self.store(org_id, connector_type, self._staged_type(credential_type, approval_id), value)
+
+    def promote_staged(
+        self,
+        org_id: int | None,
+        connector_type: str,
+        credential_type: str,
+        approval_id: int,
+    ) -> None:
+        """On approval: move the staged value to the real credential row.
+
+        A no-op, not an error, when nothing was staged for this approval --
+        most connector changes carry no new secret at all (a plain config
+        edit), and this is called unconditionally from apply_connector_change.
+        """
+        staged_type = self._staged_type(credential_type, approval_id)
+        value = self.retrieve(org_id, connector_type, staged_type)
+        if value is not None:
+            self.store(org_id, connector_type, credential_type, value)
+        self.delete(org_id, connector_type, staged_type)
+
+    def discard_staged(
+        self,
+        org_id: int | None,
+        connector_type: str,
+        credential_type: str,
+        approval_id: int,
+    ) -> None:
+        """On rejection: remove the staged value without ever making it live."""
+        self.delete(org_id, connector_type, self._staged_type(credential_type, approval_id))
+
     def rotate_all_credentials(self, org_id: int) -> int:
         """Rotate the organisation's encryption key and re-encrypt every
         credential row.

@@ -292,6 +292,37 @@ class AIChatApprovalService:
                 exc_info=True,
             )
 
+    def _discard_staged_connector_credential(self, approval: AIChatCRUDApproval) -> None:
+        """M1: a rejected connectors proposal must never let its staged
+        secret become reachable later -- delete it, best-effort, the same
+        way _audit_nonblocking treats its own write as non-critical next to
+        the already-durable rejection above it.
+        """
+        try:
+            import json
+
+            from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+            payload = json.loads(approval.operation_payload or "{}")
+            connector_type = payload.get("connector_type")
+            if not connector_type:
+                return
+            from app.services.connector_framework import CONNECTOR_CREDENTIAL_TYPES
+
+            vault = OrgCredentialVault()
+            credential_type = CONNECTOR_CREDENTIAL_TYPES.get(connector_type)
+            if credential_type:
+                vault.discard_staged(approval.organization_id, connector_type, credential_type, approval.id)
+            vault.discard_staged(approval.organization_id, connector_type, "credentials", approval.id)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            self.logger.warning(
+                "Approval %s rejected but its staged connector credential could not be discarded",
+                approval.id,
+                exc_info=True,
+            )
+
     # ------------------------------------------------------------------ #
     # Audit trail (ARCH-022)                                              #
     # ------------------------------------------------------------------ #
@@ -950,6 +981,8 @@ class AIChatApprovalService:
                     "code": "NOT_FOUND",
                     "error": f"Approval {approval_id} not found after rejection",
                 }
+            if approval.entity_type == "connectors":
+                self._discard_staged_connector_credential(approval)
             self._audit_nonblocking(
                 approval,
                 event="cancelled" if is_requester_cancellation else "rejected",

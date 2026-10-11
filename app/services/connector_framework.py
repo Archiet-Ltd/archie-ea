@@ -283,6 +283,17 @@ CONNECTOR_ACTION_UPDATE = "update"
 CONNECTOR_ACTION_DELETE = "delete"
 CONNECTOR_ACTION_SYNC = "sync"
 
+# The one secret each connector type's own save route collects, and the
+# vault credential_type it belongs under once approved (M1). The generic
+# connectors page stores a JSON blob under "credentials"
+# (OrgCredentialVault.store_credentials); the three per-connector forms
+# each store one named value instead.
+CONNECTOR_CREDENTIAL_TYPES = {
+    "jira": "api_token",
+    "m365": "client_secret",
+    "servicenow": "client_secret",
+}
+
 # Connector types surfaced by the connectors page. A type is only offered
 # from a per-organisation configuration row already in the system; this is
 # the display order, not an allowlist -- the permit gate is
@@ -583,6 +594,21 @@ def apply_connector_change(
 
     connector_type = payload.get("connector_type")
     assert_connector_permitted(connector_type)
+
+    if approval is not None and action in (CONNECTOR_ACTION_CREATE, CONNECTOR_ACTION_UPDATE):
+        # M1: the save route staged this connector type's secret (if any)
+        # under this approval rather than writing it live; now that the
+        # proposal is genuinely approved, promote it. A no-op when nothing
+        # was staged (plain config edit, no new secret in this change).
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        vault = OrgCredentialVault()
+        credential_type = CONNECTOR_CREDENTIAL_TYPES.get(connector_type)
+        if credential_type:
+            vault.promote_staged(resolved, connector_type, credential_type, approval.id)
+        # The generic connectors page always stages under "credentials",
+        # regardless of connector type.
+        vault.promote_staged(resolved, connector_type, "credentials", approval.id)
 
     if action == CONNECTOR_ACTION_CREATE:
         cfg = ConnectorConfig(

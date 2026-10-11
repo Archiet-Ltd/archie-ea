@@ -405,3 +405,96 @@ class TestM4BuiltConnectorCanActuallyAuthenticate:
 
         # Vault retrieval, not the deprecated "credential" blob key.
         assert OrgCredentialVault().retrieve_credentials(org_a.id, "jira") in (None, {})
+
+
+class TestM1CredentialDoesNotTakeEffectBeforeApproval:
+    def test_a_submitted_secret_is_not_live_while_the_proposal_is_pending(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors/jira",
+            data={
+                "instance_url": "https://probe.atlassian.net",
+                "email": "probe@example.com",
+                "api_token": "not-yet-approved-token",
+                "default_project_key": "ARCH",
+                "enabled": "on",
+            },
+        )
+
+        live = OrgCredentialVault().retrieve(org_a.id, "jira", "api_token")
+        assert live is None, (
+            "an unapproved proposal must not make its secret live"
+        )
+
+    def test_approving_promotes_the_staged_secret_to_live(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors/jira",
+            data={
+                "instance_url": "https://probe.atlassian.net",
+                "email": "probe@example.com",
+                "api_token": "now-approved-token",
+                "default_project_key": "ARCH",
+                "enabled": "on",
+            },
+        )
+        proposal = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
+        assert proposal is not None
+
+        approver = _make_admin(db_session, org_a.id, "M1Approver")
+        db_session.commit()
+        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        assert result.get("success") is True, result
+
+        vault = OrgCredentialVault()
+        assert vault.retrieve(org_a.id, "jira", "api_token") == "now-approved-token"
+        # The staged row is gone, not left behind as an orphan.
+        assert vault.retrieve(org_a.id, "jira", f"pending:{proposal.id}:api_token") is None
+
+    def test_rejecting_discards_the_staged_secret_without_ever_making_it_live(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors/jira",
+            data={
+                "instance_url": "https://probe.atlassian.net",
+                "email": "probe@example.com",
+                "api_token": "never-approved-token",
+                "default_project_key": "ARCH",
+                "enabled": "on",
+            },
+        )
+        proposal = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
+        assert proposal is not None
+
+        rejecter = _make_admin(db_session, org_a.id, "M1Rejecter")
+        db_session.commit()
+        result = AIChatApprovalService(user_id=rejecter.id).reject_approval(proposal.id)
+        assert result.get("success") is True, result
+
+        vault = OrgCredentialVault()
+        assert vault.retrieve(org_a.id, "jira", "api_token") is None, (
+            "a rejected proposal's secret must never become live"
+        )
+        assert vault.retrieve(org_a.id, "jira", f"pending:{proposal.id}:api_token") is None, (
+            "the staged row must be discarded, not left as an orphan secret"
+        )
