@@ -619,29 +619,12 @@ def change_user_business_unit(user_id):
     require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
     form = ChangeBusinessUnitForm()
-    units = _svc.list_org_business_units()
-    form.business_unit_id.choices = [("", "No unit")] + [
-        (str(unit.id), unit.name) for unit in units
-    ]
+    form.business_unit_id.choices = _svc.business_unit_choices()
     if form.validate_on_submit():
-        raw = form.business_unit_id.data
-        try:
-            _svc.set_user_business_unit(user, int(raw) if raw else None)
-        except ValueError as exc:
-            flash(str(exc), "error")
-        else:
-            unit_name = "no unit"
-            if user.business_unit_id is not None:
-                unit_name = next(
-                    (u.name for u in units if u.id == user.business_unit_id),
-                    unit_name,
-                )
-            flash(
-                "Business unit for {} successfully changed to {}.".format(
-                    user.full_name(), unit_name
-                ),
-                "form-success",
-            )
+        ok, message = _svc.assign_business_unit_and_describe(
+            user, form.business_unit_id.data
+        )
+        flash(message, "form-success" if ok else "error")
         return redirect(url_for("admin.user_info", user_id=user_id))
     return render_template("admin/manage_user.html", user=user, form=form)
 

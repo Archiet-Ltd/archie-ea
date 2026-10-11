@@ -260,3 +260,21 @@ class AdminUserService:
         )
 
         return _V1AdminUserService.set_user_business_unit(user, business_unit_id)
+
+    @staticmethod
+    def business_unit_choices():
+        """Delegate to the canonical v1 implementation."""
+        from app.modules.admin.services.admin_user_service import (
+            AdminUserService as _V1AdminUserService,
+        )
+
+        return _V1AdminUserService.business_unit_choices()
+
+    @staticmethod
+    def assign_business_unit_and_describe(user: User, raw_unit_id):
+        """Delegate to the canonical v1 implementation."""
+        from app.modules.admin.services.admin_user_service import (
+            AdminUserService as _V1AdminUserService,
+        )
+
+        return _V1AdminUserService.assign_business_unit_and_describe(user, raw_unit_id)
