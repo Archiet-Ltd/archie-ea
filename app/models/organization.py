@@ -24,6 +24,9 @@ class Organization(db.Model):  # migration-exempt
     is_active = db.Column(db.Boolean, default=True)
     settings = db.Column(db.JSON, default=dict)  # org-level config overrides
     max_users = db.Column(db.Integer, default=10)  # retired, see plan above
+    # Currency the organisation reports costs in; NULL means the platform default
+    # (read through application_cost_accessor.get_reporting_currency).
+    reporting_currency = db.Column(db.String(3))
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
 

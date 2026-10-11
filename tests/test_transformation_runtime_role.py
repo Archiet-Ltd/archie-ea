@@ -766,11 +766,13 @@ CREATE TABLE operation_results (
 CREATE TABLE transformation_outbox_events (
     id serial PRIMARY KEY,
     organization_id integer NOT NULL,
-    operation_result_id integer NOT NULL,
+    operation_result_id integer,
     event_id varchar(36) NOT NULL,
     ordinal integer NOT NULL,
     event_type varchar(160) NOT NULL,
     payload_json json NOT NULL,
+    entity_type varchar(80),
+    entity_id integer,
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     published_at timestamptz,
     delivery_attempts integer NOT NULL DEFAULT 0

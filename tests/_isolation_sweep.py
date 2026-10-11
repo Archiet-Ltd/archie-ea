@@ -64,7 +64,12 @@ class Policy:
     """What the sweep treats as in scope. Built by the test module."""
 
     def __init__(self, *, non_identifier_ints, string_identifier, excluded_params,
-                 excluded_endpoint_prefixes, excluded_endpoints, shared_models):
+                 excluded_endpoint_prefixes, excluded_endpoints, shared_models,
+                 param_models=None):
+        # Explicit overrides: {path parameter name: table name of the record it names}.
+        # They win over what the codebase reading finds, so a repointed lookup (a view
+        # that hands the id to a service the resolver cannot follow) is still proven.
+        self.param_models = dict(param_models or {})
         self.non_identifier_ints = frozenset(non_identifier_ints)
         self.string_identifier = re.compile(string_identifier)
         self.excluded_params = dict(excluded_params)
@@ -377,7 +382,10 @@ class Seeder:
             return self.org_id
         if ttable == "users":
             return self.user_id
-        if ttable in self.pks:
+        # A column under a unique index (one work package per element) gets a parent of its own:
+        # reusing the shared one would put two rows of the same table on it.
+        unique = any(ix.unique and list(ix.columns) == [col] for ix in col.table.indexes)
+        if ttable in self.pks and not unique:
             return self.pks[ttable]
         target = table_models().get(ttable)
         if target is None or depth >= 3:
@@ -386,13 +394,17 @@ class Seeder:
             raise Unseedable("required %s -> %s" % (col.name, ttable))
         if col.nullable and not tenant_owned(target, self.shared_models):
             return None
+        shared = self.pks.get(ttable)
         try:
-            self.seed(target, context, depth + 1)
+            self.seed(target, {} if unique else context, depth + 1)
         except Unseedable:
             if col.nullable:
                 return None
             raise
-        return self.pks[target.__table__.name]
+        own = self.pks[target.__table__.name]
+        if unique and shared is not None:
+            self.pks[ttable] = shared
+        return own
 
     def _value(self, col, marker, context, depth):
         import sqlalchemy as sa
@@ -877,6 +889,9 @@ def run_sweep(app, login, policy, only=None):
     """Drive every identifier-bearing route (or those ``only`` accepts)."""
     by_name = mapped_classes()
     param_models = codebase_param_models(by_name)
+    tables = table_models()
+    param_models.update({
+        param: tables[table] for param, table in policy.param_models.items() if table in tables})
     cases, excluded = enumerate_cases(app, policy)
     if only is not None:
         cases = [c for c in cases if only(c)]

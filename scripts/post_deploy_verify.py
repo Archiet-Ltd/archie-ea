@@ -42,13 +42,16 @@ failed deploy, and until now it was a successful one.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
+import os
 import re
 import ssl
 import subprocess
 import sys
 import urllib.error
 import urllib.request
+from xml.etree import ElementTree
 
 DEFAULT_BASE = "https://entelim.org"
 DEFAULT_DROPLET = "root@134.122.105.56"
@@ -126,6 +129,103 @@ def check_pages(base: str) -> list:
     return problems
 
 
+def sitemap_urls(base: str) -> list:
+    """Every <loc> in the live sitemap.xml, read the same way check_pages()
+    reads any other public page -- no new dependency, just the stdlib XML
+    parser already available everywhere Python is."""
+    status, body = _fetch(base.rstrip("/") + "/sitemap.xml")
+    if status != 200 or not body:
+        return []
+    try:
+        root = ElementTree.fromstring(body)
+    except ElementTree.ParseError:
+        return []
+    ns = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+    return [loc.text.strip() for loc in root.findall(f".//{ns}loc") if loc.text]
+
+
+def _indexnow_key() -> str:
+    """The IndexNow key, read from the one place it is defined.
+
+    INDEXNOW_API_KEY is not a secret (config.py) and this runner no longer
+    has it wired into its environment -- a real env var still wins, for
+    anyone who wants to rotate the key without a code change, but otherwise
+    this reads config.py's own source as text and pulls out its committed
+    default. Deliberately not `import config`: this runner has none of the
+    app's dependencies installed (see the module docstring above), the same
+    reason check_pages() / sitemap_urls() above talk to the live site over
+    HTTP instead of importing the app.
+    """
+    env_key = os.environ.get("INDEXNOW_API_KEY", "").strip()
+    if env_key:
+        return env_key
+
+    config_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.py"
+    )
+    try:
+        with open(config_path, "r", encoding="utf-8") as fh:
+            tree = ast.parse(fh.read(), filename=config_path)
+    except (OSError, SyntaxError):
+        return ""
+
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "INDEXNOW_API_KEY"
+                for target in node.targets
+            )
+            and isinstance(node.value, ast.Call)
+            and len(node.value.args) == 2
+            and isinstance(node.value.args[1], ast.Constant)
+            and isinstance(node.value.args[1].value, str)
+        ):
+            return node.value.args[1].value
+    return ""
+
+
+def ping_indexnow(base: str, urls: list) -> dict | None:
+    """Tell IndexNow (api.indexnow.org, shared by Bing/Yandex) that every URL
+    in *urls* may have changed, so these engines can re-crawl now rather than
+    waiting. No-op when no key can be found -- the key is free and
+    self-generated (https://www.indexnow.org/documentation), never a paid
+    account, but until one is generated and the matching /<key>.txt is
+    deployed this stays a no-op by design, the same pattern as the other
+    *_API_KEY settings in config.py.
+
+    Never allowed to fail the deploy: this is a courtesy ping to search
+    engines, not a correctness check of the site itself, so any problem here
+    is reported in the JSON output and never added to the caller's
+    `problems` list (post_deploy_verify's exit code / rollback signal).
+    """
+    key = _indexnow_key()
+    if not key or not urls:
+        return None
+
+    from urllib.parse import urlparse
+
+    payload = json.dumps({
+        "host": urlparse(base).netloc,
+        "key": key,
+        "keyLocation": base.rstrip("/") + "/" + key + ".txt",
+        "urlList": urls,
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        "https://api.indexnow.org/indexnow",
+        data=payload,
+        headers={"Content-Type": "application/json; charset=utf-8"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return {"status": response.status, "url_count": len(urls)}
+    except urllib.error.HTTPError as exc:
+        return {"status": exc.code, "url_count": len(urls), "error": exc.read().decode("utf-8", "replace")[:300]}
+    except Exception as exc:  # network-level failure
+        return {"status": 0, "url_count": len(urls), "error": str(exc)}
+
+
 def check_logs(droplet: str, app_dir: str, minutes: int = 30) -> list:
     """Count real errors in the running container since the deploy.
 
@@ -167,6 +267,10 @@ def main() -> int:
                         help="also scan the container logs over ssh")
     parser.add_argument("--minutes", type=int, default=30)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--no-indexnow", action="store_true",
+        help="skip the IndexNow ping even when a key is found",
+    )
     args = parser.parse_args()
 
     problems = check_pages(args.base)
@@ -176,9 +280,18 @@ def main() -> int:
         except Exception as exc:
             problems.append("could not read container logs: %s" % exc)
 
+    # IndexNow: only after confirming the deploy is actually healthy -- no
+    # point telling search engines to recrawl pages that are currently
+    # serving errors. A ping problem is reported but never added to
+    # `problems`: see ping_indexnow()'s docstring for why.
+    indexnow_result = None
+    if not problems and not args.no_indexnow:
+        indexnow_result = ping_indexnow(args.base, sitemap_urls(args.base))
+
     if args.json:
         print(json.dumps({"base": args.base, "problems": problems,
-                          "ok": not problems}, indent=2))
+                          "ok": not problems, "indexnow": indexnow_result},
+                          indent=2))
     else:
         if problems:
             print("PRODUCTION IS NOT HEALTHY:")
@@ -190,6 +303,11 @@ def main() -> int:
         else:
             print("production OK: %d public surfaces served, none reporting an error"
                   % len(PUBLIC_PATHS))
+            if indexnow_result is None:
+                print("IndexNow: skipped (no key found, or --no-indexnow)")
+            else:
+                print("IndexNow: submitted %d URL(s), status %s"
+                      % (indexnow_result["url_count"], indexnow_result["status"]))
     return 1 if problems else 0
 
 

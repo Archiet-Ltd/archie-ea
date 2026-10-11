@@ -91,13 +91,9 @@ def test_canvas_container_has_a_capped_height():
     `responsive: true` — Chart.js resizes from the CONTAINER, so the cap has
     to live on the wrapping element."""
     html = DASHBOARD_TEMPLATE.read_text(encoding="utf-8")
-    legacy_html = (REPO_ROOT / "app" / "templates" / "arb" / "partials" / "_legacy_dashboard.html").read_text(
-        encoding="utf-8"
-    )
-    for source in (html, legacy_html):
-        # Both canvases (typed and legacy branch) must sit in a fixed-height
-        # wrapper now that maintainAspectRatio is disabled.
-        assert re.search(r'id="arbStatusChart"', source)
+    # The legacy dashboard partial has been deleted. The typed queue
+    # is the single code path. Only the main dashboard template is checked.
+    assert re.search(r'id="arbStatusChart"', html)
     # Round-2 refuter fix (17 Sep 2026): `h-[220px]` was an arbitrary-value
     # Tailwind class that was never compiled into the committed
     # tailwind-output.css (this repo ships pre-built CSS with no Node
@@ -107,9 +103,7 @@ def test_canvas_container_has_a_capped_height():
     # its old ~654px oversized default. `h-48` is a standard, already-
     # compiled Tailwind utility (192px) that satisfies the same <=240px cap.
     assert "h-48" in html
-    assert "h-48" in legacy_html
     assert "h-[220px]" not in html, "arbitrary-value class not guaranteed compiled into shipped CSS"
-    assert "h-[220px]" not in legacy_html, "arbitrary-value class not guaranteed compiled into shipped CSS"
 
 
 def test_resolved_background_colors_are_four_distinct_semantic_tokens():

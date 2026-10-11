@@ -1,0 +1,284 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/provenance.html' import provenance_badge %}
+{% from 'components/loading_state.html' import loading_inline %}
+
+{% block title %}Model as of{% endblock %}
+
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+{% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+<div class="p-6 space-y-6" x-data="asOfPage()">
+    {{ page_shell(
+        title='Model as of',
+        subtitle='The architecture model as it stood on a specific date.',
+        breadcrumb=[('Home', home_url), ('Intelligence', url_for('intelligence_ui.ask')), ('Model as of', none)],
+    ) }}
+
+    <section class="rounded-xl border border-border bg-card p-6">
+        <form @submit.prevent="loadAsOf" class="space-y-4">
+            <div>
+                <label for="as-of-date" class="block text-sm font-medium text-foreground mb-1">As of date</label>
+                <input type="datetime-local" id="as-of-date" x-model="asOfDate"
+                       class="h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                       required>
+            </div>
+            <div class="flex items-center gap-3">
+                <button type="submit"
+                        :disabled="loading"
+                        class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none">
+                    <template x-if="loading">
+                        {{ loading_inline(size='sm', text='Loading...') }}
+                    </template>
+                    <template x-if="!loading">Show model</template>
+                </button>
+                <template x-if="lastLoaded">
+                    <span class="text-sm text-muted-foreground" x-text="'Last loaded: ' + formatDateTime(lastLoaded)"></span>
+                </template>
+            </div>
+        </form>
+    </section>
+
+    <template x-if="loading">
+        <div role="status" aria-label="Loading model snapshot" class="h-32 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+    </template>
+
+    <template x-if="error">
+        <section class="rounded-xl border border-destructive/50 bg-destructive/10 p-6">
+            <p class="text-sm text-destructive" x-text="error"></p>
+        </section>
+    </template>
+
+    <template x-if="!loading && !error && elements.length === 0 && relationships.length === 0">
+        <section class="rounded-xl border border-border bg-card p-6">
+            <p class="text-sm text-muted-foreground">No model elements or relationships recorded for this date.</p>
+        </section>
+    </template>
+
+    <template x-if="!loading && !error && (elements.length > 0 || relationships.length > 0)">
+        <section class="rounded-xl border border-border bg-card p-6">
+            <header class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-foreground">
+                    <template x-if="elements.length > 0">
+                        <span x-text="elements.length + ' element' + (elements.length === 1 ? '' : 's')"></span>
+                    </template>
+                    <template x-if="elements.length > 0 && relationships.length > 0">, </template>
+                    <template x-if="relationships.length > 0">
+                        <span x-text="relationships.length + ' relationship' + (relationships.length === 1 ? '' : 's')"></span>
+                    </template>
+                </h2>
+                <div class="flex items-center gap-2">
+                    <label class="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                        <input type="checkbox" x-model="showOnlyElements" class="h-4 w-4 rounded border-input">
+                        <span>Elements only</span>
+                    </label>
+                    <label class="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                        <input type="checkbox" x-model="showOnlyRelationships" class="h-4 w-4 rounded border-input">
+                        <span>Relationships only</span>
+                    </label>
+                </div>
+            </header>
+
+            <template x-if="!showOnlyRelationships && filteredElements.length > 0">
+                <div class="mb-6">
+                    <h3 class="text-sm font-medium text-muted-foreground mb-3">Elements</h3>
+                    <div class="space-y-3" role="list" aria-label="Elements">
+                        <template x-for="element in filteredElements" :key="element.id">
+                            <article class="rounded-lg border border-border bg-background p-4" role="listitem">
+                                <header class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm font-medium text-foreground" x-text="element.name"></span>
+                                        <span class="inline-flex h-5 items-center rounded-full border border-border px-1.5 text-[10px] font-medium text-foreground"
+                                              x-text="element.type"></span>
+                                        <span class="inline-flex h-5 items-center rounded-full border border-border px-1.5 text-[10px] font-medium text-foreground"
+                                              x-text="element.layer"></span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <template x-if="element.recorded_at">
+                                            <span x-text="formatDateTime(element.recorded_at)"></span>
+                                        </template>
+                                        <template x-if="!element.recorded_at">
+                                            <span>—</span>
+                                        </template>
+                                    </div>
+                                </header>
+
+                                <div class="grid gap-2 text-sm sm:grid-cols-3">
+                                    <div>
+                                        <dt class="text-muted-foreground">Valid from</dt>
+                                        <dd class="text-foreground font-mono text-xs" x-text="formatDateTime(element.valid_from)"></dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-muted-foreground">Valid to</dt>
+                                        <dd class="text-foreground font-mono text-xs" x-text="element.valid_to ? formatDateTime(element.valid_to) : 'current'"></dd>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3">
+                                    <button type="button"
+                                            @click="toggleSnapshot('element_' + element.id)"
+                                            class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                                        <i data-lucide="chevron-down" class="h-4 w-4" :class="{ 'rotate-180': openSnapshots.includes('element_' + element.id) }" aria-hidden="true"></i>
+                                        <span>Show snapshot</span>
+                                    </button>
+                                    <template x-if="openSnapshots.includes('element_' + element.id)">
+                                        <div class="mt-2 overflow-x-auto rounded-md border border-border bg-muted p-3">
+                                            <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(element.snapshot, null, 2)"></pre>
+                                        </div>
+                                    </template>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="!showOnlyElements && filteredRelationships.length > 0">
+                <div class="mb-6">
+                    <h3 class="text-sm font-medium text-muted-foreground mb-3">Relationships</h3>
+                    <div class="space-y-3" role="list" aria-label="Relationships">
+                        <template x-for="rel in filteredRelationships" :key="rel.id">
+                            <article class="rounded-lg border border-border bg-background p-4" role="listitem">
+                                <header class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                                    <div class="flex items-center gap-2">
+                                        <span class="inline-flex h-5 items-center rounded-full border border-border px-1.5 text-[10px] font-medium text-foreground"
+                                              x-text="rel.type"></span>
+                                        <span class="text-sm text-foreground" x-text="'#' + rel.source_id + ' \u2192 #' + rel.target_id"></span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <template x-if="rel.recorded_at">
+                                            <span x-text="formatDateTime(rel.recorded_at)"></span>
+                                        </template>
+                                        <template x-if="!rel.recorded_at">
+                                            <span>—</span>
+                                        </template>
+                                    </div>
+                                </header>
+
+                                <div class="grid gap-2 text-sm sm:grid-cols-3">
+                                    <div>
+                                        <dt class="text-muted-foreground">Valid from</dt>
+                                        <dd class="text-foreground font-mono text-xs" x-text="formatDateTime(rel.valid_from)"></dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-muted-foreground">Valid to</dt>
+                                        <dd class="text-foreground font-mono text-xs" x-text="rel.valid_to ? formatDateTime(rel.valid_to) : 'current'"></dd>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3">
+                                    <button type="button"
+                                            @click="toggleSnapshot('relationship_' + rel.id)"
+                                            class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                                        <i data-lucide="chevron-down" class="h-4 w-4" :class="{ 'rotate-180': openSnapshots.includes('relationship_' + rel.id) }" aria-hidden="true"></i>
+                                        <span>Show snapshot</span>
+                                    </button>
+                                    <template x-if="openSnapshots.includes('relationship_' + rel.id)">
+                                        <div class="mt-2 overflow-x-auto rounded-md border border-border bg-muted p-3">
+                                            <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(rel.snapshot, null, 2)"></pre>
+                                        </div>
+                                    </template>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="filteredElements.length === 0 && filteredRelationships.length === 0">
+                <p class="text-sm text-muted-foreground text-center py-8">No items match the current filters.</p>
+            </template>
+        </section>
+    </template>
+</div>
+
+<script>
+function asOfPage() {
+    return {
+        asOfDate: '',
+        loading: false,
+        error: null,
+        elements: [],
+        relationships: [],
+        lastLoaded: null,
+        showOnlyElements: false,
+        showOnlyRelationships: false,
+        openSnapshots: [],
+
+        init() {
+            // Set default to now
+            const now = new Date();
+            this.asOfDate = this.formatForInput(now);
+        },
+
+        async loadAsOf() {
+            if (!this.asOfDate) return;
+
+            this.loading = true;
+            this.error = null;
+            try {
+                const params = new URLSearchParams({
+                    as_of: this.asOfDate,
+                });
+                const response = await fetch(`/intelligence/api/history/as-of?${params}`, { // raw-fetch-ok: Alpine.js component, Platform.fetch not available in template context
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || `HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                this.elements = data.elements || [];
+                this.relationships = data.relationships || [];
+                this.lastLoaded = new Date().toISOString();
+            } catch (e) {
+                this.error = 'Could not load model snapshot: ' + e.message;
+            } finally {
+                this.loading = false;
+                this.$nextTick(() => lucide.createIcons());
+            }
+        },
+
+        get filteredElements() {
+            if (this.showOnlyRelationships) return [];
+            return this.elements;
+        },
+
+        get filteredRelationships() {
+            if (this.showOnlyElements) return [];
+            return this.relationships;
+        },
+
+        toggleSnapshot(key) {
+            if (this.openSnapshots.includes(key)) {
+                this.openSnapshots = this.openSnapshots.filter(k => k !== key);
+            } else {
+                this.openSnapshots.push(key);
+            }
+        },
+
+        formatForInput(date) {
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        },
+
+        formatDateTime(iso) {
+            if (!iso) return '—';
+            const d = new Date(iso);
+            return d.toLocaleString(undefined, {
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -32,6 +32,7 @@ from app.models.relationship_tables import (
     application_component_vendor_products as application_vendor_products,
 )
 from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
+from app.services.application_cost_accessor import get_annual_cost_with_source, has_recorded_cost
 from app.services.decorators import transactional
 
 logger = logging.getLogger(__name__)
@@ -379,18 +380,10 @@ class RationalizationScoringService:
         dimensions["lifecycle"] = not lifecycle_info["data_quality_flag"]
 
         # --- cost ---
-        # At least one of the four cost fields must be non-zero and non-null.
-        # TODO(Release 2 Cost Fact consolidation): Use application_cost_accessor.get_annual_cost()
-        # and related accessors instead of direct model field access.
-        cost_fields = [
-            app.total_cost_of_ownership,
-            app.license_cost,
-            app.maintenance_cost,
-            app.infrastructure_cost,
-        ]
-        dimensions["cost"] = any(
-            v is not None and float(v) > 0 for v in cost_fields
-        )
+        # R1-B08 PR 2: repointed through the one accessor (has_recorded_cost
+        # checks the canonical column, then the legacy per-category columns
+        # for a row never re-imported since -- see its own docstring).
+        dimensions["cost"] = has_recorded_cost(app)
 
         # --- usage ---
         dimensions["usage"] = bool(
@@ -513,6 +506,37 @@ class RationalizationScoringService:
         # Both unknown — default to operational with flag
         return {"lifecycle": "operational", "data_quality_flag": True}
 
+    REQUIRED_FORMULA_DIMENSIONS = frozenset(
+        {"technical_health", "business_value", "cost_efficiency", "vendor_risk"}
+    )
+
+    @staticmethod
+    def _resolve_overall_weights(app, scoring_config, active_policy):
+        """The ONE weight-resolution path for the rationalization overall
+        score, shared by calculate_app_score (which writes the score) and
+        get_evidence_trail (which re-derives it for display) -- so both
+        surfaces answer with the same weights (ADR 0008: one answer per
+        question). Returns (weights, active_formula_or_None); the second
+        value is non-None only when a registered FormulaRegister version's
+        weights are the ones actually returned, so callers can record that
+        version only when it is true.
+
+        A registered formula is used only when it names every required
+        dimension; an incomplete one (R1-B34 review finding C) is treated
+        exactly as if nothing were registered, rather than partially
+        overriding ScoringConfiguration with some dimensions missing.
+        """
+        from app.models.formula_register import FormulaRegister
+
+        active_formula = FormulaRegister.active_for(app.organization_id, "rationalization_overall")
+        required = RationalizationScoringService.REQUIRED_FORMULA_DIMENSIONS
+        if active_formula is not None and required.issubset(active_formula.inputs or {}):
+            return active_formula.inputs, active_formula
+
+        if active_policy is not None:
+            return active_policy.get_effective_weights(scoring_config), None
+        return scoring_config.get_weights_dict(), None
+
     @staticmethod
     @transactional
     def calculate_app_score(
@@ -565,11 +589,12 @@ class RationalizationScoringService:
             # Capability coverage dimension (CAP-020: now contributes to overall score)
             capability_result = RationalizationScoringService._compute_capability_score(application_id)
 
-            # Resolve effective weights — policy overrides base config if present.
-            if active_policy is not None:
-                weights = active_policy.get_effective_weights(scoring_config)
-            else:
-                weights = scoring_config.get_weights_dict()
+            # R1-B34 (TB-0135): one shared resolver, also used by
+            # get_evidence_trail below, so both surfaces answer with the
+            # same weights. See _resolve_overall_weights's own docstring.
+            weights, active_formula = RationalizationScoringService._resolve_overall_weights(
+                app, scoring_config, active_policy,
+            )
 
             # Calculate weighted overall score using resolved weights.
             overall_score = (
@@ -790,6 +815,13 @@ class RationalizationScoringService:
             score.assessment_date = datetime.utcnow().date()
             score.scoring_model_version = scoring_config.configuration_version
 
+            # R1-B34 (TB-0135): `active_formula` here is the same object
+            # resolved above when the overall score was computed -- it is
+            # None whenever the FormulaRegister's weights were NOT the ones
+            # actually used (missing or incomplete), so this column never
+            # names a formula that did not produce this number.
+            score.formula_version = active_formula.version if active_formula else None
+
             # Record which policy was applied (nullable — None when no policy exists).
             score.policy_id = active_policy.id if active_policy else None
             score.policy_name = active_policy.name if active_policy else None
@@ -934,10 +966,12 @@ class RationalizationScoringService:
             vendor_score = vendor_result["score"]
             vendor_evidence = vendor_result.get("evidence", [])
 
-            if active_policy is not None:
-                weights = active_policy.get_effective_weights(scoring_config)
-            else:
-                weights = scoring_config.get_weights_dict()
+            # R1-B34 (TB-0135): the same resolver calculate_app_score uses,
+            # so this re-derived trail never disagrees with the saved score
+            # (review finding A).
+            weights, _active_formula = RationalizationScoringService._resolve_overall_weights(
+                app, scoring_config, active_policy,
+            )
 
             overall_score = (
                 technical_score * weights["technical_health"]
@@ -1968,23 +2002,10 @@ class RationalizationScoringService:
         evidence: List[Dict] = []
 
         # --- Prefer structured cost fields on ApplicationComponent ---
-        # TODO(Release 2 Cost Fact consolidation): Use application_cost_accessor.get_annual_cost()
-        # and related accessors instead of direct model field access.
-        tco = app.total_cost_of_ownership
-        license_cost = app.license_cost
-        maint_cost = app.maintenance_cost
-        infra_cost = app.infrastructure_cost
-
-        annual_cost = None
-        cost_source = None
-        if tco is not None and tco > 0:
-            annual_cost = float(tco)
-            cost_source = "ApplicationComponent.total_cost_of_ownership"
-        elif any(c is not None for c in [license_cost, maint_cost, infra_cost]):
-            annual_cost = float(
-                (license_cost or 0) + (maint_cost or 0) + (infra_cost or 0)
-            )
-            cost_source = "ApplicationComponent (license_cost + maintenance_cost + infrastructure_cost)"
+        # R1-B08 PR 2: repointed through the one accessor (same TCO-first,
+        # legacy-sum-fallback behaviour this inlined before, now the one
+        # home for it rather than a copy at each call site).
+        annual_cost, cost_source = get_annual_cost_with_source(app)
 
         # Fallback: derive cost from capability cost allocations via capability mappings
         if annual_cost is None:
@@ -2690,16 +2711,8 @@ class RationalizationScoringService:
                 uncertainty_reasons.append("Score near threshold boundary")
 
             # Cost dimension gap — TCO analysis requires at least one cost field
-            # TODO(Release 2 Cost Fact consolidation): Use application_cost_accessor.get_annual_cost()
-            # and related accessors instead of direct model field access.
-            cost_fields = [
-                app.total_cost_of_ownership,  # model-safety-ok (known field)
-                app.license_cost,  # model-safety-ok
-                app.maintenance_cost,  # model-safety-ok
-                app.infrastructure_cost,  # model-safety-ok
-            ]
-            has_cost_data = any(v is not None and float(v) > 0 for v in cost_fields)
-            if not has_cost_data:
+            # R1-B08 PR 2: repointed through the one accessor.
+            if not has_recorded_cost(app):
                 uncertainty_reasons.append("No cost data for TCO analysis")
 
             # Vendor data gap — accept structured vendor_product_id, legacy vendor_name, or junction table

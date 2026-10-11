@@ -183,7 +183,14 @@ def servicenow_config_save():
 
     secret = (request.form.get("client_secret") or "").strip()
     if secret:
-        config.client_secret = secret
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        OrgCredentialVault().store(
+            org_id=org_id,
+            connector_type="servicenow",
+            credential_type="client_secret",
+            value=secret,
+        )
 
     raw_mapping = (request.form.get("field_mapping") or "{}").strip()
     try:

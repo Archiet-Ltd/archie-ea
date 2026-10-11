@@ -140,10 +140,16 @@ def test_job_trace_lines_carry_only_the_organisation_they_ran_for(
     assert run.failed == 0
     assert seen == {org_a.id: org_a.id, org_b.id: org_b.id}
 
+    # Other jobs running in the same process can log trace lines too, so keep
+    # only the job this test ran.
     finished = [
-        _fields(line)
-        for line in _trace_lines(caplog)
-        if "trace=finished" in line and "kind=job" in line
+        f
+        for f in (
+            _fields(line)
+            for line in _trace_lines(caplog)
+            if "trace=finished" in line and "kind=job" in line
+        )
+        if f.get("name") == "trace-probe"
     ]
     by_org = {f["org"]: f for f in finished}
     assert set(by_org) == {str(org_a.id), str(org_b.id)}, finished

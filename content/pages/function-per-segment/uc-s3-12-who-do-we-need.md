@@ -7,7 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 note: "No surface exists anywhere in the codebase for this use case (register: 'surface: none'). Written as a planned capability with no module to link to."
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /enterprise-architecture/workforce-planning
+url_slug: /use-cases/workforce-planning
 ---
 
 # Who do we need, with which skills, by when?
@@ -25,8 +25,8 @@ support.
 Capacity planning joined to the same accountability and programme data Entelim already tracks, so a
 transformation plan can name its skills gap in the same place it names its work packages.
 
-Coming 2027. Join the waiting list and we'll tell you the day it ships.
+Coming in an upcoming release. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 
-- [Is the programme on time and on budget?](/enterprise-architecture/programme-tracking)
+- [Is the programme on time and on budget?](/use-cases/programme-tracking)

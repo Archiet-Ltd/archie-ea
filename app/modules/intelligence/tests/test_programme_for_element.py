@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import datetime as _dt
 
+from sqlalchemy import text
+
 
 def _element(db_session, org_id, name, layer="application"):
     from app.models import ArchiMateElement
@@ -39,6 +41,7 @@ def _work_package(db_session, element, *, name="Migrate to cloud", status="in_pr
     wp = UnifiedWorkPackage(
         name=name,
         archimate_element_id=element.id,
+        organization_id=element.organization_id,
         business_capability="Test Capability",
         status=status,
         progress_percentage=progress_percentage,
@@ -233,6 +236,9 @@ def test_multiple_work_packages_on_one_element_each_get_their_own_row(app, db_se
 
     org = make_org("programme-lens-multi")
     a = _element(db_session, org.id, "A")
+    # An element now holds one work package; the lens still returns a row per package it finds,
+    # so this runs on a database without the element index (rolled back with the test).
+    db_session.execute(text("DROP INDEX IF EXISTS uq_unified_wp_archimate_element"))  # tenancy-ok: test fixture
     _work_package(db_session, a, name="Phase 1")
     _work_package(db_session, a, name="Phase 2")
     db_session.commit()

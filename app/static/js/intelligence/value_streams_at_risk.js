@@ -30,6 +30,13 @@
         return value === null || value === undefined ? EM_DASH : String(value);
     }
 
+    function gapText(current, target) {
+        if (current === null || current === undefined || target === null || target === undefined) {
+            return EM_DASH;
+        }
+        return String(target - current);
+    }
+
     /* One capability entry per distinct capability on a row. The answer lists
        a capability once per stage it is mapped to, with the same maturity on
        each; here the stages are gathered onto the one entry. */
@@ -45,6 +52,7 @@
                     code: entry.code || '',
                     current: maturityText(entry.current_maturity),
                     target: maturityText(entry.target_maturity),
+                    gap: gapText(entry.current_maturity, entry.target_maturity),
                     atRisk: entry.at_risk === true,
                     unassessed: entry.at_risk === null || entry.at_risk === undefined,
                     stages: []

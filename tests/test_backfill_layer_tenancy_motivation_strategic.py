@@ -334,14 +334,15 @@ def test_solution_migration_roadmap_falls_back_from_solution_to_generator(db_ses
     # orphan in the solutions table itself -- a side effect of this test's
     # own setup, not something solution_migration_roadmaps resolution needs.
     # solutions has no _DERIVABLE_ORG rule of its own, so on this two-
-    # organisation database it would otherwise reach the generic resolver
-    # with no explicit org_id and raise (refuter finding H3 on PR 317). An
-    # explicit org_id here only affects that unrelated fallback -- the two
-    # roadmap rows below are resolved by solution_migration_roadmaps' own
-    # _DERIVABLE_ORG rule before the generic resolver ever runs, independent
-    # of this argument, as the assertions confirm (via_generator resolves to
-    # org_b, not org_a).
-    repair_layer_tenancy(org_id=org_a.id)
+    # organisation database its one unresolved row is left NULL and reported
+    # (_resolve_org_id refuses to guess among more than one active,
+    # non-default organisation, with or without --org-id -- passing one here
+    # would only raise, since two now exist) -- that deferral is unrelated to
+    # this test: the two roadmap rows below are resolved by
+    # solution_migration_roadmaps' own _DERIVABLE_ORG rule before the generic
+    # resolver is ever consulted for them, as the assertions confirm
+    # (via_generator resolves to org_b, not org_a).
+    repair_layer_tenancy()
 
     db_session.refresh(via_solution)
     db_session.refresh(via_generator)

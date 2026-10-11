@@ -5,7 +5,7 @@ segment_id: S1
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /startups/single-point-of-failure
+url_slug: /use-cases/single-point-of-failure
 ---
 
 # If our one cloud platform or payment provider goes down, what stops?
@@ -37,13 +37,14 @@ whose head has been the system of record until now.
 
 ## Before you ask "isn't this overkill for a company our size?"
 
-Start from what you already use — a Lean Canvas or Business Model Canvas, if you have one. The
-underlying model notation is never shown unless you choose to open it. If your canvas already lives
-in Miro or Notion, keep it there: what Entelim adds is a version that's linked to what you actually
-run, so it can say which of your assumptions have nothing real behind them yet.
+Start from what you already use — a Lean Canvas, a Business Model Canvas, or nothing written down
+at all. The underlying model notation is never shown unless you choose to open it. If your canvas
+already lives in Miro or Notion, keep it there: Entelim's own version is the Business Model Canvas,
+where every block gets an AI-drafted suggestion pulled from your own model data, so you start from
+something real instead of a blank box.
 
 ## Related
 
-- [Business Model Canvas](/startups/canvas-on-one-page)
-- [Show an investor what we run, in an afternoon](/startups/show-what-we-run)
-- [What must be true for our revenue stream](/startups/revenue-stream-risk)
+- [Business Model Canvas](/use-cases/business-model-canvas-on-one-page)
+- [Show an investor what we run, in an afternoon](/use-cases/architecture-map-for-due-diligence)
+- [What must be true for our revenue stream](/use-cases/value-streams-at-risk)

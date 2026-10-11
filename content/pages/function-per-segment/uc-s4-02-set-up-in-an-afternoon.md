@@ -6,7 +6,7 @@ state: briefed
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /services-ops/set-up-in-an-afternoon
+url_slug: /use-cases/set-up-in-an-afternoon
 ---
 
 # Set it up from our spreadsheet in an afternoon, without a notation
@@ -26,5 +26,5 @@ that seed a starting capability map instead of a blank page — no notation requ
 Coming soon. Join the waiting list and we'll tell you the day it ships.
 
 Batch import and industry framework templates already work today — see
-[What happens to my business if this underperforms?](/services-ops/what-happens-if) for what you can
+[What happens to my business if this underperforms?](/use-cases/what-happens-if-a-supplier-fails) for what you can
 ask once your data's in.

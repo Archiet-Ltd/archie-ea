@@ -35,6 +35,7 @@ from flask_login import current_user, login_required
 from app.decorators import audit_log
 from app.modules.solutions_strategic.v2.services.solution_composer_service import SolutionComposerService
 from app.utils.pagination import safe_int_arg
+from app.middleware.tenant_decorators import is_active_org_admin
 
 logger = logging.getLogger(__name__)
 
@@ -1396,7 +1397,7 @@ def populate_canvas_from_solution(solution_id: int):
     from app.models.solution_models import Solution
 
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not current_user.is_admin:
+    if solution.created_by_id != current_user.id and not is_active_org_admin():
         return jsonify({"error": "Access denied"}), 403
 
     junctions = SolutionArchiMateElement.query.filter_by(solution_id=solution_id).all()

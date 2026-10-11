@@ -53,6 +53,7 @@ class LLMCostTracker:
         user_id: Optional[int] = None,
         project_id: Optional[int] = None,
         department: Optional[str] = None,
+        organization_id: Optional[int] = None,
     ) -> Decimal:
         """
         Calculate and track cost for an LLM interaction.
@@ -65,11 +66,18 @@ class LLMCostTracker:
             user_id: User making the request
             project_id: Project/architecture ID
             department: Department name (e.g., 'Enterprise Architecture')
+            organization_id: The organisation the call was made for. Defaults to
+                the caller's own organisation inside a request; a job with no
+                tenant request context must pass it explicitly or the
+                interaction records no organisation.
 
         Returns:
             Cost in GBP
         """
         cost = self._calculate_cost(provider, model_name, input_tokens, output_tokens)
+
+        if organization_id is None:
+            organization_id = current_org_id()
 
         # Persist interaction to database for budget tracking and analytics
         try:
@@ -81,6 +89,7 @@ class LLMCostTracker:
                 cost=cost,
                 user_id=user_id,
                 pipeline_stage_id=project_id,
+                organization_id=organization_id,
             )
             db.session.add(interaction)
             db.session.commit()

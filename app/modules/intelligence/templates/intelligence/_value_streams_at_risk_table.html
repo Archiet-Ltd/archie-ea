@@ -42,7 +42,11 @@
                                               :class="cap.atRisk ? 'border-destructive/30 bg-destructive/10 text-destructive-emphasis' : 'border-border bg-muted text-muted-foreground'"
                                               x-text="cap.statusText"></span>
                                     </div>
-                                    <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-3">
+                                    <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
+                                        <div>
+                                            <dt class="text-muted-foreground">Causing capability</dt>
+                                            <dd class="break-words text-foreground" x-text="cap.name"></dd>
+                                        </div>
                                         <div>
                                             <dt class="text-muted-foreground">Current maturity</dt>
                                             <dd class="tabular-nums text-foreground" data-vsr-current x-text="cap.current"></dd>
@@ -50,6 +54,10 @@
                                         <div>
                                             <dt class="text-muted-foreground">Target maturity</dt>
                                             <dd class="tabular-nums text-foreground" x-text="cap.target"></dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-muted-foreground">Gap</dt>
+                                            <dd class="tabular-nums text-foreground" data-vsr-gap x-text="cap.gap"></dd>
                                         </div>
                                         <div class="col-span-2 sm:col-span-1">
                                             <dt class="text-muted-foreground">Stages</dt>

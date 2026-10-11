@@ -124,14 +124,19 @@ def test_work_package_target_plateau_round_trips(app, db_session, make_org, tena
     Package" form has always offered "Target Plateau"; PUT .../work-packages/<id>
     returned 200 (looked successful) but update_work_package()'s allowed_fields
     whitelist never included plateau_id, so the value was silently dropped."""
-    from app.models.implementation_migration import Plateau, WorkPackage
+    from app.models.implementation_migration import Plateau
+    from app.models.unified_work_package import UnifiedWorkPackage
     from app.models.user import User
+    from app.services import work_package_service
 
     org = make_org("wp-plateau")
     with tenant_ctx(org.id):
         plateau = Plateau(name="Cutover", organization_id=org.id)
-        wp = WorkPackage(name="Retire SCADE", organization_id=org.id)
-        db_session.add_all([plateau, wp])
+        db_session.add(plateau)
+        db_session.flush()
+        # The Capability Roadmap edits the one work package store.
+        wp = work_package_service.create_work_package(
+            organization_id=org.id, name="Retire SCADE")
         db_session.commit()
         plateau_id, wp_id = plateau.id, wp.id
 
@@ -149,9 +154,12 @@ def test_work_package_target_plateau_round_trips(app, db_session, make_org, tena
             assert resp.status_code == 200, resp.get_data(as_text=True)
 
             # Read back independently — the update actually persisted.
-            reloaded = db_session.get(WorkPackage, wp_id)
+            # The link is an ArchiMate relationship (the plateau column is not written).
+            reloaded = db_session.get(UnifiedWorkPackage, wp_id)
             db_session.refresh(reloaded)
-            assert reloaded.plateau_id == plateau_id
+            assert reloaded.plateau_id is None
+            links = work_package_service.plateau_and_gap_links([reloaded], org.id)
+            assert links[wp_id]["plateau_ids"] == [plateau_id]
 
 
 @pytest.mark.usefixtures("db_session")

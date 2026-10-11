@@ -7,7 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 note: "No surface exists anywhere in the codebase for this use case (register: 'surface: none'). Written as a planned capability with no module to link to."
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /startups/lean-canvas
+url_slug: /use-cases/lean-canvas
 ---
 
 # I think in Lean Canvas, not the nine standard business model boxes
@@ -29,4 +29,4 @@ Coming soon. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 
-- [Put our business model on one page](/startups/canvas-on-one-page)
+- [Put our business model on one page](/use-cases/business-model-canvas-on-one-page)

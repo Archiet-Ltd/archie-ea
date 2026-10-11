@@ -70,13 +70,14 @@ DEPENDENCIES:
     <!-- Sidebar Header -->
     <div class="flex items-center justify-between h-16 px-4 border-b border-border flex-shrink-0">
         {# title: the app-name span beside this icon carries sidebar-app-name,
-           which the collapse CSS hides, so collapsed this is a bare glyph. #}
+           which the collapse CSS hides, so collapsed this is a bare glyph.
+           The real icon mark (not a lucide glyph) is already visually distinct
+           from the Dashboard Overview link's own icon, so it doesn't need the
+           same disambiguation the old hexagon placeholder did. #}
         <a href="{{ url_for('dashboard.overview') }}" title="{{ config.APP_NAME }} home"
            class="flex items-center space-x-2">
-            <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <!-- hexagon, not layout-dashboard: the brand mark shared a glyph with the
-                     Dashboard Overview link, so collapsed they were the same button. -->
-                <i data-lucide="hexagon" class="w-5 h-5 text-primary-foreground"></i>
+            <div class="w-8 h-8 flex items-center justify-center">
+                <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" class="w-8 h-8">
             </div>
             <span class="text-lg font-semibold text-foreground sidebar-app-name">{{ config.APP_NAME }}</span>
         </a>

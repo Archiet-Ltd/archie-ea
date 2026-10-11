@@ -6,7 +6,7 @@ state: missing
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /services-ops/what-we-can-tell
+url_slug: /use-cases/what-we-can-and-cannot-tell
 ---
 
 # Tell me plainly what you could read from our site and what only we can tell you
@@ -29,4 +29,4 @@ Coming soon. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 
-- [Set it up from our spreadsheet in an afternoon](/services-ops/set-up-in-an-afternoon)
+- [Set it up from our spreadsheet in an afternoon](/use-cases/set-up-in-an-afternoon)

@@ -30,7 +30,7 @@ compliance_note: >
 LeanIX (now SAP LeanIX) is an established, per-application-priced enterprise architecture
 platform — rated 4.5/5 on G2 across roughly 190 reviews, strong on application portfolio management
 and technology risk. Entelim is open source under AGPL, self-hostable, and built on full ArchiMate
-3.2 modelling rather than a proprietary fact-sheet model. Neither company publishes public pricing.
+3.2 modelling rather than a proprietary fact-sheet model. LeanIX does not publish pricing; Entelim's is published at /pricing.
 
 If you're already on LeanIX, you don't have to leave it to find out what Entelim adds. Import your
 model through ArchiMate Open Exchange or a CSV export and run both side by side. What's different is
@@ -45,7 +45,7 @@ can ask without learning the notation first.
 | Vendor | SAP LeanIX (part of SAP since 2023) | Archiet Ltd |
 | Licence | Proprietary | Open source, AGPL, plus a commercial licence |
 | Self-hostable | No — SaaS only | Yes |
-| Pricing | Not published; priced per application, tiered; available on request | Not published; free to self-host under AGPL |
+| Pricing | Not published; priced per application, tiered; available on request | Published at /pricing; free to self-host under AGPL |
 | Core products | Application Portfolio Management, Technology Risk and Compliance, Architecture and Road Map Planning | One product across modelling, application portfolio, business case, and governance |
 | Modelling notation | Proprietary fact-sheet model | ArchiMate 3.2 |
 | G2 rating | 4.5/5, roughly 190 reviews | Not yet listed |
@@ -53,18 +53,12 @@ can ask without learning the notation first.
 ## What Entelim already does
 
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
-  browser across every layer and import history that keeps track of where each element came from.
+  browser across every layer and an import history of what was brought in and when.
 - **CSV and Excel import** for anything not already in ArchiMate form.
-- **Find what you're paying for twice.** Ask the question directly and get duplicate detection
-  across your application list, a consolidation plan, and spend broken down by category.
+- **Find what you're paying for twice.** Run duplicate detection across your whole application list,
+  review the overlapping groups it finds, and add them to a consolidation plan.
 - **A business case built from your own figures.** Capex, opex, three-year TCO, ROI and payback,
   computed only from data that actually exists in your model.
-
-## Where Entelim is headed next
-
-A direct LeanIX and Ardoq import — no export step required — is on the roadmap for 2027. Until then,
-ArchiMate Open Exchange and CSV are the working path across. A capability maturity heat map is
-close behind, in active development now.
 
 ## Frequently asked
 

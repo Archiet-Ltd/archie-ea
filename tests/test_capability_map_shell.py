@@ -121,6 +121,8 @@ def _seed_capability_with_mappings(db_session, org, tenant_ctx, mapped_apps=0):
     from app.models.application_capability import ApplicationCapabilityMapping
     from app.models.application_portfolio import ApplicationComponent
     from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+    from app.models.unified_capability import UnifiedCapability
 
     with tenant_ctx(org.id):
         cap = BusinessCapability(
@@ -132,6 +134,34 @@ def _seed_capability_with_mappings(db_session, org, tenant_ctx, mapped_apps=0):
         db_session.add(cap)
         db_session.flush()
 
+        # Also create the UnifiedCapability projection (simulating the
+        # project-capabilities command) so the mapping count query finds it.
+        # Check if it already exists (test database may have residue from
+        # previous runs due to the provenance unique index).
+        unified_cap = UnifiedCapability.query.filter(
+            UnifiedCapability.source_table == "business_capability",
+            UnifiedCapability.source_id == str(cap.id),
+            UnifiedCapability.source_org_id == cap.organization_id,
+        ).first()
+        if not unified_cap:
+            unified_cap = UnifiedCapability(
+                name=cap.name,
+                level=cap.level,
+                description=cap.description,
+                code=cap.code,
+                category=cap.category,
+                strategic_importance=cap.strategic_importance,
+                parent_capability_id=cap.parent_capability_id,
+                specialization_type=cap.specialization_type if hasattr(cap, 'specialization_type') else "BUSINESS",
+                organization_id=cap.organization_id,
+                scope=cap.scope if hasattr(cap, 'scope') else "tenant",
+                source_table="business_capability",
+                source_id=str(cap.id),
+                source_org_id=cap.organization_id,
+            )
+            db_session.add(unified_cap)
+            db_session.flush()
+
         for _ in range(mapped_apps):
             app_component = ApplicationComponent(
                 name=f"App {uuid.uuid4().hex[:8]}",
@@ -139,6 +169,7 @@ def _seed_capability_with_mappings(db_session, org, tenant_ctx, mapped_apps=0):
             )
             db_session.add(app_component)
             db_session.flush()
+            # Create legacy mapping
             db_session.add(
                 ApplicationCapabilityMapping(
                     organization_id=org.id,
@@ -146,6 +177,20 @@ def _seed_capability_with_mappings(db_session, org, tenant_ctx, mapped_apps=0):
                     business_capability_id=cap.id,
                 )
             )
+            # Create unified mapping (canonical store)
+            unified_mapping = UnifiedApplicationCapabilityMapping.query.filter(
+                UnifiedApplicationCapabilityMapping.unified_capability_id == unified_cap.id,
+                UnifiedApplicationCapabilityMapping.application_component_id == app_component.id,
+            ).first()
+            if not unified_mapping:
+                db_session.add(
+                    UnifiedApplicationCapabilityMapping(
+                        unified_capability_id=unified_cap.id,
+                        application_component_id=app_component.id,
+                        support_level="partial",
+                        coverage_percentage=80,
+                    )
+                )
         db_session.commit()
         return cap
 
@@ -454,3 +499,138 @@ def test_capability_map_div_tree_is_balanced(app, db_session, make_org, tenant_c
     assert closes == opens, (
         f"div balance drifted: {opens} opens, {closes} closes (expected exact balance)"
     )
+
+
+# ── D2 regression test: reference-capability mappings excluded from org counts ──
+
+def test_reference_capability_mappings_excluded_from_org_counts(
+    app, db_session, make_org, tenant_ctx
+):
+    """Reference capabilities (organization_id IS NULL) with application
+    mappings must not contribute to a tenant's per-capability mapping counts.
+
+    The old BusinessCapability-based code filtered on
+    ``organization_id == org_id``.  The UnifiedCapability do_orm_execute
+    listener includes reference rows, so the mapping-count query must add
+    its own explicit org filter — otherwise a reference capability mapped
+    to an application inflates every organisation's count.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.unified_application_capability_mapping import (
+        UnifiedApplicationCapabilityMapping,
+    )
+    from app.models.unified_capability import UnifiedCapability
+
+    user_id, org = _make_user(db_session, make_org, "ref-excluded")
+
+    # Reference capability — created outside tenant_ctx so the before_flush
+    # listener does not auto-stamp an organization_id.
+    ref_cap = UnifiedCapability(
+        name=f"Reference Cap {uuid.uuid4().hex[:8]}",
+        level=1,
+        organization_id=None,
+        scope="reference",
+    )
+    db_session.add(ref_cap)
+    db_session.flush()
+
+    with tenant_ctx(org.id):
+        tenant_cap = UnifiedCapability(
+            name=f"Tenant Cap {uuid.uuid4().hex[:8]}",
+            level=1,
+            organization_id=org.id,
+            scope="tenant",
+        )
+        db_session.add(tenant_cap)
+        db_session.flush()
+
+        app_component = ApplicationComponent(
+            name=f"App {uuid.uuid4().hex[:8]}",
+            organization_id=org.id,
+        )
+        db_session.add(app_component)
+        db_session.flush()
+
+        # Map the same app to both the reference and the tenant capability.
+        db_session.add(
+            UnifiedApplicationCapabilityMapping(
+                unified_capability_id=ref_cap.id,
+                application_component_id=app_component.id,
+                support_level="partial",
+                coverage_percentage=80,
+            )
+        )
+        db_session.add(
+            UnifiedApplicationCapabilityMapping(
+                unified_capability_id=tenant_cap.id,
+                application_component_id=app_component.id,
+                support_level="partial",
+                coverage_percentage=80,
+            )
+        )
+        db_session.commit()
+
+    client = app.test_client()
+    _login(client, user_id)
+    html = client.get("/capability-map/hierarchy").get_data(as_text=True)
+
+    # The reference capability IS visible in the hierarchy (the listener
+    # includes organisation_id IS NULL rows), but its mapping must not be
+    # counted — only the tenant-owned capability contributes a count of 1.
+    assert ref_cap.name in html, "reference capability should be visible in the tree"
+    assert tenant_cap.name in html
+    assert '"mapping_count": 1' in html
+    assert html.count('"mapping_count": 1') == 1, (
+        "only the tenant-owned capability should have mapping_count: 1; "
+        "the reference capability's mapping must not be counted"
+    )
+
+
+# ── D5: prove endpoints read from UnifiedCapability, not BusinessCapability ──
+
+def test_hierarchy_reads_from_unified_not_business_capability(
+    app, db_session, make_org, tenant_ctx
+):
+    """The hierarchy and index pages must read from UnifiedCapability, not
+    BusinessCapability.  Seed only UnifiedCapability rows (zero
+    BusinessCapability rows) and assert both pages still return the correct
+    total.  This test fails on anioko/main where the readers still query
+    BusinessCapability directly.
+    """
+    from app.models.unified_capability import UnifiedCapability
+
+    user_id, org = _make_user(db_session, make_org, "unified-only")
+
+    with tenant_ctx(org.id):
+        root = UnifiedCapability(
+            name=f"Unified-Only Root {uuid.uuid4().hex[:8]}",
+            level=1,
+            organization_id=org.id,
+            scope="tenant",
+        )
+        db_session.add(root)
+        db_session.flush()
+
+        for i in range(5):
+            child = UnifiedCapability(
+                name=f"Unified-Only Child {i}-{uuid.uuid4().hex[:8]}",
+                level=2,
+                parent_capability_id=root.id,
+                organization_id=org.id,
+                scope="tenant",
+            )
+            db_session.add(child)
+        db_session.commit()
+
+    client = app.test_client()
+    _login(client, user_id)
+
+    html = client.get("/capability-map/hierarchy").get_data(as_text=True)
+    assert root.name in html, "root UnifiedCapability must appear in hierarchy page"
+
+    total = _extract_capability_total(html)
+    assert total == 6, f"expected 6 capabilities from UnifiedCapability, got {total}"
+
+    index_html = client.get("/capability-map/").get_data(as_text=True)
+    index_total = _extract_capability_total(index_html)
+    assert index_total == 6, f"index page expected 6, got {index_total}"

@@ -8,6 +8,7 @@ docs/buckets/
 *.pyo
 env
 venv
+.venv
 *.env
 .env.*
 dist
@@ -175,6 +176,12 @@ scripts/prune/db_cleanup*.py
 scripts/prune/execute_db_cleanup.py
 scripts/prune/db_analysis.json
 scripts/prune/*.txt
+
+# scripts/capture_screenshots.py --modules's own server log and raw (pre-
+# encoding) video capture scratch space -- the committed outputs are the
+# encoded app/static/img/ and app/static/video/ files, not this.
+scripts/_capture_scratch/
+
 .aider*
 
 .claude/
@@ -236,6 +243,7 @@ scripts/check_*.py
 !scripts/check_smoke_coverage_on_change.py
 !scripts/check_composer_url_params.py
 !scripts/check_crosswalk_writer_gated.py
+!scripts/check_is_admin_called.py
 scripts/patch_*.py
 scripts/find_*.py
 scripts/delete_*.py

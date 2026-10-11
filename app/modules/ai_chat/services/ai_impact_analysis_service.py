@@ -23,8 +23,6 @@ from typing import Any, Dict, List
 
 
 from app.models.application_portfolio import ApplicationComponent
-from app.models.business_capabilities import BusinessCapability
-from app.services.archimate.relationship_service import RelationshipService
 from app.services.llm_service import LLMService
 
 logger = logging.getLogger(__name__)
@@ -221,7 +219,10 @@ class AIImpactAnalysisService:
     @staticmethod
     def _analyze_dependencies(app: ApplicationComponent) -> Dict[str, Any]:
         """
-        Perform graph-based dependency analysis using ArchiMate relationships.
+        Perform graph-based dependency analysis using the canonical cross_layer_impact walk.
+
+        Repointed to IntelligenceQueryService.cross_layer_impact — the one
+        engine for impact traversal, replacing the previous RelationshipService path.
         """
         if not app.archimate_element_id:
             return {
@@ -234,40 +235,81 @@ class AIImpactAnalysisService:
                 "message": "No architectural mapping found for this application.",
             }
 
-        service = RelationshipService()
-        analysis = service.analyze_impact(
-            element_id=app.archimate_element_id,
-            change_description=f"Impact analysis for {app.name}",
-            max_hops=3,
+        from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+        result = IntelligenceQueryService.cross_layer_impact(
+            app.archimate_element_id,
+            include_derived=False,
+            max_depth=3,
+            direction="downstream",
+            with_owner=True,
         )
+        rows = result.get("rows") or []
+        elements = result.get("elements") or {}
 
-        # Enhance with capability information
+        # Batch-resolve BusinessCapability level and category for enrichment.
+        capability_element_ids = [
+            row["element_id"] for row in rows
+            if elements.get(str(row["element_id"]), {}).get("type") == "Capability"
+        ]
+        capability_lookup: Dict[int, Dict[str, Any]] = {}
+        if capability_element_ids:
+            from app.models.business_capabilities import BusinessCapability
+
+            caps = BusinessCapability.query.filter(
+                BusinessCapability.archimate_element_id.in_(capability_element_ids)
+            ).all()
+            capability_lookup = {c.archimate_element_id: {"level": c.level, "category": c.category} for c in caps}
+
+        direct_impacts = []
+        indirect_by_depth: Dict[int, list] = {}
         affected_capabilities = []
-        for cap in BusinessCapability.query.filter(
-            BusinessCapability.archimate_element_id.in_(
-                [i["id"] for i in analysis.get("direct_impacts", [])]
-            )
-        ).all():
-            affected_capabilities.append(
-                {
-                    "id": cap.id,
-                    "name": cap.name,
-                    "level": cap.level,
-                    "criticality": cap.category or "unknown",
-                }
-            )
+        affected_goals = []
+        layer_counts: Dict[str, int] = {}
 
-        direct_count = len(analysis.get("direct_impacts", []))
-        indirect_count = sum(len(v) for v in analysis.get("indirect_impacts", {}).values())
+        for row in rows:
+            el = elements.get(str(row["element_id"]), {})
+            item = {
+                "id": row["element_id"],
+                "name": el.get("name"),
+                "type": el.get("type"),
+                "layer": el.get("layer"),
+                "depth": row["relation"]["depth"],
+                "owner": row.get("owner"),
+                "health": row.get("health"),
+            }
+            depth = row["relation"]["depth"]
+            if depth == 1:
+                direct_impacts.append(item)
+            else:
+                indirect_by_depth.setdefault(depth, []).append(item)
+
+            el_type = el.get("type", "")
+            if el_type == "Capability":
+                cap_info = capability_lookup.get(row["element_id"], {})
+                affected_capabilities.append({
+                    "id": row["element_id"],
+                    "name": el.get("name"),
+                    "level": cap_info.get("level"),
+                    "criticality": cap_info.get("category") or "unknown",
+                })
+            elif el_type == "Goal":
+                affected_goals.append(item)
+
+            layer = el.get("layer") or "Unknown"
+            layer_counts[layer] = layer_counts.get(layer, 0) + 1
+
+        direct_count = len(direct_impacts)
+        indirect_count = sum(len(v) for v in indirect_by_depth.values())
 
         return {
             "has_archimate_mapping": True,
             "blast_radius": direct_count + indirect_count,
-            "direct_impacts": analysis.get("direct_impacts", []),
-            "indirect_impacts": analysis.get("indirect_impacts", {}),
+            "direct_impacts": direct_impacts,
+            "indirect_impacts": indirect_by_depth,
             "affected_capabilities": affected_capabilities,
-            "affected_goals": analysis.get("affected_goals", []),
-            "layer_breakdown": analysis.get("blast_radius", {}),
+            "affected_goals": affected_goals,
+            "layer_breakdown": layer_counts,
         }
 
     @staticmethod

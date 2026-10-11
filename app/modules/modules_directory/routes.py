@@ -38,6 +38,24 @@ _SECTION_BY_ENDPOINT_PREFIX = {
     "admin.": "administration",
     "procurement.": "procurement",
     "my_applications.": "my_applications",
+    # R1-B56: lives under /admin/agent-registry but is its own blueprint
+    # ("agent_registry", not "admin"), so the "admin." prefix above never
+    # matched it -- without this entry it leaked to every role the same way
+    # the admin zone itself did before this table existed.
+    "agent_registry.": "administration",
+    # R1-B34 (TB-0135): same leak class, different blueprint -- Formula
+    # Register lives under /admin/formula-register but its endpoints are
+    # "formula_register.*", not "admin.*", so it leaked to every role the
+    # same way agent_registry did above. NOT mapped to "administration":
+    # its own index() route is @login_required only (open to any signed-in
+    # org member) and its sidebar link lives in the portfolio_manager zone,
+    # not the admin one -- only its new_version() POST is role-gated, to
+    # portfolio_manager. Mapping it to "administration" would have hidden
+    # it from the persona who is actually meant to use it while only
+    # incidentally fixing the test. "portfolio_management" (role_access.py)
+    # grants portfolio_manager and platform_admin, matching that reality;
+    # the /admin/ URL prefix itself is misleading but out of scope here.
+    "formula_register.": "portfolio_management",
 }
 
 
@@ -116,11 +134,6 @@ _MORE_TOOLS = [
     ("Chief Architect Synthesis", "solution_design.architect_synthesis", "layout-dashboard"),
     # Hidden from this list on 30 Aug 2026 after every entry was requested with
     # a logged-in client and its status recorded:
-    #   implementation_planning.implementation_dashboard - 404 for everyone. Its
-    #     blueprint's before_request aborts 404 unless a feature flag row exists
-    #     AND is active, and the module is marked DEPRECATED in its own
-    #     docstring. "Work Packages" (enterprise.work_packages) is the live
-    #     surface and is already listed.
     #   main.capability_framework.dashboard - 302 to /framework-management/,
     #     already listed as "Framework Management".
     #   dashboard.index - 302 to /dashboard/overview, already a Home zone link.
@@ -137,6 +150,8 @@ _MORE_TOOLS = [
     # and requires each to be known here — deleting them would report five
     # brand-new "orphan modules" that are not orphans. `_NOT_RENDERED` below is
     # what keeps them out of the page and out of global search.
+    # Serves a real page again since the work package store rewrite, so it is
+    # listed (it is no longer in _NOT_RENDERED).
     ("Implementation Planning", "implementation_planning.implementation_dashboard", "package"),
     ("Capability Framework", "main.capability_framework.dashboard", "map"),
     ("Dashboard", "dashboard.index", "layout-dashboard"),
@@ -192,10 +207,6 @@ _MORE_TOOLS = [
 # one of them, so an entry that becomes live again fails the suite instead of
 # staying invisible.
 _NOT_RENDERED = {
-    # Hard 404 for every user: the blueprint's before_request aborts unless a
-    # feature-flag row exists AND is active, and the module's own docstring
-    # says DEPRECATED. "Work Packages" (enterprise.work_packages) is live.
-    "implementation_planning.implementation_dashboard": "404 - deprecated module",
     # 302 aliases onto a page this directory already lists under its own name.
     "main.capability_framework.dashboard": "302 -> Framework Management",
     "dashboard.index": "302 -> Dashboard Overview",

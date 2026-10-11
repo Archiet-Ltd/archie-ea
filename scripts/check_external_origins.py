@@ -28,6 +28,9 @@ fetch/XHR, or dynamic import. Deliberately NOT counted:
 * Documentation/placeholder hosts (``example.com``, ``your-idp.example.com``).
 * Plain anchor links to external sites — a link a user may click is not a resource
   the page loads.
+* ``<link rel="canonical" ...>`` and ``<link rel="alternate" ...>`` — these tell a
+  crawler which URL is authoritative; the browser never fetches them, so they are
+  not a resource load either, same reasoning as the plain-anchor exclusion above.
 * ALLOWED_ORIGINS below — identity providers and similar, which are external by
   design and are reached by the browser, not embedded as assets.
 """
@@ -59,7 +62,14 @@ IGNORED_ORIGINS = {
 RESOURCE_PATTERNS = [
     ("script", re.compile(r"""<script[^>]+src\s*=\s*["']\s*(https?://[^"'\s>]+)""", re.I)),
     ("script", re.compile(r"""\bimport\s*\(?\s*["'](https?://[^"']+)["']""")),
-    ("style",  re.compile(r"""<link[^>]+href\s*=\s*["']\s*(https?://[^"'\s>]+)""", re.I)),
+    # Excludes rel="canonical"/"alternate": those are crawler metadata, never
+    # fetched by the browser, regardless of whether rel appears before or
+    # after href in the tag (the lookahead scans the whole tag, not just the
+    # prefix before href).
+    ("style",  re.compile(
+        r"""<link(?![^>]*\brel\s*=\s*["'](?:canonical|alternate)["'])[^>]+href\s*=\s*["']\s*(https?://[^"'\s>]+)""",
+        re.I,
+    )),
     ("style",  re.compile(r"""@import\s+(?:url\()?["']?(https?://[^"')\s]+)""", re.I)),
     ("style",  re.compile(r"""url\(\s*["']?(https?://[^"')\s]+)""", re.I)),
     ("image",  re.compile(r"""<img[^>]+(?:src|:src)\s*=\s*["'][^"']*?(https?://[^"'\s>+]+)""", re.I)),

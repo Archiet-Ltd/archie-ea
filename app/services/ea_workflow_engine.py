@@ -1186,10 +1186,18 @@ class EAWorkflowEngine:
 
     def _run_workflow_in_background(self, instance_id: int):
         """Execute workflow in a background thread with its own app context."""
+        from app.jobs.tenant_safe_job import organization_id_of, tenant_scope
+
         with self.app.app_context():
-            instance = db.session.get(EAWorkflowInstance, instance_id)
-            if instance:
-                self._execute_workflow(instance)
+            # A new thread has no request and so no session organisation; run as
+            # the organisation that owns the workflow instance.
+            owner = organization_id_of(EAWorkflowInstance, instance_id)
+            if owner is None:
+                return
+            with tenant_scope(owner):
+                instance = db.session.get(EAWorkflowInstance, instance_id)
+                if instance:
+                    self._execute_workflow(instance)
 
     def _execute_workflow(self, instance: EAWorkflowInstance):
         """
@@ -6177,7 +6185,15 @@ provides foundation for subsequent architecture development phases.
         """TD-003: Fetch active RoadmapTask entries for Phase D roadmap generation."""
         try:
             from app.models.roadmap import RoadmapTask
-            tasks = RoadmapTask.query.filter_by(status="active").all()
+            # Background thread, no request context, so the tenant listener
+            # does not filter; the predicate is explicit, as on this engine's
+            # other background sites.
+            org_id = instance.organization_id
+            if org_id is None:
+                logger.warning("_handle_roadmap_generation: instance %s has no organization; reading nothing", instance.id)
+                tasks = []
+            else:
+                tasks = RoadmapTask.query.filter_by(status="active", organization_id=org_id).all()
             result = [{"id": t.id, "title": getattr(t, "title", str(t.id))} for t in tasks]
         except Exception as exc:
             logger.warning("_handle_roadmap_generation: query failed: %s", exc)

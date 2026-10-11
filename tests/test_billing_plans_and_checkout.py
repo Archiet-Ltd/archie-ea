@@ -431,9 +431,35 @@ def test_without_keys_the_billing_page_says_payment_is_not_set_up(app, db_sessio
     html = page.get_data(as_text=True)
     assert page.status_code == 200
     assert "Online payment is not set up on this installation" in html
-    assert "STRIPE_SECRET_KEY" in html  # the operator can see which setting is missing
+    # An organisation administrator is a customer, not the platform operator:
+    # the banner tells them payment is not available, but not which settings
+    # are missing.
+    assert "STRIPE_SECRET_KEY" not in html
+    assert "Settings the operator has not provided" not in html
     assert "Continue to payment" not in html
     assert "Online payment is not set up on this installation. No payment was taken." in resp.get_data(as_text=True)
+
+
+def test_without_keys_a_platform_admin_sees_which_settings_are_missing(app, db_session, client, login_as, no_billing):
+    platform = _platform_admin(db_session)
+    with app.app_context():
+        login_as(client, platform)
+        page = client.get("/admin/billing/")
+    html = page.get_data(as_text=True)
+    assert page.status_code == 200
+    assert "Online payment is not set up on this installation" in html
+    assert "STRIPE_SECRET_KEY" in html  # the operator can see which setting is missing
+
+
+def test_with_keys_the_billing_page_shows_no_configuration_warning(app, db_session, client, login_as, billing):
+    org, admin = _admin_org(db_session, "haskeys")
+    with app.app_context():
+        login_as(client, admin)
+        page = client.get("/admin/billing/")
+    html = page.get_data(as_text=True)
+    assert page.status_code == 200
+    assert "Online payment is not set up on this installation" not in html
+    assert 'data-testid="billing-not-configured"' not in html
 
 
 def test_buy_starts_checkout_for_the_chosen_plan(app, db_session, client, login_as, billing, monkeypatch):
@@ -604,7 +630,10 @@ def test_billing_page_uses_the_switched_organisation(app, db_session, client, lo
 
     home_org, admin = _admin_org(db_session, "home")
     switched_org = _org(db_session, "second")
-    OrgRole.set_role(switched_org.id, admin.id, "architect", granted_by_id=admin.id)
+    # Billing authority follows the ACTIVE organisation: the viewer must be an
+    # org_admin of the organisation they switched into (an architect grant
+    # there is covered by the refusal test below).
+    OrgRole.set_role(switched_org.id, admin.id, "org_admin", granted_by_id=admin.id)
     _subscription(db_session, switched_org, plan=SubscriptionPlan.team, seats_purchased=20)
     db_session.commit()
 
@@ -627,6 +656,33 @@ def test_billing_page_uses_the_switched_organisation(app, db_session, client, lo
     assert switched_org.name in html
     assert home_org.name not in html
     assert 'data-testid="billing-current-plan">Team<' in html
+
+
+def test_home_org_admin_switched_into_another_org_is_refused_its_billing(
+    app, db_session, client, login_as, no_billing
+):
+    """Active-org property: administering your HOME organisation grants nothing
+    over billing in an organisation you merely hold a lesser role in."""
+    from app.models.org_role import OrgRole
+    from app.models.subscription import SubscriptionPlan
+
+    home_org, admin = _admin_org(db_session, "home-refused")
+    switched_org = _org(db_session, "second-refused")
+    OrgRole.set_role(switched_org.id, admin.id, "architect", granted_by_id=admin.id)
+    _subscription(db_session, switched_org, plan=SubscriptionPlan.team, seats_purchased=20)
+    db_session.commit()
+
+    with app.app_context():
+        login_as(client, admin)
+        client.post("/account/switch-organization",
+                    data={"organization_id": str(switched_org.id)}, follow_redirects=True)
+        login_as(client, admin)
+        page = client.get("/admin/billing/")
+        login_as(client, admin)
+        upgrade = client.post("/admin/billing/upgrade", data={"plan": "startup", "interval": "year"})
+
+    assert page.status_code == 403
+    assert upgrade.status_code == 403
 
 
 def test_currency_context_and_filter_follow_the_switched_organisation(app, db_session, make_org):
@@ -701,10 +757,26 @@ def test_pricing_page_has_a_buy_button_per_plan(app, client):
         resp = client.get("/pricing")
     html = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    assert "/admin/billing/?plan=startup&amp;interval=year#checkout" in html
-    assert "/admin/billing/?plan=team&amp;interval=year#checkout" in html
-    assert "/admin/billing/?plan=team&amp;interval=month#checkout" in html
+    # Buy buttons route through the click-tracking redirect
+    # (app/main/views.py::track_plan_click) before landing on registration, so
+    # the plan-preserving registration URL now travels as the redirect's
+    # "next" parameter.
+    assert "/t/plan-click?plan=startup&amp;next=/account/register?plan%3Dstartup%26interval%3Dyear" in html
+    assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dyear" in html
+    assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dmonth" in html
     assert 'data-testid="buy-enterprise"' in html
+
+
+def test_pricing_contact_sales_button_points_at_the_contact_page(app, client):
+    """'Contact sales' leads to /contact (via the click-tracking redirect,
+    app/main/views.py::track_plan_click), which now carries the sales enquiry
+    form rather than the old pre-launch waiting list."""
+    import re
+
+    resp = client.get("/pricing")
+    html = resp.get_data(as_text=True)
+    assert re.search(
+        r'<a href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
 
 
 def test_signing_in_returns_the_visitor_to_the_plan_they_chose(app, db_session, client, login_as, no_billing):

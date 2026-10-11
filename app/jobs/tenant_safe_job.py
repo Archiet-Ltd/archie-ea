@@ -95,6 +95,7 @@ PLATFORM_JOBS: frozenset[str] = frozenset({
     "capability_projection",   # all-tenant lock-guarded pass
     "abacus_incremental_sync", # ExternalSystem has no organisation predicate
     "approval_escalation",     # groups overdue rows by their own organization_id internally
+    "event_log_partition_maintenance",  # partitions are shared across all orgs
 })
 
 TENANT_JOBS: frozenset[str] = frozenset({
@@ -104,6 +105,7 @@ TENANT_JOBS: frozenset[str] = frozenset({
     "typed_arb_waiver_expiry",      # config-driven organisation ids
     "derived_facts_recompute",      # visited via run_for_each_tenant
     "ea_workflow_scheduler",        # visited via run_for_each_tenant
+"event_log_relay",              # visited via run_for_each_tenant
     "model_health_scan",            # per-org drift detection + store
 })
 
@@ -242,6 +244,13 @@ def tenant_scope(organization_id: int) -> Iterator[int]:
         raise ValueError("tenant_scope requires a concrete organization_id")
 
     _reset_session()                      # nothing inherited from the previous tenant
+    # A tenant block never runs with the fence open: park any enclosing
+    # platform scope for the block and restore it afterwards. The reset above
+    # already rolled back the transaction that carried the database setting
+    # (it is transaction-local), and with the flag cleared a transaction begun
+    # inside the block does not set it again.
+    previous_platform_scope = getattr(g, "_platform_scope", None)
+    g.pop("_platform_scope", None)
     previous = getattr(g, "current_org_id", None)
     previous_scope_org = getattr(g, "_tenant_scope_organization_id", None)
     g.current_org_id = organization_id
@@ -251,11 +260,55 @@ def tenant_scope(organization_id: int) -> Iterator[int]:
         yield organization_id
     finally:
         _reset_session()                  # nothing leaks forward to the next tenant
+        if previous_platform_scope is not None:
+            g._platform_scope = previous_platform_scope
         g.current_org_id = previous
         if previous_scope_org is None:
             g.pop("_tenant_scope_organization_id", None)
         else:
             g._tenant_scope_organization_id = previous_scope_org
+
+
+@contextmanager
+def platform_scope(reason: str) -> Iterator[str]:
+    """Let a block read and write fenced tables with no single organisation.
+
+    PostgreSQL row-level security (migration 20261008_row_level_security) shows
+    the runtime role only the session organisation's rows, so a lookup that
+    resolves the organisation itself (a password-reset token, an SSO mapping),
+    a platform-administrator aggregate across organisations, or a genuinely
+    platform-wide job has nothing to read without this. Inside the block every
+    transaction on the session carries ``archie.platform_scope = 'on'``, which
+    each policy admits. Nothing else changes: the ORM tenant filter still keys
+    off ``g.current_org_id``.
+
+    ``reason`` is mandatory and is kept on ``g._platform_scope`` so a
+    call site is greppable and a log line can say why. Anything that can run
+    per organisation must use ``tenant_scope`` / ``run_for_each_tenant``
+    instead. The setting is transaction-local; it is cleared on exit from the
+    open transaction, and a transaction begun after the block never carries it.
+    """
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("platform_scope requires a reason")
+
+    previous = getattr(g, "_platform_scope", None)
+    g._platform_scope = reason
+    if db.session().in_transaction():
+        db.session.execute(db.text("SELECT set_config('archie.platform_scope', 'on', true)"))
+    try:
+        yield reason
+    finally:
+        if previous is None:
+            g.pop("_platform_scope", None)
+        else:
+            g._platform_scope = previous
+        if previous is None and db.session().in_transaction():
+            try:
+                db.session.execute(
+                    db.text("SELECT set_config('archie.platform_scope', '', true)")
+                )
+            except Exception:  # a failed transaction is rolled back by the caller
+                logger.debug("platform_scope: could not clear the setting", exc_info=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -361,9 +414,13 @@ def organization_id_of(model, record_id) -> int | None:
     such record (or it has no owner); callers refuse rather than run unscoped.
     """
     table = model.__table__
-    value = db.session.execute(
-        db.select(table.c.organization_id).where(table.c.id == record_id)
-    ).scalar()
+    # Resolving the owner is the one read that has no organisation to scope by;
+    # under row-level security it needs the platform scope, and it returns only
+    # the owner's id.
+    with platform_scope("resolve the owning organisation of a record handed to a background worker"):
+        value = db.session.execute(
+            db.select(table.c.organization_id).where(table.c.id == record_id)
+        ).scalar()
     return int(value) if value is not None else None
 
 
@@ -519,6 +576,7 @@ __all__ = [
     "TenantResult",
     "active_organization_ids",
     "job_lock",
+    "platform_scope",
     "run_for_each_tenant",
     "tenant_job",
     "tenant_scope",

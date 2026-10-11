@@ -144,7 +144,9 @@ _ROOT_DOCS = {
     "ARCHITECT_QUICK_START.md": ROOT / "ARCHITECT_QUICK_START.md",
     "DESIGN.md": ROOT / "DESIGN.md",
     "CITATION.cff": ROOT / "CITATION.cff",
-    "llms.txt": ROOT / "llms.txt",
+    # The stale, unreferenced root llms.txt (describing an old product
+    # identity, separate from the dynamically served /llms.txt route in
+    # app/main/views.py) was deleted -- nothing serves or references it.
     "package.json": ROOT / "package.json",
     "CONTRIBUTING.md": ROOT / "CONTRIBUTING.md",
     "COMMERCIAL-LICENSE.md": ROOT / "COMMERCIAL-LICENSE.md",

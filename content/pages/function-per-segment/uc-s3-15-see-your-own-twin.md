@@ -6,7 +6,7 @@ state: missing
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /enterprise-architecture/see-your-own-twin
+url_slug: /use-cases/see-your-own-twin
 ---
 
 # See a plausible, clearly generated twin of your own company before the first conversation
@@ -28,4 +28,4 @@ Coming soon. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 
-- [From our website address, tell me what kind of company we are](/startups/website-first-look)
+- [From our website address, tell me what kind of company we are](/use-cases/website-first-look)

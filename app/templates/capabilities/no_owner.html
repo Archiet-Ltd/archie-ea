@@ -1,0 +1,87 @@
+{% extends 'layouts/admin_base.html' %}
+{% from "components/page_header.html" import page_header %}
+{% from "components/empty_state.html" import empty_state %}
+
+{% block title %}Capabilities with no owner{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+
+  {{ page_header(
+      title='Capabilities with no owner',
+      description='Capabilities in this organisation with nobody recorded as owner.',
+      breadcrumbs=[
+        {'label': 'Capability map', 'href': url_for('capability_map.index') if 'capability_map.index' in flask.current_app.view_functions else '#'},
+        {'label': 'Capabilities with no owner'}
+      ]
+  ) }}
+
+  {% if not capabilities %}
+    {{ empty_state(title='Every capability has an owner', description='Nothing to show here right now.') }}
+  {% else %}
+  <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-border bg-muted/40 text-left">
+            <th class="px-4 py-3 font-medium text-muted-foreground">Capability</th>
+            <th class="px-4 py-3 font-medium text-muted-foreground">Code</th>
+            <th class="px-4 py-3 font-medium text-muted-foreground">Assign an owner</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cap in capabilities %}
+          <tr class="border-b border-border last:border-b-0" data-testid="no-owner-row" data-capability-id="{{ cap.id }}">
+            <td class="px-4 py-3 text-foreground">{{ cap.name }}</td>
+            <td class="px-4 py-3 text-muted-foreground">{{ cap.code or '—' }}</td>
+            <td class="px-4 py-3"
+                x-data="{
+                  term: '', results: [], selected: null, saving: false, saved: false,
+                  runSearch() {
+                    const q = this.term.trim();
+                    if (!q) { this.results = []; return; }
+                    Platform.fetch.get('{{ url_for('organization.stakeholder_search') }}', { q: q })
+                      .then(data => { this.results = (data.results || []).filter(r => r.type === 'user'); })
+                      .catch(() => { this.results = []; });
+                  },
+                  choose(r) { this.selected = r; this.term = r.name; this.results = []; },
+                  assign() {
+                    if (!this.selected) return;
+                    this.saving = true;
+                    Platform.fetch.post('{{ url_for('capability_map.api_set_capability_owner', capability_id=cap.id) }}', { user_id: this.selected.id })
+                      .then(() => { this.saved = true; })
+                      .finally(() => { this.saving = false; });
+                  }
+                }">
+              <div class="relative inline-block w-64">
+                <input type="text" x-model="term" @input.debounce.300ms="runSearch()"
+                       x-show="!saved"
+                       placeholder="Search people..."
+                       data-testid="capability-owner-search-input"
+                       class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+                <div class="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-card divide-y divide-border"
+                     x-show="results.length > 0" x-cloak>
+                  <template x-for="r in results" :key="r.id">
+                    <button type="button" @click="choose(r)" data-testid="capability-owner-search-result"
+                            class="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent transition-colors">
+                      <span x-text="r.name"></span>
+                      <span class="text-xs text-muted-foreground" x-text="r.sublabel"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+              <button type="button" @click="assign()" :disabled="!selected || saving"
+                      x-show="!saved"
+                      data-testid="set-capability-owner-button"
+                      class="ml-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50">Set owner</button>
+              <span x-show="saved" data-testid="capability-owner-saved" class="text-sm text-success">Owner set</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

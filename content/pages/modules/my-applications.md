@@ -7,7 +7,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S2-10, segment: S2}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # My Applications
@@ -21,7 +22,7 @@ status for each. The full Applications module is everyone's estate; this page is
 
 ## Where you'll meet it
 
-- [Show me what I own and what depends on it](/scale-up/what-i-own)
+- [Show me what I own and what depends on it](/use-cases/what-i-own)
 
 ## Related modules
 

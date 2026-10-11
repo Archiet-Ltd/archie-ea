@@ -68,6 +68,16 @@ class ApplicationOwner(db.Model):
     source_table = db.Column(db.String(50), nullable=True)
     source_id = db.Column(db.Integer, nullable=True)
 
+    # R1-B03 PR 2: a nullable, typed reference so this one ownership record
+    # can own any element -- starting with capabilities -- without a second
+    # owner table or a new owner column on the element's own model (both
+    # forbidden by the brief). A row owns either an application
+    # (application_id) or an element (element_type + element_id), never
+    # both; enforced in the writer, not a DB constraint, since existing
+    # rows already carry application_id with these two columns NULL.
+    element_type = db.Column(db.String(30), nullable=True, index=True)
+    element_id = db.Column(db.Integer, nullable=True)
+
     # Ownership details
     ownership_type = db.Column(
         db.String(50),
@@ -101,13 +111,19 @@ class ApplicationOwner(db.Model):
     )
 
     # Valid ownership types
-    OWNERSHIP_TYPES = ["primary", "backup", "technical", "business"]
+    OWNERSHIP_TYPES = ["primary", "backup", "technical", "business", "steward"]
     OWNERSHIP_LABELS = {
         "primary": "Primary",
         "backup": "Backup",
         "technical": "Technical",
         "business": "Business",
+        "steward": "Steward",
     }
+
+    # Element types this record may own via element_type/element_id.
+    # Capability is the first; a later element type is added here, not as a
+    # new owner table.
+    ELEMENT_TYPES = ["capability", "data_entity"]
 
     @property
     def is_primary(self):
@@ -128,6 +144,8 @@ class ApplicationOwner(db.Model):
         return {
             "id": self.id,
             "application_id": self.application_id,
+            "element_type": self.element_type,
+            "element_id": self.element_id,
             "user_id": self.user_id,
             "ownership_type": self.ownership_type,
             "assigned_at": self.assigned_at.isoformat() if self.assigned_at else None,
@@ -197,5 +215,62 @@ class ApplicationOwner(db.Model):
         return cls.query.filter(
             cls.user_id == user_id,
             cls.application_id == application_id,
+            cls.organization_id == organization_id,
+        ).first() is not None
+
+    @classmethod
+    def get_owners_for_element(cls, element_type, element_id, organization_id):
+        """Get all owners for a non-application element (e.g. a capability)."""
+        return cls.query.filter(
+            cls.element_type == element_type,
+            cls.element_id == element_id,
+            cls.organization_id == organization_id,
+        ).all()
+
+    @classmethod
+    def get_display_rows_for_element(cls, element_type, element_id, organization_id):
+        """Read one element's owners with tenant-fenced user display data --
+        the element-reference counterpart of get_display_rows_for_application."""
+        from app.models.user import User
+
+        owner_rows = cls.get_owners_for_element(element_type, element_id, organization_id)
+        user_ids = [row.user_id for row in owner_rows if row.user_id is not None]
+        users = {}
+        if user_ids:
+            users = {
+                user.id: user
+                for user in db.session.execute(
+                    db.select(User)
+                    .where(User.organization_id == organization_id)
+                    .where(User.id.in_(user_ids))
+                ).scalars()
+            }
+
+        display_rows = []
+        for row in owner_rows:
+            user = users.get(row.user_id)
+            full_name = " ".join(part for part in (getattr(user, "first_name", None), getattr(user, "last_name", None)) if part).strip()
+            display_rows.append({
+                "id": row.id,
+                "user_id": row.user_id,
+                "user_name": full_name or (user.email if user else "Unknown"),
+                "user_email": user.email if user else None,
+                "ownership_type": row.ownership_type,
+                "ownership_type_label": cls.OWNERSHIP_LABELS.get(
+                    row.ownership_type,
+                    (row.ownership_type or "").capitalize(),
+                ),
+                "assigned_at": row.assigned_at.isoformat() if row.assigned_at else None,
+                "assigned_by": row.assigned_by,
+            })
+        return display_rows
+
+    @classmethod
+    def is_owner_of_element(cls, user_id, element_type, element_id, organization_id):
+        """Check if user owns a non-application element."""
+        return cls.query.filter(
+            cls.user_id == user_id,
+            cls.element_type == element_type,
+            cls.element_id == element_id,
             cls.organization_id == organization_id,
         ).first() is not None

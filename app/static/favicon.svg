@@ -1,10 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Brand mark: the header's primary-blue tile with the layout-dashboard glyph. -->
-  <rect width="32" height="32" rx="7" fill="hsl(221.2 83.2% 53.3%)"/>
-  <g transform="translate(4 4)" fill="#fff">
-    <rect x="3" y="3" width="7" height="9" rx="1.5"/>
-    <rect x="14" y="3" width="7" height="5" rx="1.5"/>
-    <rect x="14" y="12" width="7" height="9" rx="1.5"/>
-    <rect x="3" y="16" width="7" height="5" rx="1.5"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="363.96 595.29 657.03 657.03"><path fill="#135fbc" d="m963.23 978.27-141.26 141.26c-30.08 30.08-78.84 30.08-108.93 0l-84.49-84.49L739.78 923.8 628.55 812.57l84.49-84.49c30.08-30.08 78.85-30.08 108.93 0l141.26 141.26c30.08 30.08 30.08 78.84 0 108.93"/><path fill="#62a1dc" d="m739.78 923.8-111.23 111.23-56.77-56.77c-30.08-30.08-30.08-78.85 0-108.93l56.77-56.77z"/><path fill="#01d6d0" d="m571.78 978.27 56.77 56.77-59.08 59.08L399.16 923.8l170.31-170.31 59.08 59.08-56.77 56.77c-30.08 30.08-30.08 78.84 0 108.93"/></svg>

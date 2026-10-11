@@ -182,6 +182,13 @@
                         </div>
                     </a>
                     {% endif %}
+                    {# Abacus and Jira settings are platform-wide configuration
+                       (ExternalSystem/Job carry no tenant column) and their
+                       routes are @platform_admin_required -- same rule as
+                       Feature Flags above: render on the guard's own
+                       predicate, not for every admin, so a tenant admin
+                       doesn't get a tile that only leads to a 403. #}
+                    {% if current_user.is_platform_admin %}
                     <a href="{{ url_for('admin.abacus_settings') }}" class="block group">
                         <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-info/10 group-hover:bg-info/15 transition-colors">
@@ -204,6 +211,7 @@
                             </div>
                         </div>
                     </a>
+                    {% endif %}
                     <a href="{{ url_for('admin.slack_integration') }}" class="block group">
                         <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-info/10 group-hover:bg-info/15 transition-colors">

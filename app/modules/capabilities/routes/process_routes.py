@@ -570,8 +570,17 @@ def api_process_capabilities(process_id):
 
             # Fall back to CapabilityProcessMapping -> BusinessCapability if no unified results
             if not capabilities_data:
-                biz_mappings = CapabilityProcessMapping.query.filter_by(
-                    apqc_process_id=apqc_process.id
+                from app.services.apqc_mapping_tenant_fence import (
+                    fenced_capability_mappings_query,
+                )
+
+                # apqc_process_id is a shared reference id, unlike the
+                # capability_id this route's siblings already fence via a
+                # TenantMixin .get() before reaching here -- unfenced, this
+                # loaded every organisation's mappings for the process into
+                # memory (found in this consolidation sweep).
+                biz_mappings = fenced_capability_mappings_query().filter(
+                    CapabilityProcessMapping.apqc_process_id == apqc_process.id
                 ).all()
 
                 for mapping in biz_mappings:
@@ -906,6 +915,9 @@ def api_process_applications(process_id):
     try:
         from app.models.application_layer import ApplicationComponent
         from app.models.apqc_process import APQCProcess, ProcessApplicationMapping
+        from app.services.apqc_mapping_tenant_fence import (
+            fenced_application_mappings_query,
+        )
 
         # Verify process exists
         process = APQCProcess.query.get(process_id)
@@ -915,9 +927,12 @@ def api_process_applications(process_id):
         # Get all applications
         applications = ApplicationComponent.query.all()
 
-        # Get existing mappings for this process
-        existing_mappings = ProcessApplicationMapping.query.filter_by(
-            apqc_process_id=process_id
+        # Get existing mappings for this process. ProcessApplicationMapping
+        # has no organization_id of its own; unfenced, this loaded every
+        # organisation's mappings for the process into memory (pr303-v2
+        # review, DEFECT D4).
+        existing_mappings = fenced_application_mappings_query().filter(
+            ProcessApplicationMapping.apqc_process_id == process_id
         ).all()
 
         # Create mapping lookup
@@ -1003,6 +1018,10 @@ def api_process_bulk_mappings():
 
         from app import db
         from app.models.apqc_process import ProcessApplicationMapping
+        from app.services.apqc_mapping_tenant_fence import (
+            application_mapping_in_caller_org,
+            application_owned_by_caller,
+        )
 
         # Debug: Log incoming data
         data = request.get_json()
@@ -1033,8 +1052,12 @@ def api_process_bulk_mappings():
                 continue
 
             if mapping_id:
-                # Update existing mapping
-                mapping = ProcessApplicationMapping.query.get(mapping_id)
+                # Update existing mapping. ProcessApplicationMapping has no
+                # organization_id of its own; unfenced, this updated any
+                # organisation's mapping by caller-supplied mapping_id
+                # (pr303-v1 review, the original finding this whole
+                # consolidation started from).
+                mapping = application_mapping_in_caller_org(mapping_id)
                 if mapping:
                     mapping.support_level = mapping_data.get("support_level", "partial")
                     mapping.automation_level = mapping_data.get("automation_level", 1)
@@ -1044,7 +1067,15 @@ def api_process_bulk_mappings():
                     updated_count += 1
                     current_app.logger.debug(f"Updated mapping {mapping_id}")
             else:
-                # Create new mapping
+                # Create new mapping. Verify app_id belongs to the caller's
+                # organisation first -- otherwise a caller could point a new
+                # mapping at another organisation's application.
+                if not application_owned_by_caller(app_id):
+                    current_app.logger.warning(
+                        f"Skipping mapping: application {app_id} not found in caller's organisation"
+                    )
+                    continue
+
                 current_app.logger.debug(
                     f"Creating new mapping for app_id={app_id}, process_id={process_id}"
                 )

@@ -72,34 +72,45 @@ class TestSetterRaisesWithoutAKey:
         assert cfg._client_secret_encrypted is None
 
 
-class TestSetterRoundTripsWithAKey:
-    """With a key configured (as every real deployment must have), the
-    setter encrypts and the getter decrypts back to the original value —
-    unchanged from before this fix, so existing behaviour is not broken."""
+class TestSettersAreRetired:
+    """``OrgConnectorConfig`` and ``LucidchartConnectorConfig`` are retired:
+    their credential setters always raise, even with a key configured,
+    whether or not a row for this organisation already exists. New
+    credentials must go through ``OrgConnectorCredential`` via
+    ``OrgCredentialVault`` instead — the round-trip (store, encrypt per
+    organisation, decrypt) is covered there, in
+    tests/test_org_credential_store.py (``TestSecretsNeverReturned
+    .test_multi_field_credential`` for the three Lucidchart fields,
+    ``TestTwoOrgIsolation.test_org_a_retrieves_own_credential`` for the
+    general case), so it is not duplicated here."""
 
     def test_org_connector_config_client_secret_round_trips(self, db_session, org):
         from app.models.connector_config import OrgConnectorConfig
 
         cfg = OrgConnectorConfig(organization_id=org.id, connector_type="servicenow")
         secret = uuid.uuid4().hex
-        cfg.client_secret = secret
-        assert cfg._client_secret_encrypted != secret, (
-            "The stored value must be encrypted, not the plaintext."
+        with pytest.raises(RuntimeError, match="RETIRED"):
+            cfg.client_secret = secret
+        assert cfg._client_secret_encrypted is None, (
+            "The setter must not have stored anything when it raised."
         )
-        assert cfg.client_secret == secret
 
     def test_lucidchart_connector_config_three_fields_round_trip(self, db_session, org):
         from app.models.connector_config import LucidchartConnectorConfig
 
         cfg = LucidchartConnectorConfig(organization_id=org.id)
         secret, access, refresh = (uuid.uuid4().hex for _ in range(3))
-        cfg.client_secret = secret
-        cfg.access_token = access
-        cfg.refresh_token = refresh
 
-        assert cfg.client_secret == secret
-        assert cfg.access_token == access
-        assert cfg.refresh_token == refresh
+        with pytest.raises(RuntimeError, match="RETIRED"):
+            cfg.client_secret = secret
+        with pytest.raises(RuntimeError, match="RETIRED"):
+            cfg.access_token = access
+        with pytest.raises(RuntimeError, match="RETIRED"):
+            cfg.refresh_token = refresh
+
+        assert cfg._client_secret_encrypted is None
+        assert cfg._access_token_encrypted is None
+        assert cfg._refresh_token_encrypted is None
 
 
 class TestGetterToleratesPreFixPlaintext:

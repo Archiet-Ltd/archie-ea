@@ -230,4 +230,4 @@ def register(app: Flask) -> None:
     except Exception as e:
         app.logger.warning(f"[BLUEPRINT] Failed to register Risk routes: {e}")
 
-    app.logger.info("[MODULE] architecture registered (~220 routes, 18 blueprints)")
+    app.logger.info("[MODULE] architecture registered (~220 routes, 19 blueprints)")

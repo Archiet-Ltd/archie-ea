@@ -1,0 +1,69 @@
+{#
+  Supporting documents panel.
+
+  Lets a reviewer attach and download evidence documents, decision records or
+  meeting minutes against this review item. The upload/list/download routes
+  (app/modules/architecture/routes/arb_document_routes.py) were never touched
+  by the typed consolidation; only the Alpine component that drove this panel
+  was lost when the legacy review-detail template was deleted. arbDocPanel is
+  redefined in review_detail.html's extra_head_js block from that same,
+  unchanged contract (GET/POST /arb/api/review-items/<id>/documents, GET
+  /arb/api/documents/<id>/download).
+
+  Context: review (typed_arb_review_view mapping).
+#}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+
+{% set _rid = (review.identity or {}).get('review_item_id') %}
+
+{% if _rid %}
+<section id="documents" aria-labelledby="documents-heading" class="mb-6"
+         x-data="arbDocPanel('review-item', {{ _rid }})" x-init="loadDocuments()">
+{% call card() %}
+    {% call card_header() %}
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+                {% call card_title(class='text-lg') %}
+                    <span id="documents-heading">Documents</span>
+                {% endcall %}
+                {% call card_description() %}
+                    Supporting evidence, decision records and meeting minutes attached to this review.
+                {% endcall %}
+            </div>
+            <label class="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-within:outline-none focus-within:ring-2 focus-within:ring-ring">
+                <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>
+                <span x-show="!uploading" x-cloak>Attach document</span>
+                <span x-show="uploading" x-cloak>Uploading&#8230;</span>
+                <input type="file" class="sr-only" :disabled="uploading" @change="uploadFile($event)"
+                       accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.png,.jpg,.jpeg,.gif,.zip">
+            </label>
+        </div>
+    {% endcall %}
+    {% call card_content(class='p-0') %}
+    <div x-show="documents.length === 0 && !uploading" x-cloak class="px-6 py-8 text-center text-sm text-muted-foreground">
+        No documents attached. Upload supporting evidence, decision records, or meeting minutes.
+    </div>
+    <ul x-show="documents.length > 0" x-cloak class="divide-y divide-border" role="list">
+        <template x-for="doc in documents" :key="doc.id">
+            <li class="flex items-center gap-3 px-6 py-3">
+                <i data-lucide="file-text" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
+                <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-medium text-foreground" x-text="doc.original_name"></p>
+                    <p class="text-xs text-muted-foreground">
+                        <span x-text="doc.document_type" class="capitalize"></span>
+                        &#183; <span x-text="doc.uploaded_by || 'Unknown'"></span>
+                        &#183; <span x-text="formatDate(doc.uploaded_at)"></span>
+                    </p>
+                </div>
+                <a :href="`/arb/api/documents/${doc.id}/download`"
+                   class="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline">
+                    <i data-lucide="download" class="h-3 w-3" aria-hidden="true"></i>Download
+                </a>
+            </li>
+        </template>
+    </ul>
+    <div data-arb-error x-show="error" x-cloak role="alert" class="px-6 py-3 text-sm text-destructive-emphasis" x-text="error"></div>
+    {% endcall %}
+{% endcall %}
+</section>
+{% endif %}

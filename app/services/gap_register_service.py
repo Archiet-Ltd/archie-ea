@@ -14,7 +14,7 @@ Contract (docs/adm_phases_d_a_g_e_f_h_tasks.json OA-001):
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
@@ -187,3 +187,66 @@ def gap_summary_by_phase() -> Dict[str, Any]:
         log.warning("gap_register: roadmap summary unavailable: %s", exc)
 
     return summary
+
+
+def create_gap(
+    organization_id: int,
+    name: str,
+    *,
+    description: Optional[str] = None,
+    gap_type: Optional[str] = None,
+    priority: str = "medium",
+    severity: str = "medium",
+    resolution_status: str = "identified",
+    architecture_id: Optional[int] = None,
+    current_state_ref: Optional[str] = None,
+    target_state_ref: Optional[str] = None,
+    auto_generated: bool = False,
+    generation_source: Optional[str] = None,
+) -> Tuple[Gap, bool]:
+    """Create a gap in the one gap register (`gaps`, this module's canonical
+    store), refusing a duplicate within the organisation.
+
+    A duplicate is an existing gap in the same organisation with the same
+    name and, when given, the same architecture_id -- the scope a re-run of
+    gap discovery or a repeated manual "create gap" call must not
+    grow the register by re-saving what is already there.
+
+    Flushes but does not commit: the caller controls the transaction
+    boundary, so a batch (gap discovery over several findings) commits once.
+
+    Returns (gap, created). created is False when an existing gap was
+    returned instead of a new one being inserted.
+    """
+    if not organization_id:
+        raise ValueError("create_gap requires an organization_id")
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("create_gap requires a name")
+
+    query = Gap.query.filter(Gap.organization_id == organization_id, Gap.name == name)
+    if architecture_id is not None:
+        query = query.filter(Gap.architecture_id == architecture_id)
+    else:
+        query = query.filter(Gap.architecture_id.is_(None))
+    existing = query.first()
+    if existing is not None:
+        return existing, False
+
+    gap = Gap(
+        organization_id=organization_id,
+        name=name,
+        description=description or "",
+        gap_type=gap_type,
+        priority=priority,
+        severity=severity,
+        resolution_status=resolution_status,
+        architecture_id=architecture_id,
+        current_state_ref=current_state_ref,
+        target_state_ref=target_state_ref,
+        auto_generated=auto_generated,
+        generation_source=generation_source,
+    )
+    db.session.add(gap)
+    db.session.flush()
+    return gap, True

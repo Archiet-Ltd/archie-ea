@@ -5,7 +5,7 @@ segment_id: S2
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
-url_slug: /scale-up/what-breaks-and-who-gets-called
+url_slug: /use-cases/what-breaks-and-who-gets-called
 ---
 
 # What breaks if this service or platform fails, and who gets called?
@@ -26,5 +26,5 @@ guessing one. The same trace drives the strategic impact view and the visual twi
 
 ## Related
 
-- [Which systems have no owner, and which owner is a single point of failure?](/scale-up/no-owner)
-- [What are we paying for twice?](/scale-up/duplicate-spend)
+- [Which systems have no owner, and which owner is a single point of failure?](/use-cases/systems-with-no-owner)
+- [What are we paying for twice?](/use-cases/duplicate-software-spend)

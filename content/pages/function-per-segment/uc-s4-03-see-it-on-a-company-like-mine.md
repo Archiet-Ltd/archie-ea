@@ -6,7 +6,7 @@ state: missing
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-url_slug: /services-ops/demo-like-mine
+url_slug: /use-cases/demo-on-a-company-like-mine
 ---
 
 # See it working on a company like mine
@@ -29,4 +29,4 @@ Coming soon. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 
-- [What happens to my business if this underperforms?](/services-ops/what-happens-if)
+- [What happens to my business if this underperforms?](/use-cases/what-happens-if-a-supplier-fails)

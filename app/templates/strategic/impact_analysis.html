@@ -106,7 +106,7 @@
                             <option value="MODIFY">Minor Modification</option>
                         </select>
                     </div>
-                    <button type="button" @click="performAnalysis" :disabled="!selectedElement || loading"
+                    <button type="button" @click="performAnalysis()" :disabled="!selectedElement || loading"
                         class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2" aria-label="Action">
                         {# x-show sits on a wrapper, not on the <i>: Lucide swaps each <i> for an <svg> and the binding is lost. #}
                         <span x-show="!loading" x-cloak class="mr-2 inline-flex"><i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i></span>
@@ -189,32 +189,96 @@
 
                 <!-- Detailed Impacts -->
                 <div class="space-y-4">
-                    <h4 class="text-sm font-semibold flex items-center">
-                        <i data-lucide="layers" class="mr-2 h-4 w-4" aria-hidden="true"></i>
-                        Direct Architectural Dependencies
-                    </h4>
-                    <div class="space-y-2">
-                        <template x-for="impact in analysisResult?.dependencies" :key="impact.id">
-                            <div class="flex items-center justify-between p-2 rounded-md border bg-muted/30">
-                                <div class="flex items-center space-x-3">
-                                    <div class="w-2 h-2 rounded-full bg-primary/60"></div>
-                                    <div>
-                                        <p class="text-sm font-medium" x-text="impact.name"></p>
-                                        <p class="text-xs text-muted-foreground" x-text="(impact.app_name ? impact.app_name + ' · ' : '') + impact.type"></p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <span x-show="impact.criticality" x-cloak
-                                        :class="{'bg-destructive/10 text-destructive-emphasis border-destructive/20': impact.criticality === 'mission_critical', 'bg-warning/10 text-warning-emphasis border-warning/20': impact.criticality === 'important', 'bg-muted text-muted-foreground border-border': !impact.criticality || (impact.criticality !== 'mission_critical' && impact.criticality !== 'important')}"
-                                        class="text-xs font-semibold px-2 py-0.5 rounded-full border capitalize"
-                                        x-text="(impact.criticality || '').replace('_', ' ')"></span>
-                                    <span
-                                        class="text-xs font-semibold px-2 py-0.5 rounded-full border border-primary/20 bg-primary/5 text-primary"
-                                        x-text="impact.relationship"></span>
-                                </div>
-                            </div>
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-semibold flex items-center">
+                            <i data-lucide="layers" class="mr-2 h-4 w-4" aria-hidden="true"></i>
+                            Direct Architectural Dependencies
+                        </h4>
+                        <template x-if="analysisResult && analysisResult.total > 0">
+                            <span class="text-xs text-muted-foreground" x-text="'Showing ' + ((pagination.currentPage - 1) * pagination.pageSize + 1) + ' to ' + Math.min(pagination.currentPage * pagination.pageSize, analysisResult.total) + ' of ' + analysisResult.total + ' results'"></span>
                         </template>
                     </div>
+                    <div class="overflow-x-auto rounded-md border border-border">
+                        <table class="w-full caption-bottom text-sm" role="table">
+                            <thead class="[&_tr]:border-b sticky top-0 z-20">
+                                <tr class="border-b border-border bg-muted/50">
+                                    <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs bg-card">Name</th>
+                                    <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs bg-card">Type</th>
+                                    <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs bg-card">Application</th>
+                                    <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs bg-card">Owner</th>
+                                    <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs bg-card">Health</th>
+                                    <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs bg-card">Relationship</th>
+                                </tr>
+                            </thead>
+                            <tbody class="[&_tr:last-child]:border-0">
+                                <tr x-show="!analysisResult || !analysisResult.dependencies || analysisResult.dependencies.length === 0" x-cloak>
+                                    <td colspan="6" class="h-24 text-center">
+                                        <div class="flex flex-col items-center gap-2 py-8">
+                                            <i data-lucide="layers" class="h-8 w-8 text-muted-foreground/30" aria-hidden="true"></i>
+                                            <p class="text-sm text-muted-foreground">No direct dependencies found.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <template x-for="impact in analysisResult?.dependencies" :key="impact.id">
+                                    <tr class="border-b border-border transition-colors hover:bg-muted/50">
+                                        <td class="px-3 py-2 align-middle font-medium" x-text="impact.name"></td>
+                                        <td class="px-3 py-2 align-middle">
+                                            <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium border bg-muted/50 text-foreground border-border capitalize" x-text="(impact.type || '').replace(/_/g, ' ')"></span>
+                                        </td>
+                                        <td class="px-3 py-2 align-middle text-muted-foreground" x-text="impact.app_name || '—'"></td>
+                                        <td class="px-3 py-2 align-middle text-muted-foreground" x-text="impact.owner || '—'"></td>
+                                        <td class="px-3 py-2 align-middle">
+                                            <template x-if="impact.health !== null && impact.health !== undefined">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                                                      :class="{
+                                                          'bg-destructive/10 text-destructive-emphasis': impact.health?.level === 'critical',
+                                                          'bg-warning/10 text-warning-emphasis': impact.health?.level === 'high',
+                                                          'bg-info/10 text-info-emphasis': impact.health?.level === 'medium',
+                                                          'bg-muted text-muted-foreground': impact.health?.level === 'low'
+                                                      }"
+                                                      x-text="(impact.health?.level || '—').replace(/^./, c => c.toUpperCase())"></span>
+                                            </template>
+                                            <template x-if="impact.health === null || impact.health === undefined">
+                                                <span class="text-muted-foreground">—</span>
+                                            </template>
+                                        </td>
+                                        <td class="px-3 py-2 align-middle text-muted-foreground" x-text="impact.relationship"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    <template x-if="analysisResult && analysisResult.total > pagination.pageSize">
+                    <div class="flex items-center justify-between px-2 py-4">
+                        <div class="flex items-center gap-2">
+                            <button type="button" @click="prevPage()" :disabled="pagination.cursor === 0"
+                                    class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                                    aria-label="Previous page">
+                                <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
+                            </button>
+                            <span class="text-sm font-medium text-foreground">
+                                Page <span x-text="pagination.currentPage"></span> of <span x-text="Math.ceil(analysisResult.total / pagination.pageSize)"></span>
+                            </span>
+                            <button type="button" @click="nextPage()" :disabled="pagination.nextCursor === null"
+                                    class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                                    aria-label="Next page">
+                                <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <p class="text-sm font-medium text-muted-foreground hidden sm:block">Rows per page</p>
+                            <select x-model.number="pagination.pageSize" @change="goToPage(1)"
+                                    class="flex h-8 w-[70px] items-center justify-between rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Per Page">
+                                <option value="10">10</option>
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
+                    </template>
                 </div>
 
                 <!-- Transitive Dependencies -->
@@ -379,8 +443,18 @@
             analysisError: null,
             history: [],
             historyOpen: false,
+            pagination: {
+                cursor: 0,
+                pageSize: 50,
+                total: 0,
+                nextCursor: null,
+                currentPage: 1
+            },
 
-            init() { this.loadHistory(); },
+            init() { 
+            this.loadHistory(); 
+            this.initUrl();
+        },
 
             async loadHistory() {
                 try {
@@ -562,17 +636,21 @@
                 this.clearFeedback();
             },
 
-            async performAnalysis() {
+            async performAnalysis(cursor, pageSize) {
                 this.loading = true;
                 this.analysisResult = null;
                 this.analysisError = null;
 
                 try {
-                    const raw = await Platform.fetch.post('/strategic/api/impact-analysis', {
+                    const payload = {
                         element_id: this.selectedElement.id,
                         element_type: this.selectedType,
                         change_type: this.changeType
-                    });
+                    };
+                    if (cursor !== undefined) payload.cursor = cursor;
+                    if (pageSize !== undefined) payload.page_size = pageSize;
+
+                    const raw = await Platform.fetch.post('/strategic/api/impact-analysis', payload);
 
                     /* Map backend response shape to template fields */
                     const direct = raw.direct_dependencies || [];
@@ -586,14 +664,44 @@
                         impacted_processes: allDeps.filter(d => this.typeHas(d, 'process') || this.typeHas(d, 'service')),
                         estimated_risk_cost: (raw.estimated_financial_risk === null || raw.estimated_financial_risk === undefined) ? null : raw.estimated_financial_risk,
                         dependencies: direct.map(function(d, i) {
-                            return { id: d.id || i, name: d.name, type: d.type, relationship: 'Level ' + d.level + ' dependency', criticality: d.criticality, app_name: d.app_name };
+                            return { 
+                                id: d.id || i, 
+                                name: d.name, 
+                                type: d.type, 
+                                relationship: 'Level ' + d.level + ' dependency', 
+                                criticality: d.criticality, 
+                                app_name: d.app_name,
+                                owner: d.owner,
+                                health: d.health
+                            };
                         }),
                         indirect_dependencies: indirect.map(function(d, i) {
-                            return { id: d.id || i, name: d.name, type: d.type, relationship: 'Level ' + d.level + ' (transitive)', criticality: d.criticality, app_name: d.app_name };
+                            return { 
+                                id: d.id || i, 
+                                name: d.name, 
+                                type: d.type, 
+                                relationship: 'Level ' + d.level + ' (transitive)', 
+                                criticality: d.criticality, 
+                                app_name: d.app_name,
+                                owner: d.owner,
+                                health: d.health
+                            };
                         }),
                         total_affected: raw.total_affected || 0,
+                        total: raw.total || 0,
+                        next_cursor: raw.next_cursor || null,
                         recommendations: this._buildRecommendations(raw, direct, indirect)
                     };
+                    
+                    // Update pagination state
+                    this.pagination.cursor = cursor || 0;
+                    this.pagination.pageSize = pageSize || 50;
+                    this.pagination.total = raw.total || 0;
+                    this.pagination.nextCursor = raw.next_cursor || null;
+                    this.pagination.currentPage = Math.floor((cursor || 0) / (pageSize || 50)) + 1;
+                    
+                    // Update URL with cursor for reload persistence
+                    this.updateUrl();
                 } catch (e) {
                     Platform.log.error('Analysis failed', e);
                     this.analysisError = e.message || 'Impact analysis failed. Please try again.';
@@ -601,6 +709,55 @@
                     this.loading = false;
                     this.$nextTick(function() { lucide.createIcons(); });
                     this.loadHistory();
+                }
+            },
+
+            async fetchPage(cursor, pageSize) {
+                if (!this.selectedElement) return;
+                await this.performAnalysis(cursor, pageSize);
+            },
+
+            goToPage(page) {
+                const pageSize = this.pagination.pageSize;
+                const cursor = (page - 1) * pageSize;
+                this.fetchPage(cursor, pageSize);
+            },
+
+            nextPage() {
+                if (this.pagination.nextCursor !== null) {
+                    this.fetchPage(this.pagination.nextCursor, this.pagination.pageSize);
+                }
+            },
+
+            prevPage() {
+                if (this.pagination.cursor > 0) {
+                    const pageSize = this.pagination.pageSize;
+                    const newCursor = Math.max(0, this.pagination.cursor - pageSize);
+                    this.fetchPage(newCursor, pageSize);
+                }
+            },
+
+            updateUrl() {
+                const url = new URL(window.location.href);
+                if (this.pagination.cursor > 0) {
+                    url.searchParams.set('cursor', this.pagination.cursor);
+                } else {
+                    url.searchParams.delete('cursor');
+                }
+                url.searchParams.set('page_size', this.pagination.pageSize);
+                window.history.replaceState({}, '', url);
+            },
+
+            initUrl() {
+                const params = new URLSearchParams(window.location.search);
+                const cursor = parseInt(params.get('cursor') || '0', 10);
+                const pageSize = parseInt(params.get('page_size') || '50', 10);
+                if (cursor > 0 || pageSize !== 50) {
+                    this.pagination.cursor = cursor;
+                    this.pagination.pageSize = pageSize;
+                    if (this.selectedElement) {
+                        this.fetchPage(cursor, pageSize);
+                    }
                 }
             },
 

@@ -635,9 +635,9 @@ def get_vendor_organizations():
 def get_capabilities():
     """Get all capabilities for analysis."""
     try:
-        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.limit(500).all()
+        capabilities = UnifiedCapability.query.limit(500).all()
         capability_list = []
 
         for capability in capabilities:

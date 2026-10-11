@@ -6,7 +6,8 @@ source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read
 state: on_main
 answers_use_cases:
   - {id: UC-S3-01, segment: S3}
-capture_status: awaiting_capture
+capture_status: live
+cta: plans
 ---
 
 # Architecture Model
@@ -22,7 +23,7 @@ needing to be a separate destination.
 
 ## Where you'll meet it
 
-- [Import our existing model](/enterprise-architecture/import)
+- [Import our existing model](/use-cases/import-archimate-model)
 
 ## Related modules
 

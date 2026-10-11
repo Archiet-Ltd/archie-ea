@@ -62,6 +62,67 @@ class RBACService:
             return True
         return False
 
+    def org_ids_for(self, user):
+        """Every organisation ``user`` belongs to: the home organisation
+        (if any) plus every ``OrgRole`` row, with no active-state
+        filtering at all.
+
+        Deactivation is not enforced at login or at session-switch time --
+        neither ``app.middleware.tenant_context.user_can_access_org`` nor
+        ``account_service.switch_active_organization`` checks
+        ``Organization.is_active`` -- so a deactivated organisation can
+        still be switched into today exactly like an active one. A caller
+        that uses this to decide MFA authority (``is_org_admin_anywhere``
+        below, via ``mfa_service.required_for``) must fail closed on that
+        fact: an administrator of a deactivated organisation is still an
+        administrator of a place they can still reach, so this reader must
+        not pretend otherwise by excluding it. A caller that genuinely
+        needs active-only organisations should query ``Organization``
+        directly through its own, explicitly named function rather than
+        filtering this one.
+        """
+        from app.models.org_role import OrgRole
+
+        ids = set()
+        if user.organization_id is not None:
+            ids.add(user.organization_id)
+        rows = OrgRole.query.filter(OrgRole.user_id == user.id).all()
+        ids.update(row.organization_id for row in rows)
+        return ids
+
+    def is_org_admin_anywhere(self, user):
+        """True when ``user`` administers any organisation they belong to
+        (home organisation or an invited one via ``OrgRole``), with no
+        active-state filtering -- see ``org_ids_for`` above.
+
+        Single-query reduction of "is ``user`` an org_admin of any
+        organisation in ``org_ids_for(user)``": ``is_org_admin`` only ever
+        answers True for an organisation via one of two routes -- an
+        ``OrgRole`` row of role ``"org_admin"`` for that organisation (which
+        covers every organisation reachable at all, home or foreign, since
+        every such row's organisation is already included in
+        ``org_ids_for``), or the user's own home organisation plus
+        ``user.is_admin()`` (the Administrator-role case, which carries no
+        ``OrgRole`` row). Checking for the existence of either reduces this
+        to one ``OrgRole`` query plus one cheap boolean check, instead of
+        looping over every id ``org_ids_for`` returns and re-querying
+        ``is_org_admin`` per id.
+
+        Used where "is this user an administrator of anything" must be
+        answered regardless of which specific organisation granted it --
+        e.g. ``mfa_service.required_for``, which must require MFA for an
+        administrator invited into a foreign organisation exactly as it
+        does for a home-organisation administrator."""
+        from app.models.org_role import OrgRole
+
+        has_org_admin_row = (
+            OrgRole.query.filter_by(user_id=user.id, role="org_admin").first()
+            is not None
+        )
+        if has_org_admin_row:
+            return True
+        return user.organization_id is not None and user.is_admin()
+
     def can_edit(self, org_id, user_id):
         """True if role is org_admin or architect (hierarchy level >= 1)."""
         role = self.get_user_role(org_id, user_id)
