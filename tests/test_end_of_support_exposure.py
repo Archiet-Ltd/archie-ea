@@ -279,8 +279,60 @@ class TestEndOfSupportExposureSingleSourceOfTruth:
         assert len(rows) == 1
         assert rows[0]["application_id"] == app_component.id
 
-        assert len(rows) == 1
-        assert rows[0]["application_id"] == app_component.id
+    def test_query_count_for_200_exposed_products(self, db_session, make_org):
+        """Prove the exposure list issues a constant small number of queries
+        regardless of how many products are in the window (no N+1)."""
+        import uuid
+        from datetime import datetime, timedelta
+
+        from sqlalchemy import event
+
+        from app import db
+        from app.models.application_owner import ApplicationOwner
+        from app.models.user import User
+
+        org = make_org("exposure-query-count")
+        user = User(
+            first_name="Counter", last_name="User",
+            email=f"qcount-{uuid.uuid4().hex[:8]}@example.com",
+            organization_id=org.id, confirmed=True,
+        )
+        db_session.add(user)
+        db_session.flush()
+
+        for i in range(200):
+            vendor = VendorOrganization(name=f"QVendor {uuid.uuid4().hex[:6]}")
+            db_session.add(vendor)
+            db_session.flush()
+            product = VendorProduct(
+                vendor_organization_id=vendor.id,
+                name=f"QProduct {uuid.uuid4().hex[:6]}",
+                end_of_life_date=datetime.utcnow() + timedelta(days=30 + i),
+            )
+            db_session.add(product)
+            db_session.flush()
+            app = _app(db_session, org, product.id, name=f"QApp{i}")
+            db_session.add(ApplicationOwner(
+                application_id=app.id, user_id=user.id,
+                ownership_type="primary", organization_id=org.id,
+            ))
+        db_session.commit()
+
+        count = {"n": 0}
+
+        def _cnt(*_a, **_k):
+            count["n"] += 1
+
+        engine = db.session.get_bind()
+        event.listen(engine, "before_cursor_execute", _cnt)
+        try:
+            rows = end_of_support_exposure(org.id, window_months=60)
+        finally:
+            event.remove(engine, "before_cursor_execute", _cnt)
+
+        assert len(rows) == 200
+        actual = count["n"]
+        assert actual <= 5, f"query count {actual} exceeds 5"
 
 
 class TestEndOfSupportExposureRoute:
