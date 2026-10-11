@@ -863,6 +863,51 @@ def run_connector_sync(
     return result
 
 
+def _credential_field_map(connector_type: str, org_id: int, config: dict) -> dict:
+    """Map this connector type's own config/vault fields onto the field
+    names its concrete class requires (``get_required_config_fields``).
+
+    M4 (cloud-review-pr448-961a0c35-v1.md): the generic connectors page
+    stores one vault entry under credential_type="credentials" as
+    {"credential": "..."}, a key no connector class reads, and the
+    per-connector forms keep their own vault keys ("api_token",
+    "client_secret") that build_connector never looked at either -- no
+    concrete connector could authenticate from anything either save path
+    collected. Each branch here reads from the same place that connector
+    type's own save route actually writes.
+    """
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+    vault = OrgCredentialVault()
+
+    if connector_type == "jira":
+        return {
+            "base_url": config.get("instance_url", ""),
+            "username": config.get("email", ""),
+            "api_token": vault.retrieve(org_id, "jira", "api_token") or "",
+            "project_keys": [config["default_project_key"]] if config.get("default_project_key") else [],
+        }
+
+    if connector_type == "servicenow":
+        # servicenow_config_save (and the service that uses this config)
+        # authenticate with OAuth2 client credentials only -- client_id
+        # (non-secret) and client_secret (vault). ServiceNowCMDBConnector's
+        # own get_required_config_fields also lists "username"/"password",
+        # but no save path anywhere collects either; inventing a value for
+        # them would be fabricated data, so they are left absent rather
+        # than guessed. A connector_type that actually needs a password
+        # grant needs its own form field for it, not a value made up here.
+        return {
+            "base_url": config.get("instance_url", ""),
+            "client_id": config.get("client_id", ""),
+            "client_secret": vault.retrieve(org_id, "servicenow", "client_secret") or "",
+        }
+
+    # No field map for this connector type: fall back to the generic
+    # credentials blob the connectors page itself writes, unchanged.
+    return vault.retrieve_credentials(org_id, connector_type) or {}
+
+
 def build_connector(cfg: ConnectorConfig, org_id: int):
     """Build the concrete connector for a configuration, injecting the
     organisation's stored credentials for the run.
@@ -870,8 +915,6 @@ def build_connector(cfg: ConnectorConfig, org_id: int):
     Raises ``LookupError`` when the connector type has no concrete
     implementation registered in ``app/connectors/``.
     """
-    from app.modules.codegen.services.credential_vault import OrgCredentialVault
-
     _register_concrete_connectors()
     connector_class = _CONNECTOR_CLASSES.get(cfg.connector_type)
     if connector_class is None:
@@ -880,12 +923,9 @@ def build_connector(cfg: ConnectorConfig, org_id: int):
             f"{cfg.connector_type!r}."
         )
 
-    credentials = OrgCredentialVault().retrieve_credentials(
-        org_id, cfg.connector_type
-    )
-    merged_config = dict(cfg.config or {})
-    if credentials:
-        merged_config.update(credentials)
+    base_config = dict(cfg.config or {})
+    merged_config = dict(base_config)
+    merged_config.update(_credential_field_map(cfg.connector_type, org_id, base_config))
 
     runtime_config = ConnectorConfig(
         id=cfg.id,

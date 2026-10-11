@@ -237,16 +237,23 @@ def api_test_connection(connector_id):
 @admin_required
 @audit_log("connector_sync")
 def api_trigger_sync(connector_id):
-    """Manually trigger a sync for a connector.
+    """Trigger a sync for a connector, through the one connector framework.
 
-    Sync is not available yet for any connector type: no connector in
-    app/connectors/ is ever registered with ConnectorManager, and none of
-    their batch_sync implementations persist a fetched record anywhere --
-    they log a "mapped but not persisted" line instead. This always
-    returned a generic 500 (ConnectorManager has no get_connector method),
-    which read as a bug rather than as the missing feature it is; this
-    reports that honestly instead.
+    M3 (cloud-review-pr448-961a0c35-v1.md): this endpoint predates the
+    connector framework and used to answer every call with "sync is not
+    available" -- true when it was written (no connector was wired to
+    ConnectorManager), false now that jira/servicenow/abacus are registered
+    concrete connectors run through propose_or_apply_connector_change.
+    Routed onto that same path rather than removed, so this URL and the
+    newer /admin/connectors/<id>/sync agree instead of one of them lying.
     """
+    from app import db
+    from app.modules.admin.connector_routes import _active_org_id, current_user_id
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_SYNC,
+        propose_or_apply_connector_change,
+    )
+
     try:
         conn = ConnectorConfig.query.get(connector_id)
     except Exception:
@@ -259,12 +266,29 @@ def api_trigger_sync(connector_id):
     if not conn:
         return not_found_response("Connector")
 
-    return error_response(
-        message=(
-            "Sync is not available for this connector yet. No connector "
-            "type in this deployment is wired to persist synced records, "
-            "so there is nothing to run."
-        ),
-        code="SYNC_NOT_IMPLEMENTED",
-        status_code=501,
+    org_id = _active_org_id()
+    if org_id is None or conn.organization_id != org_id:
+        return not_found_response("Connector")
+
+    result = propose_or_apply_connector_change(
+        org_id=org_id,
+        actor_user_id=current_user_id(),
+        action=CONNECTOR_ACTION_SYNC,
+        connector_type=conn.connector_type,
+        summary=f"Run sync for connector '{conn.name}'",
+        payload={"connector_id": conn.id, "connector_type": conn.connector_type},
     )
+    db.session.commit()
+
+    if result.get("queued"):
+        return jsonify(
+            {
+                "queued": True,
+                "approval_id": result["approval_id"],
+                "message": (
+                    "Sync queued for approval. It runs once an approver "
+                    "in this organisation approves it."
+                ),
+            }
+        )
+    return jsonify({"queued": False, "success": result.get("success", True)})

@@ -288,3 +288,120 @@ class TestH3OnlyAnAdministratorMayApproveAConnectorChange:
         assert ConnectorConfig.query.filter_by(
             organization_id=org_a.id, connector_type="servicenow"
         ).first() is not None
+
+
+class TestM2ServiceNowFormAndServiceReadTheSameStore:
+    def test_an_approved_save_is_visible_to_the_servicenow_service(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+        from app.services.servicenow_connector_service import ServiceNowConnectorService
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors/servicenow",
+            data={
+                "instance_url": "https://probe.service-now.com",
+                "client_id": "probe-client-id",
+                "field_mapping": "{}",
+                "enabled": "on",
+            },
+        )
+        proposal = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
+        assert proposal is not None
+
+        approver = _make_admin(db_session, org_a.id, "ServiceNowApprover")
+        db_session.commit()
+        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        assert result.get("success") is True, result
+
+        seen = ServiceNowConnectorService._get_config(org_a.id, "servicenow")
+        assert seen is not None, "the service must see what the approved save wrote"
+        assert seen.instance_url == "https://probe.service-now.com"
+        assert seen.client_id == "probe-client-id"
+        assert seen.enabled is True
+
+    def test_backfill_copies_a_legacy_row_into_connectorconfig_once(self, db_session, org_a):
+        from app.commands.backfill_servicenow_connector_config import backfill_servicenow_config
+        from app.models.connector_config import ConnectorConfig, OrgConnectorConfig
+        from app.services.servicenow_connector_service import ServiceNowConnectorService
+
+        legacy = OrgConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="servicenow",
+            instance_url="https://legacy.service-now.com",
+            client_id="legacy-client-id",
+            field_mapping={"ci_query_filter": "active=true"},
+            enabled=True,
+        )
+        db_session.add(legacy)
+        db_session.commit()
+
+        stats = backfill_servicenow_config()
+        assert stats["connector_config_rows_created"] == 1
+
+        seen = ServiceNowConnectorService._get_config(org_a.id, "servicenow")
+        assert seen.instance_url == "https://legacy.service-now.com"
+        assert seen.client_id == "legacy-client-id"
+
+        # Idempotent: a second run creates nothing further, and never
+        # touches a ConnectorConfig row a real save already wrote.
+        stats_again = backfill_servicenow_config()
+        assert stats_again["connector_config_rows_created"] == 0
+        assert stats_again["already_had_a_connector_config_row"] == 1
+        assert ConnectorConfig.query.filter_by(
+            organization_id=org_a.id, connector_type="servicenow"
+        ).count() == 1
+
+
+class TestM4BuiltConnectorCanActuallyAuthenticate:
+    def test_a_jira_connector_built_from_a_form_save_has_every_required_field(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+        from app.services.connector_framework import build_connector
+
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors/jira",
+            data={
+                "instance_url": "https://probe.atlassian.net",
+                "email": "probe@example.com",
+                "api_token": "probe-jira-token",
+                "default_project_key": "ARCH",
+                "enabled": "on",
+            },
+        )
+        proposal = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
+        assert proposal is not None
+
+        approver = _make_admin(db_session, org_a.id, "JiraM4Approver")
+        db_session.commit()
+        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        assert result.get("success") is True, result
+
+        from app.models.connector_config import ConnectorConfig
+
+        cfg = ConnectorConfig.query.filter_by(
+            organization_id=org_a.id, connector_type="jira"
+        ).first()
+        assert cfg is not None
+
+        connector = build_connector(cfg, org_a.id)
+        required = connector.get_required_config_fields()
+        for field in required:
+            assert connector.config.config.get(field), f"missing required field: {field}"
+        assert connector.config.config["username"] == "probe@example.com"
+        assert connector.config.config["api_token"] == "probe-jira-token"
+        assert connector.config.config["project_keys"] == ["ARCH"]
+
+        # Vault retrieval, not the deprecated "credential" blob key.
+        assert OrgCredentialVault().retrieve_credentials(org_a.id, "jira") in (None, {})

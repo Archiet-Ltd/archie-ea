@@ -35,6 +35,24 @@ def _refresh_token_on_401(method):
     return wrapper
 
 
+class _ServiceNowConfigView:
+    """ConnectorConfig's JSON config, as the attributes this file already reads.
+
+    Not a model -- never queried, never persisted. Exists only so
+    ServiceNowConnectorService._get_token and the CMDB/ARB methods can keep
+    their existing ``config.instance_url`` style access after _get_config
+    moved off the old OrgConnectorConfig row (M2).
+    """
+
+    __slots__ = ("instance_url", "client_id", "field_mapping", "enabled")
+
+    def __init__(self, *, instance_url, client_id, field_mapping, enabled):
+        self.instance_url = instance_url
+        self.client_id = client_id
+        self.field_mapping = field_mapping
+        self.enabled = enabled
+
+
 class ServiceNowConnectorService:
     """Bidirectional connector between Entelim and a ServiceNow instance."""
 
@@ -244,14 +262,35 @@ class ServiceNowConnectorService:
 
     @staticmethod
     def _get_config(org_id: int | None, connector_type: str):
-        """Load the org's ServiceNow OrgConnectorConfig; returns None if not found."""
+        """Load the org's ServiceNow connector configuration.
+
+        Reads ``ConnectorConfig`` (the one framework's store, written by
+        app/modules/admin/connector_routes.py::servicenow_config_save and the
+        new /admin/connectors page) rather than the retired
+        ``OrgConnectorConfig``, which the save path stopped writing (M2 in
+        cloud-review-pr448-961a0c35-v1.md: settings saved on the new page
+        were never seen by this service, and existing organisations' settings
+        disappeared from the form). Wraps the JSON ``config`` dict in a thin
+        view exposing the same ``instance_url``/``client_id``/
+        ``field_mapping``/``enabled`` attributes this service's other methods
+        already read, so nothing past this method needs to change.
+        """
         if org_id is None:
             return None
-        from app.models.connector_config import OrgConnectorConfig
+        from app.models.connector_config import ConnectorConfig
 
-        return OrgConnectorConfig.query.filter_by(
+        cfg = ConnectorConfig.query.filter_by(
             organization_id=org_id, connector_type=connector_type
         ).first()
+        if cfg is None:
+            return None
+        data = cfg.config or {}
+        return _ServiceNowConfigView(
+            instance_url=data.get("instance_url") or "",
+            client_id=data.get("client_id") or "",
+            field_mapping=data.get("field_mapping") or {},
+            enabled=bool(data.get("enabled")),
+        )
 
     @staticmethod
     def _map_ci_class(ci_class: str) -> str:

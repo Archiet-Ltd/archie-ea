@@ -530,6 +530,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register application owners backfill CLI: {e}")
 
+# ServiceNow connector config backfill (M2, cloud-review-pr448-961a0c35-v1.md)
+    try:
+        from app.commands import backfill_servicenow_connector_config
+        backfill_servicenow_connector_config.init_app(app)
+        app.logger.info("✅ ServiceNow connector config backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register ServiceNow connector config backfill CLI: {e}")
+
     # Cost fact store backfill
     try:
         from app.commands import backfill_cost_facts
