@@ -10,7 +10,7 @@ def test_ci_executes_adversarial_probes_and_retains_their_results():
     workflow = yaml.safe_load(
         (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     )
-    steps = workflow["jobs"]["smoke"]["steps"]
+    steps = workflow["jobs"]["smoke-adversarial"]["steps"]
     commands = [step.get("run", "") for step in steps]
     adversarial = [command for command in commands
                    if "test_adversarial_probes.py" in command and "-m adversarial" in command]
