@@ -1,6 +1,6 @@
 ---
 page_family: connector
-connector_group: "AI assistants"
+connector_group: "ai-assistants"
 connector_label: "AI assistants"
 state: held
 capture_status: awaiting_capture
