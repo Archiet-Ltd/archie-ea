@@ -1,0 +1,813 @@
+# API Contract Subset — auto-generated
+# Source: api-model-v1.yaml
+# SHA256: f34b68f30dd7d8e52334a523eae0af7f025f379232f3280754811be6a74204fc
+# Do not edit by hand.
+openapi: 3.1.0
+info:
+  title: Entelim Enterprise Intelligence API
+  version: 1.0.0
+  summary: 'Public and partner API for the Entelim enterprise intelligence platform:
+    the enterprise model, the knowledge graph, intelligence, agents, ingestion, events
+    and administration.'
+  description: One API over one model. Every resource belongs to exactly one organisation,
+    which is taken from the access token and never from the request. Reads can be
+    taken at a past date with asOf. Every write is versioned, audited and emits a
+    domain event through the transactional outbox. Machine clients write through change
+    proposals that a person approves, unless an organisation administrator has granted
+    direct write to that client. Errors are RFC 9457 problem details. Collections
+    page by cursor. Creates and job starts accept an Idempotency-Key. Rate limits
+    are announced in RateLimit and RateLimit-Policy headers. The MCP server exposes
+    the same capabilities to AI assistants through one tool catalogue.
+  license:
+    name: AGPL-3.0-only
+    identifier: AGPL-3.0-only
+  contact:
+    name: Entelim
+    url: https://entelim.org
+  x-api-lifecycle:
+    versioning: 'Major version in the path (/v1). Within a major version only additive
+      changes ship: new operations, new optional fields, new enum values that clients
+      must tolerate. A breaking change ships as /v2 with at least twelve months of
+      overlap.'
+    deprecation: A deprecated operation answers with Deprecation (RFC 9745) and Sunset
+      (RFC 8594) headers and a Link rel=deprecation to the migration note, at least
+      six months before removal.
+    unknown_fields: Clients must ignore unknown response fields and unknown enum values;
+      the server rejects unknown request fields with 422 so typos never pass silently.
+    stability: operationId, schema names, scope names, problem types and event types
+      are stable identifiers.
+servers:
+- url: https://{host}/api/v1
+  description: The organisation's Entelim host, hosted or self-hosted.
+  variables:
+    host:
+      default: entelim.org
+      description: Host name of the Entelim instance.
+security:
+- entelimOAuth: []
+tags:
+- name: Model
+  description: Model operations
+paths:
+  /elements:
+    get:
+      operationId: listElements
+      summary: List the organisation's model elements
+      description: A generic read of every ArchiMate element of the calling organisation,
+        sorted by name. It pages by page number and page size in the first implementation;
+        the cursor form used by the per-type resources replaces this in a later version.
+      tags:
+      - Model
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: per_page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ElementListPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+  /elements/{id}:
+    get:
+      operationId: getElement
+      summary: Get one model element
+      description: One element by id, only when it belongs to the calling organisation;
+        any other id answers not found.
+      tags:
+      - Model
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ElementDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+components:
+  headers:
+    WWWAuthenticate:
+      description: Bearer challenge with resource_metadata pointing at the protected-resource
+        metadata, and error and scope where relevant.
+      schema:
+        type: string
+      example: Bearer resource_metadata="https://entelim.org/.well-known/oauth-protected-resource",
+        error="invalid_token"
+    RequestId:
+      description: Identifier of this request, also carried in problem details and
+        the audit trail.
+      schema:
+        type: string
+    RetryAfter:
+      description: Seconds to wait before retrying.
+      schema:
+        type: integer
+    RateLimit:
+      description: Remaining quota for the current window (IETF RateLimit header fields).
+      schema:
+        type: string
+      example: '"read";r=1180;t=42'
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: Resource identifier.
+      schema:
+        $ref: '#/components/schemas/Id'
+  responses:
+    Unauthorized:
+      description: No valid access token. The WWW-Authenticate header points to the
+        protected-resource metadata.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+        WWW-Authenticate:
+          $ref: '#/components/headers/WWWAuthenticate'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: No such resource in this organisation. Resources of other organisations
+        are indistinguishable from absent ones.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: Rate limit exceeded.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: The token lacks the scope, or the principal's role lacks the permission,
+        for this operation.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalError:
+      description: 'Unexpected server failure. It is never reported as data: the body
+        is a problem, not an empty result.'
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      description: 'Problem: An underlying cause of incidents.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/ProblemAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - open
+            - acknowledged
+            - mitigated
+            - resolved
+            - closed
+            readOnly: true
+            description: States of lifecycle set LC-INCIDENT.
+        additionalProperties: false
+      x-entity-id: ENT-0159
+      x-ontology-class: ONT-0154 Problem
+      x-archimate: Assessment (problem)
+      x-scope: tenant
+      x-identity-key: tenant_id + source_system + external_key
+      x-lifecycle-set: LC-INCIDENT
+      unevaluatedProperties: false
+    ElementListPage:
+      type: object
+      required:
+      - elements
+      - pagination
+      properties:
+        elements:
+          type: array
+          items:
+            $ref: '#/components/schemas/ElementSummary'
+        pagination:
+          type: object
+          required:
+          - page
+          - per_page
+          - total
+          - pages
+          properties:
+            page:
+              type: integer
+            per_page:
+              type: integer
+            total:
+              type: integer
+            pages:
+              type: integer
+    EntityBase:
+      type: object
+      description: The common attributes of the entity catalogue, carried by every
+        record.
+      required:
+      - id
+      - type
+      - tenant_id
+      - name
+      - lifecycle_state
+      - valid_from
+      - recorded_at
+      - version
+      - truth_class
+      - confidence
+      - created_by
+      - updated_by
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+          readOnly: true
+        type:
+          $ref: '#/components/schemas/EntityTypeKey'
+          readOnly: true
+        tenant_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          readOnly: true
+          description: Owning tenant; null only on shared reference rows.
+        scope:
+          type: string
+          enum:
+          - tenant
+          - reference
+          readOnly: true
+        name:
+          type: string
+          minLength: 1
+          maxLength: 500
+        normalised_name:
+          type: string
+          readOnly: true
+        description:
+          type:
+          - string
+          - 'null'
+          maxLength: 50000
+        lifecycle_state:
+          type: string
+          readOnly: true
+          description: State from the entity's lifecycle set; changed through the
+            transitions operation.
+        archimate_type:
+          type:
+          - string
+          - 'null'
+          readOnly: true
+        valid_from:
+          type: string
+          format: date-time
+          description: When this state became true in the world.
+        valid_to:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        recorded_at:
+          type: string
+          format: date-time
+          readOnly: true
+        superseded_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          readOnly: true
+        version:
+          type: integer
+          readOnly: true
+        etag:
+          type: string
+          readOnly: true
+        truth_class:
+          type: string
+          enum:
+          - recorded
+          - imported
+          - synchronised
+          - derived
+          - inferred
+          - estimated
+          readOnly: true
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          readOnly: true
+        primary_source_system_id:
+          oneOf:
+          - $ref: '#/components/schemas/EntityRef'
+          - type: 'null'
+          readOnly: true
+        created_by:
+          $ref: '#/components/schemas/EntityRef'
+          readOnly: true
+        updated_by:
+          $ref: '#/components/schemas/EntityRef'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        retired_into_id:
+          oneOf:
+          - $ref: '#/components/schemas/Id'
+          - type: 'null'
+          readOnly: true
+        properties:
+          type: object
+          additionalProperties: true
+          description: Tenant-defined attributes, validated against the tenant's attribute
+            definitions (property templates).
+        accountability:
+          type: array
+          readOnly: true
+          items:
+            type: object
+            properties:
+              accountability_type:
+                type: string
+              holder:
+                oneOf:
+                - $ref: '#/components/schemas/EntityRef'
+                - type: 'null'
+            additionalProperties: false
+          description: Accountability Assignments (ENT-0141) for this record; an empty
+            list means not recorded and is shown as such.
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityRef'
+          description: Tags (ENT-0209).
+        external_identifiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalIdentifier'
+          readOnly: true
+        provenance:
+          $ref: '#/components/schemas/Provenance'
+          readOnly: true
+        links:
+          type: object
+          readOnly: true
+          additionalProperties:
+            type: string
+            format: uri-reference
+    Provenance:
+      type: object
+      properties:
+        truth_class:
+          type: string
+          enum:
+          - recorded
+          - imported
+          - synchronised
+          - derived
+          - inferred
+          - estimated
+          description: How the fact came to be known (entity catalogue common attribute).
+        confidence:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+        primary_source_system:
+          oneOf:
+          - $ref: '#/components/schemas/EntityRef'
+          - type: 'null'
+          description: Source System (ENT-0179) that masters this record.
+        ingestion_run:
+          oneOf:
+          - $ref: '#/components/schemas/EntityRef'
+          - type: 'null'
+        change_proposal:
+          oneOf:
+          - $ref: '#/components/schemas/EntityRef'
+          - type: 'null'
+        assertions:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityRef'
+          description: Assertions (ENT-0184) behind the current values.
+        derived_fact:
+          oneOf:
+          - $ref: '#/components/schemas/EntityRef'
+          - type: 'null'
+        recorded_by:
+          $ref: '#/components/schemas/EntityRef'
+        recorded_at:
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+      - truth_class
+      - recorded_at
+      description: Where a fact came from. Every record, relationship and answer row
+        carries one.
+    ExternalIdentifier:
+      description: 'External Identifier: The identifier crosswalk row.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/ExternalIdentifierAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - recorded
+            - corrected
+            - superseded
+            readOnly: true
+            description: States of lifecycle set LC-RECORD.
+        additionalProperties: false
+      x-entity-id: ENT-0182
+      x-ontology-class: ONT-0178 External Identifier
+      x-archimate: Property (identifier)
+      x-scope: tenant
+      x-identity-key: source_system_id + key_type + external_key (unique per tenant)
+      x-lifecycle-set: LC-RECORD
+      unevaluatedProperties: false
+    ExternalIdentifierAttributes:
+      type: object
+      properties:
+        subject_entity_id:
+          $ref: '#/components/schemas/EntityRef'
+          description: Reference to any element; its type is carried in the paired
+            subject_type field.
+        subject_type:
+          type: string
+          maxLength: 500
+        source_system_id:
+          $ref: '#/components/schemas/EntityRef'
+          x-target-entity: SourceSystem
+        external_key:
+          type: string
+          maxLength: 500
+        key_type:
+          type: string
+          maxLength: 500
+        first_seen_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+      description: Attributes specific to External Identifier (ENT-0182).
+    ElementSummary:
+      type: object
+      required:
+      - id
+      - name
+      - type
+      - layer
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+        layer:
+          type: string
+        description:
+          type: string
+    ElementDetail:
+      allOf:
+      - $ref: '#/components/schemas/ElementSummary'
+      - type: object
+        properties:
+          scope:
+            type: string
+          building_block_type:
+            type: string
+          plateau:
+            type: string
+    ProblemAttributes:
+      type: object
+      properties:
+        external_key:
+          type: string
+          maxLength: 500
+        known_error:
+          type: boolean
+        workaround:
+          type: string
+          maxLength: 50000
+      description: Attributes specific to Problem (ENT-0159).
+    EntityTypeKey:
+      type: string
+      pattern: ^[a-z][a-z0-9-]{1,60}$
+      description: Kebab-case entity type key from the entity catalogue.
+      enum:
+      - access-grant
+      - accountability-assignment
+      - ai-agent
+      - ai-evaluation
+      - ai-impact-assessment
+      - ai-interaction-record
+      - ai-model
+      - ai-system
+      - ai-tool
+      - ai-use-case
+      - alert
+      - answer
+      - api-endpoint
+      - applicability-statement
+      - application-collaboration
+      - application-component
+      - application-event
+      - application-function
+      - application-interaction
+      - application-interface
+      - application-process
+      - application-service
+      - application-usage-measurement
+      - approval
+      - approval-policy
+      - architecture-decision
+      - architecture-model
+      - architecture-pattern
+      - architecture-review
+      - architecture-standard
+      - architecture-view
+      - artifact
+      - assertion
+      - assessment
+      - assumption
+      - audit
+      - audit-event
+      - baseline
+      - benefit
+      - budget
+      - business-actor
+      - business-case
+      - business-collaboration
+      - business-event
+      - business-function
+      - business-interaction
+      - business-interface
+      - business-model
+      - business-object
+      - business-process
+      - business-role
+      - business-scenario
+      - business-service
+      - capability
+      - capacity-allocation
+      - cash-flow-line
+      - change-proposal
+      - change-record
+      - cloud-resource
+      - communication-network
+      - compliance-finding
+      - composite-score-value
+      - computation-run
+      - connector
+      - constraint
+      - continuity-plan
+      - contract
+      - contract-term
+      - control
+      - control-test
+      - cost-allocation
+      - cost-centre
+      - cost-fact
+      - course-of-action
+      - currency-rate
+      - data-attribute
+      - data-classification
+      - data-domain
+      - data-entity
+      - data-lineage-step
+      - data-product
+      - data-quality-result
+      - data-quality-rule
+      - data-sharing-agreement
+      - data-store
+      - data-subject-request
+      - dataset
+      - deliverable
+      - demand-request
+      - deployment
+      - derivation-rule
+      - derived-fact
+      - device
+      - distribution-network
+      - document
+      - driver
+      - environment
+      - epic
+      - equipment
+      - evidence-record
+      - exception
+      - external-identifier
+      - facility
+      - financial-period
+      - forecast
+      - gap
+      - gate-passage
+      - goal
+      - governance-gate
+      - grouping
+      - guardrail
+      - implementation-event
+      - incident
+      - ingestion-run
+      - initiative
+      - insight
+      - integration-flow
+      - invoice
+      - issue
+      - it-service
+      - key-result
+      - key-risk-indicator
+      - knowledge-source
+      - legal-entity
+      - licence-entitlement
+      - licence-usage-measurement
+      - location
+      - market-segment
+      - material
+      - meaning
+      - measurement
+      - message-topic
+      - metric-definition
+      - migration-wave
+      - milestone
+      - model-version
+      - node
+      - objective
+      - obligation
+      - organisation-unit
+      - outcome
+      - path
+      - person
+      - plateau
+      - policy
+      - position
+      - price-plan
+      - principle
+      - problem
+      - processing-activity
+      - product
+      - programme
+      - project
+      - prompt-template
+      - purchase-order
+      - recommendation
+      - reference-model-entry
+      - regulatory-framework
+      - renewal
+      - representation
+      - requirement
+      - retention-rule
+      - review-board
+      - review-condition
+      - risk
+      - risk-treatment
+      - roadmap
+      - saved-query
+      - scenario
+      - security-incident
+      - service-level-measurement
+      - service-level-objective
+      - simulation-run
+      - skill
+      - skill-holding
+      - software-package
+      - solution
+      - solution-option
+      - source-repository
+      - source-system
+      - stakeholder
+      - strategic-resource
+      - strategic-theme
+      - subscription
+      - subscription-alert
+      - system-software
+      - tag
+      - technology-collaboration
+      - technology-event
+      - technology-function
+      - technology-interaction
+      - technology-interface
+      - technology-process
+      - technology-product
+      - technology-service
+      - technology-standard
+      - telemetry-series
+      - tenant-organisation
+      - threat
+      - training-dataset
+      - user-account
+      - value
+      - value-stream
+      - value-stream-stage
+      - vendor
+      - vendor-assessment
+      - vendor-product
+      - viewpoint
+      - vulnerability
+      - work-package
+    Id:
+      type: string
+      format: uuid
+      description: UUID v7 (time-ordered) surrogate id. Never reused; stable across
+        renames and re-imports.
+    EntityRef:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        type:
+          $ref: '#/components/schemas/EntityTypeKey'
+        entity_id:
+          type: string
+          pattern: ^ENT-[0-9]{4}$
+          readOnly: true
+        name:
+          type: string
+          maxLength: 500
+          readOnly: true
+        href:
+          type: string
+          format: uri-reference
+          readOnly: true
+      additionalProperties: false
+      required:
+      - id
+      description: Reference to another record. On write only id is read; the type
+        is checked against the relationship catalogue.
