@@ -851,16 +851,14 @@ def test_accountability_endpoint_unknown_element_is_404(app, db_session, make_or
     assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
 
 
-def test_accountability_endpoint_returns_the_withdrawn_reason(
+def test_accountability_endpoint_returns_empty_owners_when_none_recorded(
     app, db_session, make_org, client, login_as
 ):
-    """The ownership read is withdrawn (a tenant-isolation gap found in
-    external review of the original PR, see
-    IntelligenceQueryService.accountability_for_element's docstring) --
-    every real element returns this honest reason, not owner data."""
+    """When no ApplicationOwner records exist, the endpoint returns empty
+    owners with no_ownership_records reason."""
     from app.models.application_portfolio import ApplicationComponent
 
-    org = make_org("accountability-route-withdrawn")
+    org = make_org("accountability-route-empty")
     user = _make_user(db_session, org)
     a = _make_element(db_session, org.id, "A")
     component = ApplicationComponent(name="A App", organization_id=org.id, archimate_element_id=a.id)
@@ -873,17 +871,14 @@ def test_accountability_endpoint_returns_the_withdrawn_reason(
     data = resp.get_json()["data"]
     assert data["owners"] == []
     assert data["capacity_not_available"] is True
-    assert "ownership_reader_not_built" in data["reasons"]
+    assert "no_ownership_records" in data["reasons"]
 
 
-def test_accountability_endpoint_never_returns_seeded_ownership_data(
+def test_accountability_endpoint_never_returns_application_ownership_data(
     app, db_session, make_org, client, login_as
 ):
-    """The regression guard that matters: a real, well-formed ownership
-    graph exists -- exactly the shape the original (unsafe) implementation
-    would have served over HTTP, including the cross-tenant-leakable
-    organization_unit fields -- and the endpoint must still return nothing
-    from it."""
+    """ApplicationOwnership (the old model) is not returned by the
+    accountability endpoint — only ApplicationOwner records are."""
     from app.models.application_portfolio import ApplicationComponent
     from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
 
@@ -908,7 +903,7 @@ def test_accountability_endpoint_never_returns_seeded_ownership_data(
     assert resp.status_code == 200
     data = resp.get_json()["data"]
     assert data["owners"] == []
-    assert data["reasons"] == ["ownership_reader_not_built", "capacity_not_available"]
+    assert "no_ownership_records" in data["reasons"]
 
 
 def test_accountability_endpoint_cross_tenant_element_is_404_not_leak(
