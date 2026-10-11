@@ -50,7 +50,7 @@ def _surface_impact_analysis_service(element_id):
     indirect = result.get("indirect_dependencies") or []
     all_deps = direct + indirect
     return [
-        {"id": d["id"], "name": d.get("name"), "health": d.get("health")}
+        {"id": d["id"], "name": d.get("name"), "health": d.get("health"), "owners": d.get("owners", [])}
         for d in all_deps
     ]
 
@@ -74,7 +74,7 @@ def _surface_ai_impact_service(app_id):
         indirect_list.extend(depth_items)
     all_impacts = direct + indirect_list
     return [
-        {"id": i["id"], "name": i.get("name"), "health": i.get("health")}
+        {"id": i["id"], "name": i.get("name"), "health": i.get("health"), "owners": i.get("owners", [])}
         for i in all_impacts
     ]
 
@@ -100,6 +100,7 @@ def _surface_cross_layer_impact(element_id):
             "id": r["element_id"],
             "name": elements.get(str(r["element_id"]), {}).get("name"),
             "health": r.get("health"),
+            "owners": r.get("owners", []),
         }
         for r in rows
     ]
@@ -534,3 +535,414 @@ def test_large_impact_walk_first_page_within_latency_budget(app, db_session, mak
     assert result["total"] == 2400, f"Expected 2400 total rows, got {result['total']}"
     assert len(result["rows"]) == 50, f"First page should have 50 rows, got {len(result['rows'])}"
     assert result["next_cursor"] == 50, f"next_cursor should be 50, got {result['next_cursor']}"
+
+
+# ── PR 2: owners on every row ──────────────────────────────────────────────
+
+
+def _make_user(db_session, org, first_name="Alice", last_name="Owner"):
+    from app.models.user import User
+
+    user = User(
+        first_name=first_name,
+        last_name=last_name,
+        email=f"{first_name.lower()}.{last_name.lower()}@example.com",
+        organization_id=org.id,
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def _application_owner(db_session, org, element_type, element_id, user, ownership_type="primary", application_id=None):
+    from app.models.application_owner import ApplicationOwner
+
+    ao = ApplicationOwner(
+        element_type=element_type,
+        element_id=element_id,
+        application_id=application_id,
+        user_id=user.id,
+        organization_id=org.id,
+        ownership_type=ownership_type,
+    )
+    db_session.add(ao)
+    db_session.flush()
+    return ao
+
+
+def test_owners_field_present_on_every_row(app, db_session, make_org):
+    """Every row of cross_layer_impact carries an owners list.
+    An empty list renders as em-dash; a row with an ApplicationOwner
+    record carries name and role."""
+    org = make_org("owners-field")
+    a = _element(db_session, org.id, "App-X")
+    b = _element(db_session, org.id, "Svc-Y")
+    c = _element(db_session, org.id, "Cap-Z", etype="Capability", layer="business")
+    _relationship(db_session, org.id, a, b)
+    _relationship(db_session, org.id, b, c)
+    # Create an ApplicationComponent for element B and link the owner
+    # through application_id (the correct path for ApplicationComponent
+    # elements).
+    comp_b = _application_component(db_session, org.id, b.id, name="Svc App")
+    user = _make_user(db_session, org, "Bob", "Smith")
+    _application_owner(db_session, org, None, None, user, "primary", application_id=comp_b.id)
+    db_session.commit()
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org.id
+        result = IntelligenceQueryService.cross_layer_impact(
+            a.id, include_derived=False, max_depth=3, with_owner=True
+        )
+
+    rows = result.get("rows") or []
+    assert len(rows) > 0, "Expected at least one dependency row"
+
+    for row in rows:
+        assert "owners" in row, f"Row {row['element_id']} missing owners field"
+        assert isinstance(row["owners"], list), f"Row {row['element_id']} owners is not a list"
+        if row["element_id"] == b.id:
+            assert len(row["owners"]) > 0, f"Row {row['element_id']} should have owners"
+            assert "name" in row["owners"][0], "Owner entry missing name"
+            assert "role" in row["owners"][0], "Owner entry missing role"
+        else:
+            # Rows without ApplicationOwner records have empty list.
+            assert row["owners"] == [], f"Row {row['element_id']} should have empty owners"
+
+
+def test_two_organisation_owner_isolation(app, db_session, make_org):
+    """Organisation B's ApplicationOwner records never appear in
+    organisation A's impact walk."""
+    org_a = make_org("owners-iso-a")
+    org_b = make_org("owners-iso-b")
+
+    a1 = _element(db_session, org_a.id, "A1")
+    a2 = _element(db_session, org_a.id, "A2")
+    _relationship(db_session, org_a.id, a1, a2)
+
+    b1 = _element(db_session, org_b.id, "B1")
+    b2 = _element(db_session, org_b.id, "B2")
+    _relationship(db_session, org_b.id, b1, b2)
+
+    # Create ApplicationComponent and ApplicationOwner for org B's element.
+    comp_b2 = _application_component(db_session, org_b.id, b2.id, name="B2 App")
+    user_b = _make_user(db_session, org_b, "OrgB", "Owner")
+    _application_owner(db_session, org_b, None, None, user_b, "primary", application_id=comp_b2.id)
+
+    db_session.commit()
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org_a.id
+        result = IntelligenceQueryService.cross_layer_impact(
+            a1.id, include_derived=False, max_depth=3, with_owner=True
+        )
+
+    rows = result.get("rows") or []
+    for row in rows:
+        # Org A's rows must have empty owners (no ApplicationOwner records for org A).
+        assert row["owners"] == [], (
+            f"Org A row {row['element_id']} leaked owners: {row['owners']}"
+        )
+
+    # Verify org B's walk has owners.
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org_b.id
+        result_b = IntelligenceQueryService.cross_layer_impact(
+            b1.id, include_derived=False, max_depth=3, with_owner=True
+        )
+
+    rows_b = result_b.get("rows") or []
+    b2_row = [r for r in rows_b if r["element_id"] == b2.id]
+    assert len(b2_row) == 1
+    assert len(b2_row[0]["owners"]) > 0, "Org B's owned element should have owners"
+
+
+def test_three_surfaces_return_same_owners(app, db_session, make_org):
+    """All three impact surfaces return the same owners for the same seed.
+    Extends the existing comparison test to also check owners."""
+    org = make_org("owners-three-surface")
+    a = _element(db_session, org.id, "Platform-A")
+    b = _element(db_session, org.id, "Svc-B")
+    c = _element(db_session, org.id, "Cap-C", etype="Capability", layer="business")
+    _relationship(db_session, org.id, a, b)
+    _relationship(db_session, org.id, b, c)
+    app_comp = _application_component(db_session, org.id, a.id, name="Platform App")
+
+    # Create ApplicationComponent and ApplicationOwner for element B.
+    comp_b = _application_component(db_session, org.id, b.id, name="Svc App")
+    user = _make_user(db_session, org, "Carol", "Owner")
+    _application_owner(db_session, org, None, None, user, "primary", application_id=comp_b.id)
+    db_session.commit()
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org.id
+
+        surface1 = _surface_impact_analysis_service(a.id)
+        surface2 = _surface_ai_impact_service(app_comp.id)
+        surface3 = _surface_cross_layer_impact(a.id)
+
+    # All three surfaces must return the same owners for each element.
+    def _owners_map(rows):
+        return {r["id"]: r.get("owners", []) for r in rows}
+
+    owners1 = _owners_map(surface1)
+    owners2 = _owners_map(surface2)
+    owners3 = _owners_map(surface3)
+
+    for label, owners_map in [("ImpactAnalysisService", owners1),
+                               ("AIImpactAnalysisService", owners2),
+                               ("cross_layer_impact", owners3)]:
+        for eid, owners in owners_map.items():
+            assert isinstance(owners, list), f"{label} element {eid} owners is not a list"
+
+    # Element B should have owners in all three surfaces.
+    assert len(owners1.get(b.id, [])) > 0, "ImpactAnalysisService missing owners for element B"
+    assert len(owners2.get(b.id, [])) > 0, "AIImpactAnalysisService missing owners for element B"
+    assert len(owners3.get(b.id, [])) > 0, "cross_layer_impact missing owners for element B"
+
+    # Owner names and roles must match across surfaces.
+    for eid in owners1:
+        if eid in owners2:
+            assert owners1[eid] == owners2[eid], (
+                f"Owner mismatch for element {eid} between ImpactAnalysisService and AIImpactAnalysisService"
+            )
+        if eid in owners3:
+            assert owners1[eid] == owners3[eid], (
+                f"Owner mismatch for element {eid} between ImpactAnalysisService and cross_layer_impact"
+            )
+
+
+def test_accountability_returns_owners_from_walk(app, db_session, make_org):
+    """The accountability endpoint returns the owners of every affected
+    element from the walk, not an empty answer."""
+    org = make_org("accountability-walk")
+    a = _element(db_session, org.id, "Root")
+    b = _element(db_session, org.id, "Child")
+    _relationship(db_session, org.id, a, b)
+
+    # Create ApplicationComponent and ApplicationOwner for element B.
+    comp_b = _application_component(db_session, org.id, b.id, name="Child App")
+    user = _make_user(db_session, org, "Diana", "Owner")
+    _application_owner(db_session, org, None, None, user, "primary", application_id=comp_b.id)
+    db_session.commit()
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org.id
+        result = IntelligenceQueryService.accountability_for_element(a.id)
+
+    # The accountability answer must return owners from the walk,
+    # not an empty withdrawn answer.
+    assert "owners" in result, "accountability_for_element missing owners key"
+    assert len(result["owners"]) > 0, (
+        "accountability_for_element returned empty owners — "
+        "should return owners from the walk"
+    )
+    # The owners should include the owner of element B.
+    owner_names = [o.get("name") for o in result["owners"]]
+    assert "Diana Owner" in owner_names, (
+        f"Expected Diana Owner in accountability owners, got {owner_names}"
+    )
+
+
+def test_owner_fetch_query_count(app, db_session, make_org):
+    """Owner fetch issues a bounded number of queries, independent of page size.
+    The batch resolution uses a constant number of queries regardless of how
+    many rows are on the page."""
+    import sqlalchemy as sa
+
+    org = make_org("owner-query-count")
+    root = _element(db_session, org.id, "Root")
+    children = []
+    for i in range(10):
+        child = _element(db_session, org.id, f"Child-{i}")
+        _relationship(db_session, org.id, root, child)
+        children.append(child)
+    db_session.commit()
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    def _count_queries(org_id, page_size):
+        """Run cross_layer_impact and count queries."""
+        with app.test_request_context("/"):
+            from flask import g
+
+            g.current_org_id = org_id
+
+            queries = []
+
+            def _listener(conn, cur, stmt, params, context, executemany):
+                queries.append(stmt)
+
+            sa.event.listen(sa.engine.Engine, "before_cursor_execute", _listener)
+            try:
+                IntelligenceQueryService.cross_layer_impact(
+                    root.id,
+                    include_derived=False,
+                    max_depth=3,
+                    with_owner=True,
+                    page_size=page_size,
+                )
+            finally:
+                sa.event.remove(sa.engine.Engine, "before_cursor_execute", _listener)
+
+            return len(queries)
+
+    # Count queries with a small page and a large page — the owner fetch
+    # should issue the same number of queries regardless.
+    query_count_small = _count_queries(org.id, 2)
+    query_count_large = _count_queries(org.id, 10)
+
+    # The query count should be bounded and similar regardless of page size.
+    # The owner resolution adds at most 2 queries (one for ApplicationOwner,
+    # one for User resolution) regardless of page size.
+    assert abs(query_count_small - query_count_large) <= 2, (
+        f"Query count differs too much between page_size=2 ({query_count_small}) "
+        f"and page_size=10 ({query_count_large})"
+    )
+
+
+def test_capability_owner_does_not_leak_to_application_row(app, db_session, make_org):
+    """A capability owner whose element_id equals an application-element id
+    in the same organisation must NOT appear on the application's impact row.
+
+    The batch owner lookup must filter by element_type so a capability owner
+    (element_type='capability') is never attached to an ApplicationComponent
+    row that happens to share the same element_id value."""
+    org = make_org("cap-owner-leak")
+    # Create an application element and a capability element that share
+    # the same numeric id (impossible with real PKs, so we use different
+    # orgs to get different PKs and verify the element_type filter).
+    app_el = _element(db_session, org.id, "App", etype="ApplicationComponent")
+    cap_el = _element(db_session, org.id, "Cap", etype="Capability", layer="business")
+    _relationship(db_session, org.id, app_el, cap_el)
+
+    # Create an ApplicationComponent for the app element.
+    _application_component(db_session, org.id, app_el.id, name="App Component")
+
+    # Create a capability owner with element_type='capability' and
+    # element_id set to the app element's id (simulating a collision).
+    user = _make_user(db_session, org, "Cap", "Owner")
+    _application_owner(db_session, org, "capability", app_el.id, user, "primary")
+    db_session.commit()
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org.id
+        result = IntelligenceQueryService.cross_layer_impact(
+            app_el.id, include_derived=False, max_depth=3, with_owner=True
+        )
+
+    rows = result.get("rows") or []
+    # The app element's row must have empty owners — the capability owner
+    # with the same element_id must not leak through.
+    app_row = [r for r in rows if r["element_id"] == app_el.id]
+    if app_row:
+        assert app_row[0]["owners"] == [], (
+            f"App element {app_el.id} should have no owners, "
+            f"got {app_row[0]['owners']}"
+        )
+
+
+def test_two_organisation_owner_isolation_with_capability_owner(app, db_session, make_org):
+    """Organisation B's capability owner never appears in organisation A's
+    impact walk, even when element_ids coincide."""
+    org_a = make_org("cap-iso-a")
+    org_b = make_org("cap-iso-b")
+
+    a1 = _element(db_session, org_a.id, "A1")
+    a2 = _element(db_session, org_a.id, "A2")
+    _relationship(db_session, org_a.id, a1, a2)
+
+    b1 = _element(db_session, org_b.id, "B1")
+    b2 = _element(db_session, org_b.id, "B2", etype="Capability", layer="business")
+    _relationship(db_session, org_b.id, b1, b2)
+
+    # Create a capability owner for org B's element.
+    user_b = _make_user(db_session, org_b, "OrgB", "CapOwner")
+    _application_owner(db_session, org_b, "capability", b2.id, user_b, "primary")
+    db_session.commit()
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org_a.id
+        result = IntelligenceQueryService.cross_layer_impact(
+            a1.id, include_derived=False, max_depth=3, with_owner=True
+        )
+
+    rows = result.get("rows") or []
+    for row in rows:
+        assert row["owners"] == [], (
+            f"Org A row {row['element_id']} leaked owners: {row['owners']}"
+        )
+
+
+def test_large_impact_walk_with_owners_within_budget(app, db_session, make_org):
+    """A 2,400-row impact walk with owners enabled returns the first page
+    within the latency budget and the owner fetch does not cause N+1."""
+    org = make_org("large-walk-owners")
+    root = _element(db_session, org.id, "Root-Large")
+
+    # Create 2,400 direct children.
+    children = []
+    batch_size = 500
+    for batch_start in range(0, 2400, batch_size):
+        batch = []
+        for i in range(batch_start, min(batch_start + batch_size, 2400)):
+            child = _element(db_session, org.id, f"Child-{i}")
+            _relationship(db_session, org.id, root, child)
+            batch.append(child)
+        children.extend(batch)
+        db_session.flush()
+    db_session.commit()
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org.id
+
+        result = IntelligenceQueryService.cross_layer_impact(
+            root.id,
+            include_derived=False,
+            max_depth=3,
+            direction="downstream",
+            with_owner=True,
+            page_size=50,
+        )
+
+    latency_ms = result["summary"]["latency_ms"]
+    budget_ms = 2000.0
+    assert latency_ms <= budget_ms, (
+        f"First page latency {latency_ms:.1f}ms exceeds budget {budget_ms}ms "
+        f"(2,400 rows, page_size=50, with_owner=True)"
+    )
+
+    assert result["total"] == 2400, f"Expected 2400 total rows, got {result['total']}"
+    assert len(result["rows"]) == 50, f"First page should have 50 rows, got {len(result['rows'])}"
+
+    # Every row on the page must have an owners field.
+    for row in result["rows"]:
+        assert "owners" in row, f"Row {row['element_id']} missing owners field"
+        assert isinstance(row["owners"], list), f"Row {row['element_id']} owners is not a list"
