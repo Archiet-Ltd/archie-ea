@@ -266,6 +266,13 @@ def batch_update_maturity():
                     flash("Invalid target maturity level", "error")
                     return redirect(url_for("maturity_management.batch_update_maturity"))
 
+            # Reject an entirely blank submission — no level and no notes
+            # would still touch every row's updated_at and flash a success
+            # message without recording anything.
+            if not current_level and not target_level and not notes:
+                flash("Provide at least one field to update (current level, target level or notes).", "error")
+                return redirect(url_for("maturity_management.batch_update_maturity"))
+
             # Scope to the caller's org (and any domain / importance
             # filters the form selected), then record through the
             # single write path once per capability in the set.
