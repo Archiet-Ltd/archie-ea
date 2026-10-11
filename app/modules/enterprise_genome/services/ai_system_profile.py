@@ -171,6 +171,11 @@ def profile_from_element(element) -> dict:
         # New fields: read from typed properties (acm_properties), not custom_properties.
         "risk_class": _read_risk_class(element),
         "release_state": _read_release_state(element),
+        # The release gate surfaced as data: the refusal reason (shown on the
+        # register page when a high-risk system has no accepted assessment)
+        # and whether the required assessment has been accepted.
+        "release_blocked_reason": _read_release_blocked_reason(element),
+        "assessment_accepted": _read_assessment_accepted(element),
         "owner": _read_owner(element),
     }
     profile["risk_flags"] = risk_flags(profile)
@@ -284,6 +289,34 @@ def _read_release_state(element) -> str:
         return val if val in RELEASE_STATES else NOT_SET
     val = str(entry) if entry else ""
     return val if val in RELEASE_STATES else NOT_SET
+
+
+def _read_release_blocked_reason(element):
+    """Why the release gate refuses this system, or ``None`` when it can be
+    released. One message source shared with the release route's HTTP response
+    (``ai_system_classification.release_refusal_reason``), so the page and the
+    route can never show different reasons."""
+    from .ai_system_classification import release_refusal_reason
+
+    org_id = getattr(element, "organization_id", None)
+    if org_id is None:
+        return None
+    return release_refusal_reason(element, org_id)
+
+
+def _read_assessment_accepted(element):
+    """Assessment acceptance state for the register.
+
+    ``True`` when an assessment has been accepted, ``False`` when one is
+    required (accepted class is high) but missing, ``None`` when the system is
+    not high-risk and needs no assessment. Scoped to the element's own
+    organisation."""
+    from .ai_system_classification import assessment_accepted_for
+
+    org_id = getattr(element, "organization_id", None)
+    if org_id is None:
+        return None
+    return assessment_accepted_for(element, org_id)
 
 
 def _read_owner(element) -> dict:

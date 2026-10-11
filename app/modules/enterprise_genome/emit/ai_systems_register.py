@@ -70,6 +70,68 @@ def _owner_cell(owner) -> str:
     return str(escape(name))
 
 
+def _action_form(element_id: int, endpoint: str, label: str) -> str:
+    """A small CSP-safe POST form: hidden csrf token + labelled button.
+
+    Empty string outside a request context (no CSRF token to mint), so the
+    deterministic emitter stays byte-stable in unit tests that never render a
+    live page; a real register render carries the live forms.
+    """
+    from flask import has_request_context, url_for
+    from flask_wtf.csrf import generate_csrf
+
+    if not has_request_context():
+        return ""
+    action = url_for(endpoint, element_id=element_id)
+    token = generate_csrf()
+    # raw-html-ok: action and token are escaped below; label is a fixed
+    # literal from this module, never user text.
+    return (
+        '<form method="POST" action="' + str(escape(action)) + '" class="inline-block">'
+        '<input type="hidden" name="csrf_token" value="' + str(escape(token)) + '">'
+        '<button type="submit" '
+        'class="h-7 rounded-md border border-border bg-card px-3 text-xs font-medium '
+        'text-foreground hover:bg-accent">' + str(escape(label)) + "</button></form>"
+    )
+
+
+def _release_cell(system: dict) -> str:
+    """The Release state cell: the state, the gate refusal reason when release
+    is blocked, and the admin actions (Release / Attach assessment).
+
+    CSP-safe: plain markup only, all text escaped, no inline handlers. The
+    action forms render only inside a request (where a CSRF token exists);
+    outside one, only the text is produced.
+    """
+    state = system.get("release_state")
+    reason = system.get("release_blocked_reason")
+    element_id = system.get("archimate_element_id")
+
+    parts = [_cell(state)]
+    if reason:
+        parts.append(
+            f'<p class="text-xs text-destructive mt-1">{_cell(reason)}</p>'  # raw-html-ok: _cell() escapes internally
+        )
+        if element_id is not None:
+            attach = _action_form(
+                element_id,
+                "ai_systems_genome.ai_system_attach_assessment",
+                "Attach assessment",
+            )
+            if attach:
+                parts.append(f'<div class="mt-1">{attach}</div>')  # raw-html-ok: _action_form() escapes its action URL, csrf token and label
+    elif state != "released" and element_id is not None:
+        release = _action_form(
+            element_id,
+            "ai_systems_genome.ai_system_release",
+            "Release",
+        )
+        if release:
+            parts.append(f'<div class="mt-1">{release}</div>')  # raw-html-ok: _action_form() escapes its action URL, csrf token and label
+
+    return "".join(parts)
+
+
 def emit_ai_systems_register(slice_data: dict) -> Markup:
     """Emit the register table for a slice. Returns a ``Markup`` fragment."""
     systems = slice_data.get("systems") or []
@@ -98,7 +160,7 @@ def emit_ai_systems_register(slice_data: dict) -> Markup:
             f'<td class="px-3 py-2 text-sm">{_tri_cell(gov.get("human_review"))}</td>'  # raw-html-ok: _tri_cell() (defined above) returns only 'Yes'/'No'/em-dash literals
             f'<td class="px-3 py-2 text-sm">{_cell(s.get("data_sensitivity"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm">{_cell(s.get("risk_class"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
-            f'<td class="px-3 py-2 text-sm">{_cell(s.get("release_state"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_release_cell(s)}</td>'  # raw-html-ok: _release_cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm">{_owner_cell(s.get("owner"))}</td>'  # raw-html-ok: _owner_cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm text-destructive">{_flags_cell(flags)}</td>'  # raw-html-ok: _flags_cell() (defined above) escapes internally
             "</tr>"

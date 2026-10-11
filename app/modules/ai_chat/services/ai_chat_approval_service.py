@@ -725,6 +725,19 @@ class AIChatApprovalService:
                         organization_id=org_id,
                     )
                     result = {"success": accepted}
+                elif approval.entity_type == "ai_system_assessment":
+                    # Accept a proposed AI system assessment. The accepted
+                    # approval row IS the assessment record — the second
+                    # approval type, through the same queue, no new table.
+                    from app.modules.enterprise_genome.services.ai_system_classification import (
+                        accept_assessment,
+                    )
+                    org_id = approval.organization_id
+                    accepted = accept_assessment(
+                        approval_id=approval.id,
+                        organization_id=org_id,
+                    )
+                    result = {"success": accepted}
                 else:
                     return {"success": False, "error": f"Unknown entity type: {approval.entity_type}"}
 
