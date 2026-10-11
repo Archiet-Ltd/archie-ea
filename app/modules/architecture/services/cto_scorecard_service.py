@@ -158,7 +158,7 @@ def end_of_support_exposure(
                 {
                     "vendor_product_id": product.id,
                     "product_name": product.name,
-                    "end_of_life_date": product.end_of_life_date.date().isoformat(),
+                    "end_of_life_date": product.end_of_life_date.date(),
                     "application_id": app_component.id,
                     "application_name": app_component.name,
                     "owners": owner_summary(app_component.id, organization_id),

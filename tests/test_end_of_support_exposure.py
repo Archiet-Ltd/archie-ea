@@ -89,7 +89,7 @@ class TestEndOfSupportExposure:
         assert [r["application_id"] for r in rows] == [soon_app.id, later_app.id]
         # Soonest end-of-support date first.
         assert rows[0]["vendor_product_id"] == soon.id
-        assert rows[0]["end_of_life_date"] == soon.end_of_life_date.date().isoformat()
+        assert rows[0]["end_of_life_date"] == soon.end_of_life_date.date()
 
     def test_each_row_carries_the_owner_summary(self, db_session, make_org):
         org = make_org("exposure-owner")
@@ -237,7 +237,7 @@ class TestEndOfSupportExposureSingleSourceOfTruth:
 
         # One row per dependent application, all carrying the register's date.
         assert {r["application_id"] for r in rows} == {app_one.id, app_two.id}
-        assert rows[0]["end_of_life_date"] == product.end_of_life_date.date().isoformat()
+        assert rows[0]["end_of_life_date"] == product.end_of_life_date.date()
 
     def test_an_end_of_life_date_exactly_at_the_cutoff_is_included(self, db_session, make_org):
         from app.services.eol_window import add_months, lead_months_for
@@ -342,7 +342,7 @@ class TestEndOfSupportExposureRoute:
 
         assert response.status_code == 200
         html = response.get_data(as_text=True)
-        assert product.end_of_life_date.date().isoformat() in html
+        assert product.end_of_life_date.date().strftime('%d %b %Y') in html
 
     def test_a_user_who_may_not_see_the_scorecard_is_refused(
         self, db_session, make_org, client, login_as

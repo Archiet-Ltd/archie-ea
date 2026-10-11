@@ -58,7 +58,7 @@
     <ul class="divide-y divide-border text-sm">
       {% for row in exposure %}
       <li class="py-2" data-testid="exposure-row-{{ row.application_id }}">
-        <p class="font-medium text-foreground">{{ row.product_name }} — {{ row.end_of_life_date }}</p>
+        <p class="font-medium text-foreground">{{ row.product_name }} — {{ row.end_of_life_date|format_date }}</p>
         <p class="text-muted-foreground">{{ row.application_name }} — owner: {{ row.owners }}</p>
       </li>
       {% endfor %}
