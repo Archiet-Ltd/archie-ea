@@ -61,11 +61,15 @@ def add_months(start: datetime, months: int) -> datetime:
 
 
 def dependents(product_id: int, organization_id: int) -> List[ApplicationComponent]:
-    """This organisation's applications that depend on the product."""
+    """This organisation's applications that depend on the product.
+
+    Soft-deleted applications are excluded (deleted_at IS NULL).
+    """
     return (
         ApplicationComponent.query.filter(
             ApplicationComponent.vendor_product_id == product_id,
             ApplicationComponent.organization_id == organization_id,
+            ApplicationComponent.deleted_at.is_(None),
         )
         .order_by(ApplicationComponent.name)
         .all()

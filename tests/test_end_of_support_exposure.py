@@ -255,6 +255,33 @@ class TestEndOfSupportExposureSingleSourceOfTruth:
         assert len(rows) == 1
         assert rows[0]["vendor_product_id"] == product.id
 
+    def test_a_soft_deleted_application_is_excluded(self, db_session, make_org):
+        from datetime import datetime
+        from sqlalchemy import text
+
+        org = make_org("exposure-soft-delete")
+        product = _vendor_product(db_session, months_to_eol=6)
+        app_component = _app(db_session, org, product.id, name="Active")
+        # Create a second app and set deleted_at via raw SQL to bypass
+        # any ORM-level issues with the version_id_col lock_version.
+        deleted_app = _app(db_session, org, product.id, name="Deleted")
+        db_session.execute(
+            text(
+                "UPDATE application_components SET deleted_at = :now "
+                "WHERE id = :aid"
+            ),
+            {"now": datetime.utcnow(), "aid": deleted_app.id},
+        )
+        db_session.commit()
+
+        rows = end_of_support_exposure(org.id, window_months=12)
+
+        assert len(rows) == 1
+        assert rows[0]["application_id"] == app_component.id
+
+        assert len(rows) == 1
+        assert rows[0]["application_id"] == app_component.id
+
 
 class TestEndOfSupportExposureRoute:
     def _scorecard_user(self, db_session, org, role="cto"):
