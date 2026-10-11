@@ -3,15 +3,22 @@
 Assesses the blast radius of a change request by traversing ArchiMate
 relationships (up to depth 2) to identify downstream application dependencies.
 Calls TechnologyStackAuditService for technology context.
-All queries use SQLAlchemy ORM — no raw SQL, no hardcoded counts.
+
+The walk itself delegates to the one canonical impact engine
+(``IntelligenceQueryService.cross_layer_impact``) rather than running its
+own BFS -- a separate traversal is exactly the "second impact engine"
+PR 297 defect 4 flagged. Multi-seed reachability (a change request can
+scope several applications at once) is the union of each seed's own
+downstream-reachable set within the same hop budget, which is what the
+old multi-source BFS computed too.
 """
 
 import logging
 from typing import Any, Dict, List, Set
 
-from app import db
 from app.models.application_portfolio import ApplicationComponent
 from app.services.technology_stack_audit_service import TechnologyStackAuditService
+from app.utils.route_guards import load_entity
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +84,13 @@ class ArchitectureChangeImpactService:
         except ImportError:
             return {"error": "import_error", "change_request_id": change_request_id}
 
-        change_request = db.session.get(ChangeRequest, change_request_id)
+        # Not db.session.get()/Model.query.get() -- SQLAlchemy's primary-key
+        # lookup path does not reliably run through do_orm_execute, so the
+        # tenant with_loader_criteria filter installed there never applies
+        # to it (see load_entity's own docstring). This was the actual
+        # cross-org leak in defects 2/3: ChangeRequest now has
+        # organization_id, but db.session.get() ignored it.
+        change_request = load_entity(ChangeRequest, change_request_id)
         if change_request is None:
             return {"error": "not_found", "change_request_id": change_request_id}
 
@@ -98,7 +111,7 @@ class ArchitectureChangeImpactService:
         scope_app_count = len(apps_in_scope)
 
         # -------------------------------------------------------------- #
-        # 4. BFS traversal of ArchiMateRelationship (depth ≤ MAX_HOPS)   #
+        # 4. Downstream walk via the canonical impact engine (≤ MAX_HOPS) #
         # -------------------------------------------------------------- #
         scope_element_ids: Set[int] = {
             a.archimate_element_id
@@ -106,11 +119,7 @@ class ArchitectureChangeImpactService:
             if a.archimate_element_id is not None
         }
 
-        downstream_element_ids: Set[int] = set()
-        if scope_element_ids:
-            all_rels = self._load_all_relationships()
-            hop_map = self._bfs_traverse(list(scope_element_ids), all_rels)
-            downstream_element_ids = set(hop_map.keys())
+        downstream_element_ids: Set[int] = self._downstream_reachable(scope_element_ids)
 
         # Map downstream element IDs → ApplicationComponent rows
         downstream_apps: List[ApplicationComponent] = []
@@ -170,62 +179,34 @@ class ArchitectureChangeImpactService:
                     return [int(i) for i in ids if i is not None]
         return []
 
-    def _load_all_relationships(self) -> List:
-        """Load all ArchiMateRelationship rows once (avoids per-hop queries)."""
-        try:
-            from app.models.models import ArchiMateRelationship  # type: ignore[attr-defined]
-            rows = (
-                db.session.query(
-                    ArchiMateRelationship.source_id,
-                    ArchiMateRelationship.target_id,
-                )
-                .all()
-            )
-            return rows
-        except Exception as exc:
-            logger.warning("_load_all_relationships: %s", exc)
-            return []
+    def _downstream_reachable(self, seed_element_ids: Set[int]) -> Set[int]:
+        """Every element reachable downstream from any seed within MAX_HOPS.
 
-    def _bfs_traverse(
-        self,
-        seed_ids: List[int],
-        relationships: List,
-    ) -> Dict[int, int]:
-        """BFS from seed_ids over relationships, returning element_id → hop.
-
-        Parameters
-        ----------
-        seed_ids : list[int]
-            Starting ArchiMate element IDs (depth 0 — excluded from result).
-        relationships : list
-            Iterable of (source_id, target_id) row tuples from ORM query.
-
-        Returns
-        -------
-        dict mapping each reachable element_id to its minimum hop distance
-        from any seed node.  Seed nodes themselves are not included.
-        Traversal is capped at MAX_HOPS hops.
+        Delegates to IntelligenceQueryService.cross_layer_impact, the one
+        canonical (tenant-fenced) walk -- one call per seed, union of the
+        results. Equivalent to the old multi-source BFS: a node reachable
+        within k hops of the seed SET is reachable within k hops of at
+        least one individual seed.
         """
-        adj: Dict[int, Set[int]] = {}
-        for src, tgt in relationships:
-            adj.setdefault(src, set()).add(tgt)
+        if not seed_element_ids:
+            return set()
 
-        visited: Dict[int, int] = {}
-        frontier: Set[int] = set(seed_ids)
-        seed_set: Set[int] = set(seed_ids)
+        from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
-        for hop in range(1, self.MAX_HOPS + 1):
-            next_frontier: Set[int] = set()
-            for node in frontier:
-                for neighbour in adj.get(node, set()):
-                    if neighbour not in seed_set and neighbour not in visited:
-                        visited[neighbour] = hop
-                        next_frontier.add(neighbour)
-            if not next_frontier:
-                break
-            frontier = next_frontier
+        reachable: Set[int] = set()
+        for seed_id in seed_element_ids:
+            result = IntelligenceQueryService.cross_layer_impact(
+                seed_id,
+                include_derived=False,
+                max_depth=self.MAX_HOPS,
+                direction="downstream",
+                with_owner=False,
+            )
+            for row in result.get("rows") or []:
+                reachable.add(row["element_id"])
 
-        return visited
+        reachable -= seed_element_ids
+        return reachable
 
     def _has_compliance_risk(self, apps: List[ApplicationComponent]) -> bool:
         """Return True if any app in the list has user_satisfaction_score < 60.

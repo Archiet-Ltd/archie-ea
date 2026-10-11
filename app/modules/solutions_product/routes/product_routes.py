@@ -474,8 +474,13 @@ def push_to_devops(solution_id):
     if not solution:
         return jsonify({"error": "Solution not found"}), 404
 
-    # Load connector config
-    config = DevOpsConnectorConfig.query.filter_by(id=connector_id).first()
+    # Load connector config. The connector must belong to the solution's own
+    # organisation (the solution is tenant-fenced): a connector id from another
+    # organisation is refused exactly like one that does not exist, so its stored
+    # token is never used on the caller's behalf.
+    config = DevOpsConnectorConfig.query.filter_by(
+        id=connector_id, organization_id=solution.organization_id
+    ).first()
     if not config or not config.enabled or config.provider != provider:
         return jsonify({"error": "Connector not found or not enabled for this provider"}), 400
 
@@ -995,6 +1000,12 @@ def update_webhook(solution_id, webhook_id):
     PUT /api/solutions/<id>/webhooks/<wid>
     """
     from app.models.spec_webhook import SpecWebhook
+    from app.models.solution_models import Solution
+    from app.utils.route_guards import require_entity
+
+    # A webhook carries no organisation of its own; its solution does. Listing
+    # already resolves the solution first; editing, deleting and firing must too.
+    require_entity(Solution, solution_id, description="Solution not found")
 
     webhook = SpecWebhook.query.filter_by(id=webhook_id, solution_id=solution_id).first()
     if not webhook:
@@ -1046,6 +1057,12 @@ def delete_webhook(solution_id, webhook_id):
     DELETE /api/solutions/<id>/webhooks/<wid>
     """
     from app.models.spec_webhook import SpecWebhook
+    from app.models.solution_models import Solution
+    from app.utils.route_guards import require_entity
+
+    # A webhook carries no organisation of its own; its solution does. Listing
+    # already resolves the solution first; editing, deleting and firing must too.
+    require_entity(Solution, solution_id, description="Solution not found")
 
     webhook = SpecWebhook.query.filter_by(id=webhook_id, solution_id=solution_id).first()
     if not webhook:
@@ -1066,6 +1083,12 @@ def test_webhook(solution_id, webhook_id):
     """
     from app.models.spec_webhook import SpecWebhook
     from app.modules.solutions_product.services.drift_remediation_service import DriftRemediationService
+    from app.models.solution_models import Solution
+    from app.utils.route_guards import require_entity
+
+    # A webhook carries no organisation of its own; its solution does. Listing
+    # already resolves the solution first; editing, deleting and firing must too.
+    require_entity(Solution, solution_id, description="Solution not found")
 
     webhook = SpecWebhook.query.filter_by(id=webhook_id, solution_id=solution_id).first()
     if not webhook:
@@ -1076,7 +1099,7 @@ def test_webhook(solution_id, webhook_id):
         "event": "test",
         "solution_id": solution_id,
         "timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-        "message": "This is a test webhook from A.R.C.H.I.E.",
+        "message": "This is a test webhook from Entelim",
     }
 
     success = svc._fire_single_webhook(webhook, test_payload)

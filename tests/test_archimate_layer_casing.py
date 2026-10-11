@@ -249,6 +249,24 @@ def test_backfill_canonicalises_legacy_rows_and_is_idempotent(db_session, make_o
     assert rerun["updated"] == 0, "backfill is not idempotent"
 
 
+def test_backfill_rewrites_implementation_migration_alias(db_session, make_org):
+    """The backfill must close the old combined-name split as well as casing."""
+    from app.commands.backfill_archimate_layer_casing import canonicalise_layer_rows
+
+    org = make_org("layer-backfill-implementation")
+    legacy = _raw_insert(db_session, org.id, "Legacy Impl", "implementation_migration")
+    canonical = _raw_insert(db_session, org.id, "Canonical Impl", "implementation")
+
+    dry_run = canonicalise_layer_rows(org_id=org.id, dry_run=True)
+    assert dry_run["would_update"] == 1
+    assert dry_run["by_value"] == {"implementation_migration": 1}
+
+    report = canonicalise_layer_rows(org_id=org.id)
+    assert report["updated"] == 1, report
+    assert _stored_layer(db_session, legacy) == "implementation"
+    assert _stored_layer(db_session, canonical) == "implementation"
+
+
 def test_backfill_dry_run_changes_nothing(db_session, make_org):
     from app.commands.backfill_archimate_layer_casing import canonicalise_layer_rows
 
@@ -283,6 +301,21 @@ def test_backfill_org_id_scopes_the_update(db_session, make_org):
     assert _stored_layer(db_session, theirs) == "Business", (
         "the backfill rewrote a row belonging to another tenant"
     )
+
+
+def test_backfill_sql_uses_literal_archimate_elements_statements():
+    """Literal SQL keeps the constant table name out of string interpolation."""
+    import inspect
+
+    import app.commands.backfill_archimate_layer_casing as command
+
+    source = inspect.getsource(command)
+
+    assert '"SELECT count(*) FROM archimate_elements WHERE TRUE"' in source
+    assert '"SELECT id, layer FROM archimate_elements "' in source
+    assert '"UPDATE archimate_elements SET layer = :layer WHERE id = :id"' in source
+    assert 'f"SELECT id, layer FROM {TABLE} "' not in source
+    assert 'f"UPDATE {TABLE} SET layer = :layer "' not in source
 
 
 def test_backfill_command_is_registered(app):

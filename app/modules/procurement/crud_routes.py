@@ -301,9 +301,13 @@ def _apply_license_form(entitlement, form):
     entitlement.product_name = (form.get("product_name") or "").strip()[:200] or None
     entitlement.license_type = form.get("license_type") or "named_user"
     entitlement.license_metric = (form.get("license_metric") or "").strip()[:50] or None
-    for field in ("quantity_entitled", "quantity_deployed", "quantity_used"):
+    raw = form.get("quantity_entitled")
+    entitlement.quantity_entitled = int(raw) if raw not in (None, "") else 0
+    # Deployed and used are left unrecorded (None -> "—") when blank, never 0:
+    # a zero would read as a measured "nobody uses this".
+    for field in ("quantity_deployed", "quantity_used"):
         raw = form.get(field)
-        setattr(entitlement, field, int(raw) if raw not in (None, "") else 0)
+        setattr(entitlement, field, int(raw) if raw not in (None, "") else None)
     entitlement.unit_cost = _parse_number(form.get("unit_cost"))
     return _recompute_compliance(entitlement)
 
@@ -316,8 +320,11 @@ def _recompute_compliance(entitlement):
     exact condition that screen exists to surface.
     """
     entitled = entitlement.quantity_entitled or 0
-    deployed = entitlement.quantity_deployed or 0
-    if deployed > entitled:
+    deployed = entitlement.quantity_deployed
+    if deployed is None:
+        # Nothing to judge compliance against until deployment is recorded.
+        entitlement.compliance_status = None
+    elif deployed > entitled:
         entitlement.compliance_status = "over_deployed"
     elif entitled and deployed < entitled * 0.5:
         entitlement.compliance_status = "under_utilized"

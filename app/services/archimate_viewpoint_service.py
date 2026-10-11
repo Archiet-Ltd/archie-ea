@@ -13,6 +13,8 @@ Invariants enforced by get_viewpoint_data():
 
 import logging
 
+from app.models.constants import ArchiMateRelationshipType
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,12 +24,7 @@ def _normalize_rel_type(rel_type):
     DB has mixed formats: 'serving', 'ServingRelationship', 'Realization'.
     Viewpoint definitions use lowercase: 'serving', 'realization'.
     """
-    if not rel_type:
-        return 'association'
-    t = rel_type.lower()
-    if t.endswith('relationship'):
-        t = t[:-len('relationship')]
-    return t
+    return ArchiMateRelationshipType.normalize(rel_type) or 'association'
 
 
 STANDARD_VIEWPOINTS = {
@@ -234,7 +231,12 @@ class ArchiMateViewpointService:
 # ── SA-007 module-level helpers ───────────────────────────────────────────────
 
 def get_available_viewpoints() -> list:
-    """Return list of all viewpoint definitions for the SA-007 UI."""
+    """Return list of all viewpoint definitions for the SA-007 UI.
+
+    Also appends CANVAS_TEMPLATES (Lean Canvas, Business Model Canvas,
+    business case) with category 'canvas', by importing the config dict —
+    the Composer's viewpoint dropdown lists them without a fourth catalogue.
+    """
     result = []
     for vp_id, vp in STANDARD_VIEWPOINTS.items():
         result.append({
@@ -244,6 +246,18 @@ def get_available_viewpoints() -> list:
             'layers': vp.get('layers', []),
             'element_types': vp.get('element_types', []),
             'category': vp.get('category', 'other'),
+        })
+
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+
+    for key, tpl in CANVAS_TEMPLATES.items():
+        result.append({
+            'id': key,
+            'name': tpl['name'],
+            'description': '',
+            'layers': [],
+            'element_types': [],
+            'category': 'canvas',
         })
     return result
 
@@ -369,7 +383,30 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
     2. Element type filtering via viewpoint's element_types
     3. Relationship type filtering via viewpoint's allowed_relationships
     4. Relationships with hidden endpoints are hidden (no dangling arrows)
+
+    A canvas key (CANVAS_TEMPLATES) short-circuits before any of the above —
+    canvases are never scope_required — and returns the standard shape with
+    `zones` and `entries` present and empty. A later change fills them via
+    a projection; until then the key is present so the Composer's payload
+    shape never changes underneath it.
     """
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+
+    if viewpoint_id in CANVAS_TEMPLATES:
+        tpl = CANVAS_TEMPLATES[viewpoint_id]
+        return {
+            'viewpoint_id': viewpoint_id,
+            'viewpoint_name': tpl['name'],
+            'scope_required': False,
+            'elements': [],
+            'relationships': [],
+            'total': 0,
+            'layer_order': [],
+            'groups': {},
+            'zones': [],
+            'entries': [],
+        }
+
     vp = STANDARD_VIEWPOINTS.get(viewpoint_id, STANDARD_VIEWPOINTS['basic'])
     layers = [la.lower() for la in vp.get('layers', [])]
     allowed_types = vp.get('element_types', [])

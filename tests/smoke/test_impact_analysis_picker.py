@@ -591,7 +591,7 @@ def test_a_late_failure_of_an_older_search_shows_no_error_over_the_newer_rows(
 
         _release_late(page, held[0], status=500)
         assert rows.count() == 1, "the newer rows must stay"
-        expect(page.locator('p[role="alert"]')).to_be_hidden()
+        expect(page.locator('#main-content p[role="alert"]')).to_be_hidden()
     finally:
         ctx.close()
 

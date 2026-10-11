@@ -62,9 +62,11 @@
             class="flex-1 px-3 py-1.5 bg-muted hover:bg-muted/80 text-muted-foreground rounded text-xs font-medium transition-colors" aria-label="Test connection">  {# placeholder-copy-ok: "Test" is the verb on a connector action button; the accessible name carries the full phrase #}
       Test
     </button>
-    <button type="button" @click.stop="triggerSync(connector.id)"
-            class="flex-1 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded text-xs font-medium transition-colors" aria-label="Action">
-      Sync
+    <button type="button" disabled
+            class="flex-1 px-3 py-1.5 bg-muted text-muted-foreground rounded text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Sync is not available for this connector yet"
+            aria-label="Sync is not available for this connector yet">
+      Not Available
     </button>
   </div>
 </div>

@@ -42,7 +42,53 @@
     function _show(id, on) { var e = document.getElementById(id); if (e) e.classList.toggle('hidden', !on); }
     function _text(id, t) { var e = document.getElementById(id); if (e) e.textContent = t; }
 
+    // The same answer as a readable list: who depends on this element, and
+    // what it depends on, each marked direct or indirect with its hop count.
+    function renderList(key, items, depth) {
+        var list = document.getElementById('impact-' + key + '-list');
+        var status = document.getElementById('impact-' + key + '-status');
+        if (!list || !status) return;
+        while (list.firstChild) list.removeChild(list.firstChild);
+        items = items || [];
+        items.forEach(function (item) {
+            var li = document.createElement('li');
+            li.className = 'flex items-center justify-between gap-3 py-2 text-sm';
+            li.setAttribute('data-element-id', String(item.id));
+            var left = document.createElement('div');
+            left.className = 'min-w-0';
+            var link = document.createElement('a');
+            link.className = 'font-medium text-foreground hover:underline break-words';
+            link.href = PAGE_TMPL.replace(/\/0\/impact$/, '/' + item.id + '/impact');
+            link.textContent = item.name;
+            var type = document.createElement('span');
+            type.className = 'block text-xs text-muted-foreground';
+            type.textContent = item.type || 'Element';
+            left.appendChild(link);
+            left.appendChild(type);
+            var badge = document.createElement('span');
+            badge.className = 'shrink-0 inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium '
+                + (item.hops === 1 ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground');
+            badge.textContent = item.hops === 1 ? 'direct' : 'indirect (' + item.hops + ' hops)';
+            li.appendChild(left);
+            li.appendChild(badge);
+            list.appendChild(li);
+        });
+        status.textContent = items.length ? '' : 'None recorded within ' + depth + ' hop' + (depth === 1 ? '' : 's') + '.';
+        status.classList.toggle('hidden', items.length > 0);
+    }
+
+    function listStatus(text) {
+        ['consumers', 'providers'].forEach(function (key) {
+            var list = document.getElementById('impact-' + key + '-list');
+            if (list) while (list.firstChild) list.removeChild(list.firstChild);
+            var status = document.getElementById('impact-' + key + '-status');
+            if (status) { status.textContent = text; status.classList.remove('hidden'); }
+        });
+    }
+
     function render(data) {
+        renderList('consumers', data.consumers, data.depth);
+        renderList('providers', data.providers, data.depth);
         _show('impact-loading', false);
         linkG.selectAll('*').remove();
         nodeG.selectAll('*').remove();
@@ -106,6 +152,7 @@
     function load(depth) {
         _show('impact-empty', false);
         _show('impact-loading', true);
+        listStatus('Loading…');
         // Platform.fetch returns the parsed body and throws on a non-2xx, so the
         // old two-step response check is unnecessary (and keeps this off the
         // raw-fetch-sites gate).
@@ -114,6 +161,7 @@
             .catch(function () {
                 _show('impact-loading', false);
                 _text('impact-counts', 'Could not load the impact graph.');
+                listStatus('Could not load dependencies.');
             });
     }
 

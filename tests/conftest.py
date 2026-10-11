@@ -70,20 +70,52 @@ def app():
     return application
 
 
+def seed_implementation_planning_flag():
+    """Switch the implementation planning module on (committed). The one place
+    the ``architecture_implementation_planning`` flag is seeded for tests;
+    idempotent. Needs an application context."""
+    from app import db
+    from app.models.feature_flags import FeatureFlag, FeatureState
+
+    flag = FeatureFlag.query.filter_by(key="architecture_implementation_planning").first()
+    if flag is None:
+        flag = FeatureFlag(
+            key="architecture_implementation_planning",
+            name="Architecture Implementation Planning",
+            description="Enable the Implementation Planning module (gap discovery, work packages, plateaus)",
+            enabled=True,
+            state=FeatureState.STABLE,
+        )
+        db.session.add(flag)
+    else:
+        flag.enabled = True
+        flag.state = FeatureState.STABLE
+    db.session.commit()
+
+
 @pytest.fixture(scope="session")
 def _schema(app):
     """Ensure tables exist once per session.
 
     ``create_all()`` only creates *missing* tables, so this is safe against a
-    shared database that already has a schema. It does not add missing columns —
+    shared database that already has a schema.  It does not add missing columns —
     see the schema-drift gate in scripts/verify.py for that.
+
+    It also seeds the standard roles, as a deployed database has them. A user
+    created without an explicit role takes the default one, so without this a
+    test's permissions depended on whether some earlier test in the same run
+    had happened to seed them, and a test run on its own, or in a CI shard
+    without that earlier test, was refused with 403.
     """
     from app import db
+    from app.models.user import Role
 
     with app.app_context():
         db.create_all()
+        Role.insert_roles()
+        seed_implementation_planning_flag()
+        db.session.remove()
     return True
-
 
 @pytest.fixture
 def db_session(app, _schema):

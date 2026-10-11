@@ -370,20 +370,20 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
     application_services = Column(
         db.Text
     )  # JSON: [{name, type, description, endpoints}]
-    application_functions_text = Column(db.Text)  # Comma-separated text of functions
+    application_functions_text = Column(db.Text)  # unrendered-field-ok: legacy comma-separated mirror of business_functions (JSON array), which is what fact_sheet.html/edit.html render
     imported_apqc_codes = Column(db.Text)  # JSON: [process_codes]
 
     # Abacus integration fields
     external_id = Column(db.String(255), unique=True, index=True)  # External system ID
     abacus_source = Column(db.Boolean, default=False)  # Whether sourced from Abacus
     last_sync_from_abacus = Column(db.DateTime)  # Last sync timestamp
-    abacus_properties = Column(db.JSON)  # Additional properties from Abacus
+    abacus_properties = Column(db.JSON)  # unrendered-field-ok: raw unstructured sync payload, not a business-user-facing field; abacus_source/last_sync_from_abacus already show the sync state that matters to a reader
     confidence_score = Column(db.Float)  # AI confidence in mapping
 
     # Power Platform CoE integration
     data_source = Column(db.String(50), nullable=True)        # 'power_platform_coe', 'abacus', 'manual'
     source_identifier = Column(db.String(255), nullable=True)  # external GUID for dedup (Power App GUID)
-    provenance = Column(db.JSON, nullable=True)                # API response snapshot for audit trail
+    provenance = Column(db.JSON, nullable=True)                # unrendered-field-ok: raw API response snapshot for audit/debugging, not a business-user-facing field; data_source/source_identifier already show what matters to a reader
 
     # Timestamps
     created_at = Column(db.DateTime, default=datetime.utcnow)
@@ -755,12 +755,20 @@ class VendorContract(TenantMixin, db.Model):
     """
 
     __tablename__ = "vendor_contracts"
-    __table_args__ = {"extend_existing": True}
+    # Each organisation numbers its own contracts, so a contract number is
+    # unique within one organisation, not across the platform. Existing
+    # databases carried a platform-wide unique index;
+    # `flask reconcile-schema` replaces it.
+    __table_args__ = (
+        db.UniqueConstraint("organization_id", "contract_number",
+                            name="uq_vendor_contracts_org_contract_number"),
+        {"extend_existing": True},
+    )
 
     id = Column(db.Integer, primary_key=True)
 
     # Contract identity
-    contract_number = Column(db.String(100), unique=True, index=True)
+    contract_number = Column(db.String(100), index=True)
     contract_name = Column(db.String(256), nullable=False)
     contract_description = Column(db.Text)
 
@@ -775,6 +783,21 @@ class VendorContract(TenantMixin, db.Model):
     # Link entities
     application_id = Column(db.Integer, db.ForeignKey("application_components.id"))
     vendor_id = Column(db.Integer, db.ForeignKey("vendor_organizations.id"))
+    archimate_contract_id = Column(
+        db.Integer, db.ForeignKey("archimate_contracts.id"), nullable=True, index=True
+    )  # Mirror link to ArchiMate Contract (consolidation of archimate_contracts)
+
+    # The contract as an element of the architecture model (ArchiMate
+    # business-layer Contract), created with the contract by the listener
+    # below - the same mirror ApplicationComponent keeps. NULL for contracts
+    # recorded before the mirror existed.
+    archimate_element_id = Column(
+        db.Integer,
+        ForeignKey("archimate_elements.id", ondelete="SET NULL", use_alter=True,
+                   name="fk_vendor_contracts_archimate_element_id"),
+        nullable=True,
+        index=True,
+    )
 
     # Contract details
     contract_type = Column(
@@ -855,6 +878,11 @@ class VendorContract(TenantMixin, db.Model):
     # SLAs under this contract (required by ServiceLevelAgreement.contract back_populates)
     slas = relationship(
         "ServiceLevelAgreement", back_populates="contract", cascade="all, delete-orphan"
+    )
+
+    # ArchiMate Contract mirror (consolidation of archimate_contracts into vendor_contracts)
+    archimate_contract = relationship(
+        "Contract", foreign_keys=[archimate_contract_id], backref="vendor_contract_mirror"
     )
 
     def __repr__(self):
@@ -946,6 +974,54 @@ def validate_application_name(mapper, connection, target):
     """Validate ApplicationComponent name before insert or update."""
     if not target.name or (isinstance(target.name, str) and target.name.strip() == ""):
         raise ValueError("Application name cannot be null or empty")
+
+
+@event.listens_for(VendorContract, "before_insert")
+def create_vendor_contract_archimate_element(mapper, connection, target):
+    """Mirror a new vendor contract into the model as an ArchiMate Contract.
+
+    Runs on the flush's own connection, so the element and the contract
+    commit or roll back together. organization_id is set by the tenant
+    before_flush (or by the route) before this fires; without one there is no
+    tenant to own the element, so nothing is mirrored rather than guessing.
+    """
+    if target.archimate_element_id is not None or target.organization_id is None:
+        return
+    from sqlalchemy import insert
+
+    from .archimate_core import ArchiMateElement
+
+    result = connection.execute(
+        insert(ArchiMateElement.__table__).values(
+            name=target.contract_name,
+            type="Contract",
+            layer="Business",
+            description=target.contract_description or f"Vendor contract: {target.contract_name}",
+            organization_id=target.organization_id,
+        )
+    )
+    target.archimate_element_id = result.inserted_primary_key[0]
+
+
+@event.listens_for(VendorContract, "before_update")
+def rename_vendor_contract_archimate_element(mapper, connection, target):
+    """Keep the mirrored element's name in step when the contract is renamed."""
+    if target.archimate_element_id is None:
+        return
+    from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy import update
+
+    from .archimate_core import ArchiMateElement
+
+    if not sa_inspect(target).attrs.contract_name.history.has_changes():
+        return
+    elements = ArchiMateElement.__table__
+    connection.execute(
+        update(elements)
+        .where(elements.c.id == target.archimate_element_id,
+               elements.c.organization_id == target.organization_id)
+        .values(name=target.contract_name)
+    )
 
 
 @event.listens_for(ApplicationComponent, "before_insert")

@@ -5,8 +5,9 @@ conversational agent are now wrapped as tools:
 
 * ``create_vendor`` — WRITE, mutates=True, tier 'approve'. Wraps
   ``AIDataInteractionService.create_vendor`` (creates a ``VendorOrganization``).
-* ``extract_contract_from_document`` — READ/extract, mutates=False, tier 'auto'.
-  Wraps ``contract_extraction_service.extract_contract_terms`` (LLM text->JSON).
+* ``extract_contract_from_document`` — EXTRACT (calls external LLM service),
+  mutates=True, tier 'approve'. Wraps ``contract_extraction_service.extract_contract_terms``
+  (LLM text->JSON). Classified as external_action and requires confirmation.
 
 DEVIATION pinned here as fact, not oversight: ``VendorOrganization`` is
 DELIBERATELY not tenant-scoped (ADR-0003 — shared reference data with a globally
@@ -51,8 +52,9 @@ def test_both_tools_registered_with_correct_flags():
     assert create["tier"] == "approve"
 
     assert extract is not None, "extract_contract_from_document is not registered"
-    assert extract["mutates"] is False
-    assert extract["tier"] == "auto"
+    # The tool calls an external service, so it needs confirmation.
+    assert extract["mutates"] is True
+    assert extract["tier"] == "approve"
 
 
 def test_tools_dispatch_via_getattr():

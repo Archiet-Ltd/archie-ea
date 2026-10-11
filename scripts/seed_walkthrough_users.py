@@ -46,7 +46,12 @@ def main() -> int:
         if org is None:
             org = Organization(name="Walkthrough Org", slug="walkthrough")
             db.session.add(org)
-            db.session.commit()
+            db.session.flush()
+        # One person per persona is more than Community admits.
+        from app.services.billing_plans import set_contract_plan
+
+        set_contract_plan(org, "enterprise", None)
+        db.session.commit()
 
         role = Role.query.filter_by(name="Architect").first()
         users = {}

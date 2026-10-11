@@ -162,6 +162,9 @@ class AISemanticDiscoveryService:
             
             # Try a simple API call to verify connectivity
             import openai
+            from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+            LLMService._guard_provider_call("openai", None, prompt="semantic discovery availability check")
             openai.api_key = api_key
             # Make a minimal request to check availability
             openai.Model.list()

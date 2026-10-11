@@ -491,7 +491,7 @@ def test_welcome_banner_dismiss_persists_server_side(app, db_session, make_org):
     first = client.get("/dashboard/overview")
     assert first.status_code == 200
     first_html = first.get_data(as_text=True)
-    # Not a plain text-substring check: "Welcome to A.R.C.H.I.E." also appears
+    # Not a plain text-substring check: "Welcome to Entelim" also appears
     # in admin_base.html's separate role-selection onboarding modal, so pin the
     # dashboard's own banner via its data-testid instead.
     assert 'data-testid="welcome-banner"' in first_html

@@ -4,7 +4,8 @@ Tests for the architecture module migration (full-copy).
 Verifies:
 - All 13 blueprints importable from app.modules.architecture
 - Blueprint names and prefixes match legacy
-- register() wires all blueprints to a Flask app
+- register() wires 12 of the 13 blueprints to a Flask app by default; the
+  architecture monitoring blueprint mounts only when configured
 - Route parity between legacy and module paths
 """
 import pytest
@@ -98,7 +99,7 @@ class TestArchitectureModuleImports:
 class TestArchitectureModuleRegistration:
     """Test that the module registers all blueprints correctly."""
 
-    def test_all_13_blueprints_registered(self, app):
+    def test_all_12_default_blueprints_registered(self, app):
         bp_names = list(app.blueprints.keys())
         expected = [
             "archimate_crud",
@@ -109,7 +110,6 @@ class TestArchitectureModuleRegistration:
             "architecture_assistant",
             "archimate_export",
             "architect_ui",
-            "architecture_monitoring",
             "arb",
             "arb_workflow",
             "adm_kanban_view",
@@ -151,8 +151,45 @@ class TestArchitectureRouteParity:
         must_have = [
             "archimate_crud.dashboard",
             "arb.dashboard",
-            "architecture_monitoring.get_monitoring_status",
             "adm_kanban.update_card",
         ]
         for ep in must_have:
             assert ep in endpoints, f"Missing endpoint: {ep}"
+
+
+class TestArchitectureMonitoringApiFlag:
+    """The architecture monitoring API is off by default and mounted when configured."""
+
+    def test_not_mounted_by_default(self, app):
+        assert "architecture_monitoring" not in app.blueprints
+        assert not any(
+            r.rule.startswith("/api/architecture-monitoring") for r in app.url_map.iter_rules()
+        )
+
+    def test_mounted_when_flag_enabled(self, monkeypatch):
+        monkeypatch.setenv("ARCHITECTURE_MONITORING_API_ENABLED", "true")
+        from app import create_app
+
+        flagged_app = create_app()
+        assert "architecture_monitoring" in flagged_app.blueprints
+        assert "architecture_monitoring.get_monitoring_status" in flagged_app.view_functions
+        rule_count = sum(
+            r.rule.startswith("/api/architecture-monitoring")
+            for r in flagged_app.url_map.iter_rules()
+        )
+        assert rule_count == 17
+
+    def test_boot_continues_when_monitoring_routes_import_fails(self, monkeypatch):
+        """A broken monitoring routes module must not take the whole application down."""
+        import sys
+
+        monkeypatch.setitem(
+            sys.modules,
+            "app.modules.architecture.routes.architecture_monitoring_routes",
+            None,
+        )
+        from app import create_app
+
+        broken_app = create_app()
+        assert "architecture_monitoring" not in broken_app.blueprints
+        assert "arb" in broken_app.blueprints

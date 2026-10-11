@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: plain-language filter wiring — element.layer and element.type now use |plain_layer and |plain_name filters #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 
@@ -41,7 +42,7 @@
         <div>
             <div class="font-semibold text-lg">{{ element.name }}</div>
             <div class="text-sm text-muted-foreground">
-                {{ element.layer or 'Unknown layer' }} &nbsp;·&nbsp; {{ element.type or 'Unknown type' }}
+                {{ (element.layer or 'Unknown layer') | plain_layer(current_user) }} &nbsp;·&nbsp; {{ (element.type or 'Unknown type') | plain_name(current_user) }}
             </div>
         </div>
     </div>

@@ -52,7 +52,10 @@ def test_assign_epic_horizon_survives_reload(browser, live_server, seeded):
     title = "SmkEpic %s" % uuid.uuid4().hex[:8]
     app = create_app("testing")
     with app.app_context():
-        epic = Requirement(title=title, requirement_type="epic", type="functional")
+        epic = Requirement(
+            title=title, requirement_type="epic", type="functional",
+            organization_id=seeded["ids"]["org"],
+        )
         db.session.add(epic)
         db.session.commit()
         epic_id = epic.id

@@ -1,0 +1,54 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+
+{% block title %}System of record — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6">
+  {{ page_shell(
+      title='System of record',
+      subtitle='Which application is authoritative for each data entity.',
+      breadcrumb=[('Home', url_for('main.index')), ('Data governance', None)],
+      tabs=tabs
+  ) }}
+  {% if rows %}
+  <div class="rounded-lg border border-border bg-card overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm" data-testid="sor-table">
+        <thead class="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wide">
+          <tr>
+            <th class="text-left px-4 py-2.5">Data entity</th>
+            <th class="text-left px-4 py-2.5">Domain</th>
+            <th class="text-left px-4 py-2.5">System of record</th>
+            <th class="text-right px-4 py-2.5">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+          {% for row in rows %}
+          <tr data-testid="sor-row-{{ row.entity.id }}">
+            <td class="px-4 py-2.5 font-medium">{{ row.entity.name }}</td>
+            <td class="px-4 py-2.5">{{ row.entity.domain.name | dash if row.entity.domain else '—' }}</td>
+            <td class="px-4 py-2.5">
+              {% if row.system_of_record_name %}{{ row.system_of_record_name }}
+              {% elif row.system_of_record_fallback %}
+              <span class="text-foreground">Legacy label: {{ row.system_of_record_fallback }} — no matching application found yet</span>
+              {% else %}<span class="text-muted-foreground">Not declared</span>{% endif %}
+            </td>
+            <td class="px-4 py-2.5 text-right">
+              <a href="{{ url_for('data_governance.entity_detail', entity_id=row.entity.id) }}"
+                 class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-xs">
+                {{ 'View' if row.system_of_record_name else 'Declare' }}
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  {{ empty_state(icon='database', headline='No data entities yet',
+      body='Data entities are created in the data architecture catalogue. Once one exists you can declare its system of record here.') }}
+  {% endif %}
+</div>
+{% endblock %}

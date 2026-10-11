@@ -54,7 +54,9 @@ DIRECTORY_ONLY_ENDPOINTS = [
     "unified_duplicate.simple_dashboard",
     "strategic.impact_analysis",
     "consolidation_list.dashboard",
-    "batch_import_view.dashboard",
+    # Canvas/framework UI fix (24 Sep 2026): batch_import_view.dashboard was
+    # intentionally folded from platform_admin's Admin zone to stay within the
+    # link budget after adding Framework Management and Framework Configuration.
     "stakeholder_map.stakeholder_map_page",
     "maturity_management.frameworks_overview",
     "strategic.capability_health",
@@ -106,7 +108,7 @@ NONE_SAFE_TEMPLATES = [
     "app/templates/arb/dashboard.html",
     "app/templates/arb/review_detail.html",
     "app/templates/arb/sessions.html",
-    "app/modules/admin/templates/admin/user_role_edit.html",
+    "app/templates/admin/user_role_edit.html",
 ]
 
 

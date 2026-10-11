@@ -199,6 +199,10 @@ def data_import_execute(solution_id):
     if not rows:
         return jsonify({"error": "rows is required. Upload a file first."}), 400
 
+    # Validate mappings are dicts with required keys
+    if not isinstance(mappings, list) or not all(isinstance(m, dict) for m in mappings):
+        return jsonify({"error": "mappings must be a list of mapping objects. Run auto-map first."}), 400
+
     # Filter to only mapped columns (confidence > 0)
     active_mappings = [m for m in mappings if m.get("target_field")]
 

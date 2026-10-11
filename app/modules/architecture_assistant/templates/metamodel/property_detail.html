@@ -1,0 +1,49 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, section_card, empty_state %}
+
+{% block title %}{{ definition.display_name }}{% endblock %}
+
+{% block content %}
+{% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+<div class="p-6 space-y-6">
+    {{ page_shell(
+        title=definition.display_name,
+        subtitle=definition.archimate_type ~ ' · ' ~ type_labels.get(definition.property_type, definition.property_type) ~ (' · required' if definition.is_mandatory else ' · optional'),
+        breadcrumb=[('Home', home_url), ('Element properties', url_for('metamodel_properties.index')), (definition.display_name, none)]
+    ) }}
+
+    {% call section_card(title='Definition') %}
+        <dl class="grid gap-4 text-sm md:grid-cols-2">
+            <div>
+                <dt class="text-muted-foreground">Allowed values</dt>
+                <dd class="mt-1 text-foreground">{{ definition.enum_options | join(', ') if definition.enum_options else '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-muted-foreground">Guidance</dt>
+                <dd class="mt-1 text-foreground">{{ definition.help_text or '—' }}</dd>
+            </div>
+        </dl>
+    {% endcall %}
+
+    {% call section_card(title='Elements missing a value') %}
+        <p class="mb-4 text-sm text-muted-foreground" data-testid="metamodel-missing-count">
+            {{ missing | length }} {{ definition.archimate_type }} element{{ '' if missing | length == 1 else 's' }} without {{ definition.display_name }}.
+        </p>
+        {% if missing %}
+        <ul class="divide-y divide-border text-sm" data-testid="metamodel-missing-list">
+            {% for element in missing %}
+            <li class="flex items-center justify-between gap-4 py-2" data-element-id="{{ element.id }}">
+                <span class="font-medium text-foreground">{{ element.name }}</span>
+                <span class="flex items-center gap-3">
+                    <a href="{{ url_for('intelligence_ui.traceability', element=element.id) }}" class="text-primary hover:underline">Check traceability</a>
+                    <a href="{{ url_for('intelligence_ui.twin_map', element=element.id) }}" class="text-primary hover:underline">Open in Twin map</a>
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        {{ empty_state('check-circle', 'Nothing is missing', 'Every ' ~ definition.archimate_type ~ ' element in your organisation has a value for this property.') }}
+        {% endif %}
+    {% endcall %}
+</div>
+{% endblock %}

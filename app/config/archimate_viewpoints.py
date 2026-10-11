@@ -10,6 +10,7 @@ Each viewpoint defines:
 
 Reference: The Open Group ArchiMate 3.2 Specification, Chapter 14 (Viewpoints)
 """
+import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -1183,4 +1184,371 @@ VIEWPOINT_CATEGORIES = {
     ],
     "implementation": ["project", "migration", "implementation_and_migration"],
     "composite": ["layered", "landscape_map"],
+}
+
+
+# =============================================================================
+# Canvas templates — Lean Canvas, Business Model Canvas, business case (wave 1)
+# =============================================================================
+# A canvas is a viewpoint template, not a second drawing engine: it projects
+# the standard viewpoints above through named boxes instead of drawing
+# anything new. CANVAS_TEMPLATES is data beside VIEWPOINTS; `flask
+# seed-viewpoints` (app/commands/seed_viewpoints.py) upserts one
+# ArchiMateViewpoint catalogue row per template and the `profile`
+# property-template row every zone's element types need.
+#
+# `colour` is always a layer name (motivation/strategy/business/
+# implementation/composite) — never a literal colour. The client resolves it
+# through ComposerRenderer.layerColor: no new drawing library, no literal
+# colour anywhere in this module (see test_no_literal_colour_anywhere_in_the_
+# config_module in tests/test_canvas_templates.py).
+#
+# Only two templates share a record: `lean_canvas` and `business_model_canvas`
+# both read/write BusinessModelCanvas — which canvas is which is the saved
+# diagram's viewpoint_type, not a second table.
+
+CANVAS_REASON_CODES = frozenset({"canvas_box_empty", "canvas_box_not_derived"})
+
+CANVAS_MEMBERSHIP_KINDS = frozenset({
+    "type_profile",         # entries = elements of the box's type(s) carrying its profile
+    "type_profile_anchor",  # as above, plus a relationship to another box's entry (anchor)
+    "attribute",            # a typed-property view over another box's entries — never an element
+    "composed",             # read from other boxes' recorded facts side by side, never derived
+    "register",             # read from an existing register (e.g. risks), never duplicated
+})
+
+# Membership kinds whose entries are real elements and so carry all three flags.
+CANVAS_ELEMENT_MEMBERSHIP = frozenset({"type_profile", "type_profile_anchor", "register"})
+
+CANVAS_FLAG_NAMES = ("high_risk", "nothing_realises", "stale")
+
+# Words that would make a zone's label or box_key read as example content
+# rather than a real box name — the fabrication rule's static placeholder
+# test.
+_CANVAS_PLACEHOLDER_WORDS = (
+    "lorem ipsum", "example text", "placeholder", "todo", "tbd", "xxx", "sample data",
+)
+
+
+def _canvas_zone(
+    box_key, label, order, element_types, profile, membership, colour,
+    anchor_box=None, fill_relationship=None, attribute_keys=None,
+    empty_reason="canvas_box_empty",
+):
+    """One canvas box.
+
+    `phone_order` always equals `order`: the design stacks every canvas in
+    the same sequence at 360px as at desktop width — there is no separate
+    phone reordering for canvases, only a different layout of the same
+    order.
+    """
+    return {
+        "box_key": box_key,
+        "label": label,
+        "order": order,
+        "phone_order": order,
+        "element_types": list(element_types),
+        "profile": profile,
+        "membership": membership,
+        "anchor_box": anchor_box,
+        "fill_relationship": fill_relationship,
+        "attribute_keys": list(attribute_keys or []),
+        "empty_reason": empty_reason,
+        "colour": colour,
+        "flags": list(CANVAS_FLAG_NAMES) if membership in CANVAS_ELEMENT_MEMBERSHIP else [],
+    }
+
+
+# ── Lean Canvas — one row per box the standard's own mapping gives, in the
+# design's stated screen order ──────────────────────────────────────────
+_LEAN_ZONES = [
+    _canvas_zone(
+        "problem", "Problem", 1, ["Driver", "Assessment"], "problem",
+        "type_profile_anchor", "motivation",
+        anchor_box="customer_segments",
+        fill_relationship={"type": "association", "direction": "out"},
+    ),
+    _canvas_zone(
+        "customer_segments", "Customer Segments", 2, ["Stakeholder"], "customer_segment",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "value_propositions", "Unique Value Proposition", 3, ["Value"], "value_proposition",
+        "type_profile_anchor", "motivation",
+        anchor_box="customer_segments",
+        fill_relationship={"type": "association", "direction": "out"},
+    ),
+    _canvas_zone(
+        "solution", "Solution", 4, ["Requirement"], "solution_feature",
+        "type_profile_anchor", "motivation",
+        fill_relationship={"type": "realization", "direction": "in"},
+    ),
+    _canvas_zone(
+        "channels", "Channels", 5, ["BusinessInterface"], "channel",
+        "type_profile_anchor", "business",
+        anchor_box="customer_segments",
+        fill_relationship={"type": "association", "direction": "out"},
+    ),
+    _canvas_zone(
+        "revenue_streams", "Revenue Streams", 6, ["Value"], None,
+        "attribute", "motivation",
+        anchor_box="value_propositions",
+        attribute_keys=["revenue_model", "revenue_amount", "currency"],
+    ),
+    _canvas_zone(
+        "cost_structure", "Cost Structure", 7, ["Resource", "Capability"], None,
+        "attribute", "strategy",
+        attribute_keys=["cost_type", "cost_amount", "currency"],
+    ),
+    _canvas_zone(
+        "key_metrics", "Key Metrics", 8, ["Outcome"], "key_metric",
+        "type_profile_anchor", "motivation",
+        anchor_box="value_propositions",
+        fill_relationship={"type": "association", "direction": "out"},
+    ),
+    _canvas_zone(
+        "unfair_advantage", "Unfair Advantage", 9, ["Resource"], "unfair_advantage",
+        "type_profile_anchor", "strategy",
+        fill_relationship={"type": "assignment", "direction": "out"},
+    ),
+]
+
+# ── Business Model Canvas — one row per box the standard's own mapping
+# gives, in the design's stated screen order. Every box_key equals its
+# BusinessModelCanvas column (app/models/business_model.py CANVAS_BLOCKS) —
+# a box_key equals the record column where one exists.
+_BMC_ZONES = [
+    _canvas_zone(
+        "customer_segments", "Customer Segments", 1, ["Stakeholder"], "customer_segment",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "value_propositions", "Value Propositions", 2, ["Value"], "value_proposition",
+        "type_profile_anchor", "motivation",
+        anchor_box="customer_segments",
+        fill_relationship={"type": "association", "direction": "out"},
+    ),
+    _canvas_zone(
+        "channels", "Channels", 3, ["BusinessInterface"], "channel",
+        "type_profile_anchor", "business",
+        anchor_box="customer_segments",
+        fill_relationship={"type": "association", "direction": "out"},
+    ),
+    _canvas_zone(
+        "customer_relationships", "Customer Relationships", 4, ["BusinessService"],
+        "customer_relationship", "type_profile_anchor", "business",
+        anchor_box="customer_segments",
+        fill_relationship={"type": "association", "direction": "out"},
+    ),
+    _canvas_zone(
+        "revenue_streams", "Revenue Streams", 5, ["Value"], None,
+        "attribute", "motivation",
+        anchor_box="value_propositions",
+        attribute_keys=["revenue_model", "revenue_amount", "currency"],
+    ),
+    _canvas_zone(
+        "key_activities", "Key Activities", 6, ["Capability"], "key_activity",
+        "type_profile_anchor", "strategy",
+        fill_relationship={"type": "realization", "direction": "out"},
+    ),
+    _canvas_zone(
+        "key_resources", "Key Resources", 7, ["Resource"], "key_resource",
+        "type_profile_anchor", "strategy",
+        anchor_box="key_activities",
+        fill_relationship={"type": "assignment", "direction": "out"},
+    ),
+    _canvas_zone(
+        "key_partners", "Key Partnerships", 8, ["BusinessActor"], "key_partner",
+        "type_profile_anchor", "business",
+        anchor_box="key_resources",
+        fill_relationship={"type": "association", "direction": "out"},
+    ),
+    _canvas_zone(
+        "cost_structure", "Cost Structure", 9, ["Resource", "Capability"], None,
+        "attribute", "strategy",
+        attribute_keys=["cost_type", "cost_amount", "currency"],
+    ),
+]
+
+# ── Business case — one row per box the standard's own mapping gives, in
+# record order. box_key equals the BusinessCase column where one exists
+# (app/models/business_case.py); the five with none (executive_summary,
+# expected_disbenefits, timescale, costs, investment_appraisal) carry no
+# existing note to render yet.
+_CASE_ZONES = [
+    _canvas_zone(
+        "executive_summary", "Executive summary", 1, [], None,
+        "composed", "composite",
+        empty_reason="canvas_box_not_derived",
+    ),
+    _canvas_zone(
+        "problem_statement", "Reasons (strategic context)", 2, ["Driver", "Assessment"], "reason",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "options_considered", "Business options", 3, ["CourseOfAction"], "option",
+        "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "expected_benefits", "Expected benefits", 4, ["Outcome"], "benefit",
+        "type_profile_anchor", "motivation",
+        anchor_box="options_considered",
+        fill_relationship={"type": "realization", "direction": "in"},
+    ),
+    _canvas_zone(
+        "expected_disbenefits", "Expected dis-benefits", 5, ["Outcome"], "disbenefit",
+        "type_profile_anchor", "motivation",
+        anchor_box="options_considered",
+        fill_relationship={"type": "realization", "direction": "in"},
+    ),
+    _canvas_zone(
+        "timescale", "Timescale", 6, ["WorkPackage", "ImplementationEvent", "Plateau"], "plan_item",
+        "type_profile_anchor", "implementation",
+        anchor_box="expected_benefits",
+        fill_relationship={"type": "realization", "direction": "out"},
+    ),
+    _canvas_zone(
+        "costs", "Costs", 7, ["WorkPackage", "CourseOfAction"], None,
+        "attribute", "implementation",
+        attribute_keys=["cost_amount", "currency", "cost_type"],
+    ),
+    _canvas_zone(
+        "investment_appraisal", "Investment appraisal", 8, [], None,
+        "composed", "composite",
+        empty_reason="canvas_box_not_derived",
+    ),
+    _canvas_zone(
+        "key_risks", "Major risks", 9, ["Assessment"], "risk",
+        "register", "motivation",
+        anchor_box="options_considered",
+        fill_relationship={"type": "association", "direction": "out"},
+    ),
+]
+
+CANVAS_TEMPLATES: Dict[str, dict] = {
+    "lean_canvas": {
+        "key": "lean_canvas",
+        "name": "Lean Canvas",
+        "record": "business_model_canvas",
+        "projects": ["motivation", "strategy"],
+        "zones": _LEAN_ZONES,
+    },
+    "business_model_canvas": {
+        "key": "business_model_canvas",
+        "name": "Business Model Canvas",
+        "record": "business_model_canvas",
+        "projects": ["motivation", "strategy", "product"],
+        "zones": _BMC_ZONES,
+    },
+    "business_case": {
+        "key": "business_case",
+        "name": "Business case",
+        "record": "business_case",
+        "projects": ["motivation", "strategy", "implementation_and_migration", "project"],
+        "zones": _CASE_ZONES,
+    },
+}
+
+
+def validate_canvas_templates(templates: Optional[Dict[str, dict]] = None) -> None:
+    """Assert a CANVAS_TEMPLATES-shaped dict's schema: every required zone
+    field present, box_keys unique within a template, membership and
+    empty_reason from their closed vocabularies, colour a layer name and
+    never a literal colour, flags present on every element zone and absent
+    from attribute/composed zones, order a dense 1..N sequence, and no
+    placeholder text in any label or box_key. Raises AssertionError on the
+    first problem found.
+
+    Validates the real CANVAS_TEMPLATES by default; a caller passes a copy
+    with one field deliberately broken to prove the check actually catches
+    it (a static test importing this module is otherwise unable to tell a
+    validator that always passes from one that works).
+    """
+    templates = CANVAS_TEMPLATES if templates is None else templates
+    for tpl_key, tpl in templates.items():
+        assert tpl["key"] == tpl_key, f"{tpl_key}: key field does not match its dict key"
+        assert tpl["record"] in ("business_model_canvas", "business_case"), (
+            f"{tpl_key}: unknown record {tpl['record']!r}"
+        )
+        assert isinstance(tpl["projects"], list) and tpl["projects"], f"{tpl_key}: no projects"
+        for vp_key in tpl["projects"]:
+            assert vp_key in VIEWPOINTS, f"{tpl_key}: {vp_key!r} is not a standard viewpoint key"
+
+        zones = tpl["zones"]
+        assert zones, f"{tpl_key}: no zones"
+        seen_keys = set()
+        for zone in zones:
+            for field in (
+                "box_key", "label", "order", "phone_order", "element_types",
+                "membership", "anchor_box", "fill_relationship", "attribute_keys",
+                "empty_reason", "colour", "flags",
+            ):
+                assert field in zone, f"{tpl_key}: zone missing {field!r}"
+
+            box_key = zone["box_key"]
+            assert box_key and box_key not in seen_keys, (
+                f"{tpl_key}: missing or duplicate box_key {box_key!r}"
+            )
+            seen_keys.add(box_key)
+
+            assert zone["membership"] in CANVAS_MEMBERSHIP_KINDS, (
+                f"{tpl_key}.{box_key}: unknown membership {zone['membership']!r}"
+            )
+            assert zone["empty_reason"] in CANVAS_REASON_CODES, (
+                f"{tpl_key}.{box_key}: unknown empty_reason {zone['empty_reason']!r}"
+            )
+            assert zone["colour"] in VIEWPOINT_LAYERS, (
+                f"{tpl_key}.{box_key}: colour {zone['colour']!r} is not a layer name"
+            )
+            assert not re.match(r"^#[0-9a-fA-F]{3,8}$", str(zone["colour"])), (
+                f"{tpl_key}.{box_key}: colour must never be a literal colour"
+            )
+            if zone["membership"] in CANVAS_ELEMENT_MEMBERSHIP:
+                assert zone["flags"] == list(CANVAS_FLAG_NAMES), (
+                    f"{tpl_key}.{box_key}: an element zone must carry all three flags"
+                )
+            else:
+                assert zone["flags"] == [], (
+                    f"{tpl_key}.{box_key}: an attribute/composed zone must carry no flags"
+                )
+
+            for text in (zone["label"], box_key):
+                low = text.lower()
+                for word in _CANVAS_PLACEHOLDER_WORDS:
+                    assert word not in low, (
+                        f"{tpl_key}.{box_key}: placeholder text {word!r} found in {text!r}"
+                    )
+
+        orders = sorted(z["order"] for z in zones)
+        assert orders == list(range(1, len(zones) + 1)), (
+            f"{tpl_key}: order is not a dense 1..{len(zones)} sequence: {orders}"
+        )
+        phone_orders = sorted(z["phone_order"] for z in zones)
+        assert phone_orders == orders, f"{tpl_key}: phone_order must match order"
+
+
+# Every distinct ArchiMate type CANVAS_TEMPLATES' zones name, plus the
+# element types the mapping names as a secondary concept within a box (e.g.
+# Problem's "existing alternatives" Assessment), mapped to every profile
+# value that type takes anywhere across the three templates. One
+# AcmPropertyTemplate `profile` row is seeded per key
+# (app/commands/seed_viewpoints.py) — this is the source of that seeding, not
+# derived from the zones above, because a type's full profile vocabulary
+# spans more than any one zone's own `profile` field.
+CANVAS_PROFILE_OPTIONS_BY_TYPE: Dict[str, List[str]] = {
+    "Driver": ["problem", "reason"],
+    "Assessment": ["existing_alternative", "current_state", "risk"],
+    "Stakeholder": ["customer_segment"],
+    "Value": ["value_proposition"],
+    "Requirement": ["solution_feature"],
+    "Outcome": ["key_metric", "benefit", "disbenefit"],
+    "BusinessInterface": ["channel"],
+    "Resource": ["unfair_advantage", "key_resource"],
+    "Capability": ["key_activity"],
+    "BusinessService": ["customer_relationship"],
+    "BusinessActor": ["key_partner"],
+    "CourseOfAction": ["option"],
+    "WorkPackage": ["plan_item"],
+    "ImplementationEvent": ["milestone"],
+    "Plateau": ["target_state"],
 }

@@ -58,28 +58,67 @@
     {# ── Ownership ── #}
     <section class="rounded-xl border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Ownership</h2>
-      <p class="text-sm text-muted-foreground">Assign owners to enable governance and accountability.</p>
+      <p class="text-sm text-muted-foreground">Assign owner records below. Legacy text fields are read-only.</p>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {# Legacy text columns — read-only, migrated to application_owners #}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <div>
-          <label for="business_owner" class="block text-sm font-medium mb-1">Business Owner</label>
-          <!-- entity-picker-ok: owners are free-text names, not platform users — Abacus has no structured user data -->
+          <label for="business_owner" class="block text-sm font-medium mb-1">Business Owner (legacy)</label>
           <input type="text" id="business_owner" name="business_owner" value="{{ application.business_owner or '' }}"
-                 placeholder="e.g. Jane Smith"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground" readonly>
+          <p class="text-xs text-muted-foreground mt-1">Migrated to owner records. Edit below.</p>
         </div>
         <div>
-          <label for="technical_owner" class="block text-sm font-medium mb-1">Technical Owner</label>
-          <!-- entity-picker-ok: owners are free-text names -->
+          <label for="technical_owner" class="block text-sm font-medium mb-1">Technical Owner (legacy)</label>
           <input type="text" id="technical_owner" name="technical_owner" value="{{ application.technical_owner or '' }}"
-                 placeholder="e.g. John Doe"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground" readonly>
+          <p class="text-xs text-muted-foreground mt-1">Migrated to owner records. Edit below.</p>
+        </div>
+      </div>
+
+      {# Current owner records from ApplicationOwner #}
+      <div id="owner-list" class="space-y-2 mb-4">
+        <p class="text-sm font-medium">Current owners</p>
+        {% for o in application_owners %}
+        <div class="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
+             data-owner-id="{{ o.id }}">
+          <div>
+            <span class="font-medium">{{ o.user_name }}</span>
+            <span class="text-muted-foreground ml-2">({{ o.ownership_type | capitalize }})</span>
+          </div>
+          <button type="button" class="text-destructive hover:text-destructive-emphasis text-xs remove-owner-btn"
+                  data-owner-id="{{ o.id }}" data-app-id="{{ application.id }}">Remove</button>
+        </div>
+        {% else %}
+        <p class="text-sm text-muted-foreground" id="no-owners-msg">No owners assigned yet.</p>
+        {% endfor %}
+      </div>
+
+      {# Add owner form #}
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+        <div>
+          <label for="owner_picker_search" class="block text-sm font-medium mb-1">Search user</label>
+          <input type="text" id="owner_picker_search"
+                 placeholder="Type at least 2 characters…"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                 data-app-id="{{ application.id }}">
+          <div id="owner_picker_results" class="hidden absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-lg max-h-48 overflow-y-auto"></div>
         </div>
         <div>
-          <label for="business_purpose" class="block text-sm font-medium mb-1">Business Purpose</label>
-          <input type="text" id="business_purpose" name="business_purpose" value="{{ application.business_purpose or '' }}"
-                 placeholder="e.g. Customer data management"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          <label for="owner_type_select" class="block text-sm font-medium mb-1">Role</label>
+          <select id="owner_type_select"
+                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+            <option value="primary">Primary</option>
+            <option value="backup">Backup</option>
+            <option value="technical">Technical</option>
+            <option value="business">Business</option>
+          </select>
+        </div>
+        <div>
+          <button type="button" id="add-owner-btn" disabled
+                  class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 text-sm font-medium transition-colors disabled:opacity-50">
+            <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add owner
+          </button>
         </div>
       </div>
     </section>
@@ -105,6 +144,12 @@
             <option value="{{ current_crit }}" selected>{{ current_crit | capitalize }}</option>
             {% endif %}
           </select>
+        </div>
+        <div>
+          <label for="business_purpose" class="block text-sm font-medium mb-1">Business Purpose</label>
+          <input type="text" id="business_purpose" name="business_purpose" value="{{ application.business_purpose or '' }}"
+                 placeholder="e.g. Core business function, compliance reporting"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
         <div>
           <label for="deployment_status" class="block text-sm font-medium mb-1">Deployment Status</label>
@@ -166,6 +211,96 @@
       </div>
     </section>
 
+    {# ── Technical profile ── #}
+    <section class="rounded-xl border border-border bg-card p-6 space-y-4">
+      <h2 class="text-lg font-semibold">Technical profile</h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="cloud_provider" class="block text-sm font-medium mb-1">Cloud Provider</label>
+          <input type="text" id="cloud_provider" name="cloud_provider" value="{{ application.cloud_provider or '' }}"
+                 placeholder="e.g. AWS, Azure, GCP, On-Prem"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="deployment_region" class="block text-sm font-medium mb-1">Deployment Region</label>
+          <input type="text" id="deployment_region" name="deployment_region" value="{{ application.deployment_region or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="database_platforms" class="block text-sm font-medium mb-1">Database Platforms</label>
+          <input type="text" id="database_platforms" name="database_platforms" value="{{ application.database_platforms or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="programming_languages" class="block text-sm font-medium mb-1">Programming Languages</label>
+          <input type="text" id="programming_languages" name="programming_languages" value="{{ application.programming_languages or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="integration_methods" class="block text-sm font-medium mb-1">Integration Methods</label>
+          <input type="text" id="integration_methods" name="integration_methods" value="{{ application.integration_methods or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="authentication_method" class="block text-sm font-medium mb-1">Authentication Method</label>
+          <input type="text" id="authentication_method" name="authentication_method" value="{{ application.authentication_method or '' }}"
+                 placeholder="e.g. OAuth2, SAML, LDAP, API Key"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="container_image" class="block text-sm font-medium mb-1">Container Image</label>
+          <input type="text" id="container_image" name="container_image" value="{{ application.container_image or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="kubernetes_namespace" class="block text-sm font-medium mb-1">Kubernetes Namespace</label>
+          <input type="text" id="kubernetes_namespace" name="kubernetes_namespace" value="{{ application.kubernetes_namespace or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="version_control_url" class="block text-sm font-medium mb-1">Version Control URL</label>
+          <input type="text" id="version_control_url" name="version_control_url" value="{{ application.version_control_url or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="main_branch" class="block text-sm font-medium mb-1">Main Branch</label>
+          <input type="text" id="main_branch" name="main_branch" value="{{ application.main_branch or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+      </div>
+    </section>
+
+    {# ── Compliance and notes ── #}
+    <section class="rounded-xl border border-border bg-card p-6 space-y-4">
+      <h2 class="text-lg font-semibold">Compliance and notes</h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="compliance_requirements" class="block text-sm font-medium mb-1">Compliance Requirements</label>
+          <input type="text" id="compliance_requirements" name="compliance_requirements" value="{{ application.compliance_requirements or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+        <div>
+          <label for="security_certifications" class="block text-sm font-medium mb-1">Security Certifications</label>
+          <input type="text" id="security_certifications" name="security_certifications" value="{{ application.security_certifications or '' }}"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+      </div>
+
+      <div>
+        <label for="notes" class="block text-sm font-medium mb-1">Notes</label>
+        <textarea id="notes" name="notes" rows="3"
+                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">{{ application.notes or '' }}</textarea>
+      </div>
+
+      <div>
+        <label for="assessment_notes" class="block text-sm font-medium mb-1">Assessment Notes</label>
+        <textarea id="assessment_notes" name="assessment_notes" rows="3"
+                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">{{ application.assessment_notes or '' }}</textarea>
+      </div>
+    </section>
+
     {# ── Actions ── #}
     <div class="flex items-center justify-between pt-2">
       <a href="{{ url_for('unified_applications.application_detail', id=application.id) }}"
@@ -177,4 +312,9 @@
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/applications/owner_picker.js') }}"></script>
 {% endblock %}

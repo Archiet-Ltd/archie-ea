@@ -120,39 +120,72 @@ def test_exactly_one_primary_cta_in_page_actions(app, db_session, make_org):
 
 
 def test_primary_cta_label_matches_destination_h1(app, db_session, make_org):
-    """The primary CTA's label must not lie about what page it opens — fetch
-    the href and compare against the destination's own <h1>."""
+    """The primary CTA's label must not lie about what it does.
+
+    Two kinds of primary action, two rules:
+    - a link (navigates to another page): its label must match the
+      destination page's own <h1> — fetch the href and compare.
+    - a button that performs an action directly (nothing to navigate to,
+      so no destination <h1> to check): its label must name the action it
+      performs, and the button must actually be wired to that action, not
+      just claim to be.
+    """
     client, html = _get_list_html(app, db_session, make_org, "label")
     actions_slice = _page_actions_slice(html)
 
-    match = re.search(
+    link_match = re.search(
         r'<a[^>]*bg-primary text-primary-foreground[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
         actions_slice,
         re.DOTALL,
     )
-    if not match:
+    if not link_match:
         # href may precede the class attribute — try the other order too.
-        match = re.search(
+        link_match = re.search(
             r'<a[^>]*href="([^"]+)"[^>]*bg-primary text-primary-foreground[^>]*>(.*?)</a>',
             actions_slice,
             re.DOTALL,
         )
-    assert match, actions_slice
-    href, inner = match.group(1), match.group(2)
+
+    if link_match:
+        href, inner = link_match.group(1), link_match.group(2)
+        label_text = re.sub(r"<[^>]+>", " ", inner)
+        label_text = re.sub(r"\s+", " ", label_text).strip()
+
+        dest_resp = client.get(href)
+        assert dest_resp.status_code == 200, dest_resp.get_data(as_text=True)[:2000]
+        dest_html = dest_resp.get_data(as_text=True)
+        h1_match = re.search(r"<h1[^>]*>(.*?)</h1>", dest_html, re.DOTALL)
+        assert h1_match, "destination page has no <h1>"
+        h1_text = re.sub(r"<[^>]+>", " ", h1_match.group(1))
+        h1_text = re.sub(r"\s+", " ", h1_text).strip()
+
+        assert h1_text.lower() in label_text.lower(), (
+            f"primary CTA label {label_text!r} does not match destination "
+            f"<h1> {h1_text!r}"
+        )
+        return
+
+    # Not a link — must be a button that performs an action directly.
+    button_match = re.search(
+        r'<button[^>]*bg-primary text-primary-foreground[^>]*>(.*?)</button>',
+        actions_slice,
+        re.DOTALL,
+    )
+    assert button_match, (
+        "primary action in page-actions is neither a link with an href nor "
+        f"a button: {actions_slice}"
+    )
+    tag, inner = button_match.group(0), button_match.group(1)
     label_text = re.sub(r"<[^>]+>", " ", inner)
     label_text = re.sub(r"\s+", " ", label_text).strip()
 
-    dest_resp = client.get(href)
-    assert dest_resp.status_code == 200, dest_resp.get_data(as_text=True)[:2000]
-    dest_html = dest_resp.get_data(as_text=True)
-    h1_match = re.search(r"<h1[^>]*>(.*?)</h1>", dest_html, re.DOTALL)
-    assert h1_match, "destination page has no <h1>"
-    h1_text = re.sub(r"<[^>]+>", " ", h1_match.group(1))
-    h1_text = re.sub(r"\s+", " ", h1_text).strip()
-
-    assert h1_text.lower() in label_text.lower(), (
-        f"primary CTA label {label_text!r} does not match destination "
-        f"<h1> {h1_text!r}"
+    assert "new solution" in label_text.lower(), (
+        f"primary CTA button label {label_text!r} does not name the action "
+        "it performs"
+    )
+    assert "startSolution" in tag, (
+        f"primary CTA button is labelled {label_text!r} but is not wired "
+        f"to the action it names: {tag!r}"
     )
 
 

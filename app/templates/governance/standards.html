@@ -2,48 +2,155 @@
 {% from 'components/page_header.html' import page_header %}
 {% block title %}Technology Standards{% endblock %}
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-  {{ page_header(title='Technology Standards', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Technology Standards'}], description='Approved technologies and their status') }}
-  <div class="mt-6 rounded-xl border bg-card shadow-sm overflow-x-auto">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+  {{ page_header(title='Technology Standards', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Technology Standards'}], description='Approved technologies per domain, with their radar ring and sunset date') }}
+
+  <section class="rounded-xl border bg-card shadow-sm p-4 sm:p-6" aria-labelledby="standard-form-title">
+    <h2 id="standard-form-title" class="text-base font-semibold">Publish a standard</h2>
+    <p class="text-sm text-muted-foreground mt-0.5">The radar ring is recorded on the Tech Radar for the technology element you choose.</p>
+    <form method="POST" action="{{ url_for('governance.standards') }}" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="standard-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="block text-sm">
+        <span class="block font-medium mb-1">Technology <span class="text-destructive-emphasis" aria-hidden="true">*</span></span>
+        <input type="text" name="technology_name" required maxlength="255" value="{{ form.get('technology_name', '') }}"
+          class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+      </label>
+      <label class="block text-sm">
+        <span class="block font-medium mb-1">Domain <span class="text-destructive-emphasis" aria-hidden="true">*</span></span>
+        <input type="text" name="category" required maxlength="100" list="standard-domains" value="{{ form.get('category', '') }}"
+          placeholder="e.g. Messaging, Database, Runtime"
+          class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+        <datalist id="standard-domains">
+          {% for domain in grouped.keys() if domain %}<option value="{{ domain }}"></option>{% endfor %}
+        </datalist>
+      </label>
+      <label class="block text-sm">
+        <span class="block font-medium mb-1">Status <span class="text-destructive-emphasis" aria-hidden="true">*</span></span>
+        <select name="status" required class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+          <option value="">Select…</option>
+          {% for s in statuses %}
+          <option value="{{ s }}" {% if form.get('status') == s %}selected{% endif %}>{{ s.replace('_', ' ') | capitalize }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="block text-sm">
+        <span class="block font-medium mb-1">Approved version</span>
+        <input type="text" name="approved_version" maxlength="50" value="{{ form.get('approved_version', '') }}"
+          class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+      </label>
+      <div class="relative text-sm" x-data="standardElementPicker()">
+        <label for="standard-element" class="block font-medium mb-1">Technology element</label>
+        <input type="hidden" name="archimate_element_id" :value="picked ? picked.id : ''">
+        <input id="standard-element" type="text" autocomplete="off" role="combobox" aria-autocomplete="list"
+          :aria-expanded="results.length > 0 ? 'true' : 'false'" aria-controls="standard-element-results"
+          x-model="query" @input.debounce.300ms="search()" placeholder="Search the technology layer"
+          class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+        <ul id="standard-element-results" role="listbox" x-show="results.length" x-cloak
+          class="absolute z-10 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-56 overflow-auto">
+          <template x-for="item in results" :key="item.id">
+            <li role="option" aria-selected="false">
+              <button type="button" @click="choose(item)" class="w-full text-left px-3 py-2 hover:bg-muted">
+                <span x-text="item.name"></span> <span class="text-xs text-muted-foreground" x-text="item.type"></span>
+              </button>
+            </li>
+          </template>
+        </ul>
+        <p class="mt-1 text-xs text-muted-foreground" x-show="!picked">Needed for a radar ring.</p>
+        <p class="mt-1 text-xs" x-show="picked" x-cloak>Selected: <span class="font-medium" x-text="picked ? picked.name : ''"></span></p>
+        <p class="mt-1 text-xs text-destructive-emphasis" x-show="error" x-cloak x-text="error"></p>
+      </div>
+      <label class="block text-sm">
+        <span class="block font-medium mb-1">Radar ring</span>
+        <select name="ring" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+          <option value="">Not placed on the radar</option>
+          {% for r in rings %}
+          <option value="{{ r }}" {% if form.get('ring') == r %}selected{% endif %}>{{ ring_labels[r] }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="block text-sm">
+        <span class="block font-medium mb-1">Sunset date</span>
+        <input type="date" name="sunset_date" value="{{ form.get('sunset_date', '') }}"
+          class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+      </label>
+      <label class="block text-sm">
+        <span class="block font-medium mb-1">Replacement technology</span>
+        <input type="text" name="replacement_technology" maxlength="255" value="{{ form.get('replacement_technology', '') }}"
+          class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+      </label>
+      <label class="block text-sm md:col-span-2">
+        <span class="block font-medium mb-1">Rationale</span>
+        <textarea name="rationale" rows="3" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">{{ form.get('rationale', '') }}</textarea>
+      </label>
+      <div class="md:col-span-2 flex justify-end">
+        <button type="submit" data-testid="standard-submit"
+          class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4">
+          Publish standard
+        </button>
+      </div>
+    </form>
+  </section>
+
+  {% if not grouped %}
+  <div class="rounded-xl border bg-card shadow-sm px-4 py-10 text-center text-sm text-muted-foreground" data-testid="standards-empty">
+    No technology standards defined yet.
+  </div>
+  {% endif %}
+
+  {% for domain, rows in grouped.items() %}
+  <section class="rounded-xl border bg-card shadow-sm overflow-x-auto" data-testid="standards-domain" data-domain="{{ domain }}">
+    <h2 class="px-4 py-3 border-b border-border text-sm font-semibold">{{ domain or '—' }}</h2>
     <table class="w-full text-sm">
       <thead>
         <tr class="border-b border-border text-left text-muted-foreground">
           <th class="px-4 py-3 font-medium">Technology</th>
-          <th class="px-4 py-3 font-medium">Category</th>
           <th class="px-4 py-3 font-medium">Status</th>
+          <th class="px-4 py-3 font-medium">Radar ring</th>
           <th class="px-4 py-3 font-medium">Version</th>
+          <th class="px-4 py-3 font-medium">Sunset date</th>
+          <th class="px-4 py-3 font-medium">Rationale</th>
         </tr>
       </thead>
-      <tbody id="gov-rows">
-        <tr><td colspan="4" class="px-4 py-3"><div class="animate-pulse h-4 bg-muted rounded w-full"></div></td></tr>
-        <tr><td colspan="4" class="px-4 py-3"><div class="animate-pulse h-4 bg-muted rounded w-full"></div></td></tr>
-        <tr><td colspan="4" class="px-4 py-3"><div class="animate-pulse h-4 bg-muted rounded w-full"></div></td></tr>
+      <tbody>
+        {% for row in rows %}
+        {% set s = row.standard %}
+        <tr class="border-b border-border last:border-0 align-top" data-testid="standard-row-{{ s.id }}">
+          <td class="px-4 py-3 font-medium text-foreground">{{ s.technology_name }}</td>
+          <td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">{{ (s.status or '—').replace('_', ' ') | capitalize }}</span></td>
+          <td class="px-4 py-3" data-testid="standard-ring-{{ s.id }}">{{ ring_labels[row.ring] if row.ring else '—' }}</td>
+          <td class="px-4 py-3 text-muted-foreground">{{ s.approved_version or '—' }}</td>
+          <td class="px-4 py-3 text-muted-foreground" data-testid="standard-sunset-{{ s.id }}">{{ s.sunset_date | format_date if s.sunset_date else '—' }}</td>
+          <td class="px-4 py-3 text-muted-foreground">{{ s.rationale or '—' }}</td>
+        </tr>
+        {% endfor %}
       </tbody>
     </table>
-  </div>
+  </section>
+  {% endfor %}
 </div>
 <script>
-(function(){
-  function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
-  var body=document.getElementById('gov-rows');
-  function empty(msg){ body.innerHTML='<tr><td colspan="4" class="px-4 py-10 text-center text-muted-foreground">'+msg+'</td></tr>'; }
-  function error(msg){ body.innerHTML='<tr><td colspan="4" class="px-4 py-10 text-center text-destructive-emphasis">'+msg+'</td></tr>'; }
-  Platform.fetch.get('/governance/api/standards', null, { headers: { 'Accept': 'application/json' }, silent: true })
-    .then(function(items){
-      if(!items || !items.length){ empty('No technology standards defined yet.'); return; }
-      body.innerHTML=items.map(function(s){
-        return '<tr class="border-b border-border last:border-0">'
-          +'<td class="px-4 py-3 font-medium text-foreground">'+esc(s.technology)+'</td>'
-          +'<td class="px-4 py-3 text-muted-foreground">'+esc(s.category||'')+'</td>'
-          +'<td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">'+esc(s.status||'')+'</span></td>'
-          +'<td class="px-4 py-3 text-muted-foreground">'+esc(s.version||'')+'</td></tr>';
-      }).join('');
-    })
-    .catch(function(err){ 
-      // The call site already paints its own inline error state, so we pass silent:true to avoid duplicate toast.
-      // Platform.fetch throws on non-ok responses, so we handle the error here.
-      error('Could not load technology standards — the request failed.');
-    });
-})();
+  // Live-search picker over the organisation's Technology-layer elements.
+  window.standardElementPicker = function () {
+    return {
+      query: '',
+      results: [],
+      picked: null,
+      error: '',
+      search() {
+        const q = this.query.trim();
+        this.error = '';
+        if (this.picked && q !== this.picked.name) this.picked = null;
+        if (q.length < 2) { this.results = []; return; }
+        Platform.fetch.get('/archimate/api/elements/search?layer=technology&limit=10&q=' + encodeURIComponent(q), null, { silent: true })
+          .then((body) => { this.results = (body && Array.isArray(body.data)) ? body.data : []; })
+          .catch(() => { this.results = []; this.error = 'Technology elements could not be searched.'; });
+      },
+      choose(item) {
+        this.picked = item;
+        this.query = item.name;
+        this.results = [];
+      },
+    };
+  };
 </script>
 {% endblock %}

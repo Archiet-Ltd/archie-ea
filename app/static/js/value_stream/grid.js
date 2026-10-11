@@ -95,6 +95,27 @@
                 return String(cell.support_level);
             },
 
+            // Capability maturity as recorded on the capability itself.
+            // Unassessed renders as an em dash, never as a level.
+            maturityLabel(cap) {
+                var current = cap && cap.current_maturity_level;
+                var target = cap && cap.target_maturity_level;
+                var label = (current === null || current === undefined) ? '—' : 'L' + current;
+                if (target !== null && target !== undefined) {
+                    label += ' → L' + target;
+                }
+                return label;
+            },
+
+            // Capabilities mapped to one stage, for the swimlane card.
+            capabilitiesForStage(stageId) {
+                var self = this;
+                return this.capabilities.filter(function (cap) {
+                    var cell = self.cells[self.cellKey(cap.id, stageId)];
+                    return cell && cell.support_level;
+                });
+            },
+
             cellClass(capabilityId, stageId) {
                 var cell = this.cells[this.cellKey(capabilityId, stageId)];
                 if (!cell || !cell.support_level) {

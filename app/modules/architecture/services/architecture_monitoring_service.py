@@ -13,7 +13,7 @@ Key Features:
 - Alert types: NEW_GAP, COVERAGE_DECREASE, MATURITY_REGRESSION, VENDOR_RISK_CHANGE
 - Alert severity levels: info, warning, critical
 - Integration with existing gap detection services
-- Scheduled scanning functionality
+- Scans run on request only (no scheduler); scan_interval_minutes is stored and reported, not acted on
 
 Reuses:
 - gap_discovery_service.py for scanning

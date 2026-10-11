@@ -26,17 +26,17 @@ class TestSolutionsStrategicModuleImports:
         assert callable(register)
 
     def test_strategic_bp_importable(self):
-        from app.routes.strategic_routes import strategic_bp
+        from app.modules.solutions_strategic.v2.routes.strategic_routes import strategic_bp
 
         assert strategic_bp.name == "strategic"
 
     def test_solution_design_importable(self):
-        from app.routes.solution_design_routes import solution_design_bp
+        from app.modules.solutions_strategic.v2.routes.solution_design_routes import solution_design_bp
 
         assert solution_design_bp.name == "solution_design"
 
     def test_roadmap_api_importable(self):
-        from app.api.roadmap_api import roadmap_bp
+        from app.modules.solutions_strategic.v2.routes.roadmap_api import roadmap_bp
 
         assert roadmap_bp.name == "roadmap_api"
 

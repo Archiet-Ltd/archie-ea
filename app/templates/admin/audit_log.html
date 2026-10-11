@@ -8,7 +8,7 @@
 <div class="p-6 space-y-6 mx-auto max-w-7xl">
     {{ page_header(
         title='Audit Log',
-        description='Query and filter audit trail entries for compliance review',
+        description='Query, export and verify your organisation\'s audit trail',
         breadcrumbs=[
             {'label': 'Dashboard', 'href': url_for('main.index')},
             {'label': 'Admin', 'href': url_for('admin.dashboard')},
@@ -70,18 +70,67 @@
                class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors">
                 Clear
             </a>
-            <a href="{{ url_for('admin.audit_log_viewer', date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q, export='csv') }}"
+            <a href="{{ url_for('admin.audit_log_viewer', action='tool_refused') }}" data-testid="audit-refused-tool-calls"
+               {% if action_filter == 'tool_refused' %}aria-current="page"{% endif %}
+               class="inline-flex items-center justify-center rounded-md border border-input px-4 py-2 text-sm font-medium transition-colors {% if action_filter == 'tool_refused' %}bg-accent text-accent-foreground{% else %}bg-background hover:bg-accent{% endif %}">
+                <i data-lucide="shield-x" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Refused AI tool calls
+            </a>
+            <a id="audit-export" href="{{ url_for('admin.audit_log_viewer', date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q, export='csv') }}"
                class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors ml-auto">
                 <i data-lucide="download" class="h-4 w-4 mr-1.5"></i> Export CSV
             </a>
         </div>
     </form>
 
+    <!-- Integrity: the organisation's hash chain and its last recorded check -->
+    <section class="mt-6 rounded-xl border bg-card p-4" aria-labelledby="audit-integrity-heading">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0 space-y-1">
+                <h2 id="audit-integrity-heading" class="text-sm font-semibold text-foreground">Integrity</h2>
+                <p class="text-xs text-muted-foreground">Each entry is sealed to the one before it, so an entry altered, removed or inserted afterwards is detected.</p>
+                <div id="audit-last-verification" class="text-sm">
+                    {% set v = latest_verification.new_value if latest_verification and latest_verification.new_value is mapping else none %}
+                    {% if v %}
+                        {% if v.status == 'intact' %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">Intact</span>
+                        <span class="text-muted-foreground">{{ v.checked }} entries verified</span>
+                        {% elif v.status == 'broken' %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30">Broken</span>
+                        <span class="text-foreground">at entry #{{ v.first_broken_id if v.first_broken_id is not none else '—' }}: {{ v.reason or '—' }}</span>
+                        {% else %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">No sealed entries</span>
+                        {% endif %}
+                        <span class="block text-xs text-muted-foreground mt-1">
+                            Last verified {{ latest_verification.created_at.strftime('%Y-%m-%d %H:%M:%S') if latest_verification.created_at else '—' }} UTC
+                            by {{ latest_verification.user_email or '—' }}{% if v.unsealed %}; {{ v.unsealed }} earlier entries were recorded before sealing began and are not covered{% endif %}.
+                        </span>
+                    {% else %}
+                        <span class="text-muted-foreground">Not verified yet — run a check to record the first result.</span>
+                    {% endif %}
+                </div>
+            </div>
+            <form method="post" action="{{ url_for('admin.audit_log_viewer', date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q) }}" class="shrink-0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button id="audit-verify" type="submit"
+                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                    <i data-lucide="shield-check" class="h-4 w-4 mr-1.5"></i> Verify integrity
+                </button>
+            </form>
+        </div>
+    </section>
+
+    {% if load_error %}
+    <div role="alert" class="mt-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-emphasis">
+        The audit log could not be read. No entries are shown because none could be loaded; reload to try again.
+    </div>
+    {% endif %}
+
     <!-- Results summary -->
     <div class="flex items-center justify-between mt-6 mb-3">
         <p class="text-sm text-muted-foreground">
-            Showing {{ entries|length }} of {{ total }} entries
+            Showing {{ entries|length }} of <span id="audit-total">{{ total if total is not none else '—' }}</span> entries
             {% if page > 1 %} (page {{ page }} of {{ total_pages }}){% endif %}
+            {% if total %} · Export CSV includes all {{ total }}{% endif %}
         </p>
     </div>
 
@@ -97,7 +146,6 @@
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground">Action</th>
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground">Entity</th>
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground">Description</th>
-                        <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
@@ -109,9 +157,9 @@
                                :class="expanded[{{ entry.id }}] ? 'rotate-90' : ''"></i>
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                            {{ entry.timestamp.strftime('%Y-%m-%d %H:%M:%S') if entry.timestamp else '-' }}
+                            {{ entry.timestamp.strftime('%Y-%m-%d %H:%M:%S') if entry.timestamp else '—' }}
                         </td>
-                        <td class="px-4 py-3 whitespace-nowrap">{{ entry.user_email or '-' }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">{{ entry.user_email or '—' }}</td>
                         <td class="px-4 py-3">
                             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium
                                 {% if entry.action == 'create' %}bg-success/10 text-success-emphasis border border-success/30
@@ -131,20 +179,34 @@
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 max-w-xs truncate" title="{{ entry.description or '' }}">
-                            {{ entry.description or '-' }}
-                        </td>
-                        <td class="px-4 py-3">
-                            {% if entry.status == 'success' %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">success</span>
-                            {% else %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30">{{ entry.status }}</span>
-                            {% endif %}
+                            {{ entry.description or '—' }}
                         </td>
                     </tr>
                     <!-- Expanded detail row -->
                     <tr x-show="expanded[{{ entry.id }}]" x-cloak class="bg-muted/20">
-                        <td colspan="7" class="px-4 py-4">
+                        <td colspan="6" class="px-4 py-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                {% if entry.action == 'tool_refused' and entry.new_values is mapping %}
+                                {% set refusal = entry.new_values %}
+                                <dl class="col-span-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1" data-testid="refused-tool-call-{{ entry.id }}">
+                                    <dt class="text-muted-foreground">Tool</dt>
+                                    <dd class="font-medium">{{ refusal.get('tool') or '—' }}</dd>
+                                    <dt class="text-muted-foreground">Refused by</dt>
+                                    <dd>{{ refusal.get('rule_description') or '—' }}</dd>
+                                    <dt class="text-muted-foreground">Attempted through</dt>
+                                    <dd>{{ {'agent': 'The assistant running the tool', 'approval': 'Approving a queued tool call'}.get(refusal.get('via'), '—') }}</dd>
+                                    <dt class="text-muted-foreground">Asked for</dt>
+                                    <dd>
+                                        {% if refusal.get('arguments') %}
+                                        <ul class="space-y-0.5">
+                                            {% for key, value in refusal.get('arguments').items() %}
+                                            <li><span class="text-muted-foreground">{{ key }}:</span> {{ '—' if value is none else value }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% else %}—{% endif %}
+                                    </dd>
+                                </dl>
+                                {% endif %}
                                 {% if entry.old_values %}
                                 <div>
                                     <h4 class="font-medium text-muted-foreground mb-2">Previous Values</h4>
@@ -162,6 +224,8 @@
                                 {% endif %}
                                 <div class="col-span-2 flex gap-6 text-xs text-muted-foreground border-t border-border pt-3 mt-1">
                                     {% if entry.ip_address %}<span>IP: {{ entry.ip_address }}</span>{% endif %}
+                                    {% if entry.source_table %}<span>Recorded first in: {{ entry.source_table }} #{{ entry.source_id }}</span>{% endif %}
+                                    <span class="break-all">Seal: {{ entry.row_hash or 'not sealed (recorded before sealing began)' }}</span>
                                     {% if entry.request_id %}<span>Request ID: {{ entry.request_id }}</span>{% endif %}
                                     {% if entry.error_message %}<span class="text-destructive-emphasis">Error: {{ entry.error_message }}</span>{% endif %}
                                 </div>
@@ -169,8 +233,9 @@
                         </td>
                     </tr>
                     {% else %}
+                    {% if not load_error %}
                     <tr>
-                        <td colspan="7">
+                        <td colspan="6">
                             {% if date_from or date_to or user_email or action_filter or entity_type_filter or search_q %}
                             {{ empty_state(icon='file-search', title='No audit log entries found matching your filters.',
                                            description='Widen the date range or drop a filter to see the entries that were recorded.',
@@ -189,6 +254,7 @@
                             {% endif %}
                         </td>
                     </tr>
+                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>

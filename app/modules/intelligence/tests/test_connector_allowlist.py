@@ -3,9 +3,9 @@ crosswalk write.
 
 Covers: refusal of a known-pending source with a named reason, refusal of a
 type nobody has ever heard of (proving the allowlist, not a denylist, is the
-mechanism), that a refusal performs no write, that this module's claim is
-scoped to the crosswalk-write boundary and not the connector-configuration
-boundary, pass-through for every permitted type, the config-approved
+mechanism), that a refusal performs no write, that this module's claim names
+both boundaries it gates (crosswalk write and connector configuration) and
+the configuration path calls it, pass-through for every permitted type, the config-approved
 default-closed behaviour, and a mutation check that a denylist substitution
 would have let the unrecognised-type test catch it.
 """
@@ -95,17 +95,23 @@ def test_refused_call_reaches_no_writer(app):
 # 4. Narrowed-claim correctness
 # ---------------------------------------------------------------------------
 
-def test_module_docstring_names_crosswalk_write_and_disclaims_configuration():
-    """This module claims exactly the crosswalk-write boundary. Its own
-    documentation must name that boundary, and must not assert that the
-    connector-configuration boundary (the endpoint that accepts
-    connector_type/credentials at setup time) is covered by this gate --
-    only that it is a separate, unfenced surface."""
+def test_module_docstring_names_both_boundaries_it_gates():
+    """The gate now covers two boundaries: the crosswalk write, where a
+    connected system's data enters the model, and connector configuration,
+    where a connected system is first wired up. Its documentation must name
+    both, and the configuration path must really call it, so the claim and
+    the code cannot drift apart."""
+    import inspect
+
+    from app.modules.codegen.routes import connector_routes
+    from app.modules.codegen.services import connector_orchestrator
+
     doc = " ".join((gate_module.__doc__ or "").lower().split())
-    assert "crosswalk write" in doc
-    assert "it does not gate" in doc
+    assert "two boundaries" in doc
+    assert "crosswalk" in doc
     assert "configur" in doc
-    assert "unfenced" in doc
+    assert "assert_connector_permitted(" in inspect.getsource(connector_orchestrator)
+    assert "assert_connector_permitted(" in inspect.getsource(connector_routes)
 
 
 def test_assert_connector_permitted_has_no_configuration_side_effect(app):

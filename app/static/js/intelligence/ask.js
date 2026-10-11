@@ -1,10 +1,12 @@
 /* The Ask page.
  *
  * A person opens a question card, types a business noun, chooses a match and
- * gets that question's answer for it. Four questions today: impact (L1,
- * "what breaks"), risk (L6, "what could hurt"), portfolio (L3, a deep link
- * to rationalization planning) and programme (L5, "what's changing"). One
- * question is open at a time
+ * gets that question's answer for it. All six lenses of the catalogue are
+ * here now: impact (L1, "what breaks"), strategy (L2, "what are we trying
+ * to achieve"), portfolio (L3, a deep link to rationalization planning),
+ * accountability (L4, "who's accountable"), programme (L5, "what's
+ * changing") and risk (L6, "what could hurt"). One question is open at a
+ * time
  * (openKey), and one shared picker (fixed input id / $refs.pickerInput --
  * see _entity_picker.html) sits in whichever panel is open; onSelect()
  * dispatches by openKey rather than always loading the impact answer.
@@ -43,6 +45,21 @@ function askSurface() {
         programmeState: 'idle',
         programmeBusy: false,
         workPackages: [],
+        strategyState: 'idle',
+        strategyBusy: false,
+        initiatives: [],
+        accountabilityState: 'idle',
+        accountabilityBusy: false,
+        owners: [],
+        dataState: 'idle',
+        dataBusy: false,
+        dataObjects: [],
+        dataFlows: [],
+        complianceState: 'idle',
+        complianceBusy: false,
+        controls: [],
+        violations: [],
+        lastScanAt: null,
 
         init() {
             this.twinMapUrl = this.$el.getAttribute('data-twin-map-url') || '';
@@ -77,6 +94,14 @@ function askSurface() {
                 this.loadPortfolio(option.id);
             } else if (this.openKey === 'programme') {
                 this.loadProgramme(option.id);
+            } else if (this.openKey === 'strategy') {
+                this.loadStrategy(option.id);
+            } else if (this.openKey === 'accountability') {
+                this.loadAccountability(option.id);
+            } else if (this.openKey === 'data') {
+                this.loadData(option.id);
+            } else if (this.openKey === 'compliance') {
+                this.loadCompliance(option.id);
             } else {
                 this.load(option.id);
             }
@@ -112,7 +137,13 @@ function askSurface() {
             }
             this.busy = false;
             this.syncDrawer();
-            this.$nextTick(function () { Intelligence.refreshIcons(); });
+            var self = this;
+            this.$nextTick(function () {
+                Intelligence.refreshIcons();
+                if (self.state === 'ready' || self.state === 'empty') {
+                    Intelligence.showResults(self.$refs.resultsHeading);
+                }
+            });
         },
 
         /* L6 counterpart of load(). No provenance-drawer sync -- the drawer
@@ -139,7 +170,13 @@ function askSurface() {
                 this.riskState = 'error';
             }
             this.riskBusy = false;
-            this.$nextTick(function () { Intelligence.refreshIcons(); });
+            var self = this;
+            this.$nextTick(function () {
+                Intelligence.refreshIcons();
+                if (self.riskState === 'ready' || self.riskState === 'empty') {
+                    Intelligence.showResults(self.$refs.riskResultsHeading);
+                }
+            });
         },
 
         /* L3: no rows, no drawer -- just resolves whether a deep link exists
@@ -167,6 +204,12 @@ function askSurface() {
                 this.portfolioState = 'error';
             }
             this.portfolioBusy = false;
+            var self = this;
+            this.$nextTick(function () {
+                if (self.portfolioState === 'ready' || self.portfolioState === 'empty') {
+                    Intelligence.showResults(self.$refs.portfolioResultsHeading);
+                }
+            });
         },
 
         /* L5 counterpart of loadRisk(). No provenance-drawer sync, same
@@ -191,7 +234,135 @@ function askSurface() {
                 this.programmeState = 'error';
             }
             this.programmeBusy = false;
-            this.$nextTick(function () { Intelligence.refreshIcons(); });
+            var self = this;
+            this.$nextTick(function () {
+                Intelligence.refreshIcons();
+                if (self.programmeState === 'ready' || self.programmeState === 'empty') {
+                    Intelligence.showResults(self.$refs.programmeResultsHeading);
+                }
+            });
+        },
+
+        /* L2 counterpart of loadProgramme(). No provenance-drawer sync, same
+           reasoning as risk/programme cards. budgetVariancePct/budgetReason
+           on each row already carry the not-costed distinction from the
+           server -- this method does not recompute or guess a variance. */
+        async loadStrategy(elementId) {
+            this.answeredKey = 'strategy';
+            this.strategyCentreId = elementId;
+            this._strategyLoadSeq = (this._strategyLoadSeq || 0) + 1;
+            var seq = this._strategyLoadSeq;
+            this.strategyBusy = true;
+            this.strategyState = 'loading';
+            try {
+                var payload = await Intelligence.fetchStrategy(elementId, { maxDepth: 3, includeDerived: true });
+                if (seq !== this._strategyLoadSeq) return;
+                this.initiatives = Intelligence.buildInitiatives(payload);
+                this.strategyState = this.initiatives.length ? 'ready' : 'empty';
+            } catch (err) {
+                if (seq !== this._strategyLoadSeq) return;
+                this.initiatives = [];
+                this.strategyState = 'error';
+            }
+            this.strategyBusy = false;
+            var self = this;
+            this.$nextTick(function () {
+                Intelligence.refreshIcons();
+                if (self.strategyState === 'ready' || self.strategyState === 'empty') {
+                    Intelligence.showResults(self.$refs.strategyResultsHeading);
+                }
+            });
+        },
+
+        /* L4 counterpart of loadStrategy(). No provenance-drawer sync, no
+           blast-radius rows -- this lens is a pure ownership lookup, not a
+           traversal, so there is nothing to sync the drawer against. */
+        async loadAccountability(elementId) {
+            this.answeredKey = 'accountability';
+            this.accountabilityCentreId = elementId;
+            this._accountabilityLoadSeq = (this._accountabilityLoadSeq || 0) + 1;
+            var seq = this._accountabilityLoadSeq;
+            this.accountabilityBusy = true;
+            this.accountabilityState = 'loading';
+            try {
+                var payload = await Intelligence.fetchAccountability(elementId);
+                if (seq !== this._accountabilityLoadSeq) return;
+                this.owners = Intelligence.buildOwners(payload);
+                this.accountabilityState = this.owners.length ? 'ready' : 'empty';
+            } catch (err) {
+                if (seq !== this._accountabilityLoadSeq) return;
+                this.owners = [];
+                this.accountabilityState = 'error';
+            }
+            this.accountabilityBusy = false;
+            var self = this;
+            this.$nextTick(function () {
+                Intelligence.refreshIcons();
+                if (self.accountabilityState === 'ready' || self.accountabilityState === 'empty') {
+                    Intelligence.showResults(self.$refs.accountabilityResultsHeading);
+                }
+            });
+        },
+
+        /* L7: what data the element holds or produces and where it flows. No
+           provenance-drawer sync -- like L4 this is a lookup, not a traversal. */
+        async loadData(elementId) {
+            this.answeredKey = 'data';
+            this._dataLoadSeq = (this._dataLoadSeq || 0) + 1;
+            var seq = this._dataLoadSeq;
+            this.dataBusy = true;
+            this.dataState = 'loading';
+            try {
+                var payload = await Intelligence.fetchData(elementId);
+                if (seq !== this._dataLoadSeq) return;
+                this.dataObjects = Intelligence.buildDataObjects(payload);
+                this.dataFlows = Intelligence.buildFlows(payload);
+                this.dataState = (this.dataObjects.length || this.dataFlows.length) ? 'ready' : 'empty';
+            } catch (err) {
+                if (seq !== this._dataLoadSeq) return;
+                this.dataObjects = [];
+                this.dataFlows = [];
+                this.dataState = 'error';
+            }
+            this.dataBusy = false;
+            var self = this;
+            this.$nextTick(function () {
+                Intelligence.refreshIcons();
+                if (self.dataState === 'ready' || self.dataState === 'empty') {
+                    Intelligence.showResults(self.$refs.dataResultsHeading);
+                }
+            });
+        },
+
+        /* Compliance (under L6): a lookup, no provenance-drawer sync. */
+        async loadCompliance(elementId) {
+            this.answeredKey = 'compliance';
+            this._complianceLoadSeq = (this._complianceLoadSeq || 0) + 1;
+            var seq = this._complianceLoadSeq;
+            this.complianceBusy = true;
+            this.complianceState = 'loading';
+            try {
+                var payload = await Intelligence.fetchCompliance(elementId);
+                if (seq !== this._complianceLoadSeq) return;
+                this.controls = Intelligence.buildControls(payload);
+                this.violations = Intelligence.buildViolations(payload);
+                this.lastScanAt = payload.last_scan_at || null;
+                this.complianceState = (this.controls.length || this.violations.length) ? 'ready' : 'empty';
+            } catch (err) {
+                if (seq !== this._complianceLoadSeq) return;
+                this.controls = [];
+                this.violations = [];
+                this.lastScanAt = null;
+                this.complianceState = 'error';
+            }
+            this.complianceBusy = false;
+            var self = this;
+            this.$nextTick(function () {
+                Intelligence.refreshIcons();
+                if (self.complianceState === 'ready' || self.complianceState === 'empty') {
+                    Intelligence.showResults(self.$refs.complianceResultsHeading);
+                }
+            });
         },
 
         async recomputeNow() {

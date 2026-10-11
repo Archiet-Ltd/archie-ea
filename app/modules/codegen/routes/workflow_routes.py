@@ -17,6 +17,29 @@ from ._helpers import _check_access
 
 # -- Workflow Designer routes --------------------------------------------------
 
+
+def _workflow_designs():
+    """Workflow designs visible to the caller's organisation.
+
+    A design carries no organisation column; it belongs to a solution, which does.
+    The inner join lets the automatic tenant filter on ``Solution`` apply to every
+    design read here.
+    """
+    from app.modules.codegen.models import WorkflowDesign
+
+    return WorkflowDesign.query.join(Solution, WorkflowDesign.solution_id == Solution.id)
+
+
+def _workflow_design_or_404(design_id):
+    from flask import abort
+
+    from app.modules.codegen.models import WorkflowDesign
+
+    design = _workflow_designs().filter(WorkflowDesign.id == design_id).first()
+    if design is None:
+        abort(404)
+    return design
+
 @codegen_bp.route("/codegen/workflow-designer")
 @login_required
 def workflow_designer_page():
@@ -31,9 +54,9 @@ def list_workflow_designs():
     from app.modules.codegen.models import WorkflowDesign
 
     solution_id = request.args.get("solution_id", type=int)
-    query = WorkflowDesign.query
+    query = _workflow_designs()
     if solution_id:
-        query = query.filter_by(solution_id=solution_id)
+        query = query.filter(WorkflowDesign.solution_id == solution_id)
     query = query.order_by(WorkflowDesign.updated_at.desc())
 
     designs = query.all()
@@ -66,6 +89,9 @@ def create_workflow_design():
         return jsonify({"error": "name is required"}), 400
     if not data.get("workflow_definition"):
         return jsonify({"error": "workflow_definition is required"}), 400
+    if data.get("solution_id") is not None:
+        # The design is attached to this solution: it must be one the caller can see.
+        Solution.query.get_or_404(data.get("solution_id"))
 
     design = WorkflowDesign(
         solution_id=data.get("solution_id"),
@@ -84,9 +110,7 @@ def create_workflow_design():
 @login_required
 def get_workflow_design(design_id):
     """Get a single workflow design."""
-    from app.modules.codegen.models import WorkflowDesign
-
-    design = WorkflowDesign.query.get_or_404(design_id)
+    design = _workflow_design_or_404(design_id)
     return jsonify({
         "id": design.id,
         "solution_id": design.solution_id,
@@ -104,9 +128,7 @@ def get_workflow_design(design_id):
 @login_required
 def update_workflow_design(design_id):
     """Update a workflow design."""
-    from app.modules.codegen.models import WorkflowDesign
-
-    design = WorkflowDesign.query.get_or_404(design_id)
+    design = _workflow_design_or_404(design_id)
     data = request.get_json() or {}
 
     if "name" in data:

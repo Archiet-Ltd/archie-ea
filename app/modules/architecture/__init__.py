@@ -118,12 +118,18 @@ def register(app: Flask) -> None:
     try:
         from app.modules.architecture.routes.architecture_monitoring_routes import (
             architecture_monitoring_bp,
+            monitoring_api_enabled,
         )
 
-        app.register_blueprint(architecture_monitoring_bp)
-        app.logger.info(
-            "[BLUEPRINT] Architecture Monitoring API registered at /api/architecture-monitoring"
-        )
+        if monitoring_api_enabled(app):
+            app.register_blueprint(architecture_monitoring_bp)
+            app.logger.info(
+                "[BLUEPRINT] Architecture Monitoring API registered at /api/architecture-monitoring"
+            )
+        else:
+            app.logger.info(
+                "[BLUEPRINT] Architecture Monitoring API not mounted (ARCHITECTURE_MONITORING_API_ENABLED off)"
+            )
     except Exception as e:
         app.logger.warning(
             f"[BLUEPRINT] Failed to register Architecture Monitoring routes: {e}"
@@ -224,4 +230,4 @@ def register(app: Flask) -> None:
     except Exception as e:
         app.logger.warning(f"[BLUEPRINT] Failed to register Risk routes: {e}")
 
-    app.logger.info("[MODULE] architecture registered (~220 routes, 18 blueprints)")
+    app.logger.info("[MODULE] architecture registered (~220 routes, 19 blueprints)")

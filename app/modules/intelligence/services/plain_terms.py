@@ -165,4 +165,29 @@ def plain_terms_sentence(
     return sentence
 
 
-__all__ = ["SUPPORTED_TYPES", "plain_terms_sentence", "wording_family"]
+def link_sentence(
+    *,
+    source_name: Optional[str],
+    target_name: Optional[str],
+    relation_type: Optional[str],
+) -> Optional[str]:
+    """One drawn link of a chain in plain words, or ``None``.
+
+    The same wording and the same direction rule as ``plain_terms_sentence``,
+    for a single recorded relationship rather than a worked-out one: "Portal
+    depends on Gateway." A missing name or a type with no wording gives
+    ``None``, never a sentence with a gap in it.
+    """
+    source = _usable_name(source_name)
+    target = _usable_name(target_name)
+    if source is None or target is None:
+        return None
+    wording = _WORDING.get(relation_type) if isinstance(relation_type, str) else None
+    if wording is None:
+        return None
+    _family, first_side, clause = wording
+    first, second = (source, target) if first_side == SOURCE else (target, source)
+    return clause.format(first=first, second=second) + "."
+
+
+__all__ = ["SUPPORTED_TYPES", "link_sentence", "plain_terms_sentence", "wording_family"]

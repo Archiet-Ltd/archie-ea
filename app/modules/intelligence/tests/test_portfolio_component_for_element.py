@@ -3,8 +3,7 @@
 one real Portfolio deep link (rationalization planning) is keyed on.
 
 Fixtures (app, db_session, make_org) are discovered via
-app/modules/intelligence/tests/conftest.py's own import of tests.conftest,
-same pattern as test_query_service.py. No import needed here.
+app/modules/conftest.py's import of tests.conftest. No import needed here.
 """
 
 from __future__ import annotations
@@ -96,21 +95,35 @@ def test_component_resolved_via_reverse_lookup(app, db_session, make_org):
     assert result["application_component_id"] == component_id
 
 
-def test_forward_fk_getattr_is_defensive_only_on_the_canonical_model(app, db_session, make_org):
-    """The canonical ``ArchiMateElement`` (``app/models/archimate_core.py``,
-    what ``app.models.ArchiMateElement`` resolves to) does NOT carry an
-    ``application_component_id`` column -- confirmed directly against the
-    model file. That column only exists on a legacy duplicate class mapped
-    to the same table (``app/models/models.py``, a pre-existing FR-2
-    duplicate-authority issue, not something this change introduces).
-
-    ``getattr(element, "application_component_id", None)`` (the same
-    pattern ``strategic_routes.py`` already uses) is therefore defensive
-    against a real-but-inert attribute today, not a live first branch --
-    it always falls through to the reverse lookup on the canonical model.
-    This test pins that fact so a future migration that DOES add the
-    column to the canonical model is a deliberate, visible change here,
-    not a silent behaviour shift."""
+def test_forward_fk_on_the_element_is_honoured_first(app, db_session, make_org):
+    """At normal runtime ``app.models.ArchiMateElement`` is the class in
+    ``app/models/models.py`` (``archimate_core`` re-exports it unless
+    APP_FAST_INIT is set), and that class carries ``application_component_id``.
+    So the forward link is a live first branch: when the element names a
+    component directly, that component is the answer, even when a different
+    component points back at the element."""
     from app.models import ArchiMateElement
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
-    assert not hasattr(ArchiMateElement, "application_component_id")
+    assert hasattr(ArchiMateElement, "application_component_id")
+
+    org = make_org("portfolio-lens-forward")
+    a = _element(db_session, org.id, "A")
+    forward = ApplicationComponent(name="Forward App", organization_id=org.id)
+    reverse = ApplicationComponent(name="Reverse App", organization_id=org.id, archimate_element_id=a.id)
+    db_session.add_all([forward, reverse])
+    db_session.flush()
+    a.application_component_id = forward.id
+    db_session.commit()
+    forward_id = forward.id
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org.id
+        result = IntelligenceQueryService.portfolio_component_for_element(a.id)
+
+    assert result["reasons"] == []
+    assert result["application_component_id"] == forward_id
+

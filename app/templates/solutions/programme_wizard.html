@@ -284,7 +284,7 @@ function transformationProgrammeIntake() {
         });
         const query = this.ownerQuery.trim().toLowerCase();
         this.owners = (body.users || []).filter((person) =>
-          !query || person.name.toLowerCase().includes(query) || person.email.toLowerCase().includes(query)
+          !query || (person.name || '').toLowerCase().includes(query) || (person.email || '').toLowerCase().includes(query)
         ).slice(0, 12);
       } catch (failure) {
         this.error = failure.message || 'People search is unavailable.';

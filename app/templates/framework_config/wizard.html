@@ -1,0 +1,56 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block title %}Configuration Wizard{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6 mx-auto max-w-7xl">
+    {{ page_header(
+        title='Configuration Wizard',
+        description='Step-by-step framework configuration setup',
+        breadcrumbs=[
+            {'label': 'Dashboard', 'href': url_for('main.index')},
+            {'label': 'Framework Configuration', 'href': url_for('framework_config_ui.framework_config_dashboard')},
+            {'label': 'Wizard'}
+        ]
+    ) }}
+
+    <div class="bg-card rounded-lg border p-6">
+        <div class="mb-6">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium">1</span>
+                <h2 class="text-lg font-semibold text-foreground">Select a template</h2>
+            </div>
+            <p class="text-sm text-muted-foreground ml-10">Choose a framework template to start from, or begin with a blank configuration.</p>
+        </div>
+
+        {% if templates %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ml-10 mb-8">
+            {% for template in templates %}
+            <div class="bg-muted rounded-lg border p-4">
+                <h3 class="font-medium text-foreground mb-1">{{ template.template_name }}</h3>
+                <p class="text-xs text-muted-foreground mb-3">{{ template.template_description or '' }}</p>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                    {{ template.organization_size.title() if template.organization_size else 'Any size' }}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="ml-10 mb-8 text-sm text-muted-foreground">
+            <p>No templates are available yet. You can still create a blank configuration from the dashboard.</p>
+        </div>
+        {% endif %}
+
+        <div class="flex items-center gap-2 mb-2">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-medium">2</span>
+            <h2 class="text-lg font-semibold text-muted-foreground">Configure domains and extensions</h2>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-medium">3</span>
+            <h2 class="text-lg font-semibold text-muted-foreground">Review and deploy</h2>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1621,6 +1621,7 @@ def _delete_archimate_element(element_id, rel_type="realization"):
             {"id": eid},
         )
         # data_object_storage: application_component_id is NOT NULL
+        # tenancy-ok: keyed on the same ownership-checked eid
         db.session.execute(
             text("DELETE FROM data_object_storage WHERE application_component_id = :id"),
             {"id": eid},

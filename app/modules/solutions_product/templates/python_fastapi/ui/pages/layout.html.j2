@@ -1,7 +1,7 @@
 {# layout.html.j2 — Base layout for server-rendered pages in generated FastAPI apps.
-   ARCHIE renders this once per generation; the output is a Jinja2 base template
+   Entelim renders this once per generation; the output is a Jinja2 base template
    that the generated app extends at runtime.
-   Context (from ARCHIE): solution_name, solution_id, entities, identity_provider, roles, product #}
+   Context (from Entelim): solution_name, solution_id, entities, identity_provider, roles, product #}
 {% set product_name = product.name if product and product.name else solution_name %}
 {% set product_tagline = product.tagline if product and product.tagline else '' %}
 {% set product_logo = product.logo_url if product and product.logo_url else '' %}

@@ -11,12 +11,15 @@ they otherwise exist on exactly one machine with no version history.
 | `caddy/caddy-restart-override.conf` | `/etc/systemd/system/caddy.service.d/override.conf` on the **proxy** droplet | `Restart=on-failure`. The unit shipped with no `Restart=` at all, so systemd's default of `Restart=no` applied to the single ingress point |
 | `archie-backup.sh` | `/usr/local/bin/` | Verified 6-hourly `pg_dump` with retention and a success marker |
 | `archie-backup.{service,timer}` | `/etc/systemd/system/` | Schedules the backup |
+| `write-backup-marker.sh` | next to whichever backup script calls it (`/usr/local/bin/` for `archie-backup.sh`) | Writes the one `LAST_SUCCESS` marker format; called by `archie-backup.sh` and by the production backup step, so the format is never duplicated |
 
 ## Backups
 
-`archie-backup.sh` runs every 6 hours. It verifies each dump is restorable
-(`pg_restore --list`) rather than merely present, prunes at 14 days, and writes
-`/var/backups/archie/LAST_SUCCESS`. The watchdog warns if that marker is more
+`archie-backup.sh` runs every 6 hours when `archie-backup.timer` is installed.
+It verifies each dump is restorable (`pg_restore --list`) rather than merely
+present, prunes at 14 days, and writes `/var/backups/archie/LAST_SUCCESS` in
+the format `write-backup-marker.sh` writes (`<timestamp> size=<bytes>
+objects=<count> file=<dump path>`). The watchdog warns if that marker is more
 than 18 hours old, because a backup that stops silently looks exactly like one
 that works.
 
@@ -25,9 +28,35 @@ a lost droplet. Shipping them off-box needs object-storage credentials.
 
 Install:
 
-    cp archie-backup.sh /usr/local/bin/ && chmod +x /usr/local/bin/archie-backup.sh
+    cp archie-backup.sh write-backup-marker.sh /usr/local/bin/
+    chmod +x /usr/local/bin/archie-backup.sh /usr/local/bin/write-backup-marker.sh
     cp archie-backup.service archie-backup.timer /etc/systemd/system/
     systemctl daemon-reload && systemctl enable --now archie-backup.timer
+
+### The capability tenancy cutover needs to see a backup
+
+`scripts/database/deploy-schema.sh`'s `cutover-capability-tenancy --apply` step
+refuses to run without a backup it can name (`ARCHIE_BACKUP_MARKER`, default
+`/var/backups/archie/LAST_SUCCESS` inside the `schema-deploy` container). The
+`docker-compose.yml` `schema-deploy` service mounts `ARCHIE_BACKUP_HOST_DIR`
+read-only at that path; locally it defaults to a project directory that stays
+empty, so the step correctly skips with nothing further to configure.
+
+**Production step (one-time, and whenever the backup location changes):** this
+droplet's real backups are not `archie-backup.sh` -- a separate script,
+`/opt/archie/backup.sh`, already runs a verified `pg_dump` into
+`/opt/archie/backups` before every deploy and is not in this repository.
+Point the mount at it and give it the one marker-writing call:
+
+1. In the `.env` used by `docker compose` on this host, set
+   `ARCHIE_BACKUP_HOST_DIR=/opt/archie/backups`.
+2. Install `write-backup-marker.sh` next to `/opt/archie/backup.sh` and add one
+   line at the end of that script's own verified-dump step, after it has
+   confirmed the dump restores (the same way `archie-backup.sh` calls it
+   below): `write-backup-marker.sh /opt/archie/backups/LAST_SUCCESS <size>
+   <object count> <dump path>`.
+
+No second marker format: both call the same `write-backup-marker.sh`.
 
 ## Why the watchdog exists
 

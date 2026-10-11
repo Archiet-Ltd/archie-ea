@@ -39,7 +39,7 @@ def brand_shell(request):
         first_name="Synthetic", full_name=lambda: "Synthetic fixture", email="fixture@example.invalid",
     )
     shell = Flask("brand_shell", template_folder=str(ROOT / "app/templates"))
-    shell.config["APP_NAME"] = "A.R.C.H.I.E."
+    shell.config["APP_NAME"] = "Entelim"
     shell.add_url_rule("/dashboard/overview", "dashboard.overview", lambda: "<h1>Dashboard</h1>")
     shell.add_url_rule("/admin/", "admin.index", lambda: (
         ("<h1>Command Center</h1>", 200) if administrator else ("Forbidden", 403)))
@@ -80,7 +80,7 @@ def test_brand_click_returns_to_shared_home_without_removing_admin_navigation(br
         expect(command_center).to_have_count(1 if administrator else 0)
         if administrator:
             expect(command_center).to_have_attribute("href", "/admin/")
-        brand = sidebar.get_by_role("link", name="A.R.C.H.I.E.", exact=True)
+        brand = sidebar.get_by_role("link", name="Entelim", exact=True)
         with page.expect_navigation() as destination:
             brand.click()
         assert destination.value.status == 200

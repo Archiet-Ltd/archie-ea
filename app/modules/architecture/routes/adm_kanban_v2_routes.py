@@ -14,6 +14,8 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import audit_log
+from app.middleware.tenant_context import current_org_id
+from app.utils.tenant_users import same_user_id, user_in_org
 from app.services.kanban_projection_service import (
     COLUMNS,
     ADM_PHASES,
@@ -150,6 +152,13 @@ def create_task():
             {"success": False, "error": f"Phase '{phase_code}' not found. Run /adm-kanban/init-phases first."}
         ), 400
 
+    # Checked before anything is added to the session: the audit decorator
+    # commits after this view returns, even on a refusal, so an auto-created
+    # board added above a 400 would still be saved.
+    assignee = data.get('assignee')
+    if assignee and not user_in_org(assignee, current_org_id()):
+        return jsonify({"success": False, "error": "Invalid assignee"}), 400
+
     # Find or auto-create a default board for this user
     board = (
         KanbanBoard.query
@@ -187,7 +196,7 @@ def create_task():
     card.driver_ids = data.get('driver_ids', [])
     card.principle_ids = data.get('principle_ids', [])
     card.issue_type = data.get('issue_type', 'Task')
-    card.assignee = data.get('assignee')
+    card.assignee = assignee
     card.story_points = data.get('story_points')
     card.labels = data.get('labels', [])
     card.arch_layer = data.get('arch_layer')
@@ -416,10 +425,29 @@ def update_task(card_ref):
 
     data = request.get_json() or {}
 
+    # Every refusal below runs before any field is changed: the audit
+    # decorator commits the session after this view returns, even on a
+    # refusal, so a field set before a 400 would still be saved.
     if "title" in data:
         title = (data["title"] or "").strip()
         if not title:
             return jsonify({"success": False, "error": "Title cannot be empty"}), 400
+
+    # The card drawer sends the stored assignee back unchanged on every save.
+    # A card written before the organisation check may hold another
+    # organisation's user id; an unchanged value is left as it is rather than
+    # refusing the whole edit (the projection names it only inside the card's
+    # own organisation, so no foreign name is shown).
+    assignee_unchanged = "assignee" in data and same_user_id(data["assignee"], card.assignee)
+    if (
+        "assignee" in data
+        and not assignee_unchanged
+        and data["assignee"]
+        and not user_in_org(data["assignee"], current_org_id())
+    ):
+        return jsonify({"success": False, "error": "Invalid assignee"}), 400
+
+    if "title" in data:
         card.title = title
 
     if "description" in data:
@@ -447,7 +475,7 @@ def update_task(card_ref):
         card.principle_ids = data["principle_ids"]
     if "issue_type" in data:
         card.issue_type = data["issue_type"]
-    if "assignee" in data:
+    if "assignee" in data and not assignee_unchanged:
         card.assignee = data["assignee"]
     if "story_points" in data:
         card.story_points = data["story_points"]
@@ -505,12 +533,13 @@ def delete_task(card_ref):
 @audit_log("kanban_push_to_gantt")
 def push_to_gantt(card_ref):
     """
-    Create or update a RoadmapWorkPackage linked to this KanbanCard.
+    Create or update the work package (the one store) for this KanbanCard.
     Body (JSON): { target_start_date: "YYYY-MM-DD", target_end_date: "YYYY-MM-DD" }
     Returns: { success: True, work_package_id: int, gantt_url: str }
     """
     from app.models.adm_kanban import KanbanCard
-    from app.models.roadmap_models import RoadmapWorkPackage
+    from app.services import work_package_service
+    from app.utils.tenant import current_organization_id
     from datetime import datetime
 
     if not card_ref.startswith("task:"):
@@ -547,37 +576,53 @@ def push_to_gantt(card_ref):
     priority_map = {"critical": "critical", "high": "high", "medium": "medium", "low": "low"}
     wp_priority = priority_map.get(card.priority or "medium", "medium")
 
-    if card.work_package_id:
-        # Update existing
-        wp = db.session.get(RoadmapWorkPackage, card.work_package_id)
-        if wp:
-            wp.name = card.title
-            wp.description = card.description or ""
-            if target_start:
-                wp.start_date = target_start
-            if target_end:
-                wp.end_date = target_end
-            wp.priority = wp_priority
-            db.session.commit()
-            return jsonify({"success": True, "work_package_id": wp.id, "updated": True,
-                            "gantt_url": "/roadmap-builder"})
+    # The work package lives in the one store (UnifiedWorkPackage). A card finds
+    # it through its own unified_work_package_id; a card pushed before that
+    # column existed still holds the retired roadmap store's id, which the merge
+    # carried across (source_table / source_id).
+    org_id = current_organization_id()
+    existing = None
+    if card.unified_work_package_id:
+        existing = work_package_service.get_work_package(card.unified_work_package_id, org_id)
+    if existing is None and card.work_package_id:
+        existing = work_package_service.get_by_source(
+            "roadmap_work_packages", card.work_package_id, org_id
+        )
+    if existing is not None:
+        fields = {"name": card.title, "description": card.description or "", "priority": wp_priority}
+        if target_start:
+            fields["start_date"] = target_start
+        if target_end:
+            fields["end_date"] = target_end
+        try:
+            work_package_service.update_work_package(
+                existing.id, organization_id=org_id, user_id=current_user.id, **fields
+            )
+        except work_package_service.WorkPackageError as exc:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(exc)}), 400
+        card.unified_work_package_id = existing.id
+        db.session.commit()
+        return jsonify({"success": True, "work_package_id": existing.id, "updated": True,
+                        "gantt_url": "/roadmap-builder"})
 
-    # Create new
-    wp = RoadmapWorkPackage(
-        name=card.title,
-        description=card.description or "",
-        business_capability=f"ADM Phase {phase_code} — {card.arch_domain or 'Business'}",
-        start_date=target_start,
-        end_date=target_end,
-        priority=wp_priority,
-        source_type="adm_kanban",
-        source_id=card.id,
-        created_by=current_user.id,
-    )
-    db.session.add(wp)
-    db.session.flush()
-
-    card.work_package_id = wp.id
+    try:
+        wp = work_package_service.create_work_package(
+            organization_id=org_id,
+            user_id=current_user.id,
+            name=card.title,
+            description=card.description or "",
+            business_capability=f"ADM Phase {phase_code} — {card.arch_domain or 'Business'}",
+            start_date=target_start,
+            end_date=target_end,
+            priority=wp_priority,
+            source_type="adm_kanban",
+            source_id=card.id,
+        )
+    except work_package_service.WorkPackageError as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "error": str(exc)}), 400
+    card.unified_work_package_id = wp.id
     db.session.commit()
 
     return jsonify({"success": True, "work_package_id": wp.id, "updated": False,
@@ -627,7 +672,10 @@ def check_deliverable(deliverable_id):
     data = request.get_json() or {}
     checked = bool(data.get("checked", False))
     board_id = data.get("board_id") or None
-    check = toggle_deliverable(deliverable_id, board_id, checked)
+    try:
+        check = toggle_deliverable(deliverable_id, board_id, checked)
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 404
     return jsonify({"success": True, "check": check})
 
 
@@ -698,7 +746,7 @@ def roadmap_timeline_all():
                 "arch_domain": domain,
                 "adm_phase": phase_code,
                 "board_id": card.board_id,
-                "work_package_id": card.work_package_id,
+                "work_package_id": card.unified_work_package_id,
             },
         })
 
@@ -789,7 +837,7 @@ def roadmap_timeline(board_id):
             "metadata": {
                 "arch_domain": domain,
                 "adm_phase": phase_code,
-                "work_package_id": card.work_package_id,
+                "work_package_id": card.unified_work_package_id,
                 "ref": card.card_ref if hasattr(card, "card_ref") else str(card.id),
             },
         })

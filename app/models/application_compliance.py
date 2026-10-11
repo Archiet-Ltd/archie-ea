@@ -21,10 +21,13 @@ class ApplicationComplianceControl(TenantMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     application_id = db.Column(
-        db.Integer, db.ForeignKey("application_components.id", ondelete="CASCADE"), nullable=False
+        db.Integer, db.ForeignKey("application_components.id", ondelete="CASCADE"), nullable=True
     )
     control_id = db.Column(
         db.Integer, db.ForeignKey("compliance_controls.id", ondelete="CASCADE"), nullable=False
+    )
+    adoption_id = db.Column(
+        db.Integer, db.ForeignKey("framework_adoptions.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     # Implementation tracking
@@ -54,6 +57,8 @@ class ApplicationComplianceControl(TenantMixin, db.Model):
         "ComplianceControl", backref=db.backref("application_mappings", lazy="dynamic")
     )
     verified_by = db.relationship("User", foreign_keys=[verified_by_id])
+
+    adoption = db.relationship("FrameworkAdoption", back_populates="adopted_controls")
 
     __table_args__ = (db.UniqueConstraint("application_id", "control_id", name="uq_app_control"),)
 

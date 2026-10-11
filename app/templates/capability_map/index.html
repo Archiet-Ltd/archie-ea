@@ -1,4 +1,5 @@
 {% extends "layouts/admin_base.html" %}
+{# smoke-coverage-ok: CSP inline style fix (removed style="width:0%"); covered by tests/test_capability_map_a11y_csp.py #}
 {% from 'components/data_card.html' import data_card %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/status_badge.html' import status_badge %}
@@ -422,7 +423,7 @@
                                 <span class="text-warning-emphasis font-medium" id="mfg-prod-pct">0%</span>
                             </div>
                             <div class="mt-2 w-full bg-border rounded-full h-1.5">
-                                <div class="bg-warning h-1.5 rounded-full transition-all" id="mfg-prod-bar" style="width: 0%"></div>  <!-- inline-style-ok -->
+                                <div class="bg-warning h-1.5 rounded-full transition-all" id="mfg-prod-bar"></div>  <!-- width set by JS -->
                             </div>
                         </div>
 
@@ -442,7 +443,7 @@
                                 <span class="text-primary font-medium" id="mfg-sc-pct">0%</span>
                             </div>
                             <div class="mt-2 w-full bg-border rounded-full h-1.5">
-                                <div class="bg-primary h-1.5 rounded-full transition-all" id="mfg-sc-bar" style="width: 0%"></div>  <!-- inline-style-ok -->
+                                <div class="bg-primary h-1.5 rounded-full transition-all" id="mfg-sc-bar"></div>  <!-- width set by JS -->
                             </div>
                         </div>
 
@@ -462,7 +463,7 @@
                                 <span class="text-success-emphasis font-medium" id="mfg-qual-pct">0%</span>
                             </div>
                             <div class="mt-2 w-full bg-border rounded-full h-1.5">
-                                <div class="bg-success h-1.5 rounded-full transition-all" id="mfg-qual-bar" style="width: 0%"></div>  <!-- inline-style-ok -->
+                                <div class="bg-success h-1.5 rounded-full transition-all" id="mfg-qual-bar"></div>  <!-- width set by JS -->
                             </div>
                         </div>
 
@@ -482,7 +483,7 @@
                                 <span class="text-primary font-medium" id="mfg-maint-pct">0%</span>
                             </div>
                             <div class="mt-2 w-full bg-border rounded-full h-1.5">
-                                <div class="bg-primary h-1.5 rounded-full transition-all" id="mfg-maint-bar" style="width: 0%"></div>  <!-- inline-style-ok -->
+                                <div class="bg-primary h-1.5 rounded-full transition-all" id="mfg-maint-bar"></div>  <!-- width set by JS -->
                             </div>
                         </div>
 
@@ -502,7 +503,7 @@
                                 <span class="text-primary font-medium" id="mfg-eng-pct">0%</span>
                             </div>
                             <div class="mt-2 w-full bg-border rounded-full h-1.5">
-                                <div class="bg-primary h-1.5 rounded-full transition-all" id="mfg-eng-bar" style="width: 0%"></div>  <!-- inline-style-ok -->
+                                <div class="bg-primary h-1.5 rounded-full transition-all" id="mfg-eng-bar"></div>  <!-- width set by JS -->
                             </div>
                         </div>
                     </div>
@@ -2153,7 +2154,7 @@
                                             <span id="edit-wp-progress-value" class="text-sm font-semibold text-foreground w-12 text-right">0%</span>
                                         </div>
                                         <div class="mt-2 w-full bg-border rounded-full h-2">
-                                            <div id="edit-wp-progress-bar" class="bg-primary h-2 rounded-full transition-all duration-300" style="width: 0%"></div>  <!-- inline-style-ok -->
+                                            <div id="edit-wp-progress-bar" class="bg-primary h-2 rounded-full transition-all duration-300"></div>  <!-- width set by JS -->
                                         </div>
                                     </div>
                                 </div>
@@ -2530,8 +2531,6 @@
                 </div>
             </div>
         </div>
-
-    </div>
 
     {# ARCH-064: only the unified mapping modal is still rendered up front —
        it pulls in its own <script src=...>, which an injected fragment cannot

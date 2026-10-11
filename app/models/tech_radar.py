@@ -46,6 +46,18 @@ class TechRadarEntry(TenantMixin, db.Model):
     )
     ring = db.Column(db.String(10), nullable=False)  # one of RADAR_RINGS
     rationale = db.Column(db.Text, nullable=True)
+    # When the classification is next due for review. Nullable: an entry with
+    # no recorded date reads as "—", never as a guessed date.
+    review_date = db.Column(db.Date, nullable=True)
+    # The programme or initiative that asked for this technology. The platform's
+    # initiative store is StrategicInitiative; nullable, and cleared rather than
+    # left dangling if that initiative is deleted.
+    requesting_initiative_id = db.Column(
+        db.Integer,
+        db.ForeignKey("strategic_initiatives.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     set_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
     updated_at = db.Column(
@@ -54,6 +66,9 @@ class TechRadarEntry(TenantMixin, db.Model):
 
     element = db.relationship("ArchiMateElement", foreign_keys=[archimate_element_id])
     set_by = db.relationship("User", foreign_keys=[set_by_user_id])
+    requesting_initiative = db.relationship(
+        "StrategicInitiative", foreign_keys=[requesting_initiative_id]
+    )
 
     def to_dict(self):
         return {
@@ -64,6 +79,11 @@ class TechRadarEntry(TenantMixin, db.Model):
             "ring": self.ring,
             "ring_label": RADAR_RING_LABELS.get(self.ring, self.ring),
             "rationale": self.rationale,
+            "review_date": self.review_date.isoformat() if self.review_date else None,
+            "requesting_initiative_id": self.requesting_initiative_id,
+            "requesting_initiative_name": (
+                self.requesting_initiative.name if self.requesting_initiative else None
+            ),
             "set_by_user_id": self.set_by_user_id,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

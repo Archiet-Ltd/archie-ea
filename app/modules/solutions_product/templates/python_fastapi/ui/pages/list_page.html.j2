@@ -1,6 +1,6 @@
 {# list_page.html.j2 — Entity list page, one generated per module.
-   ARCHIE renders this per-entity; output is a Jinja2 template the generated app serves.
-   Context (from ARCHIE): entity (dict with name_snake, name_display, fields, api_path,
+   Entelim renders this per-entity; output is a Jinja2 template the generated app serves.
+   Context (from Entelim): entity (dict with name_snake, name_display, fields, api_path,
      status_field, states, transitions, view_columns, view_filters, view_default_sort, view_actions) #}
 {% raw %}{% extends "layout.html" %}
 {% from "_components.html" import status_badge, empty_state, pagination %}

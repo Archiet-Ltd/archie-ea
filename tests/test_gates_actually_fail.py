@@ -394,6 +394,22 @@ CASES.append(("check_business_layer_backbone.py", _business_layer_backbone))
 CASES.append(("check_api_envelope.py", _api_envelope))
 
 
+def _untyped_property_writes(root, defective):
+    """An element property write outside PropertyService bypasses typing."""
+    if defective:
+        body = "def f(element):\n    element.properties = '{}'\n"
+    else:
+        body = (
+            "from app.modules.architecture_assistant.property_service import PropertyService\n\n"
+            "def f(element):\n"
+            "    PropertyService().set_element_property(element, 'rate_limit', '1000 req/min')\n"
+        )
+    _write(root, "app/probe.py", body)
+
+
+CASES.append(("check_untyped_property_writes.py", _untyped_property_writes))
+
+
 def _collapsed_nav_affordance(root, defective):
     """A collapsed rail with no tooltip is a row of unlabelled buttons."""
     named = "" if defective else ' title="Dashboard"'

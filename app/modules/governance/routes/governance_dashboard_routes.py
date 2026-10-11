@@ -215,12 +215,136 @@ def principles():
     return render_template("governance/principles.html")
 
 
-@governance_bp.route("/standards")
+TECHNOLOGY_STANDARD_STATUSES = (
+    "approved", "preferred", "acceptable", "under_review", "deprecated", "prohibited",
+)
+
+
+def _standards_by_domain():
+    """Active standards grouped by category (the domain), each with the radar
+    ring its linked technology element carries — read from the radar, never
+    stored twice."""
+    from app.models.technology_standard import TechnologyStandard
+    from app.modules.tech_radar import service as radar
+
+    rows = (
+        db.session.query(TechnologyStandard)
+        .filter(TechnologyStandard.is_active.is_(True))
+        .order_by(TechnologyStandard.category, TechnologyStandard.technology_name)
+        .all()
+    )
+    rings = radar.rings_for_elements([r.archimate_element_id for r in rows])
+    grouped = {}
+    for row in rows:
+        grouped.setdefault(row.category or "", []).append(
+            {"standard": row, "ring": rings.get(row.archimate_element_id)}
+        )
+    return grouped
+
+
+def _create_standard(form, user_id):
+    """Record one technology standard from the page's form, and when a ring is
+    chosen for its technology element, place that element on the radar in the
+    same transaction. Returns (standard, None) or (None, error message)."""
+    from datetime import date
+
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.tech_radar import RADAR_RINGS
+    from app.models.technology_standard import TechnologyStandard
+    from app.modules.tech_radar import service as radar
+
+    name = (form.get("technology_name") or "").strip()
+    category = (form.get("category") or "").strip()
+    status = (form.get("status") or "").strip().lower()
+    ring = (form.get("ring") or "").strip().lower()
+    element_raw = (form.get("archimate_element_id") or "").strip()
+    if not name or not category:
+        return None, "Technology and domain are required."
+    if status not in TECHNOLOGY_STANDARD_STATUSES:
+        return None, "Choose a status for the standard."
+    if ring and ring not in RADAR_RINGS:
+        return None, "Choose a radar ring from the list."
+    dates = {}
+    for field in ("sunset_date", "review_date"):
+        raw = (form.get(field) or "").strip()
+        try:
+            dates[field] = date.fromisoformat(raw) if raw else None
+        except ValueError:
+            return None, "Dates must be given as YYYY-MM-DD."
+    element_id = None
+    if element_raw:
+        if not element_raw.isdigit():
+            return None, "Choose the technology element from the search results."
+        element = ArchiMateElement.query.filter(ArchiMateElement.id == int(element_raw)).first()
+        if element is None or element.layer != "Technology":
+            return None, "The technology element must be a Technology-layer element in this organisation."
+        element_id = element.id
+    if ring and element_id is None:
+        return None, "A radar ring needs the technology element it applies to."
+
+    standard = TechnologyStandard(
+        technology_name=name[:255],
+        category=category[:100],
+        status=status,
+        approved_version=(form.get("approved_version") or "").strip()[:50] or None,
+        rationale=(form.get("rationale") or "").strip() or None,
+        replacement_technology=(form.get("replacement_technology") or "").strip()[:255] or None,
+        sunset_date=dates["sunset_date"],
+        review_date=dates["review_date"],
+        archimate_element_id=element_id,
+        owner_id=user_id,
+    )
+    try:
+        db.session.add(standard)
+        if ring:
+            radar.classify(element_id, ring, None, user_id, commit=False)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        return None, str(exc)
+    return standard, None
+
+
+@governance_bp.route("/standards", methods=["GET", "POST"])
 @login_required
 @require_roles("admin", "architect")
 def standards():
-    """Technology Standards management page."""
-    return render_template("governance/standards.html")
+    """Technology Standards: the register per domain, and the form that
+    publishes a new standard into it."""
+    from flask import flash, request
+    from flask_login import current_user
+
+    from app.models.tech_radar import RADAR_RING_LABELS, RADAR_RINGS
+
+    if request.method == "POST":
+        try:
+            standard, error = _create_standard(request.form, current_user.id)
+        except Exception:  # noqa: BLE001
+            db.session.rollback()
+            logger.exception("technology standard create failed")
+            standard, error = None, "The standard could not be saved."
+        if error:
+            flash(error, "error")
+            return render_template(
+                "governance/standards.html",
+                grouped=_standards_by_domain(),
+                statuses=TECHNOLOGY_STANDARD_STATUSES,
+                rings=RADAR_RINGS,
+                ring_labels=RADAR_RING_LABELS,
+                form=request.form,
+            ), 400
+        flash("%s published as a %s standard." % (
+            standard.technology_name, standard.status.replace("_", " ")), "success")
+        return redirect(url_for("governance.standards"))
+
+    return render_template(
+        "governance/standards.html",
+        grouped=_standards_by_domain(),
+        statuses=TECHNOLOGY_STANDARD_STATUSES,
+        rings=RADAR_RINGS,
+        ring_labels=RADAR_RING_LABELS,
+        form={},
+    )
 
 
 @governance_bp.route("/roadmap")

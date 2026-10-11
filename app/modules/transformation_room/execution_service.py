@@ -1118,13 +1118,14 @@ class TransformationExecutionService:
             return reconciled
         if attempt.status != "in_progress":
             raise CommandConflict("delivery_export_attempt_already_completed")
+        completed_now = CommandService._database_now(session)
         attempt.status = payload["status"]
         attempt.external_key = payload["external_key"]
         attempt.response_digest = payload["response_digest"]
         attempt.error_class = payload["error_class"]
         attempt.error_message = payload["error_message"]
         attempt.dispatch_lease_expires_at = None
-        attempt.completed_at = CommandService._database_now(session)
+        attempt.completed_at = completed_now
         session.flush()
         object_ids = {
             "work_package_id": attempt.work_package_id,

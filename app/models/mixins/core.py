@@ -80,6 +80,35 @@ class TenantMixin:  # migration-exempt
         return db.relationship("Organization", lazy="select")
 
 
+class HybridTenantMixin:  # migration-exempt
+    """Add to a shared-catalogue model: platform-wide rows readable by every
+    organisation, writable only by the platform, tailored through separate
+    per-organisation override rows.
+
+    Generalises the pattern first written as ``HybridCapabilityTenantMixin``
+    in app/models/unified_capability.py. Deliberately
+    NOT ``TenantMixin``: that mixin's ``do_orm_execute`` equality filter would
+    hide every shared row (``organization_id IS NULL``) from every organisation,
+    which is the opposite of "shared". A hybrid-scoped model reads and writes
+    through its own explicit queries/event handlers instead (the read-only
+    enforcement and per-organisation tailoring are a separate, later change,
+    not this column).
+
+    Nullable forever, not as an expand-step waiting for a later NOT NULL
+    tightening: a shared catalogue row legitimately has no owning organisation.
+    """
+
+    @declared_attr
+    def organization_id(cls):
+        from app import db
+        return db.Column(
+            db.Integer,
+            db.ForeignKey("organizations.id", ondelete="CASCADE"),
+            nullable=True,
+            index=True,
+        )
+
+
 class OptimisticLockMixin:
     """Mixin for SQLAlchemy-enforced optimistic locking.
 

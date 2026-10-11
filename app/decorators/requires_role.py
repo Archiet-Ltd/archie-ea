@@ -18,6 +18,31 @@ from app.models.user import ROLE_PLATFORM_ADMIN
 from app.utils.role_access import get_user_role
 
 
+# The roles that handle data-subject requests (scope, assign, access, erasure).
+# The route decorators and the sidebar/directory link share this one list.
+DATA_SUBJECT_REQUEST_ROLES = ["security_architect"]
+
+
+def may_handle_data_subject_requests(user):
+    """True when ``user`` may open the data-subject request pages: the roles in
+    DATA_SUBJECT_REQUEST_ROLES, and platform_admin as ``requires_role`` always
+    admits it.
+
+    R3-5 (PR 428 round 4): kept consistent with the fix in ``requires_role``
+    below -- genuine platform authority is judged by ``is_platform_admin``,
+    never by the raw ``enterprise_role`` persona column happening to read
+    the literal string "platform_admin" (that column's legacy default for
+    every account). Otherwise this sidebar/directory check would keep
+    showing the data-subject-request pages to a default-persona user that
+    ``requires_role`` now correctly refuses.
+    """
+    from app.middleware.tenant_decorators import is_platform_admin
+
+    if is_platform_admin(user):
+        return True
+    return get_user_role(user) in DATA_SUBJECT_REQUEST_ROLES
+
+
 def requires_role(allowed_roles: Union[str, List[str]]):
     """
     Decorator to restrict route access to specific enterprise roles.
@@ -49,6 +74,13 @@ def requires_role(allowed_roles: Union[str, List[str]]):
     if isinstance(allowed_roles, str):
         allowed_roles = [allowed_roles]
 
+    # R3-5 (PR 428 round 4): the roles actually requested by the caller,
+    # before platform_admin is appended below -- used for the persona
+    # membership check further down, which must never admit someone on the
+    # strength of the LITERAL string "platform_admin" alone (see the
+    # ``is_platform_admin`` check in ``decorated_function``).
+    requested_roles = list(allowed_roles)
+
     # Always allow platform_admin
     if ROLE_PLATFORM_ADMIN not in allowed_roles:
         allowed_roles = list(allowed_roles) + [ROLE_PLATFORM_ADMIN]
@@ -63,11 +95,31 @@ def requires_role(allowed_roles: Union[str, List[str]]):
                 )
                 abort(401)
 
+            # R3-5 (PR 428 round 4): "Always allow platform_admin" above
+            # used to be implemented by appending the literal string
+            # "platform_admin" to allowed_roles and comparing it against
+            # get_user_role(current_user) -- the raw, uncomputed
+            # ``enterprise_role`` persona column, which defaults to
+            # "platform_admin" for every legacy account ("existing users
+            # get full access", app/models/user.py). That let a default-
+            # persona Viewer through every route this decorator guards,
+            # all nine GDPR data-subject-request routes included, the same
+            # "default persona stands in for platform authority" bug this
+            # round already fixed in role_required/require_roles. Genuine
+            # platform authority is judged the one real way, same as those
+            # two decorators.
+            from app.middleware.tenant_decorators import is_platform_admin
+
+            if is_platform_admin(current_user):
+                return f(*args, **kwargs)
+
             # Get user's role
             user_role = get_user_role(current_user)
 
-            # Check if user has required role
-            if user_role not in allowed_roles:
+            # Check if user has one of the CALLER'S OWN requested roles --
+            # never admit on the raw "platform_admin" persona string alone;
+            # that path is_platform_admin() above already judged properly.
+            if user_role not in requested_roles:
                 current_app.logger.warning(
                     f"Access denied: user {current_user.id} (role={user_role}) "
                     f"attempted to access {request.path} (requires {allowed_roles})"
@@ -101,6 +153,18 @@ def requires_procurement(f):
     Allows procurement role and portfolio_manager (read-only context).
     """
     return requires_role(["procurement", "portfolio_manager"])(f)
+
+
+def requires_procurement_or_finance(f):
+    """
+    Shorthand for the two procurement pages a finance persona also owns:
+    licences and spend (R1-B36, TB-0146). Deliberately NOT applied to
+    contracts, renewals or the compliance dashboard -- adding "finance" to
+    the shared requires_procurement would have opened every procurement
+    page to it, which the authorisation matrix caught as a real mismatch
+    (POLICY only names the two pages finance's own sidebar links to).
+    """
+    return requires_role(["procurement", "portfolio_manager", "finance"])(f)
 
 
 def requires_application_owner(f):

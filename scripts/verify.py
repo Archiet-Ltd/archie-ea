@@ -94,6 +94,9 @@ class Result:
     baseline: int | None = None
     duration_s: float = 0.0
     remediation: str = ""
+    # Further ratchet measurements of the same gate, {baseline key: value}, for a
+    # gate whose name does not map onto its baseline keys (--update-baseline).
+    extra: dict | None = None
 
 
 @dataclass
@@ -513,6 +516,29 @@ def gate_error_signalling() -> Result:
                       f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
     detail = "" if count == 0 else "run scripts/check_error_signalling.py to list them"
     return Result("error-signalling", PASS if count == 0 else FAIL, detail, count, 0)
+
+
+def gate_is_admin_called() -> Result:
+    """R2-1 (PR 428 round 3): ``*user.is_admin`` referenced without calling
+    it. MUST BE ZERO.
+
+    ``User.is_admin`` is a bound method, not a property -- an unparenthesized
+    ``not current_user.is_admin`` tests the method object itself, which is
+    always truthy, so the guard admits every signed-in user including a
+    plain Viewer. 37 such sites were found by the PR 428 round 2 cloud
+    review across solution_design_routes.py, the AI-chat admin routes, the
+    ADM kanban routes, import history/sophisticated-import, the enterprise
+    capabilities API and the ADM permissions helper; every one of them was
+    an "owner or admin" / "admin only" guard that enforced nothing.
+    """
+    proc = _run([sys.executable, "scripts/check_is_admin_called.py", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("is-admin-called", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count == 0 else "run scripts/check_is_admin_called.py to list them"
+    return Result("is-admin-called", PASS if count == 0 else FAIL, detail, count, 0)
 
 
 def gate_silent_data() -> Result:
@@ -964,6 +990,44 @@ def gate_unregistered_checks(baseline: int) -> Result:
     return Result("unregistered-checks", PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_background_mechanisms(baseline: int, instances_baseline: int) -> Result:
+    """Every background-work mechanism is in docs/background-mechanisms.yml. RATCHET.
+
+    Static (no boot, no database): fails when a file under app/ (or manage.py) starts
+    rq, celery, apscheduler, threading.Thread, ThreadPoolExecutor, multiprocessing,
+    a detached subprocess or a fork in a function with no register entry, when an
+    entry names something no longer used, and when either the number of files holding
+    `thread` entries (`background_mechanisms_thread`) or the number of thread
+    instances (`background_mechanisms_thread_instances`) rises above its baseline. An
+    empty scan exits 2 and is a FAIL here: finding nothing proves nothing.
+    """
+    script = "scripts/check_background_mechanisms.py"
+
+    def count(flag):
+        proc = _run([sys.executable, script, flag])
+        try:
+            return int(proc.stdout.strip().splitlines()[-1]), proc
+        except (ValueError, IndexError):
+            return None, proc
+
+    files, proc = count("--count")
+    instances, proc2 = count("--count-instances")
+    if files is None or instances is None:
+        bad = proc if files is None else proc2
+        return Result("background-mechanisms", FAIL,
+                      f"could not parse count: {bad.stdout!r} {bad.stderr[:300]}")
+    proc = _run([sys.executable, script])
+    ok = proc.returncode == 0 and files <= baseline and instances <= instances_baseline
+    detail = ""
+    if not ok:
+        detail = proc.stdout[-1800:]
+        if instances > instances_baseline:
+            detail += f"\n  thread instances {instances} > baseline {instances_baseline}"
+    return Result("background-mechanisms", PASS if ok else FAIL, detail, files, baseline,
+                  extra={"background_mechanisms_thread": files,
+                         "background_mechanisms_thread_instances": instances})
+
+
 def gate_null_filters() -> Result:
     """No `|default(...)` feeds a filter that calls len(). Gated at ZERO.
 
@@ -1185,6 +1249,34 @@ def gate_raw_sql_tenancy(baseline: int) -> Result:
     return Result("raw-sql-tenancy", PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_raw_sql_tenancy_writes(baseline: int) -> Result:
+    """organization_id written on a tenant table outside the one command allowed to.
+
+    A ratchet, not a hard zero: the dedicated commands that predate
+    app/commands/backfill_layer_tenancy.py as the single policy home are
+    counted here, not excused, and fall out of this baseline one at a time as
+    they retire. A new write outside that one file raises the count and fails
+    the build; the fix is to move the write into the canonical command, not
+    to raise the baseline.
+
+    This is rule 2 of the same file rule 1 (raw-sql-tenancy, above) already
+    registers -- one cached tenant-table list, two shapes of the same
+    problem: a raw SQL string naming a tenant table, found by walking string
+    literals rather than trusting a comment.
+    """
+    proc = _run([sys.executable, "scripts/check_raw_sql_tenancy.py", "--count", "--rule", "writes"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("raw-sql-tenancy-writes", FAIL, f"could not parse: {proc.stdout!r}")
+    detail = ""
+    if count > baseline:
+        detail = _run(
+            [sys.executable, "scripts/check_raw_sql_tenancy.py", "--rule", "writes"]
+        ).stdout[-1500:]
+    return Result("raw-sql-tenancy-writes", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
 def gate_tenant_scoping(baseline: int) -> Result:
     """ORM queries over a tenant-owned-but-unmixed model with no org predicate.
 
@@ -1223,6 +1315,49 @@ def gate_tenant_scoping(baseline: int) -> Result:
     if count > baseline:
         detail = _run([sys.executable, "scripts/check_tenant_scoping.py"]).stdout[-1500:]
     return Result("tenant-scoping", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
+def gate_untenanted_reads(baseline: int) -> Result:
+    """Reads of a model with no tenant fence, with no organisation predicate.
+
+    ``do_orm_execute`` filters only models that inherit TenantMixin. The older
+    tenant-scoping gate sees models that have the column but not the mixin, and
+    only the ``.query`` shapes. This one reads every ``db.select(Model)``,
+    ``Model.query``, ``session.query(Model)`` and ``session.get(Model, id)`` over
+    ANY unfenced model, including one with no tenant column at all (the shape of
+    the OrganizationUnit read and the work-package owner ``select(User)`` that
+    would have named another organisation's user).
+
+    A ratchet: the count may fall, never rise. It does not prove tenancy; it stops
+    a new read of an unfenced model arriving without a predicate or a written
+    reason. See scripts/check_untenanted_reads.py.
+    """
+    proc = _run([sys.executable, "scripts/check_untenanted_reads.py", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("untenanted-reads", FAIL, f"could not parse: {proc.stdout!r}")
+    detail = ""
+    if count > baseline:
+        detail = _run([sys.executable, "scripts/check_untenanted_reads.py"]).stdout[-1500:]
+    return Result("untenanted-reads", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
+def gate_unfenced_tables() -> Result:
+    """Every table whose model has no tenant fence is listed, so a new one is a decision.
+
+    scripts/unfenced_tables.txt is the inventory of tables with no TenantMixin. A new
+    table that is neither fenced nor listed fails, so whether it holds tenant data,
+    global reference data or rows reached only through a fenced parent is decided when
+    the table is created, not after a later feature reads it.
+    """
+    proc = _run([sys.executable, "scripts/check_untenanted_reads.py", "--new-tables"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("unfenced-tables", FAIL, f"could not parse: {proc.stdout!r}")
+    detail = proc.stdout[-1500:] if count else ""
+    return Result("unfenced-tables", PASS if count == 0 else FAIL, detail, count, 0)
 
 
 def gate_sidebar_links(baseline: int) -> Result:
@@ -1469,6 +1604,38 @@ def gate_dependency_cves() -> Result:
     return Result("dependency-cves", PASS, detail, found, accepted)
 
 
+BANDIT_GATE = os.path.join("scripts", "ci", "bandit_gate.py")
+
+
+def gate_high_findings(targets: list[str] | None = None) -> Result:
+    """No release while a HIGH-severity static-analysis finding is open.
+
+    The security-sast job fails only on findings NEW against .bandit-baseline.json,
+    which is right for the medium backlog and wrong for a high one: fourteen HIGH
+    findings sat accepted in that baseline, so every change passed over them. This
+    counts every HIGH finding whether or not the baseline knows it, and does not
+    honour a bare `# nosec` -- a finding is dispositioned only by
+    `# nosec <test id> -- <reason>` on its own lines, which a reviewer can read.
+    Secrets and dependency advisories need no equivalent: gitleaks fails on any
+    leak, and dependency-cves on any advisory not deliberately accepted.
+    """
+    try:
+        import bandit  # noqa: F401
+    except ImportError:
+        return Result("high-findings", FAIL, "bandit is not installed",
+                      remediation="pip install -r requirements-test.txt (it pins bandit)")
+    cmd = [sys.executable, BANDIT_GATE, "--high"]
+    if targets:
+        cmd += ["--targets", *targets]
+    proc = _run(cmd, timeout=900)
+    output = (proc.stdout + proc.stderr).strip()
+    match = re.search(r"high-severity findings open: (\d+)", output)
+    if not match:
+        return Result("high-findings", FAIL, "bandit did not run:\n" + output[-1200:])
+    count = int(match.group(1))
+    return Result("high-findings", PASS if count == 0 else FAIL, output[-1800:], count, 0)
+
+
 def gate_boot_health() -> Result:
     """Boot + wiring. Database-free by design — see tests/test_boot_health.py."""
     proc = _run([sys.executable, "-m", "pytest", "tests/test_boot_health.py", "-q", "-p", "no:cacheprovider"])
@@ -1688,9 +1855,24 @@ def build_gates(baseline: dict) -> list[Gate]:
              "ratchet", lambda: gate_raw_sql_tenancy(baseline["raw_sql_tenancy"]),
              remediation="scope the query, or append 'tenancy-ok: <reason>'",
              tags=["static", "security"]),
+        Gate("raw-sql-tenancy-writes", "organization_id written outside the one backfill command",
+             "ratchet", lambda: gate_raw_sql_tenancy_writes(baseline["raw_sql_tenancy_writes"]),
+             remediation="derive or assign organization_id only in "
+                         "app/commands/backfill_layer_tenancy.py",
+             tags=["static", "security"]),
         Gate("tenant-scoping", "ORM queries on tenant-owned-but-unmixed models without an org predicate",
              "ratchet", lambda: gate_tenant_scoping(baseline["tenant_scoping"]),
              remediation="scope the query, or append 'tenant-scoping-ok: <reason>'",
+             tags=["static", "security"]),
+        Gate("untenanted-reads", "reads of a model with no tenant fence, without an org predicate",
+             "ratchet", lambda: gate_untenanted_reads(baseline["untenanted_reads"]),
+             remediation="scope the read to the caller's organisation, or append "
+                         "'tenant-scoping-ok: <reason>' on the statement",
+             tags=["static", "security"]),
+        Gate("unfenced-tables", "every table without a tenant fence is listed (a new one is a decision)",
+             "ratchet", gate_unfenced_tables,
+             remediation="give the model TenantMixin, or list the table in "
+                         "scripts/unfenced_tables.txt with a reason in review",
              tags=["static", "security"]),
         Gate("llm-boundary", "codegen emitters make no direct LLM calls (deterministic boundary)",
              "ratchet", lambda: gate_llm_boundary(baseline.get("llm_boundary", 0)),
@@ -1708,6 +1890,15 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_evidence_contract.py; add a test or Evidence: "
                          "trailer, and add Proven-against: to every registered checker",
              tags=["static", "process", "evidence"]),
+        Gate("untyped-property-writes",
+             "no new direct ArchiMate element property writes bypass the typed writer",
+             "ratchet",
+             lambda: gate_count_checker(
+                 "untyped-property-writes", "scripts/check_untyped_property_writes.py",
+                 baseline.get("untyped_property_writes", 0),
+             ),
+             remediation="run scripts/check_untyped_property_writes.py; route the write through PropertyService.set_element_property()/merge_element_properties()",
+             tags=["static", "architecture", "correctness"]),
         Gate("role-gate-coverage",
              "every declared delivery role resolves to at least one verifier gate",
              "ratchet",
@@ -1845,6 +2036,12 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_error_signalling.py; return an explicit "
                          "4xx/5xx so the client's !response.ok can see the failure",
              tags=["static", "correctness"]),
+        Gate("is-admin-called", "no *.is_admin reference used without calling it", "zero",
+             gate_is_admin_called,
+             remediation="run scripts/check_is_admin_called.py; call it -- "
+                         "current_user.is_admin() -- or mark "
+                         "'is-admin-called-ok: <reason>' on the line",
+             tags=["static", "security"]),
         Gate("silent-data", "no server failure returned to the caller as data", "zero",
              gate_silent_data,
              remediation="run scripts/check_silent_data.py; let it propagate, or log "
@@ -1883,6 +2080,15 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_public_repo_hygiene.py; remove the "
                          "content/reference, or mark the line 'hygiene-ok: <reason>'",
              tags=["static", "qa"]),
+        Gate("background-mechanisms",
+             "every background-work mechanism is listed in the one register",
+             "ratchet",
+             lambda: gate_background_mechanisms(
+                 baseline.get("background_mechanisms_thread", 22),
+                 baseline.get("background_mechanisms_thread_instances", 29)),
+             remediation="add the file to docs/background-mechanisms.yml with its class, "
+                         "disposition and tenant_context (see scripts/check_background_mechanisms.py)",
+             tags=["static"]),
         Gate("unregistered-checks",
              "no scripts/check_*.py exists with no Gate(...) entry in build_gates()",
              "ratchet", lambda: gate_unregistered_checks(baseline.get("unregistered_checks", 41)),
@@ -1966,6 +2172,12 @@ def build_gates(baseline: dict) -> list[Gate]:
              gate_vendor_integrity,
              remediation="run: python scripts/vendor_assets.py",
              tags=["static", "ui", "airgap", "security"]),
+        Gate("high-findings", "No HIGH-severity static-analysis finding is open", "zero",
+             gate_high_findings,
+             remediation="run: python scripts/ci/bandit_gate.py --high; fix each finding, or "
+                         "disposition one that is not a vulnerability with "
+                         "# nosec <test id> -- <reason> on its own line",
+             tags=["static", "security"]),
         Gate("dependency-cves", "No NEW known CVEs in shipped dependencies", "ratchet",
              gate_dependency_cves,
              remediation="bump the affected package (watch for blocking upper bounds)",
@@ -2110,7 +2322,12 @@ def main(argv: list[str] | None = None) -> int:
         results.append(result)
 
     if args.update_baseline:
-        measured = {r.name.replace("-", "_"): r.measured for r in results if r.measured is not None}
+        measured = {}
+        for r in results:
+            if r.extra:
+                measured.update(r.extra)
+            elif r.measured is not None:
+                measured[r.name.replace("-", "_")] = r.measured
         new = {**baseline, **{k: v for k, v in measured.items() if k in baseline}}
         lowered, raised = _baseline_diff(baseline, new)
         save_baseline(new, f"updated {time.strftime('%Y-%m-%d')}")

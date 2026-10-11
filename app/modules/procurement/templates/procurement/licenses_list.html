@@ -88,6 +88,7 @@
                     <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vendor</th>
                     <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Entitled</th>
                     <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Consumed</th>
+                    <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Used</th>
                     <th class="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Utilization</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                     <th class="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
@@ -103,8 +104,12 @@
                     <td class="px-4 py-3 text-sm">{{ license.vendor.name if license.vendor else '—' }}</td>
                     <td class="px-4 py-3 text-center font-medium">{{ license.quantity_entitled if license.quantity_entitled is not none else '—' }}</td>
                     <td class="px-4 py-3 text-center font-medium">{{ license.quantity_deployed if license.quantity_deployed is not none else '—' }}</td>
+                    <td class="px-4 py-3 text-center font-medium">{{ license.quantity_used if license.quantity_used is not none else '—' }}</td>
                     <td class="px-4 py-3 text-center">
-                        {% set util = (license.quantity_deployed or 0) / (license.quantity_entitled or 1) * 100 %}
+                        {% if license.quantity_deployed is none or not license.quantity_entitled %}
+                        <span class="text-sm text-muted-foreground">—</span>
+                        {% else %}
+                        {% set util = license.quantity_deployed / license.quantity_entitled * 100 %}
                         <div class="flex items-center justify-center gap-2">
                             <div class="w-16 h-2 bg-muted rounded-full overflow-hidden">
                                 <div class="h-full rounded-full
@@ -115,11 +120,13 @@
                             </div>
                             <span class="text-sm">{{ "{:.0f}".format(util) }}%</span>
                         </div>
+                        {% endif %}
                     </td>
                     <td class="px-4 py-3">
                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
                             {% if license.compliance_status == 'compliant' %}bg-success/10 text-success-emphasis
                             {% elif license.compliance_status == 'warning' %}bg-warning/10 text-warning-emphasis
+                            {% elif not license.compliance_status %}bg-muted text-muted-foreground
                             {% else %}bg-destructive/10 text-destructive-emphasis{% endif %}">
                             {# Stored snake_case; render as words. 'over_deployed' was shown verbatim. #}
                     {{ (license.compliance_status or 'unknown') | replace('_', ' ') | title }}

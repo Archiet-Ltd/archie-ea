@@ -127,6 +127,7 @@ CONTRIBUTOR = "arb_member"
 OUTSIDER = "procurement"
 
 _CLEANUP_TABLES = (
+    "subscriptions",
     "archie_command_claim_challenges",
     "arb_condition_events",
     "arb_canonical_conditions",

@@ -5,19 +5,22 @@ Shows available frameworks, extensions, and templates.
 Allows adoption and deployment of framework configurations.
 """
 
+import json
+import re
 from datetime import datetime
 
 from flask import Blueprint, jsonify, render_template, request
 
 from app import db
 from app.decorators import audit_log
+from app.jobs.tenant_safe_job import platform_scope
 from app.models.framework_configuration import (
     CapabilityFrameworkConfiguration,
     FrameworkConfigurationTemplate,
     FrameworkExtension,
     FrameworkInstance,
 )
-from flask_login import login_required
+from app.middleware.tenant_decorators import platform_admin_required
 
 framework_management_bp = Blueprint(
     "framework_management", __name__, url_prefix="/framework-management"
@@ -25,17 +28,18 @@ framework_management_bp = Blueprint(
 
 
 @framework_management_bp.route("/")
-@login_required
+@platform_admin_required
 def dashboard():
     """Framework Management Dashboard"""
-    return render_template("framework_management/dashboard.html")
+    has_manufacturing = db.session.query(FrameworkInstance).count() > 0
+    return render_template("framework_management/dashboard.html", has_manufacturing=has_manufacturing)
 
 
 MATURITY_LABELS = {1: "Initial", 2: "Developing", 3: "Defined", 4: "Managed", 5: "Optimizing"}
 
 
 @framework_management_bp.route("/manufacturing/dashboard")
-@login_required
+@platform_admin_required
 def framework_dashboard():
     """Manufacturing Excellence Framework Dashboard — real data only, no fabricated values."""
     instance_count = db.session.query(FrameworkInstance).count()
@@ -69,14 +73,14 @@ def framework_dashboard():
 
 
 @framework_management_bp.route("/manufacturing/table")
-@login_required
+@platform_admin_required
 def framework_table():
     """Manufacturing Excellence Framework Data Table"""
     return render_template("framework_management/manufacturing_table.html")
 
 
 @framework_management_bp.route("/api/manufacturing/instances")
-@login_required
+@platform_admin_required
 def get_manufacturing_instances():
     """Return framework instances for manufacturing table — real data only."""
     instances = FrameworkInstance.query.order_by(FrameworkInstance.instance_name).all()
@@ -97,17 +101,53 @@ def get_manufacturing_instances():
     return jsonify({"data": data, "total": len(data)})
 
 
+def _extension_slug(value):
+    """Normalise a name/code to the dash-separated form used in extension dashboard URLs."""
+    return re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
+
+
+def _extension_json_list(raw):
+    """Parse a FrameworkExtension JSON-array text column into a list of strings."""
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [str(item) for item in parsed if str(item).strip()]
+
+
 @framework_management_bp.route("/extensions/<extension_name>")
-@login_required
+@platform_admin_required
 def extension_dashboard(extension_name):
-    """Framework Extension Dashboard"""
+    """Framework Extension Dashboard — renders the registered FrameworkExtension record, if any."""
+    slug = _extension_slug(extension_name)
+    extension = next(
+        (
+            ext
+            for ext in FrameworkExtension.query.all()
+            if _extension_slug(ext.extension_code) == slug
+            or _extension_slug(ext.extension_name) == slug
+        ),
+        None,
+    )
+    features = _extension_json_list(extension.additional_capabilities) if extension else []
+    compatible_versions = ", ".join(_extension_json_list(extension.compatible_versions)) if extension else ""
+    dependencies_display = ", ".join(_extension_json_list(extension.dependencies)) if extension else ""
     return render_template(
-        "framework_management/extension_dashboard.html", extension_name=extension_name
+        "framework_management/extension_dashboard.html",
+        extension_name=extension_name,
+        extension=extension,
+        features=features,
+        compatible_versions=compatible_versions,
+        dependencies_display=dependencies_display,
     )
 
 
 @framework_management_bp.route("/templates/<template_name>")
-@login_required
+@platform_admin_required
 def template_dashboard(template_name):
     """Framework Template Dashboard"""
     return render_template(
@@ -116,7 +156,7 @@ def template_dashboard(template_name):
 
 
 @framework_management_bp.route("/api/available-frameworks")
-@login_required
+@platform_admin_required
 def get_available_frameworks():
     """Get available frameworks, extensions, and templates"""
 
@@ -194,7 +234,7 @@ def get_available_frameworks():
 
 
 @framework_management_bp.route("/api/deploy-configuration", methods=["POST"])
-@login_required
+@platform_admin_required
 @audit_log("deploy_configuration")
 def deploy_configuration():
     """Deploy a framework configuration"""
@@ -236,7 +276,7 @@ def deploy_configuration():
 
 @framework_management_bp.route("/api/activate-extension", methods=["POST"])
 @framework_management_bp.route("/api/activate-extension/<int:extension_id>", methods=["POST"])
-@login_required
+@platform_admin_required
 @audit_log("activate_extension")
 def activate_extension(extension_id=None):
     """Activate a framework extension by ID (URL param) or name (JSON body)."""
@@ -276,7 +316,7 @@ def activate_extension(extension_id=None):
 
 
 @framework_management_bp.route("/api/apply-template", methods=["POST"])
-@login_required
+@platform_admin_required
 @audit_log("apply_template")
 def apply_template():
     """Apply a framework template"""
@@ -305,19 +345,20 @@ def apply_template():
         # Apply template configuration
         if template.template_configuration:
             # Parse and apply template settings
-            import json
-
             template_config = json.loads(template.template_configuration)
             for key, value in template_config.items():
                 if hasattr(configuration, key):
                     setattr(configuration, key, value)
 
-        db.session.add(configuration)
+        # The new configuration and the template's usage count are both
+        # platform-wide catalogue rows.
+        with platform_scope("platform administrator applies a shared framework template"):
+            db.session.add(configuration)
 
-        # Update template usage count
-        template.usage_count = template.usage_count + 1
+            # Update template usage count
+            template.usage_count = template.usage_count + 1
 
-        db.session.commit()
+            db.session.commit()
 
         return jsonify(
             {
@@ -334,7 +375,7 @@ def apply_template():
 
 
 @framework_management_bp.route("/api/statistics")
-@login_required
+@platform_admin_required
 def get_statistics():
     """Get framework management statistics"""
 
@@ -390,7 +431,7 @@ def get_statistics():
 
 
 @framework_management_bp.route("/api/active-framework")
-@login_required
+@platform_admin_required
 def get_active_framework():
     """Get the currently active framework configuration"""
     active_config = CapabilityFrameworkConfiguration.query.filter_by(status="active").first()

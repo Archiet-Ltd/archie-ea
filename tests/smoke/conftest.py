@@ -30,10 +30,39 @@ import uuid
 import pytest
 
 pytest.importorskip("playwright", reason="playwright not installed - smoke journeys skipped")
-from playwright.sync_api import sync_playwright  # noqa: E402
 
 PASSWORD = "SmokeJourney!2026"
 BOOT_TIMEOUT = int(os.environ.get("SMOKE_BOOT_TIMEOUT", "180"))
+
+
+def pytest_configure(config):
+    """Register fallback ``page`` and ``context`` fixtures when the
+    pytest-playwright plugin is absent.
+
+    CI's "Browser journeys" and "Browser compatibility" jobs install
+    ``playwright`` and ``pytest-timeout`` but NOT ``pytest-playwright``,
+    so every test that uses the plugin's ``page`` (or ``context``) fixture
+    errors at setup with "fixture 'page' not found".  These fallbacks are
+    built on this suite's own ``browser`` fixture (package scope) and
+    provide the same function-scoped lifecycle the plugin would.
+    """
+    if config.pluginmanager.hasplugin("playwright"):
+        return
+
+    class _SmokePageFallback:
+        @pytest.fixture(scope="function")
+        def context(self, browser):
+            ctx = browser.new_context()
+            yield ctx
+            ctx.close()
+
+        @pytest.fixture(scope="function")
+        def page(self, context):
+            p = context.new_page()
+            yield p
+            p.close()
+
+    config.pluginmanager.register(_SmokePageFallback(), name="smoke-page-fallback")
 
 
 def _tail(path, lines=40):
@@ -142,13 +171,75 @@ def live_server(request, ai_protocol_stub, app):
     Integrity - which is precisely the class of defect these journeys exist to
     catch.
     """
+    server = boot_live_server(request, ai_protocol_stub, app)
+    yield server
+
+    if request.session.testsfailed:
+        print("\n[smoke] server log after journey failure:\n%s" % server.tail(300))
+
+
+def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
+    """Start one app subprocess and return its SmokeServer; stopped by `request`'s finalizer.
+
+    `extra_env` overrides configuration for this server only, so a module can
+    exercise a feature flag without switching it on for every other journey.
+    """
+    # The smoke server starts against the shared candidate database before the
+    # ORM seeding below runs. When a branch adds nullable columns to existing
+    # tables, requests can 500 on the first SELECT unless the add-only repair
+    # path runs first. Production already does init-db -> reconcile-schema on
+    # boot; mirror that here so browser journeys observe the real branch code,
+    # not drift left behind by an older local schema.
+    from app.commands.reconcile_schema import _reconcile
+
+    with app.app_context():
+        _added, failed, _missing, _blocking = _reconcile(dry_run=False)
+        assert not failed, "smoke live_server could not reconcile schema: %s" % failed
+
     port = _free_port()
     env = dict(os.environ)
+    env.update(extra_env or {})
+    # PUBLIC_BASE_URL (config.py) is the one source of the OAuth/MCP
+    # "resource" identifier -- every oauth_provider route that validates a
+    # resource parameter (POST /oauth/authorize, POST /oauth/token) checks it
+    # against *this server's own* PUBLIC_BASE_URL, which tests/smoke/
+    # test_mcp_consent.py builds dynamically as `live_server + "/mcp"` (it
+    # cannot know this subprocess's port in advance, since _free_port() picks
+    # it above). This subprocess's PUBLIC_BASE_URL must match that exact
+    # ephemeral port, so it is always set here -- not setdefault -- to
+    # override whatever fixed value (or none at all) the caller's own shell
+    # happens to carry, which running any MCP-enabled test module alongside
+    # this one requires regardless (tests/conftest.py's `app` fixture, a
+    # dependency of `live_server` itself, fails fast when MCP_ENABLED is true
+    # and PUBLIC_BASE_URL is empty). A caller that genuinely needs a
+    # different value for one journey (e.g. testing a real mismatch) can
+    # still win via `extra_env`, applied above and so already present in
+    # `env` by the time this checks it.
+    if "PUBLIC_BASE_URL" not in (extra_env or {}):
+        env["PUBLIC_BASE_URL"] = "http://127.0.0.1:%d" % port
+    # The assistant connector is off by default; the consent journey needs it on in
+    # the server it drives, and no other journey is affected by its extra routes.
+    env.setdefault("MCP_ENABLED", "true")
     _require_explicit_test_database(env)
     if ai_protocol_stub is not None:
         env = ai_protocol_stub.child_environment(env)
     env.setdefault("SECRET_KEY", "smoke-only-not-secret-" + "x" * 16)
-    env.setdefault("FLASK_CONFIG", "testing")
+    # "smoke", not "testing": config.py's SmokeTestingConfig is identical to
+    # TestingConfig except for ADMIN_MFA_BYPASS, which lets the dozens of
+    # admin-archetype fixtures in this suite reach the app shell without a
+    # browser driving a real TOTP round trip (R1-B12 PR 2). The hardcoded
+    # switch lives only on that one config class -- see its docstring and
+    # app/services/mfa_service.py's required_for().
+    #
+    # An explicit assignment, not setdefault: tests/conftest.py's session-
+    # scoped `app` fixture (a dependency of `live_server` below) already ran
+    # `os.environ.setdefault("FLASK_CONFIG", "testing")` in this same process
+    # before this function is ever called, so `os.environ` here already has
+    # FLASK_CONFIG="testing" -- a setdefault on `env` would silently keep
+    # that inherited value and never select the smoke config at all. A caller
+    # that genuinely needs a different config for one journey can still win,
+    # since `extra_env` was folded into `env` above and is preserved here.
+    env["FLASK_CONFIG"] = (extra_env or {}).get("FLASK_CONFIG", "smoke")
     env["FLASK_DEBUG"] = "0"
     # TestingConfig reads TEST_DATABASE_URL, not DATABASE_URL. Without this the
     # subprocess silently falls back to the default DSN on port 5432 and every
@@ -243,15 +334,33 @@ def live_server(request, ai_protocol_stub, app):
     except Exception as exc:
         print("[smoke] live_server at %s NOT serving: %s" % (base, exc))
 
-    server = SmokeServer(base, log_path, app)
-    yield server
-
-    if request.session.testsfailed:
-        print("\n[smoke] server log after journey failure:\n%s" % server.tail(300))
+    return SmokeServer(base, log_path, app)
 
 
-@pytest.fixture(scope="session")
-def seeded(live_server, request, ai_protocol_stub):
+def _delete_api_settings(**filters):
+    """Delete APISettings rows matching *filters* inside a fresh app context.
+
+    Returns the number of rows deleted so callers can assert their own
+    expectations (e.g. exactly one row for a fixture teardown, or any number
+    for a test finalizer that may have already cleaned up).
+    """
+    from app import create_app, db
+    from app.models.models import APISettings
+
+    app = create_app("testing")
+    with app.app_context():
+        db.session.remove()
+        existing = APISettings.query.filter_by(**filters).count()
+        if existing:
+            APISettings.query.filter_by(**filters).delete(
+                synchronize_session=False)
+            db.session.commit()
+            assert APISettings.query.filter_by(**filters).count() == 0
+        db.session.remove()
+        return existing
+
+
+def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
     """One organisation, one user per archetype, and the fixtures they need.
 
     Returns {archetype: email} plus the ids the journeys navigate to.
@@ -260,11 +369,30 @@ def seeded(live_server, request, ai_protocol_stub):
     have no create path for their own entity - which was itself a finding - and a
     journey should not be blocked from testing a read screen by a missing write
     screen.
+
+    A plain function, not a fixture: `seeded` below calls it once for the
+    session-wide organisation every ordinary smoke test shares, and a second
+    caller (test_visual_regression.py's `visual_org`) calls it again for a
+    dedicated organisation of exactly the same shape, so a screen capture
+    that needs real content does not also need the shared organisation to be
+    in whatever state 500 other tests have left it in.
+
+    Every name below embeds a per-call suffix so two calls in the same
+    database never collide. It is random (a fresh uuid) by default, which is
+    what every ordinary smoke test wants -- nothing about its own content is
+    asserted on. `fixed_suffix` overrides that with a caller-chosen, stable
+    value instead, for the one caller (test_visual_regression.py's
+    `visual_org`) whose whole point is a screen whose content -- not just its
+    shape -- must render identically every run. A fixed suffix reused across
+    two calls in the same database collides on the organisation's slug (and
+    the seeded users' emails): the caller is responsible for calling this at
+    most once per database when passing one (see `visual_org`'s own guard,
+    which pytest's fixture scope alone was not enough to provide).
     """
     from app import create_app, db
 
     app = create_app("testing")
-    suffix = uuid.uuid4().hex[:8]
+    suffix = fixed_suffix or uuid.uuid4().hex[:8]
     out = {"emails": {}, "ids": {}}
 
     with app.app_context():
@@ -308,8 +436,18 @@ def seeded(live_server, request, ai_protocol_stub):
         if ai_protocol_stub is not None:
             from app.models.models import APISettings
 
+            # Clean up any stale protocol-stub records from interrupted runs.
+            # The live_server subprocess may have created a record, then the
+            # seeder's own app_context reads the same database.  Without this
+            # cleanup a previous run whose finalizer did not execute leaves an
+            # enabled provider behind, and every smoke test errors at setup.
+            for stale in APISettings.query.filter_by(key_label="ci-protocol-stub").all():
+                db.session.delete(stale)
+            db.session.commit()
+
             # This app context is intentionally unscoped: reject ANY existing
-            # enabled provider before exercising AI in a candidate database.
+            # enabled provider (other than our own, which was just removed)
+            # before exercising AI in a candidate database.
             if APISettings.query.filter_by(enabled=True).count():
                 pytest.fail("AI protocol qualification requires a candidate database without enabled provider records")
         Role.insert_roles()
@@ -318,8 +456,19 @@ def seeded(live_server, request, ai_protocol_stub):
 
         org = Organization(name="Smoke Org %s" % suffix, slug="smoke-%s" % suffix)
         db.session.add(org)
+        db.session.flush()
+        # One person per archetype is more than Community admits; the plan is
+        # recorded where every limit is read from, the subscriptions row.
+        from app.services.billing_plans import set_contract_plan
+
+        set_contract_plan(org, "enterprise", None)
         db.session.commit()
         out["ids"]["org"] = org.id
+
+        # Enable the implementation_planning feature flag so /implementation/ routes work
+        from tests.conftest import seed_implementation_planning_flag
+
+        seed_implementation_planning_flag()
 
         if ai_protocol_stub is not None:
             from tests.smoke.ai_protocol_stub import MODEL, TOKEN
@@ -333,16 +482,10 @@ def seeded(live_server, request, ai_protocol_stub):
             out["ids"]["ai_protocol_provider"] = provider_id
 
             def remove_protocol_provider():
-                with app.app_context():
-                    db.session.remove()
-                    query = APISettings.query.filter_by(
-                        id=provider_id, organization_id=provider_org,
-                        provider="openai", key_label="ci-protocol-stub")
-                    assert query.count() == 1, "Protocol provider fixture was unexpectedly changed"
-                    assert query.delete(synchronize_session=False) == 1
-                    db.session.commit()
-                    assert APISettings.query.filter_by(id=provider_id, organization_id=provider_org).count() == 0
-                    db.session.remove()
+                count = _delete_api_settings(
+                    id=provider_id, organization_id=provider_org,
+                    provider="openai", key_label="ci-protocol-stub")
+                assert count == 1, "Protocol provider fixture was unexpectedly changed"
 
             request.addfinalizer(remove_protocol_provider)
 
@@ -548,6 +691,14 @@ def seeded(live_server, request, ai_protocol_stub):
     return out
 
 
+@pytest.fixture(scope="session")
+def seeded(live_server, request, ai_protocol_stub):
+    """The one organisation, one user per archetype, and their fixtures
+    every ordinary smoke test in this session shares. See
+    `_seed_standard_org` above for what it contains."""
+    return _seed_standard_org(request, ai_protocol_stub)
+
+
 PAGE_TIMEOUT = int(os.environ.get("SMOKE_PAGE_TIMEOUT", "90000"))
 
 
@@ -575,19 +726,68 @@ PAGE_TIMEOUT = int(os.environ.get("SMOKE_PAGE_TIMEOUT", "90000"))
 # CI passes today only because its `tests` job never runs `playwright install`,
 # so the launch raises, the skip below unwinds the context, and the loop is
 # released. Adding a browser to that job would have turned it red.
+
+
+@pytest.fixture(scope="session")
+def _sync_playwright_instance(request):
+    """One sync_playwright() instance for the whole session.
+
+    Used only when the pytest-playwright plugin is absent (the CI browser jobs
+    that install ``playwright`` but not ``pytest-playwright``).  In those jobs
+    the smoke package is the last (and only) browser consumer, so a
+    session-scoped lifecycle is safe — there is no later ``asyncio.run()`` to
+    collide with.
+    """
+    from playwright.sync_api import sync_playwright
+
+    pw = sync_playwright().start()
+    request.addfinalizer(pw.stop)
+    return pw
+
+
 @pytest.fixture(scope="package")
-def browser():
-    with sync_playwright() as p:
-        engine, engine_name = _select_browser_engine(p, os.environ)
-        try:
-            b = engine.launch(headless=True)
-        except Exception as exc:                      # no browser binary in this env
+def browser(request):
+    if request.config.pluginmanager.hasplugin("playwright"):
+        playwright = request.getfixturevalue("playwright")
+    else:
+        playwright = request.getfixturevalue("_sync_playwright_instance")
+    engine, engine_name = _select_browser_engine(playwright, os.environ)
+    try:
+        b = engine.launch(headless=True)
+    except Exception as exc:                      # no browser binary in this env
+        # Some sandboxes pre-install a browser revision that doesn't match
+        # the pinned Playwright pip package (it then looks for a newer
+        # chromium_headless_shell revision that was never downloaded). Retry
+        # once against the generic pre-installed executable before giving up
+        # -- same fallback the environment's own docs recommend for the
+        # Node/@playwright/test side.
+        fallback = os.environ.get("SMOKE_CHROMIUM_EXECUTABLE") or "/opt/pw-browsers/chromium"
+        if engine_name == "chromium" and os.path.exists(fallback):
+            try:
+                b = engine.launch(headless=True, executable_path=fallback)
+            except Exception:
+                b = None
+        else:
+            b = None
+        if b is None:
             message = "%s unavailable: %s" % (engine_name, str(exc)[:120])
             if os.environ.get("SMOKE_REQUIRE_BROWSER") == "1":
                 pytest.fail(message)
             pytest.skip(message)
-        yield b
-        b.close()
+    yield b
+    b.close()
+
+
+def type_and_wait(page, prefix, term):
+    """Type *term* into the ask-picker input and wait for the option list.
+
+    Uses ``fill()`` (clears existing text, then types) so repeated
+    calls across question switches do not concatenate onto stale input.
+    """
+    box = page.locator("#%s-picker-input" % prefix)
+    box.fill(term)
+    page.wait_for_selector("#%s-picker-listbox [role=option]" % prefix)
+    return box
 
 
 # Every enterprise role the product defines. The scope contract below prevents
@@ -597,4 +797,6 @@ ARCHETYPES = [
     "arb_member", "portfolio_manager", "cto", "procurement",
     "application_manager", "platform_admin", "security_architect",
     "data_architect",
+    # R1-B36 (TB-0146): promoted from unassignable to assignable.
+    "finance", "compliance", "risk", "operations", "non_technical_owner",
 ]

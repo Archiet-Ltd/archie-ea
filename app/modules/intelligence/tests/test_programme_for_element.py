@@ -4,13 +4,15 @@ traversal via the same ``cross_layer_impact`` code path L1/L6 already use --
 no second traversal implementation, no fabricated cost figures.
 
 Fixtures (app, db_session, make_org) are discovered via
-app/modules/intelligence/tests/conftest.py's own import of tests.conftest,
+app/modules/conftest.py's import of tests.conftest,
 same pattern as test_query_service.py. No import needed here.
 """
 
 from __future__ import annotations
 
 import datetime as _dt
+
+from sqlalchemy import text
 
 
 def _element(db_session, org_id, name, layer="application"):
@@ -39,6 +41,7 @@ def _work_package(db_session, element, *, name="Migrate to cloud", status="in_pr
     wp = UnifiedWorkPackage(
         name=name,
         archimate_element_id=element.id,
+        organization_id=element.organization_id,
         business_capability="Test Capability",
         status=status,
         progress_percentage=progress_percentage,
@@ -198,6 +201,11 @@ def test_owner_absent_reads_as_honest_none_not_a_placeholder(app, db_session, ma
 
 
 def test_work_package_blast_radius_reuses_cross_layer_impact(app, db_session, make_org):
+    """Pin extended (plateau/gap addition): the programme lens adds ``plateau``/
+    ``plateau_reason`` to every affected row in place, so the rows are no
+    longer byte-for-byte identical to a fresh ``cross_layer_impact`` call --
+    they are identical apart from those two added keys, which is what this
+    now checks explicitly rather than a bare equality."""
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
     org = make_org("programme-lens-blast")
@@ -215,7 +223,12 @@ def test_work_package_blast_radius_reuses_cross_layer_impact(app, db_session, ma
         direct_impact = IntelligenceQueryService.cross_layer_impact(a.id, max_depth=3, with_owner=True)
 
     assert len(programme_result["work_packages"]) == 1
-    assert programme_result["work_packages"][0]["affected_rows"] == direct_impact["rows"]
+    affected_rows = programme_result["work_packages"][0]["affected_rows"]
+    assert len(affected_rows) == len(direct_impact["rows"]) == 1
+    for affected_row, direct_row in zip(affected_rows, direct_impact["rows"]):
+        assert "plateau" in affected_row and "plateau_reason" in affected_row
+        stripped = {k: v for k, v in affected_row.items() if k not in ("plateau", "plateau_reason")}
+        assert stripped == direct_row
 
 
 def test_multiple_work_packages_on_one_element_each_get_their_own_row(app, db_session, make_org):
@@ -223,6 +236,9 @@ def test_multiple_work_packages_on_one_element_each_get_their_own_row(app, db_se
 
     org = make_org("programme-lens-multi")
     a = _element(db_session, org.id, "A")
+    # An element now holds one work package; the lens still returns a row per package it finds,
+    # so this runs on a database without the element index (rolled back with the test).
+    db_session.execute(text("DROP INDEX IF EXISTS uq_unified_wp_archimate_element"))  # tenancy-ok: test fixture
     _work_package(db_session, a, name="Phase 1")
     _work_package(db_session, a, name="Phase 2")
     db_session.commit()
@@ -235,3 +251,55 @@ def test_multiple_work_packages_on_one_element_each_get_their_own_row(app, db_se
 
     names = {wp["name"] for wp in result["work_packages"]}
     assert names == {"Phase 1", "Phase 2"}
+
+
+def _foreign_owner_result(app, db_session, make_org, suffix):
+    from app.models.user import User
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org(f"programme-lens-foreign-owner-{suffix}")
+    other = make_org(f"programme-lens-foreign-owner-other-{suffix}")
+    a = _element(db_session, org.id, "A")
+    foreigner = User(
+        email=f"foreign-{suffix}@example.com", first_name="Fran", last_name="Foreign",
+        organization_id=other.id,
+    )
+    db_session.add(foreigner)
+    db_session.flush()
+    _work_package(db_session, a, name="Owned by someone elsewhere", owner_id=foreigner.id)
+    db_session.commit()
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org.id
+        return IntelligenceQueryService.programme_for_element(a.id)
+
+
+def test_a_work_package_owner_from_another_organisation_is_never_named(app, db_session, make_org):
+    result = _foreign_owner_result(app, db_session, make_org, "fence")
+
+    row = result["work_packages"][0]
+    assert row["owner"] is None
+    assert "Fran" not in repr(result) and "foreign-fence@example.com" not in repr(result)
+
+
+def test_the_owner_tenant_predicate_is_what_stops_the_foreign_owner_leak(
+    app, db_session, make_org, monkeypatch
+):
+    """Mutation proof: replace the seam with a predicate that matches every
+    user and the foreign owner IS named, so the test above is not passing
+    by accident."""
+    import sqlalchemy as sa
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    monkeypatch.setattr(
+        IntelligenceQueryService, "_owner_user_tenant_predicate", staticmethod(lambda org_id: sa.true())
+    )
+
+    result = _foreign_owner_result(app, db_session, make_org, "mutation")
+
+    # The foreign user's real name, not just a truthy value, proves the
+    # predicate seam is what stops the leak rather than something else.
+    assert result["work_packages"][0]["owner"] == "Fran Foreign"

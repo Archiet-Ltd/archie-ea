@@ -14,6 +14,7 @@ These models bridge the gap between strategic initiatives and tactical execution
 from datetime import datetime
 
 from app import db
+from app.models.mixins import TenantMixin
 
 # ============================================================================
 # Priority 1: Portfolio Initiative <-> Application Linkage
@@ -126,7 +127,7 @@ class InitiativeSuccessMetric(db.Model):
 # ============================================================================
 
 
-class OrganizationUnit(db.Model):
+class OrganizationUnit(TenantMixin, db.Model):
     """
     Business units, departments, teams within the enterprise
     Maps organizational structure for stakeholder management
@@ -177,7 +178,7 @@ class OrganizationUnit(db.Model):
     used_applications = db.relationship("ApplicationUsage", back_populates="organization_unit")
 
 
-class ApplicationOwnership(db.Model):
+class ApplicationOwnership(TenantMixin, db.Model):
     """
     Which organization unit OWNS/is responsible for an application
     (Product owner, budget holder, strategic direction)
@@ -206,6 +207,15 @@ class ApplicationOwnership(db.Model):
     end_date = db.Column(db.Date)
 
     notes = db.Column(db.Text)
+
+    # Consolidation: points to the ApplicationOwner row this record was
+    # merged into during backfill
+    retired_into_id = db.Column(
+        db.Integer,
+        db.ForeignKey("application_owners.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -258,7 +268,10 @@ class ApplicationUsage(db.Model):
 
 class ApplicationCost(db.Model):
     """
-    Financial tracking for applications - TCO, licensing, support costs
+    RETIRED — The annual cost of an application is now stored in
+    ApplicationComponent.total_cost_of_ownership and accessed through
+    app.services.application_cost_accessor.get_annual_cost().
+    This table exists for historical data only; no new writes arrive here.
     """
 
     __tablename__ = "application_costs"

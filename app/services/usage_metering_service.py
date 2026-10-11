@@ -113,24 +113,19 @@ class UsageMeteringService:
 
     @staticmethod
     def get_seat_usage(org_id: int) -> Dict:
-        """Return {used, purchased, limit_reached} for the organization."""
-        from app.extensions import db
-        from app.models.user import User
-        from app.models.organization import Organization
+        """Return {used, purchased, limit_reached} for the organization.
 
-        org = db.session.get(Organization, org_id)
-        purchased = org.max_users if org else 0
+        Read from the plan limits (app/services/billing_plans.py) so this and
+        the billing page give the same answer. ``purchased`` is None when the
+        plan has no limit on people.
+        """
+        from app.services.billing_plans import user_limit_status
 
-        used = (
-            db.session.query(User)
-            .filter(User.organization_id == org_id)
-            .count()
-        )
-
+        status = user_limit_status(org_id)
         return {
-            "used": used,
-            "purchased": purchased,
-            "limit_reached": used >= purchased,
+            "used": status["used"],
+            "purchased": status["limit"],
+            "limit_reached": status["limit_reached"],
         }
 
     @staticmethod

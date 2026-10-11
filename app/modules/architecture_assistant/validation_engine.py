@@ -154,10 +154,11 @@ class ValidationEngineService:
         }
 
     def _get_compliance_summary(self, capabilities):
-        """Aggregate compliance status from capability→compliance links."""
-        from app.modules.architecture_assistant.capability_derivation import CapabilityDerivationService
-        svc = CapabilityDerivationService()
+        """Aggregate compliance status from capability→compliance links.
 
+        Reads from the canonical compliance store directly instead of through
+        the removed CapabilityDerivationService.
+        """
         frameworks = {}
         gaps = []
         total_reqs = 0
@@ -167,14 +168,13 @@ class ValidationEngineService:
             if not cap_id:
                 continue
 
-            reqs = svc.get_compliance_requirements(cap_id)
+            reqs = self._query_compliance_requirements(cap_id)
             for req in reqs:
                 total_reqs += 1
                 fw = req.get("framework", "Unknown")
                 frameworks.setdefault(fw, {"requirements": [], "addressed": 0, "total": 0})
                 frameworks[fw]["requirements"].append(req.get("name", ""))
                 frameworks[fw]["total"] += 1
-                # Mark as addressed (Step 2 acknowledged it)
                 frameworks[fw]["addressed"] += 1
 
         score = 100 if total_reqs == 0 else round(
@@ -188,6 +188,29 @@ class ValidationEngineService:
             "gaps": gaps,
             "score": score,
         }
+
+    @staticmethod
+    def _query_compliance_requirements(capability_id):
+        """Query compliance requirements for a business capability.
+
+        Delegates to the shared compliance_service helper so there is exactly
+        one implementation of this query.  Returns an empty list on failure
+        after logging so the validation summary can continue.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            from app.modules.architecture_assistant.services.compliance_service import (
+                query_compliance_requirements,
+            )
+            return query_compliance_requirements(capability_id)
+        except Exception:
+            logger.warning(
+                "Failed to query compliance requirements for capability %s",
+                capability_id,
+                exc_info=True,
+            )
+            return []
 
     def _get_governance_alignment(self, capabilities):
         """Query COBIT processes and ITIL practices for capabilities."""

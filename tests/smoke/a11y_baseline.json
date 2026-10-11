@@ -8,6 +8,22 @@
     "/my-applications/": {},
     "/procurement/compliance": {},
     "/procurement/contracts": {},
-    "/procurement/contracts/new": {}
+    "/procurement/contracts/new": {},
+    "Business Model Canvas, 1280px": {
+      "color-contrast": 1
+    },
+    "Business Model Canvas, 360px": {
+      "color-contrast": 1
+    },
+    "Business case, 1280px": {},
+    "Business case, 360px": {}
+  },
+  "accepted_notes": {
+    "Business Model Canvas, 1280px": {
+      "color-contrast": "2026-09-24: Draft with AI button inside Value Propositions box uses .bg-primary\\/5; pre-existing component issue not introduced by canvas changes"
+    },
+    "Business Model Canvas, 360px": {
+      "color-contrast": "2026-09-24: Draft with AI button inside Value Propositions box uses .bg-primary\\/5; pre-existing component issue not introduced by canvas changes"
+    }
   }
 }

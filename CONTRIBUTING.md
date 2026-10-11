@@ -1,12 +1,12 @@
-# Contributing to Archie
+# Contributing to Entelim
 
-Archie is an open-source, AI-native enterprise architecture platform (TOGAF 9.2 /
+Entelim is an open-source, AI-native enterprise architecture platform (TOGAF 9.2 /
 ArchiMate 3.2). Contributions are welcome — bug fixes, features, docs, connectors,
 and codegen targets.
 
 ## License of contributions
 
-Archie is **AGPL-3.0** with a commercial dual-licence. By submitting a contribution
+Entelim is **AGPL-3.0** with a commercial dual-licence. By submitting a contribution
 you agree it is licensed under AGPL-3.0, and — so the dual-licence remains viable —
 that the maintainers may also offer it under the commercial licence. If your
 employer owns your work, get their sign-off first.

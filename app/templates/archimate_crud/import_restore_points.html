@@ -1,0 +1,74 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}Restore before an import{% endblock %}
+
+{% block breadcrumb %}
+{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
+{{ breadcrumb_nav(items=[
+    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
+    {'text': 'Import model file', 'href': url_for('architect_ui.import_oef')},
+    {'text': 'Restore before an import', 'current': true}
+]) }}
+{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6 mx-auto max-w-4xl">
+    {% macro _ps_actions() %}
+<a href="{{ url_for('architect_ui.import_oef') }}"
+           class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
+            <i data-lucide="arrow-left" class="h-4 w-4" aria-hidden="true"></i> Back to import
+        </a>
+    {% endmacro %}
+    {{ page_shell(title='Restore before an import', subtitle='Choose an import to see what undoing it would change. Nothing changes until you confirm.', actions_caller=_ps_actions) }}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="rounded-md border px-4 py-3 text-sm
+            {{ 'bg-destructive/10 border-destructive text-destructive-emphasis' if category == 'error' else 'bg-success/10 border-success text-success-emphasis' }}"
+            data-testid="restore-flash">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endwith %}
+
+    {% if restore_points %}
+    <div class="overflow-x-auto rounded-lg border border-border bg-card" data-testid="restore-points">
+        <table class="w-full text-sm">
+            <thead class="bg-muted/50">
+                <tr>
+                    <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Imported</th>
+                    <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Model</th>
+                    <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">By</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium text-muted-foreground">Elements</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium text-muted-foreground">Relationships</th>
+                    <th scope="col" class="px-3 py-2"><span class="sr-only">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+                {% for point in restore_points %}
+                <tr data-testid="restore-point-row">
+                    <td class="px-3 py-2 text-foreground">{{ point.started_at.strftime('%d %b %Y %H:%M') if point.started_at else '' }}</td>
+                    <td class="px-3 py-2 text-foreground break-words">{{ point.model_name or point.filename or 'Model import' }}</td>
+                    <td class="px-3 py-2 text-muted-foreground break-words">{{ point.user }}</td>
+                    <td class="px-3 py-2 text-right">{{ point.elements_created }} added, {{ point.elements_updated }} changed</td>
+                    <td class="px-3 py-2 text-right">{{ point.relationships_created }} added</td>
+                    <td class="px-3 py-2 text-right">
+                        <a href="{{ url_for('architect_ui.import_restore_preview', log_id=point.id) }}"
+                           data-testid="btn-review-restore"
+                           class="inline-flex items-center gap-2 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-3">
+                            Review restore
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="rounded-lg border bg-card p-6 text-sm text-muted-foreground" data-testid="restore-points-empty">
+        No imports to restore yet. Each model import from now on is kept here as a restore point.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

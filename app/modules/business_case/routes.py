@@ -7,7 +7,7 @@ Index endpoint (linked from the sidebar by the orchestrator post-merge):
 
 import logging
 
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, Response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 # Destructive and mutating routes were guarded by @login_required only, so any
@@ -15,6 +15,7 @@ from flask_login import current_user, login_required
 # already used by app/modules/capabilities/routes/enterprise_crud_routes.py.
 from app.decorators import require_roles
 
+from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 from app.models.business_case import BUSINESS_CASE_STATUSES
 from app.models.business_capabilities import BusinessCapability
 from app.models.solution_models import Solution
@@ -78,6 +79,13 @@ def detail(business_case_id):
         return render_template("business_case/not_found.html", business_case_id=business_case_id), 404
 
     capabilities, initiatives, solutions = _link_options()
+    # Zones in record order, keyed by box_key.
+    canvas_zones = CANVAS_TEMPLATES["business_case"]["zones"]
+
+    from app.services.composer_export_formats import resolve_canvas_saved_diagram_id
+
+    saved_diagram_id = resolve_canvas_saved_diagram_id(business_case, "business_case")
+
     return render_template(
         "business_case/detail.html",
         business_case=business_case,
@@ -85,6 +93,43 @@ def detail(business_case_id):
         capabilities=capabilities,
         initiatives=initiatives,
         solutions=solutions,
+        canvas_zones={z["box_key"]: z for z in canvas_zones},
+        canvas_unclassified_count=0,
+        canvas_saved_diagram_id=saved_diagram_id,
+    )
+
+
+@business_case_bp.route("/<int:business_case_id>/export", methods=["GET"])
+@login_required
+def export_canvas(business_case_id):
+    """Export this business case through the existing saved-viewpoint formats
+    (mermaid, lucid, archi) over the record's saved diagram, with every empty
+    box's reason named in the file.
+
+    Query parameter: format (mermaid|lucid|archi, default mermaid).
+    """
+    business_case = service.get_business_case_or_none(business_case_id)
+    if business_case is None:
+        return not_found_response("Business Case")
+
+    fmt = request.args.get("format", "mermaid")
+    if fmt not in ("mermaid", "lucid", "archi"):
+        return error_response(f"Unsupported format: {fmt}", code="VALIDATION_ERROR", status_code=400)
+
+    from app.services.composer_export_formats import (
+        export_canvas_viewpoint,
+        resolve_canvas_saved_diagram_id,
+    )
+
+    saved_diagram_id = resolve_canvas_saved_diagram_id(business_case, "business_case")
+    body, mimetype, ext = export_canvas_viewpoint(
+        "business_case", saved_diagram_id, fmt,
+        name=business_case.title or "Business Case",
+    )
+    filename = f"business-case-{business_case_id}.{ext}"
+    return Response(
+        body, status=200, mimetype=mimetype,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
@@ -176,6 +221,32 @@ def pull_financials(business_case_id):
 
     report = service.refresh_financials_from_links(business_case)
     return success_response({"business_case": business_case.to_dict(), "aggregation": report})
+
+
+@business_case_bp.route("/api/list")
+@login_required
+def api_list():
+    """JSON list of all Business Cases for the current tenant."""
+    cases = service.list_business_cases()
+    return success_response([
+        {
+            "id": bc.id,
+            "title": bc.title or "",
+            "status": bc.status,
+            "updated_at": bc.updated_at.isoformat() if bc.updated_at else None,
+        }
+        for bc in cases
+    ])
+
+
+@business_case_bp.route("/api/<int:business_case_id>")
+@login_required
+def api_detail(business_case_id):
+    """JSON detail of one Business Case."""
+    case = service.get_business_case_or_none(business_case_id)
+    if case is None:
+        return not_found_response("Business Case")
+    return success_response(case.to_dict())
 
 
 # Import AI section-draft route — adds POST /api/<id>/ai-draft-section to this

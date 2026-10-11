@@ -477,6 +477,9 @@ def test_the_health_page_says_how_many_are_recorded_and_how_to_record_the_rest(
         "or generate a suggestion under AI health assessment and apply it in the edit form."
     )
     org = make_org("own-numbers-intro")
+    from app.services.billing_plans import set_contract_plan
+
+    set_contract_plan(org, "enterprise", None)  # four people: more than Community admits
     one = _make_user(db_session, org, "application_manager", "introone")
     several = _make_user(db_session, org, "application_manager", "introseveral")
     all_recorded = _make_user(db_session, org, "application_manager", "introrecorded")

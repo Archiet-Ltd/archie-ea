@@ -1,12 +1,21 @@
 from datetime import datetime
 
 from app import db
+from app.models.mixins.core import TenantMixin
 
 
-class RoadmapTask(db.Model):
+class RoadmapTask(TenantMixin, db.Model):
     """
     Task model for work packages - ArchiMate 3.2 Implementation Event aligned.
     Tasks represent granular work items within a work package.
+
+    Pre-TenantMixin, this table (core roadmap/portfolio-planning data) had no
+    tenant boundary at all: any org could read/edit every other org's roadmap
+    tasks via routes_capability_roadmap.py, migration_planner.py and
+    consolidation_list_routes.py. Pre-existing rows are given their organisation
+    by `flask backfill-layer-tenancy`, derived from the creating user, the work
+    package's creator, or the consolidation entry's application; rows with none
+    of those stay NULL and are reported.
     """
 
     __tablename__ = "roadmap_tasks"

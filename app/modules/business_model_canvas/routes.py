@@ -7,7 +7,7 @@ Index endpoint (linked from the sidebar by the orchestrator post-merge):
 
 import logging
 
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, Response, redirect, render_template, request, url_for
 from flask_login import login_required
 
 # Destructive and mutating routes were guarded by @login_required only, so any
@@ -15,6 +15,7 @@ from flask_login import login_required
 # already used by app/modules/capabilities/routes/enterprise_crud_routes.py.
 from app.decorators import require_roles
 
+from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 from app.models.business_model import CANVAS_BLOCKS, OPERATING_MODEL_TYPES
 from app.utils.api_response import error_response, not_found_response, success_response
 
@@ -69,11 +70,58 @@ def detail(canvas_id):
     if canvas is None:
         return render_template("business_model/not_found.html", canvas_id=canvas_id), 404
 
+    # The Lean order applies once a saved diagram's viewpoint_type is
+    # "lean_canvas" (a later change). No such column exists yet, so every
+    # canvas renders in Business Model Canvas order and zone data comes from
+    # that template's zones, keyed by box_key.
+    canvas_zones = {z["box_key"]: z for z in CANVAS_TEMPLATES["business_model_canvas"]["zones"]}
+
+    from app.services.composer_export_formats import resolve_canvas_saved_diagram_id
+
+    saved_diagram_id = resolve_canvas_saved_diagram_id(canvas, "business_model_canvas")
+
     return render_template(
         "business_model/detail.html",
         canvas=canvas,
         canvas_blocks=CANVAS_BLOCKS,
         operating_model_types=OPERATING_MODEL_TYPES,
+        canvas_zones=canvas_zones,
+        canvas_unclassified_count=0,
+        canvas_saved_diagram_id=saved_diagram_id,
+    )
+
+
+@business_model_bp.route("/<int:canvas_id>/export", methods=["GET"])
+@login_required
+def export_canvas(canvas_id):
+    """Export this canvas through the existing saved-viewpoint formats
+    (mermaid, lucid, archi) over the record's saved diagram, with every empty
+    box's reason named in the file.
+
+    Query parameter: format (mermaid|lucid|archi, default mermaid).
+    """
+    canvas = service.get_canvas_or_none(canvas_id)
+    if canvas is None:
+        return not_found_response("Business Model Canvas")
+
+    fmt = request.args.get("format", "mermaid")
+    if fmt not in ("mermaid", "lucid", "archi"):
+        return error_response(f"Unsupported format: {fmt}", code="VALIDATION_ERROR", status_code=400)
+
+    from app.services.composer_export_formats import (
+        export_canvas_viewpoint,
+        resolve_canvas_saved_diagram_id,
+    )
+
+    saved_diagram_id = resolve_canvas_saved_diagram_id(canvas, "business_model_canvas")
+    body, mimetype, ext = export_canvas_viewpoint(
+        "business_model_canvas", saved_diagram_id, fmt,
+        name=canvas.name or "Business Model Canvas",
+    )
+    filename = f"business-model-canvas-{canvas_id}.{ext}"
+    return Response(
+        body, status=200, mimetype=mimetype,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
@@ -147,6 +195,33 @@ def save_block(canvas_id):
     except ValueError as exc:
         return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
 
+    return success_response(canvas.to_dict())
+
+
+@business_model_bp.route("/api/list")
+@login_required
+def api_list():
+    """JSON list of all Business Model Canvases for the current tenant."""
+    canvases = service.list_canvases()
+    return success_response([
+        {
+            "id": c.id,
+            "name": c.name or "",
+            "description": c.description or "",
+            "operating_model_type": c.operating_model_type,
+            "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+        }
+        for c in canvases
+    ])
+
+
+@business_model_bp.route("/api/<int:canvas_id>")
+@login_required
+def api_detail(canvas_id):
+    """JSON detail of one Business Model Canvas."""
+    canvas = service.get_canvas_or_none(canvas_id)
+    if canvas is None:
+        return not_found_response("Business Model Canvas")
     return success_response(canvas.to_dict())
 
 

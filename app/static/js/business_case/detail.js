@@ -21,6 +21,9 @@ document.addEventListener('alpine:init', () => {
     updateApiUrl: config.updateApiUrl,
     pullFinancialsApiUrl: config.pullFinancialsApiUrl,
     draftSectionApiUrl: config.draftSectionApiUrl,
+    exportApiUrl: config.exportApiUrl,
+    savedDiagramId: config.savedDiagramId || null,
+    exportFormat: 'mermaid',
 
     savingField: null,
     savedField: null,
@@ -32,6 +35,26 @@ document.addEventListener('alpine:init', () => {
 
     csrfToken() {
       return document.querySelector('meta[name=csrf-token]')?.content || '';
+    },
+
+    get exportFileUrl() {
+      return this.exportApiUrl + '?format=' + encodeURIComponent(this.exportFormat);
+    },
+
+    // The existing in-tenant saved-diagram share: opening this URL re-derives
+    // membership from the current elements, and a viewer outside this tenant
+    // gets the same "diagram not found" bytes as a missing id — no public or
+    // token-based link is created here.
+    get shareUrl() {
+      return this.savedDiagramId ? ('/archimate/composer?viewpoint_id=' + this.savedDiagramId) : null;
+    },
+
+    // The same shared ExportManager every other page's "Export as image"
+    // button uses, over the rendered canvas content — the empty-box reason
+    // lines sit in that same DOM, so they are already part of the image.
+    async exportImage() {
+      if (!window.exportToPNG) return;
+      await window.exportToPNG('bc-canvas-content', 'business-case-' + this.businessCaseId, { scale: 2 });
     },
 
     // NPV (2 Sep 2026): a real discounted-cash-flow NPV engine existed

@@ -34,6 +34,11 @@ def admin_client(app, db_session, make_org, login_as):
         role=role,
         confirmed=True,
     )
+    # The update/reset/rollback routes this fixture exercises are
+    # platform-admin-only (pr307-review: AIPromptTemplate has no tenant
+    # column, one override serves every organisation) -- an org admin now
+    # gets 403/404 on them, same defect class as the Abacus and Jira fixes.
+    user.is_platform_admin = True
     db_session.add(user)
     db_session.flush()
 
@@ -52,12 +57,13 @@ def _prompt_key(db_session):
     at teardown exactly like everything else this test writes.
     """
     from app.models.ai_service import AIPromptTemplate, AIPromptTemplateVersion
-    from app.modules.admin.routes.solution_prompt_admin import _get_prompt_defaults, _override_key
+    from app.modules.admin.routes.solution_prompt_admin import _get_prompt_defaults
+    from app.services.solution_prompt_override_service import override_key
 
     defaults = _get_prompt_defaults()
     assert defaults, "no solution prompt defaults registered — cannot exercise A-05 endpoints"
     key = next(iter(defaults))
-    override_name = _override_key(key)
+    override_name = override_key(key)
     AIPromptTemplateVersion.query.filter_by(template_name=override_name).delete()
     AIPromptTemplate.query.filter_by(name=override_name).delete()
     db_session.flush()

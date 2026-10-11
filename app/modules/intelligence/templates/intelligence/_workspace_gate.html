@@ -11,12 +11,8 @@
 
 {% macro workspace_gate(home_url) %}
 {% set counts = nav_counts if nav_counts is defined else none %}
-{% if counts is mapping
-      and workspace_counts_available is not sameas false
-      and ((counts.get('applications', 0) or 0)
-         + (counts.get('elements', 0) or 0)
-         + (counts.get('capabilities', 0) or 0)
-         + (counts.get('vendors', 0) or 0)) == 0 %}
+{% set empty_workspace = workspace_is_empty if workspace_is_empty is defined else none %}
+{% if empty_workspace is sameas true %}
 {{ empty_state(icon='layers', title='Nothing is modelled yet', description='Add your systems and teams, and this is where you will ask questions about them.', cta_text='Set up your workspace', cta_href=home_url) }}
 {% else %}
 {{ caller() }}

@@ -106,17 +106,25 @@
 {% endblock %}
 
 {% block content %}
-<div class="p-6 space-y-4" x-data="stakeholderMap()">
+<div class="p-6 space-y-4" x-data="stakeholderMap()" data-initial-programme="{{ initial_programme_id or '' }}">
 
   {# ── Page header ────────────────────────────────── #}
   {% macro _ps_actions() %}
 <div class="flex items-center gap-2">
       {# Solution filter #}
-      <select x-model="selectedSolution" @change="loadData()"
+      <select x-model="selectedSolution" @change="selectedProgramme = ''; loadData()"
               class="text-sm border border-border rounded-lg px-3 py-2 bg-background focus:ring-2 focus:ring-ring outline-none" aria-label="Select a solution...">
         <option value="">Select a solution...</option>
         {% for sol in solutions %}
         <option value="{{ sol.id }}">{{ sol.name }}</option>
+        {% endfor %}
+      </select>
+      {# Transformation programme filter: the same stakeholders, linked to a programme #}
+      <select x-model="selectedProgramme" @change="selectedSolution = ''; loadData()"
+              class="text-sm border border-border rounded-lg px-3 py-2 bg-background focus:ring-2 focus:ring-ring outline-none" aria-label="Select a programme...">
+        <option value="">Select a programme...</option>
+        {% for programme in programmes %}
+        <option value="{{ programme.id }}">{{ programme.name }}</option>
         {% endfor %}
       </select>
       <button type="button" @click="openAddModal()"
@@ -163,14 +171,14 @@
       <circle cx="9" cy="9" r="5"/><circle cx="17" cy="15" r="4"/>
       <path stroke-linecap="round" d="M14 9h.01M9 14h.01"/>
     </svg>
-    <p class="text-muted-foreground font-medium text-lg mb-1" x-text="selectedSolution ? 'No stakeholders yet' : 'Select a solution'"></p>
-    <p class="text-muted-foreground/60 text-sm mb-4" x-text="selectedSolution ? 'Add stakeholders to visualise your Power/Interest grid' : 'Choose a solution from the dropdown above to view its stakeholder map'"></p>
+    <p class="text-muted-foreground font-medium text-lg mb-1" x-text="(selectedSolution || selectedProgramme) ? 'No stakeholders yet' : 'Select a solution or a programme'"></p>
+    <p class="text-muted-foreground/60 text-sm mb-4" x-text="(selectedSolution || selectedProgramme) ? 'Add stakeholders to visualise your Power/Interest grid' : 'Choose a solution or a transformation programme above to view its stakeholder map'"></p>
     {# Found 13 Sep 2026 (full-app design pass): this button used to render
        unconditionally, including in the "no solution selected yet" state --
        clicking it there immediately failed with a "Select a solution first"
        toast, since a stakeholder can't be linked to nothing. Offering a
        primary CTA that always fails is worse than not offering it yet. #}
-    <button type="button" x-show="selectedSolution" x-cloak @click="openAddModal()"
+    <button type="button" x-show="selectedSolution || selectedProgramme" x-cloak @click="openAddModal()"
             class="bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold px-5 py-2.5 rounded-lg transition">
       + Add First Stakeholder
     </button>
@@ -181,6 +189,75 @@
     <svg id="stk-svg"></svg>
     <div id="stk-tooltip"></div>
   </div>
+
+  {# ── The same stakeholders as a table: names, positions and quadrants in
+       text, and a way to move one without dragging ─────────────────── #}
+  <section x-show="stakeholders.length > 0" x-cloak class="rounded-xl border border-border bg-card overflow-x-auto"
+           aria-labelledby="stk-table-heading">
+    <h2 id="stk-table-heading" class="px-4 py-3 border-b border-border text-sm font-semibold">Stakeholders on this map</h2>
+    <table class="w-full text-sm" data-testid="stakeholder-table">
+      <thead>
+        <tr class="border-b border-border text-left text-muted-foreground">
+          <th scope="col" class="px-4 py-2 font-medium">Stakeholder</th>
+          <th scope="col" class="px-4 py-2 font-medium">Influence</th>
+          <th scope="col" class="px-4 py-2 font-medium">Interest</th>
+          <th scope="col" class="px-4 py-2 font-medium">Quadrant</th>
+          <th scope="col" class="px-4 py-2 font-medium"><span class="sr-only">Save position</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="s in stakeholders" :key="s.id">
+          <tr class="border-b border-border last:border-0" :data-stakeholder="s.name">
+            <td class="px-4 py-2 font-medium" x-text="s.name"></td>
+            <td class="px-4 py-2">
+              <select x-model.number="s.influence_level" :aria-label="'Influence of ' + s.name"
+                      class="h-8 rounded-md border border-input bg-background px-2 text-sm">
+                <template x-for="n in [1,2,3,4,5]" :key="n"><option :value="n" x-text="n" :selected="n === s.influence_level"></option></template>
+              </select>
+            </td>
+            <td class="px-4 py-2">
+              <select x-model.number="s.interest_level" :aria-label="'Interest of ' + s.name"
+                      class="h-8 rounded-md border border-input bg-background px-2 text-sm">
+                <template x-for="n in [1,2,3,4,5]" :key="n"><option :value="n" x-text="n" :selected="n === s.interest_level"></option></template>
+              </select>
+            </td>
+            <td class="px-4 py-2" data-quadrant x-text="quadrantLabel(s.quadrant)"></td>
+            <td class="px-4 py-2 text-right">
+              <button type="button" @click="savePosition(s)"
+                      class="h-8 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent">Save position</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </section>
+
+  {# ── Suggestions for a programme: the owners its records name for what it
+       affects. Shown only when a programme is chosen. ─────────────────── #}
+  <section x-show="selectedProgramme" x-cloak class="rounded-xl border border-border bg-card p-4"
+           aria-labelledby="stk-suggest-heading" data-testid="programme-suggestions">
+    <h2 id="stk-suggest-heading" class="text-sm font-semibold">Suggested from what this programme affects</h2>
+    <p x-show="suggestions.loading" class="mt-2 text-sm text-muted-foreground">Looking up owners…</p>
+    <p x-show="suggestions.error" x-cloak class="mt-2 text-sm text-destructive-emphasis" x-text="suggestions.error"></p>
+    <p x-show="!suggestions.loading && !suggestions.error && suggestions.items.length === 0" x-cloak
+       class="mt-2 text-sm text-muted-foreground" data-testid="programme-suggestions-none"
+       x-text="suggestions.affectedCount === 0
+         ? 'This programme records no affected capabilities yet, so there are no owners to suggest.'
+         : 'No owners are recorded for the capabilities this programme affects, or they are already on the map.'"></p>
+    <ul x-show="suggestions.items.length > 0" x-cloak class="mt-2 divide-y divide-border">
+      <template x-for="sugg in suggestions.items" :key="sugg.name">
+        <li class="flex items-start justify-between gap-3 py-2">
+          <div class="min-w-0">
+            <p class="text-sm font-medium" x-text="sugg.name"></p>
+            <p class="text-xs text-muted-foreground" x-text="sugg.basis.join('; ')"></p>
+          </div>
+          <button type="button" @click="addProgrammeSuggestion(sugg)"
+                  class="shrink-0 h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                  :aria-label="'Add ' + sugg.name">Add</button>
+        </li>
+      </template>
+    </ul>
+  </section>
 
 
   {# Modals moved here (instead of the separate {% block modals %}) because they
@@ -385,6 +462,8 @@ function stakeholderMap() {
     stakeholders: [],
     loading: true,
     selectedSolution: '',
+    selectedProgramme: '',
+    suggestions: { loading: false, error: '', items: [], affectedCount: null },
     form: { name:'', influence_level:3, interest_level:3, stakeholder_type:'individual', attitude:'neutral',
             business_actor_id: null, user_id: null },
     personSearch: '',
@@ -404,8 +483,48 @@ function stakeholderMap() {
     },
 
     init() {
-      // Don't auto-load all stakeholders — wait for solution selection
+      // Don't auto-load all stakeholders — wait for a solution or programme,
+      // unless the page was opened for a programme (?programme_id=).
       this.loading = false;
+      const initial = this.$el.dataset.initialProgramme;
+      if (initial) {
+        this.selectedProgramme = initial;
+        this.loadData();
+      }
+    },
+    quadrantLabel(q) {
+      return ({ manage_closely: 'Manage closely', keep_satisfied: 'Keep satisfied',
+                keep_informed: 'Keep informed', monitor: 'Monitor' })[q] || '—';
+    },
+    async savePosition(s) {
+      await this.patchStakeholder(s.id, s.influence_level, s.interest_level);
+      await this.loadData();
+    },
+    async loadSuggestions() {
+      this.suggestions = { loading: true, error: '', items: [], affectedCount: null };
+      try {
+        const data = await Platform.fetch('/api/stakeholders/programme-suggestions?programme_id=' + this.selectedProgramme,
+                                          { silent: true, errorMsg: 'Suggestions could not be loaded.' });
+        this.suggestions = { loading: false, error: '', items: data.suggestions || [], affectedCount: data.affected_count };
+      } catch (e) {
+        this.suggestions = { loading: false, error: e.message || 'Suggestions could not be loaded.', items: [], affectedCount: null };
+      }
+    },
+    async addProgrammeSuggestion(sugg) {
+      const body = {
+        name: sugg.name,
+        description: sugg.basis.join('; '),
+        programme_id: parseInt(this.selectedProgramme),
+        stakeholder_type: 'individual',
+        attitude: 'neutral',
+      };
+      try {
+        await Platform.fetch.post('/api/stakeholders/', body, { silent: true });
+        Platform.toast.success(sugg.name + ' added.');
+        await this.loadData();
+      } catch (e) {
+        Platform.toast.error('Could not add ' + sugg.name + '.');
+      }
     },
 
     async searchPeople() {
@@ -445,7 +564,7 @@ function stakeholderMap() {
     },
 
     async loadData() {
-      if (!this.selectedSolution) {
+      if (!this.selectedSolution && !this.selectedProgramme) {
         this.stakeholders = [];
         this.loadError = '';
         if (this._simulation) { this._simulation.stop(); this._simulation = null; }
@@ -453,7 +572,10 @@ function stakeholderMap() {
         return;
       }
       this.loading = true;
-      const url = '/api/stakeholders/map-data?solution_id=' + this.selectedSolution;
+      const url = this.selectedProgramme
+        ? '/api/stakeholders/map-data?programme_id=' + this.selectedProgramme
+        : '/api/stakeholders/map-data?solution_id=' + this.selectedSolution;
+      if (this.selectedProgramme) this.loadSuggestions();
       try {
         this.stakeholders = await Platform.fetch(url, { silent: true, errorMsg: 'Could not load the stakeholder map.' });
         this.loadError = '';
@@ -488,6 +610,7 @@ function stakeholderMap() {
       }
       const body = { ...this.form };
       if (this.selectedSolution) body.solution_id = parseInt(this.selectedSolution);
+      if (this.selectedProgramme) body.programme_id = parseInt(this.selectedProgramme);
       try {
         await Platform.fetch.post('/api/stakeholders/', body, { silent: true });
         Platform.modal.close('add-stakeholder-modal');
@@ -526,17 +649,18 @@ function stakeholderMap() {
     },
 
     async addSuggestedStakeholder(sugg) {
-      if (!this.selectedSolution) {
-        Platform.toast.error('Select a solution first so this stakeholder can be linked to it.');
+      if (!this.selectedSolution && !this.selectedProgramme) {
+        Platform.toast.error('Select a solution or a programme first so this stakeholder can be linked to it.');
         return;
       }
       const body = {
         name: sugg.name,
         description: sugg.description || '',
-        solution_id: parseInt(this.selectedSolution),
         stakeholder_type: 'individual',
         attitude: 'neutral',
       };
+      if (this.selectedSolution) body.solution_id = parseInt(this.selectedSolution);
+      if (this.selectedProgramme) body.programme_id = parseInt(this.selectedProgramme);
       try {
         await Platform.fetch.post('/api/stakeholders/', body, { silent: true });
         Platform.toast.success(sugg.name + ' added.');

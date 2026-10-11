@@ -19,6 +19,19 @@ class _Scheduler:
             raise self.optional_add_error
         self.jobs.append(kwargs)
 
+    def get_jobs(self):
+        _Job = type("_FakeJob", (), {"__init__": lambda self, jid: setattr(self, "id", jid)})
+        return [_Job(j["id"]) for j in self.jobs]
+
+    def get_job(self, job_id):
+        for j in self.jobs:
+            if j["id"] == job_id:
+                return j
+        return None
+
+    def remove_job(self, job_id):
+        self.jobs = [j for j in self.jobs if j["id"] != job_id]
+
     def start(self):
         self.started = True
 
@@ -74,6 +87,9 @@ def test_scheduler_disabled_preserves_established_jobs(monkeypatch):
         "executive_summary",
         "teams_subscription_renewal",
         "error_digest",
+        "approval_escalation",
+        "event_log_relay",
+        "event_log_partition_maintenance",
     }
 
 
@@ -96,6 +112,9 @@ def test_malformed_optional_interval_does_not_disable_established_jobs(monkeypat
         "executive_summary",
         "teams_subscription_renewal",
         "error_digest",
+        "approval_escalation",
+        "event_log_relay",
+        "event_log_partition_maintenance",
     }
 
 
@@ -121,6 +140,9 @@ def test_overflowing_optional_trigger_does_not_disable_established_jobs(monkeypa
         "executive_summary",
         "teams_subscription_renewal",
         "error_digest",
+        "approval_escalation",
+        "event_log_relay",
+        "event_log_partition_maintenance",
     }
 
 
@@ -138,4 +160,7 @@ def test_optional_add_job_failure_does_not_disable_established_jobs(monkeypatch)
         "executive_summary",
         "teams_subscription_renewal",
         "error_digest",
+        "approval_escalation",
+        "event_log_relay",
+        "event_log_partition_maintenance",
     }

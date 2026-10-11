@@ -20,7 +20,7 @@ exclude = [
     "__pycache__",
     "venv",
     ".venv",
-    "migrations/versions",   # historical Alembic revisions; not maintained code
+    "migrations/versions/_archive_pre_baseline",   # pre-baseline Alembic history; not on the chain
     "app/static",
     "node_modules",
     "code_templates",        # emitted scaffolding, not application code

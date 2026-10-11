@@ -4,7 +4,6 @@ AI analysis service — imports from inlined canonical sources.
 Consolidates AI analysis, detection, and recommendation services:
 - ai_gap_detection_service (AIGapDetectionService)
 - ai_impact_analysis_service (AIImpactAnalysisService)
-- ai_recommendation_engine (AIRecommendationEngine)
 - ai_semantic_discovery_service (AISemanticDiscoveryService)
 - ai_confidence_calculator (AIConfidenceCalculator)
 - ai_hallucination_detector (AIHallucinationDetector)
@@ -18,10 +17,6 @@ from app.modules.ai_chat.services.ai_gap_detection_service import (  # noqa: F40
 
 from app.modules.ai_chat.services.ai_impact_analysis_service import (  # noqa: F401
     AIImpactAnalysisService,
-)
-
-from app.modules.ai_chat.services.ai_recommendation_engine import (  # noqa: F401
-    AIRecommendationEngine,
 )
 
 from app.modules.ai_chat.services.ai_semantic_discovery_service import (  # noqa: F401

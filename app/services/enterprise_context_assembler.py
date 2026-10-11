@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from app import db
+from app.models.constants import ArchiMateRelationshipType
 from app.utils.tenant_sql import org_scope
 
 logger = logging.getLogger(__name__)
@@ -1117,28 +1118,10 @@ triggering, flow, specialization, association.
     def _is_valid_type(cls, el_type: str) -> bool:
         return el_type in cls._ALL_ARCHIMATE_TYPES
 
-    # Aliases: LLMs often return verb forms instead of canonical noun forms
-    _REL_TYPE_ALIASES = {
-        "realizes": "realization",
-        "serves": "serving",
-        "uses": "serving",
-        "triggers": "triggering",
-        "flows": "flow",
-        "composes": "composition",
-        "aggregates": "aggregation",
-        "assigns": "assignment",
-        "specializes": "specialization",
-        "associates": "association",
-        "accesses": "access",
-        "influences": "influence",
-    }
-
     @classmethod
     def _normalize_rel_type_alias(cls, raw: str) -> str:
         """Normalise LLM verb forms to canonical ArchiMate noun forms."""
-        import re as _re
-        normalised = _re.sub(r"(?i)relationship$", "", raw).strip().lower()
-        return cls._REL_TYPE_ALIASES.get(normalised, normalised)
+        return ArchiMateRelationshipType.normalize(raw) or raw
 
     @classmethod
     def _is_valid_relationship_type(cls, rel_type: str) -> bool:

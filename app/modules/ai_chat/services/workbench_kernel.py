@@ -842,24 +842,25 @@ class WorkbenchKernel:
         tracks it as a workspace artifact.
         """
         try:
-            from app.models.adr import ArchitectureDecisionRecord
+            from app.models.architecture_decision import ArchitectureDecision
+            from app.models.solution_architect_models import SolutionAnalysisSession
 
-            # Determine next ADR number
-            max_num = db.session.query(
-                db.func.coalesce(db.func.max(ArchitectureDecisionRecord.adr_number), 0)
-            ).scalar()
-            next_num = (max_num or 0) + 1
+            # Not .query.get(): an identity-map hit on a warm session returns
+            # the cached row with no SQL, bypassing the tenant filter.
+            session = SolutionAnalysisSession.query.filter_by(id=workspace_id).first()
+            org_id = session.organization_id if session else None
 
-            adr = ArchitectureDecisionRecord(
-                adr_number=next_num,
+            adr = ArchitectureDecision(
+                decision_id=ArchitectureDecision.next_decision_id(),
                 title=title[:200],
                 status="proposed",
                 context=f"Decision context for: {title}",
                 decision=chosen_option,
                 rationale=rationale,
                 consequences=f"Alternatives: {alternatives}" if alternatives else "No alternatives documented",
-                alternatives_considered=alternatives or None,
+                alternatives=alternatives or None,
                 assumptions=assumptions or None,
+                organization_id=org_id,
             )
             db.session.add(adr)
             db.session.flush()
@@ -2614,25 +2615,26 @@ class SADGovernanceGenerator:
     ) -> Dict[str, Any]:
         """Create and persist an architecture decision record."""
         try:
-            from app.models.adr import ArchitectureDecisionRecord
+            from app.models.architecture_decision import ArchitectureDecision
+            from app.models.solution_architect_models import SolutionAnalysisSession
 
-            # Determine next ADR number
-            max_num = db.session.query(
-                db.func.coalesce(db.func.max(ArchitectureDecisionRecord.adr_number), 0)
-            ).scalar()
-            next_num = (max_num or 0) + 1
+            # Not .query.get(): an identity-map hit on a warm session returns
+            # the cached row with no SQL, bypassing the tenant filter.
+            session = SolutionAnalysisSession.query.filter_by(id=workspace_id).first()
+            org_id = session.organization_id if session else None
 
             alternatives_text = ", ".join(alternatives or [])
 
-            adr = ArchitectureDecisionRecord(
-                adr_number=next_num,
+            adr = ArchitectureDecision(
+                decision_id=ArchitectureDecision.next_decision_id(),
                 title=title[:200],
                 status="proposed",
                 context=f"Decision context for: {title}",
                 decision=chosen_option,
                 rationale=rationale,
                 consequences=f"Alternatives considered: {alternatives_text}" if alternatives_text else "No alternatives documented",
-                alternatives_considered=alternatives_text or None,
+                alternatives=alternatives_text or None,
+                organization_id=org_id,
             )
             db.session.add(adr)
             db.session.flush()

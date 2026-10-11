@@ -252,10 +252,14 @@
                                                 {# Text/number input #}
                                                 <template x-if="tmpl.property_type === 'text' || tmpl.property_type === 'number'">
                                                     <input :aria-label="tmpl.property_key" type="text" class="flex-1 text-xs border border-input rounded px-2 py-1 bg-background"
-                                                           :value="getPropertyValue(code, el.id, tmpl.property_key)"
-                                                           @blur="setPropertyValue(code, el.id, tmpl.property_key, $event.target.value)"
-                                                           :placeholder="tmpl.help_text ? tmpl.help_text.substring(0, 40) : ''">
+                                                            :value="getPropertyValue(code, el.id, tmpl.property_key)"
+                                                            @blur="setPropertyValue(code, el.id, tmpl.property_key, $event.target.value)"
+                                                            :placeholder="tmpl.help_text ? tmpl.help_text.substring(0, 40) : ''">
                                                 </template>
+
+                                                <span x-show="tmpl.unit"
+                                                      class="text-2xs text-muted-foreground flex-shrink-0"
+                                                      x-text="tmpl.unit"></span>
 
                                                 {# Multi-select as text for v1 #}
                                                 <template x-if="tmpl.property_type === 'multi-select'">

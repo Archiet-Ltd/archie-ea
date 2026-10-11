@@ -8,7 +8,7 @@ uploading raised `ImportError` → a 500 on a real, user-reachable control. This
 restores the contract against the extractor that *does* exist
 (`document_text_extractor.parse_spreadsheet_to_records`).
 
-Design principle (Archie is a system of record — never invent data): a row becomes
+Design principle (Entelim is a system of record — never invent data): a row becomes
 an element ONLY when a recognised name column carries a non-empty value. Rows with
 no derivable name are skipped and counted, never fabricated into placeholder
 elements. Every other column is preserved verbatim under the element's

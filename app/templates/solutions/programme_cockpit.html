@@ -47,7 +47,7 @@
             <p class="text-xs text-muted-foreground uppercase tracking-wider">Risks</p>
             <p class="text-2xl font-bold text-foreground mt-1">{{ rollup.risks.total }}</p>
             <p class="text-xs text-muted-foreground mt-0.5">
-                {{ rollup.risks.by_impact.get('high', 0) + rollup.risks.by_impact.get('critical', 0) }} high/critical
+                {{ rollup.risks.by_level.get('high', 0) + rollup.risks.by_level.get('critical', 0) }} high/critical
             </p>
         </div>
         <div class="border border-border rounded-xl bg-card p-4">
@@ -66,7 +66,7 @@
                 <div>
                     <h2 class="text-sm font-semibold text-foreground">AI review on import</h2>
                     <p class="text-xs text-muted-foreground mt-0.5">
-                        ARCHIE reviewed this landscape automatically when it landed
+                        Entelim reviewed this landscape automatically when it landed
                         ({{ import_review.source|replace('_',' ') }}{% if import_review.taken_at %} · {{ import_review.taken_at[:10] }}{% endif %}).
                     </p>
                 </div>
@@ -323,6 +323,85 @@
                 {% endif %}
             </div>
 
+            {# ── Programme Risks ───────────────────────────────────────── #}
+            <div class="border border-border rounded-xl bg-card p-5"
+                 x-data="programmeRisks({{ rollup.programme.id }})" x-init="load()">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-semibold text-foreground">Risks</h2>
+                    <button type="button" @click="openCreate()"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                        <i data-lucide="plus" class="w-3.5 h-3.5" aria-hidden="true"></i> Add Risk
+                    </button>
+                </div>
+                <template x-if="loading">
+                    <div class="p-4 text-center text-sm text-muted-foreground">Loading risks…</div>
+                </template>
+                <template x-if="!loading && risks.length === 0">
+                    <p class="text-sm text-muted-foreground italic">No risks recorded for this programme yet.</p>
+                </template>
+                <template x-if="!loading && risks.length > 0">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                    <th class="px-4 py-2 font-medium">Risk</th>
+                                    <th class="px-4 py-2 font-medium">Level</th>
+                                    <th class="px-4 py-2 font-medium">Inherent</th>
+                                    <th class="px-4 py-2 font-medium">Residual</th>
+                                    <th class="px-4 py-2 font-medium">Linked to</th>
+                                    <th class="px-4 py-2 font-medium text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border">
+                                <template x-for="risk in risks" :key="risk.id">
+                                    <tr class="hover:bg-accent/40 transition-colors">
+                                        <td class="px-4 py-2">
+                                            <div class="font-medium text-foreground" x-text="risk.title"></div>
+                                            <div class="text-xs text-muted-foreground" x-text="risk.description"></div>
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                                                  :class="riskLevelClass(risk.risk_level)" x-text="risk.risk_level"></span>
+                                        </td>
+                                        <td class="px-4 py-2 text-center tabular-nums text-xs"
+                                            x-text="risk.inherent_likelihood + '×' + risk.inherent_impact"></td>
+                                        <td class="px-4 py-2 text-center tabular-nums text-xs"
+                                            x-text="risk.residual_likelihood + '×' + risk.residual_impact"></td>
+                                        <td class="px-4 py-2 text-xs">
+                                            <template x-if="risk.entity_links && risk.entity_links.length">
+                                                <template x-for="link in risk.entity_links" :key="link.id">
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1 mb-1"
+                                                          x-text="link.entity_type"></span>
+                                                <span class="text-xs text-foreground mr-2" x-text="link.entity_label"></span>
+                                                <br>
+                                                </template>
+                                            </template>
+                                            <span x-show="!risk.entity_links || !risk.entity_links.length" class="text-muted-foreground">—</span>
+                                        </td>
+                                        <td class="px-4 py-2 text-right whitespace-nowrap">
+                                            <button type="button" @click="openLinkPicker(risk)"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                                                    title="Link to elements">
+                                                <i data-lucide="link" class="w-3 h-3" aria-hidden="true"></i> Link
+                                            </button>
+                                            <button type="button" @click="openScoreModal(risk)"
+                                                    class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors ml-1"
+                                                    title="Set scores">
+                                                <i data-lucide="sliders-horizontal" class="w-3 h-3" aria-hidden="true"></i>
+                                            </button>
+                                            <button type="button" @click="confirmDelete(risk)"
+                                                    class="text-muted-foreground hover:text-destructive-emphasis p-1 ml-1" title="Delete">
+                                                <i data-lucide="trash-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+            </div>
+
             <div class="border border-border rounded-xl bg-card p-5">
                 <h2 class="text-sm font-semibold text-foreground mb-3">ARB Pipeline</h2>
                 <div class="space-y-2">
@@ -403,6 +482,149 @@
         </div>
     </div>
 </div>
+
+{# ── Create Risk Modal ────────────────────────────────────────────── #}
+{% from 'components/modal.html' import modal %}
+{% call modal(id='create-programme-risk-modal', title='Add Programme Risk', description='Record a risk for this programme.', size='lg') %}
+<div class="space-y-4" x-show="showCreateModal" x-cloak>
+    <div>
+        <label for="prg-risk-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
+        <input id="prg-risk-title" type="text" x-model="createForm.title"
+               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+               placeholder="What could go wrong?">
+    </div>
+    <div>
+        <label for="prg-risk-description" class="block text-sm font-medium mb-1">Description</label>
+        <textarea id="prg-risk-description" rows="2" x-model="createForm.description"
+                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  placeholder="Context and consequence"></textarea>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label for="prg-risk-likelihood" class="block text-sm font-medium mb-1">Likelihood (1-5) <span class="text-destructive-emphasis">*</span></label>
+            <select id="prg-risk-likelihood" x-model="createForm.likelihood"
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+        </div>
+        <div>
+            <label for="prg-risk-impact" class="block text-sm font-medium mb-1">Impact (1-5) <span class="text-destructive-emphasis">*</span></label>
+            <select id="prg-risk-impact" x-model="createForm.impact"
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+        </div>
+    </div>
+    <div>
+        <label for="prg-risk-owner" class="block text-sm font-medium mb-1">Owner</label>
+        <input id="prg-risk-owner" type="text" x-model="createForm.owner"
+               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+               placeholder="Who carries this risk?">
+    </div>
+    <div>
+        <label for="prg-risk-mitigation" class="block text-sm font-medium mb-1">Mitigation plan</label>
+        <textarea id="prg-risk-mitigation" rows="2" x-model="createForm.mitigation_plan"
+                  class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="What reduces it?"></textarea>
+    </div>
+    <div x-show="createError" x-cloak role="alert"
+         class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
+         x-text="createError"></div>
+</div>
+<div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
+    <button type="button" @click="showCreateModal = false"
+            class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
+    <button type="button" @click="submitCreate()" :disabled="creating"
+            class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none">
+        <span x-text="creating ? 'Saving' : 'Add Risk'"></span>
+    </button>
+</div>
+{% endcall %}
+
+{# ── Link Picker Modal ────────────────────────────────────────────── #}
+{% call modal(id='link-programme-risk-modal', title='Link Risk to Elements', description='Search and select elements to link this risk to.', size='lg') %}
+<div class="space-y-4" x-show="showLinkPicker" x-cloak>
+    <div class="flex gap-2">
+        <select x-model="linkType" aria-label="Entity type to link" class="h-9 rounded-md border border-input bg-background px-3 text-sm">
+            <option value="application">Application</option>
+            <option value="solution">Solution</option>
+            <option value="programme">Programme</option>
+        </select>
+        <input type="text" x-model="linkSearch" @input.debounce.300ms="searchLinkEntities()"
+               aria-label="Search entities to link"
+               class="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
+               :placeholder="'Search ' + linkType + 's…'">
+    </div>
+    <div x-show="linkResults.length > 0" x-cloak class="max-h-60 overflow-y-auto rounded-md border border-border divide-y divide-border">
+        <template x-for="entity in linkResults" :key="entity.id">
+            <button type="button" @click="addLink(entity)" class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors" x-text="entity.name"></button>
+        </template>
+    </div>
+    <p x-show="linkSearch.length >= 2 && linkResults.length === 0" x-cloak class="text-sm text-muted-foreground">No matching elements found.</p>
+</div>
+<div class="flex justify-end gap-2 mt-4">
+    <button type="button" @click="showLinkPicker = false"
+            class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
+</div>
+{% endcall %}
+
+{# ── Set Score Modal ──────────────────────────────────────────────── #}
+{% call modal(id='score-programme-risk-modal', title='Set Risk Score', description='Record an inherent or residual likelihood/impact score.', size='md') %}
+<div class="space-y-4" x-show="showScoreModal" x-cloak>
+    <div>
+        <label for="prg-score-kind" class="block text-sm font-medium mb-1">Score kind <span class="text-destructive-emphasis">*</span></label>
+        <select id="prg-score-kind" x-model="scoreForm.score_kind"
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+            <option value="inherent">Inherent (before mitigation)</option>
+            <option value="residual">Residual (after mitigation)</option>
+        </select>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+        <div>
+            <label for="prg-score-likelihood" class="block text-sm font-medium mb-1">Likelihood (1-5) <span class="text-destructive-emphasis">*</span></label>
+            <select id="prg-score-likelihood" x-model="scoreForm.likelihood"
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+        </div>
+        <div>
+            <label for="prg-score-impact" class="block text-sm font-medium mb-1">Impact (1-5) <span class="text-destructive-emphasis">*</span></label>
+            <select id="prg-score-impact" x-model="scoreForm.impact"
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+        </div>
+    </div>
+    <div x-show="scoreError" x-cloak role="alert"
+         class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
+         x-text="scoreError"></div>
+</div>
+<div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
+    <button type="button" @click="showScoreModal = false"
+            class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
+    <button type="button" @click="submitScore()" :disabled="scoring"
+            class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none">
+        <span x-text="scoring ? 'Saving' : 'Record Score'"></span>
+    </button>
+</div>
+{% endcall %}
+
 {% endblock %}
 
 {% block extra_head_js %}
@@ -433,6 +655,222 @@
                 } catch (e) {
                     if (window.Platform && Platform.toast) Platform.toast.error(e.message || 'Snapshot failed');
                 } finally { this.busy = false; }
+            },
+        };
+    }
+
+    function programmeRisks(programmeId) {
+        return {
+            programmeId: programmeId,
+            risks: [],
+            loading: true,
+            error: null,
+
+            // Create risk modal state
+            showCreateModal: false,
+            creating: false,
+            createForm: {
+                title: '',
+                description: '',
+                likelihood: '3',
+                impact: '3',
+                owner: '',
+                mitigation_plan: '',
+            },
+            createError: '',
+
+            // Link picker state
+            linkingRiskId: null,
+            showLinkPicker: false,
+            linkType: 'application',
+            linkSearch: '',
+            linkResults: [],
+
+            // Score modal state
+            scoringRiskId: null,
+            showScoreModal: false,
+            scoreForm: {
+                score_kind: 'inherent',
+                likelihood: '3',
+                impact: '3',
+            },
+            scoring: false,
+            scoreError: '',
+
+            // Delete confirmation
+            deletingRiskId: null,
+
+            _csrf() { return document.querySelector('meta[name=csrf-token]')?.content || ''; },
+
+            async load() {
+                this.loading = true;
+                this.error = null;
+                try {
+                    const d = await Platform.fetch('/api/entities/programme/' + this.programmeId + '/risks',
+                        { silent: true, errorMsg: 'Could not load programme risks.' });
+                    this.risks = d || [];
+                    this.error = null;
+                } catch (e) {
+                    this.risks = [];
+                    this.error = e.message || 'Could not load programme risks.';
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            riskLevelClass(level) {
+                const classes = {
+                    'critical': 'bg-destructive/10 text-destructive border-destructive/30',
+                    'high': 'bg-warning/10 text-warning border-warning/30',
+                    'medium': 'bg-primary/10 text-primary border-primary/30',
+                    'low': 'bg-success/10 text-success border-success/30',
+                };
+                return classes[level] || 'bg-muted text-muted-foreground border-border';
+            },
+
+            openCreate() {
+                this.createForm = {
+                    title: '',
+                    description: '',
+                    likelihood: '3',
+                    impact: '3',
+                    owner: '',
+                    mitigation_plan: '',
+                };
+                this.createError = '';
+                this.creating = false;
+                this.showCreateModal = true;
+            },
+
+            async submitCreate() {
+                if (this.creating) return;
+                if (!String(this.createForm.title || '').trim()) {
+                    this.createError = 'Title is required.';
+                    return;
+                }
+                this.creating = true;
+                this.createError = '';
+                try {
+                    const payload = {
+                        title: this.createForm.title,
+                        description: this.createForm.description,
+                        likelihood: Number(this.createForm.likelihood),
+                        impact: Number(this.createForm.impact),
+                        owner: this.createForm.owner,
+                        mitigation_plan: this.createForm.mitigation_plan,
+                    };
+                    const risk = await Platform.fetch.post('/api/risks', payload, { silent: true });
+                    // Link the new risk to this programme
+                    await Platform.fetch.post('/api/risks/' + risk.id + '/links', {
+                        entity_type: 'programme',
+                        entity_id: this.programmeId,
+                    }, { silent: true });
+                    Platform.toast.success('Risk recorded and linked to programme.');
+                    this.showCreateModal = false;
+                    await this.load();
+                } catch (e) {
+                    this.createError = 'Could not create the risk.';
+                    throw e;
+                } finally {
+                    this.creating = false;
+                }
+            },
+
+            openLinkPicker(risk) {
+                this.linkingRiskId = risk.id;
+                this.linkType = 'application';
+                this.linkSearch = '';
+                this.linkResults = [];
+                this.showLinkPicker = true;
+            },
+
+            async searchLinkEntities() {
+                const q = this.linkSearch.trim();
+                if (q.length < 2) { this.linkResults = []; return; }
+                const endpoints = {
+                    application: '/applications/api/list?search=' + encodeURIComponent(q) + '&limit=10',
+                    solution: '/api/solutions/search?q=' + encodeURIComponent(q),
+                    programme: '/api/programmes/search?q=' + encodeURIComponent(q),
+                };
+                try {
+                    const data = await Platform.fetch.get(endpoints[this.linkType], null, { silent: true });
+                    const rows = data.applications || data.items || data || [];
+                    this.linkResults = rows.map(function (r) { return { id: r.id, name: r.name }; });
+                } catch (e) {
+                    this.linkResults = [];
+                }
+            },
+
+            async addLink(entity) {
+                if (!this.linkingRiskId) return;
+                try {
+                    const link = await Platform.fetch.post('/api/risks/' + this.linkingRiskId + '/links', {
+                        entity_type: this.linkType,
+                        entity_id: entity.id,
+                    }, { silent: true });
+                    Platform.toast.success('Risk linked to ' + (link.entity_label || entity.name) + '.');
+                    this.linkSearch = '';
+                    this.linkResults = [];
+                    await this.load();
+                } catch (e) {
+                    Platform.toast.error('Could not link this risk.');
+                    throw e;
+                }
+            },
+
+            openScoreModal(risk) {
+                this.scoringRiskId = risk.id;
+                this.scoreForm = {
+                    score_kind: 'inherent',
+                    likelihood: '3',
+                    impact: '3',
+                };
+                this.scoreError = '';
+                this.scoring = false;
+                this.showScoreModal = true;
+            },
+
+            async submitScore() {
+                if (this.scoring) return;
+                this.scoring = true;
+                this.scoreError = '';
+                try {
+                    await Platform.fetch.post('/api/risks/' + this.scoringRiskId + '/scores', this.scoreForm, { silent: true });
+                    Platform.toast.success('Score recorded.');
+                    this.showScoreModal = false;
+                    await this.load();
+                } catch (e) {
+                    this.scoreError = 'Could not record the score.';
+                    throw e;
+                } finally {
+                    this.scoring = false;
+                }
+            },
+
+            confirmDelete(risk) {
+                this.deletingRiskId = risk.id;
+                Platform.modal.confirm({
+                    title: 'Delete risk?',
+                    message: 'Delete "' + risk.title + '"? This also removes its links. This cannot be undone.',
+                    confirmText: 'Delete',
+                    variant: 'destructive'
+                }).then((confirmed) => {
+                    if (confirmed) {
+                        this.deleteRisk(risk.id);
+                    }
+                    this.deletingRiskId = null;
+                });
+            },
+
+            async deleteRisk(riskId) {
+                try {
+                    await Platform.fetch('/api/risks/' + riskId, { method: 'DELETE', silent: true });
+                    Platform.toast.success('Risk deleted.');
+                    await this.load();
+                } catch (e) {
+                    Platform.toast.error('Could not delete this risk.');
+                    throw e;
+                }
             },
         };
     }

@@ -95,7 +95,7 @@ def test_remember_me_session_rejection_does_not_loop(page, live_server, seeded):
         row.revoked_at = __import__("datetime").datetime.utcnow()
         row.revoked_reason = "logout"
         _db.session.commit()
-    _db.session.remove()
+        _db.session.remove()
 
     # First navigation after the out-of-band revoke: this is the request
     # that trips session_policy.py's rejection branch (is_active(sid) is now

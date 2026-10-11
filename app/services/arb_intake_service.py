@@ -428,6 +428,7 @@ class ARBIntakeService:
                 "review_number": review_item.review_number,
                 "routing": routing,
             },
+            organization_id=card.organization_id,
         )
 
         self.logger.info(f"Created ARB review {review_item.review_number} from card {card.id}")

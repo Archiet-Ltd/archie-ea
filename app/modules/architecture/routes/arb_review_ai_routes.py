@@ -1,6 +1,6 @@
 """ARB reviewer-side AI assist: pre-brief generation.
 
-Archie's ARB flow already lets a submitter draft a submission with AI
+Entelim's ARB flow already lets a submitter draft a submission with AI
 (app/modules/architecture/routes/architecture_assistant_routes.py). The
 reviewer side had no equivalent: opening a review gave a reviewer nothing —
 no pre-brief, no conflict surfacing, no draft disposition. This endpoint is

@@ -21,6 +21,7 @@
         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
             {% if license.compliance_status == 'compliant' %}bg-success/10 text-success-emphasis
             {% elif license.compliance_status == 'warning' %}bg-warning/10 text-warning-emphasis
+            {% elif not license.compliance_status %}bg-muted text-muted-foreground
             {% else %}bg-destructive/10 text-destructive-emphasis{% endif %}">
             {# Stored snake_case; render as words. 'over_deployed' was shown verbatim. #}
             {{ (license.compliance_status or 'unknown') | replace('_', ' ') | title }}
@@ -32,12 +33,14 @@
             <!-- Utilization -->
             <div class="bg-card border border-border rounded-lg p-6">
                 <h2 class="text-lg font-semibold mb-4">License Utilization</h2>
-                {% set util = (license.quantity_deployed or 0) / (license.quantity_entitled or 1) * 100 %}
+                {% set util = (license.quantity_deployed / license.quantity_entitled * 100)
+                              if license.quantity_deployed is not none and license.quantity_entitled else none %}
                 <div class="mb-4">
                     <div class="flex justify-between text-sm mb-2">
                         <span>{{ license.quantity_deployed if license.quantity_deployed is not none else '—' }} consumed of {{ license.quantity_entitled if license.quantity_entitled is not none else '—' }} entitled</span>
-                        <span class="font-medium">{{ "{:.1f}".format(util) }}%</span>
+                        <span class="font-medium" data-testid="license-utilization">{{ ("{:.1f}".format(util) ~ '%') if util is not none else '—' }}</span>
                     </div>
+                    {% if util is not none %}
                     <div class="h-4 bg-muted rounded-full overflow-hidden">
                         <div class="h-full rounded-full
                             {% if util > 100 %}bg-destructive
@@ -45,8 +48,11 @@
                             {% else %}bg-success{% endif %}"
                              style="width: {{ [util, 100]|min }}%"></div>
                     </div>
+                    {% else %}
+                    <p class="text-sm text-muted-foreground">Utilization unavailable until deployment is recorded.</p>
+                    {% endif %}
                 </div>
-                <div class="grid grid-cols-3 gap-4 text-center">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center" data-testid="license-position">
                     <div class="p-3 bg-muted/50 rounded-lg">
                         <div class="text-2xl font-bold">{{ license.quantity_entitled if license.quantity_entitled is not none else '—' }}</div>
                         <div class="text-sm text-muted-foreground">Entitled</div>
@@ -56,7 +62,11 @@
                         <div class="text-sm text-muted-foreground">Consumed</div>
                     </div>
                     <div class="p-3 bg-muted/50 rounded-lg">
-                        <div class="text-2xl font-bold text-success-emphasis">{{ (license.quantity_entitled or 0) - (license.quantity_deployed or 0) }}</div>
+                        <div class="text-2xl font-bold">{{ license.quantity_used if license.quantity_used is not none else '—' }}</div>
+                        <div class="text-sm text-muted-foreground">Used</div>
+                    </div>
+                    <div class="p-3 bg-muted/50 rounded-lg">
+                        <div class="text-2xl font-bold {{ 'text-success-emphasis' if license.available_quantity is not none }}">{{ license.available_quantity if license.available_quantity is not none else '—' }}</div>
                         <div class="text-sm text-muted-foreground">Available</div>
                     </div>
                 </div>

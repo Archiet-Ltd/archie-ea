@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 from flask_login import login_required
 # rapidfuzz (MIT), not fuzzywuzzy (GPL-2.0-only). fuzzywuzzy and its
 # python-Levenshtein speedup are GPL-2.0, which cannot be sublicensed under
-# Archie's commercial licence — see docs/adr/0006. rapidfuzz is API-compatible
+# Entelim's commercial licence — see docs/adr/0006. rapidfuzz is API-compatible
 # for the functions used here; it returns a float where fuzzywuzzy returned
 # int(round(...)), so call sites round to keep scores identical.
 from rapidfuzz import fuzz
@@ -229,7 +229,28 @@ def reject_merge(abacus_id, manual_id):
 
 
 def find_duplicate_candidates(similarity_threshold=80, limit=100):
-    """Find potential duplicate capabilities using fuzzy matching."""
+    """
+    Find merge candidates between abacus-source and manual capabilities.
+
+    NOT delegated to MatcherService: this finder compares two *existing*
+    record populations (abacus-origin capabilities, manual capabilities) and
+    returns a scored, sorted candidate list. Both populations are already
+    persisted as org elements, so MatcherService.match_by_name would resolve
+    every name to its own element (a certain self-match) before any fuzzy path
+    runs — the cross-source fuzzy candidates this screen exists to surface
+    would disappear. Delegation would change behaviour its callers rely on
+    (the threshold slider and scored candidate list here and in the
+    get_candidates route), so the original pairwise algorithm is retained.
+
+    Callers:
+    - abacus_consolidation.py:index (line 59)
+    - abacus_consolidation.py:get_candidates (line 78)
+
+    Returns:
+        List of candidate dicts with abacus/manual ids, names, codes,
+        similarity (0-100), code_match and AUTO_MERGE/REVIEW recommendation,
+        sorted by similarity descending and capped at ``limit``.
+    """
     abacus_caps = BusinessCapability.query.filter_by(discovery_source="abacus").all()
 
     manual_caps = BusinessCapability.query.filter(

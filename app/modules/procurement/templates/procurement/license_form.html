@@ -92,13 +92,13 @@
         <div>
           <label for="quantity_deployed" class="block text-sm font-medium mb-1.5">Deployed</label>
           <input type="number" min="0" step="1" id="quantity_deployed" name="quantity_deployed"
-                 value="{{ current('quantity_deployed', license.quantity_deployed if license else 0) | trim }}"
+                 value="{{ current('quantity_deployed', license.quantity_deployed if license else '') | trim }}" placeholder="Not recorded"
                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
         <div>
           <label for="quantity_used" class="block text-sm font-medium mb-1.5">Actually used</label>
           <input type="number" min="0" step="1" id="quantity_used" name="quantity_used"
-                 value="{{ current('quantity_used', license.quantity_used if license else 0) | trim }}"
+                 value="{{ current('quantity_used', license.quantity_used if license else '') | trim }}" placeholder="Not recorded"
                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
       </div>

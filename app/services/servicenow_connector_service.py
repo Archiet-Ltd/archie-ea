@@ -36,7 +36,7 @@ def _refresh_token_on_401(method):
 
 
 class ServiceNowConnectorService:
-    """Bidirectional connector between A.R.C.H.I.E. and a ServiceNow instance."""
+    """Bidirectional connector between Entelim and a ServiceNow instance."""
 
     def __init__(self):
         self._token: str | None = None
@@ -61,7 +61,7 @@ class ServiceNowConnectorService:
             return {}
 
         try:
-            token = self._get_token(config)
+            token = self._get_token(config, org_id)
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/json",
@@ -79,7 +79,7 @@ class ServiceNowConnectorService:
             resp = requests.get(url, headers=headers, params=params, timeout=10)
             if resp.status_code == 401:
                 self._token = None
-                token = self._get_token(config)
+                token = self._get_token(config, org_id)
                 headers["Authorization"] = f"Bearer {token}"
                 resp = requests.get(url, headers=headers, params=params, timeout=10)
 
@@ -149,7 +149,7 @@ class ServiceNowConnectorService:
             return {}
 
         try:
-            token = self._get_token(config)
+            token = self._get_token(config, org_id)
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
@@ -175,7 +175,7 @@ class ServiceNowConnectorService:
             resp = requests.post(url, json=payload, headers=headers, timeout=10)
             if resp.status_code == 401:
                 self._token = None
-                token = self._get_token(config)
+                token = self._get_token(config, org_id)
                 headers["Authorization"] = f"Bearer {token}"
                 resp = requests.post(url, json=payload, headers=headers, timeout=10)
 
@@ -206,14 +206,24 @@ class ServiceNowConnectorService:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _get_token(self, config) -> str:
+    def _get_token(self, config, org_id: int) -> str:
         """
         Return a valid OAuth2 bearer token for the given config.
         Caches the token in-instance; refreshes when within 60s of expiry.
+
+        The client secret is stored in ``OrgConnectorCredential`` via
+        ``OrgCredentialVault`` (encrypted with the organisation's own key),
+        not on the retired ``OrgConnectorConfig.client_secret`` column.
         """
         now = time.monotonic()
         if self._token and now < self._token_expires_at:
             return self._token
+
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        client_secret = OrgCredentialVault().retrieve(
+            org_id=org_id, connector_type="servicenow", credential_type="client_secret"
+        )
 
         token_url = f"{config.instance_url.rstrip('/')}/oauth_token.do"
         resp = requests.post(
@@ -221,7 +231,7 @@ class ServiceNowConnectorService:
             data={
                 "grant_type": "client_credentials",
                 "client_id": config.client_id,
-                "client_secret": config.client_secret,
+                "client_secret": client_secret,
             },
             timeout=10,
         )

@@ -220,6 +220,8 @@ class DetectionStrategy(ABC):
         for app in applications:
             cost = 0.0
             # Try various cost attributes
+            # TODO(Release 2 Cost Fact consolidation): Use application_cost_accessor.get_annual_cost()
+            # instead of direct model field access.
             if hasattr(app, "annual_cost") and app.annual_cost:
                 cost = float(app.annual_cost)
             elif hasattr(app, "license_cost") and app.license_cost:

@@ -32,7 +32,7 @@ class TestImportBatchModuleImports:
 
     def test_batch_import_bp_importable(self):
         """batch_import_bp has name 'batch_import_api'."""
-        from app.routes.batch_import_routes import batch_import_bp
+        from app.modules.import_batch.routes.batch_import_routes import batch_import_bp
 
         assert batch_import_bp.name == "batch_import_api", (
             f"Expected 'batch_import_api', got '{batch_import_bp.name}'"
@@ -40,7 +40,7 @@ class TestImportBatchModuleImports:
 
     def test_batch_import_view_bp_importable(self):
         """batch_import_view_bp has name 'batch_import_view'."""
-        from app.routes.batch_import_view_routes import batch_import_view_bp
+        from app.modules.import_batch.routes.batch_import_view_routes import batch_import_view_bp
 
         assert batch_import_view_bp.name == "batch_import_view", (
             f"Expected 'batch_import_view', got '{batch_import_view_bp.name}'"
@@ -48,7 +48,7 @@ class TestImportBatchModuleImports:
 
     def test_batch_processing_bp_importable(self):
         """batch_processing_bp has name 'batch_processing'."""
-        from app.api.batch_processing_routes import batch_processing_bp
+        from app.modules.import_batch.routes.batch_processing_routes import batch_processing_bp
 
         assert batch_processing_bp.name == "batch_processing", (
             f"Expected 'batch_processing', got '{batch_processing_bp.name}'"
@@ -56,7 +56,7 @@ class TestImportBatchModuleImports:
 
     def test_unified_import_bp_importable(self):
         """unified_import bp has name 'unified_import'."""
-        from app.routes.unified_import_routes import bp as unified_import_bp
+        from app.modules.import_batch.routes.unified_import_routes import bp as unified_import_bp
 
         assert unified_import_bp.name == "unified_import", (
             f"Expected 'unified_import', got '{unified_import_bp.name}'"
@@ -68,19 +68,19 @@ class TestImportBatchBlueprintConfig:
 
     def test_batch_import_api_prefix(self):
         """batch_import_bp has url_prefix='/api/batch-import'."""
-        from app.routes.batch_import_routes import batch_import_bp
+        from app.modules.import_batch.routes.batch_import_routes import batch_import_bp
 
         assert batch_import_bp.url_prefix == "/api/batch-import"
 
     def test_batch_import_view_prefix(self):
         """batch_import_view_bp has url_prefix='/batch-import'."""
-        from app.routes.batch_import_view_routes import batch_import_view_bp
+        from app.modules.import_batch.routes.batch_import_view_routes import batch_import_view_bp
 
         assert batch_import_view_bp.url_prefix == "/batch-import"
 
     def test_batch_processing_prefix(self):
         """batch_processing_bp has url_prefix='/api/batch'."""
-        from app.api.batch_processing_routes import batch_processing_bp
+        from app.modules.import_batch.routes.batch_processing_routes import batch_processing_bp
 
         assert batch_processing_bp.url_prefix == "/api/batch"
 
@@ -90,7 +90,7 @@ class TestImportBatchRouteCount:
 
     def test_batch_import_api_route_count(self):
         """batch_import_bp should have at least 26 routes."""
-        from app.routes.batch_import_routes import batch_import_bp
+        from app.modules.import_batch.routes.batch_import_routes import batch_import_bp
 
         count = len(batch_import_bp.deferred_functions)
         assert count >= 26, (
@@ -99,7 +99,7 @@ class TestImportBatchRouteCount:
 
     def test_batch_import_view_route_count(self):
         """batch_import_view_bp should have at least 4 routes."""
-        from app.routes.batch_import_view_routes import batch_import_view_bp
+        from app.modules.import_batch.routes.batch_import_view_routes import batch_import_view_bp
 
         count = len(batch_import_view_bp.deferred_functions)
         assert count >= 4, (
@@ -108,7 +108,7 @@ class TestImportBatchRouteCount:
 
     def test_batch_processing_route_count(self):
         """batch_processing_bp should have at least 13 routes."""
-        from app.api.batch_processing_routes import batch_processing_bp
+        from app.modules.import_batch.routes.batch_processing_routes import batch_processing_bp
 
         count = len(batch_processing_bp.deferred_functions)
         assert count >= 13, (

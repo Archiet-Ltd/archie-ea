@@ -7,7 +7,7 @@ import type { NextRequest } from "next/server"
 
 // BASE_PATH: overridable at runtime via BASE_PATH env var.
 // Standalone deployment: set BASE_PATH="" in .env.local before starting the server.
-// Default falls back to the subpath baked in at generation time (ARCHIE preview).
+// Default falls back to the subpath baked in at generation time (Entelim preview).
 const BASE_PATH = process.env.BASE_PATH ?? "{{ base_path }}"
 const PUBLIC_PATHS = ["/login", "/register", "/api/", "/auth/"]
 

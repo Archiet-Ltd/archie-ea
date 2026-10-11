@@ -98,6 +98,7 @@ jobs:
       - name: Create schema
         run: |
           python -m flask --app manage init-db
+          python -m flask --app manage schema-upgrade
           python -m flask --app manage reconcile-schema
       - name: Run the adversarial probes
         run: pytest tests/smoke/test_adversarial_probes.py -m adversarial -q -p no:randomly --timeout=2400

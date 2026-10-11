@@ -88,7 +88,7 @@ main{min-height:80vh;display:flex;align-items:center;justify-content:center;padd
 <div class="icon-wrap" aria-hidden="true">!</div>
 <h1 class="code">503</h1>
 <h2 class="title">Service Temporarily Unavailable</h2>
-<p class="copy">Archie is restarting and will be back within a few minutes. Please retry the page you asked for below.</p>
+<p class="copy">Entelim is restarting and will be back within a few minutes. Please retry the page you asked for below.</p>
 <p class="path">{http.request.orig_uri}</p>
 <div class="actions">
 <a class="button button-primary" href="{http.request.orig_uri}">Retry This Page</a>

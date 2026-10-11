@@ -418,7 +418,14 @@ def score_vendor(vendor_id):
         from app.modules.vendors.services.vendor_scoring_service import VendorScoringService
 
         vendor = VendorOrganization.query.get_or_404(vendor_id)
-        options = VendorOption.query.filter_by(vendor_organization_id=vendor_id).all()
+        # tenant-scoping-ok: VendorOption has no organisation column of its own; the fence is the
+        # join to OptionsAnalysis, which is TenantMixin, so the ORM listener scopes this query.
+        options = (
+            VendorOption.query
+            .join(OptionsAnalysis, VendorOption.analysis_id == OptionsAnalysis.id)
+            .filter(VendorOption.vendor_organization_id == vendor_id)
+            .all()
+        )
 
         if not options:
             return jsonify({"success": True, "vendor": vendor.name, "scores": [], "total": 0})
@@ -466,10 +473,16 @@ def score_vendor(vendor_id):
 def rank_vendors():
     """FRAG-036: Rank all vendor options by score."""
     try:
-        from app.models.vendor_analysis import VendorOption
+        from app.models.vendor_analysis import OptionsAnalysis, VendorOption
         from app.modules.vendors.services.vendor_scoring_service import VendorScoringService
 
-        options = VendorOption.query.filter(VendorOption.total_score.isnot(None)).all()
+        # tenant-scoping-ok: same join-through-analysis fence as score_vendor above.
+        options = (
+            VendorOption.query
+            .join(OptionsAnalysis, VendorOption.analysis_id == OptionsAnalysis.id)
+            .filter(VendorOption.total_score.isnot(None))
+            .all()
+        )
         if not options:
             return jsonify({"success": True, "ranking": [], "total": 0})
 

@@ -1568,13 +1568,18 @@ Return complete Python service code for XML export."""
     ) -> Dict:
         """Phase 4: Create work packages from roadmap."""
         try:
-            from app.models.unified_work_package import UnifiedWorkPackage
+            from app.models.archimate_core import ArchitectureModel
+            from app.services import work_package_service
+            from app.utils.tenant import current_organization_id
 
             work_packages = []
+            architecture = db.session.get(ArchitectureModel, architecture_id)
+            org_id = (architecture.organization_id if architecture else None) or current_organization_id()
 
             for item in roadmap_items:
-                # Create UnifiedWorkPackage for each roadmap item
-                wp = UnifiedWorkPackage(
+                # Create the work package for each roadmap item through the one writer
+                wp = work_package_service.create_work_package(
+                    organization_id=org_id,
                     name=item.get("name"),
                     description=item.get("description"),
                     capability_id=item.get("capability_id"),
@@ -1604,9 +1609,6 @@ Return complete Python service code for XML export."""
                         }
                     ),
                 )
-
-                db.session.add(wp)
-                db.session.flush()
 
                 work_packages.append(
                     {

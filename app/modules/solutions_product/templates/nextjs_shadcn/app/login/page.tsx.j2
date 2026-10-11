@@ -75,7 +75,7 @@ function LoginPageContent() {
       document.cookie = `token=${access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
       toast.success("Welcome back!")
       // Redirect to ?from= param, always ensuring the BASE_PATH prefix is present
-      // so we stay inside the generated app and don't land on the ARCHIE platform.
+      // so we stay inside the generated app and don't land on the Entelim platform.
       const raw = params.get("from") || "/"
       const dest = BASE_PATH && !raw.startsWith(BASE_PATH) ? BASE_PATH + raw : raw
       window.location.href = dest

@@ -177,6 +177,10 @@ def delete_solution_rule(solution_id, rule_id):
     """Deactivate a business rule (soft delete)."""
     from app.modules.codegen.models import SolutionRule
 
+    # A rule carries no organisation of its own; its solution does. Checking only
+    # that the rule matches the URL's solution id let another organisation's pair
+    # of ids through, so resolve the solution first.
+    Solution.query.get_or_404(solution_id)
     rule = SolutionRule.query.get_or_404(rule_id)
     if rule.solution_id != solution_id:
         return jsonify({"success": False, "error": "Rule does not belong to this solution"}), 403
@@ -191,6 +195,8 @@ def compile_solution_rules(solution_id):
     """Compile all active rules for a solution into implementation artifacts."""
     from app.modules.codegen.models import SolutionRule
     from app.modules.codegen.services.rule_compiler import RuleCompiler
+
+    Solution.query.get_or_404(solution_id)
 
     rules = SolutionRule.query.filter_by(solution_id=solution_id, is_active=True).all()
     if not rules:

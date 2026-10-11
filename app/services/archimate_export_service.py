@@ -65,7 +65,7 @@ def to_open_exchange_xml(viewpoint_dict: Dict[str, Any]) -> str:
     doc_el = ET.SubElement(root, f"{{{_OEF_NS}}}documentation")
     doc_el.text = (
         f"Generated from TOGAF ADM phase: {viewpoint_dict.get('phase_name', 'unknown')}. "
-        "Exported by A.R.C.H.I.E. platform."
+        "Exported by Entelim platform."
     )
 
     # <elements>
@@ -225,7 +225,7 @@ def _export_with_layout(viewpoint_dict: Dict[str, Any]) -> str:
     doc_el = ET.SubElement(root, f"{{{_OEF_NS}}}documentation")
     doc_el.text = (
         f"Viewpoint type: {viewpoint_dict.get('phase_name', 'unknown')}. "
-        "Exported by A.R.C.H.I.E. platform."
+        "Exported by Entelim platform."
     )
 
     # <elements>

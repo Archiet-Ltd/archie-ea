@@ -1,7 +1,7 @@
 """
 Monitoring Package
 
-Provides comprehensive monitoring infrastructure for the A.R.C.H.I.E. platform including:
+Provides comprehensive monitoring infrastructure for the Entelim platform including:
 - Metrics collection and aggregation
 - Alerting and notification system
 - Security event monitoring

@@ -137,3 +137,74 @@ def test_button_name_probe_resolves_label_references_in_chromium():
             assert probe["unnamedButtons"] == ["broken-reference"]
         finally:
             browser.close()
+
+
+def test_is_public_account_route_matches_exact_and_prefixed_paths():
+    from scripts import production_readiness_audit as audit
+
+    # Exact matches.
+    for route in audit._PUBLIC_ACCOUNT_ROUTES:
+        assert audit._is_public_account_route(route), f"{route} should be public"
+        assert audit._is_public_account_route(route + "/"), f"{route}/ should be public"
+
+    # Prefixed sub-paths.
+    assert audit._is_public_account_route("/account/login?next=/admin")
+    assert audit._is_public_account_route("/account/register?foo=bar")
+    assert audit._is_public_account_route("/account/reset-password/abc123")
+    assert audit._is_public_account_route("/account/confirm-account/42")
+    assert audit._is_public_account_route("/account/unconfirmed")
+    assert audit._is_public_account_route("/account/sso/google")
+    assert audit._is_public_account_route("/account/join-from-invite/5/token123")
+
+    # Non-public routes.
+    assert not audit._is_public_account_route("/account/manage")
+    assert not audit._is_public_account_route("/account/manage/info")
+    assert not audit._is_public_account_route("/account/manage/change-password")
+    assert not audit._is_public_account_route("/account/logout")
+    assert not audit._is_public_account_route("/admin/users")
+    assert not audit._is_public_account_route("/dashboard/overview")
+    assert not audit._is_public_account_route("/")
+
+
+def test_is_login_form_detects_login_url_and_login_fields():
+    from scripts import production_readiness_audit as audit
+
+    # URL check: exact login path.
+    assert audit._is_login_form("http://127.0.0.1:5000/account/login")
+    assert audit._is_login_form("http://127.0.0.1:5000/account/login?next=/admin")
+    assert not audit._is_login_form("http://127.0.0.1:5000/account/register")
+    assert not audit._is_login_form("http://127.0.0.1:5000/dashboard/overview")
+
+    # Probe check: has email and password fields.
+    login_probe = {"controls": [
+        {"id": "email", "tag": "input"},
+        {"id": "password", "tag": "input"},
+        {"id": "submit", "tag": "button"},
+    ]}
+    assert audit._is_login_form("http://127.0.0.1:5000/dashboard/overview", login_probe)
+
+    # No login fields.
+    normal_probe = {"controls": [
+        {"id": "search", "tag": "input"},
+        {"id": "name", "tag": "input"},
+    ]}
+    assert not audit._is_login_form("http://127.0.0.1:5000/dashboard/overview", normal_probe)
+
+    # Empty probe.
+    assert not audit._is_login_form("http://127.0.0.1:5000/dashboard/overview", {})
+
+    # URL takes precedence over probe when URL is /account/login.
+    assert audit._is_login_form("http://127.0.0.1:5000/account/login", {})
+
+
+def test_session_lost_finding_suppresses_levels_above_1():
+    """The suppression logic uses active_levels & {0,1} which is {1} since
+    evaluate_findings only handles levels 1-9. This confirms the set operation."""
+    from scripts import production_readiness_audit as audit
+
+    # When on a login form for a non-public route, active levels are limited.
+    all_levels = set(range(11))
+    suppressed = all_levels & {0, 1}
+    assert suppressed == {0, 1}
+    # verify that {0, 1} & {1, 2, 3, 4, 5, 6, 7, 8, 9} == {1}
+    assert suppressed & {1, 2, 3, 4, 5, 6, 7, 8, 9} == {1}

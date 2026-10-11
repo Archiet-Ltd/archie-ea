@@ -32,13 +32,15 @@ def test_template_and_js_component_agree_on_bulk_confirm_field():
 
 @pytest.mark.usefixtures("db_session")
 def test_bulk_delete_api_removes_the_work_package(app, db_session, make_org, tenant_ctx):
-    from app.models.implementation_migration import WorkPackage
+    from app.models.unified_work_package import UnifiedWorkPackage
     from app.models.user import User
+    from app.services import work_package_service
 
     org = make_org("wp-bulk-delete")
     with tenant_ctx(org.id):
-        wp = WorkPackage(name="ZZ-AUDIT retire legacy router", organization_id=org.id)
-        db_session.add(wp)
+        # The screen lists and deletes the one store's work packages.
+        wp = work_package_service.create_work_package(
+            organization_id=org.id, name="ZZ-AUDIT retire legacy router")
         user = User(email=f"wpdel-{org.id}@example.com", organization_id=org.id,
                     enterprise_role="enterprise_architect", confirmed=True)
         db_session.add(user)
@@ -52,4 +54,4 @@ def test_bulk_delete_api_removes_the_work_package(app, db_session, make_org, ten
             resp = c.delete("/enterprise/api/work-packages/bulk", json={"ids": [wp_id]})
             assert resp.status_code in (200, 204), resp.get_data(as_text=True)
 
-            assert db_session.get(WorkPackage, wp_id) is None
+            assert db_session.get(UnifiedWorkPackage, wp_id) is None

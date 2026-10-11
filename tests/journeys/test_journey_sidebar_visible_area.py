@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import parse_qsl, urlparse
 
 import pytest
+from playwright.sync_api import expect
 
 from .conftest import login, make_org, make_user
 
@@ -126,9 +127,7 @@ def test_a_no_match_search_still_says_so_after_the_layout_change(app, client, br
     try:
         pg.fill('input[x-ref="searchInput"]', "zzzznomatch")
         results = pg.locator('[data-testid="sidebar-search-results"]')
-        results.wait_for(state="visible", timeout=10000)
-        pg.wait_for_timeout(300)
-        assert 'No pages match "zzzznomatch"' in results.inner_text()
+        expect(results).to_contain_text('No pages match "zzzznomatch"')
         assert results.get_by_role("button", name="Search everywhere (Ctrl+K)").is_visible()
 
         pg.click('button[title="Clear search"]')

@@ -28,11 +28,22 @@
 {# L5 (2026-09-22): programme answers inline, one card per work package
    seeded on the picked element, each with its own blast-radius -- the
    same shape L6's risk cards already use. #}
+{# L2 (2026-09-22): strategy answers inline, one card per initiative seeded
+   on the picked element, each with its own blast-radius and nested success
+   metrics -- same shape as L5's programme cards. #}
+{# L4 (2026-09-22): accountability answers inline, one card per owner of the
+   element's ApplicationComponent -- no blast-radius (pure ownership lookup,
+   not a traversal), and a permanent capacity-gap note since capacity data
+   does not exist anywhere in this codebase. This completes all six lenses. #}
 {% set questions = [
     {'key': 'impact', 'before': 'What breaks if', 'blank': '___', 'after': 'fails or is under-resourced?'},
+    {'key': 'strategy', 'before': 'What are we trying to achieve at', 'blank': '___', 'after': ', and how is it tracking?'},
     {'key': 'risk', 'before': 'What could hurt', 'blank': '___', 'after': 'and what does it touch?'},
     {'key': 'portfolio', 'before': 'What is the rationalization status of', 'blank': '___', 'after': '?'},
-    {'key': 'programme', 'before': "What's changing at", 'blank': '___', 'after': ', and is it on track?'}
+    {'key': 'programme', 'before': "What's changing at", 'blank': '___', 'after': ', and is it on track?'},
+    {'key': 'data', 'before': 'What data does', 'blank': '___', 'after': 'hold or produce, who stewards it, and where does it flow?'},
+    {'key': 'compliance', 'before': 'Which regulations and controls apply to', 'blank': '___', 'after': ', and which controls have no evidence of being met?'},
+    {'key': 'accountability', 'before': "Who's accountable for", 'blank': '___', 'after': ', and can they take on more?'}
 ] %}
 {% macro _ps_actions() %}
 <a href="{{ url_for('intelligence_ui.twin_map') }}"
@@ -103,14 +114,17 @@
        separate result block rather than overloading `rows`. #}
     <div id="ask-risk-results" aria-busy="false" :aria-busy="riskBusy ? 'true' : 'false'" x-show="answeredKey === 'risk' && riskState !== 'idle'" x-cloak class="space-y-4">
         <h2 id="ask-risk-results-heading" x-ref="riskResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
-        {# Own loading state, not the shared impact_states() macro -- that
-           macro's not-computed/stale notices are bound to the impact
-           question's own component state and would cross-contaminate this
-           panel if reused here. #}
-        <div x-show="riskState === 'loading'" x-cloak role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
-        <p x-show="riskState === 'empty'" x-cloak class="text-sm text-muted-foreground">No risks recorded against this element.</p>
-        <p x-show="riskState === 'error'" x-cloak class="text-sm text-destructive">Could not load risks for this element.</p>
-        <ul class="space-y-3" x-show="riskState === 'ready'" x-cloak>
+        <template x-if="riskState === 'loading'">
+            <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+        </template>
+        <template x-if="riskState === 'empty'">
+            <p class="text-sm text-muted-foreground">No risks recorded against this element.</p>
+        </template>
+        <template x-if="riskState === 'error'">
+            <p class="text-sm text-destructive">Could not load risks for this element.</p>
+        </template>
+        <template x-if="riskState === 'ready'">
+            <ul class="space-y-3">
             <template x-for="risk in risks" :key="risk.riskId">
                 <li class="rounded-lg border border-border bg-card p-4" data-ask-risk-row>
                     <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
@@ -127,6 +141,7 @@
                 </li>
             </template>
         </ul>
+        </template>
     </div>
 
     {# L3: not an inline answer -- a deep link, once the element resolves to
@@ -135,31 +150,46 @@
        per-application HTML page today). #}
     <div id="ask-portfolio-results" aria-busy="false" :aria-busy="portfolioBusy ? 'true' : 'false'" x-show="answeredKey === 'portfolio' && portfolioState !== 'idle'" x-cloak class="space-y-4">
         <h2 id="ask-portfolio-results-heading" x-ref="portfolioResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
-        <div x-show="portfolioState === 'loading'" x-cloak role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
-        <p x-show="portfolioState === 'empty'" x-cloak class="text-sm text-muted-foreground">This is not something the rationalization view tracks.</p>
-        <p x-show="portfolioState === 'error'" x-cloak class="text-sm text-destructive">Could not look that up just now.</p>
-        <div x-show="portfolioState === 'ready'" x-cloak class="rounded-lg border border-border bg-card p-4" data-ask-portfolio-card>
+        <template x-if="portfolioState === 'loading'">
+            <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+        </template>
+        <template x-if="portfolioState === 'empty'">
+            <p class="text-sm text-muted-foreground">This is not something the rationalization view tracks.</p>
+        </template>
+        <template x-if="portfolioState === 'error'">
+            <p class="text-sm text-destructive">Could not look that up just now.</p>
+        </template>
+        <template x-if="portfolioState === 'ready'">
+            <div class="rounded-lg border border-border bg-card p-4" data-ask-portfolio-card>
             <p class="text-sm text-muted-foreground">Rationalization status, cost and ownership for this application.</p>
             <a :href="portfolioPlanningHref()"
                class="mt-3 inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                 Open rationalization planning
             </a>
         </div>
+        </template>
     </div>
 
     {# L5: one card per work package seeded on the picked element, each with
        its own blast-radius rows -- same shape as L6's risk cards. #}
     <div id="ask-programme-results" aria-busy="false" :aria-busy="programmeBusy ? 'true' : 'false'" x-show="answeredKey === 'programme' && programmeState !== 'idle'" x-cloak class="space-y-4">
         <h2 id="ask-programme-results-heading" x-ref="programmeResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
-        <div x-show="programmeState === 'loading'" x-cloak role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
-        <p x-show="programmeState === 'empty'" x-cloak class="text-sm text-muted-foreground">No work packages recorded against this element.</p>
-        <p x-show="programmeState === 'error'" x-cloak class="text-sm text-destructive">Could not load work packages for this element.</p>
-        <ul class="space-y-3" x-show="programmeState === 'ready'" x-cloak>
+        <template x-if="programmeState === 'loading'">
+            <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+        </template>
+        <template x-if="programmeState === 'empty'">
+            <p class="text-sm text-muted-foreground">No work packages recorded against this element.</p>
+        </template>
+        <template x-if="programmeState === 'error'">
+            <p class="text-sm text-destructive">Could not load work packages for this element.</p>
+        </template>
+        <template x-if="programmeState === 'ready'">
+            <ul class="space-y-3">
             <template x-for="wp in workPackages" :key="wp.workPackageId">
                 <li class="rounded-lg border border-border bg-card p-4" data-ask-programme-row>
                     <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
                         <h3 class="min-w-0 break-words text-base font-semibold text-foreground" x-text="wp.name"></h3>
-                        <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-text="wp.status"></span>
+                        <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-text="wp.statusLabel"></span>
                     </div>
                     <p class="mt-1 text-sm text-muted-foreground">
                         <span x-text="wp.progressPercentage + '% complete'"></span>
@@ -167,13 +197,274 @@
                     </p>
                     <p class="mt-1 text-sm text-foreground" x-show="wp.owner"><span x-text="wp.owner"></span></p>
                     <p class="mt-1 text-sm text-muted-foreground" x-show="!wp.owner">No owner recorded</p>
-                    <p class="mt-1 text-sm text-foreground" x-show="wp.costVariancePct !== null" x-text="'Cost variance: ' + wp.costVariancePct.toFixed(1) + '%'"></p>
-                    <p class="mt-1 text-sm text-muted-foreground" x-show="wp.costVariancePct === null">Not costed</p>
+                    <template x-if="wp.hasCostVariance">
+                        <p class="mt-1 text-sm text-foreground" x-text="'Cost variance: ' + wp.costVarianceText"></p>
+                    </template>
+                    <template x-if="!wp.hasCostVariance && !wp.costRedacted">
+                        <p class="mt-1 text-sm text-muted-foreground">Not costed</p>
+                    </template>
+                    <template x-if="!wp.hasCostVariance && wp.costRedacted">
+                        <p class="mt-1 text-sm text-muted-foreground">Restricted to roles with budget authority</p>
+                    </template>
                     <p class="mt-2 text-sm text-foreground" x-text="wp.affectedRows.length + ' connection' + (wp.affectedRows.length === 1 ? '' : 's') + ' reached'"></p>
                 </li>
             </template>
         </ul>
+        </template>
     </div>
+
+    {# L2: one card per initiative seeded on the picked element, each with
+       its own blast-radius rows and a nested success-metrics list -- same
+       shape as L5's work-package cards. #}
+    <div id="ask-strategy-results" aria-busy="false" :aria-busy="strategyBusy ? 'true' : 'false'" x-show="answeredKey === 'strategy' && strategyState !== 'idle'" x-cloak class="space-y-4">
+        <h2 id="ask-strategy-results-heading" x-ref="strategyResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <template x-if="strategyState === 'loading'">
+            <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+        </template>
+        <template x-if="strategyState === 'empty'">
+            <p class="text-sm text-muted-foreground">No initiatives recorded against this element.</p>
+        </template>
+        <template x-if="strategyState === 'error'">
+            <p class="text-sm text-destructive">Could not load initiatives for this element.</p>
+        </template>
+        <template x-if="strategyState === 'ready'">
+            <ul class="space-y-3">
+            <template x-for="initiative in initiatives" :key="initiative.initiativeId">
+                <li class="rounded-lg border border-border bg-card p-4" data-ask-strategy-row>
+                    <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+                        <h3 class="min-w-0 break-words text-base font-semibold text-foreground" x-text="initiative.name"></h3>
+                        <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-text="initiative.statusLabel"></span>
+                    </div>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        <span x-text="initiative.completionPercentage + '% complete'"></span>
+                        <span x-show="initiative.healthStatus"> — <span x-text="initiative.healthStatus"></span></span>
+                    </p>
+                    <p class="mt-1 text-sm text-foreground" x-show="initiative.executiveSponsor"><span x-text="initiative.executiveSponsor"></span></p>
+                    <p class="mt-1 text-sm text-muted-foreground" x-show="!initiative.executiveSponsor">No sponsor recorded</p>
+                    <template x-if="initiative.hasBudgetVariance">
+                        <p class="mt-1 text-sm text-foreground" x-text="'Budget variance: ' + initiative.budgetVarianceText"></p>
+                    </template>
+                    <template x-if="!initiative.hasBudgetVariance && !initiative.budgetRedacted">
+                        <p class="mt-1 text-sm text-muted-foreground">Not costed</p>
+                    </template>
+                    <template x-if="!initiative.hasBudgetVariance && initiative.budgetRedacted">
+                        <p class="mt-1 text-sm text-muted-foreground">Restricted to roles with budget authority</p>
+                    </template>
+                    <ul class="mt-2 space-y-1" x-show="initiative.successMetrics.length" x-cloak>
+                        <template x-for="metric in initiative.successMetrics" :key="metric.metricName">
+                            <li class="text-sm text-foreground">
+                                <span x-text="metric.metricName"></span>:
+                                <span x-text="(metric.actualValue || '—') + ' / ' + (metric.targetValue || '—')"></span>
+                                <span class="text-muted-foreground" x-show="metric.status"> (<span x-text="metric.status"></span>)</span>
+                            </li>
+                        </template>
+                    </ul>
+                    <p class="mt-2 text-sm text-foreground" x-text="initiative.affectedRows.length + ' connection' + (initiative.affectedRows.length === 1 ? '' : 's') + ' reached'"></p>
+                </li>
+            </template>
+        </ul>
+        </template>
+    </div>
+
+    {# L4: one card per owner of the element's ApplicationComponent -- no
+       blast-radius rows, and a permanent capacity-gap note that is NOT
+       inside any loading/error/empty state gate, since it is true on
+       every single response regardless of ownership data. #}
+    <div id="ask-accountability-results" aria-busy="false" :aria-busy="accountabilityBusy ? 'true' : 'false'" x-show="answeredKey === 'accountability' && accountabilityState !== 'idle'" x-cloak class="space-y-4">
+        <h2 id="ask-accountability-results-heading" x-ref="accountabilityResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <template x-if="accountabilityState === 'loading'">
+            <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+        </template>
+        <template x-if="accountabilityState === 'empty'">
+            <p class="text-sm text-muted-foreground">Ownership data is not yet connected.</p>
+        </template>
+        <template x-if="accountabilityState === 'error'">
+            <p class="text-sm text-destructive">Could not load ownership records for this element.</p>
+        </template>
+        <template x-if="accountabilityState === 'ready'">
+            <ul class="space-y-3">
+            <template x-for="owner in owners" :key="owner.ownerId">
+                <li class="rounded-lg border border-border bg-card p-4" data-ask-accountability-row>
+                    <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+                        <h3 class="min-w-0 break-words text-base font-semibold text-foreground" x-text="owner.ownershipType"></h3>
+                        <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-show="owner.organizationUnit" x-text="owner.organizationUnit && owner.organizationUnit.name"></span>
+                    </div>
+                    <p class="mt-1 text-sm text-foreground" x-show="owner.primaryContact"><span x-text="owner.primaryContact"></span></p>
+                    <p class="mt-1 text-sm text-muted-foreground" x-show="!owner.primaryContact">No contact recorded</p>
+                    {# Currency is decided once, server-side, by the as_of
+                       date the accountability query used -- no browser date
+                       comparison here, so a row reaching this template is
+                       always current ownership. #}
+                    <p class="mt-1 text-sm text-muted-foreground" x-show="owner.startDate"><span x-text="'Since ' + owner.startDate"></span></p>
+                </li>
+            </template>
+        </ul>
+        </template>
+        <p class="mt-2 text-sm text-muted-foreground">Capacity and availability data is not yet connected.</p>
+    </div>
+
+    {# L7: the Data lens. One card per data object linked to the element, then
+       the lineage flows. Steward and owner are free text as recorded, never a
+       person; anything missing says "not recorded" (no blank, no zero). #}
+    <div id="ask-data-results" aria-busy="false" :aria-busy="dataBusy ? 'true' : 'false'" x-show="answeredKey === 'data' && dataState !== 'idle'" x-cloak class="space-y-4">
+        <h2 id="ask-data-results-heading" x-ref="dataResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <template x-if="dataState === 'loading'">
+            <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+        </template>
+        <template x-if="dataState === 'empty'">
+            <p class="text-sm text-muted-foreground">No data objects or data flows are recorded for this element yet.</p>
+        </template>
+        <template x-if="dataState === 'error'">
+            <p class="text-sm text-destructive">Could not load the data recorded for this element.</p>
+        </template>
+        <template x-if="dataState === 'ready'">
+            <div class="space-y-4">
+                <p class="text-sm text-muted-foreground" x-show="!dataObjects.length">No data objects are recorded for this element.</p>
+                <ul class="space-y-3" x-show="dataObjects.length">
+                    <template x-for="obj in dataObjects" :key="obj.id">
+                        <li class="rounded-lg border border-border bg-card p-4" data-ask-data-row>
+                            <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+                                <h3 class="min-w-0 break-words text-base font-semibold text-foreground" x-text="obj.name"></h3>
+                                <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-show="obj.classification" x-text="obj.classification"></span>
+                            </div>
+                            <p class="mt-1 text-sm text-foreground"><span class="text-muted-foreground">Steward: </span><span x-text="obj.steward || 'Not recorded'"></span></p>
+                            <p class="mt-1 text-sm text-foreground"><span class="text-muted-foreground">Owner: </span><span x-text="obj.owner || 'Not recorded'"></span></p>
+                            <p class="mt-1 text-sm text-muted-foreground" x-show="obj.containsPii">Contains personal data</p>
+                            <p class="mt-1 text-sm text-muted-foreground" x-show="obj.retentionDays !== null" x-text="'Retained for ' + obj.retentionDays + ' days'"></p>
+                        </li>
+                    </template>
+                </ul>
+                <h3 class="text-base font-semibold text-foreground">Where it flows</h3>
+                <p class="text-sm text-muted-foreground" x-show="!dataFlows.length">No data flows are recorded for this element.</p>
+                <ul class="space-y-2" x-show="dataFlows.length">
+                    <template x-for="flow in dataFlows" :key="flow.direction + flow.otherElementId">
+                        <li class="text-sm text-foreground" data-ask-data-flow>
+                            <span class="font-medium" x-text="flow.direction === 'out' ? 'Flows to ' : 'Comes from '"></span><span x-text="flow.otherElementName"></span>
+                            <span class="text-muted-foreground" x-show="flow.lineageType || flow.frequency"> (<span x-text="[flow.lineageType, flow.frequency].filter(Boolean).join(', ')"></span>)</span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </template>
+    </div>
+
+    {# Compliance (under L6): one card per control the element's application is
+       mapped to, then open policy violations. A control with no evidence says
+       so. The last scan time is shown only when one exists; nothing is shown as
+       a percentage or a zero. #}
+    <div id="ask-compliance-results" aria-busy="false" :aria-busy="complianceBusy ? 'true' : 'false'" x-show="answeredKey === 'compliance' && complianceState !== 'idle'" x-cloak class="space-y-4">
+        <h2 id="ask-compliance-results-heading" x-ref="complianceResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <template x-if="complianceState === 'loading'">
+            <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+        </template>
+        <template x-if="complianceState === 'empty'">
+            <p class="text-sm text-muted-foreground">No compliance controls are recorded for this element yet.</p>
+        </template>
+        <template x-if="complianceState === 'error'">
+            <p class="text-sm text-destructive">Could not load the compliance records for this element.</p>
+        </template>
+        <template x-if="complianceState === 'ready'">
+            <div class="space-y-4">
+                <p class="text-sm text-muted-foreground" x-show="!controls.length">No compliance controls are recorded for this element.</p>
+                <ul class="space-y-3" x-show="controls.length">
+                    <template x-for="control in controls" :key="control.code + control.name">
+                        <li class="rounded-lg border border-border bg-card p-4" data-ask-compliance-row>
+                            <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+                                <h3 class="min-w-0 break-words text-base font-semibold text-foreground"><span x-show="control.code" x-text="control.code + ': '"></span><span x-text="control.name"></span></h3>
+                                <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-show="control.frameworkName" x-text="control.frameworkName"></span>
+                            </div>
+                            <p class="mt-1 text-sm text-foreground"><span class="text-muted-foreground">Status: </span><span x-text="control.status"></span></p>
+                            <p class="mt-1 text-sm text-destructive" x-show="control.noEvidence">No evidence recorded and not verified</p>
+                            <p class="mt-1 text-sm text-muted-foreground" x-show="!control.noEvidence &amp;&amp; control.evidenceRecorded">Evidence recorded</p>
+                            <p class="mt-1 text-sm text-muted-foreground" x-show="control.verifiedDate" x-text="'Verified ' + control.verifiedDate"></p>
+                        </li>
+                    </template>
+                </ul>
+                <h3 class="text-base font-semibold text-foreground">Open policy violations</h3>
+                <p class="text-sm text-muted-foreground" x-show="!violations.length">No open policy violations are recorded for this element.</p>
+                <ul class="space-y-2" x-show="violations.length">
+                    <template x-for="violation in violations" :key="violation.policyName + violation.detectedAt">
+                        <li class="text-sm text-foreground" data-ask-compliance-violation>
+                            <span x-text="violation.policyName"></span>
+                            <span class="text-muted-foreground" x-show="violation.severity"> (<span x-text="violation.severity"></span>)</span>
+                        </li>
+                    </template>
+                </ul>
+                <p class="text-sm text-muted-foreground" x-show="lastScanAt" x-text="'Last policy scan: ' + lastScanAt"></p>
+                <p class="text-sm text-muted-foreground" x-show="!lastScanAt">No policy scan is recorded for this element.</p>
+            </div>
+        </template>
+    </div>
+
+    {# Read-only: when the indirect connections were last worked out, what each
+       recent run found, and how many are now out of date and why. Every figure
+       is read from the run records and the worked-out connection store; a
+       figure that was never measured reads as a dash. #}
+    {% set stale_reason_words = {
+        'relationship_created': 'a relationship was added',
+        'relationship_updated': 'a relationship was changed',
+        'relationship_deleted': 'a relationship was removed',
+        'element_deleted': 'an element was removed',
+        'bulk_operation': 'several records were changed at once',
+    } %}
+    <section class="rounded-xl border border-border bg-card p-6" data-derivation-status aria-labelledby="derivation-status-heading">
+        <h2 id="derivation-status-heading" class="text-lg font-semibold text-foreground">Indirect connections</h2>
+        {% if derivation_status is none %}
+        <p class="mt-2 text-sm text-muted-foreground" data-derivation-status-unavailable>We could not read when these were last worked out.</p>
+        {% else %}
+        {% set last = derivation_status.last_run %}
+        <dl class="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+            <div>
+                <dt class="text-muted-foreground">Last worked out</dt>
+                <dd class="text-foreground" data-derivation-last-run>{{ last.finished_at | format_datetime if last and last.finished_at else '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-muted-foreground">Current</dt>
+                <dd class="text-foreground" data-derivation-current>{{ derivation_status.current_count if last else '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-muted-foreground">May be out of date</dt>
+                <dd class="text-foreground" data-derivation-stale>{{ derivation_status.stale_count if last else '—' }}</dd>
+            </div>
+        </dl>
+        {% if derivation_status.stale_reasons %}
+        <ul class="mt-3 space-y-1 text-sm text-foreground" data-derivation-stale-reasons>
+            {% for reason, count in derivation_status.stale_reasons %}
+            <li>{{ count }} out of date because {{ stale_reason_words.get(reason, 'the model changed') }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% if derivation_status.runs %}
+        <div class="mt-4 overflow-x-auto">
+            <table class="w-full text-sm" data-derivation-runs>
+                <caption class="sr-only">Recent runs</caption>
+                <thead>
+                    <tr class="border-b border-border text-left text-muted-foreground">
+                        <th scope="col" class="py-2 pr-4 font-medium">Finished</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Started by</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Relationships read</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Connections found</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Time taken</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in derivation_status.runs %}
+                    <tr class="border-b border-border last:border-0" data-derivation-run>
+                        <td class="py-2 pr-4">{{ run.finished_at | format_datetime if run.finished_at else '—' }}</td>
+                        <td class="py-2 pr-4">{{ {'on_demand': 'A person', 'scheduled': 'The schedule'}.get(run.trigger, '—') }}</td>
+                        <td class="py-2 pr-4">{{ run.explicit_count if run.explicit_count is not none else '—' }}</td>
+                        <td class="py-2 pr-4">{{ run.derived_count if run.derived_count is not none else '—' }}</td>
+                        <td class="py-2 pr-4">{{ (run.duration_ms ~ ' ms') if run.duration_ms is not none else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="mt-3 text-sm text-muted-foreground" data-derivation-never-run>Not worked out yet.</p>
+        {% endif %}
+        {% endif %}
+    </section>
 
     {{ provenance_drawer() }}
     {% endcall %}

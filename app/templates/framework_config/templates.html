@@ -1,0 +1,51 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block title %}Framework Templates{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6 mx-auto max-w-7xl">
+    {{ page_header(
+        title='Framework Templates',
+        description='Browse and apply framework configuration templates',
+        breadcrumbs=[
+            {'label': 'Dashboard', 'href': url_for('main.index')},
+            {'label': 'Framework Configuration', 'href': url_for('framework_config_ui.framework_config_dashboard')},
+            {'label': 'Templates'}
+        ]
+    ) }}
+
+    {% if templates %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for template in templates %}
+        <div class="bg-card rounded-lg border p-6">
+            <div class="flex items-center justify-between mb-4">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                    {{ template.template_type.title() if template.template_type else 'General' }}
+                </span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
+                    {{ template.organization_size.title() if template.organization_size else 'Any' }}
+                </span>
+            </div>
+            <h3 class="text-lg font-semibold text-foreground mb-2">{{ template.template_name }}</h3>
+            <p class="text-sm text-muted-foreground mb-4">{{ template.template_description or '' }}</p>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <svg class="w-4 h-4 text-success" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span class="text-xs text-muted-foreground">{{ template.certification_status.title() if template.certification_status else 'Verified' }}</span>
+                </div>
+                <a href="{{ url_for('framework_config_ui.template_details', template_id=template.id) }}"
+                   class="text-sm text-primary hover:underline">Details</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 text-sm text-muted-foreground">
+        <p>No framework templates are available yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

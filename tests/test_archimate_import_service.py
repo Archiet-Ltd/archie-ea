@@ -144,12 +144,11 @@ def test_element_flush_failure_is_isolated_to_that_element(app, org_ctx, monkeyp
     }
 
     real_flush = db.session.flush
-    call_count = {"n": 0}
 
     def flaky_flush(*args, **kwargs):
-        call_count["n"] += 1
-        # First call is A's flush (succeeds); second call is BAD's — raise.
-        if call_count["n"] == 2:
+        # Refuse exactly the flush that would write BAD, however many other
+        # flushes (the import's provenance record, A, C) happen around it.
+        if any(getattr(obj, "name", None) == "BAD" for obj in db.session.new):
             raise RuntimeError("simulated DB constraint failure on BAD")
         return real_flush(*args, **kwargs)
 

@@ -492,6 +492,8 @@ def delete_process_link(app_id, link_id):
     """Delete a process link."""
     from ..models.relationship_tables import ApplicationProcessSupport
 
+    # The link carries no organisation of its own; the application does.
+    ApplicationComponent.query.get_or_404(app_id)
     link = ApplicationProcessSupport.query.filter_by(
         id=link_id, application_component_id=app_id
     ).first_or_404()

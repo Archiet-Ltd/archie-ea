@@ -1,3 +1,4 @@
+// smoke-coverage-ok: plain-language formatTypeName reads window globals set by admin_base.html; no new DOM interactions
 let APP_CONFIG = window.__APP_CONFIG__ || {};
 
 document.addEventListener('alpine:init', function() {
@@ -663,7 +664,11 @@ document.addEventListener('alpine:init', function() {
 
             formatTypeName(type) {
                 if (!type) return '';
-                return type.replace(/([A-Z])/g, ' $1').trim();
+                if (window.__SHOW_ARCHIMATE_NAMES__) {
+                    return type.replace(/([A-Z])/g, ' $1').trim();
+                }
+                const names = window.__PLAIN_LANGUAGE_NAMES__ || {};
+                return names[type] || type.replace(/([A-Z])/g, ' $1').trim();
             },
             truncate(text, len) {
                 if (!text) return '';

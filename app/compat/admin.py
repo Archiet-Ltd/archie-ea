@@ -20,7 +20,6 @@ class AdminCompatStats(CompatStats):
 LEGACY_ROUTE_MAP = {
     # admin blueprint (38+ routes, url_prefix=/admin)
     "admin.index":                        {"url": "/admin/",                                    "v2": "admin.index",                        "method": "GET"},
-    "admin.dashboard_test":               {"url": "/admin/dashboard-test",                      "v2": "admin.dashboard_test",               "method": "GET"},
     "admin.dashboard":                    {"url": "/admin/dashboard",                           "v2": "admin.dashboard",                    "method": "GET"},
     "admin.new_user":                     {"url": "/admin/new-user",                            "v2": "admin.new_user",                     "method": "GET,POST"},
     "admin.invite_user":                  {"url": "/admin/invite-user",                         "v2": "admin.invite_user",                  "method": "GET,POST"},
@@ -29,7 +28,7 @@ LEGACY_ROUTE_MAP = {
     "admin.change_user_email":            {"url": "/admin/user/<int:user_id>/change-email",     "v2": "admin.change_user_email",            "method": "GET,POST"},
     "admin.change_account_type":          {"url": "/admin/user/<int:user_id>/change-account-type", "v2": "admin.change_account_type",       "method": "GET,POST"},
     "admin.delete_user_request":          {"url": "/admin/user/<int:user_id>/delete",           "v2": "admin.delete_user_request",          "method": "GET"},
-    "admin.delete_user":                  {"url": "/admin/user/<int:user_id>/_delete",          "v2": "admin.delete_user",                  "method": "GET"},
+    "admin.delete_user":                  {"url": "/admin/user/<int:user_id>/_delete",          "v2": "admin.delete_user",                  "method": "POST"},
     "admin.update_editor_contents":       {"url": "/admin/_update_editor_contents",             "v2": "admin.update_editor_contents",       "method": "POST"},
     "admin.api_settings":                 {"url": "/admin/api-settings",                        "v2": "admin.api_settings",                 "method": "GET,POST"},
     "admin.delete_api_settings":          {"url": "/admin/api-settings/<int:settings_id>/delete", "v2": "admin.delete_api_settings",        "method": "POST"},

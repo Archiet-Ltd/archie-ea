@@ -44,14 +44,14 @@
                         </td>
                         <td class="px-6 py-4">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
-                                {% if item.org.plan == 'enterprise' %}bg-primary/10 text-primary border border-primary/30
-                                {% elif item.org.plan == 'pro' %}bg-info/10 text-info border border-info/30
+                                {% if item.limits.plan_key == 'enterprise' %}bg-primary/10 text-primary border border-primary/30
+                                {% elif item.limits.plan_key in ('startup', 'team') %}bg-info/10 text-info border border-info/30
                                 {% else %}bg-secondary text-secondary-foreground{% endif %}">
-                                {{ item.org.plan|capitalize }}
+                                {{ item.limits.plan_name }}
                             </span>
                         </td>
                         <td class="px-6 py-4 text-sm text-muted-foreground">
-                            {{ item.user_count }} / {{ item.org.max_users }}
+                            {{ item.user_count }} / {{ item.limits.limit if item.limits.limit is not none else 'no limit' }}
                         </td>
                         <td class="px-6 py-4">
                             {% if item.org.is_active %}

@@ -228,6 +228,20 @@ class Capability(TenantMixin, db.Model):
     created_at = db.Column(db.DateTime, default=utcnow)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
+    # Set once by `flask backfill-capability-catalogs` when this row's
+    # capability has a canonical `unified_capabilities` row (ADR 0008): either
+    # a fresh projection of this row, or an existing row this one turned out
+    # to duplicate. NULL means "not yet processed", which is also what makes
+    # the backfill idempotent (it only ever selects WHERE retired_into_id IS
+    # NULL) and what the platform-admin merge report reads to show which
+    # duplicate records were merged into which survivor.
+    retired_into_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("unified_capabilities.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     parent_capability = db.relationship(
         "Capability", remote_side=[id], backref="children"
     )
@@ -250,8 +264,24 @@ class BusinessFunction(TenantMixin, db.Model):
     __tablename__ = "business_function"
 
     id = db.Column(db.Integer, primary_key=True)
+    # FK target repointed from business_capability.id to unified_capabilities.id:
+    # the only caller that actually constructs a BusinessFunction
+    # (ensure_function() in
+    # app/modules/applications/services/application_capability_catalog.py)
+    # passes a UnifiedCapability instance's id, not a BusinessCapability's --
+    # unified_capabilities is the single source of truth for capability
+    # modeling (see UnifiedCapability's own class docstring). The old FK let
+    # that write succeed only by coincidence (the two tables have
+    # independent id sequences) and raise a ForeignKeyViolation otherwise.
+    # Column stays Integer, matching the existing precedent for other FKs
+    # onto unified_capabilities.id (CapabilityValueStreamMapping,
+    # UnifiedCapabilityProcessMapping, CapabilityTechnologyMapping in
+    # app/models/unified_capability.py all use Integer, not BigInteger, even
+    # though unified_capabilities.id itself is a BigInteger primary key).
+    # See the migration that repoints this constraint for the data carried
+    # forward from business_capability.id.
     capability_id = db.Column(
-        db.Integer, db.ForeignKey("business_capability.id"), nullable=False
+        db.Integer, db.ForeignKey("unified_capabilities.id"), nullable=False
     )
 
     # Function identity
@@ -292,7 +322,10 @@ class BusinessFunction(TenantMixin, db.Model):
     )
 
     # Relationships
-    capability = db.relationship("BusinessCapability", backref="functions")
+    # Points at UnifiedCapability, not BusinessCapability, matching the FK
+    # above. backref="functions" is safe here: there is no pre-existing
+    # "functions" backref/attribute on UnifiedCapability to collide with.
+    capability = db.relationship("UnifiedCapability", backref="functions")
 
     def __repr__(self):
         return f"<BusinessFunction {self.name}>"

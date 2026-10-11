@@ -112,10 +112,16 @@ def update_capability_mapping(id, mapping_id):
     # csrf-ok: global CSRFProtect active
 
     try:
-        # Find the capability mapping
-        from app.models.application_layer import UnifiedApplicationCapabilityMapping
-
+        # UnifiedApplicationCapabilityMapping is imported at module level (line ~45).
+        # A local re-import here used to shadow it with a wrong path
+        # (app.models.application_layer, which does not define this class), so the update
+        # always hit the except branch below and never persisted -- caught while adding the
+        # tenant-ownership check just below.
         mapping = UnifiedApplicationCapabilityMapping.query.get_or_404(mapping_id)
+
+        if mapping.application_component_id != app.id:
+            flash("That capability mapping does not belong to this application.", "error")
+            return _redirect_to_detail(app.id, tab="capabilities")
 
         # Update mapping fields
         if request.form.get("support_level"):

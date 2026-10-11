@@ -69,7 +69,14 @@ class ImportSessionLog(db.Model):
     rolled_back_by_id = Column(Integer, ForeignKey('users.id'), nullable=True)
     rolled_back_by = relationship('User', foreign_keys=[rolled_back_by_id])
     rollback_reason = Column(Text, nullable=True)
-    
+
+    # Organisation the import ran in, and the snapshot taken before it wrote
+    # (what it created, and the earlier state of what it changed). Both are
+    # nullable so rows written before restore existed stay valid; a row with
+    # no organisation is never offered as a restore point.
+    organization_id = Column(Integer, ForeignKey('organizations.id'), nullable=True, index=True)
+    snapshot_data = Column(JSON, nullable=True)
+
     def __repr__(self):
         return f'<ImportSessionLog {self.id}: {self.operation_type} by {self.user_id} at {self.started_at}>'
     

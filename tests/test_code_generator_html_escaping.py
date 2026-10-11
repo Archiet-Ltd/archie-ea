@@ -70,3 +70,34 @@ def test_non_html_templates_are_not_autoescaped():
     assert callable(gen._env.autoescape)
     assert gen._env.autoescape("main.go.j2") is False
     assert gen._env.autoescape("ui/entity_list.html.j2") is True
+
+
+def _nextjs_files(solution_name):
+    from types import SimpleNamespace
+
+    bundle = SimpleNamespace(
+        solution_name=solution_name, solution_id=0, entities=[], services=[],
+        workflows=[], relationships=[], confirmed_fields={}, state_machines={},
+        identity_provider={}, genome=None,
+    )
+    gen = DeterministicCodeGenerator(language="python-fastapi")
+    return {f.path: f.content for f in gen._generate_nextjs_frontend(bundle)}
+
+
+def test_nextjs_admin_preview_escapes_solution_name():
+    """The Next.js frontend's standalone admin preview (frontend/admin.html)
+    is HTML, rendered by an Environment that had autoescape off, so a
+    solution name carrying markup ran as script in the generated app."""
+    files = _nextjs_files(MALICIOUS)
+    html = files["frontend/admin.html"]
+    assert MALICIOUS not in html
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+
+
+def test_nextjs_code_templates_are_not_escaped():
+    """The same Environment renders TSX; escaping must not touch it."""
+    files = _nextjs_files("Plain Name")
+    tsx = [c for p, c in files.items() if p.endswith(".tsx")]
+    assert tsx, "the Next.js frontend produced no TSX files"
+    assert any("<div" in c for c in tsx)
+    assert not any("&lt;div" in c for c in tsx)

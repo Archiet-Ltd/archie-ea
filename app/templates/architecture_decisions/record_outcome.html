@@ -1,0 +1,116 @@
+{% extends "layouts/admin_base.html" %}
+{% from "components/page_header.html" import page_header %}
+
+{% block title %}Record Review Outcome{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {{ page_header(
+        title='Record Review Outcome',
+        description=decision.title,
+        breadcrumbs=[
+            {'label': 'Dashboard', 'href': url_for('main.index')},
+            {'label': 'Governance'},
+            {'label': 'Architecture Decisions', 'href': url_for('arch_decisions.list_decisions')},
+            {'label': 'Due For Review', 'href': url_for('arch_decisions.due_for_review')},
+            {'label': 'Record Outcome'}
+        ]
+    ) }}
+
+    <form method="POST" action="{{ url_for('arch_decisions.record_outcome', decision_id=decision.id) }}"
+          class="bg-card border border-border rounded-lg p-6 space-y-5">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="text-sm text-muted-foreground">
+            Review date: <span class="font-medium text-foreground">{{ decision.review_date.isoformat() if decision.review_date else '—' }}</span>
+        </div>
+
+        <!-- Original decision, read-only: a reviewer deciding whether this
+             still holds needs to see what was decided and why, not just the
+             title in the page header. -->
+        <details class="bg-muted/40 border border-border rounded-md p-4 text-sm">
+            <summary class="cursor-pointer font-medium text-foreground">Original decision record</summary>
+            <dl class="mt-3 space-y-3">
+                {% if decision.context %}
+                <div><dt class="text-muted-foreground mb-1">Context</dt><dd class="whitespace-pre-wrap text-foreground">{{ decision.context }}</dd></div>
+                {% endif %}
+                {% if decision.decision %}
+                <div><dt class="text-muted-foreground mb-1">Decision</dt><dd class="whitespace-pre-wrap text-foreground">{{ decision.decision }}</dd></div>
+                {% endif %}
+                {% if decision.rationale %}
+                <div><dt class="text-muted-foreground mb-1">Rationale</dt><dd class="whitespace-pre-wrap text-foreground">{{ decision.rationale }}</dd></div>
+                {% endif %}
+                {% if decision.consequences %}
+                <div><dt class="text-muted-foreground mb-1">Consequences</dt><dd class="whitespace-pre-wrap text-foreground">{{ decision.consequences }}</dd></div>
+                {% endif %}
+                {% if decision.alternatives %}
+                <div><dt class="text-muted-foreground mb-1">Alternatives considered</dt><dd class="whitespace-pre-wrap text-foreground">{{ decision.alternatives }}</dd></div>
+                {% endif %}
+                {% if decision.constraints %}
+                <div><dt class="text-muted-foreground mb-1">Constraints</dt><dd class="text-foreground">{% for c in decision.constraints %}{{ c.get('constraint_name', c) if c is mapping else c }}{% if not loop.last %}, {% endif %}{% endfor %}</dd></div>
+                {% endif %}
+                {% if decision.rejection_reason %}
+                <div><dt class="text-destructive-emphasis mb-1">Rejection reason</dt><dd class="text-foreground">{{ decision.rejection_reason }}</dd></div>
+                {% endif %}
+                {% set linked_count = (decision.archimate_element_ids or [])|length + (decision.related_element_ids or [])|length %}
+                {% if linked_count %}
+                <div><dt class="text-muted-foreground mb-1">Linked elements</dt><dd class="text-foreground">{{ linked_count }} (see the full decision record)</dd></div>
+                {% endif %}
+            </dl>
+        </details>
+
+        <!-- Context for the reviewer, read-only: what was recorded when this
+             decision was created, if it came from the AI chat, workbench or
+             solution-options-advisor paths rather than a human filling the
+             form. -->
+        {% if decision.assumptions or decision.affected_systems or decision.decided_by_label %}
+        <div class="bg-muted/40 border border-border rounded-md p-4 space-y-2 text-sm">
+            {% if decision.decided_by_label %}
+            <div class="flex gap-2">
+                <dt class="text-muted-foreground shrink-0">Recorded by</dt>
+                <dd class="text-foreground">{{ decision.decided_by_label }}</dd>
+            </div>
+            {% endif %}
+            {% if decision.assumptions %}
+            <div>
+                <dt class="text-muted-foreground mb-1">Assumptions</dt>
+                <dd class="whitespace-pre-wrap text-foreground">{{ decision.assumptions }}</dd>
+            </div>
+            {% endif %}
+            {% if decision.affected_systems %}
+            <div>
+                <dt class="text-muted-foreground mb-1">Affected systems</dt>
+                <dd class="text-foreground">{{ decision.affected_systems | join(', ') }}</dd>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div>
+            <label class="block text-sm font-medium text-foreground mb-1.5" for="review_outcome">
+                Review Outcome <span class="text-destructive-emphasis">*</span>
+            </label>
+            <p class="text-xs text-muted-foreground mb-2">What was found, and whether the decision still stands.</p>
+            <textarea id="review_outcome" name="review_outcome" rows="5" required
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+                      placeholder="The decision still holds; renewed the vendor contract for another 12 months...">{{ decision.review_outcome or '' }}</textarea>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-foreground mb-1.5" for="next_review_date">Next Review Date</label>
+            <p class="text-xs text-muted-foreground mb-2">Leave blank if this decision does not need reviewing again.</p>
+            <input type="date" id="next_review_date" name="next_review_date"
+                   class="w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+            <a href="{{ url_for('arch_decisions.view_decision', decision_id=decision.id) }}"
+               class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium border border-input hover:bg-accent">Cancel</a>
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                Record Outcome
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

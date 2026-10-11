@@ -68,3 +68,48 @@ class OrgRole(db.Model):  # migration-exempt
             f"<OrgRole org={self.organization_id} "
             f"user={self.user_id} role={self.role}>"
         )
+
+
+def apply_admin_role_change(user, new_role):
+    """Change ``user``'s global Role to ``new_role``, keeping the per-organisation
+    OrgRole grant, the denormalised ``is_org_admin`` column, and a platform
+    admin's Permission.ADMINISTER in step -- the one implementation shared by
+    every admin page that lets an operator set a user's Role directly (the
+    platform admin's "change account type" page, in both the v1 and v2 admin
+    services). Neither service re-implements this state transition.
+
+    Routes every crossing of the Administrator boundary through
+    ``User.grant_org_admin`` / ``revoke_org_admin``, so a platform admin's
+    Permission.ADMINISTER is never stripped by an org-scoped role change:
+    revoke_org_admin() no-ops for a platform admin regardless of which role
+    was picked in the form, exactly as every other revoke site already
+    behaves (team page, organisation-admin toggle, remove-from-org,
+    delete-organisation).
+    """
+    was_admin = user.is_admin()
+    wants_admin = bool(new_role is not None and new_role.name == "Administrator")
+
+    if wants_admin and not was_admin:
+        user.grant_org_admin()
+        OrgRole.set_role(user.organization_id, user.id, "org_admin")
+    elif was_admin and not wants_admin:
+        user.revoke_org_admin(fallback_role=new_role)
+        if not user.is_admin():
+            # The revoke actually took effect (not a platform-admin no-op):
+            # the per-organisation grant is gone too.
+            OrgRole.query.filter_by(
+                organization_id=user.organization_id, user_id=user.id
+            ).delete(synchronize_session=False)
+    else:
+        user.role = new_role
+
+
+def apply_admin_role_grant_for_new_user(user, role):
+    """Write the per-organisation OrgRole grant and the denormalised column
+    for a newly created user whose Role is Administrator, through
+    ``User.grant_org_admin`` -- the one implementation shared by both admin
+    services' ``create_user``, so a new Administrator account agrees with
+    the team page and database-level guards from the moment it exists."""
+    if role is not None and role.name == "Administrator":
+        user.grant_org_admin()
+        OrgRole.set_role(user.organization_id, user.id, "org_admin")

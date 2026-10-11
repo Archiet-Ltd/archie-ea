@@ -278,6 +278,14 @@ class VendorOrganization(db.Model):
     headquarters_location = db.Column(db.String(100))
     website = db.Column(db.String(500))
 
+    # Legal entity information
+    legal_name = db.Column(db.String(300))  # Registered legal name
+    legal_registration_number = db.Column(db.String(100), nullable=True)  # Company registration / VAT / tax ID — uniqueness enforced by partial index uq_vendor_legal_reg
+    legal_address = db.Column(db.Text)  # Registered office address
+    parent_vendor_id = db.Column(
+        db.Integer, db.ForeignKey("vendor_organizations.id"), nullable=True
+    )  # Parent group vendor (self-referential)
+
     # Market intelligence
     gartner_magic_quadrant_position = db.Column(
         db.String(50)
@@ -410,6 +418,26 @@ class VendorOrganization(db.Model):
         secondary=initiative_vendors,
         back_populates="evaluated_vendors",
     )
+
+    # Parent group relationship (self-referential foreign key)
+    parent_vendor = db.relationship(
+        "VendorOrganization",
+        remote_side="VendorOrganization.id",
+        backref=db.backref("subsidiary_vendors", lazy="dynamic"),
+    )
+
+    # Partial unique index on legal_registration_number — the column is nullable
+    # and standard UNIQUE constraints treat NULL as distinct in some databases,
+    # so a partial index ensures uniqueness of non-NULL values only.
+    __table_args__ = (
+        db.Index(
+            "uq_vendor_legal_reg",
+            "legal_registration_number",
+            unique=True,
+            postgresql_where=db.text("legal_registration_number IS NOT NULL"),
+        ),
+    )
+
     # NOTE: Commented out due to SQLAlchemy mapper initialization issues
     # The vendor_capability_risks table exists but causes circular import issues
     # Use direct queries via relationship_tables.vendor_capability_risks instead
@@ -1519,7 +1547,7 @@ class VendorArchiMateTemplate(db.Model):
     Canonical vendor→ArchiMate element mapping.
 
     Provides deterministic, versioned vendor templates so that when an architect
-    links an SAP or Microsoft product, A.R.C.H.I.E. can auto-populate the correct
+    links an SAP or Microsoft product, Entelim can auto-populate the correct
     Technology layer elements without fuzzy search.
 
     Populated by: flask seed-vendor-templates

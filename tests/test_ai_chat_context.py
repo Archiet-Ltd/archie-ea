@@ -302,3 +302,128 @@ def test_every_loader_taking_context_filter_actually_reads_it(loader):
     assert "context_focus" in body, (
         f"{loader} does not label the record the user asked about"
     )
+
+
+# --------------------------------------------------------------------------
+# Architecture context ordering
+#
+# _load_architecture_context selected an organisation's own elements with no
+# ORDER BY, then LIMIT(100) and (when there are relationships) a re-sort by
+# relationship count. Neither step means anything without a deterministic
+# starting order: which rows the LIMIT keeps when an organisation has more
+# than 100, and which element wins a relationship-count tie, both depend on
+# it. Confirmed live: an otherwise-identical capture of the same
+# organisation's AI chat page (same organisation, same records, nothing else
+# changed) rendered a different element in an early, visible slot depending
+# only on how much unrelated data existed elsewhere in the archimate_elements
+# table — the query was free to hand rows back in whatever order their
+# physical storage happened to put them in.
+# --------------------------------------------------------------------------
+
+def test_architecture_context_elements_are_name_ordered_and_stable_across_calls(
+    db_session, make_org, tenant_ctx
+):
+    """Insert an organisation's elements in the reverse of the order the fix
+    must produce, so an unordered query — which hands rows back in roughly
+    insertion order absent an ORDER BY — and the correct, name-ordered one
+    disagree about what comes first. Without the fix this fails on the first
+    assertion below, not just on a mismatch between the two calls."""
+    from app.models.archimate_core import ArchiMateElement
+
+    org = make_org("architecture-order")
+    suffix = uuid.uuid4().hex[:8]
+
+    names = [f"Zz Element {suffix}", f"Mm Element {suffix}", f"Aa Element {suffix}"]
+    for name in names:
+        db_session.add(ArchiMateElement(
+            name=name, type="ApplicationComponent", layer="application",
+            organization_id=org.id,
+        ))
+    db_session.flush()
+    expected_order = sorted(names)
+
+    with tenant_ctx(org.id):
+        first = _service().get_domain_context("architecture", {})
+        second = _service().get_domain_context("architecture", {})
+
+    assert first["success"], first
+    assert second["success"], second
+
+    first_names = [e["name"] for e in first["context"]["architecture_elements"]]
+    second_names = [e["name"] for e in second["context"]["architecture_elements"]]
+
+    assert first_names == expected_order, (
+        "the architecture context's own elements are not name-ordered — "
+        "which rows a LIMIT keeps, and which element wins a relationship-"
+        "count tie, both depend on this"
+    )
+    assert second_names == first_names, (
+        "the same organisation's architecture context changed order between "
+        "two calls with nothing in between that should have changed it"
+    )
+
+
+def test_architecture_context_same_named_elements_are_id_ordered_and_stable_across_calls(
+    db_session, make_org, tenant_ctx
+):
+    """Two elements sharing one name are exactly the case the comment above
+    the fix describes: name alone does not distinguish them, so without an id
+    tie-breaker either one can come first and the two can swap between calls.
+
+    The row inserted first is given the higher id (an explicit id override),
+    so insertion order and id order disagree -- an id-ordered result and a
+    name-only one give different answers for which element comes first."""
+    from app.extensions import db as _db
+    from app.models.archimate_core import ArchiMateElement
+
+    org = make_org("architecture-tie")
+    suffix = uuid.uuid4().hex[:8]
+    shared_name = f"Tied Element {suffix}"
+
+    max_id = _db.session.query(_db.func.max(ArchiMateElement.id)).scalar() or 0
+    higher_id = max_id + 10001
+
+    first_inserted = ArchiMateElement(
+        id=higher_id, name=shared_name, type="ApplicationComponent",
+        layer="application", organization_id=org.id,
+    )
+    db_session.add(first_inserted)
+    db_session.flush()
+
+    second_inserted = ArchiMateElement(
+        name=shared_name, type="ApplicationComponent",
+        layer="application", organization_id=org.id,
+    )
+    db_session.add(second_inserted)
+    db_session.flush()
+
+    assert second_inserted.id < first_inserted.id, (
+        "test setup requires the second-inserted row to hold the lower id -- "
+        "got %r then %r" % (first_inserted.id, second_inserted.id)
+    )
+    expected_ids = [second_inserted.id, first_inserted.id]
+
+    with tenant_ctx(org.id):
+        first = _service().get_domain_context("architecture", {})
+        second = _service().get_domain_context("architecture", {})
+
+    assert first["success"], first
+    assert second["success"], second
+
+    def _tied_ids(result):
+        return [
+            e["id"] for e in result["context"]["architecture_elements"]
+            if e["name"] == shared_name
+        ]
+
+    first_ids = _tied_ids(first)
+    second_ids = _tied_ids(second)
+
+    assert first_ids == expected_ids, (
+        "two elements with the same name must be ordered by id, not left to "
+        "whatever order the database happens to return ties in"
+    )
+    assert second_ids == first_ids, (
+        "the tied pair changed order between two calls with nothing in "
+        "between that should have changed it"
+    )

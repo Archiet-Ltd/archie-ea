@@ -10,7 +10,10 @@
     icon_position='left',
     href=none,
     on_click=none,
-    aria_label=none
+    aria_label=none,
+    data_action=none,
+    testid=none,
+    attrs_dict={}
 ) %}
     {% set base = 'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50' %}
     
@@ -33,13 +36,13 @@
     {% set classes = base + ' ' + variants[variant] + ' ' + sizes[size] + ' ' + class %}
     
     {% if href %}
-        <a href="{{ href }}" class="{{ classes }}" {% if disabled %}aria-disabled="true"{% endif %} {% if on_click %}@click="{{ on_click }}"{% endif %} {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}>
+        <a href="{{ href }}" class="{{ classes }}" {% if disabled %}aria-disabled="true"{% endif %} {% if on_click %}@click="{{ on_click }}"{% endif %} {% if aria_label %}aria-label="{{ aria_label }}"{% endif %} {% if data_action %}data-action="{{ data_action }}"{% endif %} {% if testid %}data-testid="{{ testid }}"{% endif %} {{ attrs_dict|xmlattr }}>
             {% if icon and icon_position == 'left' %}<i data-lucide="{{ icon }}" class="mr-2 h-4 w-4"></i>{% endif %}
             {{ text }}{{ caller() if caller }}
             {% if icon and icon_position == 'right' %}<i data-lucide="{{ icon }}" class="ml-2 h-4 w-4"></i>{% endif %}
         </a>
     {% else %}
-        <button type="{{ type }}" class="{{ classes }}" {% if disabled %}disabled{% endif %} {% if on_click %}@click="{{ on_click }}"{% endif %} {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}>
+        <button type="{{ type }}" class="{{ classes }}" {% if disabled %}disabled{% endif %} {% if on_click %}@click="{{ on_click }}"{% endif %} {% if aria_label %}aria-label="{{ aria_label }}"{% endif %} {% if data_action %}data-action="{{ data_action }}"{% endif %} {% if testid %}data-testid="{{ testid }}"{% endif %} {{ attrs_dict|xmlattr }}>
             {% if icon and icon_position == 'left' %}<i data-lucide="{{ icon }}" class="mr-2 h-4 w-4"></i>{% endif %}
             {{ text }}{{ caller() if caller }}
             {% if icon and icon_position == 'right' %}<i data-lucide="{{ icon }}" class="ml-2 h-4 w-4"></i>{% endif %}

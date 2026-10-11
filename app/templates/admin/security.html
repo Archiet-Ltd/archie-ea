@@ -1,8 +1,9 @@
-{% extends 'layouts/base.html' %}
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Security Settings{% endblock %}
 {% block content %}
 <div class="max-w-3xl mx-auto py-8">
-  <h1 class="text-2xl font-bold mb-4">Security Dashboard</h1>
+  {{ page_shell(title='Security Dashboard', breadcrumb=[('Home', '/'), ('Security Dashboard', none)]) }}
   <div class="bg-background shadow rounded p-6 mb-6">
     <h2 class="text-lg font-semibold mb-2">Response Headers</h2>
     {% if headers %}

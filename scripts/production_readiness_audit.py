@@ -132,6 +132,78 @@ SKIP_SUBSTRINGS = (
     "/favicon", "/openapi",
 )
 
+# Account routes that are public — the login form on these pages is expected,
+# not a sign that the session was lost. Built from the account route files
+# and kept small: only paths that do not require login_required.
+_PUBLIC_ACCOUNT_ROUTES = (
+    "/account/login",
+    "/account/register",
+    "/account/reset-password",
+    "/account/confirm-account",
+    "/account/unconfirmed",
+    "/account/sso",
+    "/account/join-from-invite",
+    "/account/join",
+)
+
+
+def _is_public_account_route(path):
+    """Return True if `path` is a public account route where the login form is expected."""
+    parsed = urllib.parse.urlsplit(path).path
+    if parsed in _PUBLIC_ACCOUNT_ROUTES:
+        return True
+    return any(parsed.startswith(r + "/") for r in _PUBLIC_ACCOUNT_ROUTES)
+
+
+def _is_login_form(url, probe=None):
+    """Detect whether the current page is the login form."""
+    parsed = urllib.parse.urlsplit(url).path
+    if parsed == "/account/login":
+        return True
+    if probe:
+        ids = {c.get("id") for c in (probe.get("controls") or [])}
+        if "email" in ids and "password" in ids:
+            return True
+    return False
+
+
+def _sign_in(page, base, email):
+    """Sign the persona in. Returns True on success."""
+    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=60000)
+    page.fill("#email", email)
+    page.fill("#password", PASSWORD)
+    page.locator("#submit").click(force=True, no_wait_after=True)
+    try:
+        page.wait_for_url(lambda u: "/account/login" not in u, timeout=60000)
+    except Exception:
+        pass
+    page.wait_for_timeout(800)
+    return "/account/login" not in page.url
+
+
+def _goto_and_probe(page, base, path, settle_ms):
+    """Load a page (retried once for cold start) and run PAGE_PROBE.
+
+    Returns (resp, status, ctype, probe).
+    """
+    try:
+        resp = page.goto(base + path, wait_until="domcontentloaded", timeout=45000)
+    except Exception:
+        resp = page.goto(base + path, wait_until="domcontentloaded", timeout=45000)
+    status = resp.status if resp else 0
+    ctype = ""
+    if resp:
+        ctype = (resp.headers or {}).get("content-type", "")
+    if "html" in ctype.lower():
+        page.wait_for_timeout(settle_ms)
+        page.eval_on_selector_all(
+            "[x-show='showOnboarding'], .onboarding-overlay",
+            "els => els.forEach(e => e.remove())")
+        probe = page.evaluate(PAGE_PROBE)
+    else:
+        probe = {}
+    return resp, status, ctype, probe
+
 
 # --------------------------------------------------------------------------- setup
 
@@ -1019,17 +1091,7 @@ def run(args):
                         f"{r.status} {r.url[:120]}") if r.status >= 400 else None)
 
                     # Sign in once per context.
-                    page.goto(base + "/account/login", wait_until="domcontentloaded",
-                              timeout=60000)
-                    page.fill("#email", email)
-                    page.fill("#password", PASSWORD)
-                    page.locator("#submit").click(force=True, no_wait_after=True)
-                    try:
-                        page.wait_for_url(lambda u: "/account/login" not in u, timeout=60000)
-                    except Exception:
-                        pass
-                    page.wait_for_timeout(800)
-                    if "/account/login" in page.url:
+                    if not _sign_in(page, base, email):
                         findings.append({
                             "level": 0, "kind": "login-failed", "persona": role,
                             "viewport": vp_name, "route": "/account/login",
@@ -1045,54 +1107,46 @@ def run(args):
                                    + route_index)
                         path = route["path"]
                         ctx = {"route": path, "endpoint": route["endpoint"],
-                               "persona": role, "viewport": vp_name}
+"persona": role, "viewport": vp_name}
                         console_errors.clear()
                         failed_requests.clear()
                         try:
-                            # Retried once, deliberately. The server is reachable
-                            # (boot() waited on /health) but the FIRST real page
-                            # load still pays the whole lazy-import cost, so a
-                            # cold start was being recorded as a high-severity
-                            # navigation failure against whichever route happened
-                            # to go first -- /dashboard/health, which loads in
-                            # 0.24s and reaches domcontentloaded fine on a second
-                            # attempt. An audit whose first three findings are
-                            # noise is an audit people learn to ignore
-                            # (TESTING_STANDARD.md, rule 8). A genuine hang fails
-                            # both times; a cold start does not.
-                            try:
-                                resp = page.goto(base + path, wait_until="domcontentloaded",
-                                                 timeout=45000)
-                            except Exception:
-                                resp = page.goto(base + path, wait_until="domcontentloaded",
-                                                 timeout=45000)
-                            status = resp.status if resp else 0
-                            ctype = ""
-                            if resp:
-                                ctype = (resp.headers or {}).get("content-type", "")
+                            resp, status, ctype, probe = _goto_and_probe(
+                                page, base, path, args.settle)
                             if route.get("parameterised") and status in (403, 404, 410):
-                                # Substituted id addresses no real row. Checked
-                                # before the content-type branch, which otherwise
-                                # reports JSON 404s the suppression would drop.
                                 audited += 1
                                 processed.append({"slot_id": slot_id, "result": "parameterised-denial"})
                                 continue
                             if "html" not in ctype.lower():
-                                # JSON/text endpoint reachable by GET. Not a page:
-                                # only its status is meaningful here, and its body
-                                # contract is covered by the API tests.
                                 findings.extend(evaluate_findings(
                                     level_set & {1}, ctx, {}, status, [], []))
                                 audited += 1
                                 processed.append({"slot_id": slot_id, "result": "non-html"})
                                 continue
-                            page.wait_for_timeout(args.settle)
-                            # The onboarding overlay covers content and is not the
-                            # subject of the audit; dismiss it rather than measure it.
-                            page.eval_on_selector_all(
-                                "[x-show='showOnboarding'], .onboarding-overlay",
-                                "els => els.forEach(e => e.remove())")
-                            probe = page.evaluate(PAGE_PROBE)
+
+                            # Session guard: detect signed-out state after page load.
+                            # The login form on public account routes is expected;
+                            # on every other route it means the session was lost.
+                            current_url = page.url
+                            if _is_login_form(current_url, probe) and not _is_public_account_route(path):
+                                findings.append({
+                                    **ctx, "level": 0, "kind": "session-lost",
+                                    "severity": "high",
+                                    "detail": f"session lost while auditing {path}; "
+                                              f"ended at {current_url}",
+                                })
+                                if _sign_in(page, base, email):
+                                    # Reload and re-probe the same route once.
+                                    resp, status, ctype, probe = _goto_and_probe(
+                                        page, base, path, args.settle)
+                                else:
+                                    findings.append({
+                                        **ctx, "level": 0, "kind": "login-failed",
+                                        "severity": "high",
+                                        "detail": "re-sign-in failed after session loss",
+                                    })
+
+                            # Populate control inventory from the (possibly retried) probe.
                             control_inventory.append({
                                 **ctx,
                                 "status": status,
@@ -1139,6 +1193,30 @@ def run(args):
                                             "[x-show='showOnboarding'], .onboarding-overlay",
                                             "els => els.forEach(e => e.remove())",
                                         )
+
+                                        # Session guard for outcome pages too.
+                                        oc_url = outcome_page.url
+                                        oc_probe = outcome_page.evaluate(PAGE_PROBE)
+                                        if _is_login_form(oc_url, oc_probe) and not _is_public_account_route(path):
+                                            findings.append({
+                                                **ctx, "level": 0, "kind": "session-lost",
+                                                "severity": "high",
+                                                "detail": f"session lost during control activation on {path}; "
+                                                          f"control: {control.get('label')!r} "
+                                                          f"({control.get('href') or ''})",
+                                            })
+                                            if _sign_in(outcome_page, base, email):
+                                                outcome_page.goto(
+                                                    base + path,
+                                                    wait_until="domcontentloaded",
+                                                    timeout=45000,
+                                                )
+                                                outcome_page.wait_for_timeout(args.settle)
+                                                outcome_page.eval_on_selector_all(
+                                                    "[x-show='showOnboarding'], .onboarding-overlay",
+                                                    "els => els.forEach(e => e.remove())",
+                                                )
+
                                         outcome_record["probe_attempted"] = True
                                         result = probe_control_outcome(
                                             outcome_page, control["ordinal"]
@@ -1187,6 +1265,10 @@ def run(args):
                         if route.get("parameterised") and status in (403, 404, 410):
                             # The substituted id addresses no real row. Not a defect.
                             active_levels = set()
+                        # Never record unauthorized-access or L2-10 findings from a page
+                        # that is the login form.
+                        if _is_login_form(page.url, probe) and not _is_public_account_route(path):
+                            active_levels = active_levels & {0, 1}
                         findings.extend(evaluate_findings(
                             active_levels, ctx, probe, status,
                             list(console_errors), list(failed_requests)))

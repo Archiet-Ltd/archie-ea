@@ -4,7 +4,7 @@ traversal via the same ``cross_layer_impact`` code path L1 already uses --
 no second traversal implementation, no fabricated risk score.
 
 Fixtures (app, db_session, make_org) are discovered via
-app/modules/intelligence/tests/conftest.py's own import of tests.conftest,
+app/modules/conftest.py's import of tests.conftest,
 same pattern as test_query_service.py. No import needed here.
 """
 

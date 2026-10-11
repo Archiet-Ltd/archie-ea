@@ -6,10 +6,20 @@ from datetime import datetime
 from typing import Dict
 
 from app.extensions import db
+from app.models.mixins.core import TenantMixin
 
 
-class WebhookSubscription(db.Model):
-    """Webhook subscription model"""
+class WebhookSubscription(TenantMixin, db.Model):
+    """Webhook subscription model.
+
+    Pre-TenantMixin, `_find_matching_subscriptions` (webhook_service.py) queried
+    every organisation's active subscriptions with no filter at all when publishing
+    an event -- one org's event payload could be delivered to another org's
+    registered webhook URL. TenantMixin's do_orm_execute filter closes that for
+    every bare `.query` call in request context; see reconcile_schema.py's
+    `_backfill_webhook_organizations` for the nullable-column backfill this needed
+    (organization_id here predates the mixin and can't be NOT NULL immediately).
+    """
 
     __tablename__ = "webhook_subscriptions"
 
@@ -50,8 +60,10 @@ class WebhookSubscription(db.Model):
         }
 
 
-class WebhookEvent(db.Model):
-    """Webhook event model"""
+class WebhookEvent(TenantMixin, db.Model):
+    """Webhook event model. See WebhookSubscription's docstring for why this
+    carries TenantMixin -- `get_events`/`retry_event` (webhook_service.py) read
+    this table with no org filter of their own, relying on TenantMixin's."""
 
     __tablename__ = "webhook_events"
 
@@ -79,8 +91,17 @@ class WebhookEvent(db.Model):
         }
 
 
-class WebhookDelivery(db.Model):
-    """Webhook delivery attempt model"""
+class WebhookDelivery(TenantMixin, db.Model):
+    """Webhook delivery attempt model.
+
+    Carries TenantMixin directly (not just inherited via its subscription_id FK)
+    because response_body/error_message can hold the delivered payload's content --
+    defense in depth per CLAUDE.md's tenant-isolation guidance, not just belt-and-
+    suspenders. `_deliver_to_subscriptions` writes these from a background thread
+    with no request context (see app.middleware.tenant_isolation), so its INSERT
+    is unfiltered by design there; the subscription list it iterates was already
+    org-scoped by the time the thread started (WebhookSubscription's own filter,
+    applied in-request before the thread is spawned)."""
 
     __tablename__ = "webhook_deliveries"
 

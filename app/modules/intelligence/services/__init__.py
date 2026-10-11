@@ -7,4 +7,6 @@ without touching either file:
 - T-002/T-003 add ``invalidation.py`` (DE-3) and ``recompute_job.py`` (DE-4).
 - T-006 adds ``connector_allowlist.py`` (DE-8) — the connector allowlist gate
   is explicitly out of scope for T-001.
+- A later change adds ``crosswalk_service.py`` and the external-identifier
+  crosswalk model/readers/writer.
 """

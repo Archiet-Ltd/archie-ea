@@ -54,11 +54,11 @@ def seed_impact_graph(org_id, noun_prefix="Ledgerpay"):
         )
         db.session.add(component)
         db.session.commit()
-        unit = OrganizationUnit(name="Payments Platform %s" % suffix)
+        unit = OrganizationUnit(organization_id=org_id, name="Payments Platform %s" % suffix)
         db.session.add(unit)
         db.session.commit()
         db.session.add(ApplicationOwnership(
-            application_id=component.id, organization_unit_id=unit.id,
+            organization_id=org_id, application_id=component.id, organization_unit_id=unit.id,
             ownership_type="Business Owner",
         ))
         db.session.commit()

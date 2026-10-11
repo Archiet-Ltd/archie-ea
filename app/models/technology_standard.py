@@ -43,6 +43,16 @@ class TechnologyStandard(TenantMixin, db.Model):
     replacement_technology = db.Column(db.String(255))
     sunset_date = db.Column(db.Date)
 
+    # The modelled technology this standard governs, when there is one. Its
+    # radar ring is not copied here: it is read from that element's
+    # TechRadarEntry, the one store for adopt / trial / assess / hold.
+    archimate_element_id = db.Column(
+        db.Integer,
+        db.ForeignKey("archimate_elements.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -51,6 +61,7 @@ class TechnologyStandard(TenantMixin, db.Model):
     )
 
     owner = db.relationship("User", backref="owned_technology_standards")
+    element = db.relationship("ArchiMateElement", foreign_keys=[archimate_element_id])
 
     def to_dict(self):
         """Shape consumed by the governance dashboard's Technology Standards tab."""
