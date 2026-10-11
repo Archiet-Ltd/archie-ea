@@ -1012,16 +1012,25 @@ def _post_org_chart_edit(page, live_server):
     page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
     for method, path, body in ORG_CHART_EDIT_PROBES:
-        response = page.request.request(
-            method,
-            live_server + path,
-            data=json.dumps(body) if body is not None else None,
-            headers={
-                "X-CSRFToken": csrf_token,
-                "Content-Type": "application/json",
-            },
-            max_redirects=0,
-        )
+        headers = {
+            "X-CSRFToken": csrf_token,
+            "Content-Type": "application/json",
+        }
+        data_str = json.dumps(body) if body is not None else None
+        if method == "POST":
+            response = page.request.post(
+                live_server + path, data=data_str,
+                headers=headers, max_redirects=0,
+            )
+        elif method == "PATCH":
+            response = page.request.patch(
+                live_server + path, data=data_str,
+                headers=headers, max_redirects=0,
+            )
+        else:
+            response = page.request.delete(
+                live_server + path, headers=headers, max_redirects=0,
+            )
         yield method, path, response
 
 
