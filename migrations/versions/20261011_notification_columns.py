@@ -5,7 +5,7 @@ to the notifications table. Backfills organization_id from the user's
 organization_id for existing rows.
 
 Revision ID: 20261011_notification_columns
-Revises: 20261010_oauth_token_grants
+Revises: 20261012_api_token_scopes
 Create Date: 2026-10-11
 """
 from alembic import op
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy import text
 
 revision = "20261011_notification_columns"
-down_revision = "20261010_oauth_token_grants"
+down_revision = "20261012_api_token_scopes"
 branch_labels = None
 depends_on = None
 
