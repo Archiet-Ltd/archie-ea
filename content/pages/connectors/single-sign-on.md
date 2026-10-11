@@ -1,13 +1,13 @@
 ---
 page_family: connector
-connector_group: "Sign-in"
-connector_label: "Single sign-on"
+connector_group: "sign-in"
 state: held
 capture_status: awaiting_capture
 cta: plans
 description: "Entelim signs people in with your own identity provider over OpenID Connect or SAML 2.0, set up by your admin and included from the Team plan."
 source: app/services/sso_service.py, app/services/saml_service.py, app/modules/auth/sso_routes.py,
-  app/models/sso_config.py, app/templates/public/pricing.html, read 11 October 2026
+  app/models/sso_config.py, app/templates/public/pricing.html, PR 527 (feat/seo-geo-nav-plumbing,
+  app/services/public_pages.py CONNECTOR_GROUPS), read 11 October 2026
 ---
 
 # Single sign-on for enterprise architecture software
