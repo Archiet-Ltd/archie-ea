@@ -32,6 +32,7 @@ def index():
         versions=svc.supported_version_share(org_id),
         exceptions=svc.open_exceptions(org_id),
         agreement=svc.store_agreement_findings(org_id),
+        exposure=svc.end_of_support_exposure(org_id),
     )
 
 
