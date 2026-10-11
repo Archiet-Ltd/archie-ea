@@ -712,6 +712,19 @@ class AIChatApprovalService:
                         organization_id=org_id,
                         accepted_by=effective_approver_id,
                     )
+                elif approval.entity_type == "ai_system_classification":
+                    # Accept a proposed AI system risk classification.
+                    # The risk class is written onto the element's typed
+                    # properties (acm_properties), not custom_properties.
+                    from app.modules.enterprise_genome.services.ai_system_classification import (
+                        accept_classification,
+                    )
+                    org_id = approval.organization_id
+                    accepted = accept_classification(
+                        approval_id=approval.id,
+                        organization_id=org_id,
+                    )
+                    result = {"success": accepted}
                 else:
                     return {"success": False, "error": f"Unknown entity type: {approval.entity_type}"}
 
