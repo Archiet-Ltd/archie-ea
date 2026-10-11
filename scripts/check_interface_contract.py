@@ -32,6 +32,7 @@ from typing import Any
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
 # Scopes that are considered read-class for the purpose of scope matching.
 READ_CLASS_SCOPES = {
