@@ -179,9 +179,13 @@ services:
       timeout: 12s
       retries: 3
       start_period: 420s
+    # Server no longer depends on database-acl (and transitively schema-deploy).
+    # The schema chain (database-bootstrap -> schema-deploy -> database-acl) runs
+    # as a one-off before the server is recreated, so the old server keeps serving
+    # throughout. See docs/runbooks/deploy-without-downtime.md.
     depends_on:
-      database-acl:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_started
 
@@ -217,9 +221,11 @@ services:
       # The RQ worker opens its own pool too; it only sends email, so keep it small.
       SQLALCHEMY_POOL_SIZE: "4"
       SQLALCHEMY_MAX_OVERFLOW: "2"
+    # Worker no longer depends on database-acl (same zero-downtime decoupling as
+    # server). See docs/runbooks/deploy-without-downtime.md.
     depends_on:
-      database-acl:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_started
 
