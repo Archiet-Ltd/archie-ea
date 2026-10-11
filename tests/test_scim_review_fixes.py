@@ -532,9 +532,24 @@ _VOLATILE_HEADERS = {"date", "x-request-id"}
 
 
 def _header_set(resp):
-    """The full header set, excluding only per-request values."""
+    """The full header set, excluding only per-request values.
+
+    Set-Cookie's session value is itself signed with a per-request timestamp
+    (flask_login embeds it in the remember/session cookie payload), so two
+    logins that straddle a second boundary carry equal cookie names and
+    attributes but different signed values -- a real timing flake, not a
+    behavioural difference. Normalise the value, keep the cookie name and
+    every attribute (HttpOnly, Path, SameSite, ...) intact.
+    """
+
+    def _normalise(key, value):
+        value = re.sub(r"nonce-[A-Za-z0-9_\-=+/]+", "nonce-", value)  # the CSP nonce is per request
+        if key == "set-cookie":
+            value = re.sub(r"^([^=]+)=[^;]*", r"\1=<redacted>", value)
+        return value
+
     return sorted(
-        (k.lower(), re.sub(r"nonce-[A-Za-z0-9_\-=+/]+", "nonce-", v))  # the CSP nonce is per request
+        (k.lower(), _normalise(k.lower(), v))
         for k, v in resp.headers.items()
         if k.lower() not in _VOLATILE_HEADERS
     )
