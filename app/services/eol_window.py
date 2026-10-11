@@ -16,7 +16,7 @@ subtlety plain timedelta arithmetic gets wrong.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List
+from typing import List
 
 from app import db
 from app.models.application_owner import ApplicationOwner
@@ -87,7 +87,7 @@ def owner_summary(application_id: int, organization_id: int) -> str:
     return ", ".join(named) if named else "no owner recorded"
 
 
-def owner_summaries(application_ids, organization_id):
+def owner_summaries(application_ids, organization_id) -> dict:
     """Batch owner summaries for multiple applications.
 
     Returns a dict mapping each application_id to its owner summary string.
