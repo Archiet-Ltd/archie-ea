@@ -12,6 +12,8 @@ set -eu
 flask --app manage init-db
 flask --app manage schema-upgrade
 flask --app manage reconcile-schema
+# Default global compliance catalogue (six frameworks and their controls). Idempotent: adds only what is missing and never edits an existing row, so it is safe on every deploy. Non-fatal: adoption screens show an honest empty state until it runs.
+flask --app manage seed-compliance-catalogue || echo 'WARN compliance catalogue seed skipped - the default frameworks and controls are not loaded until it runs'
 flask --app manage migrate-connector-credentials || echo 'WARN connector credential migration skipped - ServiceNow/Lucidchart secrets saved before this fix remain only in the retired encrypted columns; ServiceNowConnectorService and LucidchartConnectorService read the new OrgCredentialVault store and will treat those organisations as unconfigured until it runs'
 flask --app manage reconcile-admin-flags || echo 'WARN reconcile-admin-flags skipped - stale is_org_admin flags may disagree with is_admin() until it runs'
 flask --app manage backfill-ai-chat-approval-org || echo 'WARN AI chat approval tenancy backfill skipped - legacy approvals remain unavailable for review until requester organization ownership is restored'
