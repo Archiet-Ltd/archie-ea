@@ -19,7 +19,12 @@ from flask import Blueprint, current_app, g, jsonify, redirect, render_template,
 from flask_login import current_user, login_required
 
 from app.extensions import csrf
-from app.modules.oauth_provider.models import OAuthAuthorizationCode, OAuthClient, OAuthToken
+from app.modules.oauth_provider.models import (
+    OAuthAuthorizationCode,
+    OAuthClient,
+    OAuthToken,
+    hash_secret,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -206,13 +211,18 @@ def authorize():
 @oauth_provider_bp.route("/token", methods=["POST"])
 @csrf.exempt
 def token():
-    """Token endpoint — authorization_code and refresh_token grants.
+    """Token endpoint — authorization_code, refresh_token and
+    client_credentials grants.
 
     Called by OAuth clients with no session cookie at all (a CLI, an
-    assistant backend) — there is no CSRF token to carry, and nothing here
-    can be driven by forging a browser session because none is read.
+    assistant backend, a machine client) — there is no CSRF token to carry,
+    and nothing here can be driven by forging a browser session because none
+    is read.
     """
     grant_type = request.form.get("grant_type", "")
+    if grant_type == "client_credentials":
+        return _token_client_credentials()
+
     resource = request.form.get("resource", "")
 
     expected_resource = _mcp_resource_url()
@@ -224,6 +234,90 @@ def token():
     if grant_type == "refresh_token":
         return _token_refresh(expected_resource)
     return jsonify({"error": "unsupported_grant_type"}), 400
+
+
+def _api_resource_url() -> str | None:
+    """The one resource identifier REST tokens are issued for."""
+    base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+    if not base:
+        return None
+    return f"{base}/api/v1"
+
+
+def _token_client_credentials():
+    """RFC 6749 client-credentials grant for a registered service client.
+
+    Issues only scopes the client was registered with (``OAuthClient.scope``,
+    which must be an api:* scope), binds the token to the client's own bound
+    service user — never a user or organisation named by the caller — sets
+    the organisation from that user, and issues no refresh token.
+    """
+    client_id = request.form.get("client_id", "")
+    client_secret = request.form.get("client_secret", "")
+    requested_scope = (request.form.get("scope") or "").strip()
+    resource = request.form.get("resource", "")
+    if not client_id or not client_secret:
+        return jsonify({"error": "invalid_request"}), 400
+
+    expected_resource = _api_resource_url()
+    if expected_resource is None or resource.rstrip("/") != expected_resource:
+        return jsonify({"error": "invalid_target", "error_description": "resource does not match this server"}), 400
+
+    client = OAuthClient.query.filter_by(client_id=client_id, is_active=True).first()  # tenant-scoping-ok: platform-level client registry, not tenant-owned data
+    if client is None or client.client_secret_hash is None:
+        return jsonify({"error": "invalid_client", "error_description": "client not found or not a confidential client"}), 401
+    if not hmac.compare_digest(client.client_secret_hash, hash_secret(client_secret)):
+        return jsonify({"error": "invalid_client", "error_description": "client authentication failed"}), 401
+    if "client_credentials" not in (client.grant_types or "").split():
+        return jsonify({"error": "unauthorized_client", "error_description": "this client may not use the client-credentials grant"}), 403
+    if client.service_user_id is None:
+        return jsonify({"error": "unauthorized_client", "error_description": "this client has no service user"}), 403
+
+    from app.modules.oauth_provider.scopes import API_SCOPES
+
+    allowed = {item for item in (client.scope or "").split() if item}
+    if not allowed:
+        return jsonify({"error": "invalid_scope", "error_description": "this client has no registered scopes"}), 400
+    if not allowed <= set(API_SCOPES):
+        return jsonify({"error": "invalid_scope", "error_description": "this client is registered for scopes this grant cannot issue"}), 400
+    if requested_scope:
+        requested = {item for item in requested_scope.split() if item}
+        if not requested <= allowed:
+            return jsonify({"error": "invalid_scope", "error_description": "scope not registered for this client"}), 400
+        if not requested <= set(API_SCOPES):
+            return jsonify({"error": "invalid_scope", "error_description": "scope not allowed for this grant"}), 400
+        scopes = sorted(requested)
+    else:
+        scopes = sorted(allowed)
+
+    from app.extensions import db
+    from app.models.user import User
+
+    user = db.session.get(User, client.service_user_id)  # tenant-scoping-ok: the bound service user by primary key; no session exists on this endpoint
+    if user is None or not getattr(user, "is_service_user", False):
+        return jsonify({"error": "invalid_client", "error_description": "service user missing or not a service account"}), 401
+    if user.organization_id is None:
+        return jsonify({"error": "invalid_client", "error_description": "service user has no organisation"}), 401
+
+    raw_access, _raw_refresh, row = OAuthToken.issue(
+        client_id=client.client_id,
+        user_id=user.id,
+        scope=" ".join(scopes),
+        resource=expected_resource,
+        grant_type="client_credentials",
+        organization_id=user.organization_id,
+    )
+    # A client-credentials grant issues no refresh token: clear the stored
+    # hash so no row can ever be rotated through the refresh grant.
+    row.refresh_token = None
+    db.session.commit()
+
+    return jsonify({
+        "access_token": raw_access,
+        "token_type": "Bearer",
+        "expires_in": 3600,
+        "scope": " ".join(scopes),
+    })
 
 
 def _token_authorization_code(expected_resource: str):

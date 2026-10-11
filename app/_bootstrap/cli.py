@@ -282,6 +282,13 @@ def init_cli(app):
         app.logger.warning(f"Failed to register OAuth client pruning CLI: {e}")
 
     try:
+        from app.commands.create_service_client import init_app as init_create_service_client
+        init_create_service_client(app)
+        app.logger.info("Service client creation CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register service client creation CLI: {e}")
+
+    try:
         from app.commands.clean_test_artefacts import init_app as init_clean_test_artefacts
         init_clean_test_artefacts(app)
         app.logger.info("\u2705 Clean test artefacts CLI command registered")
