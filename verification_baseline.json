@@ -12,6 +12,7 @@
   "_note10": "added 2026-09-28: tenant_isolation_route_coverage_pct 44.0 is the share of identifier-bearing routes (one rule, one method) proven to refuse another organisation's identifiers, measured by the route sweep in tests/test_tenant_isolation_matrix.py and enforced by that test, not by a verify.py gate. It is the one ratchet here where HIGHER is better: raise it after proving more routes, never lower it.",
   "_note11": "updated 2026-10-04: sidebar_links 28 -> 30 is real link growth, not a corrected measurement. Two new My-work links (\"Model as of\", \"Changes\") were added for enterprise_architect, the role that owns the capability model and audits its evolution. enterprise_architect was already the worst case at 28 (tied with business_architect); it now measures 30, still within SIDEBAR_LINK_BUDGET 31. No other role's links changed.",
   "_note12": "updated 2026-10-05: merged origin/main, which carries PR #353's Approval Inbox link and moves SIDEBAR_LINK_BUDGET 31 -> 32 (see app/utils/role_access.py's comment) — this branch's own _note11 cited the now-stale 31. Re-ran scripts/check_sidebar_links.py after the merge: sidebar_links stays 30, enterprise_architect still the worst case. The count is unchanged because Approval Inbox is permission-gated (requires=\"general\") and the script's stub user never satisfies a requires= guard (the same stub-evaluates-falsy limitation this file's 2026-09-02 note recorded for the admin-zone predicate), so the new link adds nothing to what this ratchet measures, for any role. The two links _note11 describes (\"Model as of\", \"Changes\") are the only ones behind the 30; only the budget figure needed correcting, to 32.",
+  "_note13": "added 2026-10-10: background_mechanisms_thread_instances 29 is a NEW measurement, not growth. The register is now keyed on file, kind and enclosing function, so the gate counts thread instances (29) beside the files holding them (background_mechanisms_thread, still 22); the older key counted one entry per file and could not see a second pool in a listed file. Both may only fall.",
   "ratchets": {
     "undefined_names": 0,
     "redefinitions": 0,
@@ -44,6 +45,8 @@
     "raw_html_escaping": 0,
     "store_agreement": 4,
     "canonical_store": 0,
+    "background_mechanisms_thread": 22,
+    "background_mechanisms_thread_instances": 29,
     "unrendered_model_fields": 342,
     "tenant_isolation_route_coverage_pct": 44.0
   }
