@@ -749,8 +749,6 @@ def _render_family_hub(family: str, path: str, fallback_title: str, extra_entrie
     page is held, the hub shows a plain H1 and its feed-built groups with
     noindex. The lists come from family_hub_groups(), i.e. load_feed_pages().
     """
-    from markupsafe import Markup
-
     from app.services.public_pages import (
         build_hub_jsonld,
         family_hub_groups,
@@ -776,7 +774,7 @@ def _render_family_hub(family: str, path: str, fallback_title: str, extra_entrie
         title=title,
         canonical_url=f"https://entelim.org{path}",
         description=description,
-        intro_html=Markup(intro.body_html) if live_intro else None,
+        intro_html=intro.body_html if live_intro else None,
         groups=groups,
         extra_groups=extra_groups,
         show_descriptions=True,
