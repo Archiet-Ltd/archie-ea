@@ -20,7 +20,10 @@ test_oauth_flow.py for the run command).
 
 from __future__ import annotations
 
+import os
 import secrets
+
+import pytest
 
 from app.modules.mcp.tests.test_scope_enforcement import _clear_cached_identity, _mcp_call
 from app.modules.mcp.tests.test_tools import _make_element
@@ -29,6 +32,19 @@ from app.modules.oauth_provider.tests.test_oauth_flow import _make_user, _regist
 API_SCOPE = "api:read"
 MCP_SCOPE = "mcp:read"
 SERVICE_CLIENT_SECRET = "machine-secret"
+
+# The OAuth/MCP blueprints only exist in builds with the connector on. When
+# this module is collected directly in a plain build (changed-file runs, for
+# instance), the mechanism the tests exercise is not registered, so the whole
+# module skips rather than fails — the same gate the directory conftest
+# applies to its glob.
+_OAUTH_ACTIVE = (
+    os.environ.get("MCP_ENABLED", "").lower() in ("1", "true", "yes")
+    and bool(os.environ.get("PUBLIC_BASE_URL"))
+)
+pytestmark = pytest.mark.skipif(
+    not _OAUTH_ACTIVE, reason="OAuth routes not registered (MCP_ENABLED off)"
+)
 
 
 def _api_resource_value(app) -> str:
