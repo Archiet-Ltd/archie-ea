@@ -86,6 +86,7 @@ document.addEventListener('alpine:init', () => {
             this.addChildName = '';
             this.renameName = '';
             this.moveParentId = '';
+            this.refreshMovableParents();
             this.loadUnitCapabilities(unit.id);
         },
 
@@ -129,11 +130,44 @@ document.addEventListener('alpine:init', () => {
             }
             this.allNodes = nodes;
             if (this.selectedUnit) {
-                // The unit itself is not a valid move target (self-parent is a cycle).
-                this.movableParents = nodes.filter(n => n.id !== this.selectedUnit.id);
+                // Neither the unit nor any of its descendants is a valid move
+                // target (each would make a cycle).
+                const excluded = this.descendantIds(this.selectedUnit.id);
+                excluded.add(this.selectedUnit.id);
+                this.movableParents = nodes.filter(n => !excluded.has(n.id));
             } else {
                 this.movableParents = nodes;
             }
+        },
+
+        descendantIds(unitId) {
+            const found = new Set();
+            const seen = new Set();
+            const locate = (nodes) => {
+                for (const node of nodes || []) {
+                    if (node.id === unitId) return node;
+                    const hit = locate(node.children);
+                    if (hit) return hit;
+                }
+                return null;
+            };
+            const start = this.fallback ? null : locate(this.roots);
+            const stack = start ? [...(start.children || [])] : [];
+            while (stack.length) {
+                const node = stack.pop();
+                if (seen.has(node.id)) continue;
+                seen.add(node.id);
+                found.add(node.id);
+                stack.push(...(node.children || []));
+            }
+            return found;
+        },
+
+        // The server's refusal reason when it sent one, else a fixed line.
+        reportFailure(e, fallback) {
+            if (!(window.Platform && Platform.toast)) return;
+            const reason = e && e.message && !/^HTTP \d+$/.test(e.message) ? e.message : '';
+            Platform.toast.error(reason || fallback);
         },
 
         // ── Hierarchy editing ──────────────────────────────────────────────
@@ -146,12 +180,13 @@ document.addEventListener('alpine:init', () => {
             try {
                 await Platform.fetch('/organization/chart/api/units', {
                     method: 'POST',
+                    silent: true,
                     body: { name, parent_id: this.selectedUnit.id, actor_type: 'Department' },
                 });
                 this.addChildName = '';
                 await this.loadData();
             } catch (e) {
-                if (window.Platform && Platform.toast) Platform.toast.error('Could not add the unit.');
+                this.reportFailure(e, 'Could not add the unit.');
             }
         },
 
@@ -161,13 +196,14 @@ document.addEventListener('alpine:init', () => {
             try {
                 await Platform.fetch(`/organization/chart/api/units/${this.selectedUnit.id}`, {
                     method: 'PATCH',
+                    silent: true,
                     body: { name },
                 });
                 this.selectedUnit.name = name;
                 this.renameName = '';
                 await this.loadData();
             } catch (e) {
-                if (window.Platform && Platform.toast) Platform.toast.error('Could not rename the unit.');
+                this.reportFailure(e, 'Could not rename the unit.');
             }
         },
 
@@ -176,28 +212,30 @@ document.addEventListener('alpine:init', () => {
             try {
                 await Platform.fetch(`/organization/chart/api/units/${this.selectedUnit.id}/parent`, {
                     method: 'PATCH',
+                    silent: true,
                     body: { parent_id: this.moveParentId ? Number(this.moveParentId) : null },
                 });
                 this.moveParentId = '';
                 await this.loadData();
             } catch (e) {
-                if (window.Platform && Platform.toast) Platform.toast.error('Could not move the unit.');
+                this.reportFailure(e, 'Could not move the unit.');
             }
         },
 
         async removeUnit() {
             if (!this.selectedUnit) return;
-            if (!window.confirm(`Remove "${this.selectedUnit.name}"? Refused while it has children or assigned people.`)) {
+            if (!(await Platform.modal.confirm(`Remove "${this.selectedUnit.name}"? Refused while it has children, assigned people or other relationships.`))) {
                 return;
             }
             try {
                 await Platform.fetch(`/organization/chart/api/units/${this.selectedUnit.id}`, {
                     method: 'DELETE',
+                    silent: true,
                 });
                 this.clearSelection();
                 await this.loadData();
             } catch (e) {
-                if (window.Platform && Platform.toast) Platform.toast.error('Could not remove the unit.');
+                this.reportFailure(e, 'Could not remove the unit.');
             }
         },
 

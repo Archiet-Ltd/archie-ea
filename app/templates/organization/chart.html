@@ -142,7 +142,8 @@
           </ul>
         </div>
 
-        <!-- Hierarchy editing -->
+        <!-- Hierarchy editing (only for roles the write routes accept) -->
+        {% if can_edit_org_chart %}
         <div class="space-y-3 pt-3 border-t border-border">
           <h4 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Edit hierarchy</h4>
           <form @submit.prevent="addChild()" class="flex items-center gap-2" data-testid="org-chart-add-child-form">
@@ -176,9 +177,10 @@
                     data-testid="org-chart-remove-unit">
               Remove unit
             </button>
-            <span class="text-xs text-muted-foreground">Removing is refused while the unit has children or assigned people.</span>
+            <span class="text-xs text-muted-foreground">Removing is refused while the unit has children, assigned people or other relationships.</span>
           </div>
         </div>
+        {% endif %}
       </div>
     </div>
   </div>
