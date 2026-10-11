@@ -12,11 +12,17 @@
 {% block title %}Twin map{% endblock %}
 
 {% block extra_head_js %}
-<script src="{{ url_for('static', filename='vendor/d3.min.js') }}"></script>
+{# The map is drawn by the Composer's renderer. JointJS needs its peers
+   (jQuery, Lodash, Backbone) loaded before it. #}
+<script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/lodash.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/backbone-min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/joint.min.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/joint.min.css') }}">
+<script src="{{ url_for('static', filename='js/archimate/composer_renderer.js') }}"></script>
 <script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
 <script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
 <script src="{{ url_for('static', filename='js/intelligence/drawer.js') }}"></script>
-<script src="{{ url_for('static', filename='js/intelligence/graph.js') }}"></script>
 <script src="{{ url_for('static', filename='js/intelligence/twin_map.js') }}"></script>
 {% endblock %}
 
@@ -78,7 +84,7 @@
 
             <div class="grid gap-6 min-[1400px]:grid-cols-[minmax(0,1fr)_20rem]">
                 <div x-ref="canvas" class="relative w-full min-w-0" data-twin-canvas>
-                    <div data-graph-svg role="img" :aria-label="caption" class="absolute inset-0"><svg class="block" focusable="false"></svg></div>
+                    <div data-graph-svg role="img" :aria-label="caption" class="absolute inset-0"></div>
                     <div data-graph-nodes class="absolute inset-0" @keydown.escape="closeRailFromNode()"></div>
                 </div>
 

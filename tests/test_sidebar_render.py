@@ -177,11 +177,13 @@ def test_platform_admin_hits_the_link_budget_exactly(app, db_session, make_org):
         ("platform_admin", "pa-ask"),
     ],
 )
-def test_ask_link_renders_first_under_my_work_and_the_twin_map_has_none(
+def test_ask_link_renders_first_under_my_work_and_the_twin_map_only_for_its_personas(
     app, db_session, make_org, role, label
 ):
     """One front door to the Ask page, under My work, before that persona's own
-    links; the Twin map is reached from the Ask page and has no link of its own."""
+    links. The Twin map is a signature screen with a link of its own for the
+    solution architect, the ARB member and the CTO; everyone else reaches it
+    from the Ask page."""
     sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
     ask = sidebar_html.find('href="/intelligence/ask"')
     assert ask != -1, f"{role}: no Ask a question link in the rendered sidebar"
@@ -193,7 +195,7 @@ def test_ask_link_renders_first_under_my_work_and_the_twin_map_has_none(
     first_link = sidebar_html.find("<a ", my_work)
     assert first_link == sidebar_html.rfind("<a ", 0, ask + 1)
     assert "Ask a question" in sidebar_html
-    assert "/intelligence/twin-map" not in sidebar_html
+    assert sidebar_html.count('href="/intelligence/twin-map"') == (1 if role in {"solution_architect", "cto"} else 0)
 
 
 def test_platform_admin_applications_link_not_duplicated(app, db_session, make_org):

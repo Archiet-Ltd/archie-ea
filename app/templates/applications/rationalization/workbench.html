@@ -245,6 +245,7 @@
         <div class="relative max-h-[300px] mb-4">
             <canvas id="comparisonRadarChart"></canvas>
         </div>
+        {% with chart_id='comparisonRadarChart', caption='Comparison by dimension' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
 
         {# Dimension comparison table #}
         <div class="overflow-x-auto">
@@ -342,6 +343,7 @@
                         <div class="relative max-h-[220px]">
                             <canvas id="breakdownRadarChart"></canvas>
                         </div>
+                        {% with chart_id='breakdownRadarChart', caption='Score breakdown by dimension' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
 
                         {# Dimension bars #}
                         <div class="space-y-2">

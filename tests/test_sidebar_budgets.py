@@ -13,6 +13,7 @@ from app.models.user import (
     ROLE_ARB_MEMBER,
     ROLE_BUSINESS_ARCHITECT,
     ROLE_CTO,
+    ROLE_DATA_ARCHITECT,
     ROLE_ENTERPRISE_ARCHITECT,
     ROLE_PLATFORM_ADMIN,
     ROLE_PORTFOLIO_MANAGER,
@@ -175,10 +176,43 @@ def test_ask_link_is_first_in_every_personas_my_work_and_is_the_same_link():
         assert [link["endpoint"] for link in _all_links(role)].count("intelligence_ui.ask") == 1
 
 
-def test_twin_map_has_no_sidebar_link_of_its_own():
-    """The Twin map is reached from the Ask page; it does not spend a second link."""
+# Signature screens: each is one click from the sidebar of the personas whose
+# work it is, and from nobody else's (so no persona at the worst-case link count
+# pays for it). The application manager's workspace ("My Applications") was
+# already there.
+SIGNATURE_SCREENS = {
+    "intelligence_ui.twin_map": {ROLE_SOLUTION_ARCHITECT, ROLE_ARB_MEMBER, ROLE_CTO},
+    "enterprise.enterprise_dashboard": {ROLE_CTO},
+    "business_case.index": {ROLE_CTO, ROLE_PORTFOLIO_MANAGER},
+    "batch_import_view.dashboard": {ROLE_APPLICATION_MANAGER, ROLE_DATA_ARCHITECT},
+    "my_applications.dashboard": {ROLE_APPLICATION_MANAGER},
+}
+
+
+@pytest.mark.parametrize("endpoint", sorted(SIGNATURE_SCREENS))
+def test_each_signature_screen_is_in_exactly_its_personas_sidebars_once(endpoint):
     for role in SIDEBAR_ZONES:
-        assert "intelligence_ui.twin_map" not in [link["endpoint"] for link in _all_links(role)]
+        count = [link["endpoint"] for link in _all_links(role)].count(endpoint)
+        assert count == (1 if role in SIGNATURE_SCREENS[endpoint] else 0), (role, endpoint, count)
+
+
+@pytest.mark.parametrize("endpoint", sorted(SIGNATURE_SCREENS))
+def test_a_signature_screen_is_the_same_link_for_every_persona(endpoint):
+    links = {
+        (link["label"], link["icon"])
+        for role in SIDEBAR_ZONES
+        for link in _all_links(role)
+        if link["endpoint"] == endpoint
+    }
+    assert len(links) == 1, links
+
+
+def test_signature_screens_add_nothing_to_the_worst_case_personas():
+    """The link budget holds: the personas already at the worst case carry none of them."""
+    worst = max(len(_all_links(role)) for role in SIDEBAR_ZONES)
+    for endpoint, roles in SIGNATURE_SCREENS.items():
+        for role in roles:
+            assert len(_all_links(role)) < worst or endpoint == "my_applications.dashboard", (role, endpoint)
 
 
 def _my_work_labels(role):
@@ -215,6 +249,8 @@ def test_solution_architect_my_work_membership():
         # with no training had no discoverable path to it. Impact analysis is a primary job for
         # this persona. This is the 8th link, one past the spec table's "3-7"; the spec now says so.
         "Impact Analysis",
+        # Signature screen: what a design touches, drawn with typed arrows.
+        "Twin map",
     ]
 
 
@@ -291,6 +327,10 @@ def test_cto_my_work_membership():
         # its own require_roles list -- the persona was authorised to set the
         # rings and had no link to the page from anywhere.
         "Tech Radar",
+        # Signature screens for the executive seat.
+        "Enterprise dashboard",
+        "Business cases",
+        "Twin map",
         # Ownership coverage by business unit — CTO accountability.
         "Ownership Coverage",
         # R1-B03 PR 2: the one ownership record now also covers capabilities.
@@ -358,6 +398,8 @@ def test_portfolio_manager_my_work_membership():
         # NAV-1: see test_cto_my_work_membership — same page, other owner.
         "Portfolio KPIs",
         "Duplicate Detection",
+        # Signature screen: the business cases a portfolio decision rests on.
+        "Business cases",
         # Ownership coverage by business unit — portfolio manager.
         "Ownership Coverage",
         # R1-B03 PR 2: the one ownership record now also covers capabilities.
@@ -399,6 +441,8 @@ def test_application_manager_my_work_membership():
         "Applications",
         "Rationalization",
         "Vendors",
+        # Signature screen: bring an application list in from a file.
+        "Batch Import",
     ]
 
 

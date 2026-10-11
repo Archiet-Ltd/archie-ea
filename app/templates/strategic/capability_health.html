@@ -109,6 +109,7 @@
                 <div style="position:relative;width:250px;height:250px;">
                     <canvas id="healthDistributionChart"></canvas>
                 </div>
+                {% with chart_id='healthDistributionChart', caption='Portfolio distribution' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
                 <div class="grid grid-cols-3 gap-8 mt-8 text-center w-full">
                     <div>
                         <div class="text-xs text-muted-foreground mb-1">Healthy</div>

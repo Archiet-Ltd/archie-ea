@@ -350,14 +350,17 @@
             <div class="border border-border rounded-lg p-4 bg-background">
                 <h5 class="text-sm font-semibold mb-3">ROI Comparison</h5>
                 <canvas id="comparisonRoiChart" height="200"></canvas>
+                {% with chart_id='comparisonRoiChart', caption='ROI comparison' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
             </div>
             <div class="border border-border rounded-lg p-4 bg-background">
                 <h5 class="text-sm font-semibold mb-3">Payback Period</h5>
                 <canvas id="comparisonPaybackChart" height="200"></canvas>
+                {% with chart_id='comparisonPaybackChart', caption='Payback period' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
             </div>
             <div class="border border-border rounded-lg p-4 bg-background">
                 <h5 class="text-sm font-semibold mb-3">Risk vs Return</h5>
                 <canvas id="comparisonBubbleChart" height="200"></canvas>
+                {% with chart_id='comparisonBubbleChart', caption='Risk against return' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
             </div>
         </div>
 

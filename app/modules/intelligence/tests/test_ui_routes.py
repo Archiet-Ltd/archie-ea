@@ -29,6 +29,13 @@ PAGES = ["/intelligence/ask", "/intelligence/twin-map"]
 REPO_ROOT = Path(__file__).resolve().parents[4]
 TEMPLATE_DIR = REPO_ROOT / "app" / "modules" / "intelligence" / "templates" / "intelligence"
 SCRIPT_DIR = REPO_ROOT / "app" / "static" / "js" / "intelligence"
+# The Twin map is drawn by the Composer's renderer; the map's drawing rules are
+# read from there.
+RENDERER = REPO_ROOT / "app" / "static" / "js" / "archimate" / "composer_renderer.js"
+
+
+def _renderer() -> str:
+    return _text_of(RENDERER)
 
 
 def _text_of(path: Path) -> str:
@@ -572,24 +579,26 @@ def test_no_hard_coded_colour_values_and_no_per_domain_palette():
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b", re.sub(r"&#\d+;", "", source)), name
         assert not re.search(r"\.domain-[a-z]+", source), name
         assert not re.search(r"\brgba?\(|\bhsla?\(\s*\d", source), name
-    graph = _scripts()["graph.js"]
+    # The page draws with the renderer's token theme: band and element colour
+    # come from the layer tokens, one class per layer, and never the risk token.
+    assert "theme: 'tokens'" in _code(_scripts()["twin_map.js"])
+    renderer = _renderer()
     for layer in ("motivation", "strategy", "business", "application", "technology", "implementation"):
-        assert f"layer-{layer}" in graph
-    assert "layer-risk" not in graph
+        assert f"fill-layer-{layer}/10 stroke-layer-{layer}/40" in renderer
+    assert "layer-risk" not in renderer
 
 
 def test_derived_edges_are_dashed_and_badged_and_explicit_edges_are_solid():
-    graph = _scripts()["graph.js"]
-    assert "var DASH = '5,5'" in graph
-    assert re.search(r"stroke-dasharray.*d\.edge\.kind === 'derived' \? DASH : null", graph)
-    assert "Intelligence.WORKED_OUT" in graph
+    renderer = _code(_renderer())
+    assert "link.attr('line/strokeDasharray', derived ? '5,5' : (style.strokeDasharray || null));" in renderer
+    assert "Intelligence.WORKED_OUT" in _code(_scripts()["twin_map.js"])
     assert "var WORKED_OUT = 'Worked out';" in _code(_scripts()["core.js"])
 
 
 def test_the_map_text_is_written_with_text_never_html():
-    graph = _scripts()["graph.js"]
-    assert ".html(" not in graph
-    assert "innerHTML" not in graph
+    renderer = _renderer()
+    assert ".html(" not in renderer
+    assert "innerHTML" not in renderer
     for name, source in _scripts().items():
         assert "innerHTML" not in source and "insertAdjacentHTML" not in source, name
 
@@ -761,8 +770,8 @@ def test_the_row_kind_in_the_drawer_title_is_true_of_the_row_and_adds_no_badge_k
 
 
 def test_the_map_badge_and_table_say_when_a_worked_out_connection_may_be_out_of_date():
-    graph = _code(_scripts()["graph.js"])
-    assert "WORKED_OUT_STALE" in graph and "GLYPH_CLOCK" in graph
+    assert "WORKED_OUT_STALE" in _code(_scripts()["twin_map.js"])
+    assert "GLYPH_CLOCK" in _code(_renderer())
     core = _code(_scripts()["core.js"])
     assert "var WORKED_OUT_STALE = 'Worked out, may be out of date';" in core
     table = _templates()["_map_table.html"]

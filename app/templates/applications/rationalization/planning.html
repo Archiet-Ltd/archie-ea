@@ -120,6 +120,7 @@
                         <div class="relative max-h-[280px]">
                             <canvas id="scoreRadarChart"></canvas>
                         </div>
+                        {% with chart_id='scoreRadarChart', caption='Score by dimension' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
                         {# Dimension Summary + TIME Badge #}
                         <div class="space-y-3">
                             <div class="flex items-center gap-2 mb-3">

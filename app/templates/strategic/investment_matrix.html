@@ -326,6 +326,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
             </div>
             <div class="p-6 pt-0">
                 <canvas id="priorityChart"></canvas>
+                {% with chart_id='priorityChart', caption='Priority' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
             </div>
         </div>
 
@@ -335,6 +336,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
             </div>
             <div class="p-6 pt-0">
                 <canvas id="investmentChart"></canvas>
+                {% with chart_id='investmentChart', caption='Investment' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
             </div>
         </div>
     </div>

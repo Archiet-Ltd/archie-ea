@@ -1,0 +1,26 @@
+{#- The table alternative for a graph or chart: the same rows as the picture, as
+    a table a keyboard and a screen reader can read. One per chart, included
+    right after the chart:
+
+        {% with chart_id='arbStatusChart', caption='Review status' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
+
+    `chart_id` is the id of the chart's <canvas> (Chart.js) or of any element a
+    script has registered rows for with GraphTableView.register(id, fn).
+    `caption` names the table; it defaults to the chart's aria-label.
+
+    Nothing here is drawn twice and nothing is fetched: the rows are read from
+    the chart on the page, when the table is opened, so the table and the
+    picture show the same numbers from the same request. Keyboard: the arrow
+    keys move between cells, Home and End go to the ends of a row,
+    Ctrl+Home and Ctrl+End to the first and last cell, Escape returns to the
+    button. -#}
+{%- set _gtv_id = chart_id ~ '-table-view' -%}
+<div class="mt-3" data-graph-table-view data-for="{{ chart_id }}" data-caption="{{ caption | default('', true) }}">
+    <button type="button" data-graph-table-toggle aria-expanded="false" aria-controls="{{ _gtv_id }}"
+            class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+        <i data-lucide="table" class="h-4 w-4" aria-hidden="true"></i>
+        <span data-graph-table-label>Show as table</span>
+    </button>
+    <div id="{{ _gtv_id }}" data-graph-table-region hidden class="mt-3 overflow-x-auto rounded-md border border-border"></div>
+</div>
+<script src="{{ url_for('static', filename='js/components/graph_table_view.js') }}"></script>

@@ -94,11 +94,6 @@ function composerApp() {
         clear: function() { this._undo = []; this._redo = []; },
     };
 
-    /* ── Layer Y-band ordering ────────────────────────────── */
-    let LAYER_Y_ORDER = {
-        'strategy': 0, 'motivation': 1, 'business': 2,
-        'application': 3, 'technology': 4, 'physical': 5, 'implementation': 6,
-    };
 
     /* ── Element types that support white-box nesting ─────── */
     let CONTAINER_TYPES = {
@@ -444,63 +439,8 @@ function composerApp() {
         return (document.querySelector('meta[name=csrf-token]') || {}).content || '';
     }
 
-    /* ── Layer banding algorithm ──────────────────────────── */
-    function applyLayerBanding(graph) {
-        /* Exclude non-element cells: layer zone swimlanes and annotations */
-        let cells = graph.getElements().filter(function(c) {
-            return !c.get('isLayerZone') && !c.get('isAnnotation');
-        });
-        if (cells.length === 0) return;
-
-        let layersPresent = {};
-        cells.forEach(function(cell) {
-            let layer = (cell.get('elLayer') || '').toLowerCase();
-            if (!layersPresent[layer]) layersPresent[layer] = [];
-            layersPresent[layer].push(cell);
-        });
-
-        /* Only use known ArchiMate layers for banding */
-        let sortedLayers = Object.keys(layersPresent)
-            .filter(function(l) { return LAYER_Y_ORDER[l] !== undefined; })
-            .sort(function(a, b) { return LAYER_Y_ORDER[a] - LAYER_Y_ORDER[b]; });
-
-        /* Unknown layers (connectors, empty string, etc.) get appended last */
-        let unknownLayers = Object.keys(layersPresent).filter(function(l) {
-            return LAYER_Y_ORDER[l] === undefined;
-        });
-        sortedLayers = sortedLayers.concat(unknownLayers);
-
-        if (sortedLayers.length < 2) {
-            /* Single layer: simple grid */
-            let cols = Math.ceil(Math.sqrt(cells.length));
-            cells.forEach(function(cell, i) {
-                cell.position(40 + (i % cols) * 240, 40 + Math.floor(i / cols) * 160);
-            });
-            return;
-        }
-
-        let COLS_MAX = 10;
-        let SPACING_X = 240;   /* element width 200 + 40px gap */
-        let SPACING_Y = 160;   /* element height 130 + 30px gap */
-        let BAND_GAP = 80;
-        let yOffset = 40;
-
-        sortedLayers.forEach(function(layer) {
-            let nodes = layersPresent[layer];
-            let cols = Math.min(nodes.length, COLS_MAX);
-            let totalW = cols * SPACING_X;
-            let startX = Math.max(40, (cols <= 3 ? 200 : 40));
-
-            nodes.forEach(function(n, i) {
-                let col = i % cols;
-                let row = Math.floor(i / cols);
-                n.position(startX + col * SPACING_X, yOffset + row * SPACING_Y);
-            });
-
-            let rows = Math.ceil(nodes.length / cols);
-            yOffset += rows * SPACING_Y + BAND_GAP;
-        });
-    }
+    /* ── Layer banding: the renderer's one layered layout ─── */
+    let applyLayerBanding = ComposerRenderer.applyLayerBanding;
 
     /* ── CMP-027: Toast helper ──────────────────────────── */
     function _toast(type, msg) {

@@ -265,6 +265,7 @@
                  class="relative h-64" x-cloak>
                 <canvas id="burndownCanvas" aria-label="Burndown chart" role="img"></canvas>
             </div>
+            {% with chart_id='burndownCanvas', caption='Burndown' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
         </div>
     </section>
 
@@ -297,6 +298,7 @@
                  class="relative h-64" x-cloak>
                 <canvas id="velocityCanvas" aria-label="Velocity chart" role="img"></canvas>
             </div>
+            {% with chart_id='velocityCanvas', caption='Velocity' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
         </div>
     </section>
 </div>

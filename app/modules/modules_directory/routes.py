@@ -111,22 +111,20 @@ _MORE_TOOLS = [
     # A-20 (readiness table 5.1, 2026-09-22): Ask already has a real sidebar
     # link in every persona's My-work zone (role_access.py's _ASK_LINK), so
     # it needs no entry here -- the directory already unions every zone's
-    # links. Twin map deliberately has no sidebar link of its own (its own
-    # code comment: reached from an Ask result, kept out of the sidebar
-    # budget) -- this is its one findable home. "network" matches the icon
-    # already used for the Twin map button inside ask.html.
-    ("Twin Map", "intelligence_ui.twin_map", "network"),
+    # links. The Twin map and Batch import are signature screens with sidebar
+    # links of their own now (role_access.py), so they arrive the same way --
+    # it is deliberately absent from the tuples below for that reason, not
+    # by omission.
     # Reached from a Twin map element or an Element properties missing-value
     # row as well; this is its findable home, outside the sidebar budget.
     ("Traceability Check", "intelligence_ui.traceability", "route"),
     # An organisation's governed element properties and the elements missing
-    # them; kept out of the sidebar budget like Twin map.
+    # them; kept out of the sidebar budget like Traceability Check.
     ("Element Properties", "metamodel_properties.index", "sliders-horizontal"),
     ("Stakeholder Map", "stakeholder_map.stakeholder_map_page", "users"),
     ("Capability Health", "strategic.capability_health", "heart-pulse"),
     ("Impact Analysis", "strategic.impact_analysis", "target"),
     ("Maturity Frameworks", "maturity_management.frameworks_overview", "trending-up"),
-    ("Batch Import", "batch_import_view.dashboard", "upload"),
     ("Consolidation List", "consolidation_list.dashboard", "combine"),
     ("Duplicate Detection", "unified_duplicate.simple_dashboard", "copy"),
     ("EA Briefings", "solution_design.ea_briefings", "newspaper"),

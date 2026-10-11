@@ -6113,3 +6113,87 @@ def save_ux_preferences(solution_id: int):
         return api_error("Failed to save UX preferences", 500)
 
     return api_success(data={"ux_preferences": prefs}, message="UX preferences saved")
+
+
+def _requirement_out(req):
+    return {
+        "id": req.id,
+        "title": req.title,
+        "description": req.description,
+        "type": req.type,
+        "priority": req.priority,
+        "capability_id": req.capability_id,
+        "capability_name": req.capability.name if req.capability else None,
+        "implementing_application_ids": [a.id for a in req.implementing_applications],
+    }
+
+
+@journey_v2_bp.route("/<int:solution_id>/requirements", methods=["GET"])
+@login_required
+@_require_solution_org_view
+def list_solution_requirements(solution_id):
+    """R1-B43 PR 2 (TB-0188/PB-0190): requirements captured during this
+    solution's guided-design journey, with the capability and application
+    links shown on reload."""
+    from app.models.models import Requirement
+
+    rows = Requirement.query.filter_by(solution_id=solution_id).order_by(Requirement.id).all()
+    return api_success(data={"requirements": [_requirement_out(r) for r in rows]})
+
+
+@journey_v2_bp.route("/<int:solution_id>/requirements", methods=["POST"])
+@login_required
+@_require_solution_owner
+def create_solution_requirement(solution_id):
+    """R1-B43 PR 2 (TB-0188/PB-0190): capture a requirement from the
+    guided-design journey's requirements-capture step, linked to the
+    capability it realises and the application(s) that implement it.
+
+    A capability_id or application_component_id naming another
+    organisation's row is refused rather than silently linking across a
+    tenant boundary -- TenantMixin's own query filter makes that id
+    simply not resolve, which this treats as 400, not 500.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.models import Requirement
+    from app.models.unified_capability import UnifiedCapability
+
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    if not title:
+        return api_error("title is required", 400)
+
+    capability_id = data.get("capability_id")
+    if capability_id is not None:
+        capability = UnifiedCapability.query.filter_by(id=capability_id).first()
+        if capability is None:
+            return api_error("capability_id does not resolve in this organisation", 400)
+
+    application_component_ids = data.get("application_component_ids") or []
+    applications = []
+    for app_id in application_component_ids:
+        app_row = ApplicationComponent.query.filter_by(id=app_id).first()
+        if app_row is None:
+            return api_error(
+                f"application_component_id {app_id!r} does not resolve in this organisation", 400,
+            )
+        applications.append(app_row)
+
+    requirement = Requirement(
+        title=title,
+        description=(data.get("description") or "").strip() or None,
+        type=data.get("type") or "functional",
+        priority=data.get("priority") or "medium",
+        capability_id=capability_id,
+        solution_id=solution_id,
+    )
+    requirement.implementing_applications = applications
+    db.session.add(requirement)
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error("create_solution_requirement commit failed: %s", e)
+        return api_error("Failed to save requirement", 500)
+
+    return api_success(data=_requirement_out(requirement), message="Requirement captured")

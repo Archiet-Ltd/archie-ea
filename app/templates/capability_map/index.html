@@ -1568,6 +1568,7 @@
                     <div class="relative h-[420px]">
                         <canvas id="maturity-radar-chart"></canvas>
                     </div>
+                    {% with chart_id='maturity-radar-chart', caption='Current and target maturity' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
                 </div>
             </div>
 
