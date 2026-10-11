@@ -19,6 +19,10 @@ from __future__ import annotations
 
 from markupsafe import Markup, escape
 
+from app.modules.enterprise_genome.services.ai_system_classification import (
+    REFUSAL_MISSING_ASSESSMENT,
+)
+
 EM_DASH = "—"
 
 # Human labels for the machine enum values. A value the profile could not
@@ -62,12 +66,32 @@ def _flags_cell(flags: list[str]) -> str:
     return " · ".join(labels)
 
 
-def _owner_cell(owner) -> str:
-    """Render an owner dict as a display name, or em dash if unset."""
-    if owner is None:
-        return EM_DASH
-    name = owner.get("user_name") or EM_DASH
-    return str(escape(name))
+def _owner_cell(owner, element_id=None) -> str:
+    """Render an owner dict as a display name, or em dash if unset, with a
+    debounced user picker to assign (or change) the owner. The picker renders
+    only inside a request, where the page script that drives it is loaded."""
+    name = EM_DASH if owner is None else (owner.get("user_name") or EM_DASH)
+    parts = [str(escape(name))]
+    if element_id is not None:
+        from flask import has_request_context, url_for
+
+        if has_request_context():
+            url = url_for("ai_systems_genome.ai_system_set_owner", element_id=element_id)
+            # raw-html-ok: the owners URL is escaped; every other fragment is a fixed literal
+            parts.append(
+                '<div class="relative mt-1" data-owner-picker data-owners-url="'
+                + str(escape(url)) + '">'
+                '<input type="text" data-owner-search autocomplete="off" '
+                'aria-label="Search for an owner" placeholder="Assign owner…" '
+                'class="h-7 w-40 rounded border border-border bg-card px-2 text-xs">'
+                '<button type="button" data-owner-save disabled '
+                'class="ml-1 h-7 rounded-md border border-border bg-card px-2 text-xs '
+                'font-medium text-foreground hover:bg-accent disabled:opacity-50">Set</button>'
+                '<div data-owner-results role="listbox" '
+                'class="hidden absolute z-10 mt-1 w-64 rounded-md border border-border '
+                'bg-card shadow-lg max-h-48 overflow-y-auto"></div></div>'
+            )
+    return "".join(parts)
 
 
 def _action_form(element_id: int, endpoint: str, label: str) -> str:
@@ -112,7 +136,7 @@ def _release_cell(system: dict) -> str:
         parts.append(
             f'<p class="text-xs text-destructive mt-1">{_cell(reason)}</p>'  # raw-html-ok: _cell() escapes internally
         )
-        if element_id is not None:
+        if element_id is not None and reason == REFUSAL_MISSING_ASSESSMENT:
             attach = _action_form(
                 element_id,
                 "ai_systems_genome.ai_system_attach_assessment",
@@ -134,13 +158,12 @@ def _release_cell(system: dict) -> str:
 
 def _classify_cell(system: dict) -> str:
     """The Risk class cell: the current class and a classify form to propose
-    a new classification. Renders only inside a request context."""
+    a new (or first) classification. Renders only inside a request context."""
     risk_class = system.get("risk_class")
     element_id = system.get("archimate_element_id")
 
     parts = [_cell(risk_class)]
-    if element_id is not None and risk_class != "not set":
-        # Show a small form to re-classify.
+    if element_id is not None:
         from flask import has_request_context, url_for
         from flask_wtf.csrf import generate_csrf
 
@@ -150,33 +173,15 @@ def _classify_cell(system: dict) -> str:
             parts.append(
                 '<form method="POST" action="' + str(escape(action)) + '" class="inline-block mt-1">'
                 '<input type="hidden" name="csrf_token" value="' + str(escape(token)) + '">'
-                '<select name="risk_class" class="h-7 rounded border border-border bg-card px-2 text-xs">'
+                '<select name="risk_class" aria-label="Risk class" '
+                'class="h-7 rounded border border-border bg-card px-2 text-xs">'
                 '<option value="high">High</option>'
                 '<option value="limited">Limited</option>'
                 '<option value="minimal">Minimal</option>'
                 '<option value="unacceptable">Unacceptable</option>'
                 '</select>'
-                '<button type="submit" class="h-7 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground hover:bg-accent ml-1">Classify</button>'
-                '</form>'
-            )
-    elif element_id is not None:
-        # No classification yet — show a classify form.
-        from flask import has_request_context, url_for
-        from flask_wtf.csrf import generate_csrf
-
-        if has_request_context():
-            action = url_for("ai_systems_genome.ai_system_classify", element_id=element_id)
-            token = generate_csrf()
-            parts.append(
-                '<form method="POST" action="' + str(escape(action)) + '" class="inline-block mt-1">'
-                '<input type="hidden" name="csrf_token" value="' + str(escape(token)) + '">'
-                '<select name="risk_class" class="h-7 rounded border border-border bg-card px-2 text-xs">'
-                '<option value="high">High</option>'
-                '<option value="limited">Limited</option>'
-                '<option value="minimal">Minimal</option>'
-                '<option value="unacceptable">Unacceptable</option>'
-                '</select>'
-                '<button type="submit" class="h-7 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground hover:bg-accent ml-1">Classify</button>'
+                '<button type="submit" class="h-7 rounded-md border border-border bg-card px-2 '
+                'text-xs font-medium text-foreground hover:bg-accent ml-1">Classify</button>'
                 '</form>'
             )
 
@@ -209,10 +214,10 @@ def emit_ai_systems_register(slice_data: dict) -> Markup:
             f'<td class="px-3 py-2 text-sm">{_cell(s.get("autonomy_level"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm">{_tri_cell(gov.get("approval_gate"))}</td>'  # raw-html-ok: _tri_cell() (defined above) returns only 'Yes'/'No'/em-dash literals
             f'<td class="px-3 py-2 text-sm">{_tri_cell(gov.get("human_review"))}</td>'  # raw-html-ok: _tri_cell() (defined above) returns only 'Yes'/'No'/em-dash literals
-f'<td class="px-3 py-2 text-sm">{_cell(s.get("data_sensitivity"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
-             f'<td class="px-3 py-2 text-sm">{_classify_cell(s)}</td>'  # raw-html-ok: _classify_cell() (defined above) escapes internally
-             f'<td class="px-3 py-2 text-sm">{_release_cell(s)}</td>'  # raw-html-ok: _release_cell() (defined above) escapes internally
-            f'<td class="px-3 py-2 text-sm">{_owner_cell(s.get("owner"))}</td>'  # raw-html-ok: _owner_cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_cell(s.get("data_sensitivity"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_classify_cell(s)}</td>'  # raw-html-ok: _classify_cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_release_cell(s)}</td>'  # raw-html-ok: _release_cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_owner_cell(s.get("owner"), s.get("archimate_element_id"))}</td>'  # raw-html-ok: _owner_cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm text-destructive">{_flags_cell(flags)}</td>'  # raw-html-ok: _flags_cell() (defined above) escapes internally
             "</tr>"
         )
