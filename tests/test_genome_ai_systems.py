@@ -191,7 +191,7 @@ def test_seed_is_idempotent_on_name(db_session, org):
     assert names.count(ARCHIE_COPILOT_NAME) == 1
 
 
-# --- R1-B23 PR 2: risk class, release state, owner, classification gate -------
+# --- Risk class, release state, owner, classification gate -------
 
 
 def test_risk_tier_vocabulary_defined():

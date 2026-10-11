@@ -1,4 +1,4 @@
-"""AI system risk classification and release gate (R1-B23 PR 2).
+"""AI system risk classification and release gate.
 
 Vocabulary
 ----------
