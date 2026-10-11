@@ -114,8 +114,8 @@ def _gather_referenced_components(
         _collect_refs(path_item, all_refs)
 
     # Resolve refs and gather referenced component names
-    result: dict[str, OrderedDict] = {}
-    # Track which component names we've already included to avoid infinite loops
+    # Track names per category in sets; the traversal order (set iteration)
+    # is hash-seed dependent, so insertion order must never feed the output.
     included: dict[str, set[str]] = {}
 
     # Process refs iteratively until no new ones are found
@@ -136,16 +136,12 @@ def _gather_referenced_components(
             continue
         included[category].add(name)
 
-        if category not in result:
-            result[category] = OrderedDict()
         if category not in source_components:
             continue
 
         component = source_components[category].get(name)
         if component is None:
             continue
-
-        result[category][name] = component
 
         # Collect refs from this component too
         new_refs: set[str] = set()
@@ -154,6 +150,19 @@ def _gather_referenced_components(
             if nr not in all_refs:
                 all_refs.add(nr)
                 pending.add(nr)
+
+    # Emit every collection in sorted order so regeneration of an unchanged
+    # source is byte-identical under any Python hash seed (set iteration
+    # order is unspecified and seeded per process).
+    result: dict[str, OrderedDict] = {}
+    for category in sorted(included.keys()):
+        if category not in source_components:
+            continue
+        result[category] = OrderedDict(
+            (name, source_components[category][name])
+            for name in sorted(included[category])
+            if name in source_components[category]
+        )
 
     return result
 

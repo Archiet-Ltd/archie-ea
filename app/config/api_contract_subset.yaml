@@ -126,13 +126,11 @@ paths:
       x-rate-limit-tier: read
 components:
   headers:
-    WWWAuthenticate:
-      description: Bearer challenge with resource_metadata pointing at the protected-resource
-        metadata, and error and scope where relevant.
+    RateLimit:
+      description: Remaining quota for the current window (IETF RateLimit header fields).
       schema:
         type: string
-      example: Bearer resource_metadata="https://entelim.org/.well-known/oauth-protected-resource",
-        error="invalid_token"
+      example: '"read";r=1180;t=42'
     RequestId:
       description: Identifier of this request, also carried in problem details and
         the audit trail.
@@ -142,11 +140,13 @@ components:
       description: Seconds to wait before retrying.
       schema:
         type: integer
-    RateLimit:
-      description: Remaining quota for the current window (IETF RateLimit header fields).
+    WWWAuthenticate:
+      description: Bearer challenge with resource_metadata pointing at the protected-resource
+        metadata, and error and scope where relevant.
       schema:
         type: string
-      example: '"read";r=1180;t=42'
+      example: Bearer resource_metadata="https://entelim.org/.well-known/oauth-protected-resource",
+        error="invalid_token"
   parameters:
     Id:
       name: id
@@ -156,14 +156,22 @@ components:
       schema:
         $ref: '#/components/schemas/Id'
   responses:
-    Unauthorized:
-      description: No valid access token. The WWW-Authenticate header points to the
-        protected-resource metadata.
+    Forbidden:
+      description: The token lacks the scope, or the principal's role lacks the permission,
+        for this operation.
       headers:
         Request-Id:
           $ref: '#/components/headers/RequestId'
-        WWW-Authenticate:
-          $ref: '#/components/headers/WWWAuthenticate'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalError:
+      description: 'Unexpected server failure. It is never reported as data: the body
+        is a problem, not an empty result.'
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
       content:
         application/problem+json:
           schema:
@@ -191,52 +199,30 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
-    Forbidden:
-      description: The token lacks the scope, or the principal's role lacks the permission,
-        for this operation.
+    Unauthorized:
+      description: No valid access token. The WWW-Authenticate header points to the
+        protected-resource metadata.
       headers:
         Request-Id:
           $ref: '#/components/headers/RequestId'
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/Problem'
-    InternalError:
-      description: 'Unexpected server failure. It is never reported as data: the body
-        is a problem, not an empty result.'
-      headers:
-        Request-Id:
-          $ref: '#/components/headers/RequestId'
+        WWW-Authenticate:
+          $ref: '#/components/headers/WWWAuthenticate'
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
-    Problem:
-      description: 'Problem: An underlying cause of incidents.'
+    ElementDetail:
       allOf:
-      - $ref: '#/components/schemas/EntityBase'
-      - $ref: '#/components/schemas/ProblemAttributes'
+      - $ref: '#/components/schemas/ElementSummary'
       - type: object
         properties:
-          lifecycle_state:
+          scope:
             type: string
-            enum:
-            - open
-            - acknowledged
-            - mitigated
-            - resolved
-            - closed
-            readOnly: true
-            description: States of lifecycle set LC-INCIDENT.
-        additionalProperties: false
-      x-entity-id: ENT-0159
-      x-ontology-class: ONT-0154 Problem
-      x-archimate: Assessment (problem)
-      x-scope: tenant
-      x-identity-key: tenant_id + source_system + external_key
-      x-lifecycle-set: LC-INCIDENT
-      unevaluatedProperties: false
+          building_block_type:
+            type: string
+          plateau:
+            type: string
     ElementListPage:
       type: object
       required:
@@ -263,6 +249,24 @@ components:
               type: integer
             pages:
               type: integer
+    ElementSummary:
+      type: object
+      required:
+      - id
+      - name
+      - type
+      - layer
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+        layer:
+          type: string
+        description:
+          type: string
     EntityBase:
       type: object
       description: The common attributes of the entity catalogue, carried by every
@@ -425,148 +429,30 @@ components:
           additionalProperties:
             type: string
             format: uri-reference
-    Provenance:
+    EntityRef:
       type: object
-      properties:
-        truth_class:
-          type: string
-          enum:
-          - recorded
-          - imported
-          - synchronised
-          - derived
-          - inferred
-          - estimated
-          description: How the fact came to be known (entity catalogue common attribute).
-        confidence:
-          type:
-          - number
-          - 'null'
-          minimum: 0
-          maximum: 1
-        primary_source_system:
-          oneOf:
-          - $ref: '#/components/schemas/EntityRef'
-          - type: 'null'
-          description: Source System (ENT-0179) that masters this record.
-        ingestion_run:
-          oneOf:
-          - $ref: '#/components/schemas/EntityRef'
-          - type: 'null'
-        change_proposal:
-          oneOf:
-          - $ref: '#/components/schemas/EntityRef'
-          - type: 'null'
-        assertions:
-          type: array
-          items:
-            $ref: '#/components/schemas/EntityRef'
-          description: Assertions (ENT-0184) behind the current values.
-        derived_fact:
-          oneOf:
-          - $ref: '#/components/schemas/EntityRef'
-          - type: 'null'
-        recorded_by:
-          $ref: '#/components/schemas/EntityRef'
-        recorded_at:
-          type: string
-          format: date-time
-      additionalProperties: false
-      required:
-      - truth_class
-      - recorded_at
-      description: Where a fact came from. Every record, relationship and answer row
-        carries one.
-    ExternalIdentifier:
-      description: 'External Identifier: The identifier crosswalk row.'
-      allOf:
-      - $ref: '#/components/schemas/EntityBase'
-      - $ref: '#/components/schemas/ExternalIdentifierAttributes'
-      - type: object
-        properties:
-          lifecycle_state:
-            type: string
-            enum:
-            - recorded
-            - corrected
-            - superseded
-            readOnly: true
-            description: States of lifecycle set LC-RECORD.
-        additionalProperties: false
-      x-entity-id: ENT-0182
-      x-ontology-class: ONT-0178 External Identifier
-      x-archimate: Property (identifier)
-      x-scope: tenant
-      x-identity-key: source_system_id + key_type + external_key (unique per tenant)
-      x-lifecycle-set: LC-RECORD
-      unevaluatedProperties: false
-    ExternalIdentifierAttributes:
-      type: object
-      properties:
-        subject_entity_id:
-          $ref: '#/components/schemas/EntityRef'
-          description: Reference to any element; its type is carried in the paired
-            subject_type field.
-        subject_type:
-          type: string
-          maxLength: 500
-        source_system_id:
-          $ref: '#/components/schemas/EntityRef'
-          x-target-entity: SourceSystem
-        external_key:
-          type: string
-          maxLength: 500
-        key_type:
-          type: string
-          maxLength: 500
-        first_seen_at:
-          type: string
-          format: date-time
-        last_seen_at:
-          type: string
-          format: date-time
-      description: Attributes specific to External Identifier (ENT-0182).
-    ElementSummary:
-      type: object
-      required:
-      - id
-      - name
-      - type
-      - layer
       properties:
         id:
-          type: integer
+          $ref: '#/components/schemas/Id'
+        type:
+          $ref: '#/components/schemas/EntityTypeKey'
+        entity_id:
+          type: string
+          pattern: ^ENT-[0-9]{4}$
+          readOnly: true
         name:
           type: string
-        type:
-          type: string
-        layer:
-          type: string
-        description:
-          type: string
-    ElementDetail:
-      allOf:
-      - $ref: '#/components/schemas/ElementSummary'
-      - type: object
-        properties:
-          scope:
-            type: string
-          building_block_type:
-            type: string
-          plateau:
-            type: string
-    ProblemAttributes:
-      type: object
-      properties:
-        external_key:
-          type: string
           maxLength: 500
-        known_error:
-          type: boolean
-        workaround:
+          readOnly: true
+        href:
           type: string
-          maxLength: 50000
-      description: Attributes specific to Problem (ENT-0159).
+          format: uri-reference
+          readOnly: true
+      additionalProperties: false
+      required:
+      - id
+      description: Reference to another record. On write only id is read; the type
+        is checked against the relationship catalogue.
     EntityTypeKey:
       type: string
       pattern: ^[a-z][a-z0-9-]{1,60}$
@@ -782,32 +668,146 @@ components:
       - viewpoint
       - vulnerability
       - work-package
+    ExternalIdentifier:
+      description: 'External Identifier: The identifier crosswalk row.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/ExternalIdentifierAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - recorded
+            - corrected
+            - superseded
+            readOnly: true
+            description: States of lifecycle set LC-RECORD.
+        additionalProperties: false
+      x-entity-id: ENT-0182
+      x-ontology-class: ONT-0178 External Identifier
+      x-archimate: Property (identifier)
+      x-scope: tenant
+      x-identity-key: source_system_id + key_type + external_key (unique per tenant)
+      x-lifecycle-set: LC-RECORD
+      unevaluatedProperties: false
+    ExternalIdentifierAttributes:
+      type: object
+      properties:
+        subject_entity_id:
+          $ref: '#/components/schemas/EntityRef'
+          description: Reference to any element; its type is carried in the paired
+            subject_type field.
+        subject_type:
+          type: string
+          maxLength: 500
+        source_system_id:
+          $ref: '#/components/schemas/EntityRef'
+          x-target-entity: SourceSystem
+        external_key:
+          type: string
+          maxLength: 500
+        key_type:
+          type: string
+          maxLength: 500
+        first_seen_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+      description: Attributes specific to External Identifier (ENT-0182).
     Id:
       type: string
       format: uuid
       description: UUID v7 (time-ordered) surrogate id. Never reused; stable across
         renames and re-imports.
-    EntityRef:
+    Problem:
+      description: 'Problem: An underlying cause of incidents.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/ProblemAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - open
+            - acknowledged
+            - mitigated
+            - resolved
+            - closed
+            readOnly: true
+            description: States of lifecycle set LC-INCIDENT.
+        additionalProperties: false
+      x-entity-id: ENT-0159
+      x-ontology-class: ONT-0154 Problem
+      x-archimate: Assessment (problem)
+      x-scope: tenant
+      x-identity-key: tenant_id + source_system + external_key
+      x-lifecycle-set: LC-INCIDENT
+      unevaluatedProperties: false
+    ProblemAttributes:
       type: object
       properties:
-        id:
-          $ref: '#/components/schemas/Id'
-        type:
-          $ref: '#/components/schemas/EntityTypeKey'
-        entity_id:
-          type: string
-          pattern: ^ENT-[0-9]{4}$
-          readOnly: true
-        name:
+        external_key:
           type: string
           maxLength: 500
-          readOnly: true
-        href:
+        known_error:
+          type: boolean
+        workaround:
           type: string
-          format: uri-reference
-          readOnly: true
+          maxLength: 50000
+      description: Attributes specific to Problem (ENT-0159).
+    Provenance:
+      type: object
+      properties:
+        truth_class:
+          type: string
+          enum:
+          - recorded
+          - imported
+          - synchronised
+          - derived
+          - inferred
+          - estimated
+          description: How the fact came to be known (entity catalogue common attribute).
+        confidence:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+        primary_source_system:
+          oneOf:
+          - $ref: '#/components/schemas/EntityRef'
+          - type: 'null'
+          description: Source System (ENT-0179) that masters this record.
+        ingestion_run:
+          oneOf:
+          - $ref: '#/components/schemas/EntityRef'
+          - type: 'null'
+        change_proposal:
+          oneOf:
+          - $ref: '#/components/schemas/EntityRef'
+          - type: 'null'
+        assertions:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityRef'
+          description: Assertions (ENT-0184) behind the current values.
+        derived_fact:
+          oneOf:
+          - $ref: '#/components/schemas/EntityRef'
+          - type: 'null'
+        recorded_by:
+          $ref: '#/components/schemas/EntityRef'
+        recorded_at:
+          type: string
+          format: date-time
       additionalProperties: false
       required:
-      - id
-      description: Reference to another record. On write only id is read; the type
-        is checked against the relationship catalogue.
+      - truth_class
+      - recorded_at
+      description: Where a fact came from. Every record, relationship and answer row
+        carries one.
