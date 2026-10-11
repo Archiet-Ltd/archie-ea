@@ -130,12 +130,14 @@ def record_capability_maturity(
     now = _naive_utcnow()
     capability.updated_at = now
 
-    # A recording without a current level (a target-only or notes-only update)
-    # changes the source row but is not an assessment event: there is no level
-    # for the history row's NOT NULL maturity_level, so no history row and no
-    # assessment-date stamp.
+    # Determine the level for the history row. When a current level is provided
+    # in the call, use it. When only target or notes change but the source row
+    # already holds a level, record that level in history too so every
+    # assessment event (target change, notes update) leaves a trace. Skip
+    # entirely only when neither argument nor stored value has a current level.
+    level_for_history = current if current is not None else capability.current_maturity_level
     history: CapabilityMaturityAssessment | None = None
-    if current is not None:
+    if level_for_history is not None:
         capability.maturity_assessment_date = now
         history = CapabilityMaturityAssessment(
             organization_id=organization_id,
@@ -143,7 +145,7 @@ def record_capability_maturity(
             assessment_date=now.date(),
             assessor_name=assessor_name,
             assessor_role=assessor_role,
-            maturity_level=current,
+            maturity_level=level_for_history,
             target_maturity_level=target,
             maturity_framework="custom",
             notes=notes,
