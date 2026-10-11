@@ -1,7 +1,6 @@
 ---
 page_family: role
-role_group: "Architecture"
-role_label: "Enterprise architects"
+role_group: architecture
 state: held
 capture_status: awaiting_capture
 cta: plans
@@ -130,10 +129,6 @@ in Entelim.
 A drawing tool stores a picture; Entelim stores the elements and relationships behind it, so a
 question such as "what breaks if this fails" is answered by tracing the model, not by someone reading
 a diagram and guessing. Composer still gives you the diagram, opened from the same elements.
-
-## Other roles
-
-Entelim gives every other enterprise architecture role its own workspace over this same shared model.
 
 ## Start free
 
