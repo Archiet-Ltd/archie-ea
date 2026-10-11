@@ -94,6 +94,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register layer tenancy backfill CLI: {e}")
 
+    # Duplicate-detection tenancy backfill
+    try:
+        from app.commands.backfill_dedupe_tenancy import init_app as init_dedupe_tenancy
+        init_dedupe_tenancy(app)
+        app.logger.info("✅ Duplicate-detection tenancy backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register duplicate-detection tenancy backfill CLI: {e}")
+
     # BIZBOK Strategy & Motivation backfill CLI command
     try:
         from scripts.backfill_strategy_motivation_elements import init_app as init_strat_backfill

@@ -16,6 +16,7 @@ from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship, validates
 
 from .. import db
+from ..models.mixins.core import TenantMixin
 
 
 class DetectionStrategy(str, Enum):
@@ -78,14 +79,27 @@ unified_group_members = db.Table(
 )
 
 
-class UnifiedDetectionRun(db.Model):
+class UnifiedDetectionRun(TenantMixin, db.Model):
     """
     Tracks individual detection run executions.
     Strategy-agnostic - stores results from any detection method.
+
+    TenantMixin declares organization_id NOT NULL, but this is an existing
+    table and reconcile-schema can only ADD nullable columns (ADR 0002).
+    Override to nullable so the column can land on deployed databases
+    without a maintenance window.  Legacy rows with no known owner stay NULL
+    and are hidden from every organisation by the tenant filter.
     """
 
     __tablename__ = "unified_detection_runs"
     __table_args__ = {"extend_existing": True}
+
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     id = Column(Integer, primary_key=True)
 
@@ -161,14 +175,27 @@ class UnifiedDetectionRun(db.Model):
         }
 
 
-class UnifiedDuplicateGroup(db.Model):
+class UnifiedDuplicateGroup(TenantMixin, db.Model):
     """
     Represents a group of duplicate applications.
     Supports full workflow from detection to resolution.
+
+    TenantMixin declares organization_id NOT NULL, but this is an existing
+    table and reconcile-schema can only ADD nullable columns (ADR 0002).
+    Override to nullable so the column can land on deployed databases
+    without a maintenance window.  Legacy rows with no known owner stay NULL
+    and are hidden from every organisation by the tenant filter.
     """
 
     __tablename__ = "unified_duplicate_groups"
     __table_args__ = {"extend_existing": True}
+
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     id = Column(Integer, primary_key=True)
 
