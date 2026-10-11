@@ -12,8 +12,9 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
 import threading
+import uuid
 
-from flask import current_app, g, request
+from flask import current_app, g, has_app_context, has_request_context, request
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,8 @@ class AuditEvent:
     details: Dict[str, Any]
     timestamp: datetime
     correlation_id: Optional[str] = None
+    # The organisation whose model call this is. Every reader filters on it.
+    organization_id: Optional[int] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert audit event to dictionary."""
@@ -76,15 +79,25 @@ class AIAuditTrail:
         self._events = []  # In-memory storage (in production, use database)
         self._correlation_map = {}  # correlation_id -> event_ids
         self._lock = threading.Lock()
-        
-        # Initialize retention policies
-        self._retention_days = current_app.config.get('AI_AUDIT_RETENTION_DAYS', 90)
-        self._max_events = current_app.config.get('AI_AUDIT_MAX_EVENTS', 10000)
+
+    # Retention settings are read when used, so the package imports cleanly
+    # outside an application context (the model-call path imports it lazily).
+    @property
+    def _retention_days(self) -> int:
+        if has_app_context():
+            return current_app.config.get('AI_AUDIT_RETENTION_DAYS', 90)
+        return 90
+
+    @property
+    def _max_events(self) -> int:
+        if has_app_context():
+            return current_app.config.get('AI_AUDIT_MAX_EVENTS', 10000)
+        return 10000
     
     def log_event(self, event_type: AuditEventType, severity: AuditSeverity = AuditSeverity.INFO,
                   feature: Optional[str] = None, action: Optional[str] = None,
                   resource: Optional[str] = None, details: Optional[Dict[str, Any]] = None,
-                  correlation_id: Optional[str] = None):
+                  correlation_id: Optional[str] = None, organization_id: Optional[int] = None):
         """
         Log an audit event.
         
@@ -97,11 +110,19 @@ class AIAuditTrail:
             details: Additional event details
             correlation_id: Optional correlation ID for related events
         """
-        # Get request context
-        user_id = getattr(g, 'user_id', None) if hasattr(g, 'user_id') else None
-        session_id = getattr(g, 'session_id', None) if hasattr(g, 'session_id') else None
-        ip_address = getattr(request, 'remote_addr', 'unknown') if request else 'unknown'
-        user_agent = getattr(request, 'user_agent', {}).get('string', 'unknown') if request and hasattr(request, 'user_agent') else 'unknown'
+        # Get request context (none in a background job or a CLI command)
+        user_id = getattr(g, 'user_id', None) if has_app_context() else None
+        session_id = getattr(g, 'session_id', None) if has_app_context() else None
+        if has_request_context():
+            ip_address = request.remote_addr or 'unknown'
+            user_agent = getattr(request.user_agent, 'string', None) or 'unknown'
+        else:
+            ip_address = 'unknown'
+            user_agent = 'unknown'
+        if organization_id is None:
+            from app.utils.tenant_sql import current_org_id
+
+            organization_id = current_org_id()
         
         # Generate correlation ID if not provided
         if not correlation_id:
@@ -121,7 +142,8 @@ class AIAuditTrail:
             resource=resource,
             details=details or {},
             timestamp=datetime.utcnow(),
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
+            organization_id=organization_id,
         )
         
         with self._lock:
@@ -151,7 +173,8 @@ class AIAuditTrail:
             self._handle_policy_violation(event)
     
     def log_ai_request(self, feature: str, prompt: str, user_id: Optional[str] = None,
-                      metadata: Optional[Dict[str, Any]] = None) -> str:
+                      metadata: Optional[Dict[str, Any]] = None,
+                      organization_id: Optional[int] = None) -> str:
         """
         Log an AI request event.
         
@@ -181,14 +204,16 @@ class AIAuditTrail:
             feature=feature,
             action='request',
             details=details,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
+            organization_id=organization_id,
         )
         
         return correlation_id
     
     def log_ai_response(self, correlation_id: str, feature: str, response: str,
                        tokens_used: Optional[int] = None, cost: Optional[float] = None,
-                       metadata: Optional[Dict[str, Any]] = None):
+                       metadata: Optional[Dict[str, Any]] = None,
+                       organization_id: Optional[int] = None):
         """
         Log an AI response event.
         
@@ -217,11 +242,13 @@ class AIAuditTrail:
             feature=feature,
             action='response',
             details=details,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
+            organization_id=organization_id,
         )
     
     def log_ai_error(self, correlation_id: str, feature: str, error: str,
-                    error_type: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
+                    error_type: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None,
+                    organization_id: Optional[int] = None):
         """
         Log an AI error event.
         
@@ -244,11 +271,14 @@ class AIAuditTrail:
             feature=feature,
             action='error',
             details=details,
-            correlation_id=correlation_id
+            correlation_id=correlation_id,
+            organization_id=organization_id,
         )
     
     def log_data_classification(self, data: str, classification_result: Dict[str, Any],
-                              feature: Optional[str] = None):
+                              feature: Optional[str] = None,
+                              correlation_id: Optional[str] = None,
+                              organization_id: Optional[int] = None):
         """
         Log a data classification event.
         
@@ -257,13 +287,16 @@ class AIAuditTrail:
             classification_result: Classification analysis result
             feature: AI feature involved
         """
+        found = classification_result.get('patterns_found', [])
+        # Only the names of what was found are kept. The matched text itself is
+        # the sensitive value, so it never enters the audit trail.
         details = {
             'data_length': len(data),
             'classification': classification_result.get('classification'),
             'risk': classification_result.get('risk'),
-            'patterns_found': len(classification_result.get('patterns_found', [])),
+            'patterns_found': len(found),
+            'pattern_names': sorted({p.get('name') for p in found if p.get('name')}),
             'safe_for_ai': classification_result.get('safe_for_ai'),
-            'classification_result': classification_result
         }
         
         self.log_event(
@@ -271,7 +304,9 @@ class AIAuditTrail:
             severity=AuditSeverity.INFO,
             feature=feature,
             action='classify',
-            details=details
+            details=details,
+            correlation_id=correlation_id,
+            organization_id=organization_id,
         )
     
     def log_cost_tracking(self, feature: str, cost: float, user_id: Optional[str] = None,
@@ -402,7 +437,8 @@ class AIAuditTrail:
     def get_events(self, limit: int = 100, event_type: Optional[AuditEventType] = None,
                    severity: Optional[AuditSeverity] = None, user_id: Optional[str] = None,
                    feature: Optional[str] = None, correlation_id: Optional[str] = None,
-                   time_delta: Optional[timedelta] = None) -> List[Dict[str, Any]]:
+                   time_delta: Optional[timedelta] = None,
+                   organization_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         Get audit events with filtering options.
         
@@ -414,6 +450,7 @@ class AIAuditTrail:
             feature: Filter by feature
             correlation_id: Filter by correlation ID
             time_delta: Filter by time range
+            organization_id: Only this organisation's events
             
         Returns:
             List of audit events
@@ -422,6 +459,9 @@ class AIAuditTrail:
             events = self._events.copy()
         
         # Apply filters
+        if organization_id is not None:
+            events = [e for e in events if e.organization_id == organization_id]
+        
         if event_type:
             events = [e for e in events if e.event_type == event_type]
         
@@ -515,16 +555,12 @@ class AIAuditTrail:
         }
     
     def _generate_event_id(self) -> str:
-        """Generate unique event ID."""
-        timestamp = str(int(datetime.utcnow().timestamp()))
-        data = f"audit_{timestamp}_{threading.get_ident()}"
-        return hashlib.md5(data.encode(), usedforsecurity=False).hexdigest()[:16]
+        """Generate a unique event ID (two calls in the same second must differ)."""
+        return uuid.uuid4().hex[:16]
     
     def _generate_correlation_id(self) -> str:
-        """Generate unique correlation ID."""
-        timestamp = str(int(datetime.utcnow().timestamp()))
-        data = f"corr_{timestamp}_{threading.get_ident()}"
-        return hashlib.md5(data.encode(), usedforsecurity=False).hexdigest()[:12]
+        """Generate a unique correlation ID, one per model call."""
+        return uuid.uuid4().hex[:12]
     
     def _cleanup_old_events(self):
         """Clean up old audit events based on retention policy."""

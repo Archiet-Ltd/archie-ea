@@ -10,6 +10,7 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
 import threading
+import uuid
 
 from app.models import APISettings
 
@@ -32,6 +33,8 @@ class CostRecord:
     cost_unit: CostUnit
     timestamp: datetime
     metadata: Dict[str, Any]
+    # The organisation whose model call this is. Summaries filter on it.
+    organization_id: Optional[int] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert cost record to dictionary."""
@@ -63,6 +66,11 @@ class AICostMonitor:
         self._budgets = {}  # user_id -> budget_info
         self._usage_tracking = {}  # user_id -> feature -> usage_count
         self._lock = threading.Lock()
+        # Budget alerts fire only against limits someone configured. The defaults
+        # below are placeholders, not anyone's budget, so they never raise an alert;
+        # spend limits on model calls are enforced by the model-call path's own
+        # budget check before each call.
+        self._budgets_configured = False
         
         # Initialize default budgets
         self._initialize_default_budgets()
@@ -109,6 +117,7 @@ class AICostMonitor:
                         
                         if budget_type in self._budgets.get('global', {}):
                             self._budgets['global'][budget_type] = float(setting.value)
+                            self._budgets_configured = True
                             
                 except Exception as e:
                     logger.warning(f"Failed to parse budget setting {setting.key}: {e}")
@@ -117,7 +126,8 @@ class AICostMonitor:
             logger.warning(f"Failed to load budgets from database: {e}")
     
     def record_cost(self, feature: str, cost_amount: float, cost_unit: CostUnit = CostUnit.REQUEST,
-                   user_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
+                   user_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None,
+                   organization_id: Optional[int] = None):
         """
         Record a cost for an AI feature.
         
@@ -135,7 +145,8 @@ class AICostMonitor:
             cost_amount=cost_amount,
             cost_unit=cost_unit,
             timestamp=datetime.utcnow(),
-            metadata=metadata or {}
+            metadata=metadata or {},
+            organization_id=organization_id,
         )
         
         with self._lock:
@@ -248,6 +259,8 @@ class AICostMonitor:
     
     def _check_budget_alerts(self, user_id: Optional[str] = None):
         """Check and trigger budget alerts."""
+        if not self._budgets_configured:
+            return
         try:
             global_budget = self._budgets.get('global', {})
             alert_thresholds = global_budget.get('alert_thresholds', [0.5, 0.8, 0.95])
@@ -309,12 +322,14 @@ class AICostMonitor:
         except Exception as e:
             logger.error(f"Failed to trigger budget alert: {e}")
     
-    def get_cost_summary(self, time_delta: timedelta = timedelta(days=1)) -> Dict[str, Any]:
+    def get_cost_summary(self, time_delta: timedelta = timedelta(days=1),
+                         organization_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Get cost summary for a time period.
         
         Args:
             time_delta: Time period to analyze
+            organization_id: Only this organisation's records
             
         Returns:
             Cost summary statistics
@@ -322,7 +337,11 @@ class AICostMonitor:
         cutoff_time = datetime.utcnow() - time_delta
         
         with self._lock:
-            relevant_records = [r for r in self._cost_records if r.timestamp > cutoff_time]
+            relevant_records = [
+                r for r in self._cost_records
+                if r.timestamp > cutoff_time
+                and (organization_id is None or r.organization_id == organization_id)
+            ]
         
         # Calculate totals
         total_cost = sum(r.cost_amount for r in relevant_records)
@@ -391,9 +410,7 @@ class AICostMonitor:
     
     def _generate_cost_id(self) -> str:
         """Generate unique cost record ID."""
-        timestamp = str(int(datetime.utcnow().timestamp()))
-        data = f"cost_{timestamp}_{threading.get_ident()}"
-        return data
+        return f"cost_{uuid.uuid4().hex[:16]}"
     
     def set_budget_limit(self, budget_type: str, limit: float):
         """
@@ -408,6 +425,7 @@ class AICostMonitor:
                 self._budgets['global'] = {}
             
             self._budgets['global'][budget_type] = limit
+            self._budgets_configured = True
             
             logger.info(f"Budget limit set: {budget_type} = ${limit:.2f}")
     

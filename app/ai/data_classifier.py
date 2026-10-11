@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 import threading
 
-from flask import current_app
+from flask import current_app, has_app_context
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,11 @@ class DataRisk(Enum):
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+
+
+# Risk levels from least to most severe. The values are words, so comparing them
+# directly ranks them alphabetically ("critical" < "low"); rank by position instead.
+_RISK_ORDER = [DataRisk.LOW, DataRisk.MEDIUM, DataRisk.HIGH, DataRisk.CRITICAL]
 
 @dataclass
 class DataPattern:
@@ -167,6 +172,10 @@ class AIDataClassifier:
     
     def _load_configuration(self):
         """Load configuration from environment variables."""
+        # Outside an application context (a bare import) there is no configuration
+        # to read; the default patterns still apply.
+        if not has_app_context():
+            return
         # Load blocked domains
         blocked_domains = current_app.config.get('AI_BLOCKED_DOMAINS', '')
         if blocked_domains:
@@ -215,7 +224,7 @@ class AIDataClassifier:
                     patterns_found.append(pattern_info)
                     
                     # Update highest risk and classification
-                    if pattern.risk.value > highest_risk.value:
+                    if _RISK_ORDER.index(pattern.risk) > _RISK_ORDER.index(highest_risk):
                         highest_risk = pattern.risk
                     if self._compare_classification(pattern.classification, highest_classification) > 0:
                         highest_classification = pattern.classification

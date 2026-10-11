@@ -45,6 +45,7 @@ from app.modules.genome.services.drift_detector import (
     FINDING_ORPHANED,
     detect_model_drift,
 )
+from app.modules.genome.services.freshness import measure_freshness
 
 logger = logging.getLogger(__name__)
 
@@ -184,6 +185,17 @@ def index():
     report_html = None
     error = None
     summary = None
+    freshness = None
+    freshness_error = None
+    if org_id is not None:
+        try:
+            freshness = measure_freshness(org_id)
+        except Exception as exc:  # show the failure, never a made-up figure
+            logger.warning("Freshness measurement failed for org %s: %s", org_id, exc)
+            from app.extensions import db
+
+            db.session.rollback()
+            freshness_error = "Freshness could not be measured."
     computed_at = None
     pending = False
     if org_id is None:
@@ -218,6 +230,8 @@ def index():
         summary=summary,
         error=error,
         org_id=org_id,
+        freshness=freshness,
+        freshness_error=freshness_error,
         computed_at=computed_at,
         pending=pending,
     )
