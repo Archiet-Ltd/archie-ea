@@ -14,6 +14,7 @@ from flask import Blueprint, jsonify, render_template, request
 from flask_login import login_required
 
 from app.decorators import audit_log, admin_required
+from app.middleware.tenant_decorators import platform_admin_required
 
 from app.utils.deprecation import get_deprecation_metrics
 
@@ -151,6 +152,12 @@ def send_opsgenie_alert(alert_data):
 
 @deprecation_bp.route("/")
 @login_required
+# get_deprecation_metrics() is process-wide, deployment-level API usage
+# telemetry (not tenant data), and the webhook routes below send alerts to
+# PagerDuty/Slack/OpsGenie using shared, platform-level credentials.
+# admin_required alone let any tenant's own admin reach all of this
+# (R1 admin-rbac systemic fix).
+@platform_admin_required
 @admin_required
 def dashboard():
     """Render the deprecation status dashboard."""
@@ -159,6 +166,7 @@ def dashboard():
 
 @deprecation_bp.route("/api/stats")
 @login_required
+@platform_admin_required
 @admin_required
 def api_stats():
     """Get deprecation metrics as JSON."""
@@ -169,6 +177,7 @@ def api_stats():
 
 @deprecation_bp.route("/api/alerts")
 @login_required
+@platform_admin_required
 @admin_required
 def api_alerts():
     """Get deprecation spike alerts as JSON."""
@@ -183,6 +192,7 @@ def api_alerts():
 
 @deprecation_bp.route("/api/velocity")
 @login_required
+@platform_admin_required
 @admin_required
 def api_velocity():
     """Get endpoint velocity as JSON."""
@@ -203,6 +213,7 @@ def api_velocity():
 
 @deprecation_bp.route("/api/export")
 @login_required
+@platform_admin_required
 @admin_required
 def api_export():
     """Export metrics in monitoring-compatible format."""
@@ -212,6 +223,7 @@ def api_export():
 
 @deprecation_bp.route("/api/webhook", methods=["POST"])
 @login_required
+@platform_admin_required
 @admin_required
 @audit_log("deprecation_webhook_send")
 def api_webhook():
@@ -264,6 +276,7 @@ def api_webhook():
 
 
 @deprecation_bp.route("/api/webhook/test", methods=["POST"])
+@platform_admin_required
 @admin_required
 @audit_log("deprecation_webhook_test")
 def api_webhook_test():

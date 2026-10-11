@@ -76,7 +76,24 @@ def _check_solution_access(solution_id):
         return  # Model not available — skip check gracefully
     if not sol:
         return  # Solution doesn't exist — let downstream handle
-    if hasattr(current_user, "is_admin") and current_user.is_admin():
+    # D-4 (admin-rbac-active-org continuation): this used to be
+    # ``hasattr(current_user, "is_admin") and current_user.is_admin()`` -- a
+    # global Permission.ADMINISTER flag, independent of which organisation
+    # is active in the session. Since every self-registered user is
+    # Administrator of their own organisation, a user who merely accepted a
+    # Viewer invitation into another organisation and switched their session
+    # into it could edit any solution's diagrams there too, not just their
+    # own -- the exact bug admin_required/org_admin_required already fix
+    # elsewhere in this PR.
+    from flask import g
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    _active_org_id = getattr(g, "current_org_id", None)
+    if is_platform_admin(current_user) or rbac_service.is_org_admin(
+        current_user, _active_org_id
+    ):
         return
     if getattr(sol, "owner_id", None) and sol.owner_id == current_user.id:
         return
@@ -109,11 +126,20 @@ def _run_archimate_llm_generation(requirements, context, target_layer="complete"
     """Run ArchiMate generation with an application-context timeout guard."""
     from app.modules.architecture.services.archimate_llm_service import ArchiMateLLMService
 
+    from contextlib import nullcontext
+
+    from flask import g
+
+    from app.jobs.tenant_safe_job import tenant_scope
+
     svc = ArchiMateLLMService()
     app_obj = current_app._get_current_object()
+    # The worker thread has its own context and so no session organisation;
+    # carry the caller's into it so row-level security shows it its rows.
+    org_id = getattr(g, "current_org_id", None)
 
     def _call_llm():
-        with app_obj.app_context():
+        with app_obj.app_context(), (tenant_scope(org_id) if org_id is not None else nullcontext()):
             try:
                 model_data, _ = svc.generate_archimate_from_requirements(
                     requirements=requirements,

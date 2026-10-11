@@ -23,6 +23,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
 from app.middleware.tenant_context import current_org_id
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.adm_kanban import (
     ARCHIMATE_ELEMENTS,
     ADMPhase,
@@ -232,7 +233,7 @@ def get_adm_phases():
 def init_adm_phases():
     """Initialize ADM phases in database"""
     try:
-        if not current_user.is_admin:
+        if not is_active_org_admin():
             return jsonify({"success": False, "error": "Admin required"}), 403
 
         create_adm_phases()
@@ -462,7 +463,7 @@ def create_card(board_id):
         board = KanbanBoard.query.get_or_404(board_id)
 
         # Check permissions
-        if board.created_by_id != current_user.id and not current_user.is_admin:
+        if board.created_by_id != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Access denied"}), 403
 
         data = request.get_json()
@@ -619,7 +620,7 @@ def update_card(card_id):
             card.created_by_id != current_user.id
             and card.assigned_to_id != current_user.id
             and card.board.created_by_id != current_user.id
-            and not current_user.is_admin
+            and not is_active_org_admin()
         ):
             return jsonify({"success": False, "error": "Access denied"}), 403
 
@@ -791,7 +792,7 @@ def delete_card(card_id):
         if (
             card.created_by_id != current_user.id
             and card.board.created_by_id != current_user.id
-            and not current_user.is_admin
+            and not is_active_org_admin()
         ):
             return jsonify({"success": False, "error": "Access denied"}), 403
 
@@ -818,7 +819,7 @@ def get_board_analytics(board_id):
         board = KanbanBoard.query.get_or_404(board_id)
 
         # Check permissions
-        if board.created_by_id != current_user.id and not current_user.is_admin:
+        if board.created_by_id != current_user.id and not is_active_org_admin():
             return jsonify({"success": False, "error": "Access denied"}), 403
 
         total_cards = len(board.cards)

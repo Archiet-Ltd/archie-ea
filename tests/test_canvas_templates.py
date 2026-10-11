@@ -179,6 +179,37 @@ class TestSeedIdempotence:
         seed_viewpoints(org_id=org.id)
         assert ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").count() == 3
 
+    def test_seed_property_templates_is_idempotent(self, app, db_session):
+        from app.config.property_templates import PROPERTY_TEMPLATES
+        from app.commands.seed_viewpoints import seed_property_templates
+        from app.models.acm_property_template import AcmPropertyTemplate
+
+        # The repository's test database is shared and persistent across runs.
+        # Remove the four shared rows this seed owns so the first call exercises
+        # creation even if a prior session left them behind.
+        seeded_keys = {
+            (row["archimate_type"], row["property_key"])
+            for row in PROPERTY_TEMPLATES
+        }
+        for row in AcmPropertyTemplate.query.filter(
+            AcmPropertyTemplate.organization_id.is_(None)
+        ).all():
+            if (row.archimate_type, row.property_key) in seeded_keys:
+                db_session.delete(row)
+        db_session.flush()
+
+        first = seed_property_templates()
+        assert first == (4, 0)
+
+        second = seed_property_templates()
+        assert second == (0, 4)
+
+        rate_limit = AcmPropertyTemplate.query.filter_by(
+            archimate_type="ApplicationInterface",
+            property_key="rate_limit",
+        ).one()
+        assert rate_limit.property_type == "number"
+
 
 # -- Composer render shape ----------------------------------------------------
 

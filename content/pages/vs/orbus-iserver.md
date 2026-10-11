@@ -64,14 +64,9 @@ source under AGPL, self-hostable, and built on full ArchiMate 3.2 modelling, wit
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
   browser across every layer.
 - **CSV and Excel import** for anything not already in ArchiMate form.
-- **Find what you're paying for twice.** Duplicate-spend detection and a consolidation plan,
-  deep-linked directly from a plain-language question.
+- **Find what you're paying for twice.** Run duplicate detection across your whole application list,
+  review the overlapping groups it finds, and add them to a consolidation plan.
 - **A business case built from your own figures**, never invented to fill a gap.
-
-## Where Entelim is headed next
-
-A direct import from the major enterprise-architecture tools is on the roadmap for 2027. Until then,
-ArchiMate Open Exchange and CSV are the working path across.
 
 ## Frequently asked
 

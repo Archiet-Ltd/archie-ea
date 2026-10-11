@@ -305,10 +305,26 @@ def _may_delete_document(doc, user):
     The caller must already have passed tenant isolation (the document belongs
     to the same organisation as the caller, or the caller is a platform
     administrator).  This function checks only the ownership rule within that
-    organisation: the uploader may delete, and any user carrying the
-    ADMINISTER permission may delete.
+    organisation: the uploader may delete, and an admin OF THE ACTIVE
+    organisation may delete.
+
+    D-4 (admin-rbac-active-org continuation): the admin branch used to be
+    ``user.is_admin()`` -- a global ``Permission.ADMINISTER`` flag,
+    independent of which organisation is active in the session
+    (``g.current_org_id``). Since every self-registered user is
+    Administrator of their own organisation, a user who merely accepted a
+    Viewer invitation into another organisation and switched their session
+    into it could delete that organisation's documents too, despite never
+    uploading them -- the exact bug ``admin_required``/``org_admin_required``
+    already fix elsewhere in this PR.
     """
-    if user.is_admin():
+    from flask import g
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    active_org_id = getattr(g, "current_org_id", None)
+    if is_platform_admin(user) or rbac_service.is_org_admin(user, active_org_id):
         return True
     return doc.uploaded_by_id is not None and doc.uploaded_by_id == user.id
 

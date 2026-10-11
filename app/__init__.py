@@ -75,6 +75,11 @@ def create_app(config=None):
     install_tenant_context(app)
     install_tenant_filter(app)
 
+    # 1b'. Transitional: keep unified_work_packages in step with the four retired
+    # work package stores while their remaining writers are repointed (R1-B04 PR 3).
+    from app.services.work_package_bridge import register as register_work_package_bridge
+    register_work_package_bridge(app)
+
     # 1c. Usage metering: non-blocking after_request event recording
     from app.middleware.usage_tracking import install_usage_tracking
     install_usage_tracking(app)

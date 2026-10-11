@@ -48,14 +48,14 @@ governance — as one open-source product, self-hostable, built specifically on 
 
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
   browser across every layer.
-- **Portfolio and duplicate-spend detection**, answered directly from a plain-language question.
+- **Find what you're paying for twice.** Run duplicate detection across your whole application list,
+  review the overlapping groups it finds, and add them to a consolidation plan.
 - **A business case built from your own figures**, never invented to fill a gap.
 - **Full ArchiMate 3.2 modelling**, named explicitly rather than left undocumented.
 
-## Where Entelim is headed next
+## Bringing your model across
 
-Direct imports from major enterprise-architecture tools are on the roadmap for 2027. Today, ArchiMate
-Open Exchange and CSV bring an existing model across.
+ArchiMate Open Exchange and CSV are the working path to bring a model across.
 
 ## Frequently asked
 

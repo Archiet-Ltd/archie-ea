@@ -24,8 +24,4 @@ architecture model, so an incident never automatically tells you what it actuall
 A bring-your-own-feed connection — a signed webhook or file at first, growing into a unified
 ticketing API — so incidents from your monitoring tools read directly against the model.
 
-Coming 2027. Join the waiting list and we'll tell you the day it ships.
-
-## Related
-
-- [What has changed around this component since we last checked?](/use-cases/architecture-change-tracking)
+Coming in an upcoming release. Join the waiting list and we'll tell you the day it ships.

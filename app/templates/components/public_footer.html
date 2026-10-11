@@ -7,7 +7,7 @@
   <div class="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-16">
     <div class="grid sm:grid-cols-2 md:grid-cols-5 gap-8 mb-8">
       <div class="space-y-4">
-        <h3 class="font-semibold text-foreground">Entelim</h3>
+        <img src="{{ url_for('static', filename='brand/entelim-logo.svg') }}" alt="Entelim" class="h-6">
         <ul class="space-y-2 text-sm text-muted-foreground">
           <li><a href="/features" class="hover:text-foreground transition-colors">Features</a></li>
           <li><a href="/pricing" class="hover:text-foreground transition-colors">Pricing</a></li>
@@ -27,17 +27,15 @@
       <div class="space-y-4">
         <h3 class="font-semibold text-foreground">Licensing</h3>
         <ul class="space-y-2 text-sm text-muted-foreground">
-          <li><a href="/docs" class="hover:text-foreground transition-colors">Documentation</a></li>
-          <li><span class="text-muted-foreground/60 cursor-default">AGPL-3.0</span></li>
+          <li><span class="public-footer-plain">AGPL-3.0</span></li>
         </ul>
       </div>
       <div class="space-y-4">
         <h3 class="font-semibold text-foreground">Company</h3>
         <ul class="space-y-2 text-sm text-muted-foreground">
           <li><a href="/about" class="hover:text-foreground transition-colors">About</a></li>
-          <li><a href="/vision" class="hover:text-foreground transition-colors">Our vision</a></li>
           <li><a href="/contact" class="hover:text-foreground transition-colors">Contact</a></li>
-          <li><span class="text-muted-foreground/60 cursor-default">Archiet Ltd</span></li>
+          <li><span class="public-footer-plain">Archiet Ltd</span></li>
         </ul>
       </div>
       <div class="space-y-4">

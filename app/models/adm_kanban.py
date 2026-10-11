@@ -4,7 +4,7 @@ ADM Kanban Models - TOGAF ADM Phase Tracking with ArchiMate Integration
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.ext.declarative import declared_attr  # dead-code-ok
 from sqlalchemy.orm import relationship
 
@@ -204,6 +204,11 @@ class KanbanCard(TenantMixin, db.Model):
     target_start_date = Column(DateTime, nullable=True)
     target_end_date = Column(DateTime, nullable=True)
     work_package_id = Column(Integer, ForeignKey('roadmap_work_packages.id', ondelete='SET NULL'), nullable=True, index=True)
+    # The one work package store. work_package_id above is the retired
+    # roadmap store's id and is only read to find a merged row.
+    unified_work_package_id = Column(
+        BigInteger, ForeignKey('unified_work_packages.id', ondelete='SET NULL'), nullable=True, index=True
+    )
 
     # ArchiMate 3.2 Motivation linkage
     requirement_ids = db.Column(db.JSON, nullable=True)

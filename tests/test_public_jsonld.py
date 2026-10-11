@@ -12,7 +12,7 @@ import json
 
 import pytest
 
-from app.services.public_pages import load_all_pages
+from app.services.public_pages import MERGED_PAGES, load_all_pages
 
 _JSONLD_SCRIPT_RE_SOURCE = (
     r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>'
@@ -45,6 +45,14 @@ def _iter_offers(node):
             yield from _iter_offers(item)
 
 
+def _jsonld_nodes(ld: dict) -> list[dict]:
+    """Every schema.org node in one page's JSON-LD, whether or not it's
+    wrapped in an ``@graph`` (module/use-case/comparison/offer pages now
+    carry a BreadcrumbList, and some also an FAQPage, alongside their own
+    primary type -- see app/services/public_pages.py build_jsonld)."""
+    return ld["@graph"] if "@graph" in ld else [ld]
+
+
 def test_sitewide_jsonld_schema_and_url_consistency(app):
     """Every page's JSON-LD -- every real page via ``load_all_pages()``, plus the
     homepage's own hardcoded block -- is valid JSON, carries the schema.org
@@ -57,8 +65,16 @@ def test_sitewide_jsonld_schema_and_url_consistency(app):
     ``FAQPage.mainEntity`` comes back empty -- the known silent-failure mode of
     ``_jsonld_faq``, whose HTML-regex extraction can match nothing and return an
     empty list with no error.
+
+    A page's JSON-LD may now be a single node or an ``@graph`` of several
+    (a BreadcrumbList, and sometimes an FAQPage, alongside its own primary
+    type -- see build_jsonld); every check below walks whichever shape a
+    page actually has via ``_jsonld_nodes`` rather than assuming one node.
+    A MERGE-verdict page's own URL 301s to its parent instead of rendering,
+    so it has no JSON-LD of its own to check here -- see
+    test_merged_pages_301_to_their_parent in test_public_content_pages.py.
     """
-    pages = load_all_pages()
+    pages = [p for p in load_all_pages() if p.url not in MERGED_PAGES]
     assert len(pages) > 0, "No pages loaded from content/pages/"
 
     with app.test_client() as client:
@@ -93,64 +109,88 @@ def test_sitewide_jsonld_schema_and_url_consistency(app):
                     pytest.fail(f"{page.url}: invalid JSON-LD: {e}")
 
                 assert "@context" in ld, f"{page.url}: JSON-LD missing @context"
-                ld_type = ld.get("@type")
-                assert ld_type, f"{page.url}: JSON-LD missing @type"
 
-                # URL self-consistency: catches a page rendering with another
-                # page's (or a stale/hardcoded) URL in its own structured data.
                 expected_url = f"{SITE_URL}{page.url}"
-                assert ld.get("url") == expected_url, (
-                    f"{page.url}: JSON-LD url is {ld.get('url')!r}, "
-                    f"expected {expected_url!r}"
-                )
+                saw_a_typed_node = False
 
-                if ld_type == "WebPage":
-                    assert ld.get("name"), f"{page.url}: WebPage missing name"
+                for node in _jsonld_nodes(ld):
+                    ld_type = node.get("@type")
+                    if not ld_type:
+                        pytest.fail(f"{page.url}: a JSON-LD node is missing @type")
+                    saw_a_typed_node = True
 
-                elif ld_type == "SoftwareApplication":
-                    assert ld.get("name"), (
-                        f"{page.url}: SoftwareApplication missing name"
-                    )
-                    assert ld.get("applicationCategory"), (
-                        f"{page.url}: SoftwareApplication missing applicationCategory"
-                    )
-                    assert ld.get("offers"), (
-                        f"{page.url}: SoftwareApplication missing offers"
-                    )
+                    # URL self-consistency: catches a page rendering with
+                    # another page's (or a stale/hardcoded) URL in its own
+                    # structured data. BreadcrumbList carries no "url" of
+                    # its own (its itemListElement entries carry theirs).
+                    if ld_type != "BreadcrumbList":
+                        assert node.get("url") == expected_url, (
+                            f"{page.url}: {ld_type} JSON-LD url is "
+                            f"{node.get('url')!r}, expected {expected_url!r}"
+                        )
 
-                elif ld_type == "FAQPage":
-                    assert "mainEntity" in ld, (
-                        f"{page.url}: FAQPage missing mainEntity"
-                    )
-                    if page.family == "comparison":
-                        # The silent-failure mode this test exists to catch:
-                        # _jsonld_faq's two regex sub-patterns can both fail to
-                        # match a page's real FAQ markup and return [] with no
-                        # error, leaving the page serving an empty, useless
-                        # FAQPage block. Every comparison page must have at
-                        # least one real FAQ entry.
-                        assert len(ld["mainEntity"]) > 0, (
-                            f"{page.url}: FAQPage.mainEntity is empty -- "
-                            f"_jsonld_faq's regex extraction found no FAQ "
-                            f"entries on this comparison page"
+                    if ld_type == "WebPage":
+                        assert node.get("name"), f"{page.url}: WebPage missing name"
+
+                    elif ld_type == "SoftwareApplication":
+                        assert node.get("name"), (
+                            f"{page.url}: SoftwareApplication missing name"
                         )
-                    for item in ld["mainEntity"]:
-                        assert item.get("@type") == "Question", (
-                            f"{page.url}: mainEntity entry is not a Question: "
-                            f"{item}"
+                        assert node.get("applicationCategory"), (
+                            f"{page.url}: SoftwareApplication missing applicationCategory"
                         )
-                        assert item.get("name"), (
-                            f"{page.url}: Question missing non-empty name: "
-                            f"{item}"
+                        assert node.get("offers"), (
+                            f"{page.url}: SoftwareApplication missing offers"
                         )
-                        answer = item.get("acceptedAnswer") or {}
-                        assert answer.get("@type") == "Answer", (
-                            f"{page.url}: acceptedAnswer is not an Answer: "
-                            f"{item}"
+
+                    elif ld_type == "FAQPage":
+                        assert "mainEntity" in node, (
+                            f"{page.url}: FAQPage missing mainEntity"
                         )
-                        assert answer.get("text"), (
-                            f"{page.url}: Answer missing non-empty text: {item}"
+                        if page.family == "comparison":
+                            # The silent-failure mode this test exists to catch:
+                            # _jsonld_faq's two regex sub-patterns can both fail to
+                            # match a page's real FAQ markup and return [] with no
+                            # error, leaving the page serving an empty, useless
+                            # FAQPage block. Every comparison page must have at
+                            # least one real FAQ entry.
+                            assert len(node["mainEntity"]) > 0, (
+                                f"{page.url}: FAQPage.mainEntity is empty -- "
+                                f"_jsonld_faq's regex extraction found no FAQ "
+                                f"entries on this comparison page"
+                            )
+                        for item in node["mainEntity"]:
+                            assert item.get("@type") == "Question", (
+                                f"{page.url}: mainEntity entry is not a Question: "
+                                f"{item}"
+                            )
+                            assert item.get("name"), (
+                                f"{page.url}: Question missing non-empty name: "
+                                f"{item}"
+                            )
+                            answer = item.get("acceptedAnswer") or {}
+                            assert answer.get("@type") == "Answer", (
+                                f"{page.url}: acceptedAnswer is not an Answer: "
+                                f"{item}"
+                            )
+                            assert answer.get("text"), (
+                                f"{page.url}: Answer missing non-empty text: {item}"
+                            )
+
+                    elif ld_type == "BreadcrumbList":
+                        items = node.get("itemListElement") or []
+                        assert len(items) >= 2, (
+                            f"{page.url}: BreadcrumbList has fewer than 2 items"
                         )
+                        for item in items:
+                            assert item.get("name"), (
+                                f"{page.url}: a BreadcrumbList item is missing name"
+                            )
+                            assert item.get("item"), (
+                                f"{page.url}: a BreadcrumbList item is missing item (url)"
+                            )
+
+                assert saw_a_typed_node, f"{page.url}: JSON-LD has no typed node at all"
 
                 # Every Offer anywhere in the tree -- top-level list for
                 # SoftwareApplication, or nested under about.offers for

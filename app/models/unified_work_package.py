@@ -15,9 +15,11 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -39,6 +41,19 @@ class UnifiedWorkPackage(TenantMixin, db.Model):
     """
 
     __tablename__ = "unified_work_packages"
+    __table_args__ = (
+        # One copy per row of a retired store; the merge and the session bridge
+        # insert with ON CONFLICT DO NOTHING on this key.
+        Index(
+            "uq_unified_wp_source_copy", "source_table", "source_id",
+            unique=True, postgresql_where=text("source_table IS NOT NULL"),
+        ),
+        # One copy per ArchiMate element (the rule is element_refusal_sql in work_package_service).
+        Index(
+            "uq_unified_wp_archimate_element", "archimate_element_id",
+            unique=True, postgresql_where=text("archimate_element_id IS NOT NULL"),
+        ),
+    )
 
     # === Primary Key ===
     id = Column(BigInteger, primary_key=True)
@@ -92,6 +107,15 @@ class UnifiedWorkPackage(TenantMixin, db.Model):
     context = Column(String(20), default="architecture", nullable=False, index=True)
     context_id = Column(Integer, nullable=True)
 
+    # === Enterprise create screen fields (R1-B04 PR 2, round 3) ===
+    # Carried by the enterprise work package form; nullable, nothing is
+    # backfilled. The screen's architecture is ``context_id`` above.
+    summary = Column(Text, nullable=True)
+    estimated_effort_hours = Column(Float, nullable=True)
+    actual_effort_hours = Column(Float, nullable=True)
+    level = Column(Integer, nullable=True)
+    color = Column(String(20), nullable=True)
+
     # === Capability Context (from RoadmapWorkPackage) ===
     # Nullable: a row merged in from technology_roadmap_initiatives,
     # implementation_work_packages or work_packages may carry no capability
@@ -126,8 +150,9 @@ class UnifiedWorkPackage(TenantMixin, db.Model):
     duration_days = Column(Integer)  # Calculated field
 
     # === Progress and Status ===
+    # 50 wide to match roadmap_work_packages.status, the widest store merged in.
     status = Column(
-        String(30), default="planned", index=True
+        String(50), default="planned", index=True
     )  # planned, in_progress, completed, cancelled, on_hold
     progress_percentage = Column(Float, default=0.0)
 
@@ -178,6 +203,22 @@ class UnifiedWorkPackage(TenantMixin, db.Model):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
     created_by = Column(Integer, ForeignKey("users.id"), index=True)
     updated_by = Column(Integer, ForeignKey("users.id"))
+
+    # Set once work_dependencies hold unified ids (merge remap, or created by the
+    # writer). Lets the merge's dependency remap run exactly once per row.
+    dependencies_remapped_at = Column(DateTime, nullable=True)
+
+    # Set once the plateau and gap links held in the old store's association tables
+    # (gap_work_packages, work_package_plateaus) have become relationships. A marked
+    # row is never migrated again, so a link removed on a new screen cannot return.
+    # Bookkeeping for the deploy migration (IW-85); PR 3 drops it with the tables.
+    association_links_migrated_at = Column(DateTime, nullable=True)
+
+    # Hierarchy (a child work package under a parent), carried from the
+    # work_packages store; filled by the merge and the bridge.
+    parent_id = Column(
+        BigInteger, ForeignKey("unified_work_packages.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # === Sync and Automation Status ===
     last_sync_at = Column(DateTime)

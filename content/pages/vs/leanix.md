@@ -55,16 +55,10 @@ can ask without learning the notation first.
 - **Import your existing model.** ArchiMate Open Exchange and .archimate import, with a full element
   browser across every layer and an import history of what was brought in and when.
 - **CSV and Excel import** for anything not already in ArchiMate form.
-- **Find what you're paying for twice.** Ask the question directly and get duplicate detection
-  across your application list, a consolidation plan, and spend broken down by category.
+- **Find what you're paying for twice.** Run duplicate detection across your whole application list,
+  review the overlapping groups it finds, and add them to a consolidation plan.
 - **A business case built from your own figures.** Capex, opex, three-year TCO, ROI and payback,
   computed only from data that actually exists in your model.
-
-## Where Entelim is headed next
-
-A direct LeanIX and Ardoq import — no export step required — is on the roadmap for 2027. Until then,
-ArchiMate Open Exchange and CSV are the working path across. A capability maturity heat map is
-close behind, in active development now.
 
 ## Frequently asked
 

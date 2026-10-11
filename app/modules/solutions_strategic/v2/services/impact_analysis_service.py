@@ -8,10 +8,7 @@ All analysis results are stored via this ORM model only.
 """
 from typing import Dict, List
 
-from sqlalchemy import text
-
 from app import db
-from app.middleware.tenant_context import current_org_id
 from .decorators import transactional
 
 
@@ -34,7 +31,8 @@ class ImpactAnalysisService:
 
     @classmethod
     def analyze_change_impact(
-        cls, element_id: int, change_type: str = "MODIFY", scenario: str = None
+        cls, element_id: int, change_type: str = "MODIFY", scenario: str = None,
+        cursor: int = None, page_size: int = None,
     ) -> Dict:
         """
         Analyze complete impact of changing an element.
@@ -43,17 +41,86 @@ class ImpactAnalysisService:
             element_id: Element being changed
             change_type: MODIFY, RETIRE, REPLACE
             scenario: Optional API scenario name (e.g. retirement, modification) for persistence.
+            cursor: Optional pagination cursor (0-based index into the full result set).
+            page_size: Optional page size for pagination.
 
         Returns:
             Full impact analysis with risk assessment
         """
-        # Get direct dependencies (depth=2: level 1 is self, level 2 is direct)
-        direct_deps = cls._get_dependencies(element_id, depth=2)
+        # Repointed to the canonical cross_layer_impact walk (max_depth=3, 3 hops from seed).
+        from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
-        # Get transitive dependencies (4 levels deep)
-        all_deps = cls._get_dependencies(element_id, depth=4)
-        direct_ids = {d["id"] for d in direct_deps}
-        indirect_deps = [d for d in all_deps if d["id"] not in direct_ids]
+        is_paginated = cursor is not None or page_size is not None
+
+        # When paginated, fetch the full (unpaginated) result for risk scoring
+        # and persistence, then paginate only the rows returned to the caller.
+        if is_paginated:
+            full_result = IntelligenceQueryService.cross_layer_impact(
+                element_id,
+                include_derived=False,
+                max_depth=3,
+                direction="downstream",
+                with_owner=True,
+            )
+        else:
+            full_result = None
+
+        result = IntelligenceQueryService.cross_layer_impact(
+            element_id,
+            include_derived=False,
+            max_depth=3,
+            direction="downstream",
+            with_owner=True,
+            cursor=cursor,
+            page_size=page_size,
+        )
+        rows = result.get("rows") or []
+
+        # Use the full (unpaginated) rows for scoring and storage.
+        scoring_rows = (full_result or result).get("rows") or []
+        scoring_elements = (full_result or result).get("elements") or {}
+
+        # Batch-resolve dependency_level from archimate_elements.
+        all_element_ids = list({r["element_id"] for r in scoring_rows})
+        dep_levels = {}
+        if all_element_ids:
+            from app.models.archimate_core import ArchiMateElement as _AE
+            _ae_rows = _AE.query.filter(_AE.id.in_(all_element_ids)).with_entities(
+                _AE.id, _AE.dependency_level
+            ).all()
+            dep_levels = {row.id: (row.dependency_level or "medium") for row in _ae_rows}
+
+        # Batch-resolve application component names.
+        app_names = {}
+        if all_element_ids:
+            from app.models.application_portfolio import ApplicationComponent as _AC
+            _ac_rows = _AC.query.filter(
+                _AC.archimate_element_id.in_(all_element_ids)
+            ).with_entities(
+                _AC.archimate_element_id, _AC.name
+            ).all()
+            app_names = {row.archimate_element_id: row.name for row in _ac_rows}
+
+        def _row_to_dep(row):
+            el = scoring_elements.get(str(row["element_id"]), {})
+            eid = row["element_id"]
+            return {
+                "id": eid,
+                "name": el.get("name"),
+                "type": el.get("type"),
+                "level": row["relation"]["depth"],
+                "dependency_level": dep_levels.get(eid, "medium"),
+                "app_name": app_names.get(eid),
+                "criticality": None,
+                "tco": 0.0,
+                "owner": row.get("owner"),
+                "health": row.get("health"),
+            }
+
+        # Build deps from the full (unpaginated) rows for scoring.
+        all_deps = [_row_to_dep(r) for r in scoring_rows]
+        direct_deps = [d for d in all_deps if d["level"] == 1]
+        indirect_deps = [d for d in all_deps if d["level"] > 1]
 
         # Severity-weighted risk: critical elements count 5x, high 3x, medium 2x, low/unknown 1x
         _dep_weights = {"critical": 5, "high": 3, "medium": 2, "low": 1}
@@ -99,92 +166,28 @@ class ImpactAnalysisService:
         except Exception:
             db.session.rollback()
 
+        # Build paginated deps for the response when pagination is active.
+        if is_paginated:
+            page_deps = [_row_to_dep(r) for r in rows]
+            page_direct = [d for d in page_deps if d["level"] == 1]
+            page_indirect = [d for d in page_deps if d["level"] > 1]
+        else:
+            page_direct = direct_deps
+            page_indirect = indirect_deps
+
         return {
             "element_id": element_id,
             "change_type": change_type,
-            "direct_dependencies": direct_deps,
-            "indirect_dependencies": indirect_deps,
+            "direct_dependencies": page_direct,
+            "indirect_dependencies": page_indirect,
             "total_affected": total_affected,
             "weighted_score": weighted_score,
             "risk_level": risk_level,
             "estimated_financial_risk": estimated_financial_risk,
             "analysis_id": analysis_id,
+            "total": result.get("total"),
+            "next_cursor": result.get("next_cursor"),
         }
-
-    @classmethod
-    def _get_dependencies(cls, element_id: int, depth: int = 3) -> List[Dict]:
-        """Get dependencies with specified depth, enriched with application portfolio data."""
-
-        # Every arm of the walk carries an explicit organization_id predicate.
-        # It previously carried only the comment "scoped via element_id FK",
-        # which is an assumption rather than a filter: archimate_elements ids are
-        # global, so ANY id -- including one from a different tenant, and
-        # including an application_components id that happens to collide with a
-        # foreign element id -- seeded the recursion and returned that other
-        # organisation's dependency graph. Measured: an architect in org A asked
-        # "what breaks if I retire Nimbus Billing?" and was shown a capability
-        # belonging to org B, presented as their own. Fail closed instead: with
-        # no tenant in context (CLI, scheduler) return nothing rather than
-        # everything.
-        org_id = current_org_id()
-        if org_id is None:
-            return []
-
-        query = """
-            WITH RECURSIVE dependencies AS (
-                SELECT
-                    e.id, e.name, e.type, 1 as level,
-                    ARRAY[e.id] as path,
-                    e.dependency_level,
-                    e.application_component_id
-                FROM archimate_elements e
-                WHERE e.id = :element_id
-                  AND e.organization_id = :org_id
-
-                UNION ALL
-
-                SELECT
-                    e.id, e.name, e.type, d.level + 1,
-                    d.path || e.id,
-                    e.dependency_level,
-                    e.application_component_id
-                FROM archimate_elements e
-                JOIN archimate_relationships r ON r.target_id = e.id
-                JOIN dependencies d ON r.source_id = d.id
-                WHERE e.id NOT IN (SELECT unnest(d.path))
-                AND d.level < :depth
-                AND e.organization_id = :org_id
-            )
-            SELECT
-                d.id, d.name, d.type, d.level, d.dependency_level,
-                ac.name AS app_name,
-                ac.criticality AS app_criticality,
-                COALESCE(ac.total_cost_of_ownership, 0) AS app_tco
-            FROM dependencies d
-            LEFT JOIN application_components ac
-                   ON d.application_component_id = ac.id
-                  AND ac.organization_id = :org_id
-            WHERE d.level > 1
-            ORDER BY d.level, d.name
-        """
-
-        result = db.session.execute(  # tenancy-ok: explicit organization_id predicate on every arm
-            text(query), {"element_id": element_id, "depth": depth, "org_id": org_id}
-        ).fetchall()
-
-        return [
-            {
-                "id": row[0],
-                "name": row[1],
-                "type": row[2],
-                "level": row[3],
-                "dependency_level": row[4],
-                "app_name": row[5],
-                "criticality": row[6],
-                "tco": float(row[7]) if row[7] else 0.0,
-            }
-            for row in result
-        ]
 
     @classmethod
     @transactional

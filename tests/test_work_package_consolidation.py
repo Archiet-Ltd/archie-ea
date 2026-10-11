@@ -100,6 +100,16 @@ def _run(command, dry_run=False):
     return runner.invoke(args=args)
 
 
+@pytest.fixture(autouse=True)
+def _bridge_off():
+    """These tests seed rows in the retired stores to exercise the deploy
+    merge; the session bridge would copy them on insert."""
+    from app.services import work_package_bridge
+
+    with work_package_bridge.suspended():
+        yield
+
+
 @pytest.fixture
 def two_orgs(db_session, make_org):
     org_a = make_org("wp-backfill-a")

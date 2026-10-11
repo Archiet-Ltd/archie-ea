@@ -12,9 +12,9 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, abort, jsonify, request
 from flask_login import current_user, login_required
-from sqlalchemy import text
+from sqlalchemy import func, text
 
 from app import db
 from app.decorators import audit_log
@@ -24,7 +24,9 @@ from app.models.implementation_migration import (
     Gap as ImplementationGap,
     Plateau as ImplementationPlateau,
 )
-from app.models.roadmap_models import RoadmapWorkPackage as ImplementationWorkPackage
+from app.models.unified_work_package import UnifiedWorkPackage as ImplementationWorkPackage
+from app.services import work_package_service
+from app.utils.tenant import current_organization_id
 from app.modules.solutions_strategic.v2.services.roadmap_automation import (
     RoadmapAutomationEngine,
 )
@@ -35,6 +37,35 @@ from app.modules.solutions_strategic.v2.services.roadmap_validator import (
 from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
+
+
+def _require(work_package_id):
+    """This organisation's work package, else a 404 (another organisation's id
+    is indistinguishable from a missing one)."""
+    work_package = work_package_service.get_work_package(
+        work_package_id, current_organization_id()
+    )
+    if work_package is None:
+        abort(404)
+    return work_package
+
+
+def _by_priority(rows):
+    """Work packages per priority ("unset" when none), for these rows."""
+    counts = {}
+    for priority, count in rows.with_entities(
+        ImplementationWorkPackage.priority, func.count()
+    ).group_by(ImplementationWorkPackage.priority).all():
+        counts[priority or "unset"] = counts.get(priority or "unset", 0) + count
+    return counts
+
+
+def _deliverable_or_404(deliverable_id):
+    """A deliverable of one of this organisation's work packages, else a 404."""
+    deliverable = work_package_service.get_deliverable(deliverable_id, current_organization_id())
+    if deliverable is None:
+        abort(404)
+    return deliverable
 
 # Create blueprint
 roadmap_bp = Blueprint("roadmap_api", __name__, url_prefix="/api/roadmap")
@@ -125,7 +156,7 @@ def get_work_packages():
         search = request.args.get("search", "").strip()
 
         # Build base query
-        query = ImplementationWorkPackage.query
+        query = work_package_service.query_for(current_organization_id())
 
         # Apply filters
         if status:
@@ -288,31 +319,24 @@ def create_work_package():
                 201,
             )
 
-        # Create manual work package
-        work_package = ImplementationWorkPackage(
+        # Create manual work package (the one writer)
+        work_package = work_package_service.create_work_package(
+            organization_id=current_organization_id(),
+            user_id=current_user.id,
             name=data["name"],
             description=data.get("description", ""),
             business_capability=data["business_capability"],
             assigned_to=data.get("assigned_to"),
             status=data.get("status", "planned"),
-            start_date=datetime.fromisoformat(data["start_date"])
-            if data.get("start_date")
-            else None,
-            end_date=datetime.fromisoformat(data["end_date"]) if data.get("end_date") else None,
+            start_date=data.get("start_date"),
+            end_date=data.get("end_date"),
             progress_percentage=data.get("progress_percentage", 0),
             estimated_cost=data.get("estimated_cost"),
             priority=data.get("priority", "medium"),
-            created_by=current_user.id,
-            auto_generated=False,
             source_data=data.get("source_data"),
             confidence_score=data.get("confidence_score", 1.0),
         )
-
-        db.session.add(work_package)
         db.session.commit()
-
-        # Sync with related systems
-        sync_service.sync_work_package_created(work_package)
 
         return (
             jsonify(
@@ -333,6 +357,10 @@ def create_work_package():
     except HTTPException:
 
         raise
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return api_error(str(e), "VALIDATION_ERROR")
 
     except Exception as e:
         db.session.rollback()
@@ -366,23 +394,23 @@ def get_work_package(work_package_id: int):
         description: Not found
     """
     try:
-        work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
+        work_package = _require(work_package_id)
 
         # Get related deliverables
-        deliverables = Deliverable.query.filter_by(work_package_id=work_package_id).all()
+        deliverables = Deliverable.query.filter_by(
+            unified_work_package_id=work_package.id
+        ).all()
 
-        # Get dependencies
-        dependencies = db.session.execute(  # tenant-filtered: scoped via parent FK (work_package_id)
-            text(
-                """
-            SELECT wp.id, wp.name, wp.status
-            FROM implementation_work_packages wp
-            JOIN work_package_dependencies wpd ON wp.id = wpd.dependency_id
-            WHERE wpd.work_package_id = :wp_id
-        """
-            ),
-            {"wp_id": work_package_id},
-        ).fetchall()
+        # Get dependencies (ids held on the work package itself)
+        dep_ids = work_package_service.dependency_ids(work_package)
+        dependencies = []
+        if dep_ids:
+            dependencies = [
+                (d.id, d.name, d.status)
+                for d in work_package_service.query_for(current_organization_id())
+                .filter(ImplementationWorkPackage.id.in_(dep_ids))
+                .all()
+            ]
 
         return jsonify(
             {
@@ -481,7 +509,7 @@ def update_work_package(work_package_id: int):
         description: Not found
     """
     try:
-        work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
+        work_package = _require(work_package_id)
 
         # Validate JSON data
         if not request.is_json:
@@ -514,20 +542,13 @@ def update_work_package(work_package_id: int):
             "priority",
         ]
 
-        for field in updatable_fields:
-            if field in data:
-                if field in ["start_date", "end_date"] and data[field]:
-                    setattr(work_package, field, datetime.fromisoformat(data[field]))
-                else:
-                    setattr(work_package, field, data[field])
-
-        work_package.updated_by = current_user.id
-        work_package.updated_at = datetime.utcnow()
-
+        work_package = work_package_service.update_work_package(
+            work_package_id,
+            organization_id=current_organization_id(),
+            user_id=current_user.id,
+            **{f: data[f] for f in updatable_fields if f in data},
+        )
         db.session.commit()
-
-        # Sync changes
-        sync_service.sync_work_package_updated(work_package)
 
         return jsonify(
             {
@@ -544,6 +565,10 @@ def update_work_package(work_package_id: int):
     except HTTPException:
 
         raise
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return api_error(str(e), "VALIDATION_ERROR")
 
     except Exception as e:
         db.session.rollback()
@@ -580,33 +605,28 @@ def delete_work_package(work_package_id: int):
         description: Not found
     """
     try:
-        work_package = ImplementationWorkPackage.query.get_or_404(work_package_id)
+        work_package = _require(work_package_id)
 
         # Check for dependencies
-        dependents = db.session.execute(  # tenant-filtered: scoped via parent FK (work_package_id)
-            text(
-                """
-            SELECT COUNT(*) as count
-            FROM work_package_dependencies
-            WHERE dependency_id = :wp_id
-        """
-            ),
-            {"wp_id": work_package_id},
-        ).fetchone()
+        dependent_count = len(
+            work_package_service.dependents_of(work_package_id, current_organization_id())
+        )
 
-        if dependents and dependents.count > 0:
+        if dependent_count > 0:
             return (
                 jsonify(
                     {
                         "error": "Cannot delete work package with dependencies",
-                        "dependent_count": dependents.count,
+                        "dependent_count": dependent_count,
                     }
                 ),
                 400,
             )
 
         # Check for deliverables
-        deliverable_count = Deliverable.query.filter_by(work_package_id=work_package_id).count()
+        deliverable_count = Deliverable.query.filter_by(
+            unified_work_package_id=work_package.id
+        ).count()
         if deliverable_count > 0:
             return (
                 jsonify(
@@ -619,17 +639,20 @@ def delete_work_package(work_package_id: int):
             )
 
         # Delete the work package
-        db.session.delete(work_package)
+        work_package_service.delete_work_package(
+            work_package_id, organization_id=current_organization_id()
+        )
         db.session.commit()
-
-        # Sync deletion
-        sync_service.sync_work_package_deleted(work_package_id)
 
         return jsonify({"message": "Work package deleted successfully"})
 
     except HTTPException:
 
         raise
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return api_error(str(e), "VALIDATION_ERROR")
 
     except Exception as e:
         db.session.rollback()
@@ -672,9 +695,11 @@ def get_deliverables():
         work_package_id = request.args.get("work_package_id", type=int)
         status = request.args.get("status")
 
-        query = Deliverable.query
         if work_package_id:
-            query = query.filter(Deliverable.work_package_id == work_package_id)
+            _require(work_package_id)
+        query = work_package_service.deliverables_query(
+            current_organization_id(), work_package_id or None
+        )
         if status:
             query = query.filter(Deliverable.delivery_status == status)
 
@@ -687,7 +712,7 @@ def get_deliverables():
                         "id": d.id,
                         "name": d.name,
                         "description": d.description,
-                        "work_package_id": d.work_package_id,
+                        "work_package_id": d.unified_work_package_id,
                         "status": d.delivery_status,
                         "due_date": d.target_date.isoformat() if d.target_date else None,
                         "delivered_date": d.delivered_date.isoformat()
@@ -758,20 +783,21 @@ def create_deliverable():
 
         data = request.get_json()
 
-        # Validate work package exists
-        ImplementationWorkPackage.query.get_or_404(data["work_package_id"])
+        # The work package must be this organisation's own (404 otherwise).
+        # Any work package takes a deliverable.
+        _require(data["work_package_id"])
 
         # Deliverable columns are delivery_status/target_date/assigned_user_id — the
         # old code used status/due_date/approval_criteria/created_by (none exist).
-        deliverable = Deliverable(
+        deliverable = work_package_service.create_deliverable(
+            data["work_package_id"],
+            organization_id=current_organization_id(),
             name=data["name"],
             description=data.get("description", ""),
-            work_package_id=data["work_package_id"],
             delivery_status=data.get("status", "planned"),
             target_date=datetime.fromisoformat(data["due_date"]) if data.get("due_date") else None,
         )
 
-        db.session.add(deliverable)
         db.session.commit()
 
         return (
@@ -781,7 +807,7 @@ def create_deliverable():
                     "deliverable": {
                         "id": deliverable.id,
                         "name": deliverable.name,
-                        "work_package_id": deliverable.work_package_id,
+                        "work_package_id": deliverable.unified_work_package_id,
                         "status": deliverable.delivery_status,
                     },
                 }
@@ -839,7 +865,7 @@ def update_deliverable(deliverable_id: int):
         description: Not found
     """
     try:
-        deliverable = Deliverable.query.get_or_404(deliverable_id)
+        deliverable = _deliverable_or_404(deliverable_id)
 
         if not request.is_json:
             return {"error": "Request must be JSON"}, 400
@@ -915,7 +941,7 @@ def delete_deliverable(deliverable_id: int):
         description: Not found
     """
     try:
-        deliverable = Deliverable.query.get_or_404(deliverable_id)
+        deliverable = _deliverable_or_404(deliverable_id)
 
         db.session.delete(deliverable)
         db.session.commit()
@@ -1349,6 +1375,8 @@ def optimize_timeline():
         optimized_timeline = automation_engine.optimize_timeline(
             work_package_ids=data["work_package_ids"], constraints=data.get("constraints", {})
         )
+        if optimized_timeline.get("error"):
+            return jsonify({"error": optimized_timeline["error"]}), 404
 
         return jsonify(
             {"message": "Timeline optimized successfully", "optimized_timeline": optimized_timeline}
@@ -1507,6 +1535,12 @@ def get_statistics():
         # the "tenant-exempt: aggregate stats" note they carried was wrong, and
         # work_packages / gaps are both tenant tables. Raw SQL bypasses the ORM
         # listener, so the predicate has to be written out.
+        from sqlalchemy import func as _func
+
+        # The work package totals and the breakdowns read the same population:
+        # this organisation's rows of the one store.
+        _wp_rows = work_package_service.query_for(current_organization_id())
+        _deliverable_rows = work_package_service.deliverables_query(current_organization_id())
         from flask import g as _g
         _org = getattr(_g, "current_org_id", None)
         _org_where = " WHERE organization_id = :org" if _org is not None else ""
@@ -1520,53 +1554,27 @@ def get_statistics():
 
         stats = {
             "work_packages": {
-                "total": ImplementationWorkPackage.query.count(),
+                "total": _wp_rows.count(),
                 "by_status": dict(
-                    db.session.execute(
-                        text(
-                            f"""
-                    SELECT status, COUNT(*)
-                    FROM work_packages{_org_where}
-                    GROUP BY status
-                """
-                        ), _org_params
-                    ).fetchall()
+                    _wp_rows.with_entities(ImplementationWorkPackage.status, _func.count())
+                    .group_by(ImplementationWorkPackage.status)
+                    .all()
                 ),
-                "by_priority": dict(
-                    db.session.execute(
-                        text(
-                            f"""
-                    SELECT COALESCE(priority, 'unset'), COUNT(*)
-                    FROM work_packages{_org_where}
-                    GROUP BY priority
-                """
-                        ), _org_params
-                    ).fetchall()
-                ),
-                "total_cost": db.session.execute(
-                    text(
-                        f"""
-                    SELECT COALESCE(SUM(estimated_cost), 0)
-                    FROM work_packages
-                    WHERE estimated_cost IS NOT NULL{_org_and}
-                """
-                    ), _org_params
-                ).fetchone()[0]
+                "by_priority": _by_priority(_wp_rows),
+                "total_cost": _wp_rows.with_entities(
+                    _func.coalesce(_func.sum(ImplementationWorkPackage.estimated_cost), 0)
+                ).scalar()
                 or 0,
             },
             "deliverables": {
-                "total": Deliverable.query.count(),
-                "by_status": dict(
-                    db.session.execute(  # tenant-exempt: system table (aggregate stats)
-                        text(
-                            """
-                    SELECT COALESCE(delivery_status, 'unknown'), COUNT(*)
-                    FROM deliverables
-                    GROUP BY delivery_status
-                """
-                        )
-                    ).fetchall()
-                ),
+                # This organisation's deliverables only: those of its work packages.
+                "total": _deliverable_rows.count(),
+                "by_status": {
+                    (status or "unknown"): n
+                    for status, n in _deliverable_rows.with_entities(
+                        Deliverable.delivery_status, _func.count()
+                    ).group_by(Deliverable.delivery_status).all()
+                },
             },
             "gaps": {
                 "total": ImplementationGap.query.filter(ImplementationGap.gap_kind != "plateau_transition").count(),
@@ -1597,7 +1605,7 @@ def get_statistics():
             "plateaus": {"total": ImplementationPlateau.query.count()},
             "automation_metrics": {
                 "auto_generated_count": 0,
-                "manual_count": ImplementationWorkPackage.query.count(),
+                "manual_count": _wp_rows.count(),
                 "average_confidence": 0,
             },
         }

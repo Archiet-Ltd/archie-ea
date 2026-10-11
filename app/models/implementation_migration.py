@@ -67,6 +67,10 @@ class TechnologyRoadmapInitiative(db.Model):
         nullable=True,
         index=True,
     )
+    # Set when the row is copied across (merge or bridge). A unified copy that
+    # is later deleted nulls retired_into_id (ON DELETE SET NULL) but leaves
+    # this set, so the row stays deleted instead of being merged again.
+    retired_at = db.Column(db.DateTime, nullable=True)
 
     def to_dict(self):
         return {
@@ -188,6 +192,10 @@ class WorkPackage(TenantMixin, db.Model):
         nullable=True,
         index=True,
     )
+    # Set when the row is copied across (merge or bridge). A unified copy that
+    # is later deleted nulls retired_into_id (ON DELETE SET NULL) but leaves
+    # this set, so the row stays deleted instead of being merged again.
+    retired_at = db.Column(db.DateTime, nullable=True)
 
     architecture = db.relationship("ArchitectureModel", backref="migration_work_packages")
     archimate_element = db.relationship(
@@ -355,15 +363,28 @@ class Deliverable(db.Model):
 
     __tablename__ = "deliverables"
     __table_args__ = {"extend_existing": True}
+    # A deliverable has two parents that both cascade the delete in the database
+    # (the older work_packages row and the unified work package), so the row can
+    # already be gone when the unit of work reaches it.
+    __mapper_args__ = {"confirm_deleted_rows": False}
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False, index=True)
     description = db.Column(db.Text)
 
+    # Legacy key: only set when a work_packages row exists for this work
+    # package. Nullable so a deliverable can be added to any work package;
+    # unified_work_package_id below is the key every reader uses.
     work_package_id = db.Column(
         db.Integer,
         db.ForeignKey("work_packages.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    unified_work_package_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey("unified_work_packages.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     architecture_id = db.Column(
@@ -380,12 +401,25 @@ class Deliverable(db.Model):
     # Link to Goal (Deliverables contribute to Goal achievement)
     goal_id = db.Column(db.Integer, db.ForeignKey("goals.id", ondelete="SET NULL"), index=True)
 
-    delivery_status = db.Column(db.String(30), default="planned", index=True)
+    # 50 wide to match roadmap_deliverables.status, the store merged in (R1-B04 PR 2).
+    delivery_status = db.Column(db.String(50), default="planned", index=True)
     deliverable_type = db.Column(db.String(50))
     start_date = db.Column(db.Date)  # When work on deliverable begins
     target_date = db.Column(db.Date)  # Expected completion date
     delivered_date = db.Column(db.Date)  # Actual delivery date
+    # Review fields the capability roadmap screen reads and writes; moved here
+    # from roadmap_deliverables, which is retired into this table (IW-86).
+    review_date = db.Column(db.DateTime, nullable=True)
+    approval_criteria = db.Column(db.Text, nullable=True)
+    quality_score = db.Column(db.Float, nullable=True, default=0.0)
+    approval_status = db.Column(db.String(20), nullable=True, default="pending")
+    related_task_ids = db.Column(db.Text, nullable=True)  # JSON list of RoadmapTask ids
     assigned_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
+    # Provenance kept from the retired roadmap deliverable store.
+    auto_generated = db.Column(db.Boolean, nullable=True, default=False)
+    generation_method = db.Column(db.String(100), nullable=True)
+    created_by = db.Column(db.Integer, nullable=True)
+    updated_by = db.Column(db.Integer, nullable=True)
 
     artifact_references = db.Column(db.JSON)
 

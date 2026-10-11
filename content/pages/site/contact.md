@@ -2,6 +2,7 @@
 page_family: site
 title: "Contact"
 page_role: "Sales and support routes. Commercial questions use the same enquiry form as the offer pages; no invented email address."
+description: "Talk to Entelim about pricing, a hosted plan or a commercial licence, or report a bug, feature request or security issue."
 cta: inquiry
 offer: sales_enquiry
 offer_summary: "I'd like to talk to sales about Entelim."
@@ -19,7 +20,7 @@ hosted plan, or a commercial licence.
 ## Bugs, feature requests and security issues
 
 Entelim is licensed under AGPL-3.0. For a bug, a feature request, or a security issue, use
-[reqarchitect.com](https://reqarchitect.com) or [archiet.com](https://archiet.com) — please
+[reqarchitect.com](https://reqarchitect.com) or [archiet.dev](https://archiet.dev) — please
 report a security issue privately rather than in public, so it can be fixed first.
 
 ## Already have an account?

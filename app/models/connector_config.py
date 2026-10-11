@@ -3,6 +3,16 @@ ConnectorConfig model — per-organisation connector credentials and settings.
 
 Stores encrypted credentials for external connectors (ServiceNow, Jira, M365).
 Unique per (organization_id, connector_type).
+
+``OrgConnectorCredential`` is the sole credential store. All connector routes
+and services read from and write to this model via ``OrgCredentialVault``.
+Legacy models (``OrgConnectorConfig``, ``DevOpsConnectorConfig``,
+``LucidchartConnectorConfig``) are retired: their setters raise so no new
+credentials can be written, and a ``migrate-connector-credentials`` CLI command
+exists to copy existing rows into the new store.
+
+``ExternalSystem`` (platform-wide, no organisation) is scoped separately and
+is not migrated; it remains as-is for platform-level system configurations.
 """
 
 import logging
@@ -382,7 +392,13 @@ class SyncLog(db.Model):
 
 
 class OrgConnectorConfig(db.Model):
-    """Per-organisation connector configuration with encrypted credentials."""
+    """Per-organisation connector configuration with encrypted credentials.
+
+    RETIRED. Use ``OrgConnectorCredential`` via ``OrgCredentialVault`` for
+    new credentials. Kept for backward compatibility with existing rows.
+    Writers raise ``RuntimeError``. Run ``flask migrate-connector-credentials``
+    to copy existing rows to the new store and then drop this table.
+    """
 
     __tablename__ = "org_connector_configs"
     __table_args__ = (
@@ -419,7 +435,7 @@ class OrgConnectorConfig(db.Model):
     organization = db.relationship("Organization", backref="connector_configs")
 
     # ------------------------------------------------------------------
-    # Encrypted credential property
+    # Encrypted credential property — RETIRED, raises on write
     # ------------------------------------------------------------------
 
     @property
@@ -431,11 +447,15 @@ class OrgConnectorConfig(db.Model):
 
     @client_secret.setter
     def client_secret(self, value: str | None) -> None:
-        """Encrypt and store client secret. Raises if no encryption key is configured."""
-        if value is None:
-            self._client_secret_encrypted = None
-            return
-        self._client_secret_encrypted = encrypt_credential(value).decode()
+        """Encrypt and store client secret. RETIRED — raises RuntimeError."""
+        logger.warning(
+            "OrgConnectorConfig is RETIRED. Use OrgCredentialVault instead."
+        )
+        raise RuntimeError(
+            "OrgConnectorConfig is RETIRED — new credentials must use "
+            "OrgConnectorCredential via OrgCredentialVault. "
+            "Run `flask migrate-connector-credentials` to migrate existing rows."
+        )
 
     def __repr__(self) -> str:
         return f"<ConnectorConfig {self.connector_type} org={self.organization_id}>"
@@ -443,6 +463,10 @@ class OrgConnectorConfig(db.Model):
 
 class DevOpsConnectorConfig(db.Model):  # migration-exempt — COM-018
     """Per-org GitHub / Azure DevOps connector configuration.
+
+    RETIRED. Use ``OrgConnectorCredential`` via ``OrgCredentialVault``.
+    Kept for backward compatibility with existing rows.
+    Writers raise ``RuntimeError``.
 
     One record per organisation. Access token is Fernet-encrypted using
     ``CREDENTIAL_ENCRYPTION_KEY``; the setter raises if no key is configured.
@@ -484,7 +508,7 @@ class DevOpsConnectorConfig(db.Model):  # migration-exempt — COM-018
     )
 
     # ------------------------------------------------------------------
-    # Fernet-encrypted access_token property
+    # Fernet-encrypted access_token property — RETIRED, raises on write
     # ------------------------------------------------------------------
 
     @property
@@ -496,18 +520,27 @@ class DevOpsConnectorConfig(db.Model):  # migration-exempt — COM-018
 
     @access_token.setter
     def access_token(self, value: str | None) -> None:
-        """Encrypt and store the access token. Raises if no encryption key is configured."""
-        if not value:
-            self._access_token_encrypted = None
-            return
-        self._access_token_encrypted = encrypt_credential(value).decode()
+        """Encrypt and store the access token. RETIRED — raises RuntimeError."""
+        logger.warning(
+            "DevOpsConnectorConfig is RETIRED. Use OrgCredentialVault instead."
+        )
+        raise RuntimeError(
+            "DevOpsConnectorConfig is RETIRED — new credentials must use "
+            "OrgConnectorCredential via OrgCredentialVault. "
+            "Run `flask migrate-connector-credentials` to migrate existing rows."
+        )
 
     def __repr__(self) -> str:
         return f"<DevOpsConnectorConfig {self.provider} org={self.organization_id}>"
 
 
 class LucidchartConnectorConfig(db.Model):  # migration-exempt — LUC-001
-    """Per-org Lucidchart OAuth configuration with encrypted token storage."""
+    """Per-org Lucidchart OAuth configuration with encrypted token storage.
+
+    RETIRED. Use ``OrgConnectorCredential`` via ``OrgCredentialVault``.
+    Kept for backward compatibility with existing rows.
+    Writers raise ``RuntimeError``.
+    """
 
     __tablename__ = "lucidchart_connector_configs"
     __table_args__ = (
@@ -568,11 +601,15 @@ class LucidchartConnectorConfig(db.Model):  # migration-exempt — LUC-001
 
     @client_secret.setter
     def client_secret(self, value: str | None) -> None:
-        """Encrypt and store the OAuth client secret. Raises if no encryption key is configured."""
-        if not value:
-            self._client_secret_encrypted = None
-            return
-        self._client_secret_encrypted = encrypt_credential(value).decode()
+        """Encrypt and store the OAuth client secret. RETIRED — raises RuntimeError."""
+        logger.warning(
+            "LucidchartConnectorConfig is RETIRED. Use OrgCredentialVault instead."
+        )
+        raise RuntimeError(
+            "LucidchartConnectorConfig is RETIRED — new credentials must use "
+            "OrgConnectorCredential via OrgCredentialVault. "
+            "Run `flask migrate-connector-credentials` to migrate existing rows."
+        )
 
     @property
     def access_token(self) -> str | None:
@@ -583,11 +620,15 @@ class LucidchartConnectorConfig(db.Model):  # migration-exempt — LUC-001
 
     @access_token.setter
     def access_token(self, value: str | None) -> None:
-        """Encrypt and store the Lucidchart access token. Raises if no encryption key is configured."""
-        if not value:
-            self._access_token_encrypted = None
-            return
-        self._access_token_encrypted = encrypt_credential(value).decode()
+        """Encrypt and store the Lucidchart access token. RETIRED — raises RuntimeError."""
+        logger.warning(
+            "LucidchartConnectorConfig is RETIRED. Use OrgCredentialVault instead."
+        )
+        raise RuntimeError(
+            "LucidchartConnectorConfig is RETIRED — new credentials must use "
+            "OrgConnectorCredential via OrgCredentialVault. "
+            "Run `flask migrate-connector-credentials` to migrate existing rows."
+        )
 
     @property
     def refresh_token(self) -> str | None:
@@ -598,11 +639,15 @@ class LucidchartConnectorConfig(db.Model):  # migration-exempt — LUC-001
 
     @refresh_token.setter
     def refresh_token(self, value: str | None) -> None:
-        """Encrypt and store the Lucidchart refresh token. Raises if no encryption key is configured."""
-        if not value:
-            self._refresh_token_encrypted = None
-            return
-        self._refresh_token_encrypted = encrypt_credential(value).decode()
+        """Encrypt and store the Lucidchart refresh token. RETIRED — raises RuntimeError."""
+        logger.warning(
+            "LucidchartConnectorConfig is RETIRED. Use OrgCredentialVault instead."
+        )
+        raise RuntimeError(
+            "LucidchartConnectorConfig is RETIRED — new credentials must use "
+            "OrgConnectorCredential via OrgCredentialVault. "
+            "Run `flask migrate-connector-credentials` to migrate existing rows."
+        )
 
     def token_is_expired(self, now: datetime | None = None) -> bool:
         """Return True when the stored access token is missing or expired."""
@@ -613,3 +658,115 @@ class LucidchartConnectorConfig(db.Model):  # migration-exempt — LUC-001
 
     def __repr__(self) -> str:
         return f"<LucidchartConnectorConfig org={self.organization_id} enabled={self.enabled}>"
+
+
+# ============================================================================
+# Per-organisation encryption key store
+# ============================================================================
+
+class OrganizationEncryptionKey(TenantMixin, db.Model):  # migration-exempt — per-org key store
+    """One Fernet encryption key per organisation, itself encrypted with a
+    master key from ``ORG_ENCRYPTION_MASTER_KEY``.
+
+    ``key_version`` supports zero-downtime rotation: after re-encrypting every
+    credential row with the new key, increment the version. Old credentials
+    encrypted under a previous version must be re-encrypted by the rotation
+    service before the old key is discarded.
+    """
+
+    __tablename__ = "organization_encryption_keys"
+    __table_args__ = (
+        db.UniqueConstraint("organization_id", name="uq_org_encryption_key"),
+        {"extend_existing": True},
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    @declared_attr
+    def organization_id(cls):
+        return db.Column(
+            db.Integer,
+            db.ForeignKey("organizations.id", ondelete="CASCADE"),
+            nullable=False,
+            unique=True,
+            index=True,
+        )
+    # The org's Fernet key, encrypted with the master key
+    encrypted_key = db.Column(db.LargeBinary, nullable=False)
+    key_version = db.Column(db.Integer, nullable=False, default=1)
+    previous_encrypted_key = db.Column(db.LargeBinary, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    organization = db.relationship(
+        "Organization",
+        backref=db.backref("encryption_key", uselist=False),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<OrganizationEncryptionKey org={self.organization_id} "
+            f"version={self.key_version}>"
+        )
+
+
+class OrgConnectorCredential(TenantMixin, db.Model):  # migration-exempt — per-org credential store
+    """Single credential store for all connector types, encrypted with the
+    organisation's own Fernet key (see ``OrganizationEncryptionKey``).
+
+    Replaces the retired per-model stores (``OrgConnectorConfig``,
+    ``DevOpsConnectorConfig``, ``LucidchartConnectorConfig``). New credentials
+    must be stored here via ``OrgCredentialVault``.
+    """
+
+    __tablename__ = "org_connector_credentials"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "organization_id", "connector_type", "credential_type",
+            name="uq_org_connector_credential",
+        ),
+        {"extend_existing": True},
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    @declared_attr
+    def organization_id(cls):
+        return db.Column(
+            db.Integer,
+            db.ForeignKey("organizations.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    connector_type = db.Column(db.String(50), nullable=False)
+    # Distinguishes credential kinds: "api_key", "client_secret", "access_token",
+    # "refresh_token", "credentials" (full JSON blob)
+    credential_type = db.Column(db.String(50), nullable=False, default="credentials")
+    # Fernet-encrypted JSON blob or single value, encrypted with the org's key
+    encrypted_value = db.Column(db.LargeBinary, nullable=False)
+    # Tracks which encryption key version was used; enables per-row key lookup
+    # and MultiFernet fallthrough during rotation
+    key_version = db.Column(db.Integer, nullable=False, default=1)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    organization = db.relationship(
+        "Organization",
+        backref=db.backref("connector_credentials", lazy="dynamic"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<OrgConnectorCredential org={self.organization_id} "
+            f"type={self.connector_type}/{self.credential_type}>"
+        )

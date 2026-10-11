@@ -16,6 +16,19 @@ pytestmark = pytest.mark.usefixtures("db_session")
 _PASSWORD = "Str0ng!Passw0rd"
 
 
+def _azure_identity():
+    """One tid+oid pair, and the (userinfo, external_id) shape the nOAuth
+    fix (app/auth/sso.py) requires to resolve-or-link an Azure account:
+    either a pre-existing external_id = "{tid}:{oid}" match, or a
+    configured AZURE_AD_TENANT_ID whose value equals the claim's own tid.
+    Lead ruling (board note 939): these tests must drive one of those two
+    real paths, not the now-correctly-refused "any unverified email claim
+    links any existing account" shape they used before the fix."""
+    tid = f"tid-{uuid.uuid4().hex[:8]}"
+    oid = f"oid-{uuid.uuid4().hex[:8]}"
+    return tid, oid, f"{tid}:{oid}"
+
+
 def _make_admin(db_session, org, *, mfa_enabled=False, mfa_secret=None):
     from app.models import Role
     from app.models.user import User
@@ -244,10 +257,16 @@ def test_sso_callback_sends_an_org_admin_of_an_invited_org_to_the_mfa_challenge(
     home_org = make_org("sso-mfa-gate-invited-home")
     other_org = make_org("sso-mfa-gate-invited-other")
     user = _make_user_with_org_role(db_session, home_org, role_org=other_org)
+    tid, oid, external_id = _azure_identity()
+    user.external_id = external_id
+    user.sso_provider = "azure"
+    db_session.commit()
 
     client = app.test_client()
     userinfo = {
         "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "oid": oid,
+        "tid": tid,
         "email": user.email,
         "given_name": "Invited",
         "family_name": "Admin",
@@ -553,10 +572,16 @@ def test_sso_callback_sends_an_mfa_enrolled_administrator_to_the_challenge(
     secret = pyotp.random_base32()
     org = make_org("sso-mfa-gate-enrolled")
     admin = _make_admin(db_session, org, mfa_enabled=True, mfa_secret=secret)
+    tid, oid, external_id = _azure_identity()
+    admin.external_id = external_id
+    admin.sso_provider = "azure"
+    db_session.commit()
 
     client = app.test_client()
     userinfo = {
         "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "oid": oid,
+        "tid": tid,
         "email": admin.email,
         "given_name": "Ada",
         "family_name": "Lovelace",
@@ -590,10 +615,16 @@ def test_sso_callback_mfa_pending_sets_remember_false(
     secret = pyotp.random_base32()
     org = make_org("sso-mfa-gate-remember-false")
     admin = _make_admin(db_session, org, mfa_enabled=True, mfa_secret=secret)
+    tid, oid, external_id = _azure_identity()
+    admin.external_id = external_id
+    admin.sso_provider = "azure"
+    db_session.commit()
 
     client = app.test_client()
     userinfo = {
         "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "oid": oid,
+        "tid": tid,
         "email": admin.email,
         "given_name": "Ada",
         "family_name": "Lovelace",
@@ -612,10 +643,16 @@ def test_sso_callback_still_logs_in_a_plain_user_no_regression(
 ):
     org = make_org("sso-mfa-gate-plain")
     user = _make_plain_user(db_session, org)
+    tid, oid, external_id = _azure_identity()
+    user.external_id = external_id
+    user.sso_provider = "azure"
+    db_session.commit()
 
     client = app.test_client()
     userinfo = {
         "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "oid": oid,
+        "tid": tid,
         "email": user.email,
         "given_name": "Grace",
         "family_name": "Hopper",
@@ -649,7 +686,10 @@ def _v1_forced_app(monkeypatch):
     return v1_app
 
 
-def _v1_seed_user(v1_app, label, *, mfa_enabled=False, mfa_secret=None, plain=False):
+def _v1_seed_user(
+    v1_app, label, *, mfa_enabled=False, mfa_secret=None, plain=False,
+    external_id=None, sso_provider=None,
+):
     """Create an Organization + User directly against the forced v1 app's
     own engine/connection and commit for real (see the module docstring
     above on why this bypasses the db_session savepoint fixture)."""
@@ -679,6 +719,9 @@ def _v1_seed_user(v1_app, label, *, mfa_enabled=False, mfa_secret=None, plain=Fa
         if not plain:
             user.mfa_enabled = mfa_enabled
             user.mfa_secret = mfa_secret
+        if external_id is not None:
+            user.external_id = external_id
+            user.sso_provider = sso_provider
         db.session.add(user)
         db.session.commit()
         user_id, user_email = user.id, user.email
@@ -734,12 +777,16 @@ def test_v1_sso_callback_sends_an_mfa_enrolled_administrator_to_the_challenge(
     v1 is what is actually registered."""
     v1_app = _v1_forced_app(monkeypatch)
     secret = pyotp.random_base32()
+    tid, oid, external_id = _azure_identity()
     admin_id, admin_email = _v1_seed_user(
-        v1_app, "v1-sso-mfa-gate-enrolled", mfa_enabled=True, mfa_secret=secret
+        v1_app, "v1-sso-mfa-gate-enrolled", mfa_enabled=True, mfa_secret=secret,
+        external_id=external_id, sso_provider="azure",
     )
 
     userinfo = {
         "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "oid": oid,
+        "tid": tid,
         "email": admin_email,
         "given_name": "Ada",
         "family_name": "Lovelace",
@@ -758,10 +805,16 @@ def test_v1_sso_callback_sends_an_mfa_enrolled_administrator_to_the_challenge(
 
 def test_v1_sso_callback_still_logs_in_a_plain_user_no_regression(monkeypatch):
     v1_app = _v1_forced_app(monkeypatch)
-    _, user_email = _v1_seed_user(v1_app, "v1-sso-mfa-gate-plain", plain=True)
+    tid, oid, external_id = _azure_identity()
+    _, user_email = _v1_seed_user(
+        v1_app, "v1-sso-mfa-gate-plain", plain=True,
+        external_id=external_id, sso_provider="azure",
+    )
 
     userinfo = {
         "sub": f"external-{uuid.uuid4().hex[:8]}",
+        "oid": oid,
+        "tid": tid,
         "email": user_email,
         "given_name": "Grace",
         "family_name": "Hopper",

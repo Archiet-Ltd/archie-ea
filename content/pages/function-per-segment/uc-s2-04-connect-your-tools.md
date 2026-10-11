@@ -8,7 +8,7 @@ capture_status: awaiting_capture
 url_slug: /use-cases/import-from-jira-and-github
 ---
 
-# Pull our systems and initiatives from Jira and GitHub instead of typing them in
+# Pull our systems and initiatives from Jira and ServiceNow instead of typing them in
 
 **For scale-up CTOs and VPs of Engineering.**
 
@@ -19,9 +19,9 @@ tooling at a fifty-person company. Nobody has a headcount for keeping a diagram 
 
 ## What Entelim answers
 
-Connect Jira, GitHub or Azure DevOps, and ServiceNow, and Entelim reads what you already keep
-current in them. The model becomes a by-product of systems your team already maintains, not a new
-one to look after — with a connector health page so you can see exactly what's feeding it.
+Connect Jira and ServiceNow, and Entelim reads what you already keep current in them. The model
+becomes a by-product of systems your team already maintains, not a new one to look after — with a
+connector health page so you can see exactly what's feeding it.
 
 ## Related
 

@@ -199,6 +199,27 @@ def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
     port = _free_port()
     env = dict(os.environ)
     env.update(extra_env or {})
+    # PUBLIC_BASE_URL (config.py) is the one source of the OAuth/MCP
+    # "resource" identifier -- every oauth_provider route that validates a
+    # resource parameter (POST /oauth/authorize, POST /oauth/token) checks it
+    # against *this server's own* PUBLIC_BASE_URL, which tests/smoke/
+    # test_mcp_consent.py builds dynamically as `live_server + "/mcp"` (it
+    # cannot know this subprocess's port in advance, since _free_port() picks
+    # it above). This subprocess's PUBLIC_BASE_URL must match that exact
+    # ephemeral port, so it is always set here -- not setdefault -- to
+    # override whatever fixed value (or none at all) the caller's own shell
+    # happens to carry, which running any MCP-enabled test module alongside
+    # this one requires regardless (tests/conftest.py's `app` fixture, a
+    # dependency of `live_server` itself, fails fast when MCP_ENABLED is true
+    # and PUBLIC_BASE_URL is empty). A caller that genuinely needs a
+    # different value for one journey (e.g. testing a real mismatch) can
+    # still win via `extra_env`, applied above and so already present in
+    # `env` by the time this checks it.
+    if "PUBLIC_BASE_URL" not in (extra_env or {}):
+        env["PUBLIC_BASE_URL"] = "http://127.0.0.1:%d" % port
+    # The assistant connector is off by default; the consent journey needs it on in
+    # the server it drives, and no other journey is affected by its extra routes.
+    env.setdefault("MCP_ENABLED", "true")
     _require_explicit_test_database(env)
     if ai_protocol_stub is not None:
         env = ai_protocol_stub.child_environment(env)
@@ -445,22 +466,9 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
         out["ids"]["org"] = org.id
 
         # Enable the implementation_planning feature flag so /implementation/ routes work
-        from app.models.feature_flags import FeatureFlag, FeatureState
-        impl_flag = FeatureFlag.query.filter_by(key="architecture_implementation_planning").first()
-        if not impl_flag:
-            impl_flag = FeatureFlag(
-                key="architecture_implementation_planning",
-                name="Architecture Implementation Planning",
-                description="Enable the Implementation Planning module (gap discovery, work packages, plateaus)",
-                enabled=True,
-                state=FeatureState.STABLE,
-            )
-            db.session.add(impl_flag)
-            db.session.commit()
-        elif not impl_flag.enabled or impl_flag.state != FeatureState.STABLE:
-            impl_flag.enabled = True
-            impl_flag.state = FeatureState.STABLE
-            db.session.commit()
+        from tests.conftest import seed_implementation_planning_flag
+
+        seed_implementation_planning_flag()
 
         if ai_protocol_stub is not None:
             from tests.smoke.ai_protocol_stub import MODEL, TOKEN
@@ -747,10 +755,25 @@ def browser(request):
     try:
         b = engine.launch(headless=True)
     except Exception as exc:                      # no browser binary in this env
-        message = "%s unavailable: %s" % (engine_name, str(exc)[:120])
-        if os.environ.get("SMOKE_REQUIRE_BROWSER") == "1":
-            pytest.fail(message)
-        pytest.skip(message)
+        # Some sandboxes pre-install a browser revision that doesn't match
+        # the pinned Playwright pip package (it then looks for a newer
+        # chromium_headless_shell revision that was never downloaded). Retry
+        # once against the generic pre-installed executable before giving up
+        # -- same fallback the environment's own docs recommend for the
+        # Node/@playwright/test side.
+        fallback = os.environ.get("SMOKE_CHROMIUM_EXECUTABLE") or "/opt/pw-browsers/chromium"
+        if engine_name == "chromium" and os.path.exists(fallback):
+            try:
+                b = engine.launch(headless=True, executable_path=fallback)
+            except Exception:
+                b = None
+        else:
+            b = None
+        if b is None:
+            message = "%s unavailable: %s" % (engine_name, str(exc)[:120])
+            if os.environ.get("SMOKE_REQUIRE_BROWSER") == "1":
+                pytest.fail(message)
+            pytest.skip(message)
     yield b
     b.close()
 

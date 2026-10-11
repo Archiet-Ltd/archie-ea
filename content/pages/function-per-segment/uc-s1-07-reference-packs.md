@@ -27,7 +27,7 @@ list written in the vendor's own words, and Entelim creates the right elements f
 provenance attached, so you can always see they came from a pack, not something you typed. The
 Impact question then answers over all of it at once, immediately.
 
-Coming December 2026 to February 2027. Join the waiting list and we'll tell you the day it ships.
+Coming in an upcoming release. Join the waiting list and we'll tell you the day it ships.
 
 ## Who this is for
 

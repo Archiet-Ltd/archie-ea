@@ -293,3 +293,110 @@ class TestConnectorAdminRoutesAreTenantScoped:
             assert reloaded.config.get("instance_url") == "https://b-original.atlassian.net", (
                 "TENANT LEAK: org A's save overwrote org B's Jira configuration."
             )
+
+
+# --------------------------------------------------------------------- #
+# ServiceNow admin route (org-scoped OrgConnectorConfig + OrgCredentialVault)
+# --------------------------------------------------------------------- #
+
+
+class TestServiceNowConnectorRouteStoresSecretInVault:
+    """The ServiceNow connector admin route (``/admin/connectors/servicenow``,
+    backed by the retired ``OrgConnectorConfig``) must save the client secret
+    through ``OrgCredentialVault`` instead of the retired setter, and that
+    secret must be encrypted per organisation — never shared or readable
+    across organisations."""
+
+    def test_save_succeeds_and_stores_the_secret_encrypted_via_the_vault(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.models.connector_config import OrgConnectorConfig, OrgConnectorCredential
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        secret = uuid.uuid4().hex
+        login_as(client, admin_a)
+        resp = client.post(
+            "/admin/connectors/servicenow",
+            data={
+                "instance_url": "https://org-a.service-now.com",
+                "client_id": "org-a-client-id",
+                "client_secret": secret,
+                "ci_query_filter": "",
+                "field_mapping": "{}",
+                "enabled": "on",
+            },
+        )
+
+        # Before this fix, OrgConnectorConfig.client_secret's retired setter
+        # raised RuntimeError here, surfacing as a 500.
+        assert resp.status_code in (200, 302), (
+            f"ServiceNow save must not fail now that the setter is retired "
+            f"(got {resp.status_code})."
+        )
+
+        cfg = OrgConnectorConfig.query.filter_by(
+            organization_id=org_a.id, connector_type="servicenow"
+        ).first()
+        assert cfg is not None
+        # Non-secret settings still live on OrgConnectorConfig, as before.
+        assert cfg.instance_url == "https://org-a.service-now.com"
+        assert cfg.client_id == "org-a-client-id"
+        assert cfg.enabled is True
+        # The retired column must never receive the new secret.
+        assert cfg._client_secret_encrypted is None
+
+        row = OrgConnectorCredential.query.filter_by(
+            organization_id=org_a.id,
+            connector_type="servicenow",
+            credential_type="client_secret",
+        ).first()
+        assert row is not None, "The secret must be stored via OrgConnectorCredential."
+        assert secret.encode() not in row.encrypted_value, (
+            "The secret must be stored encrypted, not as plaintext."
+        )
+
+        retrieved = OrgCredentialVault().retrieve(org_a.id, "servicenow", "client_secret")
+        assert retrieved == secret
+
+    def test_secret_is_isolated_between_organisations(
+        self, db_session, org_a, org_b, admin_a, admin_b, client, login_as, tenant_ctx
+    ):
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        secret_a = uuid.uuid4().hex
+        secret_b = uuid.uuid4().hex
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors/servicenow",
+            data={
+                "instance_url": "https://org-a.service-now.com",
+                "client_id": "org-a-client-id",
+                "client_secret": secret_a,
+                "enabled": "on",
+            },
+        )
+
+        login_as(client, admin_b)
+        client.post(
+            "/admin/connectors/servicenow",
+            data={
+                "instance_url": "https://org-b.service-now.com",
+                "client_id": "org-b-client-id",
+                "client_secret": secret_b,
+                "enabled": "on",
+            },
+        )
+
+        # The test client's last request left g.current_org_id set to org B
+        # (the app context is held open for the whole test, per login_as's
+        # docstring) — read each org's secret back inside its own tenant
+        # context, exactly as a real request for that org would.
+        vault = OrgCredentialVault()
+        with tenant_ctx(org_a.id):
+            assert vault.retrieve(org_a.id, "servicenow", "client_secret") == secret_a
+        with tenant_ctx(org_b.id):
+            assert vault.retrieve(org_b.id, "servicenow", "client_secret") == secret_b, (
+                "TENANT LEAK: org B's saved secret was not the one org B submitted — "
+                "org A's save may have overwritten it."
+            )

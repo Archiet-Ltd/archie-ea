@@ -630,7 +630,10 @@ def test_billing_page_uses_the_switched_organisation(app, db_session, client, lo
 
     home_org, admin = _admin_org(db_session, "home")
     switched_org = _org(db_session, "second")
-    OrgRole.set_role(switched_org.id, admin.id, "architect", granted_by_id=admin.id)
+    # Billing authority follows the ACTIVE organisation: the viewer must be an
+    # org_admin of the organisation they switched into (an architect grant
+    # there is covered by the refusal test below).
+    OrgRole.set_role(switched_org.id, admin.id, "org_admin", granted_by_id=admin.id)
     _subscription(db_session, switched_org, plan=SubscriptionPlan.team, seats_purchased=20)
     db_session.commit()
 
@@ -653,6 +656,33 @@ def test_billing_page_uses_the_switched_organisation(app, db_session, client, lo
     assert switched_org.name in html
     assert home_org.name not in html
     assert 'data-testid="billing-current-plan">Team<' in html
+
+
+def test_home_org_admin_switched_into_another_org_is_refused_its_billing(
+    app, db_session, client, login_as, no_billing
+):
+    """Active-org property: administering your HOME organisation grants nothing
+    over billing in an organisation you merely hold a lesser role in."""
+    from app.models.org_role import OrgRole
+    from app.models.subscription import SubscriptionPlan
+
+    home_org, admin = _admin_org(db_session, "home-refused")
+    switched_org = _org(db_session, "second-refused")
+    OrgRole.set_role(switched_org.id, admin.id, "architect", granted_by_id=admin.id)
+    _subscription(db_session, switched_org, plan=SubscriptionPlan.team, seats_purchased=20)
+    db_session.commit()
+
+    with app.app_context():
+        login_as(client, admin)
+        client.post("/account/switch-organization",
+                    data={"organization_id": str(switched_org.id)}, follow_redirects=True)
+        login_as(client, admin)
+        page = client.get("/admin/billing/")
+        login_as(client, admin)
+        upgrade = client.post("/admin/billing/upgrade", data={"plan": "startup", "interval": "year"})
+
+    assert page.status_code == 403
+    assert upgrade.status_code == 403
 
 
 def test_currency_context_and_filter_follow_the_switched_organisation(app, db_session, make_org):

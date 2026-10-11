@@ -25,7 +25,7 @@ support.
 Capacity planning joined to the same accountability and programme data Entelim already tracks, so a
 transformation plan can name its skills gap in the same place it names its work packages.
 
-Coming 2027. Join the waiting list and we'll tell you the day it ships.
+Coming in an upcoming release. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 

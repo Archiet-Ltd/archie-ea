@@ -444,10 +444,15 @@ def init_scheduler(app):
         def run_approval_escalation():
             with app.app_context():
                 try:
+                    from app.jobs.tenant_safe_job import platform_scope
                     from app.modules.ai_chat.services.ai_chat_approval_service import (
                         escalate_overdue_approvals,
                     )
-                    escalate_overdue_approvals(app)
+
+                    # Sweeps every organisation's overdue approvals in one pass and
+                    # groups them by organization_id itself.
+                    with platform_scope("approval escalation: one sweep across every organisation's overdue approvals"):
+                        escalate_overdue_approvals(app)
                 except Exception as exc:
                     import logging
                     logging.getLogger(__name__).error(
@@ -536,7 +541,12 @@ def init_scheduler(app):
                             ARBWaiverExpiryBatchService,
                         )
 
-                        result = ARBWaiverExpiryBatchService.run_configured()
+                        from app.jobs.tenant_safe_job import platform_scope
+
+                        # One locked batch over the configured organisations; every
+                        # statement in it names its organization_id explicitly.
+                        with platform_scope("typed ARB waiver expiry: the configured organisations in one locked batch"):
+                            result = ARBWaiverExpiryBatchService.run_configured()
                         import logging
                         log = logging.getLogger(__name__)
                         if result.failed_count:
@@ -587,8 +597,13 @@ def init_scheduler(app):
             def run_capability_projection():
                 with app.app_context():
                     from app.jobs.capability_projection_job import run_capability_projection_job
+                    from app.jobs.tenant_safe_job import platform_scope
 
-                    run = run_capability_projection_job()
+                    # All-tenant by design (see the module docstring on
+                    # capability_projection_job); the projection reads and writes
+                    # every organisation's business_capability rows in one pass.
+                    with platform_scope("capability projection: one all-tenant pass over business_capability"):
+                        run = run_capability_projection_job()
                     if run.status == "failed":
                         app.logger.error(
                             "APScheduler capability projection failed: %s", run.as_dict()

@@ -275,6 +275,20 @@ def init_cli(app):
         app.logger.warning(f"\u26a0\ufe0f  Failed to register dedupe entities CLI: {e}")
 
     try:
+        from app.commands.prune_oauth_clients import init_app as init_prune_oauth_clients
+        init_prune_oauth_clients(app)
+        app.logger.info("OAuth client pruning CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register OAuth client pruning CLI: {e}")
+
+    try:
+        from app.commands.create_service_client import init_app as init_create_service_client
+        init_create_service_client(app)
+        app.logger.info("Service client creation CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register service client creation CLI: {e}")
+
+    try:
         from app.commands.clean_test_artefacts import init_app as init_clean_test_artefacts
         init_clean_test_artefacts(app)
         app.logger.info("\u2705 Clean test artefacts CLI command registered")
@@ -515,6 +529,14 @@ def init_cli(app):
         app.logger.info("✅ Application owners backfill CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register application owners backfill CLI: {e}")
+
+    # Cost fact store backfill
+    try:
+        from app.commands import backfill_cost_facts
+        backfill_cost_facts.init_app(app)
+        app.logger.info("✅ Cost fact backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register cost fact backfill CLI: {e}")
 
     try:
         from app.commands.clear_foreign_assignees import init_app as init_clear_foreign_assignees

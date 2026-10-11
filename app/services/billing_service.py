@@ -572,7 +572,13 @@ class BillingService:
         except ValueError as exc:
             logger.warning("Stripe webhook payload unreadable: %s", exc)
             return {"ok": False, "status": 400, "error": "Invalid payload"}
-        return cls.process_event(json.loads(payload))
+        from app.jobs.tenant_safe_job import platform_scope
+
+        # A signed provider event carries no signed-in user; it names the
+        # organisation by customer id, so the lookup that finds the organisation
+        # and the billing_events rows it writes need the platform scope.
+        with platform_scope("billing webhook: a signed provider event names the organisation by customer id"):
+            return cls.process_event(json.loads(payload))
 
     _HANDLED = (
         "checkout.session.completed",

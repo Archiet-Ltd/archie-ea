@@ -5,17 +5,28 @@ import logging
 import re
 from datetime import datetime
 
-from flask import current_app, g, jsonify, redirect, render_template, request, url_for
+from flask import abort, current_app, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from app import db
 from app.main.views import main
 from app.models.roadmap import RoadmapTask
-from app.models.roadmap_models import RoadmapDeliverable
+from app.models.implementation_migration import Deliverable
 from app.models.unified_capability import BusinessDomain, UnifiedCapability
 from app.models.unified_work_package import UnifiedWorkPackage
+from app.services import work_package_service
+from app.utils.tenant import current_organization_id
 from app.utils.tenant_users import escape_like_literal
+
+
+def _require_wp(wp_id):
+    """This organisation's work package, else a 404 (another organisation's id
+    is indistinguishable from a missing one)."""
+    work_package = work_package_service.get_work_package(wp_id, current_organization_id())
+    if work_package is None:
+        abort(404)
+    return work_package
 
 logger = logging.getLogger(__name__)
 
@@ -497,11 +508,11 @@ def get_capability_work_packages():
             # Get deliverable counts in a single query
             deliverable_count_query = (
                 db.session.query(
-                    RoadmapDeliverable.unified_work_package_id,
-                    func.count(RoadmapDeliverable.id).label("count"),
+                    Deliverable.unified_work_package_id,
+                    func.count(Deliverable.id).label("count"),
                 )
-                .filter(RoadmapDeliverable.unified_work_package_id.in_(wp_ids))
-                .group_by(RoadmapDeliverable.unified_work_package_id)
+                .filter(Deliverable.unified_work_package_id.in_(wp_ids))
+                .group_by(Deliverable.unified_work_package_id)
                 .all()
             )
 
@@ -612,7 +623,10 @@ def create_capability_work_package():
             business_capability = capability_names[0]
 
         # Create new work package
-        new_wp = UnifiedWorkPackage(
+        # Create through the one writer
+        new_wp = work_package_service.create_work_package(
+            organization_id=current_organization_id(),
+            user_id=current_user.id,
             name=data["name"],
             description=data.get("description", ""),
             business_capability=business_capability,
@@ -620,22 +634,14 @@ def create_capability_work_package():
             capability_names=capability_names if capability_names else None,
             assigned_to=data.get("assigned_to", "Unassigned"),
             status=data.get("status", "planned"),
-            start_date=datetime.fromisoformat(data["start_date"])
-            if isinstance(data["start_date"], str)
-            else data["start_date"],
-            end_date=datetime.fromisoformat(data["end_date"])
-            if isinstance(data["end_date"], str)
-            else data["end_date"],
+            start_date=data["start_date"],
+            end_date=data["end_date"],
             progress_percentage=data.get("progress_percentage", 0),
             estimated_cost=data.get("estimated_cost", 0),
             priority=data.get("priority", "medium"),
             risk_level=data.get("risk_level", "medium"),
             layer="implementation",  # Default layer for roadmap work packages
-            element_type="WorkPackage",
-            created_by=current_user.id,
         )
-
-        db.session.add(new_wp)
         db.session.commit()
 
         # Return the created work package with string ID
@@ -665,6 +671,14 @@ def create_capability_work_package():
 
         raise
 
+    except work_package_service.WorkPackageNotFound:
+        db.session.rollback()
+        return jsonify({"error": "Work package not found"}), 404
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+
     except Exception:
         db.session.rollback()
         return jsonify({"error": "An internal error occurred"}), 500
@@ -677,49 +691,25 @@ def update_capability_work_package(wp_id):
     try:
         data = request.get_json()
 
-        # Get existing work package
-        work_package = UnifiedWorkPackage.query.get_or_404(wp_id)
-
-        # Update fields
-        if "name" in data:
-            work_package.name = data["name"]
-        if "description" in data:
-            work_package.description = data["description"]
-        if "business_capability" in data:
-            work_package.business_capability = data["business_capability"]
-        # Multi-capability support
-        if "capability_ids" in data:
-            work_package.capability_ids = data["capability_ids"] if data["capability_ids"] else None
-        if "capability_names" in data:
-            work_package.capability_names = (
-                data["capability_names"] if data["capability_names"] else None
+        # Update through the one writer
+        fields = {
+            key: data[key]
+            for key in (
+                "name", "description", "business_capability", "capability_ids",
+                "capability_names", "assigned_to", "status", "start_date", "end_date",
+                "progress_percentage", "estimated_cost", "priority", "risk_level",
             )
-        if "assigned_to" in data:
-            work_package.assigned_to = data["assigned_to"]
-        if "status" in data:
-            work_package.status = data["status"]
-        if "start_date" in data:
-            work_package.start_date = (
-                datetime.fromisoformat(data["start_date"])
-                if isinstance(data["start_date"], str)
-                else data["start_date"]
-            )
-        if "end_date" in data:
-            work_package.end_date = (
-                datetime.fromisoformat(data["end_date"])
-                if isinstance(data["end_date"], str)
-                else data["end_date"]
-            )
-        if "progress_percentage" in data:
-            work_package.progress_percentage = data["progress_percentage"]
-        if "estimated_cost" in data:
-            work_package.estimated_cost = data["estimated_cost"]
-        if "priority" in data:
-            work_package.priority = data["priority"]
-        if "risk_level" in data:
-            work_package.risk_level = data["risk_level"]
-
-        work_package.updated_by = current_user.id
+            if key in data
+        }
+        for key in ("capability_ids", "capability_names"):
+            if key in fields and not fields[key]:
+                fields[key] = None
+        work_package = work_package_service.update_work_package(
+            wp_id,
+            organization_id=current_organization_id(),
+            user_id=current_user.id,
+            **fields,
+        )
         db.session.commit()
 
         return jsonify(
@@ -752,6 +742,14 @@ def update_capability_work_package(wp_id):
 
         raise
 
+    except work_package_service.WorkPackageNotFound:
+        db.session.rollback()
+        return jsonify({"error": "Work package not found"}), 404
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+
     except Exception:
         db.session.rollback()
         return jsonify({"error": "An internal error occurred"}), 500
@@ -762,11 +760,9 @@ def update_capability_work_package(wp_id):
 def delete_capability_work_package(wp_id):
     """Delete capability work package"""
     try:
-        # Get existing work package
-        work_package = UnifiedWorkPackage.query.get_or_404(wp_id)
-
-        # Delete work package
-        db.session.delete(work_package)
+        work_package_service.delete_work_package(
+            wp_id, organization_id=current_organization_id()
+        )
         db.session.commit()
 
         return jsonify({"success": True, "message": f"Work package {wp_id} deleted"})
@@ -774,6 +770,14 @@ def delete_capability_work_package(wp_id):
     except HTTPException:
 
         raise
+
+    except work_package_service.WorkPackageNotFound:
+        db.session.rollback()
+        return jsonify({"error": "Work package not found"}), 404
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
 
     except Exception:
         db.session.rollback()
@@ -791,7 +795,7 @@ def get_work_package_tasks(wp_id):
     """Get all tasks for a work package"""
     try:
         # Verify work package exists
-        work_package = UnifiedWorkPackage.query.get_or_404(wp_id)
+        work_package = _require_wp(wp_id)
 
         # Get tasks for this work package
         tasks = (
@@ -824,7 +828,7 @@ def create_work_package_task(wp_id):
     """Create a new task for a work package"""
     try:
         # Verify work package exists
-        UnifiedWorkPackage.query.get_or_404(wp_id)
+        _require_wp(wp_id)
 
         data = request.get_json()
 
@@ -873,7 +877,7 @@ def update_work_package_task(wp_id, task_id):
     """Update a task"""
     try:
         # Verify work package and task exist
-        UnifiedWorkPackage.query.get_or_404(wp_id)
+        _require_wp(wp_id)
         task = RoadmapTask.query.filter_by(id=task_id, unified_work_package_id=wp_id).first_or_404()
 
         data = request.get_json()
@@ -926,7 +930,7 @@ def delete_work_package_task(wp_id, task_id):
     """Delete a task"""
     try:
         # Verify work package and task exist
-        UnifiedWorkPackage.query.get_or_404(wp_id)
+        _require_wp(wp_id)
         task = RoadmapTask.query.filter_by(id=task_id, unified_work_package_id=wp_id).first_or_404()
 
         db.session.delete(task)
@@ -954,12 +958,12 @@ def get_work_package_deliverables(wp_id):
     """Get all deliverables for a work package"""
     try:
         # Verify work package exists
-        work_package = UnifiedWorkPackage.query.get_or_404(wp_id)
+        work_package = _require_wp(wp_id)
 
-        # Get deliverables for this work package
+        # Get deliverables for this work package (the one deliverable store)
         deliverables = (
-            RoadmapDeliverable.query.filter_by(unified_work_package_id=wp_id)
-            .order_by(RoadmapDeliverable.due_date.asc())
+            work_package_service.deliverables_query(current_organization_id(), wp_id)
+            .order_by(Deliverable.target_date.asc())
             .all()
         )
 
@@ -968,7 +972,7 @@ def get_work_package_deliverables(wp_id):
                 "success": True,
                 "work_package_id": wp_id,
                 "work_package_name": work_package.name,
-                "deliverables": [d.to_dict() for d in deliverables],
+                "deliverables": [work_package_service.deliverable_to_roadmap_dict(d) for d in deliverables],
                 "total_deliverables": len(deliverables),
             }
         )
@@ -987,7 +991,7 @@ def create_work_package_deliverable(wp_id):
     """Create a new deliverable for a work package"""
     try:
         # Verify work package exists
-        UnifiedWorkPackage.query.get_or_404(wp_id)
+        _require_wp(wp_id)
 
         data = request.get_json()
 
@@ -996,23 +1000,24 @@ def create_work_package_deliverable(wp_id):
             return jsonify({"error": "Missing required field: name"}), 400
 
         # Create new deliverable
-        new_deliverable = RoadmapDeliverable(
-            name=data["name"],
-            description=data.get("description", ""),
-            unified_work_package_id=wp_id,
-            status=data.get("status", "planned"),
-            due_date=datetime.fromisoformat(data["due_date"]) if data.get("due_date") else None,
-            approval_criteria=data.get("approval_criteria"),
-            deliverable_type=data.get("deliverable_type"),
-            related_task_ids=data.get("related_task_ids"),
-            archimate_element_type="Deliverable",
-            created_by=current_user.id,
-        )
-
-        db.session.add(new_deliverable)
+        fields = work_package_service.roadmap_deliverable_fields(data)
+        fields.setdefault("description", "")
+        fields.setdefault("delivery_status", "planned")
+        try:
+            new_deliverable = work_package_service.create_deliverable(
+                wp_id, organization_id=current_organization_id(), **fields
+            )
+        except work_package_service.WorkPackageNotFound:
+            abort(404)
+        except work_package_service.WorkPackageError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
         db.session.commit()
 
-        return jsonify({"success": True, "deliverable": new_deliverable.to_dict()}), 201
+        return jsonify({
+            "success": True,
+            "deliverable": work_package_service.deliverable_to_roadmap_dict(new_deliverable),
+        }), 201
 
     except HTTPException:
 
@@ -1031,43 +1036,24 @@ def update_work_package_deliverable(wp_id, deliverable_id):
     """Update a deliverable"""
     try:
         # Verify work package and deliverable exist
-        UnifiedWorkPackage.query.get_or_404(wp_id)
-        deliverable = RoadmapDeliverable.query.filter_by(
-            id=deliverable_id, unified_work_package_id=wp_id
-        ).first_or_404()
-
+        _require_wp(wp_id)
         data = request.get_json()
-
-        # Update fields
-        if "name" in data:
-            deliverable.name = data["name"]
-        if "description" in data:
-            deliverable.description = data["description"]
-        if "status" in data:
-            deliverable.status = data["status"]
-        if "due_date" in data:
-            deliverable.due_date = (
-                datetime.fromisoformat(data["due_date"]) if data["due_date"] else None
+        try:
+            deliverable = work_package_service.update_deliverable(
+                wp_id, deliverable_id, organization_id=current_organization_id(),
+                **work_package_service.roadmap_deliverable_fields(data),
             )
-        if "delivered_date" in data:
-            deliverable.delivered_date = (
-                datetime.fromisoformat(data["delivered_date"]) if data["delivered_date"] else None
-            )
-        if "approval_criteria" in data:
-            deliverable.approval_criteria = data["approval_criteria"]
-        if "approval_status" in data:
-            deliverable.approval_status = data["approval_status"]
-        if "quality_score" in data:
-            deliverable.quality_score = data["quality_score"]
-        if "deliverable_type" in data:
-            deliverable.deliverable_type = data["deliverable_type"]
-        if "related_task_ids" in data:
-            deliverable.related_task_ids = data["related_task_ids"]
-
-        deliverable.updated_by = current_user.id
+        except work_package_service.WorkPackageNotFound:
+            abort(404)
+        except work_package_service.WorkPackageError as exc:
+            db.session.rollback()
+            return jsonify({"error": str(exc)}), 400
         db.session.commit()
 
-        return jsonify({"success": True, "deliverable": deliverable.to_dict()})
+        return jsonify({
+            "success": True,
+            "deliverable": work_package_service.deliverable_to_roadmap_dict(deliverable),
+        })
 
     except HTTPException:
 
@@ -1087,12 +1073,13 @@ def delete_work_package_deliverable(wp_id, deliverable_id):
     """Delete a deliverable"""
     try:
         # Verify work package and deliverable exist
-        UnifiedWorkPackage.query.get_or_404(wp_id)
-        deliverable = RoadmapDeliverable.query.filter_by(
-            id=deliverable_id, unified_work_package_id=wp_id
-        ).first_or_404()
-
-        db.session.delete(deliverable)
+        _require_wp(wp_id)
+        try:
+            work_package_service.delete_deliverable(
+                wp_id, deliverable_id, organization_id=current_organization_id()
+            )
+        except work_package_service.WorkPackageNotFound:
+            abort(404)
         db.session.commit()
 
         return jsonify({"success": True, "message": f"Deliverable {deliverable_id} deleted"})
@@ -1117,7 +1104,7 @@ def get_work_package_details(wp_id):
     """Get complete work package details including tasks and deliverables"""
     try:
         # Get work package
-        work_package = UnifiedWorkPackage.query.get_or_404(wp_id)
+        work_package = _require_wp(wp_id)
 
         # Get associated capability
         capability = UnifiedCapability.query.filter_by(
@@ -1133,8 +1120,8 @@ def get_work_package_details(wp_id):
 
         # Get deliverables
         deliverables = (
-            RoadmapDeliverable.query.filter_by(unified_work_package_id=wp_id)
-            .order_by(RoadmapDeliverable.due_date.asc())
+            work_package_service.deliverables_query(current_organization_id(), wp_id)
+            .order_by(Deliverable.target_date.asc())
             .all()
         )
 
@@ -1147,7 +1134,7 @@ def get_work_package_details(wp_id):
 
         # Calculate deliverable statistics
         total_deliverables = len(deliverables)
-        delivered_count = len([d for d in deliverables if d.status == "delivered"])
+        delivered_count = len([d for d in deliverables if d.delivery_status == "delivered"])
         approved_count = len([d for d in deliverables if d.approval_status == "approved"])
 
         return jsonify(
@@ -1190,7 +1177,7 @@ def get_work_package_details(wp_id):
                     else None,
                 },
                 "tasks": [task.to_dict() for task in tasks],
-                "deliverables": [d.to_dict() for d in deliverables],
+                "deliverables": [work_package_service.deliverable_to_roadmap_dict(d) for d in deliverables],
                 "statistics": {
                     "total_tasks": total_tasks,
                     "completed_tasks": completed_tasks,

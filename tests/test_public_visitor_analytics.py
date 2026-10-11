@@ -72,7 +72,11 @@ class TestPageViewLogging:
         resp = _visit(client, "/")
         assert resp.status_code == 200
 
-        rows = PublicVisitorEvent.query.filter_by(event_type="page_view").all()
+        rows = (
+            PublicVisitorEvent.query.filter_by(event_type="page_view")
+            .order_by(PublicVisitorEvent.id)
+            .all()
+        )
         assert len(rows) == before + 1
         assert rows[-1].path == "/"
 
@@ -112,11 +116,14 @@ class TestPageViewLogging:
     def test_no_raw_ip_or_user_agent_stored_on_the_row(self, client, db_session):
         from app.models.public_visitor_event import PublicVisitorEvent
 
-        _visit(client, "/vision", environ_base={
+        # /vision is a merged-away page (301s to /about, see MERGED_PAGES in
+        # app/services/public_pages.py) -- it never reaches the page-view hook,
+        # which only fires on a 200. /about always renders.
+        _visit(client, "/about", environ_base={
             "REMOTE_ADDR": "203.0.113.77", "HTTP_USER_AGENT": "VerySpecificAgent/9.9",
         })
         row = (
-            PublicVisitorEvent.query.filter_by(event_type="page_view")
+            PublicVisitorEvent.query.filter_by(event_type="page_view", path="/about")
             .order_by(PublicVisitorEvent.id.desc())
             .first()
         )
@@ -138,7 +145,7 @@ class TestPageViewLogging:
         monkeypatch.setattr(
             "app.services.visitor_hash.current_utc_day", lambda: date(2026, 10, 7)
         )
-        client.get("/vision", **same_client_kwargs)
+        client.get("/about", **same_client_kwargs)
         day1 = (
             PublicVisitorEvent.query.filter_by(event_type="page_view")
             .order_by(PublicVisitorEvent.id.desc()).first()
@@ -147,7 +154,7 @@ class TestPageViewLogging:
         monkeypatch.setattr(
             "app.services.visitor_hash.current_utc_day", lambda: date(2026, 10, 8)
         )
-        client.get("/vision", **same_client_kwargs)
+        client.get("/about", **same_client_kwargs)
         day2 = (
             PublicVisitorEvent.query.filter_by(event_type="page_view")
             .order_by(PublicVisitorEvent.id.desc()).first()
