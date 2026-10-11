@@ -38,7 +38,6 @@ from app.models import (
 )
 from app.models.application_portfolio import ApplicationComponent
 from app.services.archimate.implementation_migration_service import ImplementationMigrationService
-from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService
 from app.services.decorators import transactional
 from app.services.llm_service import LLMService
 
