@@ -115,6 +115,7 @@ class ImpactAnalysisService:
                 "tco": 0.0,
                 "owner": row.get("owner"),
                 "health": row.get("health"),
+                "owners": row.get("owners", []),
             }
 
         # Build deps from the full (unpaginated) rows for scoring.
