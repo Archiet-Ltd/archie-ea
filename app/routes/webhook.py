@@ -10,14 +10,21 @@ import secrets
 from collections import defaultdict
 from datetime import datetime
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user
 
 from app import csrf
 from app.decorators import audit_log, require_auth
+from app.middleware.tenant_decorators import require_org_or_platform_admin
+from app.services.rate_limiter import RateLimitExceeded, _rate_limiter
 from app.services.webhook_service import WebhookService
 from app.utils.pagination import safe_int_arg
 webhook_bp = Blueprint("webhook", __name__, url_prefix="/api/webhooks")
+
+# Event publishes allowed per organisation per window, across all its users (the
+# app-wide limiter already holds each user to 30 writes a minute).
+PUBLISH_RATE_LIMIT = 120
+PUBLISH_RATE_WINDOW_SECONDS = 60
 
 
 # IP-based rate limiter for the public webhook receiver endpoint
@@ -249,12 +256,10 @@ def test_subscription(subscription_id):
 @audit_log("webhook_events_list")
 def list_events():
     """List webhook events (for debugging/admin purposes)"""
+    # Admin of the organisation being acted in, or a platform admin (403 otherwise).
+    require_org_or_platform_admin(getattr(g, "current_org_id", None))
     try:
         service = WebhookService()
-
-        # Only allow admins to list all events
-        if not hasattr(request, "user_roles") or "admin" not in request.user_roles:
-            return jsonify({"success": False, "error": "Admin access required"}), 403
 
         events = service.get_events(
             limit=safe_int_arg('limit', 50, minimum=1, maximum=500),
@@ -274,12 +279,9 @@ def list_events():
 @audit_log("webhook_event_retry")
 def retry_event(event_id):
     """Retry sending a failed webhook event"""
+    require_org_or_platform_admin(getattr(g, "current_org_id", None))
     try:
         service = WebhookService()
-
-        # Only allow admins to retry events
-        if not hasattr(request, "user_roles") or "admin" not in request.user_roles:
-            return jsonify({"success": False, "error": "Admin access required"}), 403
 
         success = service.retry_event(event_id)
         if not success:
@@ -468,11 +470,25 @@ def teams_notifications():
         return "", 500
 
 
+def _enforce_publish_rate_limit() -> None:
+    """One bucket per organisation in the app's shared rate limiter: the cost of
+    a publish is the deliveries it queues, and those are the organisation's, not
+    the individual user's."""
+    if not current_app.config.get("RATE_LIMITING_ENABLED", True):
+        return
+    limit = int(current_app.config.get("WEBHOOK_PUBLISH_RATE_LIMIT", PUBLISH_RATE_LIMIT))
+    key = f"webhook-publish:org:{getattr(g, 'current_org_id', None)}"
+    allowed, retry_after = _rate_limiter.check_rate_limit(key, limit, PUBLISH_RATE_WINDOW_SECONDS)
+    if not allowed:
+        raise RateLimitExceeded(limit, "1m", retry_after)
+
+
 @webhook_bp.route("/public/events", methods=["POST"])
 @require_auth
 @audit_log("webhook_event_publish")
 def publish_event():
     """Publish a custom event to all subscribed webhooks"""
+    _enforce_publish_rate_limit()
     try:
         user_id = str(current_user.id)  # webhook tables store user_id as String(36)
         data = request.get_json()

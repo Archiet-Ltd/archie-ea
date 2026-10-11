@@ -51,10 +51,15 @@ SALESFORCE_HOST_SUFFIXES = (
 )
 
 
+_CGNAT = ipaddress.ip_network("100.64.0.0/10")  # shared address space, not public
+
+
 def _is_public_ip(addr: str) -> bool:
     try:
         ip = ipaddress.ip_address(addr)
     except ValueError:
+        return False
+    if ip.version == 4 and ip in _CGNAT:
         return False
     return not (
         ip.is_private
