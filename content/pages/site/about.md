@@ -5,7 +5,7 @@ page_role: "The company page: the category Entelim is building, why now, what we
 source: docs/eim-category-positioning-v1.md sections 1 and 4; founder-vision-2026-09-24.md
 ---
 
-# We are building Enterprise Intelligence Management
+# We are building the company brain, through Enterprise Intelligence Management
 
 Every company, from a five-person startup to a global group, has a strategy, the capabilities that
 deliver it, the systems and suppliers those capabilities depend on, the money it spends, the risks it
@@ -14,10 +14,15 @@ contracts, tickets and people's heads. When someone asks "what breaks if this fa
 this really cost?" or "are we doing what we said we would?", the answer is assembled by hand, late,
 and rarely trusted.
 
-**Enterprise Intelligence Management is the capability that fixes this.** Customer relationship
+**This isn't a search problem, and it isn't a chatbot problem.** Searching your documents faster
+doesn't fix knowledge that was never written down in a structured, checkable form, and a chatbot
+repeats the same gaps with more confidence. What's missing is a company brain: a living, explainable
+model of how the enterprise actually works, kept current and queryable by the people who run it.
+
+**Enterprise Intelligence Management is the capability that builds it.** Customer relationship
 management gave every company one record of its customers. Enterprise resource planning gave it one
 record of its operations and finances. Enterprise Intelligence Management gives it one record of the
-enterprise itself: a living digital twin of strategy, business, applications, data, technology,
+enterprise itself: a company brain holding strategy, business, applications, data, technology,
 people, money, risk, suppliers, operations and AI, kept current from the systems that master each
 fact, and turned into answers, insights, recommendations and simulations for every person who runs
 the business, and for the machines that work for them.
@@ -39,17 +44,20 @@ change, nothing changes until a person approves it.
 blank organisation, and Entelim answers its first cross-layer question in minutes: what depends on
 this, what breaks if it fails, and who needs to know.
 
-## Why now: your AI assistants need a grounded source
+## Why now: every company needs a company brain
 
-AI assistants are becoming the way people ask questions about their company. An assistant without
-grounding produces confident, uncited answers. Enterprise Intelligence Management gives every
-assistant one governed, time-aware, cited model of the enterprise to stand on, the same way a CRM is
-the source a sales assistant should read about customers. That positions Entelim as the context layer
-other AI tools plug into, rather than another AI feature added to an architecture tool. Read access
-for external AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today,
-Entelim's own assistant already works this way: every action passes one permission check and every
-change waits for approval. See [Agentic Automation](/features#agentic-automation) among the
-eighteen capabilities.
+AI assistants are becoming the way people ask questions about their company, and the blocker is
+rarely the model anymore. It's that the company's own knowledge was never written down in a
+structured, checkable form. This isn't a problem a better search box or a chattier assistant fixes:
+it needs a living, explainable model of how the enterprise actually works, with every answer traced
+back to the record it came from. Enterprise Intelligence Management gives every assistant one
+governed, time-aware, cited model of the enterprise to stand on, the same way a CRM is the source a
+sales assistant should read about customers. That positions Entelim as the company brain other AI
+tools plug into, rather than another AI feature bolted onto an architecture tool. Read access for
+external AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today, Entelim's
+own assistant already works this way: every action passes one permission check and every change
+waits for approval. See [Agentic Automation](/features#agentic-automation) among the eighteen
+capabilities.
 
 ## What we believe
 
@@ -69,11 +77,11 @@ eighteen capabilities.
 
 ## Where Entelim is today, and where it goes
 
-Entelim's digital twin grows in five stages. Today it is **modelled**: import an existing
+Entelim's company brain grows in five stages. Today it is **modelled**: import an existing
 architecture model and ask cited questions about it. **Synchronised** (Q1 2027) connects it to the
 systems you already use and opens read access for your own AI assistants. **Operational** (Q2 2027)
 brings in operations and finance. **Predictive** (Q3 2027) adds forecasting and the first scenarios.
-**Self-maintaining** (Q1 2028) lets the twin keep itself current within limits you set. See
+**Self-maintaining** (Q1 2028) lets it keep itself current within limits you set. See
 [all eighteen capabilities](/features) for what each one delivers today and what quarter adds to it
 next.
 

@@ -42,18 +42,20 @@ from sqlalchemy.pool import NullPool
 
 REPO = Path(__file__).resolve().parents[1]
 MIGRATION_PATH = REPO / "migrations" / "versions" / "20261008_row_level_security.py"
+NOTIF_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261011_notif_rls.py"
 RUNTIME_ROLE = "archie_rls_test_runtime"
 RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run
 
 
-def _load_migration():
-    spec = importlib.util.spec_from_file_location("rls_migration_under_test", MIGRATION_PATH)
+def _load_migration(path, name):
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-MIGRATION = _load_migration()
+MIGRATION = _load_migration(MIGRATION_PATH, "rls_migration_under_test")
+NOTIF_MIGRATION = _load_migration(NOTIF_MIGRATION_PATH, "notif_rls_migration_under_test")
 
 
 def _apply_policies(engine):
@@ -62,6 +64,21 @@ def _apply_policies(engine):
         context = MigrationContext.configure(connection)
         with Operations.context(context):
             MIGRATION.upgrade()
+
+
+def _apply_notif_policies(engine):
+    """Run the notifications fence upgrade() on ``engine`` (idempotent).
+
+    ``notification`` rows live under row-level security decided in
+    ``20261011_notif_rls``, which the base 20261008 fence does not cover. The
+    fixture applies it so the notification isolation tests below run against
+    the real policy, including the NULL-org rule that keeps a legacy row visible
+    to its owning user.
+    """
+    with engine.begin() as connection:
+        context = MigrationContext.configure(connection)
+        with Operations.context(context):
+            NOTIF_MIGRATION.upgrade()
 
 
 class RlsEnv:
@@ -124,6 +141,7 @@ def rls(app, _schema):
             text(f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {RUNTIME_ROLE}")
         )
     _apply_policies(owner)
+    _apply_notif_policies(owner)
     runtime = create_engine(
         url.set(username=RUNTIME_ROLE, password=RUNTIME_PASSWORD), poolclass=NullPool
     )
@@ -178,6 +196,23 @@ class World:
                 {"n": name, "c": code, "o": org_id},
             ).scalar_one()
         self.shared_codes.append(code)
+        return row_id
+
+    def notification(self, user_id, organization_id, message):
+        """A notifications row for ``user_id``, optionally owned by ``organization_id``.
+
+        ``organization_id=None`` models the legacy NULL-org rows the backfill
+        leaves behind for a user with no organisation.
+        """
+        with self.rls.owner.begin() as connection:
+            row_id = connection.execute(
+                text(
+                    "INSERT INTO notifications (user_id, organization_id, message, url, read) "
+                    "VALUES (:u, :o, :m, '/n', false) RETURNING id"
+                ),
+                {"u": user_id, "o": organization_id, "m": message},
+            ).scalar_one()
+        self.extra_deletes.append(("notifications", "id", [row_id]))
         return row_id
 
     def cleanup(self):
@@ -478,6 +513,93 @@ def test_tenant_cannot_move_its_row_to_another_organisation(rls, world):
             connection.execute(
                 text("UPDATE application_components SET organization_id = :b WHERE id = :i"),
                 {"b": b, "i": a_id},
+            )
+
+
+# --------------------------------------------------------------------------- #
+# Notifications: writer must stamp the organisation; legacy NULL-org rows stay
+# visible to their owning user and never leak to another organisation
+# --------------------------------------------------------------------------- #
+
+
+def test_notification_service_creates_a_bell_notification_visible_to_its_owner_under_the_runtime_role(
+    app, rls, world
+):
+    """A bell notification created for a user is visible to that user when the
+    application runs as the non-owner, NOBYPASSRLS runtime role.
+
+    Fails without the fix: NotificationService.create used to leave
+    organization_id NULL, and the notifications INSERT policy refuses a NULL
+    organisation, so the row was never created (it was silently swallowed by
+    the caller's try/except or a savepoint rollback) and the bell never showed
+    it.
+    """
+    from app import db
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.services.notification_service import NotificationService
+
+    a = world.org("a")
+    user_id = _make_user(world, a, "bell", role="Architect")
+
+    created = None
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        with tenant_scope(a):
+            created = NotificationService.create(
+                user_id=user_id, message="bell msg", url="/api/notifications"
+            )
+            db.session.commit()
+            world.extra_deletes.append(("notifications", "id", [created.id]))
+
+    # Under the session organisation, the owner's own row is visible.
+    with rls.runtime_tx(a) as connection:
+        rows = connection.execute(
+            text("SELECT id FROM notifications WHERE user_id = :u AND message = 'bell msg'"),
+            {"u": user_id},
+        ).all()
+    assert len(rows) == 1
+
+
+def test_notifications_are_isolated_between_organisations_under_the_runtime_role(rls, world):
+    """Org A can never read org B's notifications at the database level, and a
+    legacy NULL-org notification stays visible to its owning organisation's
+    user (never to another organisation's context)."""
+    a, b = world.org("a"), world.org("b")
+    user_a = _make_user(world, a, "ua", role="Architect")
+    user_b = _make_user(world, b, "ub", role="Architect")
+    n_a = world.notification(user_a, a, "org-a secret")
+    n_b = world.notification(user_b, b, "org-b secret")
+    n_legacy = world.notification(user_a, None, "legacy null-org")
+
+    with rls.runtime_tx(a) as connection:
+        seen_a = {r[0] for r in connection.execute(text("SELECT id FROM notifications"))}
+    with rls.runtime_tx(b) as connection:
+        seen_b = {r[0] for r in connection.execute(text("SELECT id FROM notifications"))}
+
+    assert n_a in seen_a and n_b not in seen_a
+    assert n_legacy in seen_a        # the owning user's own legacy row stays visible
+    assert n_b in seen_b and n_a not in seen_b
+    assert n_legacy not in seen_b    # never leaked into the other organisation's context
+
+
+def test_notification_writer_cannot_stamp_another_organisations_context(rls, world):
+    """A notification written under org A context must carry org A; stamping it
+    wrong (or leaving it NULL) is refused by the fence, which is exactly why the
+    writers resolve the organisation from the recipient user."""
+    a, b = world.org("a"), world.org("b")
+    user_a = _make_user(world, a, "ua", role="Architect")
+
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(a) as connection:
+            connection.execute(
+                text("INSERT INTO notifications (user_id, organization_id, message) VALUES (:u, :b, 'x')"),
+                {"u": user_a, "b": b},
+            )
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(a) as connection:
+            connection.execute(
+                text("INSERT INTO notifications (user_id, organization_id, message) VALUES (:u, NULL, 'x')"),
+                {"u": user_a},
             )
 
 
