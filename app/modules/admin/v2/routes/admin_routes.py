@@ -618,7 +618,9 @@ def change_user_business_unit(user_id):
     organisation's people."""
     require_org_or_platform_admin(g.current_org_id)
     user = _svc.get_user_or_404(user_id)
-    form = ChangeBusinessUnitForm()
+    form = ChangeBusinessUnitForm(
+        business_unit_id=str(user.business_unit_id) if user.business_unit_id else ""
+    )
     form.business_unit_id.choices = _svc.business_unit_choices()
     if form.validate_on_submit():
         ok, message = _svc.assign_business_unit_and_describe(

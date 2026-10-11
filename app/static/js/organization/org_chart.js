@@ -166,8 +166,11 @@ document.addEventListener('alpine:init', () => {
         // The server's refusal reason when it sent one, else a fixed line.
         reportFailure(e, fallback) {
             if (!(window.Platform && Platform.toast)) return;
-            const reason = e && e.message && !/^HTTP \d+$/.test(e.message) ? e.message : '';
-            Platform.toast.error(reason || fallback);
+            // The API envelope carries the reason at data.error.message.
+            const detail = e && e.data && e.data.error;
+            const reason = (detail && typeof detail.message === 'string' && detail.message)
+                || (e && e.status && typeof e.message === 'string' ? e.message : '');
+            Platform.toast.error(reason && !/^HTTP \d+$/.test(reason) ? reason : fallback);
         },
 
         // ── Hierarchy editing ──────────────────────────────────────────────
@@ -224,7 +227,7 @@ document.addEventListener('alpine:init', () => {
 
         async removeUnit() {
             if (!this.selectedUnit) return;
-            if (!(await Platform.modal.confirm(`Remove "${this.selectedUnit.name}"? Refused while it has children, assigned people or other relationships.`))) {
+            if (!(await Platform.modal.confirm(`Remove "${this.selectedUnit.name}"? Refused while it has children, assigned people or other relationships.`, { destructive: true }))) {
                 return;
             }
             try {
