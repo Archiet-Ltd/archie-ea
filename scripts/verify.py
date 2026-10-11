@@ -1694,6 +1694,63 @@ def gate_llm_boundary(baseline: int) -> Result:
                   detail, count, baseline)
 
 
+def gate_interface_contract_unlisted() -> Result:
+    """Every token-accepting /api/v1 route is in the committed contract subset.
+    Zero tolerance — no ratchet."""
+    subset_path = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
+    if not subset_path.exists():
+        return Result("interface-contract-unlisted", SKIP,
+                      "no committed subset at app/config/api_contract_subset.yaml; "
+                      "run scripts/generate_api_contract_subset.py first")
+    try:
+        from scripts.check_interface_contract import check_unlisted_routes, _load_subset
+    except ImportError:
+        return Result("interface-contract-unlisted", FAIL,
+                      "could not import check_interface_contract module")
+    try:
+        os.environ.setdefault("FLASK_CONFIG", "testing")
+        from app import create_app
+        app = create_app("testing")
+    except Exception as exc:
+        return Result("interface-contract-unlisted", FAIL,
+                      f"could not boot the app: {exc}")
+    subset = _load_subset(subset_path)
+    passes, violations = check_unlisted_routes(app, subset)
+    if passes:
+        return Result("interface-contract-unlisted", PASS,
+                      "all token-accepting routes are in the contract subset")
+    detail = "\n".join(f"  {v}" for v in violations)
+    return Result("interface-contract-unlisted", FAIL, detail,
+                  measured=len(violations), baseline=0)
+
+
+def gate_interface_contract_unimplemented(baseline: int) -> Result:
+    """Subset operations with no matching token-accepting route — ratchet."""
+    subset_path = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
+    if not subset_path.exists():
+        return Result("interface-contract-unimplemented", SKIP,
+                      "no committed subset at app/config/api_contract_subset.yaml; "
+                      "run scripts/generate_api_contract_subset.py first")
+    try:
+        from scripts.check_interface_contract import count_unbuilt_operations, _load_subset
+    except ImportError:
+        return Result("interface-contract-unimplemented", FAIL,
+                      "could not import check_interface_contract module")
+    try:
+        os.environ.setdefault("FLASK_CONFIG", "testing")
+        from app import create_app
+        app = create_app("testing")
+    except Exception as exc:
+        return Result("interface-contract-unimplemented", FAIL,
+                      f"could not boot the app: {exc}")
+    subset = _load_subset(subset_path)
+    count = count_unbuilt_operations(app, subset)
+    detail = "" if count <= baseline else f"{count} unbuilt operation(s) > baseline {baseline}"
+    return Result("interface-contract-unimplemented",
+                  PASS if count <= baseline else FAIL,
+                  detail, count, baseline)
+
+
 def gate_count_checker(name: str, script: str, baseline: int) -> Result:
     """Run a checker whose final stdout line is its finding count."""
     proc = _run([sys.executable, script, "--count"])
@@ -1714,6 +1771,20 @@ def gate_count_checker(name: str, script: str, baseline: int) -> Result:
 
 def build_gates(baseline: dict) -> list[Gate]:
     return [
+        Gate("interface-contract-unlisted",
+             "Every token-accepting /api/v1 route is in the committed contract subset",
+             "zero", gate_interface_contract_unlisted,
+             remediation="run scripts/generate_api_contract_subset.py to regenerate the "
+                         "subset, or add the missing route to the contract",
+             tags=["static"]),
+        Gate("interface-contract-unimplemented",
+             "Subset operations with no matching token-accepting route",
+             "ratchet",
+             lambda: gate_interface_contract_unimplemented(
+                 baseline.get("interface_contract_unimplemented", 0)),
+             remediation="implement the missing route, or remove the operation from the "
+                         "subset's PUBLISHED_GROUPS",
+             tags=["static"]),
         Gate("compile", "Every module bytecode-compiles", "command", gate_compile,
              remediation="fix the reported SyntaxError", tags=["static", "fast"]),
         Gate("undefined-exports", "No __all__ entry names a missing symbol", "zero",
