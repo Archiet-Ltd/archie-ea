@@ -183,6 +183,21 @@ POLICY = {
         "solution_architect", "enterprise_architect", "business_architect",
         "security_architect", "data_architect",
     },
+    # CTO scorecard (supported estate, open exceptions, end-of-support
+    # exposure): gated on the "governance" section via can_access_section --
+    # the same section-based predicate shape as the Interface Register rows
+    # above. governance is granted, per ROLE_SECTION_ACCESS, to
+    # solution_architect, enterprise_architect, business_architect,
+    # arb_member, portfolio_manager, cto, security_architect, data_architect,
+    # compliance and risk; procurement, application_manager, finance,
+    # operations and non_technical_owner do not carry it and must be denied.
+    # The escalate POST route carries the identical _guard() and is covered
+    # by the same boundary.
+    "/architecture/cto-scorecard/": {
+        "solution_architect", "enterprise_architect", "business_architect",
+        "arb_member", "portfolio_manager", "cto", "security_architect",
+        "data_architect", "compliance", "risk",
+    },
     # The organisation's audit trail (query, export, verify). Gated by
     # governance_gate_reader_required: administrators, plus security
     # architects as readers. Every other persona is denied.
