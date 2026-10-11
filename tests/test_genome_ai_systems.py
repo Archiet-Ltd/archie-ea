@@ -5,9 +5,20 @@ Uses the shared fixtures in tests/conftest.py (db_session rolls back).
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from app.modules.enterprise_genome.emit.ai_systems_register import emit_ai_systems_register
+from app.modules.enterprise_genome.services.ai_system_classification import (
+    RISK_TIERS,
+    propose_classification,
+    accept_classification,
+    reject_classification,
+    get_classification,
+    can_mark_released,
+    mark_released,
+)
 from app.modules.enterprise_genome.services.ai_system_profile import (
     RETIRED_MODEL_IDS,
     model_currency,
@@ -178,3 +189,335 @@ def test_seed_is_idempotent_on_name(db_session, org):
     slice_data = build_ai_systems_slice(org.id, db_session)
     names = [s["name"] for s in slice_data["systems"]]
     assert names.count(ARCHIE_COPILOT_NAME) == 1
+
+
+# --- R1-B23 PR 2: risk class, release state, owner, classification gate -------
+
+
+def test_risk_tier_vocabulary_defined():
+    """The four EU AI Act tiers are defined once."""
+    assert RISK_TIERS == ("unacceptable", "high", "limited", "minimal")
+
+
+def test_profile_shows_risk_class_and_release_state_as_not_set_initially(db_session, org):
+    """A system with no classification or release state recorded shows 'not set'."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    p = profile_from_element(el)
+    assert p["risk_class"] == "not set"
+    assert p["release_state"] == "not set"
+
+
+def test_classification_proposal_creates_approval_record(db_session, org):
+    """Proposing a classification creates a pending approval in the queue."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    approval = propose_classification(
+        element=el,
+        proposed_risk_class="high",
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    assert approval is not None
+    assert approval.status.value == "pending"
+    assert approval.entity_type == "ai_system_classification"
+    assert approval.organization_id == org.id
+    # The classification is NOT applied yet
+    p = profile_from_element(el)
+    assert p["risk_class"] == "not set"
+
+
+def test_accepting_classification_sets_risk_class(db_session, org):
+    """Accepting the proposal sets the risk class on the element."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    approval = propose_classification(
+        element=el,
+        proposed_risk_class="high",
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+    p = profile_from_element(el)
+    assert p["risk_class"] == "high"
+
+
+def test_rejecting_classification_leaves_unclassified(db_session, org):
+    """Rejecting the proposal leaves the system unclassified."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    approval = propose_classification(
+        element=el,
+        proposed_risk_class="high",
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    reject_classification(approval.id, org.id)
+    db_session.flush()
+    p = profile_from_element(el)
+    assert p["risk_class"] == "not set"
+
+
+def test_high_risk_without_assessment_cannot_be_released(db_session, org):
+    """A high-risk system without an accepted assessment cannot be marked released."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    # Propose classification (pending — assessment not yet accepted)
+    propose_classification(
+        element=el,
+        proposed_risk_class="high",
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    result = mark_released(el, org.id)
+    assert result is False
+
+
+def test_high_risk_with_assessment_can_be_released(db_session, org):
+    """A high-risk system with an accepted assessment can be marked released."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    approval = propose_classification(
+        element=el,
+        proposed_risk_class="high",
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+    result = mark_released(el, org.id)
+    assert result is True
+    p = profile_from_element(el)
+    assert p["release_state"] == "released"
+
+
+def test_low_risk_system_can_be_released_without_assessment(db_session, org):
+    """A minimal-risk system can be released without an assessment."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    approval = propose_classification(
+        element=el,
+        proposed_risk_class="minimal",
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+    result = mark_released(el, org.id)
+    assert result is True
+
+
+def test_owner_read_through_application_owner(db_session, org, make_org):
+    """The owner shown on the register is read through ApplicationOwner."""
+    from app.models.application_owner import ApplicationOwner
+    from app.models.user import User
+
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+
+    # Create a user in the same org
+    user = User(email="owner@test.com", organization_id=org.id,
+                first_name="Test", last_name="Owner")
+    db_session.add(user)
+    db_session.flush()
+
+    # Set owner through ApplicationOwner
+    owner = ApplicationOwner(
+        element_type="ai_system",
+        element_id=el.id,
+        user_id=user.id,
+        ownership_type="primary",
+        organization_id=org.id,
+    )
+    db_session.add(owner)
+    db_session.flush()
+
+    # Read through profile
+    p = profile_from_element(el)
+    assert "owner" in p
+    assert p["owner"]["user_id"] == user.id
+    assert p["owner"]["ownership_type"] == "primary"
+
+
+def test_owner_not_in_profile_custom_properties(db_session, org):
+    """There is no owner key in the profile's custom_properties."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    props = el.custom_properties or {}
+    ai = props.get("ai_system") or {}
+    assert "owner" not in ai
+
+
+def test_model_restriction_through_provider_register(db_session, org):
+    """Models offered come from allowed provider rows; a blocked model is refused."""
+    from app.models.model_provider import ModelProvider
+
+    register_ai_system(db_session, org.id, name="Test System",
+                       provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    # Initially gpt-4o is allowed
+    assert ModelProvider.is_allowed_for_org("openai", "gpt-4o", org.id) is True
+
+    # Block it for this org
+    blocked = ModelProvider(
+        provider="openai",
+        model_version="gpt-4o",
+        organization_id=org.id,
+        is_platform_default=False,
+        is_allowed=False,
+    )
+    db_session.add(blocked)
+    db_session.flush()
+
+    # Now it should be refused
+    assert ModelProvider.is_allowed_for_org("openai", "gpt-4o", org.id) is False
+
+
+def test_two_org_classification_isolation(db_session, make_org):
+    """A's classifications never appear for B."""
+    from app.models.application_owner import ApplicationOwner
+    from app.models.user import User
+
+    org_a = make_org("a")
+    org_b = make_org("b")
+
+    el_a = register_ai_system(db_session, org_a.id, name="System A",
+                              provider="anthropic", model_id="claude-opus-5")
+    el_b = register_ai_system(db_session, org_b.id, name="System B",
+                              provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+
+    # Classify A's system
+    approval = propose_classification(
+        element=el_a,
+        proposed_risk_class="high",
+        organization_id=org_a.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org_a.id)
+    db_session.flush()
+
+    # A's system is classified
+    p_a = profile_from_element(el_a)
+    assert p_a["risk_class"] == "high"
+
+    # B's system is NOT classified
+    p_b = profile_from_element(el_b)
+    assert p_b["risk_class"] == "not set"
+
+    # B's slice does not include A's system
+    slice_b = build_ai_systems_slice(org_b.id, db_session)
+    names_b = [s["name"] for s in slice_b["systems"]]
+    assert "System A" not in names_b
+
+
+def test_two_org_provider_restriction_independent(db_session, make_org):
+    """B's provider restriction does not change A's register."""
+    from app.models.model_provider import ModelProvider, set_provider_restriction
+
+    org_a = make_org("a")
+    org_b = make_org("b")
+
+    # Block gpt-4o for B only
+    set_provider_restriction(org_b.id, "openai", "gpt-4o", allowed=False)
+    db_session.flush()
+
+    # A can still use gpt-4o
+    assert ModelProvider.is_allowed_for_org("openai", "gpt-4o", org_a.id) is True
+    # B cannot
+    assert ModelProvider.is_allowed_for_org("openai", "gpt-4o", org_b.id) is False
+
+
+def test_seed_is_idempotent_and_shows_archie_first(db_session, org):
+    """The product's own AI features appear as the first entries; idempotent seed."""
+    seed_archie_copilot(db_session, org.id)
+    seed_archie_copilot(db_session, org.id)
+    slice_data = build_ai_systems_slice(org.id, db_session)
+    names = [s["name"] for s in slice_data["systems"]]
+    assert names.count(ARCHIE_COPILOT_NAME) == 1
+    # Archie Copilot is the first entry
+    assert names[0] == ARCHIE_COPILOT_NAME
+
+
+def test_get_classification_returns_none_when_not_set(db_session, org):
+    """get_classification returns None for an unclassified system."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    assert get_classification(el) is None
+
+
+def test_get_classification_returns_class_after_accept(db_session, org):
+    """get_classification returns the risk class after acceptance."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    approval = propose_classification(
+        element=el,
+        proposed_risk_class="limited",
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+    assert get_classification(el) == "limited"
+
+
+def test_can_mark_released_false_for_high_risk_without_assessment(db_session, org):
+    """can_mark_released returns False for high-risk without accepted assessment."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    # Propose classification (pending — assessment not yet accepted)
+    propose_classification(
+        element=el,
+        proposed_risk_class="high",
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    assert can_mark_released(el, org.id) is False
+
+
+def test_can_mark_released_true_for_unclassified_system(db_session, org):
+    """can_mark_released returns True for an unclassified system (not high-risk)."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    # An unclassified system is not high-risk, so it can be released
+    assert can_mark_released(el, org.id) is True
+
+
+def test_can_mark_released_true_for_high_risk_with_assessment(db_session, org):
+    """can_mark_released returns True for high-risk with accepted assessment."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    approval = propose_classification(
+        element=el,
+        proposed_risk_class="high",
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+    assert can_mark_released(el, org.id) is True
