@@ -531,6 +531,7 @@ class User(UserMixin, db.Model):
         "solution_updates": True,
         "assignment_changes": True,
         "weekly_digest": True,
+        "digest_frequency": "weekly",
         "mention_notifications": True,
         "show_archimate_names": False,
     }

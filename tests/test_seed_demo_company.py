@@ -688,3 +688,67 @@ def test_elements_span_all_archimate_layers(app, db_session, make_org):
     expected = {"business", "application", "technology", "motivation", "strategy", "implementation"}
     missing = expected - layers
     assert not missing, f"missing layers: {missing}"
+
+# ── proof-asset data: the screens the public site photographs ───────────────
+# Marketing review v1 (S3 / P-06): the Applications screenshot showed four zero
+# tiles, "0 of 21 have a vendor" and "Not mapped" on every row, and the ARB
+# screenshot showed every tile as zero or a dash. These pin the seed so a
+# re-shoot can never again photograph an empty-looking demonstration company.
+
+
+def _seed_once():
+    os.environ["DEMO_USER_PASSWORD"] = "test-password"
+    try:
+        return seed_demo_company()
+    finally:
+        del os.environ["DEMO_USER_PASSWORD"]
+
+
+def test_application_portfolio_has_populated_tiles_vendors_and_capabilities(app, db_session, make_org):
+    from app.models.application_capability import ApplicationCapabilityMapping
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.unified_capability import UnifiedCapability
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    apps = ApplicationComponent.query.filter_by(organization_id=org_id).all()
+    by_stage = {}
+    for a in apps:
+        by_stage[a.lifecycle_status] = by_stage.get(a.lifecycle_status, 0) + 1
+    # Every tile the Applications screen shows is non-zero.
+    for stage in ("2.1 strategic", "2.2 tactical", "3. sunset", "5. decommissioned"):
+        assert by_stage.get(stage, 0) >= 1, f"no demo application at lifecycle {stage!r}: {by_stage}"
+    assert all(a.vendor_name for a in apps), "an application has no vendor recorded"
+    assert all(a.component_type for a in apps), "an application has no type"
+    mapped = {
+        m.application_component_id
+        for m in ApplicationCapabilityMapping.query.filter_by(organization_id=org_id).all()
+    }
+    assert mapped == {a.id for a in apps}, "every application maps to a capability"
+    # ADR 0008: the unified row is the projection of the business capability,
+    # not a second hand-written copy of it.
+    unified = UnifiedCapability.query.filter_by(organization_id=org_id).all()
+    assert len(unified) == 24
+    assert all(u.source_table == "business_capability" for u in unified)
+
+
+def test_arb_queue_has_real_reviews_with_cycle_times(app, db_session, make_org):
+    from app.models.architecture_review_board import ARBReviewItem
+
+    stats = _seed_once()
+    assert stats["arb_reviews_created"] == 9
+    items = ARBReviewItem.query.filter(ARBReviewItem.review_number.like("LQ-ARB-%")).all()
+    decided = [i for i in items if i.decision_date and i.submitted_at]
+    assert len(decided) >= 4
+    assert any(i.status == "rejected" for i in items)
+    assert any(i.status in ("submitted", "under_review") for i in items)
+    cycle = [(i.decision_date - i.submitted_at).days for i in decided]
+    assert all(c > 0 for c in cycle)
+
+
+def test_proof_asset_data_is_idempotent(app, db_session, make_org):
+    _seed_once()
+    again = _seed_once()
+    assert again["arb_reviews_created"] == 0
+    assert again["capability_mappings_created"] == 0
+    assert again["capabilities_created"] == 0

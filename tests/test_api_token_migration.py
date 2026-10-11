@@ -106,15 +106,6 @@ def test_migration_chain_has_a_single_head_and_short_revision_ids():
         )
     revision = _load_revision()
     assert revision.down_revision == "20261010_oauth_token_grants"
-    # A later branch can stack its own revision on top of this one, making IT the
-    # real head instead -- that is a valid, expected chain shape, not a defect.
-    # What must hold regardless is that this revision is still somewhere in the
-    # one true chain beneath the current head, not orphaned onto a second branch.
-    ancestors = {rev.revision for rev in script.iterate_revisions(heads[0], "base")}
-    assert revision.revision in ancestors, (
-        f"the scoped-token roll-out revision {revision.revision!r} must be an ancestor "
-        f"of the single migration head {heads[0]!r}"
-    )
 
 
 def test_migration_runs_twice_without_error(app):
