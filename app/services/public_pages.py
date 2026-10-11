@@ -366,12 +366,18 @@ class PublicPage:
         """Out of the sitemap, llms.txt/llms-full.txt and every nav/index
         listing, but still reachable at its own URL with a noindex tag.
 
-        True for a HOLD-verdict page (``HELD_PAGE_URLS`` -- not built yet)
-        and for a page withdrawn from discovery via front matter
-        ``state: not_planned`` (a feature that shipped as a page, then had
-        its release item pulled, with nothing left to build towards) --
-        both are the same "still reachable, just not advertised" case to
-        every caller, so one property covers both reasons.
+        True for a HOLD-verdict page (``HELD_PAGE_URLS`` -- not built yet),
+        for a page a content-writer has marked front matter
+        ``state: held`` (the page exists but its proof gate, a toggle it
+        depends on, or a SERP/volume check has not cleared -- the
+        content-writer who knows this has no access to edit
+        ``HELD_PAGE_URLS`` themselves, so the front-matter value is the
+        one source of truth they can actually set), and for a page
+        withdrawn from discovery via front matter ``state: not_planned``
+        (a feature that shipped as a page, then had its release item
+        pulled, with nothing left to build towards) -- all three are the
+        same "still reachable, just not advertised" case to every caller,
+        so one property covers them.
 
         A MERGE-verdict page (``MERGED_PAGES``) is a different case --
         its own URL 301s to a parent instead of rendering at all -- so it
@@ -380,7 +386,7 @@ class PublicPage:
         """
         return (
             self.url in HELD_PAGE_URLS
-            or self.front_matter.get("state") == "not_planned"
+            or self.front_matter.get("state") in ("held", "not_planned")
         )
 
     @property
