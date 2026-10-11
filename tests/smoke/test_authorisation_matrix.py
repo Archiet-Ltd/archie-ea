@@ -217,8 +217,8 @@ OVERSIGHT_POST_POLICY = {
 for _allowed in OVERSIGHT_POST_POLICY.values():
     _allowed.add("platform_admin")
 
-# AI Systems Register POST routes: release (admin_required) and assess
-# (permission_required(GENERAL)). These are tested with a real element id
+# AI Systems Register routes: release (admin_required); assess, classify and
+# the owner write routes (permission_required(GENERAL)). These are tested with a real element id
 # seeded in the fixture below.
 AI_SYSTEMS_RELEASE_PERMITTED = {"platform_admin"}
 AI_SYSTEMS_ASSESS_PERMITTED = {
@@ -228,6 +228,8 @@ AI_SYSTEMS_ASSESS_PERMITTED = {
     "finance", "compliance", "risk", "operations", "non_technical_owner",
     "platform_admin",
 }
+AI_SYSTEMS_CLASSIFY_PERMITTED = AI_SYSTEMS_ASSESS_PERMITTED
+AI_SYSTEMS_OWNER_WRITE_PERMITTED = AI_SYSTEMS_ASSESS_PERMITTED
 
 # The versioned Transformation Room collection is portfolio data.  These are
 # the persisted enterprise roles admitted by TransformationProgrammeService;
@@ -1172,3 +1174,62 @@ def test_ai_system_assess_route_authorisation(
             "%s was refused assess by the permission_required gate despite "
             "being permitted" % archetype
         )
+
+
+def _expect_gate(response, archetype, permitted, route):
+    if archetype not in permitted:
+        assert response.status == 403, (
+            "%s reached %s: expected 403, got %s" % (archetype, route, response.status)
+        )
+    else:
+        # A permitted archetype may get a redirect, a 4xx validation refusal or
+        # a success - anything except the permission gate's 403.
+        assert response.status != 403, (
+            "%s was refused %s by the permission gate despite being permitted"
+            % (archetype, route)
+        )
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_system_classify_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_system_element
+):
+    """POST /genome/ai-systems/<id>/classify is permission_required(GENERAL):
+    a Viewer cannot propose a classification."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/genome/ai-systems/%d/classify" % seeded_ai_system_element,
+        form={"csrf_token": _csrf_token(page), "risk_class": "minimal"},
+        max_redirects=0,
+    )
+    _expect_gate(response, archetype, AI_SYSTEMS_CLASSIFY_PERMITTED, "classify")
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_system_owner_set_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_system_element
+):
+    """POST /genome/api/ai-systems/<id>/owners is permission_required(GENERAL)."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/genome/api/ai-systems/%d/owners" % seeded_ai_system_element,
+        data={},
+        headers={"X-CSRFToken": _csrf_token(page), "Content-Type": "application/json"},
+        max_redirects=0,
+    )
+    _expect_gate(response, archetype, AI_SYSTEMS_OWNER_WRITE_PERMITTED, "owner set")
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_system_owner_delete_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_system_element
+):
+    """DELETE /genome/api/ai-systems/<id>/owners/<owner_id> is
+    permission_required(GENERAL)."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.delete(
+        live_server + "/genome/api/ai-systems/%d/owners/0" % seeded_ai_system_element,
+        headers={"X-CSRFToken": _csrf_token(page)},
+        max_redirects=0,
+    )
+    _expect_gate(response, archetype, AI_SYSTEMS_OWNER_WRITE_PERMITTED, "owner delete")
