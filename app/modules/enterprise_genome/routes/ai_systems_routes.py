@@ -12,6 +12,12 @@ Blueprint: ``ai_systems_genome_bp``, url_prefix ``/genome``.
                                             assessment.
   POST /genome/ai-systems/<id>/assess       queue an assessment proposal for
                                             one system (org-scoped).
+  POST /genome/ai-systems/<id>/classify     queue a risk classification proposal.
+  GET/POST/DELETE /genome/api/ai-systems/<id>/owners[/<owner_id>]
+                                            read, set and remove owners.
+
+Every route acts only on AI-system elements of the caller's organisation; any
+other element id answers 404.
 
 Login-gated, org-scoped (the tenant middleware scopes the ArchiMateElement reads
 by ``g.current_org_id``), CSP-safe form WITH ``csrf_token``. The blueprint is
@@ -63,10 +69,19 @@ def _org_scoped_element(element_id: int, org_id: int):
 
     if org_id is None:
         return None
-    return ArchiMateElement.query.filter_by(
+    from app.modules.enterprise_genome.services.ai_system_profile import is_ai_system
+
+    element = ArchiMateElement.query.filter_by(
         id=element_id,
         organization_id=org_id,
     ).first()
+    return element if element is not None and is_ai_system(element) else None
+
+
+def _wants_json() -> bool:
+    """True for API clients. A browser form submit sends ``*/*`` among its
+    accepted types and must get a redirect, not JSON."""
+    return request.is_json or request.accept_mimetypes.best == "application/json"
 
 
 @ai_systems_genome_bp.route("/ai-systems")
@@ -143,9 +158,10 @@ def ai_system_release(element_id):
 
     Limited to the administrator role, like the approval-queue accept that
     records the classification and the assessment. Refuses with the named
-    reason (HTTP 409) when the gate is shut — a high-risk system with no
-    accepted assessment — and leaves the system unreleased. The refusal
-    message is exactly what the register page shows for the system.
+    reason when the gate is shut and leaves the system unreleased: HTTP 409
+    JSON to an API client, a redirect back to the register with the reason
+    flashed to a browser form. The refusal message is exactly what the
+    register page shows for the system.
     """
     org_id = _current_org_id()
     if org_id is None:
@@ -162,12 +178,13 @@ def ai_system_release(element_id):
     result = mark_released(element, org_id)
     if not result.get("success"):
         reason = result.get("reason", "Release refused")
-        if request.is_json or request.accept_mimetypes.accept_json:
+        db.session.rollback()
+        if _wants_json():
             return jsonify(
                 {"success": False, "error": reason}
             ), 409
         flash(reason, "error")
-        return redirect(url_for("ai_systems_genome.ai_systems")), 409
+        return redirect(url_for("ai_systems_genome.ai_systems"))
 
     db.session.commit()
     return redirect(url_for("ai_systems_genome.ai_systems"))
@@ -204,9 +221,13 @@ def ai_system_attach_assessment(element_id):
             proposed_by_user_id=current_user.id,
         )
         db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
     except Exception:  # noqa: BLE001
         db.session.rollback()
         logger.exception("AI system assessment proposal failed for org %s", org_id)
+        flash("The assessment proposal could not be recorded.", "error")
 
     return redirect(url_for("ai_systems_genome.ai_systems"))
 
@@ -247,9 +268,13 @@ def ai_system_classify(element_id):
             proposed_by_user_id=current_user.id,
         )
         db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
     except Exception:  # noqa: BLE001
         db.session.rollback()
         logger.exception("AI system classification proposal failed for org %s", org_id)
+        flash("The classification proposal could not be recorded.", "error")
 
     return redirect(url_for("ai_systems_genome.ai_systems"))
 
@@ -279,8 +304,8 @@ def ai_system_owners(element_id):
 @login_required
 @permission_required(Permission.GENERAL)
 def ai_system_set_owner(element_id):
-    """Set an owner for an AI system element."""
-    from app.models.application_owner import ApplicationOwner
+    """Set an owner for an AI system element (a new primary replaces the old)."""
+    from app.services.element_ownership_service import set_element_owner
 
     org_id = _current_org_id()
     if org_id is None:
@@ -292,38 +317,22 @@ def ai_system_set_owner(element_id):
 
     data = request.get_json(silent=True) or {}
     user_id = data.get("user_id")
-    ownership_type = data.get("ownership_type", "primary")
     if not user_id:
         return jsonify({"message": "user_id is required"}), 400
 
-    # Check the user belongs to the same organisation.
-    from app.models.user import User
-
-    user = User.query.filter_by(id=user_id, organization_id=org_id).first()
-    if user is None:
-        return jsonify({"message": "User not found in this organisation"}), 400
-
-    # Remove existing primary owner if setting a new primary.
-    if ownership_type == "primary":
-        existing = ApplicationOwner.query.filter_by(
+    try:
+        record = set_element_owner(
             element_type="ai_system",
             element_id=element_id,
+            user_id=user_id,
             organization_id=org_id,
-            ownership_type="primary",
-        ).all()
-        for row in existing:
-            db.session.delete(row)
-
-    record = ApplicationOwner(
-        element_type="ai_system",
-        element_id=element_id,
-        user_id=user_id,
-        ownership_type=ownership_type,
-        organization_id=org_id,
-        assigned_by=current_user.id,
-    )
-    db.session.add(record)
-    db.session.commit()
+            ownership_type=data.get("ownership_type", "primary"),
+            assigned_by=current_user.id,
+            replace_primary=True,
+        )
+    except ValueError as exc:  # includes CrossOrganisationElementOwner
+        db.session.rollback()
+        return jsonify({"message": str(exc)}), 400
     return jsonify({"owner": record.to_dict()}), 201
 
 
@@ -337,6 +346,9 @@ def ai_system_delete_owner(element_id, owner_id):
     org_id = _current_org_id()
     if org_id is None:
         return jsonify({"message": "No organisation context"}), 400
+
+    if _org_scoped_element(element_id, org_id) is None:
+        return jsonify({"message": "AI system not found"}), 404
 
     record = ApplicationOwner.query.filter_by(
         id=owner_id,

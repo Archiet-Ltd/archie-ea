@@ -126,6 +126,15 @@ def _norm_enum(value, allowed: tuple[str, ...]) -> str:
     return v if v in allowed else UNKNOWN
 
 
+def is_ai_system(element) -> bool:
+    """True when *element* is a registered AI system: an ApplicationComponent
+    carrying the ``ai_system`` profile marker."""
+    if getattr(element, "type", None) != AI_SYSTEM_ELEMENT_TYPE:
+        return False
+    props = getattr(element, "custom_properties", None) or {}
+    return isinstance(props, dict) and AI_SYSTEM_MARKER in props
+
+
 def profile_from_element(element) -> dict:
     """Project one AI-system ``ArchiMateElement`` into a typed profile dict.
 
