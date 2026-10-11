@@ -361,77 +361,10 @@ class CapabilityGapAnalysisService:
 
         return gap_infos
 
-    def perform_compliance_rollup(self, capability_id: int) -> Dict[str, Any]:
-        """
-        Compliance Maturity Rollup:
-        1. Calculates compliance score for a capability.
-        2. Adjusts stored_maturity on the BusinessCapability model based on compliance impact.
-        3. Creates/Updates ComplianceGap entries for missing requirements.
-
-        This is the core function linking compliance to capability maturity.
-        """
-        cap = BusinessCapability.query.get(capability_id)
-        if not cap:
-            return {"status": "error", "message": f"Capability {capability_id} not found"}
-
-        # 1. Get Compliance Validation Results
-        compliance_results = ComplianceInheritanceService.validate_capability_compliance(
-            capability_id
-        )
-        score = compliance_results.get("compliance_score", 0.0)
-
-        # 2. Get Maturity Penalty Impact
-        # Compliance < 50% => cap at 1
-        # Compliance < 80% => cap at 2
-        # Otherwise no cap (max 5)
-        penalty_cap = ComplianceInheritanceService.get_compliance_impact_on_maturity(capability_id)
-
-        # 3. Adjust and persist StoredMaturity
-        original_maturity = cap.current_maturity_level
-
-        # Apply the compliance floor/cap
-        adjusted_maturity = (
-            min(original_maturity, penalty_cap) if penalty_cap < 5 else original_maturity
-        )
-
-        cap.current_maturity_level = adjusted_maturity
-
-        # 4. Sync Gaps to DB
-        gaps_created = 0
-        for app_val in compliance_results.get("application_validations", []):
-            for gap_dict in app_val.get("gaps", []):
-                # Identify if this gap already exists for this app and requirement
-                existing = ComplianceGap.query.filter_by(
-                    compliance_requirement_id=gap_dict["requirement_id"], status="open"
-                ).first()
-
-                if not existing:
-                    new_gap = ComplianceGap(
-                        gap_type="missing_requirement",
-                        title=f"Compliance Gap: {gap_dict['requirement_title']}",
-                        description=(
-                            f"Application '{app_val['application_name']}' does not satisfy requirement "
-                            f"'{gap_dict['requirement_title']}' inherited from Capability '{cap.name}'."
-                        ),
-                        compliance_requirement_id=gap_dict["requirement_id"],
-                        risk_level=gap_dict["severity"] or "medium",
-                        status="open",
-                        identified_at=utcnow(),
-                    )
-                    db.session.add(new_gap)
-                    gaps_created += 1
-
-        db.session.commit()
-
-        return {
-            "status": "success",
-            "capability_id": capability_id,
-            "compliance_score": score,
-            "original_maturity": original_maturity,
-            "stored_maturity": cap.current_maturity_level,
-            "penalty_applied": cap.current_maturity_level < original_maturity,
-            "gaps_created": gaps_created,
-        }
+    # perform_compliance_rollup was removed in favour of record_capability_maturity
+    # (capability_maturity_service.py). The uncalled method wrote
+    # current_maturity_level directly without history; it had no callers in the
+    # repository.
 
     def _serialize_decision_links(self, links: List[ADRCapabilityLink]) -> List[Dict]:
         if not links:

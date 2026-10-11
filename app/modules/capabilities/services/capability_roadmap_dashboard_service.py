@@ -865,13 +865,40 @@ class CapabilityRoadmapDashboardService:
         maturity_percentage = (total_score / total_weight * 100) if total_weight > 0 else 0
         maturity_level = int(maturity_percentage / 20)
 
-        # Update capability
-        capability.current_maturity_level = maturity_level
-        capability.last_assessment_date = datetime.now()
-        if assessor_id:
-            capability.last_assessed_by = assessor_id
+        # Route through the single write path when a corresponding
+        # BusinessCapability source exists, so the write leaves a history
+        # row and the projection listener keeps UnifiedCapability in sync.
+        from app.modules.capabilities.services.capability_maturity_service import (
+            record_capability_maturity,
+        )
 
-        db.session.commit()
+        bc_id = None
+        bc_org_id = None
+        if capability.source_table == "business_capability" and capability.source_id:
+            try:
+                bc_id = int(capability.source_id)
+                bc_org_id = capability.organization_id or capability.source_org_id
+            except (ValueError, TypeError):
+                pass
+
+        if bc_id is not None and bc_org_id is not None:
+            record_capability_maturity(
+                capability_id=bc_id,
+                organization_id=bc_org_id,
+                current=maturity_level,
+                assessor_user_id=assessor_id,
+                assessor_role="roadmap assessment",
+                commit=True,
+            )
+            db.session.refresh(capability)
+        else:
+            # Fallback: write directly on UnifiedCapability when no
+            # BusinessCapability source exists.
+            capability.current_maturity_level = maturity_level
+            capability.last_assessment_date = datetime.now()
+            if assessor_id:
+                capability.last_assessed_by = assessor_id
+            db.session.commit()
 
         # Generate recommendations
         recommendations = self._generate_maturity_recommendations(
