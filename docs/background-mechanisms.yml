@@ -1,0 +1,380 @@
+# Every background-work mechanism in the application, in one list.
+# Checked by scripts/check_background_mechanisms.py (gate: background-mechanisms).
+#
+# kind:        rq | celery | apscheduler | thread | process-pool | subprocess | other
+# class:       queue | scheduler | request-helper | generated-code
+# disposition: keep | move-to-pool | retire-after-pool | out-of-scope
+#
+# One entry per file, kind and entry function (an optional `instances: N` says
+# the function starts N of them). A file that starts a mechanism in a function
+# with no entry here fails the gate, so a second pool added to an already listed
+# file is caught; so does an entry whose file or function no longer uses it, an
+# entry naming a file that does not exist (`other` entries included) and a
+# duplicate key. The number of thread instances and the number of files holding
+# them may only fall. For rq, celery, apscheduler and multiprocessing the
+# construct is the import, so the entry function is the scope of the first
+# import, usually <module>.
+#
+# Scanned: app/**/*.py and manage.py (it holds the RQ worker command).
+# Not scanned: generated customer code under app/modules/solutions_product/templates/,
+# and test code. Detached subprocesses (a subprocess.Popen whose enclosing function
+# never waits on it) and os.fork are the `subprocess` kind.
+#
+# Excluded on purpose: asyncio.to_thread and loop.run_in_executor. They run one
+# call on the event loop's default executor and the request that made them awaits
+# the result, so they neither outlive the request nor own a pool or a thread. A
+# call that starts its own thread or pool is a `thread` entry. subprocess.run and
+# the check_* helpers are synchronous and not mechanisms either.
+#
+# Follow-up notes (not mechanisms; nothing here is gated):
+# - app/modules/admin/v2/services/abacus_sync_service_v2.py is still a near
+#   duplicate of app/services/abacus_sync_service.py and admin_routes.py still
+#   imports it. Merge it into the one service in the next job-queue change.
+mechanisms:
+- kind: apscheduler
+  file: app/_bootstrap/extensions.py
+  entry: init_scheduler
+  purpose: Registers every scheduled job (workflow schedules, error events, capability projection, waiver
+    expiry) on one BackgroundScheduler
+  class: scheduler
+  disposition: move-to-pool
+  tenant_context: each job runs through the tenant-safe job harness (run_for_each_tenant / tenant_scope);
+    platform jobs are declared in PLATFORM_JOBS and guarded by job_lock
+- kind: rq
+  file: app/_bootstrap/extensions.py
+  entry: init_extensions
+  purpose: Creates the Flask-RQ queue extension used by the worker image
+  class: queue
+  disposition: move-to-pool
+  tenant_context: 'none: the extension only holds the queue; each enqueuing caller passes its own organisation
+    in the job arguments'
+- kind: thread
+  file: app/_bootstrap/routes.py
+  entry: _register_health_check._probe_with_timeout
+  purpose: Runs a health probe on a thread so a hung dependency cannot hold the health route past its
+    timeout
+  class: request-helper
+  disposition: keep
+  tenant_context: 'none: platform-wide work, not tied to one organisation'
+- kind: thread
+  file: app/application_mgmt/import_routes.py
+  entry: analyze_import.run_with_timeout
+  purpose: Runs one analysis call on a single-worker pool to bound its time inside the request
+  class: request-helper
+  disposition: keep
+  tenant_context: the request's organisation scope is read before the call; the pool does no tenant queries
+- kind: other
+  file: app/jobs/worker.py
+  entry: main
+  purpose: 'Process that keeps the scheduler alive: the scheduled jobs run on its APScheduler threads,
+    outside the web process'
+  class: scheduler
+  disposition: move-to-pool
+  tenant_context: every job it hosts runs through the tenant-safe job harness
+- kind: rq
+  file: app/modules/account/services/account_service.py
+  entry: <module>
+  purpose: Queues outgoing account e-mail on the Flask-RQ queue when it is installed
+  class: queue
+  disposition: move-to-pool
+  tenant_context: 'none: the e-mail is fully rendered before it is queued'
+- kind: thread
+  file: app/modules/admin/connector_routes.py
+  entry: servicenow_sync
+  purpose: Runs a ServiceNow synchronisation after the request returns
+  class: queue
+  disposition: move-to-pool
+  tenant_context: organisation id passed as an argument and applied with an app context in the thread
+- kind: rq
+  file: app/modules/admin/routes/admin_routes.py
+  entry: <module>
+  purpose: Imports the Flask-RQ queue for admin e-mail sending
+  class: queue
+  disposition: move-to-pool
+  tenant_context: 'none: the e-mail is fully rendered before it is queued'
+- kind: rq
+  file: app/modules/admin/services/admin_user_service.py
+  entry: <module>
+  purpose: Queues invitation and reset e-mail on the Flask-RQ queue when it is installed
+  class: queue
+  disposition: move-to-pool
+  tenant_context: 'none: the e-mail is fully rendered before it is queued'
+- kind: rq
+  file: app/modules/admin/v2/routes/admin_routes.py
+  entry: <module>
+  purpose: Imports the Flask-RQ queue for admin e-mail sending (second admin layout)
+  class: queue
+  disposition: retire-after-pool
+  tenant_context: 'none: the e-mail is fully rendered before it is queued'
+- kind: rq
+  file: app/modules/admin/v2/services/admin_user_service_v2.py
+  entry: <module>
+  purpose: Second copy of the admin user e-mail queueing (second admin layout)
+  class: queue
+  disposition: retire-after-pool
+  tenant_context: 'none: the e-mail is fully rendered before it is queued'
+- kind: thread
+  file: app/modules/ai_chat/routes/chat_core.py
+  entry: send_message_stream
+  purpose: Runs the assistant turn on a thread while the response streams back
+  class: request-helper
+  disposition: keep
+  tenant_context: request's organisation, captured before the thread starts and re-set inside it
+- kind: thread
+  file: app/modules/architecture/routes/archimate_routes.py
+  entry: _run_archimate_llm_generation
+  purpose: Runs model generation on a single-worker pool with a timeout
+  class: request-helper
+  disposition: keep
+  tenant_context: request's organisation, captured before the thread starts and re-set inside it
+- kind: thread
+  file: app/modules/architecture/services/agentic_gap_implementation_service.py
+  entry: AgenticGapImplementationService._run_agents_parallel
+  purpose: Runs the agents of one dependency level in parallel
+  class: request-helper
+  disposition: keep
+  tenant_context: the organisation is resolved from the architecture being worked on and used for every
+    write
+- kind: thread
+  file: app/modules/architecture_assistant/architecture_generation.py
+  entry: ArchitectureGenerationService.generate_greenfield
+  purpose: Generates element batches in parallel inside one request
+  class: request-helper
+  disposition: keep
+  tenant_context: the pool calls the model only; results are written by the calling request
+  instances: 2
+- kind: thread
+  file: app/modules/codegen/routes/codegen_routes.py
+  entry: enrich_uml
+  purpose: Enriches a UML model after the request returns
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the app context is captured in the request and the solution's organisation is used for
+    every write
+- kind: subprocess
+  file: app/modules/codegen/services/deployment_orchestrator.py
+  entry: DeploymentOrchestrator._deploy_subprocess
+  purpose: Starts a generated customer application under uvicorn as a detached subprocess that outlives
+    the request and records its process id for later cleanup
+  class: generated-code
+  disposition: out-of-scope
+  tenant_context: 'none: the subprocess hosts the customer''s generated app on its own SQLite file and
+    receives no platform database access or organisation scope'
+- kind: other
+  file: app/modules/import_batch/routes/batch_import_routes.py
+  entry: start_job
+  purpose: Hands an import job to Celery when CELERY_ENABLED is true, otherwise falls back to the thread
+    in the batch processing service
+  class: request-helper
+  disposition: move-to-pool
+  tenant_context: the import job row carries the organisation
+- kind: thread
+  file: app/modules/import_batch/services/batch_processing_service.py
+  entry: BatchProcessingService.resume_batch_job
+  purpose: Resumes a paused import batch on a thread after the request returns
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the batch job row carries the organisation; the thread loads it and runs under that
+    scope
+- kind: thread
+  file: app/modules/import_batch/services/batch_processing_service.py
+  entry: BatchProcessingService.start_batch_job
+  purpose: Runs an import batch on a thread
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the batch job row carries the organisation; the thread loads it and runs under that
+    scope
+- kind: thread
+  file: app/modules/monitoring/services/health_service.py
+  entry: HealthService.full_check
+  purpose: Runs the dependency probes in parallel for the health page
+  class: request-helper
+  disposition: keep
+  tenant_context: probes run under an app context and read no tenant data
+- kind: thread
+  file: app/modules/solutions_product/services/sandbox_runner.py
+  entry: SandboxRunner._schedule_auto_stop
+  purpose: Stops a customer sandbox after its time limit
+  class: scheduler
+  disposition: move-to-pool
+  tenant_context: 'none: the thread only stops a preview container held in memory'
+- kind: process-pool
+  file: app/modules/solutions_strategic/v2/routes/journey_v2_routes.py
+  entry: batch_accept_proposals
+  purpose: Spawns a process to apply accepted proposals in bulk
+  class: request-helper
+  disposition: move-to-pool
+  tenant_context: the organisation id is passed as an argument and the child sets its scope with tenant_scope
+- kind: thread
+  file: app/modules/solutions_strategic/v2/routes/journey_v2_routes.py
+  entry: _generate_architecture_background
+  purpose: Generates the architecture layers of a solution after the request returns, reporting status
+    into the journey state
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the solution's organisation is applied with tenant_scope inside the thread
+- kind: thread
+  file: app/modules/solutions_strategic/v2/routes/journey_v2_routes.py
+  entry: _ingest_text_background
+  purpose: Ingests submitted text after the request returns
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the solution's organisation is applied with tenant_scope inside the thread
+- kind: thread
+  file: app/modules/solutions_strategic/v2/routes/solution_design_routes.py
+  entry: view_solution
+  purpose: Starts proactive analysis while a solution page is rendered
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the solution id and its organisation id are passed as arguments to the thread
+- kind: thread
+  file: app/modules/solutions_strategic/v2/services/solution_ai_orchestrator.py
+  entry: SolutionAIOrchestrator.create_from_description
+  purpose: Runs the sections of one solution analysis in parallel waves
+  class: request-helper
+  disposition: keep
+  tenant_context: each worker pushes the app context captured in the request, which carries the solution's
+    organisation
+- kind: thread
+  file: app/modules/solutions_strategic/v2/services/solution_ai_orchestrator.py
+  entry: SolutionAIOrchestrator.generate_architecture_layers
+  purpose: Runs the architecture layer generators of one solution in parallel
+  class: request-helper
+  disposition: keep
+  tenant_context: each worker pushes the app context captured in the request, which carries the solution's
+    organisation
+- kind: thread
+  file: app/routes/webhook.py
+  entry: slack_events
+  purpose: Answers a Slack event after acknowledging it inside Slack's time limit
+  class: queue
+  disposition: move-to-pool
+  tenant_context: 'none passed: the thread receives only the event payload and the handler works from
+    it'
+- kind: thread
+  file: app/routes/webhook.py
+  entry: teams_notifications
+  purpose: Handles a Microsoft Graph call-record notification after acknowledging it inside Graph's time
+    limit
+  class: queue
+  disposition: move-to-pool
+  tenant_context: 'none passed: the thread receives only the notification payload and the handler works
+    from it'
+- kind: thread
+  file: app/security/middleware.py
+  entry: SecurityMiddleware._block_ip
+  purpose: Removes an IP block after its timeout
+  class: scheduler
+  disposition: keep
+  tenant_context: 'none: platform-wide work, not tied to one organisation'
+- kind: thread
+  file: app/services/analytics_service.py
+  entry: AnalyticsService._post
+  purpose: Posts an analytics event without delaying the request
+  class: request-helper
+  disposition: keep
+  tenant_context: 'none: the event body is built before the thread starts'
+- kind: thread
+  file: app/services/application_pattern_classifier_service.py
+  entry: <module>
+  purpose: Shared pool that classifies application patterns with the model in parallel
+  class: request-helper
+  disposition: keep
+  tenant_context: the organisation is passed explicitly into each call and set in its app context
+- kind: rq
+  file: app/services/compliance/compliance_job_orchestrator.py
+  entry: <module>
+  purpose: Queues requirement-generation jobs for compliance controls on a Flask-RQ queue
+  class: queue
+  disposition: move-to-pool
+  tenant_context: only user_id and control_id are passed; the job sets no explicit organisation scope,
+    to be fixed when the work moves to the pool
+- kind: thread
+  file: app/services/ea_workflow_engine.py
+  entry: EAWorkflowEngine.resume_workflow
+  purpose: Continues a workflow on a thread after an approval step is decided
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the workflow row carries the organisation, stamped explicitly when the workflow is created
+- kind: thread
+  file: app/services/ea_workflow_engine.py
+  entry: EAWorkflowEngine.start_workflow
+  purpose: Runs a workflow and its steps on a thread
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the workflow row carries the organisation, stamped explicitly when the workflow is created
+- kind: thread
+  file: app/services/intelligent_analyzer.py
+  entry: IntelligentTechnologyAnalyzer._collect_research_data
+  purpose: Collects analysis inputs in parallel inside one request
+  class: request-helper
+  disposition: keep
+  tenant_context: each worker pushes an app context; reads are filtered by the request's organisation
+- kind: thread
+  file: app/services/job_queue_service.py
+  entry: JobQueueService.start_worker
+  purpose: The one database-backed job queue and its worker thread
+  class: queue
+  disposition: keep
+  tenant_context: jobs carry organisation_id in their payload; model-health jobs run under tenant_scope
+- kind: thread
+  file: app/services/webhook_service.py
+  entry: WebhookService.publish_event
+  purpose: Delivers webhooks to subscribers after the event is recorded
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the subscription row carries the organisation and every delivery write is stamped with
+    it
+- kind: thread
+  file: app/services/webhook_service.py
+  entry: WebhookService.retry_event
+  purpose: Re-attempts failed webhook deliveries of one event, one thread per delivery
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the subscription row carries the organisation and every delivery write is stamped with
+    it
+- kind: celery
+  file: app/tasks/__init__.py
+  entry: <module>
+  purpose: Package marker that exposes the Celery import tasks
+  class: queue
+  disposition: move-to-pool
+  tenant_context: each task receives the organisation through the import job it loads
+- kind: other
+  file: app/tasks/abacus_sync_task.py
+  entry: run_abacus_sync_job
+  purpose: Scheduler entry for the Abacus synchronisation; registration is currently switched off
+  class: scheduler
+  disposition: move-to-pool
+  tenant_context: platform-wide connection guarded by job_lock; not tied to one organisation
+- kind: process-pool
+  file: app/tasks/background_sync.py
+  entry: <module>
+  purpose: Runs a long synchronisation in a spawned process so it survives web-worker recycling
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the organisation id is passed as an argument and the child sets its scope with tenant_scope
+- kind: celery
+  file: app/tasks/import_tasks.py
+  entry: get_celery_app
+  purpose: Optional Celery worker for file import jobs, active only when CELERY_ENABLED is true
+  class: queue
+  disposition: move-to-pool
+  tenant_context: the import job row carries the organisation; the task loads it and runs in that scope
+- kind: other
+  file: app/tasks/rebuild_tasks.py
+  entry: module-level worker functions
+  purpose: Functions run in spawned processes by the rebuild routes
+  class: queue
+  disposition: move-to-pool
+  tenant_context: organisation_id_of and tenant_scope from the tenant-safe job harness
+- kind: rq
+  file: manage.py
+  entry: <module>
+  purpose: 'The run-worker command (the image command of Dockerfile.worker and the worker service in docker-compose)
+    is the RQ consumer: a Worker listening on the default queue, which receives every rq entry in this
+    register'
+  class: queue
+  disposition: move-to-pool
+  tenant_context: 'none: the worker runs whatever job it dequeues; each enqueuing caller passes its own
+    organisation in the job arguments'
