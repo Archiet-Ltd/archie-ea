@@ -24,12 +24,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # ---------------------------------------------------------------------------
 
 def _run(*args: str, **kwargs) -> subprocess.CompletedProcess:
-    """Run a command and return the CompletedProcess."""
+    """Run a command and return the CompletedProcess.
+
+    ``env_extra`` (optional) is merged into the subprocess environment.
+    """
     env = {
         **os.environ,
         "PYTHONIOENCODING": "utf-8",
         "PYTHONPATH": str(REPO_ROOT),
         "FLASK_CONFIG": "testing",
+        **kwargs.get("env_extra", {}),
     }
     return subprocess.run(
         list(args),
@@ -248,6 +252,124 @@ class TestGenerateApiContractSubset:
 
         assert out1.read_bytes() == out2.read_bytes(), (
             "Two runs produced different output"
+        )
+
+    def test_generator_deterministic_across_hash_seeds(self, tmp_path: Path):
+        """The generator must be byte-identical no matter what PYTHONHASHSEED
+        the subprocess was started with.
+
+        Regression: the generator emitted component sets in set-iteration
+        order, which Python's string hashing (seeded per process) reorders,
+        so two identical invocations under different seeds produced different
+        files. The fixture is deliberately branching (a hub schema
+        referencing 30 schemas, each referencing a leaf) so the pending-ref
+        collection holds many entries whose pop order varies by hash seed.
+        """
+        contract = _minimal_contract()
+        names = [f"Schema{i:02d}" for i in range(30)]
+        leaves = [f"Leaf{i:02d}" for i in range(30)]
+        for name in names:
+            contract["components"]["schemas"][name] = {
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+            }
+        # Hub schema referencing every SchemaNN
+        contract["components"]["schemas"]["Schema00"]["properties"] = {
+            "value": {"type": "string"},
+            **{
+                name: {"$ref": f"#/components/schemas/{name}"}
+                for name in names
+            },
+        }
+        # Each SchemaNN references a leaf, so every branch has depth
+        for name, leaf in zip(names, leaves):
+            contract["components"]["schemas"][name]["properties"]["leaf"] = {
+                "$ref": f"#/components/schemas/{leaf}"
+            }
+            contract["components"]["schemas"][leaf] = {
+                "type": "object",
+                "properties": {"x": {"type": "string"}},
+            }
+        for path_key in ("/elements", "/elements/{id}"):
+            contract["paths"][path_key]["get"]["responses"]["200"]["content"][
+                "application/json"
+            ]["schema"] = {"$ref": "#/components/schemas/Schema00"}
+        src = tmp_path / "source.yaml"
+        _write_contract(src, contract)
+
+        out1 = tmp_path / "seed1.yaml"
+        out2 = tmp_path / "seed2.yaml"
+        result1 = _run(
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "generate_api_contract_subset.py"),
+            "--source", str(src),
+            "--output", str(out1),
+            env_extra={"PYTHONHASHSEED": "1"},
+        )
+        assert result1.returncode == 0, f"Generator failed:\n{result1.stderr}"
+        result2 = _run(
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "generate_api_contract_subset.py"),
+            "--source", str(src),
+            "--output", str(out2),
+            env_extra={"PYTHONHASHSEED": "2"},
+        )
+        assert result2.returncode == 0, f"Generator failed:\n{result2.stderr}"
+
+        assert out1.read_bytes() == out2.read_bytes(), (
+            "Generator output differs under PYTHONHASHSEED=1 vs PYTHONHASHSEED=2"
+        )
+
+    def test_regenerated_subset_matches_committed(self, tmp_path: Path):
+        """Regenerating the subset from the canonical contract copy (named by
+        API_CONTRACT_SOURCE) must reproduce the committed
+        app/config/api_contract_subset.yaml byte for byte.
+
+        Skipped, with the reason shown, when API_CONTRACT_SOURCE is not set
+        or names a missing file.
+        """
+        source = os.environ.get("API_CONTRACT_SOURCE")
+        if not source:
+            pytest.skip(
+                "API_CONTRACT_SOURCE is not set; cannot regenerate the subset "
+                "from the canonical contract copy"
+            )
+        source_path = Path(source)
+        if not source_path.exists():
+            pytest.skip(f"API_CONTRACT_SOURCE names a missing file: {source}")
+
+        out = tmp_path / "regenerated.yaml"
+        result = _run(
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "generate_api_contract_subset.py"),
+            "--source", str(source_path),
+            "--output", str(out),
+        )
+        assert result.returncode == 0, f"Generator failed:\n{result.stderr}"
+
+        committed = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
+        assert committed.exists(), "No committed subset to compare against"
+        assert out.read_bytes() == committed.read_bytes(), (
+            "Regenerated subset differs from the committed subset byte for "
+            "byte; regenerate it with scripts/generate_api_contract_subset.py "
+            "and commit the result"
+        )
+
+    def test_committed_subset_header_has_64_hex_sha256(self):
+        """The committed subset header must record the source sha256 as 64
+        hex characters so a drift check can compare it against the live
+        contract copy."""
+        subset_path = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
+        if not subset_path.exists():
+            pytest.skip("Committed subset not present")
+
+        lines = subset_path.read_text(encoding="utf-8").splitlines()
+        sha_lines = [ln for ln in lines if ln.startswith("# SHA256:")]
+        assert sha_lines, "Committed subset header has no '# SHA256:' line"
+        sha = sha_lines[0].split(":", 1)[1].strip()
+        assert len(sha) == 64, f"sha256 line is {len(sha)} characters, expected 64"
+        assert all(c in "0123456789abcdef" for c in sha.lower()), (
+            f"sha256 line is not hex: {sha!r}"
         )
 
     def test_generator_records_source_sha256(self, tmp_path: Path):
