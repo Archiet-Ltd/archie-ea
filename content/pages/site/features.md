@@ -193,7 +193,8 @@ derived, and you can see the model as it stood on any past date.
 without being asked in Q1 2027; forecasts from Q3 2027; recommendations tracked to measured outcomes
 from Q4 2027.
 
-Delivered today by: [What breaks if this fails, and who gets called](/use-cases/what-breaks-and-who-gets-called).
+Delivered today by: [Digital Twin](/modules/digital-twin),
+[What breaks if this fails, and who gets called](/use-cases/what-breaks-and-who-gets-called).
 
 <h3 id="simulation-and-scenario-planning">Simulation and Scenario Planning</h3>
 
