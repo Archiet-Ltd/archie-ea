@@ -89,7 +89,7 @@ def test_only_notification_service_constructs_notification():
 
 def test_digest_respects_weekly_digest_false(app, db_session, make_org):
     """A user with weekly_digest=False receives no digest."""
-    from app.commands.send_digests import send_owner_digest
+    from app._bootstrap._digest_emails import send_owner_digest
 
     org = make_org("digest-test")
     user = _make_user(db_session, org)
@@ -98,7 +98,7 @@ def test_digest_respects_weekly_digest_false(app, db_session, make_org):
 
     # Create a notification for this user
     from app.models.models import Notification
-    n = Notification(user_id=user.id, message="Test notification", url="/test")
+    n = Notification(user_id=user.id, message="Test notification", url="/test", organization_id=org.id)
     db_session.add(n)
     db_session.commit()
 
@@ -112,7 +112,7 @@ def test_digest_respects_weekly_digest_false(app, db_session, make_org):
 
 def test_digest_respects_digest_frequency_off(app, db_session, make_org):
     """A user with digest_frequency=off receives no digest."""
-    from app.commands.send_digests import send_owner_digest
+    from app._bootstrap._digest_emails import send_owner_digest
 
     org = make_org("digest-off")
     user = _make_user(db_session, org)
@@ -122,7 +122,7 @@ def test_digest_respects_digest_frequency_off(app, db_session, make_org):
     db_session.flush()
 
     from app.models.models import Notification
-    n = Notification(user_id=user.id, message="Test notification", url="/test")
+    n = Notification(user_id=user.id, message="Test notification", url="/test", organization_id=org.id)
     db_session.add(n)
     db_session.commit()
 
@@ -136,14 +136,14 @@ def test_digest_respects_digest_frequency_off(app, db_session, make_org):
 
 def test_digest_is_idempotent_per_day(app, db_session, make_org):
     """A second run on the same day sends nothing (idempotent)."""
-    from app.commands.send_digests import send_owner_digest
+    from app._bootstrap._digest_emails import send_owner_digest
 
     org = make_org("digest-idempotent")
     user = _make_user(db_session, org)
     db_session.flush()
 
     from app.models.models import Notification
-    n = Notification(user_id=user.id, message="Test notification", url="/test")
+    n = Notification(user_id=user.id, message="Test notification", url="/test", organization_id=org.id)
     db_session.add(n)
     db_session.commit()
 
@@ -158,7 +158,7 @@ def test_digest_is_idempotent_per_day(app, db_session, make_org):
 
 def test_empty_digest_is_skipped(app, db_session, make_org):
     """A digest with nothing to report is not sent (logged as skipped)."""
-    from app.commands.send_digests import send_owner_digest
+    from app._bootstrap._digest_emails import send_owner_digest
 
     org = make_org("digest-empty")
     _make_user(db_session, org)
@@ -174,7 +174,7 @@ def test_empty_digest_is_skipped(app, db_session, make_org):
 
 def test_digest_respects_daily_cadence(app, db_session, make_org):
     """A user with digest_frequency=daily gets a digest."""
-    from app.commands.send_digests import send_owner_digest
+    from app._bootstrap._digest_emails import send_owner_digest
 
     org = make_org("digest-daily")
     user = _make_user(db_session, org)
@@ -184,7 +184,7 @@ def test_digest_respects_daily_cadence(app, db_session, make_org):
     db_session.flush()
 
     from app.models.models import Notification
-    n = Notification(user_id=user.id, message="Test notification", url="/test")
+    n = Notification(user_id=user.id, message="Test notification", url="/test", organization_id=org.id)
     db_session.add(n)
     db_session.commit()
 
@@ -197,7 +197,7 @@ def test_digest_respects_daily_cadence(app, db_session, make_org):
 
 def test_digest_respects_weekly_cadence(app, db_session, make_org):
     """A user with digest_frequency=weekly gets a digest."""
-    from app.commands.send_digests import send_owner_digest
+    from app._bootstrap._digest_emails import send_owner_digest
 
     org = make_org("digest-weekly")
     user = _make_user(db_session, org)
@@ -207,7 +207,7 @@ def test_digest_respects_weekly_cadence(app, db_session, make_org):
     db_session.flush()
 
     from app.models.models import Notification
-    n = Notification(user_id=user.id, message="Test notification", url="/test")
+    n = Notification(user_id=user.id, message="Test notification", url="/test", organization_id=org.id)
     db_session.add(n)
     db_session.commit()
 
@@ -252,7 +252,7 @@ def test_notification_isolation_two_orgs(app, db_session, make_org):
 
 def test_digest_only_own_org_items(app, db_session, make_org):
     """The per-owner digest run for org A lists only A's items."""
-    from app.commands.send_digests import send_owner_digest
+    from app._bootstrap._digest_emails import send_owner_digest
 
     org_a = make_org("digest-org-a")
     org_b = make_org("digest-org-b")
@@ -283,6 +283,67 @@ def test_digest_only_own_org_items(app, db_session, make_org):
     # Org A's digest should only include A's notification
     assert result_a["total_items"] >= 1
     assert result_b["total_items"] >= 1
+
+
+def test_owner_digest_is_a_declared_tenant_job():
+    """The per-owner digest is wired as a declared tenant job, so it is never
+    removed by ``_remove_undeclared_jobs`` and it runs per organisation."""
+    from app.jobs.tenant_safe_job import TENANT_JOBS
+
+    assert "owner_digest" in TENANT_JOBS
+
+
+def test_owner_digest_cli_command_is_registered(app):
+    """The per-owner digest is reachable through the same CLI path as the
+    platform digests (send-maturity-digest / send-executive-summary)."""
+    command_names = {name for name in app.cli.commands}
+    assert "send-owner-digest" in command_names
+
+
+def test_owner_digest_uses_the_tenant_safe_harness(app, db_session, make_org):
+    """``send_owner_digests`` routes the per-organisation work through
+    ``run_for_each_tenant`` (a ``JobRun`` per org), not a private loop."""
+    from app._bootstrap._digest_emails import send_owner_digests
+    from app.jobs.tenant_safe_job import JobRun
+
+    org = make_org("digest-harness")
+    with app.app_context():
+        run = send_owner_digests(app, organization_ids=[org.id])
+    assert isinstance(run, JobRun)
+    assert run.failed == 0
+    assert run.succeeded == 1
+
+
+def test_owner_digest_only_lists_the_own_organisations_notifications(app, db_session, make_org):
+    """A digest run for org A never reads org B's notification rows: the digest
+    is scoped to the organisation explicitly, not just by recipient user."""
+    from app._bootstrap._digest_emails import send_owner_digest
+
+    org_a = make_org("digest-scope-a")
+    org_b = make_org("digest-scope-b")
+    user_a = _make_user(db_session, org_a)
+    user_b = _make_user(db_session, org_b)
+    db_session.flush()
+
+    from app.models.models import Notification
+    n_a = Notification(
+        user_id=user_a.id, message="A only", url="/a",
+        organization_id=org_a.id,
+    )
+    n_b = Notification(
+        user_id=user_b.id, message="B only", url="/b",
+        organization_id=org_b.id,
+    )
+    db_session.add(n_a)
+    db_session.add(n_b)
+    db_session.commit()
+
+    with app.app_context():
+        from flask import g
+        g.current_org_id = org_a.id
+        result_a = send_owner_digest(org_a.id)
+
+    assert result_a["total_items"] == 1, "org A digest must only list org A's notification"
 
 
 # ---------------------------------------------------------------------------
