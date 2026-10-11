@@ -137,6 +137,7 @@ class TestStep3ACapabilityModelsReaders:
             "app/models/capability_models.py",
             "app/models/__init__.py",
             "app/models/unified_capability.py",
+            "app/modules/capabilities/services/capability_maturity_service.py",
             "app/modules/intelligence/tests/test_maturity_authority_readers.py",
         }
         pattern = re.compile(r"\bCapabilityMaturityAssessment\b")
