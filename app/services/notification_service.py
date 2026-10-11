@@ -8,7 +8,6 @@ code constructs ``Notification(`` directly — see the gate in
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Optional
 
 from app import db

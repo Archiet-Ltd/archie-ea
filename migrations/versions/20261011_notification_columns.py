@@ -70,7 +70,7 @@ def upgrade():
         )
 
     # Backfill organization_id from users table for existing rows
-    null_count = bind.execute(
+    bind.execute(
         text(
             "SELECT COUNT(*) FROM notifications n "
             "LEFT JOIN users u ON n.user_id = u.id "

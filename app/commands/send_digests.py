@@ -25,9 +25,6 @@ def _get_owners_with_items(organization_id: int):
     from app.models.models import Notification
     from app.models.user import User
 
-    today = date.today()
-    today_start = datetime(today.year, today.month, today.day)
-
     # Find users in this org who have unread notifications not yet digested
     rows = (
         db.session.query(User, Notification)
@@ -86,7 +83,6 @@ def send_owner_digest(organization_id: int) -> dict:
       - errors: list of error messages
     """
     from app._bootstrap._digest_emails import _safe_send_email
-    from app.models.user import User
 
     result = {"sent": 0, "skipped": False, "total_items": 0, "errors": []}
 

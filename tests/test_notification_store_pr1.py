@@ -68,8 +68,8 @@ def test_only_notification_service_constructs_notification():
                     hits.append((path, lineno, line.strip()))
 
     # Filter to only the notification_service.py
-    service_hits = [(p, l, t) for p, l, t in hits if "notification_service" in str(p)]
-    other_hits = [(p, l, t) for p, l, t in hits if "notification_service" not in str(p)]
+    service_hits = [(p, ln, t) for p, ln, t in hits if "notification_service" in str(p)]
+    other_hits = [(p, ln, t) for p, ln, t in hits if "notification_service" not in str(p)]
 
     # Allow only notification_service.py to construct Notification
     assert len(service_hits) >= 1, (
@@ -78,7 +78,7 @@ def test_only_notification_service_constructs_notification():
     assert len(other_hits) == 0, (
         f"Only notification_service.py may construct Notification. "
         f"Found {len(other_hits)} other constructor(s):\n" +
-        "\n".join(f"  {p}:{l} {t}" for p, l, t in other_hits)
+        "\n".join(f"  {p}:{ln} {t}" for p, ln, t in other_hits)
     )
 
 
@@ -318,7 +318,7 @@ def test_flask_db_heads_shows_one_head():
         ["python", "-m", "flask", "--app", "manage", "db", "heads"],
         capture_output=True, text=True, cwd=REPO,
     )
-    heads = [l for l in result.stdout.splitlines() if l.strip() and "(head)" in l]
+    heads = [ln for ln in result.stdout.splitlines() if ln.strip() and "(head)" in ln]
     assert len(heads) == 1, f"Expected 1 head, got {len(heads)}: {heads}"
 
 
