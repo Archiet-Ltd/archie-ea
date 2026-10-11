@@ -6,6 +6,7 @@ Uses the shared fixtures in tests/conftest.py (db_session rolls back).
 from __future__ import annotations
 
 import json
+import uuid
 
 import pytest
 
@@ -18,6 +19,9 @@ from app.modules.enterprise_genome.services.ai_system_classification import (
     get_classification,
     can_mark_released,
     mark_released,
+    propose_assessment,
+    accept_assessment,
+    release_refusal_reason,
 )
 from app.modules.enterprise_genome.services.ai_system_profile import (
     RETIRED_MODEL_IDS,
@@ -266,20 +270,45 @@ def test_rejecting_classification_leaves_unclassified(db_session, org):
 
 
 def test_high_risk_without_assessment_cannot_be_released(db_session, org):
-    """A high-risk system without an accepted assessment cannot be marked released."""
+    """An accepted-high system with no assessment cannot be marked released."""
     el = register_ai_system(db_session, org.id, name="Test System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
-    # Propose classification (pending — assessment not yet accepted)
-    propose_classification(
+    # Accept the high-risk classification — but no assessment is attached.
+    approval = propose_classification(
         element=el,
         proposed_risk_class="high",
         organization_id=org.id,
         proposed_by_user_id=None,
     )
     db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
     result = mark_released(el, org.id)
-    assert result is False
+    assert result["success"] is False
+    assert profile_from_element(el)["release_state"] == "not set"
+
+
+def test_refusal_names_missing_assessment(db_session, org):
+    """The release refusal names the missing assessment."""
+    el = register_ai_system(db_session, org.id, name="Test System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    approval = propose_classification(
+        element=el,
+        proposed_risk_class="high",
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+    reason = release_refusal_reason(el, org.id)
+    assert reason is not None
+    assert "assessment" in reason.lower()
+    result = mark_released(el, org.id)
+    assert result["success"] is False
+    assert "assessment" in result["reason"].lower()
 
 
 def test_high_risk_with_assessment_can_be_released(db_session, org):
@@ -296,8 +325,20 @@ def test_high_risk_with_assessment_can_be_released(db_session, org):
     db_session.flush()
     accept_classification(approval.id, org.id)
     db_session.flush()
+    # Classification alone is not the assessment — release is still refused.
+    assert can_mark_released(el, org.id) is False
+    # Attach an assessment proposal and accept it.
+    assessment = propose_assessment(
+        element=el,
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    assert accept_assessment(assessment.id, org.id) is True
+    db_session.flush()
+    assert can_mark_released(el, org.id) is True
     result = mark_released(el, org.id)
-    assert result is True
+    assert result["success"] is True
     p = profile_from_element(el)
     assert p["release_state"] == "released"
 
@@ -317,7 +358,7 @@ def test_low_risk_system_can_be_released_without_assessment(db_session, org):
     accept_classification(approval.id, org.id)
     db_session.flush()
     result = mark_released(el, org.id)
-    assert result is True
+    assert result["success"] is True
 
 
 def test_owner_read_through_application_owner(db_session, org, make_org):
@@ -520,4 +561,192 @@ def test_can_mark_released_true_for_high_risk_with_assessment(db_session, org):
     db_session.flush()
     accept_classification(approval.id, org.id)
     db_session.flush()
+    # Classification alone is not the assessment — still blocked.
+    assert can_mark_released(el, org.id) is False
+    assessment = propose_assessment(
+        element=el,
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_assessment(assessment.id, org.id)
+    db_session.flush()
     assert can_mark_released(el, org.id) is True
+
+
+# --- Release route, refusal message, org isolation (fix round) ----------
+
+
+def _make_admin_user(db_session, org, label):
+    from app.models.user import Role, User
+
+    admin_role = Role.query.filter_by(name="Administrator").first()
+    if admin_role is None:
+        pytest.skip("no Administrator role seeded in this database")
+    user = User(
+        email=f"{label}-{uuid.uuid4().hex[:8]}@example.test",
+        first_name=label,
+        organization_id=org.id,
+        confirmed=True,
+        role=admin_role,
+    )
+    user.password = uuid.uuid4().hex
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def test_release_route_refuses_without_assessment_then_releases_with_it(
+    app, db_session, make_org, client, login_as
+):
+    """POST /genome/ai-systems/<id>/release refuses an accepted-high system
+    without an assessment and releases it once the assessment is accepted."""
+    org = make_org("release-route")
+    admin = _make_admin_user(db_session, org, "ReleaseRoute")
+    el = register_ai_system(db_session, org.id, name="Route System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+    approval = propose_classification(
+        element=el,
+        proposed_risk_class="high",
+        organization_id=org.id,
+        proposed_by_user_id=admin.id,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+
+    login_as(client, admin)
+
+    # Accepted-high, no assessment: the route refuses with the named reason
+    # and leaves the system unreleased.
+    refused = client.post(f"/genome/ai-systems/{el.id}/release")
+    assert refused.status_code in (400, 409)
+    assert "assessment" in refused.get_data(as_text=True).lower()
+    assert profile_from_element(el)["release_state"] == "not set"
+
+    # The register page shows the refusal reason and an Attach-assessment action.
+    page = client.get("/genome/ai-systems")
+    assert page.status_code == 200
+    body = page.get_data(as_text=True)
+    assert "assessment" in body.lower()
+    assert "Attach assessment" in body
+    assert f"/genome/ai-systems/{el.id}/assess" in body
+
+    # After the assessment is accepted, the same POST releases the system.
+    assessment = propose_assessment(
+        element=el,
+        organization_id=org.id,
+        proposed_by_user_id=admin.id,
+    )
+    db_session.flush()
+    assert accept_assessment(assessment.id, org.id) is True
+    db_session.flush()
+
+    released = client.post(f"/genome/ai-systems/{el.id}/release")
+    assert released.status_code == 302
+    assert profile_from_element(el)["release_state"] == "released"
+
+
+def test_release_route_limited_to_administrator(app, db_session, make_org, client, login_as):
+    """A non-administrator cannot release a system."""
+    from app.models.user import Role, User
+
+    org = make_org("release-role")
+    architect_role = Role.query.filter_by(name="Architect").first()
+    architect = User(
+        email=f"arch-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="Architect",
+        organization_id=org.id,
+        confirmed=True,
+        role=architect_role,
+    )
+    architect.password = uuid.uuid4().hex
+    db_session.add(architect)
+    el = register_ai_system(db_session, org.id, name="Role System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+
+    login_as(client, architect)
+    resp = client.post(f"/genome/ai-systems/{el.id}/release")
+    assert resp.status_code == 403
+    assert profile_from_element(el)["release_state"] == "not set"
+
+
+def test_release_gate_and_assessment_are_org_scoped(
+    app, db_session, make_org, client, login_as
+):
+    """A's refusal reasons, releases and assessment proposals never reach B."""
+    org_a = make_org("gate-a")
+    org_b = make_org("gate-b")
+    admin_a = _make_admin_user(db_session, org_a, "GateA")
+    admin_b = _make_admin_user(db_session, org_b, "GateB")
+
+    el_a = register_ai_system(db_session, org_a.id, name="System A",
+                              provider="anthropic", model_id="claude-opus-5")
+    el_b = register_ai_system(db_session, org_b.id, name="System B",
+                              provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+
+    # A: high-risk classification accepted, no assessment (blocked).
+    approval_a = propose_classification(
+        element=el_a, proposed_risk_class="high",
+        organization_id=org_a.id, proposed_by_user_id=admin_a.id,
+    )
+    db_session.flush()
+    accept_classification(approval_a.id, org_a.id)
+    db_session.flush()
+
+    # B: high-risk classification accepted AND assessment accepted (releasable).
+    approval_b = propose_classification(
+        element=el_b, proposed_risk_class="high",
+        organization_id=org_b.id, proposed_by_user_id=admin_b.id,
+    )
+    db_session.flush()
+    accept_classification(approval_b.id, org_b.id)
+    db_session.flush()
+    assessment_b = propose_assessment(
+        element=el_b, organization_id=org_b.id, proposed_by_user_id=admin_b.id,
+    )
+    db_session.flush()
+    accept_assessment(assessment_b.id, org_b.id)
+    db_session.flush()
+
+    # B's slice never names A's system and shows no reason for B's own system.
+    slice_b = build_ai_systems_slice(org_b.id, db_session)
+    by_name_b = {s["name"]: s for s in slice_b["systems"]}
+    assert "System A" not in by_name_b
+    assert by_name_b["System B"]["release_blocked_reason"] is None
+    assert by_name_b["System B"]["assessment_accepted"] is True
+
+    # A's slice is blocked with the named assessment reason.
+    slice_a = build_ai_systems_slice(org_a.id, db_session)
+    by_name_a = {s["name"]: s for s in slice_a["systems"]}
+    assert by_name_a["System A"]["release_blocked_reason"] is not None
+    assert "assessment" in by_name_a["System A"]["release_blocked_reason"].lower()
+    assert by_name_a["System A"]["assessment_accepted"] is False
+
+    # B's administrator cannot release A's system (not in B's organisation).
+    login_as(client, admin_b)
+    cross = client.post(f"/genome/ai-systems/{el_a.id}/release")
+    assert cross.status_code == 404
+    assert profile_from_element(el_a)["release_state"] == "not set"
+
+    # B's administrator cannot attach an assessment proposal to A's system.
+    cross_assess = client.post(f"/genome/ai-systems/{el_a.id}/assess")
+    assert cross_assess.status_code == 404
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+
+    assert (
+        AIChatCRUDApproval.query.filter_by(
+            entity_type="ai_system_assessment",
+            entity_id=el_a.id,
+            organization_id=org_a.id,
+        ).count()
+        == 0
+    )
+
+    # B's own system releases through the route.
+    ok = client.post(f"/genome/ai-systems/{el_b.id}/release")
+    assert ok.status_code == 302
+    assert profile_from_element(el_b)["release_state"] == "released"
