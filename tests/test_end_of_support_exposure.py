@@ -309,7 +309,7 @@ class TestEndOfSupportExposureRoute:
         assert response.status_code == 200
         html = response.get_data(as_text=True)
         assert 'data-testid="end-of-support-exposure"' in html
-        assert "Nothing reaches end of support in this window" in html
+        assert "Nothing reaches end of support in the next " in html
 
     def test_the_scorecard_page_renders_no_owner_recorded_for_an_exposed_application(
         self, db_session, make_org, client, login_as

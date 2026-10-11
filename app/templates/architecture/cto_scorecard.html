@@ -53,7 +53,7 @@
   </div>
 
   <div class="mt-6 rounded-lg border border-border bg-card p-4" data-testid="end-of-support-exposure">
-    <h2 class="text-sm font-semibold text-muted-foreground mb-2">End-of-support exposure</h2>
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">End-of-support exposure, next {{ exposure_window_months }} months</h2>
     {% if exposure %}
     <ul class="divide-y divide-border text-sm">
       {% for row in exposure %}
@@ -64,7 +64,7 @@
       {% endfor %}
     </ul>
     {% else %}
-    {{ empty_state(icon='calendar-x', headline='Nothing reaches end of support in this window', body='No technology product this organisation depends on ends support inside the window.') }}
+    {{ empty_state(icon='calendar-x', headline='Nothing reaches end of support in the next ' ~ exposure_window_months ~ ' months', body='No technology product this organisation depends on ends support inside the window.') }}
     {% endif %}
   </div>
 
