@@ -19,7 +19,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 # Path prefixes that are treated as "content only".
 # Directories end with / so any file under them matches.
