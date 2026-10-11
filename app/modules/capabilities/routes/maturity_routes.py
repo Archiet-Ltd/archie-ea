@@ -1105,74 +1105,74 @@ def import_maturity_csv():
     skipped = 0
     errors = []
 
-    for row_num, row in enumerate(reader, start=2):
-        row_norm = {k.strip().lower(): (v or "").strip() for k, v in row.items() if k}
-        name_key = row_norm.get("capability_name", "").lower()
-
-        if not name_key:
-            skipped += 1
-            continue
-
-        cap = cap_map.get(name_key)
-        if not cap:
-            errors.append({"row": row_num, "reason": f"Capability not found: {row_norm.get('capability_name', '')}"})
-            skipped += 1
-            continue
-
-        current_raw = row_norm.get("current_maturity", "") or row_norm.get("current_level", "")
-        target_raw = row_norm.get("target_maturity", "") or row_norm.get("target_level", "")
-        notes = row_norm.get("notes", "") or row_norm.get("assessment_notes", "")
-
-        changed = False
-
-        current_lvl = None
-        target_lvl = None
-        if current_raw:
-            try:
-                current_lvl = int(current_raw)
-                if not (1 <= current_lvl <= 5):
-                    raise ValueError()
-                changed = True
-            except ValueError:
-                errors.append({"row": row_num, "reason": f"Invalid current_maturity '{current_raw}' — must be 1-5"})
-                skipped += 1
-                continue
-
-        if target_raw:
-            try:
-                target_lvl = int(target_raw)
-                if not (1 <= target_lvl <= 5):
-                    raise ValueError()
-                changed = True
-            except ValueError:
-                errors.append({"row": row_num, "reason": f"Invalid target_maturity '{target_raw}' — must be 1-5"})
-                skipped += 1
-                continue
-
-        if notes and hasattr(cap, "maturity_assessment_notes"):
-            changed = True
-
-        if changed:
-            record_capability_maturity(
-                capability_id=cap.id,
-                organization_id=cap.organization_id,
-                current=current_lvl,
-                target=target_lvl,
-                notes=notes if notes else None,
-                assessor_user_id=None,
-                assessor_name=None,
-                assessor_role=None,
-                commit=False,
-            )
-            updated += 1
-        else:
-            skipped += 1
-
-        if row_num > 501:
-            errors.append({"row": row_num, "reason": "Row limit (500) reached — remaining rows skipped"})
-            break
-
     try:
+        for row_num, row in enumerate(reader, start=2):
+            row_norm = {k.strip().lower(): (v or "").strip() for k, v in row.items() if k}
+            name_key = row_norm.get("capability_name", "").lower()
+
+            if not name_key:
+                skipped += 1
+                continue
+
+            cap = cap_map.get(name_key)
+            if not cap:
+                errors.append({"row": row_num, "reason": f"Capability not found: {row_norm.get('capability_name', '')}"})
+                skipped += 1
+                continue
+
+            current_raw = row_norm.get("current_maturity", "") or row_norm.get("current_level", "")
+            target_raw = row_norm.get("target_maturity", "") or row_norm.get("target_level", "")
+            notes = row_norm.get("notes", "") or row_norm.get("assessment_notes", "")
+
+            changed = False
+
+            current_lvl = None
+            target_lvl = None
+            if current_raw:
+                try:
+                    current_lvl = int(current_raw)
+                    if not (1 <= current_lvl <= 5):
+                        raise ValueError()
+                    changed = True
+                except ValueError:
+                    errors.append({"row": row_num, "reason": f"Invalid current_maturity '{current_raw}' — must be 1-5"})
+                    skipped += 1
+                    continue
+
+            if target_raw:
+                try:
+                    target_lvl = int(target_raw)
+                    if not (1 <= target_lvl <= 5):
+                        raise ValueError()
+                    changed = True
+                except ValueError:
+                    errors.append({"row": row_num, "reason": f"Invalid target_maturity '{target_raw}' — must be 1-5"})
+                    skipped += 1
+                    continue
+
+            if notes and hasattr(cap, "maturity_assessment_notes"):
+                changed = True
+
+            if changed:
+                record_capability_maturity(
+                    capability_id=cap.id,
+                    organization_id=cap.organization_id,
+                    current=current_lvl,
+                    target=target_lvl,
+                    notes=notes if notes else None,
+                    assessor_user_id=None,
+                    assessor_name=None,
+                    assessor_role=None,
+                    commit=False,
+                )
+                updated += 1
+            else:
+                skipped += 1
+
+            if row_num > 501:
+                errors.append({"row": row_num, "reason": "Row limit (500) reached — remaining rows skipped"})
+                break
+
         db.session.commit()
     except Exception as e:
         db.session.rollback()
