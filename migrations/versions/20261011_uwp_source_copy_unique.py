@@ -17,14 +17,14 @@ survive as plain, now-unlinked work packages rather than being deleted, then cre
 Idempotent: a second run finds nothing to clear and the index already exists.
 
 Revision ID: 20261011_uwp_source_copy_unique
-Revises: 20261012_api_token_scopes
+Revises: 20261011_notif_rls
 Create Date: 2026-10-11
 """
 from alembic import op
 from sqlalchemy import inspect, text
 
 revision = "20261011_uwp_source_copy_unique"
-down_revision = "20261012_api_token_scopes"
+down_revision = "20261011_notif_rls"
 branch_labels = None
 depends_on = None
 
