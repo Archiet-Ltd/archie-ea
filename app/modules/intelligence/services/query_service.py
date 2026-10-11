@@ -922,7 +922,7 @@ class IntelligenceQueryService:
                     # small constant number of queries.
                     # NOTE: owner resolution is moved AFTER pagination below
                     # so the 2,400-row walk only resolves owners for the
-                    # page's rows, not the full result set (MEDIUM-1 fix).
+                    # page's rows, not the full result set.
 
                     for row in rows:
                         # A Capability row carries the block the helper
@@ -982,7 +982,7 @@ class IntelligenceQueryService:
                 next_cursor = slice_start + page_size
             rows = page
 
-        # Owner resolution for the page's rows only (MEDIUM-1: moved after
+        # Owner resolution for the page's rows only (moved after
         # pagination so the 2,400-row walk resolves owners for 50 rows, not
         # 2,400 -- keeps latency within budget while the query count stays
         # constant regardless of page size).
