@@ -43,6 +43,7 @@ import click
 from flask.cli import with_appcontext
 
 from app import db
+from app.services.pgvector_embedding_service import SHARED_EMBEDDING_TABLE_NAMES
 
 
 _TRANSFORMATION_TABLES = (
@@ -1438,6 +1439,426 @@ def _backfill_document_chunk_organizations(*, dry_run, existing_tables, added, f
         )
 
 
+_EMBEDDING_TENANT_FKS = (
+    # (table, fk_column, fk_join_table, join_org_column, description)
+    (
+        "business_capability_embeddings",
+        "business_capability_id",
+        "business_capability",
+        "organization_id",
+        "BusinessCapability (TenantMixin)",
+    ),
+    (
+        "solution_embeddings",
+        "solution_id",
+        "solutions",
+        "organization_id",
+        "Solution (TenantMixin)",
+    ),
+    (
+        "application_component_embeddings",
+        "application_component_id",
+        "application_components",
+        "organization_id",
+        "ApplicationComponent (TenantMixin)",
+    ),
+    (
+        "chat_message_embeddings",
+        "user_id",
+        "users",
+        "organization_id",
+        "User (direct column)",
+    ),
+)
+# Tables with no FK chain to an org -- shared reference data, expected to stay NULL.
+_EMBEDDING_SHARED_TABLES = tuple(sorted(SHARED_EMBEDDING_TABLE_NAMES))
+_ALL_EMBEDDING_TABLES = tuple(
+    [e[0] for e in _EMBEDDING_TENANT_FKS] + list(_EMBEDDING_SHARED_TABLES)
+)
+
+
+def _backfill_chat_from_session_id(dry_run: bool) -> int:
+    """Derive organization_id for chat_message_embeddings rows with NULL
+    user_id by extracting the user id from the session_id pattern.
+
+    Session id patterns that encode a user id:
+      - chat_user_<id>
+      - saved_<id>_...
+
+    Returns the number of rows updated.
+    """
+    from sqlalchemy import text
+
+    # Try chat_user_<id> pattern first
+    eligible = db.session.scalar(
+        text(
+            """
+            SELECT count(*)
+            FROM chat_message_embeddings e
+            JOIN users u ON u.id = CAST(
+                regexp_replace(e.chat_session_id, '^chat_user_', '') AS INTEGER
+            )
+            WHERE e.organization_id IS NULL
+              AND e.user_id IS NULL
+              AND e.chat_session_id ~ '^chat_user_[0-9]+$'
+              AND u.organization_id IS NOT NULL
+            """
+        )
+    )
+    updated = eligible
+    if not dry_run and eligible:
+        result = db.session.execute(
+            text(
+                """
+                UPDATE chat_message_embeddings AS e
+                SET organization_id = u.organization_id
+                FROM users AS u
+                WHERE u.id = CAST(
+                    regexp_replace(e.chat_session_id, '^chat_user_', '') AS INTEGER
+                )
+                  AND e.organization_id IS NULL
+                  AND e.user_id IS NULL
+                  AND e.chat_session_id ~ '^chat_user_[0-9]+$'
+                  AND u.organization_id IS NOT NULL
+                """
+            )
+        )
+        updated = result.rowcount
+        db.session.commit()
+
+    # Try saved_<id>_... pattern
+    saved_eligible = db.session.scalar(
+        text(
+            """
+            SELECT count(*)
+            FROM chat_message_embeddings e
+            JOIN users u ON u.id = CAST(
+                regexp_replace(e.chat_session_id, '^saved_([0-9]+)_.*$', '\\1') AS INTEGER
+            )
+            WHERE e.organization_id IS NULL
+              AND e.user_id IS NULL
+              AND e.chat_session_id ~ '^saved_[0-9]+_'
+              AND u.organization_id IS NOT NULL
+            """
+        )
+    )
+    if not dry_run and saved_eligible:
+        result = db.session.execute(
+            text(
+                """
+                UPDATE chat_message_embeddings AS e
+                SET organization_id = u.organization_id
+                FROM users AS u
+                WHERE u.id = CAST(
+                    regexp_replace(e.chat_session_id, '^saved_([0-9]+)_.*$', '\\1') AS INTEGER
+                )
+                  AND e.organization_id IS NULL
+                  AND e.user_id IS NULL
+                  AND e.chat_session_id ~ '^saved_[0-9]+_'
+                  AND u.organization_id IS NOT NULL
+                """
+            )
+        )
+        updated += result.rowcount
+        db.session.commit()
+
+    return updated
+
+
+def _backfill_chat_from_conversation_owner(dry_run: bool, existing_tables: set[str]) -> int:
+    """Derive chat embedding organisation from the owning conversation thread.
+
+    Legacy chat_message_embeddings rows can predate organisation_id and user_id
+    population while still carrying a durable chat_session_id equal to the
+    conversation thread id. That thread is owned by a user, and the user's
+    organisation is the tenant boundary for the whole conversation.
+    """
+    from sqlalchemy import text
+
+    if not {"conversation_threads", "users"} <= existing_tables:
+        return 0
+
+    eligible = db.session.scalar(
+        text(
+            """
+            SELECT count(*)
+            FROM chat_message_embeddings e
+            JOIN conversation_threads t ON t.id = e.chat_session_id
+            JOIN users u ON u.id = t.user_id
+            WHERE e.organization_id IS NULL
+              AND u.organization_id IS NOT NULL
+            """
+        )
+    )
+    updated = eligible
+    if not dry_run and eligible:
+        result = db.session.execute(
+            text(
+                """
+                UPDATE chat_message_embeddings AS e
+                SET organization_id = u.organization_id
+                FROM conversation_threads AS t
+                JOIN users AS u ON u.id = t.user_id
+                WHERE t.id = e.chat_session_id
+                  AND e.organization_id IS NULL
+                  AND u.organization_id IS NOT NULL
+                """
+            )
+        )
+        updated = result.rowcount
+        db.session.commit()
+
+    return updated
+
+
+def _list_unresolved_chat_embedding_rows() -> list[str]:
+    """Return a stable, human-readable list of chat embedding rows still NULL."""
+    from sqlalchemy import text
+
+    rows = db.session.execute(
+        text(
+            """
+            SELECT id, chat_session_id
+            FROM chat_message_embeddings
+            WHERE organization_id IS NULL
+            ORDER BY id
+            """
+        )
+    ).fetchall()
+    return [f"{row.id}:{row.chat_session_id}" for row in rows]
+
+
+def _remove_unresolved_chat_embeddings(dry_run: bool) -> int:
+    """Delete legacy chat embeddings whose tenant provenance cannot be recovered."""
+    from sqlalchemy import text
+
+    removable = db.session.scalar(
+        text(
+            "SELECT count(*) FROM chat_message_embeddings WHERE organization_id IS NULL"
+        )
+    )
+    if dry_run or not removable:
+        return removable or 0
+
+    result = db.session.execute(
+        text("DELETE FROM chat_message_embeddings WHERE organization_id IS NULL")
+    )
+    db.session.commit()
+    return result.rowcount or 0
+
+
+def _backfill_embedding_organizations(*, dry_run, existing_tables, added, failed):
+    """Backfill organization_id on embedding tables that have a reachable org
+    through their FK chain.
+
+    Tables whose parent is shared reference data
+    (vendor_product_embeddings, process_embeddings,
+    vendor_organization_embeddings) have no tenant provenance and stay NULL --
+    they are deliberately unscoped per ADR-0003.
+    """
+    from sqlalchemy import inspect, text
+
+    present = {t for t in _ALL_EMBEDDING_TABLES if t in existing_tables}
+    if not present:
+        return
+
+    for (
+        table,
+        fk_col,
+        join_table,
+        join_org_col,
+        description,
+    ) in _EMBEDDING_TENANT_FKS:
+        if table not in present:
+            continue
+        live_columns = {c["name"] for c in inspect(db.engine).get_columns(table)}
+        if "organization_id" not in live_columns:
+            continue
+
+        before = db.session.scalar(
+            text(
+                f"SELECT count(*) FROM {table} WHERE organization_id IS NULL"
+            )
+        )
+        if not before:
+            continue
+
+        eligible = db.session.scalar(
+            text(
+                f"""
+                SELECT count(*)
+                FROM {table} e
+                JOIN {join_table} j ON j.id = e.{fk_col}
+                WHERE e.organization_id IS NULL
+                  AND j.{join_org_col} IS NOT NULL
+                """
+            )
+        )
+        updated = eligible
+        if not dry_run and eligible:
+            result = db.session.execute(
+                text(
+                    f"""
+                    UPDATE {table} AS e
+                    SET organization_id = j.{join_org_col}
+                    FROM {join_table} AS j
+                    WHERE j.id = e.{fk_col}
+                      AND e.organization_id IS NULL
+                      AND j.{join_org_col} IS NOT NULL
+                    """
+                )
+            )
+            updated = result.rowcount
+            db.session.commit()
+
+        unresolved = before - updated
+        added.append(
+            f"backfill.{table}.organization_id :: before={before}, "
+            f"updated={updated}, unresolved={unresolved} "
+            f"(provenance: {description})"
+        )
+        if unresolved:
+            # For chat_message_embeddings, try to derive org from session_id
+            # pattern before reporting as failure.
+            if table == "chat_message_embeddings":
+                _chat_derived = _backfill_chat_from_session_id(dry_run)
+                if _chat_derived:
+                    updated += _chat_derived
+                    unresolved = before - updated
+                    added.append(
+                        f"backfill.{table}.organization_id :: session-derived={_chat_derived}"
+                    )
+                _conversation_derived = _backfill_chat_from_conversation_owner(
+                    dry_run, existing_tables
+                )
+                if _conversation_derived:
+                    updated += _conversation_derived
+                    unresolved = before - updated
+                    added.append(
+                        f"backfill.{table}.organization_id :: conversation-derived={_conversation_derived}"
+                    )
+            if unresolved:
+                unresolved_rows = _list_unresolved_chat_embedding_rows() if table == "chat_message_embeddings" else []
+                if unresolved_rows:
+                    added.append(
+                        f"backfill.{table}.organization_id :: unresolved_rows={unresolved_rows}"
+                    )
+                if table == "chat_message_embeddings":
+                    removed = _remove_unresolved_chat_embeddings(dry_run)
+                    action = "would remove" if dry_run else "removed"
+                    added.append(
+                        f"backfill.{table}.organization_id :: {action}={removed} unresolved row(s) with no tenant provenance"
+                    )
+                else:
+                    added.append(
+                        f"backfill.{table}.organization_id :: "
+                        f"{unresolved} row(s) unresolved (left NULL; invisible through tenant filters)"
+                    )
+
+    for table in _EMBEDDING_SHARED_TABLES:
+        if table not in present:
+            continue
+        live_columns = {c["name"] for c in inspect(db.engine).get_columns(table)}
+        if "organization_id" not in live_columns:
+            continue
+        null_count = db.session.scalar(
+            text(f"SELECT count(*) FROM {table} WHERE organization_id IS NULL")
+        )
+        if null_count:
+            added.append(
+                f"backfill.{table}.organization_id :: "
+                f"shared reference data, no org provenance; "
+                f"{null_count} row(s) left NULL"
+            )
+
+
+def _ensure_embedding_composite_unique_constraints(*, dry_run, existing_tables, added, failed):
+    """Replace single-column unique constraints on embedding tables with
+    composite (FK, organization_id) so two organisations can each have an
+    embedding for the same entity.
+
+    The model already declares the composite constraint since the org-scoping
+    migration, but ``create_all()`` only creates tables that do not exist, so
+    a table created on an older schema keeps its single-column constraint.
+    """
+    from sqlalchemy import inspect, text
+
+    _COMPOSITE_UQ_MIGRATIONS = {
+        "business_capability_embeddings": (
+            "uq_capability_embedding",
+            ["business_capability_id", "organization_id"],
+        ),
+    }
+    for tbl, (uq_name, columns) in _COMPOSITE_UQ_MIGRATIONS.items():
+        if tbl not in existing_tables:
+            continue
+
+        existing = {
+            c["name"]: c["column_names"]
+            for c in inspect(db.engine).get_unique_constraints(tbl)
+        }
+        if uq_name in existing and set(existing[uq_name]) == set(columns):
+            continue  # already the composite constraint
+
+        label = f"constraint.{tbl}.{uq_name}"
+        if dry_run:
+            added.append(
+                f"{label} :: would replace with composite {columns}"
+            )
+            continue
+
+        db.session.execute(
+            text(f'ALTER TABLE "{tbl}" DROP CONSTRAINT IF EXISTS "{uq_name}"')
+        )
+        col_list = ", ".join(f'"{c}"' for c in columns)
+        db.session.execute(
+            text(
+                f'ALTER TABLE "{tbl}" ADD CONSTRAINT "{uq_name}" '
+                f"UNIQUE ({col_list})"
+            )
+        )
+        db.session.commit()
+        added.append(
+            f"{label} :: replaced with composite {columns}"
+        )
+
+
+def _ensure_embedding_null_org_unique_indexes(*, dry_run, existing_tables, added, failed):
+    """Keep one NULL-organisation capability embedding per capability id."""
+    from sqlalchemy import text
+
+    table_name = "business_capability_embeddings"
+    index_name = "uq_capability_embedding_null_org"
+    if table_name not in existing_tables:
+        return
+
+    label = f"index.{table_name}.{index_name}"
+    present = db.session.execute(
+        text(
+            "SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() "
+            "AND tablename = :t AND indexname = :i"
+        ),
+        {"t": table_name, "i": index_name},
+    ).first()
+    if present is not None:
+        return
+    ddl = (
+        f'CREATE UNIQUE INDEX IF NOT EXISTS "{index_name}" '
+        f'ON "{table_name}" ("business_capability_id") '
+        f'WHERE organization_id IS NULL'
+    )
+    if dry_run:
+        added.append(f"{label} :: would ensure NULL-org uniqueness")
+        return
+    try:
+        db.session.execute(text(ddl))
+        db.session.commit()
+        added.append(f"{label} :: ensured NULL-org uniqueness")
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        failed.append(f"{label}: {str(exc)[:120]}")
+
+
 def _ensure_condition_evidence_canonical_document(
     *, dry_run, existing_tables, added, failed
 ):
@@ -1703,6 +2124,24 @@ def _reconcile(dry_run=False):
         added=added,
         failed=failed,
     )
+    _backfill_embedding_organizations(
+        dry_run=dry_run,
+        existing_tables=existing_tables,
+        added=added,
+        failed=failed,
+    )
+    _ensure_embedding_composite_unique_constraints(
+        dry_run=dry_run,
+        existing_tables=existing_tables,
+        added=added,
+        failed=failed,
+    )
+    _ensure_embedding_null_org_unique_indexes(
+        dry_run=dry_run,
+        existing_tables=existing_tables,
+        added=added,
+        failed=failed,
+    )
     _backfill_webhook_organizations(
         dry_run=dry_run,
         existing_tables=existing_tables,
@@ -1906,4 +2345,122 @@ def init_app(app):
     from app.commands.schema_migrations import init_app as init_schema_migrations
 
     app.cli.add_command(reconcile_schema)
+    app.cli.add_command(reembed)
     init_schema_migrations(app)
+
+
+@click.command("reembed")
+@click.option("--org-id", type=int, default=None, help="Organisation id to re-embed (default: all orgs one at a time)")
+@with_appcontext
+def reembed(org_id):
+    """Regenerate embeddings for every tenant-scoped entity, one organisation at a time.
+
+    Re-runs ``generate_and_store`` for every capability, solution, application
+    component, and vendor product that has an embedding row, scoped to the
+    given organisation (or all organisations sequentially).
+    """
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.models.vector_embeddings import (
+        ApplicationComponentEmbedding,
+        BusinessCapabilityEmbedding,
+        SolutionEmbedding,
+        VendorProductEmbedding,
+    )
+    from app.services.pgvector_embedding_service import PgvectorEmbeddingService
+    from sqlalchemy import text
+
+    svc = PgvectorEmbeddingService()
+
+    if org_id is not None:
+        org_ids = [org_id]
+    else:
+        org_ids = [
+            row[0]
+            for row in db.session.execute(text("SELECT id FROM organizations")).fetchall()
+        ]
+
+    for oid in org_ids:
+        with tenant_scope(oid):
+            click.echo(f"Re-embedding organisation {oid}...")
+
+            # Capabilities
+            caps = db.session.execute(
+                text(
+                    "SELECT bc.id, bc.name || ' ' || COALESCE(bc.description, '') "
+                    "FROM business_capability bc "
+                    "JOIN business_capability_embeddings e ON e.business_capability_id = bc.id "
+                    "WHERE bc.organization_id = :oid",
+                ),
+                {"oid": oid},
+            ).fetchall()
+            for cap_id, cap_text in caps:
+                svc.generate_and_store(
+                    entity_type="capability",
+                    entity_id=cap_id,
+                    text=cap_text,
+                    embedding_model_cls=BusinessCapabilityEmbedding,
+                    fk_field="business_capability_id",
+                )
+            click.echo(f"  {len(caps)} capability embeddings")
+
+            # Solutions
+            sols = db.session.execute(
+                text(
+                    "SELECT s.id, s.name || ' ' || COALESCE(s.description, '') "
+                    "FROM solutions s "
+                    "JOIN solution_embeddings e ON e.solution_id = s.id "
+                    "WHERE s.organization_id = :oid",
+                ),
+                {"oid": oid},
+            ).fetchall()
+            for sol_id, sol_text in sols:
+                svc.generate_and_store(
+                    entity_type="solution",
+                    entity_id=sol_id,
+                    text=sol_text,
+                    embedding_model_cls=SolutionEmbedding,
+                    fk_field="solution_id",
+                )
+            click.echo(f"  {len(sols)} solution embeddings")
+
+            # Application components
+            apps = db.session.execute(
+                text(
+                    "SELECT ac.id, ac.name || ' ' || COALESCE(ac.description, '') "
+                    "FROM application_components ac "
+                    "JOIN application_component_embeddings e ON e.application_component_id = ac.id "
+                    "WHERE ac.organization_id = :oid",
+                ),
+                {"oid": oid},
+            ).fetchall()
+            for app_id, app_text in apps:
+                svc.generate_and_store(
+                    entity_type="application",
+                    entity_id=app_id,
+                    text=app_text,
+                    embedding_model_cls=ApplicationComponentEmbedding,
+                    fk_field="application_component_id",
+                )
+            click.echo(f"  {len(apps)} application component embeddings")
+
+            # Vendor products (shared table, no org scope)
+            vps = db.session.execute(
+                text(
+                    "SELECT vp.id, vp.name || ' ' || COALESCE(vp.description, '') "
+                    "FROM vendor_products vp "
+                    "JOIN vendor_product_embeddings e ON e.vendor_product_id = vp.id"
+                ),
+            ).fetchall()
+            for vp_id, vp_text in vps:
+                svc.generate_and_store(
+                    entity_type="vendor_product",
+                    entity_id=vp_id,
+                    text=vp_text,
+                    embedding_model_cls=VendorProductEmbedding,
+                    fk_field="vendor_product_id",
+                )
+            click.echo(f"  {len(vps)} vendor product embeddings")
+
+            db.session.remove()
+
+    click.echo("Re-embedding complete.")

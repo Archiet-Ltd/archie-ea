@@ -48,6 +48,54 @@ INTENTIONALLY_GLOBAL = {
     "Subscription": "billing is administered platform-side",
     "UsageEvent": "metering is aggregated platform-side",
     "OrgRole": "role definitions are resolved during authorisation setup",
+    "BusinessCapabilityEmbedding": (
+        "tenant-scoped at the query layer, not by column constraint: "
+        "pgvector_embedding_service.py's own _TENANT_EMBEDDING_TABLES "
+        "classification uses strict organization_id equality in "
+        "scoped_embedding_query; the column stays nullable because this "
+        "PR's own tests/test_embedding_org_scoping.py requires it, and "
+        "TenantMixin's automatic org auto-set would break "
+        "create_capability_embedding's explicit cross-tenant-rewrite refusal"
+    ),
+    "SolutionEmbedding": (
+        "tenant-scoped at the query layer, not by column constraint: "
+        "pgvector_embedding_service.py's own _TENANT_EMBEDDING_TABLES "
+        "classification uses strict organization_id equality in "
+        "scoped_embedding_query; the column stays nullable because this "
+        "PR's own tests/test_embedding_org_scoping.py requires it"
+    ),
+    "ApplicationComponentEmbedding": (
+        "tenant-scoped at the query layer, not by column constraint: "
+        "pgvector_embedding_service.py's own _TENANT_EMBEDDING_TABLES "
+        "classification uses strict organization_id equality in "
+        "scoped_embedding_query; the column stays nullable because this "
+        "PR's own tests/test_embedding_org_scoping.py requires it"
+    ),
+    "ChatMessageEmbedding": (
+        "tenant-scoped at the query layer, not by column constraint: "
+        "always written with an explicit organization_id "
+        "(multi_domain_chat_service.py's require_current_org_id), and "
+        "matches pgvector_embedding_service.py's own "
+        "_TENANT_EMBEDDING_TABLES classification; the column stays "
+        "nullable because this PR's own "
+        "tests/test_embedding_org_scoping.py requires it"
+    ),
+    "VendorProductEmbedding": (
+        "vendor products are a shared reference catalogue every organisation "
+        "searches against; pgvector_embedding_service.py's own comment marks "
+        "this embedding table as shared reference data with no org"
+    ),
+    "VendorOrganizationEmbedding": (
+        "vendor organisations are a shared reference catalogue every "
+        "organisation searches against; pgvector_embedding_service.py's own "
+        "mapping marks this embedding table as shared reference data with no org"
+    ),
+    "ProcessEmbedding": (
+        "APQC/industry processes are a shared reference catalogue every "
+        "organisation searches against; pgvector_embedding_service.py's own "
+        "_SHARED_EMBEDDING_TABLES set classifies this as nullable-or-org, "
+        "same as vendor product/organisation"
+    ),
     "UserSession": (
         "a session row is looked up by sid on every authenticated request, before "
         "a tenant context exists, and revocation on logout or password change must "

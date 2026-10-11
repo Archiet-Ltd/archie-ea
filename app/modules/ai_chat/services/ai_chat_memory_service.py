@@ -17,11 +17,14 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, func
+from sqlalchemy import func
 
 from app import db
 from app.models.vector_embeddings import ChatMessageEmbedding
-from app.services.pgvector_embedding_service import get_pgvector_service
+from app.services.pgvector_embedding_service import (
+    get_pgvector_service,
+    scoped_chat_message_query,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -119,9 +122,7 @@ class AIChatMemoryService:
         """
         try:
             messages = (
-                ChatMessageEmbedding.query.filter(
-                    ChatMessageEmbedding.chat_session_id == self.session_id
-                )
+                scoped_chat_message_query(self.session_id)
                 .order_by(ChatMessageEmbedding.created_at.desc())
                 .limit(limit)
                 .all()
@@ -139,27 +140,20 @@ class AIChatMemoryService:
             Dictionary with session metadata
         """
         try:
-            total_messages = ChatMessageEmbedding.query.filter(
-                ChatMessageEmbedding.chat_session_id == self.session_id
+            base_query = scoped_chat_message_query(self.session_id)
+
+            total_messages = base_query.count()
+
+            user_messages = base_query.filter(
+                ChatMessageEmbedding.message_role == "user"
             ).count()
 
-            user_messages = ChatMessageEmbedding.query.filter(
-                and_(
-                    ChatMessageEmbedding.chat_session_id == self.session_id,
-                    ChatMessageEmbedding.message_role == "user",
-                )
-            ).count()
-
-            assistant_messages = ChatMessageEmbedding.query.filter(
-                and_(
-                    ChatMessageEmbedding.chat_session_id == self.session_id,
-                    ChatMessageEmbedding.message_role == "assistant",
-                )
+            assistant_messages = base_query.filter(
+                ChatMessageEmbedding.message_role == "assistant"
             ).count()
 
             domains = (
-                db.session.query(ChatMessageEmbedding.domain, func.count())
-                .filter(ChatMessageEmbedding.chat_session_id == self.session_id)
+                base_query.with_entities(ChatMessageEmbedding.domain, func.count())
                 .group_by(ChatMessageEmbedding.domain)
                 .all()
             )
@@ -222,9 +216,7 @@ class AIChatMemoryService:
             True if successful, False otherwise
         """
         try:
-            ChatMessageEmbedding.query.filter(
-                ChatMessageEmbedding.chat_session_id == self.session_id
-            ).delete()
+            scoped_chat_message_query(self.session_id).delete()
             db.session.commit()
             logger.info(f"Cleared session {self.session_id}")
             return True

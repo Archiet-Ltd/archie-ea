@@ -52,6 +52,83 @@ from app.models.vector_embeddings import (
     VendorOrganizationEmbedding,
     VendorProductEmbedding,
 )
+from app.utils.tenant_sql import current_org_id
+
+# Tenant embedding tables (strict org equality)
+_TENANT_EMBEDDING_TABLES = {
+    BusinessCapabilityEmbedding,
+    SolutionEmbedding,
+    ApplicationComponentEmbedding,
+    ChatMessageEmbedding,
+}
+
+# Shared embedding tables (NULL-or-org)
+_SHARED_EMBEDDING_TABLES = {
+    VendorProductEmbedding,
+    ProcessEmbedding,
+    VendorOrganizationEmbedding,
+}
+
+# Canonical table-name classification (used by rag_engine.py and elsewhere)
+TENANT_EMBEDDING_TABLE_NAMES = frozenset(
+    model.__tablename__ for model in _TENANT_EMBEDDING_TABLES
+)
+SHARED_EMBEDDING_TABLE_NAMES = frozenset(
+    model.__tablename__ for model in _SHARED_EMBEDDING_TABLES
+)
+
+
+def scoped_embedding_query(model_cls):
+    """Return a base query on *model_cls* filtered to the current organisation.
+
+    Tenant tables (business_capability, solution, application_component,
+    chat_message) use strict ``organization_id == org``.  Shared tables
+    (vendor_product, process, vendor_organization) use
+    ``organization_id == org OR organization_id IS NULL``.
+
+    Outside a tenant request the query returns no rows (the caller must
+    pass an explicit organisation or use a platform context).
+    """
+    org_id = current_org_id()
+    if org_id is None:
+        return model_cls.query.filter(text("1=0"))
+    if model_cls in _TENANT_EMBEDDING_TABLES:
+        return model_cls.query.filter(model_cls.organization_id == org_id)
+    if model_cls in _SHARED_EMBEDDING_TABLES:
+        return model_cls.query.filter(
+            db.or_(model_cls.organization_id == org_id, model_cls.organization_id.is_(None))
+        )
+    # Fallback: strict equality for unknown tables
+    return model_cls.query.filter(model_cls.organization_id == org_id)
+
+
+def scoped_chat_message_query(chat_session_id: Optional[str] = None):
+    """Return a fail-closed tenant-scoped query for chat embeddings."""
+    query = scoped_embedding_query(ChatMessageEmbedding)
+    if chat_session_id is not None:
+        query = query.filter(ChatMessageEmbedding.chat_session_id == chat_session_id)
+    return query
+
+
+def require_current_org_id(operation: str) -> int:
+    """Return the active tenant id or raise for fail-closed chat writes."""
+    org_id = current_org_id()
+    if org_id is None:
+        raise RuntimeError(f"{operation} requires an active organization")
+    return org_id
+
+# Mapping from embedding model class to its parent model module path and class name
+# (for org provenance). None means the parent is not used for org lookup
+# (shared tables stay NULL, chat uses current_org_id).
+_PARENT_MODEL_FOR_EMBEDDING = {
+    BusinessCapabilityEmbedding: ("app.models.business_capabilities", "BusinessCapability"),
+    SolutionEmbedding: ("app.models.solution_models", "Solution"),
+    ApplicationComponentEmbedding: ("app.models.application_portfolio", "ApplicationComponent"),
+    ChatMessageEmbedding: None,  # uses current_org_id()
+    VendorProductEmbedding: None,  # shared reference data, no org
+    ProcessEmbedding: None,  # shared reference data, no org
+    VendorOrganizationEmbedding: None,  # shared reference data, no org
+}
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +160,35 @@ class PgvectorEmbeddingService:
         """Initialize with optional database session."""
         self.session = session or db.session
         self.model = get_embedding_model()
+
+    @staticmethod
+    def _parent_org_id_for_embedding(embedding_model_cls: type, entity_id: int) -> Optional[int]:
+        """Resolve the parent row's organisation for a tenant-owned embedding."""
+        _parent_ref = _PARENT_MODEL_FOR_EMBEDDING.get(embedding_model_cls)
+        if _parent_ref is None:
+            return None
+
+        import importlib
+
+        parent_mod = importlib.import_module(_parent_ref[0])
+        parent_cls = getattr(parent_mod, _parent_ref[1])
+        parent = db.session.get(parent_cls, entity_id)
+        if parent is None:
+            return None
+        return getattr(parent, "organization_id", None)
+
+    @staticmethod
+    def _ensure_parent_org_matches_caller(parent_org_id: Optional[int]) -> None:
+        """Refuse tenant-owned writes when the caller is scoped to another org."""
+        caller_org_id = current_org_id()
+        if (
+            caller_org_id is not None
+            and parent_org_id is not None
+            and parent_org_id != caller_org_id
+        ):
+            raise PermissionError(
+                f"caller organization {caller_org_id} cannot rewrite organization {parent_org_id} embedding"
+            )
 
     def generate_embedding(self, text: str) -> Optional[List[float]]:
         """
@@ -140,10 +246,10 @@ class PgvectorEmbeddingService:
             if not embedding_vector:
                 return None
 
-            # Delete existing embedding
-            VendorProductEmbedding.query.filter_by(vendor_product_id=vendor_product_id).delete()
+            # Delete existing embedding by parent id alone (shared table)
+            VendorProductEmbedding.query.filter_by(vendor_product_id=vendor_product_id).delete()  # tenant-scoping-ok: VendorProductEmbedding is shared reference data, delete by parent id alone
 
-            # Create new embedding
+            # Create new embedding (shared reference data, no org)
             embedding = VendorProductEmbedding(
                 vendor_product_id=vendor_product_id,
                 embedding=embedding_vector,
@@ -161,7 +267,8 @@ class PgvectorEmbeddingService:
 
     def _search_embeddings_python(self, model_class, id_field, query_embedding, limit, threshold):
         """Generic Python-based cosine similarity search for JSON-stored embeddings."""
-        all_rows = model_class.query.all()
+        q = scoped_embedding_query(model_class)
+        all_rows = q.all()
         scored = []
         for row in all_rows:
             vec = row.embedding
@@ -253,7 +360,12 @@ class PgvectorEmbeddingService:
             if not embedding_vector:
                 return None
 
-            # Delete existing
+            _parent_org_id = self._parent_org_id_for_embedding(
+                BusinessCapabilityEmbedding, capability_id
+            )
+            self._ensure_parent_org_matches_caller(_parent_org_id)
+
+            # Delete existing by parent id alone
             BusinessCapabilityEmbedding.query.filter_by(
                 business_capability_id=capability_id
             ).delete()
@@ -263,10 +375,14 @@ class PgvectorEmbeddingService:
                 embedding=embedding_vector,
                 embedding_text=text,
                 model_version=MODEL_NAME,
+                organization_id=_parent_org_id,
             )
             self.session.add(embedding)
             self.session.commit()
             return embedding
+        except PermissionError as e:
+            logger.error(f"Failed to create capability embedding: {e}")
+            return None
         except Exception as e:
             logger.error(f"Failed to create capability embedding: {e}")
             self.session.rollback()
@@ -322,6 +438,7 @@ class PgvectorEmbeddingService:
                 message_role=role,
                 domain=domain,
                 metadata_json=metadata or {},
+                organization_id=require_current_org_id("chat message embedding"),
             )
             self.session.add(embedding)
             self.session.commit()
@@ -335,7 +452,7 @@ class PgvectorEmbeddingService:
     def search_chat_history(
         self,
         query_text: str,
-        chat_session_id: str,
+        chat_session_id: Optional[str],
         limit: int = 5,
         threshold: float = 0.3,
     ) -> List[Dict[str, Any]]:
@@ -348,22 +465,41 @@ class PgvectorEmbeddingService:
             if not query_embedding:
                 return []
 
-            results = (
-                self.session.query(ChatMessageEmbedding)
-                .filter(ChatMessageEmbedding.chat_session_id == chat_session_id)
-                .filter(
-                    ChatMessageEmbedding.embedding.cosine_distance(query_embedding)
-                    < (1 - threshold)
+            base_query = scoped_chat_message_query(chat_session_id)
+            if not hasattr(ChatMessageEmbedding.embedding, "cosine_distance"):
+                rows = base_query.all()
+                scored = []
+                for row in rows:
+                    vec = row.embedding
+                    if not vec:
+                        continue
+                    if isinstance(vec, str):
+                        import json as _json
+
+                        vec = _json.loads(vec)
+                    sim = _cosine_similarity(query_embedding, vec)
+                    if sim >= threshold:
+                        scored.append((row, sim))
+                scored.sort(key=lambda item: item[1], reverse=True)
+                results = [row for row, _ in scored[:limit]]
+            else:
+                results = (
+                    base_query
+                    .filter(
+                        ChatMessageEmbedding.embedding.cosine_distance(query_embedding)
+                        < (1 - threshold)
+                    )
+                    .order_by(ChatMessageEmbedding.embedding.cosine_distance(query_embedding))
+                    .limit(limit)
+                    .all()
                 )
-                .order_by(ChatMessageEmbedding.embedding.cosine_distance(query_embedding))
-                .limit(limit)
-                .all()
-            )
 
             return [
                 {
                     "message": r.message_text,
                     "role": r.message_role,
+                    "session_id": r.chat_session_id,
+                    "user_id": r.user_id,
                     "created_at": r.created_at,
                     "domain": r.domain,
                 }
@@ -409,7 +545,13 @@ class PgvectorEmbeddingService:
             if hasattr(embedding_vector, "tolist"):
                 embedding_vector = embedding_vector.tolist()
 
-            # Upsert: remove existing row for this entity
+            # Determine organisation from the parent row
+            _parent_org_id = self._parent_org_id_for_embedding(
+                embedding_model_cls, entity_id
+            )
+            self._ensure_parent_org_matches_caller(_parent_org_id)
+
+            # Upsert: remove existing row for this entity by parent id alone
             embedding_model_cls.query.filter_by(**{fk_field: entity_id}).delete()
 
             record = embedding_model_cls(
@@ -418,6 +560,7 @@ class PgvectorEmbeddingService:
                     "embedding": embedding_vector,
                     "embedding_text": text,
                     "model_version": MODEL_NAME,
+                    "organization_id": _parent_org_id,
                 }
             )
             self.session.add(record)
@@ -426,6 +569,14 @@ class PgvectorEmbeddingService:
                 "Created embedding for %s id=%d", entity_type, entity_id
             )
             return record
+        except PermissionError as e:
+            logger.error(
+                "Failed to create %s embedding for id=%d: %s",
+                entity_type,
+                entity_id,
+                e,
+            )
+            return None
         except Exception as e:
             logger.error(
                 "Failed to create %s embedding for id=%d: %s",
@@ -457,7 +608,7 @@ class PgvectorEmbeddingService:
                 )
                 .limit(limit)
                 .all()
-            )
+            )  # tenant-scoping-ok: VendorProduct is shared reference data, no org
 
             return [(p.id, p.name, 0.5) for p in results]  # Neutral confidence score
         except Exception as e:
@@ -478,14 +629,15 @@ class PgvectorEmbeddingService:
     def get_embedding_stats(self) -> Dict[str, int]:
         """Get statistics on stored embeddings."""
         try:
+            # Scope each count to the current organisation via scoped_embedding_query
             stats = {
-                "vendor_product_embeddings": VendorProductEmbedding.query.count(),
-                "capability_embeddings": BusinessCapabilityEmbedding.query.count(),
-                "process_embeddings": ProcessEmbedding.query.count(),
-                "chat_message_embeddings": ChatMessageEmbedding.query.count(),
-                "solution_embeddings": SolutionEmbedding.query.count(),
-                "vendor_org_embeddings": VendorOrganizationEmbedding.query.count(),
-                "app_component_embeddings": ApplicationComponentEmbedding.query.count(),
+                "vendor_product_embeddings": scoped_embedding_query(VendorProductEmbedding).count(),
+                "capability_embeddings": scoped_embedding_query(BusinessCapabilityEmbedding).count(),
+                "process_embeddings": scoped_embedding_query(ProcessEmbedding).count(),
+                "chat_message_embeddings": scoped_embedding_query(ChatMessageEmbedding).count(),
+                "solution_embeddings": scoped_embedding_query(SolutionEmbedding).count(),
+                "vendor_org_embeddings": scoped_embedding_query(VendorOrganizationEmbedding).count(),
+                "app_component_embeddings": scoped_embedding_query(ApplicationComponentEmbedding).count(),
             }
             return stats
         except Exception as e:
