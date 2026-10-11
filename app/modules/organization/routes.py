@@ -54,6 +54,95 @@ def chart_data():
     return success_response(tree)
 
 
+# ---------------------------------------------------------------------------
+# Org chart editing — add / rename / move / remove units and the
+# capabilities-per-unit panel. Every write is organisation-scoped by the
+# tenant query filter and role-gated exactly like the RACI cell editor
+# below; a unit of another organisation is never found, renamed, moved,
+# removed or shown.
+# ---------------------------------------------------------------------------
+
+
+@organization_bp.route("/chart/api/units", methods=["POST"])
+@login_required
+@require_roles("admin", "architect", "business_architect")
+def chart_unit_create():
+    """Add a child unit under a parent on the org chart."""
+    payload = request.get_json(silent=True) or {}
+    try:
+        unit = service.add_child_unit(
+            parent_id=payload.get("parent_id"),
+            name=payload.get("name"),
+            actor_type=payload.get("actor_type"),
+        )
+    except ValueError as exc:
+        return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
+    return success_response({
+        "id": unit.id,
+        "name": unit.name,
+        "actor_type": unit.actor_type,
+        "parent_id": payload.get("parent_id"),
+    })
+
+
+@organization_bp.route("/chart/api/units/<int:unit_id>", methods=["PATCH"])
+@login_required
+@require_roles("admin", "architect", "business_architect")
+def chart_unit_rename(unit_id):
+    """Rename a unit on the org chart."""
+    if service.get_org_unit(unit_id) is None:
+        return not_found_response("Unit")
+    payload = request.get_json(silent=True) or {}
+    try:
+        unit = service.rename_unit(unit_id=unit_id, name=payload.get("name"))
+    except ValueError as exc:
+        return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
+    return success_response({"id": unit.id, "name": unit.name})
+
+
+@organization_bp.route("/chart/api/units/<int:unit_id>/parent", methods=["PATCH"])
+@login_required
+@require_roles("admin", "architect", "business_architect")
+def chart_unit_move(unit_id):
+    """Move a unit under another parent; ``{"parent_id": null}`` detaches it
+    to the root. A move that would create a cycle is refused."""
+    if service.get_org_unit(unit_id) is None:
+        return not_found_response("Unit")
+    payload = request.get_json(silent=True) or {}
+    try:
+        result = service.move_unit(
+            unit_id=unit_id, new_parent_id=payload.get("parent_id")
+        )
+    except ValueError as exc:
+        return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
+    return success_response(result)
+
+
+@organization_bp.route("/chart/api/units/<int:unit_id>", methods=["DELETE"])
+@login_required
+@require_roles("admin", "architect", "business_architect")
+def chart_unit_remove(unit_id):
+    """Remove a unit that has no children and no people assigned to it."""
+    if service.get_org_unit(unit_id) is None:
+        return not_found_response("Unit")
+    try:
+        service.remove_unit(unit_id=unit_id)
+    except ValueError as exc:
+        return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
+    return success_response({"unit_id": unit_id, "deleted": True})
+
+
+@organization_bp.route("/chart/api/units/<int:unit_id>/capabilities")
+@login_required
+def chart_unit_capabilities(unit_id):
+    """Read-only capabilities-per-unit panel data: the capabilities owned by
+    the people of a unit and its descendants (each with its owner), plus the
+    people with no unit owning capabilities, and an honest empty state."""
+    if service.get_org_unit(unit_id) is None:
+        return not_found_response("Unit")
+    return success_response(service.capabilities_for_unit(unit_id=unit_id))
+
+
 @organization_bp.route("/workforce-transition")
 @login_required
 def workforce_transition():
