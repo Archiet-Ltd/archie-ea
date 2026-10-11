@@ -240,3 +240,23 @@ class AdminUserService:
         return True, "Successfully deleted user {}.".format(
             user_name
         )
+
+    @staticmethod
+    def list_org_business_units():
+        """Delegate to the canonical v1 implementation — the unit picker and
+        the unit-assignment validation exist once, on AdminUserService."""
+        from app.modules.admin.services.admin_user_service import (
+            AdminUserService as _V1AdminUserService,
+        )
+
+        return _V1AdminUserService.list_org_business_units()
+
+    @staticmethod
+    def set_user_business_unit(user: User, business_unit_id: Optional[int]) -> None:
+        """Delegate to the canonical v1 implementation — one implementation
+        of the assign/clear behaviour and its cross-organisation refusal."""
+        from app.modules.admin.services.admin_user_service import (
+            AdminUserService as _V1AdminUserService,
+        )
+
+        return _V1AdminUserService.set_user_business_unit(user, business_unit_id)

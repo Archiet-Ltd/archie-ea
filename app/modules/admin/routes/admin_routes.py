@@ -47,6 +47,7 @@ from app.services.billing_plans import PlanLimitReached
 from ..forms.admin_forms import (
     APISettingsForm,
     ChangeAccountTypeForm,
+    ChangeBusinessUnitForm,
     ChangeUserEmailForm,
     FeatureFlagForm,
     InviteUserForm,
@@ -309,6 +310,44 @@ def change_account_type(user_id):
             ),
             "form-success",
         )
+    return render_template("admin/manage_user.html", user=user, form=form)
+
+
+@admin_bp.route("/user/<int:user_id>/change-business-unit", methods=["GET", "POST"])
+@login_required
+@admin_required
+@audit_log("admin_user_business_unit_change")
+def change_user_business_unit(user_id):
+    """Assign a person to a unit (or clear the assignment).
+
+    The picker offers only the organisational units of the caller's
+    organisation — a unit from another organisation can never be chosen —
+    and the empty choice means "no unit"."""
+    user = _svc.get_user_or_404(user_id)
+    form = ChangeBusinessUnitForm()
+    units = _svc.list_org_business_units()
+    form.business_unit_id.choices = [("", "No unit")] + [
+        (str(unit.id), unit.name) for unit in units
+    ]
+    if form.validate_on_submit():
+        raw = form.business_unit_id.data
+        try:
+            _svc.set_user_business_unit(user, int(raw) if raw else None)
+        except ValueError as exc:
+            flash(str(exc), "error")
+        else:
+            unit_name = "no unit"
+            if user.business_unit_id is not None:
+                unit_name = next(
+                    (u.name for u in units if u.id == user.business_unit_id), unit_name
+                )
+            flash(
+                "Business unit for {} successfully changed to {}.".format(
+                    user.full_name(), unit_name
+                ),
+                "form-success",
+            )
+        return redirect(url_for("admin.user_info", user_id=user_id))
     return render_template("admin/manage_user.html", user=user, form=form)
 
 
