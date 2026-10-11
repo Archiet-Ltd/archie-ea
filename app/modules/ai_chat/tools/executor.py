@@ -2392,10 +2392,13 @@ class ToolExecutor:
                 "error": "target_maturity must be an integer between 1 and 5.",
             }
 
-        # Tenant filter is applied by the ORM (TenantMixin) — do not hand-write an
-        # organization_id predicate (would double-filter). .filter_by().first()
-        # rather than .get(), which is scoped only on an identity-map miss.
-        cap = BusinessCapability.query.filter_by(id=capability_id).first()
+        # Use an explicit organization_id predicate so the tool works the same
+        # inside and outside a request context — the ORM tenant filter is a no-op
+        # when g.current_org_id is unset.
+        org_id = self._get_organization_id()
+        cap = BusinessCapability.query.filter_by(
+            id=capability_id, organization_id=org_id
+        ).first()
         if cap is None:
             return {
                 "success": False,
@@ -2421,7 +2424,7 @@ class ToolExecutor:
         try:
             record_capability_maturity(
                 capability_id=cap.id,
-                organization_id=cap.organization_id,
+                organization_id=org_id,
                 current=current,
                 target=target,
                 notes=None,
