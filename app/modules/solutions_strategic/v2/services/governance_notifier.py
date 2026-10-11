@@ -109,6 +109,7 @@ class GovernanceNotifier:
     @classmethod
     def _create_notifications(cls, user_ids, message, url) -> int:
         from app.models.models import Notification
+        from app.services.notification_service import NotificationService
 
         cutoff = datetime.utcnow() - timedelta(hours=_DEDUPE_HOURS)
         created = 0
@@ -123,7 +124,7 @@ class GovernanceNotifier:
             )
             if recent:
                 continue
-            db.session.add(Notification(user_id=uid, message=message, url=url))
+            NotificationService.create(user_id=uid, message=message, url=url)
             created += 1
         return created
 

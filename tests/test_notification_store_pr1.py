@@ -290,11 +290,11 @@ def test_digest_only_own_org_items(app, db_session, make_org):
 # ---------------------------------------------------------------------------
 
 
-def test_migration_runs_twice_without_error():
+def test_migration_runs_twice_without_error(app):
     """The migration runs twice without error."""
     from alembic.migration import MigrationContext
     from alembic.operations import Operations
-    from sqlalchemy import create_engine, text
+    from sqlalchemy import text
 
     import importlib.util
     migration_path = REPO / "migrations" / "versions" / "20261011_notification_columns.py"
@@ -302,12 +302,13 @@ def test_migration_runs_twice_without_error():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
-    engine = create_engine("postgresql+psycopg2://localhost/test")
-    with engine.begin() as connection:
-        context = MigrationContext.configure(connection)
-        with Operations.context(context):
-            module.upgrade()
-            module.upgrade()  # second run must be idempotent
+    with app.app_context():
+        engine = app.extensions["sqlalchemy"].engine
+        with engine.begin() as connection:
+            context = MigrationContext.configure(connection)
+            with Operations.context(context):
+                module.upgrade()
+                module.upgrade()  # second run must be idempotent
 
 
 def test_flask_db_heads_shows_one_head():
