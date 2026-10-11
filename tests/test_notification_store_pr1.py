@@ -61,7 +61,7 @@ def test_only_notification_service_constructs_notification():
         for path in sorted(d.rglob("*.py")):
             if any(pat in str(path) for pat in exclude_patterns):
                 continue
-            text = path.read_text()
+            text = path.read_text(encoding="utf-8")
             # Look for "Notification(" constructor calls
             for lineno, line in enumerate(text.splitlines(), 1):
                 if re.search(r"\bNotification\(", line) and "class Notification" not in line:
