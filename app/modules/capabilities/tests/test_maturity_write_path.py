@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+from app import db
 from app.modules.capabilities.services.capability_maturity_service import (
     CapabilityNotFoundError,
     MaturityValidationError,
@@ -29,6 +30,22 @@ from app.modules.capabilities.services.capability_maturity_service import (
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+_MATURITY_COLUMNS = r"(?:current|target)_maturity_level"
+_DIRECT_WRITE_PATTERNS = [
+    # row.current_maturity_level = value
+    re.compile(r"\.\s*" + _MATURITY_COLUMNS + r"\s*="),
+]
+
+
+def direct_maturity_write_hits(text):
+    """(line number, line) pairs in ``text`` that write a maturity column."""
+    hits = []
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if any(p.search(line) for p in _DIRECT_WRITE_PATTERNS):
+            hits.append((lineno, line))
+    return hits
 
 
 @pytest.fixture
@@ -367,11 +384,6 @@ def test_no_maturity_writer_owns_current_maturity_level_outside_the_service():
     ``__init__`` (seed/backfill constructors that create new instances) and
     ``capability_maturity_service.py``.
     """
-    # Match assignments like ``foo.current_maturity_level = bar`` but not
-    # keyword arguments like ``current_maturity_level=<value>,`` in constructors.
-    write_pattern = re.compile(
-        r"\.\s*(current_maturity_level|target_maturity_level)\s*="
-    )
     hits = []
     app_root = _REPO_ROOT / "app"
     for path in sorted(app_root.rglob("*.py")):
@@ -389,21 +401,20 @@ def test_no_maturity_writer_owns_current_maturity_level_outside_the_service():
         if "/tests/" in str(relative):
             continue
         text = path.read_text()
-        for lineno, line in enumerate(text.splitlines(), 1):
-            if write_pattern.search(line):
-                line_stripped = line.strip()
-                # Allow raw SQL UPSERT (projection job — reads, not writes).
-                if "EXCLUDED" in line_stripped:
-                    continue
-                # Allow the roadmap dashboard fallback that writes only when
-                # no BusinessCapability source exists (cannot route through the
-                # single write path).
-                if (
-                    "capability_roadmap_dashboard_service" in str(relative)
-                    and "capability.current_maturity_level" in line_stripped
-                ):
-                    continue
-                hits.append(f"{relative}:{lineno}: {line_stripped}")
+        for lineno, line in direct_maturity_write_hits(text):
+            line_stripped = line.strip()
+            # Allow raw SQL UPSERT (projection job — copies the derived row).
+            if "EXCLUDED" in line_stripped:
+                continue
+            # Allow the roadmap dashboard fallback that writes only when
+            # no BusinessCapability source exists (cannot route through the
+            # single write path).
+            if (
+                "capability_roadmap_dashboard_service" in str(relative)
+                and "capability.current_maturity_level" in line_stripped
+            ):
+                continue
+            hits.append(f"{relative}:{lineno}: {line_stripped}")
     assert not hits, (
         "a maturity writer still writes current_maturity_level or "
         "target_maturity_level directly:\n"
@@ -418,7 +429,6 @@ def test_calls_in_a_loop_can_defer_the_commit(
     cap_a = _make_capability(db_session, tenant_ctx, org)
     cap_b = _make_capability(db_session, tenant_ctx, org)
 
-    from app import db
 
     with tenant_ctx(org.id):
         record_capability_maturity(
@@ -737,3 +747,319 @@ def test_one_definition_of_the_writing_function_in_app_code():
         f"expected exactly one definition of record_capability_maturity, "
         f"found {len(hits)}:\n" + "\n".join(hits)
     )
+
+# --------------------------------------------------------------------------- #
+# Fix round 2 — regression tests for the review of the first fix round.        #
+# --------------------------------------------------------------------------- #
+
+def _make_user_in(db_session, org):
+    from app.models.user import User
+
+    user = User(
+        email=f"write-{uuid.uuid4().hex[:8]}@example.com",
+        first_name="Other",
+        last_name="Org",
+        organization_id=org.id,
+        confirmed=True,
+    )
+    user.password = uuid.uuid4().hex
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def _capability_state(tenant_ctx, org, cap_id):
+    from app.models.business_capabilities import BusinessCapability
+
+    with tenant_ctx(org.id):
+        row = BusinessCapability.query.filter_by(id=cap_id).first()
+        return (
+            row.current_maturity_level,
+            row.target_maturity_level,
+            row.maturity_assessment_notes,
+            row.updated_at,
+        )
+
+
+def _unified_row_id(tenant_ctx, org, cap_id):
+    from app.models.unified_capability import UnifiedCapability
+
+    with tenant_ctx(org.id):
+        row = UnifiedCapability.query.filter_by(
+            source_table="business_capability", source_id=str(cap_id)
+        ).first()
+        assert row is not None, "projection row missing"
+        return row.id
+
+
+def test_assistant_tool_outside_tenant_context_cannot_write_other_org(
+    app, db_session, make_org, tenant_ctx
+):
+    """A user of organisation B, with no tenant context at all (a background
+    runner), must not be able to set organisation A's level."""
+    from flask import g
+
+    from app.modules.ai_chat.tools.executor import ToolExecutor
+
+    org_a = make_org("write-org-a")
+    org_b = make_org("write-org-b")
+    cap_a = _make_capability(
+        db_session, tenant_ctx, org_a, current_maturity_level=2
+    )
+    user_b = _make_user_in(db_session, org_b)
+
+    with app.app_context():
+        assert getattr(g, "current_org_id", None) is None
+        result = ToolExecutor(user_id=user_b.id)._tool_record_capability_maturity(
+            {"capability_id": cap_a, "current_maturity": 5}
+        )
+
+    db_session.expunge_all()
+    assert result["success"] is False, result
+    assert _capability_state(tenant_ctx, org_a, cap_a)[0] == 2
+    assert _history_rows(db_session, tenant_ctx, org_a, cap_a) == []
+
+
+def test_all_blank_batch_flashes_error_and_touches_nothing(
+    app, db_session, make_org, tenant_ctx, login_as
+):
+    org = make_org("write-org")
+    cap_one = _make_capability(
+        db_session, tenant_ctx, org, name="Blank One", current_maturity_level=2
+    )
+    cap_two = _make_capability(
+        db_session, tenant_ctx, org, name="Blank Two", current_maturity_level=3
+    )
+    before_one = _capability_state(tenant_ctx, org, cap_one)[3]
+    before_two = _capability_state(tenant_ctx, org, cap_two)[3]
+    client = _logged_in_client(app, db_session, org, login_as)
+
+    resp = client.post(
+        "/capability-maturity/batch-update",
+        data={
+            "domain": "",
+            "strategic_importance": "",
+            "current_maturity_level": "",
+            "target_maturity_level": "",
+            "assessment_notes": "",
+        },
+    )
+    assert resp.status_code == 302
+    with client.session_transaction() as sess:
+        flashes = sess.get("_flashes") or []
+    categories = [category for category, _ in flashes]
+    assert categories.count("error") == 1, flashes
+    assert "success" not in categories, flashes
+    assert not any("Successfully updated" in message for _, message in flashes)
+    assert _capability_state(tenant_ctx, org, cap_one)[3] == before_one
+    assert _capability_state(tenant_ctx, org, cap_two)[3] == before_two
+
+
+def _roadmap_service():
+    from app.modules.capabilities.services.capability_roadmap_dashboard_service import (
+        CapabilityRoadmapDashboardService,
+    )
+
+    return CapabilityRoadmapDashboardService()
+
+
+def test_roadmap_writer_below_level_one_returns_not_enough_evidence(
+    db_session, make_org, tenant_ctx
+):
+    org = make_org("write-org")
+    cap_id = _make_capability(
+        db_session, tenant_ctx, org, current_maturity_level=2
+    )
+    uc_id = _unified_row_id(tenant_ctx, org, cap_id)
+    service = _roadmap_service()
+    with tenant_ctx(org.id):
+        questions = service.get_maturity_assessment_questions(uc_id)["questions"]
+        result = service.calculate_maturity_score(
+            uc_id, {q["id"]: 0 for q in questions}
+        )
+    assert result["success"] is False
+    assert "evidence" in result["error"].lower()
+    assert _capability_state(tenant_ctx, org, cap_id)[0] == 2
+    assert _history_rows(db_session, tenant_ctx, org, cap_id) == []
+
+
+def test_roadmap_writer_reports_not_found_from_the_service(
+    db_session, make_org, tenant_ctx, monkeypatch
+):
+    from app.modules.capabilities.services import capability_maturity_service
+
+    org = make_org("write-org")
+    cap_id = _make_capability(db_session, tenant_ctx, org)
+    uc_id = _unified_row_id(tenant_ctx, org, cap_id)
+
+    def _gone(**kwargs):
+        raise CapabilityNotFoundError("gone")
+
+    monkeypatch.setattr(capability_maturity_service, "record_capability_maturity", _gone)
+    service = _roadmap_service()
+    with tenant_ctx(org.id):
+        questions = service.get_maturity_assessment_questions(uc_id)["questions"]
+        result = service.calculate_maturity_score(
+            uc_id, {q["id"]: 5 for q in questions}
+        )
+    assert result["success"] is False
+    assert "not found" in result["error"].lower()
+
+
+def test_roadmap_writer_never_direct_writes_a_business_capability_source(
+    db_session, make_org, tenant_ctx
+):
+    """A unified row sourced from business_capability must go through the
+    service or be refused — whatever its source_id or organisation looks like."""
+    from app.models.unified_capability import UnifiedCapability
+
+    org = make_org("write-org")
+    cap_id = _make_capability(db_session, tenant_ctx, org)
+    uc_id = _unified_row_id(tenant_ctx, org, cap_id)
+    service = _roadmap_service()
+
+    with tenant_ctx(org.id):
+        uc = db.session.get(UnifiedCapability, uc_id)
+        uc.source_id = "not-a-number"
+        uc.current_maturity_level = None
+        db.session.flush()
+        questions = service.get_maturity_assessment_questions(uc_id)["questions"]
+        result = service.calculate_maturity_score(
+            uc_id, {q["id"]: 5 for q in questions}
+        )
+        db.session.expire_all()
+        uc = db.session.get(UnifiedCapability, uc_id)
+        assert result["success"] is False, result
+        assert uc.current_maturity_level is None
+
+
+def test_roadmap_writer_outside_a_tenant_request_refuses_to_write(
+    app, db_session, make_org, tenant_ctx
+):
+    from flask import g
+
+    from app.models.unified_capability import UnifiedCapability
+
+    org = make_org("write-org")
+    cap_id = _make_capability(
+        db_session, tenant_ctx, org, current_maturity_level=2
+    )
+    uc_id = _unified_row_id(tenant_ctx, org, cap_id)
+    service = _roadmap_service()
+    with tenant_ctx(org.id):
+        questions = service.get_maturity_assessment_questions(uc_id)["questions"]
+    responses = {q["id"]: 5 for q in questions}
+
+    with app.app_context():
+        assert getattr(g, "current_org_id", None) is None
+        result = service.calculate_maturity_score(uc_id, responses)
+
+    db_session.expunge_all()
+    assert result["success"] is False, result
+    assert _capability_state(tenant_ctx, org, cap_id)[0] == 2
+    assert _history_rows(db_session, tenant_ctx, org, cap_id) == []
+
+
+def test_edit_form_can_clear_a_level_with_a_recorded_trace(
+    app, db_session, make_org, tenant_ctx, login_as
+):
+    org = make_org("write-org")
+    cap_id = _make_capability(
+        db_session, tenant_ctx, org,
+        current_maturity_level=3, target_maturity_level=4,
+    )
+    client = _logged_in_client(app, db_session, org, login_as)
+
+    resp = client.post(
+        f"/capability-maturity/edit/{cap_id}",
+        data={
+            "current_maturity_level": "clear",
+            "target_maturity_level": "",
+            "assessment_notes": "",
+        },
+    )
+    assert resp.status_code == 302
+    db_session.expunge_all()
+
+    current, target, notes, _ = _capability_state(tenant_ctx, org, cap_id)
+    assert current is None
+    assert target == 4
+    assert "cleared" in (notes or "").lower()
+    rows = _history_rows(db_session, tenant_ctx, org, cap_id)
+    assert len(rows) == 1
+    assert "cleared" in (rows[0].notes or "").lower()
+
+
+def test_service_clear_flags_reject_a_value_given_with_the_clear(
+    db_session, make_org, tenant_ctx
+):
+    org = make_org("write-org")
+    cap_id = _make_capability(db_session, tenant_ctx, org, current_maturity_level=3)
+    with tenant_ctx(org.id):
+        with pytest.raises(MaturityValidationError):
+            record_capability_maturity(
+                capability_id=cap_id, organization_id=org.id,
+                current=2, clear_current=True, commit=False,
+            )
+
+
+def test_history_row_records_the_resulting_target_level(
+    db_session, make_org, tenant_ctx
+):
+    org = make_org("write-org")
+    cap_id = _make_capability(
+        db_session, tenant_ctx, org,
+        current_maturity_level=2, target_maturity_level=4,
+    )
+    with tenant_ctx(org.id):
+        record_capability_maturity(
+            capability_id=cap_id, organization_id=org.id,
+            current=3, target=None, commit=True,
+        )
+    rows = _history_rows(db_session, tenant_ctx, org, cap_id)
+    assert len(rows) == 1
+    assert rows[0].maturity_level == 3
+    assert rows[0].target_maturity_level == 4
+
+
+def test_csv_import_history_rows_record_the_acting_user(
+    app, db_session, make_org, tenant_ctx, login_as
+):
+    org = make_org("write-org")
+    name = f"Csv Assessor {uuid.uuid4().hex[:6]}"
+    cap_id = _make_capability(db_session, tenant_ctx, org, name=name)
+    client = _logged_in_client(app, db_session, org, login_as)
+
+    payload = f"capability_name,current_maturity\n{name},3\n"
+    resp = client.post(
+        "/capability-maturity/import-csv",
+        data={"file": (io.BytesIO(payload.encode()), "m.csv")},
+        content_type="multipart/form-data",
+    )
+    assert resp.get_json()["updated"] == 1
+    rows = _history_rows(db_session, tenant_ctx, org, cap_id)
+    assert len(rows) == 1
+    assert rows[0].assessor_name == "Asha Nair"
+    assert rows[0].assessor_role == "Administrator"
+
+
+def test_guard_patterns_catch_every_form_of_direct_write():
+    must_hit = [
+        "row.current_maturity_level = 3",
+        'setattr(row, "target_maturity_level", 3)',
+        "setattr(row, 'current_maturity_level', value)",
+        "db.text('UPDATE business_capability SET current_maturity_level = 1')",
+        "UPDATE business_capability\n   SET target_maturity_level = 2",
+        'Model.query.update({"current_maturity_level": 2})',
+        "q.update({\n    'target_maturity_level': 2,\n})",
+    ]
+    for snippet in must_hit:
+        assert direct_maturity_write_hits(snippet), snippet
+
+    must_pass = [
+        "BusinessCapability(name='x', current_maturity_level=2)",
+        "value = row.current_maturity_level",
+        'data = {"current_maturity_level": row.current_maturity_level}',
+    ]
+    for snippet in must_pass:
+        assert not direct_maturity_write_hits(snippet), snippet
