@@ -97,7 +97,7 @@ def _action_form(element_id: int, endpoint: str, label: str) -> str:
 
 def _release_cell(system: dict) -> str:
     """The Release state cell: the state, the gate refusal reason when release
-    is blocked, and the admin actions (Release / Attach assessment).
+    is blocked, and the admin actions (Release / Attach assessment / Classify).
 
     CSP-safe: plain markup only, all text escaped, no inline handlers. The
     action forms render only inside a request (where a CSRF token exists);
@@ -132,6 +132,57 @@ def _release_cell(system: dict) -> str:
     return "".join(parts)
 
 
+def _classify_cell(system: dict) -> str:
+    """The Risk class cell: the current class and a classify form to propose
+    a new classification. Renders only inside a request context."""
+    risk_class = system.get("risk_class")
+    element_id = system.get("archimate_element_id")
+
+    parts = [_cell(risk_class)]
+    if element_id is not None and risk_class != "not set":
+        # Show a small form to re-classify.
+        from flask import has_request_context, url_for
+        from flask_wtf.csrf import generate_csrf
+
+        if has_request_context():
+            action = url_for("ai_systems_genome.ai_system_classify", element_id=element_id)
+            token = generate_csrf()
+            parts.append(
+                '<form method="POST" action="' + str(escape(action)) + '" class="inline-block mt-1">'
+                '<input type="hidden" name="csrf_token" value="' + str(escape(token)) + '">'
+                '<select name="risk_class" class="h-7 rounded border border-border bg-card px-2 text-xs">'
+                '<option value="high">High</option>'
+                '<option value="limited">Limited</option>'
+                '<option value="minimal">Minimal</option>'
+                '<option value="unacceptable">Unacceptable</option>'
+                '</select>'
+                '<button type="submit" class="h-7 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground hover:bg-accent ml-1">Classify</button>'
+                '</form>'
+            )
+    elif element_id is not None:
+        # No classification yet — show a classify form.
+        from flask import has_request_context, url_for
+        from flask_wtf.csrf import generate_csrf
+
+        if has_request_context():
+            action = url_for("ai_systems_genome.ai_system_classify", element_id=element_id)
+            token = generate_csrf()
+            parts.append(
+                '<form method="POST" action="' + str(escape(action)) + '" class="inline-block mt-1">'
+                '<input type="hidden" name="csrf_token" value="' + str(escape(token)) + '">'
+                '<select name="risk_class" class="h-7 rounded border border-border bg-card px-2 text-xs">'
+                '<option value="high">High</option>'
+                '<option value="limited">Limited</option>'
+                '<option value="minimal">Minimal</option>'
+                '<option value="unacceptable">Unacceptable</option>'
+                '</select>'
+                '<button type="submit" class="h-7 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground hover:bg-accent ml-1">Classify</button>'
+                '</form>'
+            )
+
+    return "".join(parts)
+
+
 def emit_ai_systems_register(slice_data: dict) -> Markup:
     """Emit the register table for a slice. Returns a ``Markup`` fragment."""
     systems = slice_data.get("systems") or []
@@ -158,9 +209,9 @@ def emit_ai_systems_register(slice_data: dict) -> Markup:
             f'<td class="px-3 py-2 text-sm">{_cell(s.get("autonomy_level"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm">{_tri_cell(gov.get("approval_gate"))}</td>'  # raw-html-ok: _tri_cell() (defined above) returns only 'Yes'/'No'/em-dash literals
             f'<td class="px-3 py-2 text-sm">{_tri_cell(gov.get("human_review"))}</td>'  # raw-html-ok: _tri_cell() (defined above) returns only 'Yes'/'No'/em-dash literals
-            f'<td class="px-3 py-2 text-sm">{_cell(s.get("data_sensitivity"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
-            f'<td class="px-3 py-2 text-sm">{_cell(s.get("risk_class"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
-            f'<td class="px-3 py-2 text-sm">{_release_cell(s)}</td>'  # raw-html-ok: _release_cell() (defined above) escapes internally
+f'<td class="px-3 py-2 text-sm">{_cell(s.get("data_sensitivity"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
+             f'<td class="px-3 py-2 text-sm">{_classify_cell(s)}</td>'  # raw-html-ok: _classify_cell() (defined above) escapes internally
+             f'<td class="px-3 py-2 text-sm">{_release_cell(s)}</td>'  # raw-html-ok: _release_cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm">{_owner_cell(s.get("owner"))}</td>'  # raw-html-ok: _owner_cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm text-destructive">{_flags_cell(flags)}</td>'  # raw-html-ok: _flags_cell() (defined above) escapes internally
             "</tr>"

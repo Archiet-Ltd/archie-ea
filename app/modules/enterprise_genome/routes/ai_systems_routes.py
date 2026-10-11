@@ -209,3 +209,144 @@ def ai_system_attach_assessment(element_id):
         logger.exception("AI system assessment proposal failed for org %s", org_id)
 
     return redirect(url_for("ai_systems_genome.ai_systems"))
+
+
+@ai_systems_genome_bp.route("/ai-systems/<int:element_id>/classify", methods=["POST"])
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_classify(element_id):
+    """Propose a risk classification for one AI system.
+
+    Accepts ``risk_class`` from the form, validates it against the four EU AI
+    Act risk tiers, and creates a pending approval-queue record. Org-scoped:
+    another organisation's element id is refused.
+    """
+    from app.modules.enterprise_genome.services.ai_system_classification import (
+        RISK_TIERS,
+        propose_classification,
+    )
+
+    org_id = _current_org_id()
+    if org_id is None:
+        return redirect(url_for("ai_systems_genome.ai_systems"))
+
+    element = _org_scoped_element(element_id, org_id)
+    if element is None:
+        abort(404)
+
+    risk_class = request.form.get("risk_class", "").strip()
+    if risk_class not in RISK_TIERS:
+        flash(f"Invalid risk tier '{risk_class}'. Must be one of {', '.join(RISK_TIERS)}", "error")
+        return redirect(url_for("ai_systems_genome.ai_systems"))
+
+    try:
+        propose_classification(
+            element=element,
+            proposed_risk_class=risk_class,
+            organization_id=org_id,
+            proposed_by_user_id=current_user.id,
+        )
+        db.session.commit()
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        logger.exception("AI system classification proposal failed for org %s", org_id)
+
+    return redirect(url_for("ai_systems_genome.ai_systems"))
+
+
+# --- Owner API for AI systems (reuses ApplicationOwner with element_type="ai_system") ---
+
+
+@ai_systems_genome_bp.route("/api/ai-systems/<int:element_id>/owners", methods=["GET"])
+@login_required
+def ai_system_owners(element_id):
+    """Get owners for an AI system element."""
+    from app.models.application_owner import ApplicationOwner
+
+    org_id = _current_org_id()
+    if org_id is None:
+        return jsonify({"owners": []})
+
+    element = _org_scoped_element(element_id, org_id)
+    if element is None:
+        return jsonify({"message": "AI system not found"}), 404
+
+    rows = ApplicationOwner.get_display_rows_for_element("ai_system", element_id, org_id)
+    return jsonify({"owners": rows})
+
+
+@ai_systems_genome_bp.route("/api/ai-systems/<int:element_id>/owners", methods=["POST"])
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_set_owner(element_id):
+    """Set an owner for an AI system element."""
+    from app.models.application_owner import ApplicationOwner
+
+    org_id = _current_org_id()
+    if org_id is None:
+        return jsonify({"message": "No organisation context"}), 400
+
+    element = _org_scoped_element(element_id, org_id)
+    if element is None:
+        return jsonify({"message": "AI system not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    ownership_type = data.get("ownership_type", "primary")
+    if not user_id:
+        return jsonify({"message": "user_id is required"}), 400
+
+    # Check the user belongs to the same organisation.
+    from app.models.user import User
+
+    user = User.query.filter_by(id=user_id, organization_id=org_id).first()
+    if user is None:
+        return jsonify({"message": "User not found in this organisation"}), 400
+
+    # Remove existing primary owner if setting a new primary.
+    if ownership_type == "primary":
+        existing = ApplicationOwner.query.filter_by(
+            element_type="ai_system",
+            element_id=element_id,
+            organization_id=org_id,
+            ownership_type="primary",
+        ).all()
+        for row in existing:
+            db.session.delete(row)
+
+    record = ApplicationOwner(
+        element_type="ai_system",
+        element_id=element_id,
+        user_id=user_id,
+        ownership_type=ownership_type,
+        organization_id=org_id,
+        assigned_by=current_user.id,
+    )
+    db.session.add(record)
+    db.session.commit()
+    return jsonify({"owner": record.to_dict()}), 201
+
+
+@ai_systems_genome_bp.route("/api/ai-systems/<int:element_id>/owners/<int:owner_id>", methods=["DELETE"])
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_delete_owner(element_id, owner_id):
+    """Remove an owner record from an AI system element."""
+    from app.models.application_owner import ApplicationOwner
+
+    org_id = _current_org_id()
+    if org_id is None:
+        return jsonify({"message": "No organisation context"}), 400
+
+    record = ApplicationOwner.query.filter_by(
+        id=owner_id,
+        element_type="ai_system",
+        element_id=element_id,
+        organization_id=org_id,
+    ).first()
+    if record is None:
+        return jsonify({"message": "Owner record not found"}), 404
+
+    db.session.delete(record)
+    db.session.commit()
+    return "", 204
