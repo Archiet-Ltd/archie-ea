@@ -805,13 +805,15 @@ jobs:
       - uses: actions/download-artifact@v6
         if: always()
         with:
-          pattern: smoke-*
+          pattern: smoke-{main-*,adversarial,other}
           path: shard-artifacts
       - name: Require all browser reports without skips
         if: always()
         run: >-
           python scripts/ci/check_junit_qualification.py
-          shard-artifacts/smoke-main-*/chromium-main-*.xml
+          shard-artifacts/smoke-main-0/chromium-main-0.xml
+          shard-artifacts/smoke-main-1/chromium-main-1.xml
+          shard-artifacts/smoke-main-2/chromium-main-2.xml
           shard-artifacts/smoke-adversarial/chromium-adversarial.xml
           shard-artifacts/smoke-other/chromium-census.xml
           shard-artifacts/smoke-other/chromium-ai-protocol.xml
