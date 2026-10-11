@@ -20,6 +20,8 @@ unauthenticated /api/gdpr/delete that turned out never to be registered. Only
 driving it settles either question.
 """
 
+import json
+
 import pytest
 
 from .conftest import ARCHETYPES, PAGE_TIMEOUT, PASSWORD
@@ -59,6 +61,14 @@ POLICY = {
     "/dashboard/compliance":   set(ARCHETYPES),
     # risk.risk_register is @login_required only.
     "/risks/":                 set(ARCHETYPES),
+    # Org chart: the page and its data API are @login_required-only reads, so
+    # every archetype reaches them; stating the rows makes a role gate added
+    # later show up here as a row change. Editing the hierarchy is role-gated
+    # on the POST/PATCH/DELETE routes (require_roles like the RACI cell
+    # editor in the same module) and pinned by
+    # test_org_chart_edit_routes_refuse_a_read_only_account below.
+    "/organization/chart":          set(ARCHETYPES),
+    "/organization/chart/api/data": set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
@@ -969,6 +979,75 @@ def test_application_technology_links_refuse_a_read_only_account(
     assert _observe(page, live_server, path) == ALLOWED
     response = _post_technology_link(page, live_server, seeded["ids"]["application"])
     assert response.status == 403, "a Viewer wrote a technology link: %s" % response.status
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_org_chart_reads_are_open_to_every_archetype(archetype, page, live_server, seeded):
+    """The chart page and its data API are @login_required-only reads; every
+    archetype reaches them (POLICY rows above)."""
+    _login(page, live_server, seeded["emails"][archetype])
+    for path in ("/organization/chart", "/organization/chart/api/data"):
+        assert _observe(page, live_server, path) == ALLOWED, (
+            "%s could not read %s" % (archetype, path)
+        )
+
+
+ORG_CHART_EDIT_PROBES = (
+    (
+        "POST",
+        "/organization/chart/api/units",
+        {"name": "Probe Unit", "parent_id": 0},
+    ),
+    ("PATCH", "/organization/chart/api/units/0", {"name": "Probe Rename"}),
+    ("PATCH", "/organization/chart/api/units/0/parent", {"parent_id": None}),
+    ("DELETE", "/organization/chart/api/units/0", None),
+)
+
+
+def _post_org_chart_edit(page, live_server):
+    """One write-probe per edit route. unit_id 0 names no unit: a permitted
+    caller gets the 400 that says so, a refused one gets the role gate's 403
+    before the body is read."""
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    for method, path, body in ORG_CHART_EDIT_PROBES:
+        response = page.request.request(
+            method,
+            live_server + path,
+            data=json.dumps(body) if body is not None else None,
+            headers={
+                "X-CSRFToken": csrf_token,
+                "Content-Type": "application/json",
+            },
+            max_redirects=0,
+        )
+        yield method, path, response
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_org_chart_edit_routes_authorisation(archetype, page, live_server, seeded):
+    """Every archetype may write to the chart (the seeded organisation grants
+    the legacy Architect/Administrator role, so require_roles passes); a write
+    naming an unknown unit then gets the 400 that names it, not a 403."""
+    _login(page, live_server, seeded["emails"][archetype])
+    for method, path, response in _post_org_chart_edit(page, live_server):
+        assert response.status == 400, (
+            "%s %s as %s: expected the 400 for an unknown unit (the role gate "
+            "passed), got %s" % (method, path, archetype, response.status)
+        )
+
+
+def test_org_chart_edit_routes_refuse_a_read_only_account(
+    page, live_server, seeded, technology_links_viewer
+):
+    _login(page, live_server, technology_links_viewer)
+    for method, path, response in _post_org_chart_edit(page, live_server):
+        assert response.status == 403, (
+            "a Viewer was not refused on %s %s: %s" % (method, path, response.status)
+        )
+    # The read side of the chart stays fully available to the same account.
+    assert _observe(page, live_server, "/organization/chart") == ALLOWED
+    assert _observe(page, live_server, "/organization/chart/api/data") == ALLOWED
 
 
 OVERSIGHT_CLASSIFICATION_PERMITTED = {
