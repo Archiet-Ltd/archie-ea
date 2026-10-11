@@ -15,6 +15,11 @@ Reuse
   element's ``acm_properties`` — not in ``custom_properties``.
 * The one owner record (``ApplicationOwner``) supplies the owner; no owner key
   in the profile's custom_properties.
+* ``AgentRegistration`` (``app/models/agent_registration.py``) governs the
+  platform's own agents (owner, lifecycle status, activation gate). The AI
+  system register here governs estate AI systems. The two are separate stores
+  for separate subjects; the copilot links them when it is both an estate
+  system (this register) and a platform agent (``AgentRegistration``).
 """
 
 from __future__ import annotations
@@ -83,7 +88,8 @@ def propose_classification(
     """Propose a risk classification for an AI system.
 
     Creates a pending approval record in the approval queue. The classification
-    is NOT applied — only an administrator's accept in the queue sets it.
+    is NOT applied — another user with general permission accepts it in the
+    approval queue.
 
     Returns the ``AIChatCRUDApproval`` record.
     """
@@ -95,6 +101,11 @@ def propose_classification(
         raise ValueError(
             f"Invalid risk tier '{proposed_risk_class}'. "
             f"Must be one of {RISK_TIERS}"
+        )
+
+    if getattr(element, "organization_id", None) != organization_id:
+        raise ValueError(
+            "Classification proposals are scoped to the element's own organisation"
         )
 
     payload = {
@@ -127,9 +138,12 @@ def propose_assessment(
     """Propose an assessment of an AI system against its risk class.
 
     The proposal arrives in the same approval queue the classification uses
-    (``create_approval_record``); an administrator's accept is what records the
-    assessment. Nothing is written to the element — the accepted approval row
-    IS the assessment record. No new table.
+    (``create_approval_record``); another user with general permission accepts
+    it in the approval queue. Nothing is written to the element — the accepted
+    approval row IS the assessment record. No new table.
+
+    Refuses (ValueError) when the system has no accepted risk class — an
+    assessment can only be made against a known classification.
 
     Returns the ``AIChatCRUDApproval`` record.
     """
@@ -142,7 +156,12 @@ def propose_assessment(
             "Assessment proposals are scoped to the element's own organisation"
         )
 
-    assessed_class = get_classification(element) or "unclassified"
+    assessed_class = get_classification(element)
+    if assessed_class is None:
+        raise ValueError(
+            "Cannot propose an assessment for a system with no accepted risk class"
+        )
+
     payload = {
         "element_id": element.id,
         "assessed_risk_class": assessed_class,
@@ -169,6 +188,9 @@ def accept_classification(approval_id: int, organization_id: int) -> bool:
 
     Reads the proposal payload from the approval record and writes the risk
     class onto the element's ``acm_properties`` via the typed property writer.
+    When the accepted class is ``high`` and the system is already released
+    without an accepted assessment, the release state is reset to ``draft``
+    (HIGH-1 fix).
 
     Works both when called directly (the approval is still pending — this
     function records the accept) and when the approval queue's claim has
@@ -218,6 +240,21 @@ def accept_classification(approval_id: int, organization_id: int) -> bool:
         value=proposed_class,
         source="classification_approval",
     )
+
+    # HIGH-1 fix: when accepting a high-risk classification on a system that
+    # is already released but has no accepted assessment, reset the release
+    # state to draft.  A released high-risk system without an assessment is
+    # an unsafe state: the gate was never checked because the system was
+    # unclassified at release time.
+    if proposed_class == "high":
+        current_release = get_release_state(element)
+        if current_release == "released" and not has_accepted_assessment(element, organization_id):
+            _property_service.set_element_property(
+                element,
+                key=PROPKEY_RELEASE_STATE,
+                value="draft",
+                source="classification_approval",
+            )
 
     # Record the accept when the queue has not already claimed the row.
     if approval.status == ApprovalStatus.PENDING:
@@ -350,19 +387,53 @@ def assessment_accepted_for(element, organization_id: int) -> Optional[bool]:
 
 
 def has_accepted_assessment(element, organization_id: int) -> bool:
-    """True when an accepted ``ai_system_assessment`` exists for *element*."""
+    """True when an accepted ``ai_system_assessment`` exists for *element*
+    whose assessed risk class matches the current accepted class and whose
+    approval is later than the classification's acceptance time.
+
+    This prevents a stale assessment (accepted under a lower tier or while
+    unclassified) from opening the high-risk gate after the classification
+    changes.
+    """
     from app.models.ai_chat_crud_approval import (
         AIChatCRUDApproval,
         ApprovalStatus,
     )
+
+    current_class = get_classification(element)
+    if current_class is None:
+        return False
+
+    # Find the classification approval time so we can compare.
+    classification = AIChatCRUDApproval.query.filter_by(
+        entity_type=ENTITY_CLASSIFICATION,
+        entity_id=element.id,
+        organization_id=organization_id,
+        status=ApprovalStatus.APPROVED,
+    ).order_by(AIChatCRUDApproval.approved_at.desc()).first()
 
     accepted = AIChatCRUDApproval.query.filter_by(
         entity_type=ENTITY_ASSESSMENT,
         entity_id=element.id,
         organization_id=organization_id,
         status=ApprovalStatus.APPROVED,
-    ).first()
-    return accepted is not None
+    ).all()
+
+    for row in accepted:
+        try:
+            payload = json.loads(row.operation_payload)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        assessed_class = payload.get("assessed_risk_class")
+        if assessed_class != current_class:
+            continue
+        # The assessment must have been approved after the classification.
+        if classification is not None and classification.approved_at is not None:
+            if row.approved_at is None or row.approved_at < classification.approved_at:
+                continue
+        return True
+
+    return False
 
 
 def release_refusal_reason(element, organization_id: int) -> Optional[str]:

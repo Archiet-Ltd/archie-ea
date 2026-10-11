@@ -25,16 +25,20 @@ import logging
 from flask import (
     Blueprint,
     abort,
+    flash,
     g,
     jsonify,
     redirect,
     render_template,
+    request,
     url_for,
 )
 from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import admin_required
+from app._decorators_base import permission_required
+from app.models import Permission
 from app.modules.enterprise_genome.emit.ai_systems_register import emit_ai_systems_register
 from app.modules.enterprise_genome.services.ai_systems_seed import (
     register_ai_system,
@@ -157,9 +161,13 @@ def ai_system_release(element_id):
 
     result = mark_released(element, org_id)
     if not result.get("success"):
-        return jsonify(
-            {"success": False, "error": result.get("reason", "Release refused")}
-        ), 409
+        reason = result.get("reason", "Release refused")
+        if request.is_json or request.accept_mimetypes.accept_json:
+            return jsonify(
+                {"success": False, "error": reason}
+            ), 409
+        flash(reason, "error")
+        return redirect(url_for("ai_systems_genome.ai_systems")), 409
 
     db.session.commit()
     return redirect(url_for("ai_systems_genome.ai_systems"))
@@ -167,13 +175,15 @@ def ai_system_release(element_id):
 
 @ai_systems_genome_bp.route("/ai-systems/<int:element_id>/assess", methods=["POST"])
 @login_required
+@permission_required(Permission.GENERAL)
 def ai_system_attach_assessment(element_id):
     """Queue an assessment proposal for one AI system.
 
     Org-scoped like the other routes here: another organisation's element id
     is refused. The proposal lands in the same approval queue the
-    classification uses; only an administrator's accept records the
-    assessment (the accepted approval row IS the record — no new table).
+    classification uses; another user with general permission accepts it in
+    the approval queue (the accepted approval row IS the record — no new
+    table).
     """
     org_id = _current_org_id()
     if org_id is None:
