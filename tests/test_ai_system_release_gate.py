@@ -208,7 +208,6 @@ def test_release_racing_classification_acceptance_keeps_the_classification(app):
             AIChatApprovalAuditLog.query.filter_by(approval_id=a_id).delete()
             AIChatCRUDApproval.query.filter_by(id=a_id).delete()
             ArchiMateElement.query.filter_by(id=el_id).delete()
-            Organization.query.filter_by(id=org_id).delete()
             db.session.commit()
 
 

@@ -755,13 +755,13 @@ def test_release_gate_and_assessment_are_org_scoped(
     assert profile_from_element(el_b)["release_state"] == "released"
 
 
-# --- Fix round tests: HIGH-1, HIGH-2, MEDIUM-1, LOW-1, LOW-3 ---------------
+# --- Release gate: ordering, stale assessments, authorisation, browser form ---
 
 
-def test_high_1_release_before_classification_resets_release_state(db_session, org):
-    """HIGH-1: releasing an unclassified system then accepting a high-risk
+def test_release_before_classification_resets_release_state(db_session, org):
+    """Releasing an unclassified system then accepting a high-risk
     classification must reset the release state to draft."""
-    el = register_ai_system(db_session, org.id, name="HIGH-1 System",
+    el = register_ai_system(db_session, org.id, name="Released-then-classified System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
 
@@ -790,10 +790,10 @@ def test_high_1_release_before_classification_resets_release_state(db_session, o
     assert p["assessment_accepted"] is False
 
 
-def test_high_2_stale_assessment_does_not_open_gate(db_session, org):
-    """HIGH-2: an assessment accepted while the system was unclassified must
+def test_stale_assessment_does_not_open_gate(db_session, org):
+    """An assessment accepted while the system was unclassified must
     not open the high-risk gate after the classification changes."""
-    el = register_ai_system(db_session, org.id, name="HIGH-2 System",
+    el = register_ai_system(db_session, org.id, name="Stale-assessment System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
 
@@ -837,10 +837,10 @@ def test_high_2_stale_assessment_does_not_open_gate(db_session, org):
     assert result["success"] is True
 
 
-def test_high_2_assessment_under_lower_tier_does_not_open_gate(db_session, org):
-    """HIGH-2: an assessment accepted under a lower tier must not open the
+def test_assessment_under_lower_tier_does_not_open_gate(db_session, org):
+    """An assessment accepted under a lower tier must not open the
     high-risk gate after reclassification to high."""
-    el = register_ai_system(db_session, org.id, name="HIGH-2b System",
+    el = register_ai_system(db_session, org.id, name="Lower-tier-assessment System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
 
@@ -868,18 +868,13 @@ def test_high_2_assessment_under_lower_tier_does_not_open_gate(db_session, org):
     payload = json.loads(assessment.operation_payload)
     assert payload["assessed_risk_class"] == "minimal"
 
-    # Directly set the risk class to high (bypassing the approval queue,
-    # which has a unique constraint on source_table+source_id).
-    from app.modules.architecture_assistant.property_service import PropertyService
-    from app.modules.enterprise_genome.services.ai_system_classification import (
-        PROPKEY_RISK_CLASS,
+    # Reclassify as high through the approval queue.
+    reclassify = propose_classification(
+        element=el, proposed_risk_class="high",
+        organization_id=org.id, proposed_by_user_id=None,
     )
-    PropertyService().set_element_property(
-        el,
-        key=PROPKEY_RISK_CLASS,
-        value="high",
-        source="test_direct_set",
-    )
+    db_session.flush()
+    accept_classification(reclassify.id, org.id)
     db_session.flush()
 
     # The old minimal assessment must not open the high-risk gate.
@@ -889,8 +884,8 @@ def test_high_2_assessment_under_lower_tier_does_not_open_gate(db_session, org):
     assert "assessment" in reason.lower()
 
 
-def test_medium_1_viewer_cannot_assess(app, db_session, make_org, client, login_as):
-    """MEDIUM-1: a Viewer must get 403 on the assess route."""
+def test_viewer_cannot_assess(app, db_session, make_org, client, login_as):
+    """A Viewer must get 403 on the assess route."""
     from app.models.user import Role, User
 
     org = make_org("med1")
@@ -906,7 +901,7 @@ def test_medium_1_viewer_cannot_assess(app, db_session, make_org, client, login_
     )
     viewer.password = uuid.uuid4().hex
     db_session.add(viewer)
-    el = register_ai_system(db_session, org.id, name="MEDIUM-1 System",
+    el = register_ai_system(db_session, org.id, name="Viewer-assess System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
 
@@ -924,8 +919,8 @@ def test_medium_1_viewer_cannot_assess(app, db_session, make_org, client, login_
     assert count == 0, "Viewer should not create assessment proposals"
 
 
-def test_low_1_propose_classification_checks_org(db_session, make_org):
-    """LOW-1: propose_classification must refuse a foreign element."""
+def test_propose_classification_checks_org(db_session, make_org):
+    """propose_classification must refuse a foreign element."""
     org_a = make_org("low1-a")
     org_b = make_org("low1-b")
     el_b = register_ai_system(db_session, org_b.id, name="B's System",
@@ -941,12 +936,12 @@ def test_low_1_propose_classification_checks_org(db_session, make_org):
         )
 
 
-def test_low_3_release_refusal_flashes_for_non_json(app, db_session, make_org, client, login_as):
-    """LOW-3: a release refusal for a non-JSON request must flash and redirect,
+def test_release_refusal_flashes_for_non_json(app, db_session, make_org, client, login_as):
+    """A release refusal for a non-JSON request must flash and redirect,
     not return raw JSON."""
-    org = make_org("low3")
+    org = make_org("refusal")
     admin = _make_admin_user(db_session, org, "Low3")
-    el = register_ai_system(db_session, org.id, name="LOW-3 System",
+    el = register_ai_system(db_session, org.id, name="Browser-refusal System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
 
@@ -961,14 +956,13 @@ def test_low_3_release_refusal_flashes_for_non_json(app, db_session, make_org, c
 
     login_as(client, admin)
 
-    # POST without Accept: application/json should redirect, not return JSON.
+    # A browser form submit must redirect, not return JSON.
     resp = client.post(
         f"/genome/ai-systems/{el.id}/release",
-        headers={"Accept": "text/html"},
+        headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
     )
-    # Should be a redirect (302 or 409-equivalent redirect).
-    assert resp.status_code in (302, 409), (
-        "Expected redirect or 409 for non-JSON release refusal, got %s" % resp.status_code
+    assert resp.status_code == 302, (
+        "Expected a redirect for a browser release refusal, got %s" % resp.status_code
     )
     # The system must not be released.
     assert profile_from_element(el)["release_state"] != "released"
