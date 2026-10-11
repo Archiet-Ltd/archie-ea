@@ -1,4 +1,4 @@
-"""R1-B37: Single writer for the in-app notification store.
+"""Single writer for the in-app notification store.
 
 Every ``Notification`` row is created through this service. No other platform
 code constructs ``Notification(`` directly — see the gate in

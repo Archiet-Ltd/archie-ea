@@ -1,4 +1,4 @@
-"""R1-B37 PR 1: notification store, single writer, per-owner digest.
+"""PR 1: notification store, single writer, per-owner digest.
 
 Acceptance criteria:
 1. Two-organisation isolation (row-level security + ORM)

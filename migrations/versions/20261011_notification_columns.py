@@ -1,4 +1,4 @@
-"""Add columns to notifications table for R1-B37 notification store.
+"""Add columns to notifications table for notification store.
 
 Adds organization_id, event_type, entity_type, entity_id, email_sent_at
 to the notifications table. Backfills organization_id from the user's

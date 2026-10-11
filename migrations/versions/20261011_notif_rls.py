@@ -1,4 +1,4 @@
-"""Row-level security on notifications (R1-B37 PR 1 fencing).
+"""Row-level security on notifications (PR 1 fencing).
 
 The notifications table gained organization_id in
 20261011_notification_columns. This revision fences it with the same

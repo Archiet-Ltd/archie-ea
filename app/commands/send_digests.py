@@ -1,4 +1,4 @@
-"""R1-B37: Per-owner notification digest sender.
+"""Per-owner notification digest sender.
 
 Sends a digest of unread in-app notifications to each owner who has opted in.
 Runs per organisation through the tenant-safe job harness.
