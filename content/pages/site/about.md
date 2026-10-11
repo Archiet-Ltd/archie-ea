@@ -77,6 +77,12 @@ brings in operations and finance. **Predictive** (Q3 2027) adds forecasting and 
 [all eighteen capabilities](/features) for what each one delivers today and what quarter adds to it
 next.
 
+## Built for your AI assistants too
+
+A general assistant can guess at your architecture. It can't know it. Entelim's own AI chat queries
+your twin directly, backed by the same questions Ask answers, so an answer comes from your real
+model, not a plausible-sounding guess.
+
 ## Open source, so nobody's locked in
 
 Entelim is licensed under the GNU Affero General Public License (AGPL-3.0). Self-host your own

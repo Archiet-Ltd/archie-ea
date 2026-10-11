@@ -765,10 +765,10 @@ def test_llms_full_txt_includes_urls(app):
     discovery (state: not_planned) -- none of which it should include."""
     from app.services.public_pages import load_all_pages
 
-    target_pages = [
+    target_pages = _indexable(
         p for p in load_all_pages()
         if p.family in {"module", "function-per-segment", "comparison"}
-    ]
+    )
     assert len(target_pages) > 0, "No target pages found"
 
     with app.test_client() as client:
