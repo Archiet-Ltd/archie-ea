@@ -81,6 +81,29 @@ VIEW_OPT_OUT = {
     "app.routes.webhook.teams_notifications":
         "Microsoft Graph change notifications — external platform, "
         "client-state/signature verified, no session.",
+    "app.modules.oauth_provider.routes.token":
+        "OAuth token endpoint — called by OAuth clients (an assistant "
+        "backend, a CLI) presenting an authorization code or refresh token, "
+        "never a session cookie; there is no session here to carry a CSRF "
+        "token.",
+    "app.modules.oauth_provider.routes.revoke":
+        "OAuth token revocation (RFC 7009) — same caller population as the "
+        "token endpoint above, no session cookie read.",
+    "app.modules.oauth_provider.routes.register":
+        "Unauthenticated dynamic client registration (RFC 7591) — there is "
+        "no credential or session to present yet; rate-limited per remote "
+        "address instead of session-gated.",
+    "app.modules.mcp.blueprint.mcp_endpoint":
+        "Exempted from flask-wtf's own blanket before_request only because "
+        "that hook runs before the tenant-context hook has set g.auth_mode, "
+        "so it cannot yet tell a genuine bearer-only MCP call apart from "
+        "anything else. app.modules.mcp.blueprint._csrf_guard (a "
+        "blueprint-level before_request that runs after tenant-context) "
+        "re-applies the real check unconditionally for every request except "
+        "one that resolved via the bearer loader, to this exact path, with "
+        "no session cookie present at all — see that module's CSRF "
+        "docstring section. A session-cookie-carrying request to /mcp is "
+        "not exempt from anything; it still gets the ordinary check.",
 }
 
 # Whole blueprints exempted. Every route in the blueprint must share the same

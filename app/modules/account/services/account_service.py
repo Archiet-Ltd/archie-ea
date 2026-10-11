@@ -82,8 +82,13 @@ class AccountService:
         """Authenticate a user by email and password.
 
         Returns the User object if credentials are valid, None otherwise.
+        A service account is refused here even if it somehow holds a password:
+        it exists only as the subject of scoped client-credentials tokens and
+        must never gain a session through the sign-in path.
         """
         user = User.find_by_email(email)
+        if user is not None and getattr(user, "is_service_user", False):
+            return None
         if (
             user is not None
             and user.password_hash is not None
