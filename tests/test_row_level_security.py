@@ -56,12 +56,37 @@ def _load_migration():
 MIGRATION = _load_migration()
 
 
+def _fencing_modules():
+    """Load every fencing revision in ``migrations/versions`` by path, so its own
+    ``upgrade()`` can be invoked (not just its ``TENANT_TABLES``/``HYBRID_TABLES``
+    lists, which ``_fencing_revisions()`` below already reads this same way).
+    """
+    modules = []
+    for path in sorted((REPO / "migrations" / "versions").glob("*.py")):
+        if not FENCING_PATTERN.search(path.read_text(encoding="utf-8")):
+            continue
+        spec = importlib.util.spec_from_file_location(f"fencing_module_{path.stem}", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        modules.append(module)
+    return modules
+
+
 def _apply_policies(engine):
-    """Run the migration's own upgrade() on ``engine`` (idempotent)."""
+    """Run every fencing revision's own upgrade() on ``engine`` (idempotent).
+
+    Originally ran only the base revision's upgrade(), so a later fencing
+    revision's tables (e.g. ``arb_change_requests``, added by
+    20261010_arb_change_requests_rls) never had their policies created in this
+    module's own test database -- its runtime behaviour was untested here even
+    though the structural guard (test_every_tenant_and_hybrid_model_is_listed_or_excluded)
+    correctly saw it listed (R3-1, review-pr445-v3.md).
+    """
     with engine.begin() as connection:
         context = MigrationContext.configure(connection)
         with Operations.context(context):
-            MIGRATION.upgrade()
+            for module in _fencing_modules():
+                module.upgrade()
 
 
 class RlsEnv:
@@ -304,6 +329,23 @@ def _fencing_revisions():
     return found
 
 
+def _all_fenced_tables():
+    """Union of TENANT_TABLES / HYBRID_TABLES across every fencing revision.
+
+    The runtime policy tests below (policy-presence, and the read/write matrix)
+    originally checked only ``MIGRATION.TENANT_TABLES``/``HYBRID_TABLES`` -- the
+    base revision's own lists -- so a broken ``_fence()`` in a later fencing
+    revision would pass CI even though the structural guard
+    (test_every_tenant_and_hybrid_model_is_listed_or_excluded) correctly saw the
+    table listed (R3-1, review-pr445-v3.md). Reuses ``_fencing_revisions()``, the
+    same scan that guard already trusts.
+    """
+    revisions = _fencing_revisions()
+    tenant = set().union(*(r["tenant"] for r in revisions.values())) if revisions else set()
+    hybrid = set().union(*(r["hybrid"] for r in revisions.values())) if revisions else set()
+    return tenant, hybrid
+
+
 def _assert_every_model_is_fenced(tenant_models, hybrid_models, revisions):
     """Fail, naming the tables, when a mixin table is in no fencing revision."""
     fenced_tenant = set().union(*(r["tenant"] for r in revisions.values())) if revisions else set()
@@ -384,8 +426,9 @@ def test_a_later_fencing_revision_covers_a_table_the_first_one_does_not():
 
 
 def test_every_present_table_has_four_policies_enabled_not_forced(rls):
-    tenant = _fenced(rls, MIGRATION.TENANT_TABLES)
-    hybrid = _fenced(rls, MIGRATION.HYBRID_TABLES)
+    all_tenant, all_hybrid = _all_fenced_tables()
+    tenant = _fenced(rls, all_tenant)
+    hybrid = _fenced(rls, all_hybrid)
     assert len(tenant) > 200 and len(hybrid) >= 13
     with rls.owner.connect() as connection:
         rows = connection.execute(
@@ -406,6 +449,34 @@ def test_every_present_table_has_four_policies_enabled_not_forced(rls):
         _, enabled, forced, policies = by_name[table]
         assert enabled and not forced, table
         assert policies == sorted(MIGRATION.HYBRID_POLICIES), table
+
+
+def test_a_later_fencing_revisions_table_is_exercised_not_just_listed(rls):
+    """R3-1 (review-pr445-v3.md): before this fix, ``_apply_policies`` ran only
+    the base revision's ``upgrade()``, so ``arb_change_requests`` -- added by
+    the later revision 20261010_arb_change_requests_rls -- never had its
+    policies created in this module's own test database. The matrix tests
+    above also only ever checked ``MIGRATION.TENANT_TABLES`` (the base
+    revision's own list), so a broken ``_fence()`` in that later revision
+    would have passed CI silently even though the structural guard
+    (test_every_tenant_and_hybrid_model_is_listed_or_excluded) correctly saw
+    the table listed. This repeats the policy-presence check for that one
+    table by name, so it fails on its own if either gap reopens.
+    """
+    all_tenant, _ = _all_fenced_tables()
+    assert "arb_change_requests" in all_tenant
+    assert _fenced(rls, {"arb_change_requests"}) == ["arb_change_requests"]
+    with rls.owner.connect() as connection:
+        enabled, forced, policies = connection.execute(
+            text(
+                "SELECT c.relrowsecurity, c.relforcerowsecurity, "
+                "(SELECT array_agg(p.policyname ORDER BY p.policyname) FROM pg_policies p "
+                " WHERE p.schemaname = 'public' AND p.tablename = c.relname) "
+                "FROM pg_class c WHERE c.relname = 'arb_change_requests' AND c.relnamespace = 'public'::regnamespace"
+            )
+        ).one()
+    assert enabled and not forced
+    assert policies == sorted(MIGRATION.TENANT_POLICIES)
 
 
 def test_upgrade_twice_converges_to_the_same_definitions(rls):
@@ -487,8 +558,9 @@ def test_with_no_organisation_every_fenced_table_returns_zero_rows(rls, world):
     world.application(a, "Present but invisible")
     world.reference_model(a, "Override, invisible")
     world.reference_model(None, "Shared, visible")
-    tenant = _fenced(rls, MIGRATION.TENANT_TABLES)
-    hybrid = _fenced(rls, MIGRATION.HYBRID_TABLES)
+    all_tenant, all_hybrid = _all_fenced_tables()
+    tenant = _fenced(rls, all_tenant)
+    hybrid = _fenced(rls, all_hybrid)
     with rls.runtime_tx(None) as connection:
         for table in tenant:
             assert _count(connection, table) == 0, table
