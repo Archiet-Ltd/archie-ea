@@ -1,0 +1,2195 @@
+{
+  "catalogue_version": "2026.10.1",
+  "frameworks": [
+    {
+      "code": "ISO - 27001",
+      "name": "ISO/IEC 27001:2022 Information Security Management Systems",
+      "description": "International standard for an information security management system; Annex A holds the 93 reference controls in four themes.",
+      "category": "security",
+      "jurisdiction": "Global",
+      "enforcement_level": "recommended",
+      "penalty_risk": "high",
+      "applies_to_manufacturing": true,
+      "applies_to_region": "Global",
+      "industry_specific": "general",
+      "official_url": "https://www.iso.org/standard/27001",
+      "standard_version": "2022",
+      "status": "active",
+      "controls": [
+        {
+          "control_code": "A.5.1",
+          "title": "Policies for information security",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.1",
+          "priority": "medium",
+          "description": "Policies for information security"
+        },
+        {
+          "control_code": "A.5.2",
+          "title": "Information security roles and responsibilities",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.2",
+          "priority": "medium",
+          "description": "Information security roles and responsibilities"
+        },
+        {
+          "control_code": "A.5.3",
+          "title": "Segregation of duties",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.3",
+          "priority": "medium",
+          "description": "Segregation of duties"
+        },
+        {
+          "control_code": "A.5.4",
+          "title": "Management responsibilities",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.4",
+          "priority": "medium",
+          "description": "Management responsibilities"
+        },
+        {
+          "control_code": "A.5.5",
+          "title": "Contact with authorities",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.5",
+          "priority": "medium",
+          "description": "Contact with authorities"
+        },
+        {
+          "control_code": "A.5.6",
+          "title": "Contact with special interest groups",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.6",
+          "priority": "medium",
+          "description": "Contact with special interest groups"
+        },
+        {
+          "control_code": "A.5.7",
+          "title": "Threat intelligence",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.7",
+          "priority": "medium",
+          "description": "Threat intelligence"
+        },
+        {
+          "control_code": "A.5.8",
+          "title": "Information security in project management",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.8",
+          "priority": "medium",
+          "description": "Information security in project management"
+        },
+        {
+          "control_code": "A.5.9",
+          "title": "Inventory of information and other associated assets",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.9",
+          "priority": "medium",
+          "description": "Inventory of information and other associated assets"
+        },
+        {
+          "control_code": "A.5.10",
+          "title": "Acceptable use of information and other assets",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.10",
+          "priority": "medium",
+          "description": "Acceptable use of information and other assets"
+        },
+        {
+          "control_code": "A.5.11",
+          "title": "Return of assets",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.11",
+          "priority": "medium",
+          "description": "Return of assets"
+        },
+        {
+          "control_code": "A.5.12",
+          "title": "Classification of information",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.12",
+          "priority": "medium",
+          "description": "Classification of information"
+        },
+        {
+          "control_code": "A.5.13",
+          "title": "Labelling of information",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.13",
+          "priority": "medium",
+          "description": "Labelling of information"
+        },
+        {
+          "control_code": "A.5.14",
+          "title": "Information transfer",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.14",
+          "priority": "medium",
+          "description": "Information transfer"
+        },
+        {
+          "control_code": "A.5.15",
+          "title": "Access control",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.15",
+          "priority": "medium",
+          "description": "Access control"
+        },
+        {
+          "control_code": "A.5.16",
+          "title": "Identity management",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.16",
+          "priority": "medium",
+          "description": "Identity management"
+        },
+        {
+          "control_code": "A.5.17",
+          "title": "Authentication information",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.17",
+          "priority": "medium",
+          "description": "Authentication information"
+        },
+        {
+          "control_code": "A.5.18",
+          "title": "Access rights",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.18",
+          "priority": "medium",
+          "description": "Access rights"
+        },
+        {
+          "control_code": "A.5.19",
+          "title": "Information security in supplier relationships",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.19",
+          "priority": "medium",
+          "description": "Information security in supplier relationships"
+        },
+        {
+          "control_code": "A.5.20",
+          "title": "Security within supplier agreements",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.20",
+          "priority": "medium",
+          "description": "Security within supplier agreements"
+        },
+        {
+          "control_code": "A.5.21",
+          "title": "Managing the ICT supply chain",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.21",
+          "priority": "medium",
+          "description": "Managing the ICT supply chain"
+        },
+        {
+          "control_code": "A.5.22",
+          "title": "Monitoring and change control of supplier services",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.22",
+          "priority": "medium",
+          "description": "Monitoring and change control of supplier services"
+        },
+        {
+          "control_code": "A.5.23",
+          "title": "Information security for cloud services",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.23",
+          "priority": "medium",
+          "description": "Information security for cloud services"
+        },
+        {
+          "control_code": "A.5.24",
+          "title": "Incident management planning and preparation",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.24",
+          "priority": "medium",
+          "description": "Incident management planning and preparation"
+        },
+        {
+          "control_code": "A.5.25",
+          "title": "Assessment and decision on security events",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.25",
+          "priority": "medium",
+          "description": "Assessment and decision on security events"
+        },
+        {
+          "control_code": "A.5.26",
+          "title": "Response to security incidents",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.26",
+          "priority": "medium",
+          "description": "Response to security incidents"
+        },
+        {
+          "control_code": "A.5.27",
+          "title": "Learning from security incidents",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.27",
+          "priority": "medium",
+          "description": "Learning from security incidents"
+        },
+        {
+          "control_code": "A.5.28",
+          "title": "Collection of evidence",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.28",
+          "priority": "medium",
+          "description": "Collection of evidence"
+        },
+        {
+          "control_code": "A.5.29",
+          "title": "Security during disruption",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.29",
+          "priority": "medium",
+          "description": "Security during disruption"
+        },
+        {
+          "control_code": "A.5.30",
+          "title": "ICT readiness for business continuity",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.30",
+          "priority": "medium",
+          "description": "ICT readiness for business continuity"
+        },
+        {
+          "control_code": "A.5.31",
+          "title": "Legal, regulatory and contractual requirements",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.31",
+          "priority": "medium",
+          "description": "Legal, regulatory and contractual requirements"
+        },
+        {
+          "control_code": "A.5.32",
+          "title": "Intellectual property rights",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.32",
+          "priority": "medium",
+          "description": "Intellectual property rights"
+        },
+        {
+          "control_code": "A.5.33",
+          "title": "Protection of records",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.33",
+          "priority": "medium",
+          "description": "Protection of records"
+        },
+        {
+          "control_code": "A.5.34",
+          "title": "Privacy and protection of personal data",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.34",
+          "priority": "medium",
+          "description": "Privacy and protection of personal data"
+        },
+        {
+          "control_code": "A.5.35",
+          "title": "Independent review of information security",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.35",
+          "priority": "medium",
+          "description": "Independent review of information security"
+        },
+        {
+          "control_code": "A.5.36",
+          "title": "Compliance with security policies and standards",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.36",
+          "priority": "medium",
+          "description": "Compliance with security policies and standards"
+        },
+        {
+          "control_code": "A.5.37",
+          "title": "Documented operating procedures",
+          "category": "Organizational controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.5.37",
+          "priority": "medium",
+          "description": "Documented operating procedures"
+        },
+        {
+          "control_code": "A.6.1",
+          "title": "Screening",
+          "category": "People controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.6.1",
+          "priority": "medium",
+          "description": "Screening"
+        },
+        {
+          "control_code": "A.6.2",
+          "title": "Terms and conditions of employment",
+          "category": "People controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.6.2",
+          "priority": "medium",
+          "description": "Terms and conditions of employment"
+        },
+        {
+          "control_code": "A.6.3",
+          "title": "Security awareness, education and training",
+          "category": "People controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.6.3",
+          "priority": "medium",
+          "description": "Security awareness, education and training"
+        },
+        {
+          "control_code": "A.6.4",
+          "title": "Disciplinary process",
+          "category": "People controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.6.4",
+          "priority": "medium",
+          "description": "Disciplinary process"
+        },
+        {
+          "control_code": "A.6.5",
+          "title": "Responsibilities after termination or change of employment",
+          "category": "People controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.6.5",
+          "priority": "medium",
+          "description": "Responsibilities after termination or change of employment"
+        },
+        {
+          "control_code": "A.6.6",
+          "title": "Confidentiality and non-disclosure agreements",
+          "category": "People controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.6.6",
+          "priority": "medium",
+          "description": "Confidentiality and non-disclosure agreements"
+        },
+        {
+          "control_code": "A.6.7",
+          "title": "Remote working",
+          "category": "People controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.6.7",
+          "priority": "medium",
+          "description": "Remote working"
+        },
+        {
+          "control_code": "A.6.8",
+          "title": "Security event reporting",
+          "category": "People controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.6.8",
+          "priority": "medium",
+          "description": "Security event reporting"
+        },
+        {
+          "control_code": "A.7.1",
+          "title": "Physical security perimeters",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.1",
+          "priority": "medium",
+          "description": "Physical security perimeters"
+        },
+        {
+          "control_code": "A.7.2",
+          "title": "Physical entry controls",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.2",
+          "priority": "medium",
+          "description": "Physical entry controls"
+        },
+        {
+          "control_code": "A.7.3",
+          "title": "Securing offices, rooms and facilities",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.3",
+          "priority": "medium",
+          "description": "Securing offices, rooms and facilities"
+        },
+        {
+          "control_code": "A.7.4",
+          "title": "Physical security monitoring",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.4",
+          "priority": "medium",
+          "description": "Physical security monitoring"
+        },
+        {
+          "control_code": "A.7.5",
+          "title": "Protection against physical and environmental threats",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.5",
+          "priority": "medium",
+          "description": "Protection against physical and environmental threats"
+        },
+        {
+          "control_code": "A.7.6",
+          "title": "Working in secure areas",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.6",
+          "priority": "medium",
+          "description": "Working in secure areas"
+        },
+        {
+          "control_code": "A.7.7",
+          "title": "Clear desk and clear screen",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.7",
+          "priority": "medium",
+          "description": "Clear desk and clear screen"
+        },
+        {
+          "control_code": "A.7.8",
+          "title": "Equipment siting and protection",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.8",
+          "priority": "medium",
+          "description": "Equipment siting and protection"
+        },
+        {
+          "control_code": "A.7.9",
+          "title": "Security of assets off premises",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.9",
+          "priority": "medium",
+          "description": "Security of assets off premises"
+        },
+        {
+          "control_code": "A.7.10",
+          "title": "Storage media",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.10",
+          "priority": "medium",
+          "description": "Storage media"
+        },
+        {
+          "control_code": "A.7.11",
+          "title": "Supporting utilities",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.11",
+          "priority": "medium",
+          "description": "Supporting utilities"
+        },
+        {
+          "control_code": "A.7.12",
+          "title": "Cabling security",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.12",
+          "priority": "medium",
+          "description": "Cabling security"
+        },
+        {
+          "control_code": "A.7.13",
+          "title": "Equipment maintenance",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.13",
+          "priority": "medium",
+          "description": "Equipment maintenance"
+        },
+        {
+          "control_code": "A.7.14",
+          "title": "Secure disposal or re-use of equipment",
+          "category": "Physical controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.7.14",
+          "priority": "medium",
+          "description": "Secure disposal or re-use of equipment"
+        },
+        {
+          "control_code": "A.8.1",
+          "title": "User endpoint devices",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.1",
+          "priority": "medium",
+          "description": "User endpoint devices"
+        },
+        {
+          "control_code": "A.8.2",
+          "title": "Privileged access rights",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.2",
+          "priority": "medium",
+          "description": "Privileged access rights"
+        },
+        {
+          "control_code": "A.8.3",
+          "title": "Information access restriction",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.3",
+          "priority": "medium",
+          "description": "Information access restriction"
+        },
+        {
+          "control_code": "A.8.4",
+          "title": "Access to source code",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.4",
+          "priority": "medium",
+          "description": "Access to source code"
+        },
+        {
+          "control_code": "A.8.5",
+          "title": "Secure authentication",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.5",
+          "priority": "medium",
+          "description": "Secure authentication"
+        },
+        {
+          "control_code": "A.8.6",
+          "title": "Capacity management",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.6",
+          "priority": "medium",
+          "description": "Capacity management"
+        },
+        {
+          "control_code": "A.8.7",
+          "title": "Protection against malware",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.7",
+          "priority": "medium",
+          "description": "Protection against malware"
+        },
+        {
+          "control_code": "A.8.8",
+          "title": "Management of technical vulnerabilities",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.8",
+          "priority": "medium",
+          "description": "Management of technical vulnerabilities"
+        },
+        {
+          "control_code": "A.8.9",
+          "title": "Configuration management",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.9",
+          "priority": "medium",
+          "description": "Configuration management"
+        },
+        {
+          "control_code": "A.8.10",
+          "title": "Information deletion",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.10",
+          "priority": "medium",
+          "description": "Information deletion"
+        },
+        {
+          "control_code": "A.8.11",
+          "title": "Data masking",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.11",
+          "priority": "medium",
+          "description": "Data masking"
+        },
+        {
+          "control_code": "A.8.12",
+          "title": "Data leakage prevention",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.12",
+          "priority": "medium",
+          "description": "Data leakage prevention"
+        },
+        {
+          "control_code": "A.8.13",
+          "title": "Information backup",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.13",
+          "priority": "medium",
+          "description": "Information backup"
+        },
+        {
+          "control_code": "A.8.14",
+          "title": "Redundancy of processing facilities",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.14",
+          "priority": "medium",
+          "description": "Redundancy of processing facilities"
+        },
+        {
+          "control_code": "A.8.15",
+          "title": "Logging",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.15",
+          "priority": "medium",
+          "description": "Logging"
+        },
+        {
+          "control_code": "A.8.16",
+          "title": "Monitoring activities",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.16",
+          "priority": "medium",
+          "description": "Monitoring activities"
+        },
+        {
+          "control_code": "A.8.17",
+          "title": "Clock synchronisation",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.17",
+          "priority": "medium",
+          "description": "Clock synchronisation"
+        },
+        {
+          "control_code": "A.8.18",
+          "title": "Use of privileged utility programs",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.18",
+          "priority": "medium",
+          "description": "Use of privileged utility programs"
+        },
+        {
+          "control_code": "A.8.19",
+          "title": "Installation of software on operational systems",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.19",
+          "priority": "medium",
+          "description": "Installation of software on operational systems"
+        },
+        {
+          "control_code": "A.8.20",
+          "title": "Network security",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.20",
+          "priority": "medium",
+          "description": "Network security"
+        },
+        {
+          "control_code": "A.8.21",
+          "title": "Security of network services",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.21",
+          "priority": "medium",
+          "description": "Security of network services"
+        },
+        {
+          "control_code": "A.8.22",
+          "title": "Segregation of networks",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.22",
+          "priority": "medium",
+          "description": "Segregation of networks"
+        },
+        {
+          "control_code": "A.8.23",
+          "title": "Web filtering",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.23",
+          "priority": "medium",
+          "description": "Web filtering"
+        },
+        {
+          "control_code": "A.8.24",
+          "title": "Use of cryptography",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.24",
+          "priority": "medium",
+          "description": "Use of cryptography"
+        },
+        {
+          "control_code": "A.8.25",
+          "title": "Secure development life cycle",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.25",
+          "priority": "medium",
+          "description": "Secure development life cycle"
+        },
+        {
+          "control_code": "A.8.26",
+          "title": "Application security requirements",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.26",
+          "priority": "medium",
+          "description": "Application security requirements"
+        },
+        {
+          "control_code": "A.8.27",
+          "title": "Secure architecture and engineering principles",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.27",
+          "priority": "medium",
+          "description": "Secure architecture and engineering principles"
+        },
+        {
+          "control_code": "A.8.28",
+          "title": "Secure coding",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.28",
+          "priority": "medium",
+          "description": "Secure coding"
+        },
+        {
+          "control_code": "A.8.29",
+          "title": "Security testing in development and acceptance",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.29",
+          "priority": "medium",
+          "description": "Security testing in development and acceptance"
+        },
+        {
+          "control_code": "A.8.30",
+          "title": "Outsourced development",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.30",
+          "priority": "medium",
+          "description": "Outsourced development"
+        },
+        {
+          "control_code": "A.8.31",
+          "title": "Separation of development, test and production environments",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.31",
+          "priority": "medium",
+          "description": "Separation of development, test and production environments"
+        },
+        {
+          "control_code": "A.8.32",
+          "title": "Change management",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.32",
+          "priority": "medium",
+          "description": "Change management"
+        },
+        {
+          "control_code": "A.8.33",
+          "title": "Test information",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.33",
+          "priority": "medium",
+          "description": "Test information"
+        },
+        {
+          "control_code": "A.8.34",
+          "title": "Protection of systems during audit testing",
+          "category": "Technological controls",
+          "official_reference": "ISO/IEC 27001:2022 Annex A.8.34",
+          "priority": "medium",
+          "description": "Protection of systems during audit testing"
+        }
+      ]
+    },
+    {
+      "code": "SOC-2",
+      "name": "SOC 2 Trust Services Criteria (2017)",
+      "description": "AICPA Trust Services Criteria for security, availability, processing integrity, confidentiality and privacy.",
+      "category": "security",
+      "jurisdiction": "US",
+      "enforcement_level": "recommended",
+      "penalty_risk": "high",
+      "applies_to_manufacturing": true,
+      "applies_to_region": "Global",
+      "industry_specific": "general",
+      "official_url": "https://www.aicpa-cima.com/topic/audit-assurance/audit-and-assurance-greater-than-soc-2",
+      "standard_version": "2017",
+      "status": "active",
+      "controls": [
+        {
+          "control_code": "CC1.1",
+          "title": "Commitment to integrity and ethical values",
+          "category": "Control Environment",
+          "official_reference": "TSC CC1.1",
+          "priority": "medium",
+          "description": "Commitment to integrity and ethical values"
+        },
+        {
+          "control_code": "CC1.2",
+          "title": "Board oversight of internal control",
+          "category": "Control Environment",
+          "official_reference": "TSC CC1.2",
+          "priority": "medium",
+          "description": "Board oversight of internal control"
+        },
+        {
+          "control_code": "CC1.3",
+          "title": "Structures, reporting lines and authorities",
+          "category": "Control Environment",
+          "official_reference": "TSC CC1.3",
+          "priority": "medium",
+          "description": "Structures, reporting lines and authorities"
+        },
+        {
+          "control_code": "CC1.4",
+          "title": "Commitment to attract and retain competent people",
+          "category": "Control Environment",
+          "official_reference": "TSC CC1.4",
+          "priority": "medium",
+          "description": "Commitment to attract and retain competent people"
+        },
+        {
+          "control_code": "CC1.5",
+          "title": "Accountability for internal control responsibilities",
+          "category": "Control Environment",
+          "official_reference": "TSC CC1.5",
+          "priority": "medium",
+          "description": "Accountability for internal control responsibilities"
+        },
+        {
+          "control_code": "CC2.1",
+          "title": "Use of relevant, quality information",
+          "category": "Communication and Information",
+          "official_reference": "TSC CC2.1",
+          "priority": "medium",
+          "description": "Use of relevant, quality information"
+        },
+        {
+          "control_code": "CC2.2",
+          "title": "Internal communication of control responsibilities",
+          "category": "Communication and Information",
+          "official_reference": "TSC CC2.2",
+          "priority": "medium",
+          "description": "Internal communication of control responsibilities"
+        },
+        {
+          "control_code": "CC2.3",
+          "title": "Communication with external parties",
+          "category": "Communication and Information",
+          "official_reference": "TSC CC2.3",
+          "priority": "medium",
+          "description": "Communication with external parties"
+        },
+        {
+          "control_code": "CC3.1",
+          "title": "Objectives specified clearly enough to assess risk",
+          "category": "Risk Assessment",
+          "official_reference": "TSC CC3.1",
+          "priority": "medium",
+          "description": "Objectives specified clearly enough to assess risk"
+        },
+        {
+          "control_code": "CC3.2",
+          "title": "Risk identification and analysis",
+          "category": "Risk Assessment",
+          "official_reference": "TSC CC3.2",
+          "priority": "medium",
+          "description": "Risk identification and analysis"
+        },
+        {
+          "control_code": "CC3.3",
+          "title": "Consideration of fraud risk",
+          "category": "Risk Assessment",
+          "official_reference": "TSC CC3.3",
+          "priority": "medium",
+          "description": "Consideration of fraud risk"
+        },
+        {
+          "control_code": "CC3.4",
+          "title": "Assessment of significant changes",
+          "category": "Risk Assessment",
+          "official_reference": "TSC CC3.4",
+          "priority": "medium",
+          "description": "Assessment of significant changes"
+        },
+        {
+          "control_code": "CC4.1",
+          "title": "Ongoing and separate evaluations of controls",
+          "category": "Monitoring Activities",
+          "official_reference": "TSC CC4.1",
+          "priority": "medium",
+          "description": "Ongoing and separate evaluations of controls"
+        },
+        {
+          "control_code": "CC4.2",
+          "title": "Evaluation and communication of deficiencies",
+          "category": "Monitoring Activities",
+          "official_reference": "TSC CC4.2",
+          "priority": "medium",
+          "description": "Evaluation and communication of deficiencies"
+        },
+        {
+          "control_code": "CC5.1",
+          "title": "Selection and development of control activities",
+          "category": "Control Activities",
+          "official_reference": "TSC CC5.1",
+          "priority": "medium",
+          "description": "Selection and development of control activities"
+        },
+        {
+          "control_code": "CC5.2",
+          "title": "General controls over technology",
+          "category": "Control Activities",
+          "official_reference": "TSC CC5.2",
+          "priority": "medium",
+          "description": "General controls over technology"
+        },
+        {
+          "control_code": "CC5.3",
+          "title": "Deployment through policies and procedures",
+          "category": "Control Activities",
+          "official_reference": "TSC CC5.3",
+          "priority": "medium",
+          "description": "Deployment through policies and procedures"
+        },
+        {
+          "control_code": "CC6.1",
+          "title": "Logical access security over protected assets",
+          "category": "Logical and Physical Access Controls",
+          "official_reference": "TSC CC6.1",
+          "priority": "high",
+          "description": "Logical access security over protected assets"
+        },
+        {
+          "control_code": "CC6.2",
+          "title": "User registration and authorisation",
+          "category": "Logical and Physical Access Controls",
+          "official_reference": "TSC CC6.2",
+          "priority": "high",
+          "description": "User registration and authorisation"
+        },
+        {
+          "control_code": "CC6.3",
+          "title": "Role-based access and least privilege",
+          "category": "Logical and Physical Access Controls",
+          "official_reference": "TSC CC6.3",
+          "priority": "high",
+          "description": "Role-based access and least privilege"
+        },
+        {
+          "control_code": "CC6.4",
+          "title": "Physical access restrictions",
+          "category": "Logical and Physical Access Controls",
+          "official_reference": "TSC CC6.4",
+          "priority": "high",
+          "description": "Physical access restrictions"
+        },
+        {
+          "control_code": "CC6.5",
+          "title": "Disposal of assets and data",
+          "category": "Logical and Physical Access Controls",
+          "official_reference": "TSC CC6.5",
+          "priority": "high",
+          "description": "Disposal of assets and data"
+        },
+        {
+          "control_code": "CC6.6",
+          "title": "Protection against threats from outside system boundaries",
+          "category": "Logical and Physical Access Controls",
+          "official_reference": "TSC CC6.6",
+          "priority": "high",
+          "description": "Protection against threats from outside system boundaries"
+        },
+        {
+          "control_code": "CC6.7",
+          "title": "Restriction of information transmission and movement",
+          "category": "Logical and Physical Access Controls",
+          "official_reference": "TSC CC6.7",
+          "priority": "high",
+          "description": "Restriction of information transmission and movement"
+        },
+        {
+          "control_code": "CC6.8",
+          "title": "Prevention and detection of malicious software",
+          "category": "Logical and Physical Access Controls",
+          "official_reference": "TSC CC6.8",
+          "priority": "high",
+          "description": "Prevention and detection of malicious software"
+        },
+        {
+          "control_code": "CC7.1",
+          "title": "Detection of configuration changes and vulnerabilities",
+          "category": "System Operations",
+          "official_reference": "TSC CC7.1",
+          "priority": "high",
+          "description": "Detection of configuration changes and vulnerabilities"
+        },
+        {
+          "control_code": "CC7.2",
+          "title": "Monitoring for anomalies and security events",
+          "category": "System Operations",
+          "official_reference": "TSC CC7.2",
+          "priority": "high",
+          "description": "Monitoring for anomalies and security events"
+        },
+        {
+          "control_code": "CC7.3",
+          "title": "Evaluation of security events",
+          "category": "System Operations",
+          "official_reference": "TSC CC7.3",
+          "priority": "high",
+          "description": "Evaluation of security events"
+        },
+        {
+          "control_code": "CC7.4",
+          "title": "Incident response",
+          "category": "System Operations",
+          "official_reference": "TSC CC7.4",
+          "priority": "high",
+          "description": "Incident response"
+        },
+        {
+          "control_code": "CC7.5",
+          "title": "Recovery from incidents",
+          "category": "System Operations",
+          "official_reference": "TSC CC7.5",
+          "priority": "high",
+          "description": "Recovery from incidents"
+        },
+        {
+          "control_code": "CC8.1",
+          "title": "Authorisation, testing and approval of changes",
+          "category": "Change Management",
+          "official_reference": "TSC CC8.1",
+          "priority": "medium",
+          "description": "Authorisation, testing and approval of changes"
+        },
+        {
+          "control_code": "CC9.1",
+          "title": "Mitigation of business disruption risk",
+          "category": "Risk Mitigation",
+          "official_reference": "TSC CC9.1",
+          "priority": "medium",
+          "description": "Mitigation of business disruption risk"
+        },
+        {
+          "control_code": "CC9.2",
+          "title": "Vendor and business partner risk management",
+          "category": "Risk Mitigation",
+          "official_reference": "TSC CC9.2",
+          "priority": "medium",
+          "description": "Vendor and business partner risk management"
+        },
+        {
+          "control_code": "A1.1",
+          "title": "Capacity management",
+          "category": "Availability",
+          "official_reference": "TSC A1.1",
+          "priority": "medium",
+          "description": "Capacity management"
+        },
+        {
+          "control_code": "A1.2",
+          "title": "Environmental protection, backup and recovery infrastructure",
+          "category": "Availability",
+          "official_reference": "TSC A1.2",
+          "priority": "medium",
+          "description": "Environmental protection, backup and recovery infrastructure"
+        },
+        {
+          "control_code": "A1.3",
+          "title": "Testing of recovery plans",
+          "category": "Availability",
+          "official_reference": "TSC A1.3",
+          "priority": "medium",
+          "description": "Testing of recovery plans"
+        },
+        {
+          "control_code": "C1.1",
+          "title": "Identification and protection of confidential information",
+          "category": "Confidentiality",
+          "official_reference": "TSC C1.1",
+          "priority": "medium",
+          "description": "Identification and protection of confidential information"
+        },
+        {
+          "control_code": "C1.2",
+          "title": "Disposal of confidential information",
+          "category": "Confidentiality",
+          "official_reference": "TSC C1.2",
+          "priority": "medium",
+          "description": "Disposal of confidential information"
+        },
+        {
+          "control_code": "PI1.1",
+          "title": "Definitions of processing specifications",
+          "category": "Processing Integrity",
+          "official_reference": "TSC PI1.1",
+          "priority": "medium",
+          "description": "Definitions of processing specifications"
+        },
+        {
+          "control_code": "PI1.2",
+          "title": "Controls over system inputs",
+          "category": "Processing Integrity",
+          "official_reference": "TSC PI1.2",
+          "priority": "medium",
+          "description": "Controls over system inputs"
+        },
+        {
+          "control_code": "PI1.3",
+          "title": "Controls over system processing",
+          "category": "Processing Integrity",
+          "official_reference": "TSC PI1.3",
+          "priority": "medium",
+          "description": "Controls over system processing"
+        },
+        {
+          "control_code": "PI1.4",
+          "title": "Controls over system outputs",
+          "category": "Processing Integrity",
+          "official_reference": "TSC PI1.4",
+          "priority": "medium",
+          "description": "Controls over system outputs"
+        },
+        {
+          "control_code": "PI1.5",
+          "title": "Controls over stored items",
+          "category": "Processing Integrity",
+          "official_reference": "TSC PI1.5",
+          "priority": "medium",
+          "description": "Controls over stored items"
+        },
+        {
+          "control_code": "P1.1",
+          "title": "Privacy notice",
+          "category": "Privacy",
+          "official_reference": "TSC P1.1",
+          "priority": "medium",
+          "description": "Privacy notice"
+        },
+        {
+          "control_code": "P2.1",
+          "title": "Choice and consent",
+          "category": "Privacy",
+          "official_reference": "TSC P2.1",
+          "priority": "medium",
+          "description": "Choice and consent"
+        },
+        {
+          "control_code": "P3.1",
+          "title": "Collection limited to identified purposes",
+          "category": "Privacy",
+          "official_reference": "TSC P3.1",
+          "priority": "medium",
+          "description": "Collection limited to identified purposes"
+        },
+        {
+          "control_code": "P3.2",
+          "title": "Explicit consent for sensitive information",
+          "category": "Privacy",
+          "official_reference": "TSC P3.2",
+          "priority": "medium",
+          "description": "Explicit consent for sensitive information"
+        },
+        {
+          "control_code": "P4.1",
+          "title": "Use limited to identified purposes",
+          "category": "Privacy",
+          "official_reference": "TSC P4.1",
+          "priority": "medium",
+          "description": "Use limited to identified purposes"
+        },
+        {
+          "control_code": "P4.2",
+          "title": "Retention of personal information",
+          "category": "Privacy",
+          "official_reference": "TSC P4.2",
+          "priority": "medium",
+          "description": "Retention of personal information"
+        },
+        {
+          "control_code": "P4.3",
+          "title": "Secure disposal of personal information",
+          "category": "Privacy",
+          "official_reference": "TSC P4.3",
+          "priority": "medium",
+          "description": "Secure disposal of personal information"
+        },
+        {
+          "control_code": "P5.1",
+          "title": "Access to personal information",
+          "category": "Privacy",
+          "official_reference": "TSC P5.1",
+          "priority": "medium",
+          "description": "Access to personal information"
+        },
+        {
+          "control_code": "P5.2",
+          "title": "Correction of personal information",
+          "category": "Privacy",
+          "official_reference": "TSC P5.2",
+          "priority": "medium",
+          "description": "Correction of personal information"
+        },
+        {
+          "control_code": "P6.1",
+          "title": "Disclosure to third parties with consent",
+          "category": "Privacy",
+          "official_reference": "TSC P6.1",
+          "priority": "medium",
+          "description": "Disclosure to third parties with consent"
+        },
+        {
+          "control_code": "P6.2",
+          "title": "Record of authorised disclosures",
+          "category": "Privacy",
+          "official_reference": "TSC P6.2",
+          "priority": "medium",
+          "description": "Record of authorised disclosures"
+        },
+        {
+          "control_code": "P6.3",
+          "title": "Record of unauthorised disclosures",
+          "category": "Privacy",
+          "official_reference": "TSC P6.3",
+          "priority": "medium",
+          "description": "Record of unauthorised disclosures"
+        },
+        {
+          "control_code": "P6.4",
+          "title": "Third-party agreements on privacy commitments",
+          "category": "Privacy",
+          "official_reference": "TSC P6.4",
+          "priority": "medium",
+          "description": "Third-party agreements on privacy commitments"
+        },
+        {
+          "control_code": "P6.5",
+          "title": "Third-party notification of incidents and breaches",
+          "category": "Privacy",
+          "official_reference": "TSC P6.5",
+          "priority": "medium",
+          "description": "Third-party notification of incidents and breaches"
+        },
+        {
+          "control_code": "P6.6",
+          "title": "Notification of breaches to affected individuals",
+          "category": "Privacy",
+          "official_reference": "TSC P6.6",
+          "priority": "medium",
+          "description": "Notification of breaches to affected individuals"
+        },
+        {
+          "control_code": "P6.7",
+          "title": "Accounting of disclosures on request",
+          "category": "Privacy",
+          "official_reference": "TSC P6.7",
+          "priority": "medium",
+          "description": "Accounting of disclosures on request"
+        },
+        {
+          "control_code": "P7.1",
+          "title": "Quality of personal information",
+          "category": "Privacy",
+          "official_reference": "TSC P7.1",
+          "priority": "medium",
+          "description": "Quality of personal information"
+        },
+        {
+          "control_code": "P8.1",
+          "title": "Handling of privacy complaints and inquiries",
+          "category": "Privacy",
+          "official_reference": "TSC P8.1",
+          "priority": "medium",
+          "description": "Handling of privacy complaints and inquiries"
+        }
+      ]
+    },
+    {
+      "code": "GDPR",
+      "name": "General Data Protection Regulation (EU) 2016/679",
+      "description": "EU regulation on the protection of personal data; obligations listed at article level.",
+      "category": "privacy",
+      "jurisdiction": "EU",
+      "enforcement_level": "mandatory",
+      "penalty_risk": "critical",
+      "applies_to_manufacturing": true,
+      "applies_to_region": "EU",
+      "industry_specific": "general",
+      "official_url": "https://eur-lex.europa.eu/eli/reg/2016/679/oj",
+      "standard_version": "2016/679",
+      "status": "active",
+      "controls": [
+        {
+          "control_code": "Article - 5",
+          "title": "Principles for processing personal data",
+          "category": "Principles",
+          "official_reference": "GDPR Article 5",
+          "priority": "critical",
+          "description": "Principles for processing personal data"
+        },
+        {
+          "control_code": "Article - 6",
+          "title": "Lawfulness of processing",
+          "category": "Principles",
+          "official_reference": "GDPR Article 6",
+          "priority": "critical",
+          "description": "Lawfulness of processing"
+        },
+        {
+          "control_code": "Article - 7",
+          "title": "Conditions for consent",
+          "category": "Principles",
+          "official_reference": "GDPR Article 7",
+          "priority": "high",
+          "description": "Conditions for consent"
+        },
+        {
+          "control_code": "Article - 8",
+          "title": "Child's consent for online services",
+          "category": "Principles",
+          "official_reference": "GDPR Article 8",
+          "priority": "high",
+          "description": "Child's consent for online services"
+        },
+        {
+          "control_code": "Article - 9",
+          "title": "Special categories of personal data",
+          "category": "Principles",
+          "official_reference": "GDPR Article 9",
+          "priority": "high",
+          "description": "Special categories of personal data"
+        },
+        {
+          "control_code": "Article - 10",
+          "title": "Data on criminal convictions and offences",
+          "category": "Principles",
+          "official_reference": "GDPR Article 10",
+          "priority": "high",
+          "description": "Data on criminal convictions and offences"
+        },
+        {
+          "control_code": "Article - 11",
+          "title": "Processing that does not require identification",
+          "category": "Principles",
+          "official_reference": "GDPR Article 11",
+          "priority": "high",
+          "description": "Processing that does not require identification"
+        },
+        {
+          "control_code": "Article - 12",
+          "title": "Transparent communication with data subjects",
+          "category": "Data subject rights",
+          "official_reference": "GDPR Article 12",
+          "priority": "high",
+          "description": "Transparent communication with data subjects"
+        },
+        {
+          "control_code": "Article - 13",
+          "title": "Information when data is collected from the data subject",
+          "category": "Data subject rights",
+          "official_reference": "GDPR Article 13",
+          "priority": "high",
+          "description": "Information when data is collected from the data subject"
+        },
+        {
+          "control_code": "Article - 14",
+          "title": "Information when data is obtained from another source",
+          "category": "Data subject rights",
+          "official_reference": "GDPR Article 14",
+          "priority": "high",
+          "description": "Information when data is obtained from another source"
+        },
+        {
+          "control_code": "Article - 15",
+          "title": "Right of access",
+          "category": "Data subject rights",
+          "official_reference": "GDPR Article 15",
+          "priority": "high",
+          "description": "Right of access"
+        },
+        {
+          "control_code": "Article - 16",
+          "title": "Right to rectification",
+          "category": "Data subject rights",
+          "official_reference": "GDPR Article 16",
+          "priority": "high",
+          "description": "Right to rectification"
+        },
+        {
+          "control_code": "Article - 17",
+          "title": "Right to erasure",
+          "category": "Data subject rights",
+          "official_reference": "GDPR Article 17",
+          "priority": "high",
+          "description": "Right to erasure"
+        },
+        {
+          "control_code": "Article - 18",
+          "title": "Right to restriction of processing",
+          "category": "Data subject rights",
+          "official_reference": "GDPR Article 18",
+          "priority": "high",
+          "description": "Right to restriction of processing"
+        },
+        {
+          "control_code": "Article - 19",
+          "title": "Notification of rectification, erasure or restriction",
+          "category": "Data subject rights",
+          "official_reference": "GDPR Article 19",
+          "priority": "high",
+          "description": "Notification of rectification, erasure or restriction"
+        },
+        {
+          "control_code": "Article - 20",
+          "title": "Right to data portability",
+          "category": "Data subject rights",
+          "official_reference": "GDPR Article 20",
+          "priority": "high",
+          "description": "Right to data portability"
+        },
+        {
+          "control_code": "Article - 21",
+          "title": "Right to object",
+          "category": "Data subject rights",
+          "official_reference": "GDPR Article 21",
+          "priority": "high",
+          "description": "Right to object"
+        },
+        {
+          "control_code": "Article - 22",
+          "title": "Automated individual decision-making",
+          "category": "Data subject rights",
+          "official_reference": "GDPR Article 22",
+          "priority": "high",
+          "description": "Automated individual decision-making"
+        },
+        {
+          "control_code": "Article - 24",
+          "title": "Responsibility of the controller",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 24",
+          "priority": "high",
+          "description": "Responsibility of the controller"
+        },
+        {
+          "control_code": "Article - 25",
+          "title": "Data protection by design and by default",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 25",
+          "priority": "high",
+          "description": "Data protection by design and by default"
+        },
+        {
+          "control_code": "Article - 26",
+          "title": "Joint controllers",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 26",
+          "priority": "high",
+          "description": "Joint controllers"
+        },
+        {
+          "control_code": "Article - 27",
+          "title": "Representatives of non-EU controllers and processors",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 27",
+          "priority": "high",
+          "description": "Representatives of non-EU controllers and processors"
+        },
+        {
+          "control_code": "Article - 28",
+          "title": "Processor obligations",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 28",
+          "priority": "high",
+          "description": "Processor obligations"
+        },
+        {
+          "control_code": "Article - 29",
+          "title": "Processing under the authority of the controller",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 29",
+          "priority": "high",
+          "description": "Processing under the authority of the controller"
+        },
+        {
+          "control_code": "Article - 30",
+          "title": "Records of processing activities",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 30",
+          "priority": "high",
+          "description": "Records of processing activities"
+        },
+        {
+          "control_code": "Article - 31",
+          "title": "Cooperation with the supervisory authority",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 31",
+          "priority": "high",
+          "description": "Cooperation with the supervisory authority"
+        },
+        {
+          "control_code": "Article - 32",
+          "title": "Security of processing",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 32",
+          "priority": "critical",
+          "description": "Security of processing"
+        },
+        {
+          "control_code": "Article - 33",
+          "title": "Breach notification to the supervisory authority",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 33",
+          "priority": "critical",
+          "description": "Breach notification to the supervisory authority"
+        },
+        {
+          "control_code": "Article - 34",
+          "title": "Breach communication to the data subject",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 34",
+          "priority": "high",
+          "description": "Breach communication to the data subject"
+        },
+        {
+          "control_code": "Article - 35",
+          "title": "Data protection impact assessment",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 35",
+          "priority": "critical",
+          "description": "Data protection impact assessment"
+        },
+        {
+          "control_code": "Article - 36",
+          "title": "Prior consultation",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 36",
+          "priority": "high",
+          "description": "Prior consultation"
+        },
+        {
+          "control_code": "Article - 37",
+          "title": "Designation of a data protection officer",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 37",
+          "priority": "high",
+          "description": "Designation of a data protection officer"
+        },
+        {
+          "control_code": "Article - 38",
+          "title": "Position of the data protection officer",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 38",
+          "priority": "high",
+          "description": "Position of the data protection officer"
+        },
+        {
+          "control_code": "Article - 39",
+          "title": "Tasks of the data protection officer",
+          "category": "Controller and processor",
+          "official_reference": "GDPR Article 39",
+          "priority": "high",
+          "description": "Tasks of the data protection officer"
+        },
+        {
+          "control_code": "Article - 44",
+          "title": "General principle for transfers",
+          "category": "International transfers",
+          "official_reference": "GDPR Article 44",
+          "priority": "high",
+          "description": "General principle for transfers"
+        },
+        {
+          "control_code": "Article - 45",
+          "title": "Transfers based on an adequacy decision",
+          "category": "International transfers",
+          "official_reference": "GDPR Article 45",
+          "priority": "high",
+          "description": "Transfers based on an adequacy decision"
+        },
+        {
+          "control_code": "Article - 46",
+          "title": "Transfers subject to appropriate safeguards",
+          "category": "International transfers",
+          "official_reference": "GDPR Article 46",
+          "priority": "high",
+          "description": "Transfers subject to appropriate safeguards"
+        },
+        {
+          "control_code": "Article - 47",
+          "title": "Binding corporate rules",
+          "category": "International transfers",
+          "official_reference": "GDPR Article 47",
+          "priority": "high",
+          "description": "Binding corporate rules"
+        },
+        {
+          "control_code": "Article - 48",
+          "title": "Transfers not authorised by Union law",
+          "category": "International transfers",
+          "official_reference": "GDPR Article 48",
+          "priority": "high",
+          "description": "Transfers not authorised by Union law"
+        },
+        {
+          "control_code": "Article - 49",
+          "title": "Derogations for specific situations",
+          "category": "International transfers",
+          "official_reference": "GDPR Article 49",
+          "priority": "high",
+          "description": "Derogations for specific situations"
+        }
+      ]
+    },
+    {
+      "code": "NIS2",
+      "name": "NIS2 Directive (EU) 2022/2555",
+      "description": "EU directive on measures for a high common level of cybersecurity; risk-management measures and incident reporting.",
+      "category": "security",
+      "jurisdiction": "EU",
+      "enforcement_level": "mandatory",
+      "penalty_risk": "critical",
+      "applies_to_manufacturing": true,
+      "applies_to_region": "EU",
+      "industry_specific": "general",
+      "official_url": "https://eur-lex.europa.eu/eli/dir/2022/2555/oj",
+      "standard_version": "2022/2555",
+      "status": "active",
+      "controls": [
+        {
+          "control_code": "NIS2-Art.21(2)(a)",
+          "title": "Risk analysis and information system security policies",
+          "category": "Risk management measures",
+          "official_reference": "Article 21(2)(a)",
+          "priority": "high",
+          "description": "Risk analysis and information system security policies"
+        },
+        {
+          "control_code": "NIS2-Art.21(2)(b)",
+          "title": "Incident handling",
+          "category": "Risk management measures",
+          "official_reference": "Article 21(2)(b)",
+          "priority": "high",
+          "description": "Incident handling"
+        },
+        {
+          "control_code": "NIS2-Art.21(2)(c)",
+          "title": "Business continuity, backup, disaster recovery and crisis management",
+          "category": "Risk management measures",
+          "official_reference": "Article 21(2)(c)",
+          "priority": "high",
+          "description": "Business continuity, backup, disaster recovery and crisis management"
+        },
+        {
+          "control_code": "NIS2-Art.21(2)(d)",
+          "title": "Supply chain security",
+          "category": "Risk management measures",
+          "official_reference": "Article 21(2)(d)",
+          "priority": "high",
+          "description": "Supply chain security"
+        },
+        {
+          "control_code": "NIS2-Art.21(2)(e)",
+          "title": "Security in acquisition, development and maintenance, including vulnerability handling",
+          "category": "Risk management measures",
+          "official_reference": "Article 21(2)(e)",
+          "priority": "high",
+          "description": "Security in acquisition, development and maintenance, including vulnerability handling"
+        },
+        {
+          "control_code": "NIS2-Art.21(2)(f)",
+          "title": "Policies to assess the effectiveness of risk-management measures",
+          "category": "Risk management measures",
+          "official_reference": "Article 21(2)(f)",
+          "priority": "high",
+          "description": "Policies to assess the effectiveness of risk-management measures"
+        },
+        {
+          "control_code": "NIS2-Art.21(2)(g)",
+          "title": "Basic cyber hygiene practices and cybersecurity training",
+          "category": "Risk management measures",
+          "official_reference": "Article 21(2)(g)",
+          "priority": "high",
+          "description": "Basic cyber hygiene practices and cybersecurity training"
+        },
+        {
+          "control_code": "NIS2-Art.21(2)(h)",
+          "title": "Policies on cryptography and encryption",
+          "category": "Risk management measures",
+          "official_reference": "Article 21(2)(h)",
+          "priority": "high",
+          "description": "Policies on cryptography and encryption"
+        },
+        {
+          "control_code": "NIS2-Art.21(2)(i)",
+          "title": "Human resources security, access control and asset management",
+          "category": "Risk management measures",
+          "official_reference": "Article 21(2)(i)",
+          "priority": "high",
+          "description": "Human resources security, access control and asset management"
+        },
+        {
+          "control_code": "NIS2-Art.21(2)(j)",
+          "title": "Multi-factor authentication, secured communications and emergency communications",
+          "category": "Risk management measures",
+          "official_reference": "Article 21(2)(j)",
+          "priority": "high",
+          "description": "Multi-factor authentication, secured communications and emergency communications"
+        },
+        {
+          "control_code": "NIS2-Art.23(1)",
+          "title": "Notification of significant incidents to the CSIRT or authority",
+          "category": "Incident reporting",
+          "official_reference": "Article 23(1)",
+          "priority": "critical",
+          "description": "Notification of significant incidents to the CSIRT or authority"
+        },
+        {
+          "control_code": "NIS2-Art.23(4)(a)",
+          "title": "Early warning within 24 hours of awareness",
+          "category": "Incident reporting",
+          "official_reference": "Article 23(4)(a)",
+          "priority": "critical",
+          "description": "Early warning within 24 hours of awareness"
+        },
+        {
+          "control_code": "NIS2-Art.23(4)(b)",
+          "title": "Incident notification within 72 hours of awareness",
+          "category": "Incident reporting",
+          "official_reference": "Article 23(4)(b)",
+          "priority": "critical",
+          "description": "Incident notification within 72 hours of awareness"
+        },
+        {
+          "control_code": "NIS2-Art.23(4)(c)",
+          "title": "Intermediate report on request",
+          "category": "Incident reporting",
+          "official_reference": "Article 23(4)(c)",
+          "priority": "high",
+          "description": "Intermediate report on request"
+        },
+        {
+          "control_code": "NIS2-Art.23(4)(d)",
+          "title": "Final report within one month of the incident notification",
+          "category": "Incident reporting",
+          "official_reference": "Article 23(4)(d)",
+          "priority": "high",
+          "description": "Final report within one month of the incident notification"
+        }
+      ]
+    },
+    {
+      "code": "DORA",
+      "name": "Digital Operational Resilience Act (EU) 2022/2554",
+      "description": "EU regulation on digital operational resilience for the financial sector, at article level across five pillars.",
+      "category": "operational-resilience",
+      "jurisdiction": "EU",
+      "enforcement_level": "mandatory",
+      "penalty_risk": "critical",
+      "applies_to_manufacturing": true,
+      "applies_to_region": "EU",
+      "industry_specific": "general",
+      "official_url": "https://eur-lex.europa.eu/eli/reg/2022/2554/oj",
+      "standard_version": "2022/2554",
+      "status": "active",
+      "controls": [
+        {
+          "control_code": "DORA-Art.5",
+          "title": "Governance and organisation",
+          "category": "ICT Risk Management",
+          "official_reference": "DORA Article 5",
+          "priority": "critical",
+          "description": "Governance and organisation"
+        },
+        {
+          "control_code": "DORA-Art.6",
+          "title": "ICT risk management framework",
+          "category": "ICT Risk Management",
+          "official_reference": "DORA Article 6",
+          "priority": "critical",
+          "description": "ICT risk management framework"
+        },
+        {
+          "control_code": "DORA-Art.7",
+          "title": "ICT systems, protocols and tools",
+          "category": "ICT Risk Management",
+          "official_reference": "DORA Article 7",
+          "priority": "critical",
+          "description": "ICT systems, protocols and tools"
+        },
+        {
+          "control_code": "DORA-Art.8",
+          "title": "Identification of ICT assets and risks",
+          "category": "ICT Risk Management",
+          "official_reference": "DORA Article 8",
+          "priority": "critical",
+          "description": "Identification of ICT assets and risks"
+        },
+        {
+          "control_code": "DORA-Art.9",
+          "title": "Protection and prevention",
+          "category": "ICT Risk Management",
+          "official_reference": "DORA Article 9",
+          "priority": "critical",
+          "description": "Protection and prevention"
+        },
+        {
+          "control_code": "DORA-Art.10",
+          "title": "Detection of anomalous activities",
+          "category": "ICT Risk Management",
+          "official_reference": "DORA Article 10",
+          "priority": "critical",
+          "description": "Detection of anomalous activities"
+        },
+        {
+          "control_code": "DORA-Art.11",
+          "title": "Response and recovery",
+          "category": "ICT Risk Management",
+          "official_reference": "DORA Article 11",
+          "priority": "critical",
+          "description": "Response and recovery"
+        },
+        {
+          "control_code": "DORA-Art.12",
+          "title": "Backup, restoration and recovery",
+          "category": "ICT Risk Management",
+          "official_reference": "DORA Article 12",
+          "priority": "critical",
+          "description": "Backup, restoration and recovery"
+        },
+        {
+          "control_code": "DORA-Art.13",
+          "title": "Learning and evolving",
+          "category": "ICT Risk Management",
+          "official_reference": "DORA Article 13",
+          "priority": "critical",
+          "description": "Learning and evolving"
+        },
+        {
+          "control_code": "DORA-Art.14",
+          "title": "Communication",
+          "category": "ICT Risk Management",
+          "official_reference": "DORA Article 14",
+          "priority": "critical",
+          "description": "Communication"
+        },
+        {
+          "control_code": "DORA-Art.17",
+          "title": "ICT-related incident management process",
+          "category": "Incident Management",
+          "official_reference": "DORA Article 17",
+          "priority": "critical",
+          "description": "ICT-related incident management process"
+        },
+        {
+          "control_code": "DORA-Art.18",
+          "title": "Classification of ICT-related incidents",
+          "category": "Incident Management",
+          "official_reference": "DORA Article 18",
+          "priority": "critical",
+          "description": "Classification of ICT-related incidents"
+        },
+        {
+          "control_code": "DORA-Art.19",
+          "title": "Reporting of major ICT-related incidents",
+          "category": "Incident Management",
+          "official_reference": "DORA Article 19",
+          "priority": "critical",
+          "description": "Reporting of major ICT-related incidents"
+        },
+        {
+          "control_code": "DORA-Art.24",
+          "title": "General requirements for resilience testing",
+          "category": "Resilience Testing",
+          "official_reference": "DORA Article 24",
+          "priority": "high",
+          "description": "General requirements for resilience testing"
+        },
+        {
+          "control_code": "DORA-Art.25",
+          "title": "Testing of ICT tools and systems",
+          "category": "Resilience Testing",
+          "official_reference": "DORA Article 25",
+          "priority": "high",
+          "description": "Testing of ICT tools and systems"
+        },
+        {
+          "control_code": "DORA-Art.26",
+          "title": "Threat-led penetration testing",
+          "category": "Resilience Testing",
+          "official_reference": "DORA Article 26",
+          "priority": "high",
+          "description": "Threat-led penetration testing"
+        },
+        {
+          "control_code": "DORA-Art.27",
+          "title": "Requirements for testers",
+          "category": "Resilience Testing",
+          "official_reference": "DORA Article 27",
+          "priority": "high",
+          "description": "Requirements for testers"
+        },
+        {
+          "control_code": "DORA-Art.28",
+          "title": "General principles for ICT third-party risk",
+          "category": "Third-Party Risk",
+          "official_reference": "DORA Article 28",
+          "priority": "high",
+          "description": "General principles for ICT third-party risk"
+        },
+        {
+          "control_code": "DORA-Art.29",
+          "title": "Assessment of ICT concentration risk",
+          "category": "Third-Party Risk",
+          "official_reference": "DORA Article 29",
+          "priority": "high",
+          "description": "Assessment of ICT concentration risk"
+        },
+        {
+          "control_code": "DORA-Art.30",
+          "title": "Key contractual provisions",
+          "category": "Third-Party Risk",
+          "official_reference": "DORA Article 30",
+          "priority": "high",
+          "description": "Key contractual provisions"
+        },
+        {
+          "control_code": "DORA-Art.45",
+          "title": "Information-sharing arrangements on cyber threats",
+          "category": "Information Sharing",
+          "official_reference": "DORA Article 45",
+          "priority": "high",
+          "description": "Information-sharing arrangements on cyber threats"
+        }
+      ]
+    },
+    {
+      "code": "EU-AI-ACT",
+      "name": "Artificial Intelligence Act (EU) 2024/1689",
+      "description": "EU regulation laying down harmonised rules on artificial intelligence, organised by practice, risk class and role.",
+      "category": "ai-governance",
+      "jurisdiction": "EU",
+      "enforcement_level": "mandatory",
+      "penalty_risk": "critical",
+      "applies_to_manufacturing": true,
+      "applies_to_region": "EU",
+      "industry_specific": "general",
+      "official_url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj",
+      "standard_version": "2024/1689",
+      "status": "active",
+      "controls": [
+        {
+          "control_code": "EU-AI-ACT-Art.4",
+          "title": "AI literacy",
+          "category": "General provisions",
+          "official_reference": "AI Act Article 4",
+          "priority": "high",
+          "description": "AI literacy"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.5",
+          "title": "Prohibited AI practices",
+          "category": "Prohibited practices",
+          "official_reference": "AI Act Article 5",
+          "priority": "critical",
+          "description": "Prohibited AI practices"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.8",
+          "title": "Compliance with the high-risk requirements",
+          "category": "High-risk requirements",
+          "official_reference": "AI Act Article 8",
+          "priority": "high",
+          "description": "Compliance with the high-risk requirements"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.9",
+          "title": "Risk management system",
+          "category": "High-risk requirements",
+          "official_reference": "AI Act Article 9",
+          "priority": "critical",
+          "description": "Risk management system"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.10",
+          "title": "Data and data governance",
+          "category": "High-risk requirements",
+          "official_reference": "AI Act Article 10",
+          "priority": "high",
+          "description": "Data and data governance"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.11",
+          "title": "Technical documentation",
+          "category": "High-risk requirements",
+          "official_reference": "AI Act Article 11",
+          "priority": "high",
+          "description": "Technical documentation"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.12",
+          "title": "Record-keeping",
+          "category": "High-risk requirements",
+          "official_reference": "AI Act Article 12",
+          "priority": "high",
+          "description": "Record-keeping"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.13",
+          "title": "Transparency and information for deployers",
+          "category": "High-risk requirements",
+          "official_reference": "AI Act Article 13",
+          "priority": "high",
+          "description": "Transparency and information for deployers"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.14",
+          "title": "Human oversight",
+          "category": "High-risk requirements",
+          "official_reference": "AI Act Article 14",
+          "priority": "critical",
+          "description": "Human oversight"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.15",
+          "title": "Accuracy, robustness and cybersecurity",
+          "category": "High-risk requirements",
+          "official_reference": "AI Act Article 15",
+          "priority": "high",
+          "description": "Accuracy, robustness and cybersecurity"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.16",
+          "title": "Obligations of providers of high-risk systems",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 16",
+          "priority": "high",
+          "description": "Obligations of providers of high-risk systems"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.17",
+          "title": "Quality management system",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 17",
+          "priority": "high",
+          "description": "Quality management system"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.18",
+          "title": "Documentation keeping",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 18",
+          "priority": "high",
+          "description": "Documentation keeping"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.19",
+          "title": "Automatically generated logs",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 19",
+          "priority": "high",
+          "description": "Automatically generated logs"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.20",
+          "title": "Corrective actions and duty of information",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 20",
+          "priority": "high",
+          "description": "Corrective actions and duty of information"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.21",
+          "title": "Cooperation with competent authorities",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 21",
+          "priority": "high",
+          "description": "Cooperation with competent authorities"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.22",
+          "title": "Authorised representatives of providers",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 22",
+          "priority": "high",
+          "description": "Authorised representatives of providers"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.23",
+          "title": "Obligations of importers",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 23",
+          "priority": "high",
+          "description": "Obligations of importers"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.24",
+          "title": "Obligations of distributors",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 24",
+          "priority": "high",
+          "description": "Obligations of distributors"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.25",
+          "title": "Responsibilities along the AI value chain",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 25",
+          "priority": "high",
+          "description": "Responsibilities along the AI value chain"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.26",
+          "title": "Obligations of deployers of high-risk systems",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 26",
+          "priority": "critical",
+          "description": "Obligations of deployers of high-risk systems"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.27",
+          "title": "Fundamental rights impact assessment",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 27",
+          "priority": "high",
+          "description": "Fundamental rights impact assessment"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.43",
+          "title": "Conformity assessment",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 43",
+          "priority": "high",
+          "description": "Conformity assessment"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.49",
+          "title": "Registration",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 49",
+          "priority": "high",
+          "description": "Registration"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.72",
+          "title": "Post-market monitoring by providers",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 72",
+          "priority": "high",
+          "description": "Post-market monitoring by providers"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.73",
+          "title": "Reporting of serious incidents",
+          "category": "Provider and deployer obligations",
+          "official_reference": "AI Act Article 73",
+          "priority": "high",
+          "description": "Reporting of serious incidents"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.50",
+          "title": "Transparency obligations for certain AI systems",
+          "category": "Transparency",
+          "official_reference": "AI Act Article 50",
+          "priority": "high",
+          "description": "Transparency obligations for certain AI systems"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.51",
+          "title": "Classification of models with systemic risk",
+          "category": "General-purpose AI models",
+          "official_reference": "AI Act Article 51",
+          "priority": "high",
+          "description": "Classification of models with systemic risk"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.53",
+          "title": "Obligations of providers of general-purpose models",
+          "category": "General-purpose AI models",
+          "official_reference": "AI Act Article 53",
+          "priority": "high",
+          "description": "Obligations of providers of general-purpose models"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.54",
+          "title": "Authorised representatives of general-purpose model providers",
+          "category": "General-purpose AI models",
+          "official_reference": "AI Act Article 54",
+          "priority": "high",
+          "description": "Authorised representatives of general-purpose model providers"
+        },
+        {
+          "control_code": "EU-AI-ACT-Art.55",
+          "title": "Obligations of providers of models with systemic risk",
+          "category": "General-purpose AI models",
+          "official_reference": "AI Act Article 55",
+          "priority": "high",
+          "description": "Obligations of providers of models with systemic risk"
+        }
+      ]
+    }
+  ]
+}

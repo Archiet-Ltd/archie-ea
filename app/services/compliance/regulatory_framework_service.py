@@ -801,6 +801,78 @@ class RegulatoryFrameworkService:
 
         return frameworks
 
+    # Keys older framework lists used for control fields, mapped onto the columns.
+    _LEGACY_CONTROL_KEYS = {
+        "control_id": "control_code",
+        "criticality": "priority",
+        "control_type": "category",
+    }
+
+    @staticmethod
+    def _columns(model) -> set:
+        return {c.name for c in model.__table__.columns}
+
+    @staticmethod
+    def _control_values(control_data: Dict) -> Dict:
+        """Translate one control dict to ComplianceControl column values."""
+        columns = RegulatoryFrameworkService._columns(ComplianceControl)
+        values = {}
+        for key, value in control_data.items():
+            key = RegulatoryFrameworkService._LEGACY_CONTROL_KEYS.get(key, key)
+            if key in columns and key not in ("id", "framework_id"):
+                values.setdefault(key, value)
+        return values
+
+    @staticmethod
+    def upsert_framework_with_controls(framework_data: Dict, add_missing_controls: bool = False):
+        """Create a framework with its controls, optionally topping up an existing one.
+
+        A framework that already exists (matched on ``code``) keeps its own row
+        untouched. With ``add_missing_controls`` the controls whose ``control_code``
+        is absent from that framework are added; existing controls are never
+        edited. Does not commit.
+
+        Returns:
+            (framework, created, controls_added)
+        """
+        data = dict(framework_data)
+        controls_data = data.pop("controls", [])
+
+        framework = RegulatoryFramework.query.filter_by(code=data["code"]).first()
+        created = framework is None
+        if created:
+            columns = RegulatoryFrameworkService._columns(RegulatoryFramework)
+            framework = RegulatoryFramework(
+                **{k: v for k, v in data.items() if k in columns and k != "id"}
+            )
+            framework.last_updated = datetime.utcnow()
+            framework.next_review_date = datetime.utcnow() + timedelta(days=365)
+            db.session.add(framework)
+            db.session.flush()  # Get framework ID
+        elif not add_missing_controls:
+            return framework, False, 0
+
+        present = (
+            set()
+            if created
+            else {
+                code
+                for (code,) in db.session.query(ComplianceControl.control_code).filter_by(
+                    framework_id=framework.id
+                )
+            }
+        )
+        added = 0
+        for control_data in controls_data:
+            values = RegulatoryFrameworkService._control_values(control_data)
+            if values["control_code"] in present:
+                continue
+            db.session.add(ComplianceControl(framework_id=framework.id, **values))
+            present.add(values["control_code"])
+            added += 1
+        db.session.flush()
+        return framework, created, added
+
     @staticmethod
     def seed_manufacturing_frameworks():
         """
@@ -818,36 +890,81 @@ class RegulatoryFrameworkService:
         frameworks = RegulatoryFrameworkService.load_frameworks_from_json()
 
         for framework_data in frameworks:
-            # Check if framework already exists
-            existing = RegulatoryFramework.query.filter_by(code=framework_data["code"]).first()
-
-            if existing:
+            framework, created, added = RegulatoryFrameworkService.upsert_framework_with_controls(
+                framework_data
+            )
+            if not created:
                 logger.info(f"Framework {framework_data['code']} already exists, skipping")
                 continue
 
-            # Extract controls separately
-            controls_data = framework_data.pop("controls", [])
-
-            # Create framework
-            framework = RegulatoryFramework(**framework_data)
-            framework.last_updated = datetime.utcnow()
-            framework.next_review_date = datetime.utcnow() + timedelta(days=365)
-
-            db.session.add(framework)
-            db.session.flush()  # Get framework ID
-
-            # Create controls
-            for control_data in controls_data:
-                control = ComplianceControl(framework_id=framework.id, **control_data)
-                db.session.add(control)
-
             seeded_count += 1
-            logger.info(f"Seeded framework: {framework.code} with {len(controls_data)} controls")
+            logger.info(f"Seeded framework: {framework.code} with {added} controls")
 
         db.session.commit()
 
         logger.info(f"Seeding complete: {seeded_count} frameworks added")
         return seeded_count
+
+    @staticmethod
+    def load_default_catalogue() -> Dict:
+        """Load and validate the default global catalogue shipped with the app."""
+        json_path = os.path.join(os.path.dirname(__file__), "data", "default_catalogue.json")
+        with open(json_path, "r", encoding="utf-8") as f:
+            catalogue = json.load(f)
+        RegulatoryFrameworkService.validate_default_catalogue(catalogue)
+        return catalogue
+
+    @staticmethod
+    def validate_default_catalogue(catalogue: Dict) -> None:
+        """Raise ValueError when the catalogue data is incomplete or ambiguous."""
+        if not catalogue.get("catalogue_version"):
+            raise ValueError("catalogue has no catalogue_version")
+        for fw in catalogue.get("frameworks", []):
+            code = fw.get("code")
+            if not code or not fw.get("name") or not fw.get("official_url"):
+                raise ValueError(f"framework {code!r} needs code, name and official_url")
+            seen = set()
+            for control in fw.get("controls", []):
+                for field in ("control_code", "title", "official_reference"):
+                    if not control.get(field):
+                        raise ValueError(f"{code}: control {control!r} has no {field}")
+                if control["control_code"] in seen:
+                    raise ValueError(f"{code}: duplicate control_code {control['control_code']}")
+                seen.add(control["control_code"])
+
+    @staticmethod
+    def seed_default_catalogue() -> Dict:
+        """Load the default global catalogue; safe to run repeatedly.
+
+        Creates missing frameworks and adds missing controls to every framework,
+        existing or new. Existing rows are never edited. Global data only: no
+        organisation's data is read or written.
+
+        Returns:
+            {"catalogue_version", "frameworks_added", "controls_added"}
+        """
+        catalogue = RegulatoryFrameworkService.load_default_catalogue()
+        version = catalogue["catalogue_version"]
+        frameworks_added = 0
+        controls_added = 0
+        for framework_data in catalogue["frameworks"]:
+            _, created, added = RegulatoryFrameworkService.upsert_framework_with_controls(
+                framework_data, add_missing_controls=True
+            )
+            frameworks_added += 1 if created else 0
+            controls_added += added
+        db.session.commit()
+        logger.info(
+            "Default compliance catalogue %s: %d frameworks added, %d controls added",
+            version,
+            frameworks_added,
+            controls_added,
+        )
+        return {
+            "catalogue_version": version,
+            "frameworks_added": frameworks_added,
+            "controls_added": controls_added,
+        }
 
     @staticmethod
     def get_applicable_frameworks(
