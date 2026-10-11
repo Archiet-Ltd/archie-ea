@@ -55,9 +55,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # only if a human is deliberately routed to it; none can be an enterprise_role.
 # Listed, not silently tolerated, so the gap stays visible in review.
 ASPIRATIONAL = {
-    "technology_architect": "ARCH-123: folded into enterprise_architect, no dedicated role yet",
-    "data_architect": "ARCH-123: folded into enterprise_architect, no dedicated role yet",
-    "application_architect": "charter written ahead of the role",
     "integration_architect": "charter written ahead of the role",
     "systems_architect": "charter written ahead of the role",
     "business_analyst": "analyst, not an architecture persona with a sidebar",

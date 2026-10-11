@@ -39,6 +39,17 @@ ROLE_PLATFORM_ADMIN = "platform_admin"
 ROLE_SECURITY_ARCHITECT = "security_architect"
 ROLE_DATA_ARCHITECT = "data_architect"
 
+# Promoted from charter-only, 1 Oct 2026, on the owner's decision. Both are
+# served at the paid launch by the design document's release plan, and both had
+# an AI charter, a place in the journey-member roles and no way to be assigned.
+#
+# technology_architect: maps applications to the technology they run on and owns
+# the Tech Radar; ARCH-124 folded it into enterprise_architect for want of a role.
+#
+# application_architect: keeps each domain's application components, services
+# and interfaces modelled; served until now only through solution_architect.
+ROLE_TECHNOLOGY_ARCHITECT = "technology_architect"
+ROLE_APPLICATION_ARCHITECT = "application_architect"
 # R1-B36 (TB-0146): promoted from unassignable to assignable, 2026-10-04.
 # finance: licence/contract cost exposure had no owner who could act on it.
 # compliance: RegulatoryFramework/ComplianceControl is a security_architect-owned
@@ -65,6 +76,8 @@ VALID_ROLES = [
     ROLE_PLATFORM_ADMIN,
     ROLE_SECURITY_ARCHITECT,
     ROLE_DATA_ARCHITECT,
+    ROLE_TECHNOLOGY_ARCHITECT,
+    ROLE_APPLICATION_ARCHITECT,
     ROLE_FINANCE,
     ROLE_COMPLIANCE,
     ROLE_RISK,
@@ -85,6 +98,8 @@ ROLE_DISPLAY_NAMES = {
     ROLE_PLATFORM_ADMIN: "Platform Admin",
     ROLE_SECURITY_ARCHITECT: "Security Architect",
     ROLE_DATA_ARCHITECT: "Data Architect",
+    ROLE_TECHNOLOGY_ARCHITECT: "Technology Architect",
+    ROLE_APPLICATION_ARCHITECT: "Application Architect",
     ROLE_FINANCE: "Finance",
     ROLE_COMPLIANCE: "Compliance",
     ROLE_RISK: "Risk",

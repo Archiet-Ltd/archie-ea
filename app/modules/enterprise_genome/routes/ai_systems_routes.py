@@ -20,10 +20,7 @@ from flask_login import login_required
 
 from app import db
 from app.modules.enterprise_genome.emit.ai_systems_register import emit_ai_systems_register
-from app.modules.enterprise_genome.services.ai_systems_seed import (
-    register_ai_system,
-    seed_archie_copilot,
-)
+from app.modules.enterprise_genome.services.ai_systems_seed import seed_archie_copilot
 from app.modules.enterprise_genome.services.ai_systems_slice import build_ai_systems_slice
 
 logger = logging.getLogger(__name__)
@@ -55,11 +52,11 @@ def ai_systems():
 @ai_systems_genome_bp.route("/ai-systems/seed", methods=["POST"])
 @login_required
 def ai_systems_seed():
-    """Seed the org's AI systems, including Entelim's own copilot (self-model).
+    """Register Entelim's own copilot (self-model) in the org's register.
 
-    Idempotent — re-running updates the existing elements in place. Also seeds a
-    couple of illustrative estate systems so the register is not empty on a
-    fresh org; each is a real, modelled ArchiMateElement, not fabricated UI data.
+    Idempotent — re-running updates the existing element in place. Only systems
+    that really exist are registered: estate AI systems are never invented to
+    make the register look populated.
     """
     org_id = _current_org_id()
     if org_id is None:
@@ -68,32 +65,6 @@ def ai_systems_seed():
     try:
         # Entelim's own copilot — honest self-model.
         seed_archie_copilot(db.session, org_id)
-
-        # Illustrative estate AI systems (real modelled elements).
-        register_ai_system(
-            db.session,
-            org_id,
-            name="Fraud Scoring Engine",
-            provider="openai",
-            model_id="gpt-4o",
-            purpose="Real-time transaction fraud scoring.",
-            autonomy_level="supervised-autonomous",
-            data_sensitivity="regulated",
-            approval_gate=False,
-            human_review=False,
-        )
-        register_ai_system(
-            db.session,
-            org_id,
-            name="Legacy Ticket Classifier",
-            provider="anthropic",
-            model_id="claude-3-5-sonnet-20241022",  # on the retired denylist  stale-model-ok: demo AI system intentionally on a retired model to exercise the retired-model risk flag
-            purpose="Routes inbound support tickets to queues.",
-            autonomy_level="assisted",
-            data_sensitivity="internal",
-            approval_gate=True,
-            human_review=True,
-        )
         db.session.commit()
     except Exception:  # noqa: BLE001
         db.session.rollback()

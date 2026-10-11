@@ -31,6 +31,9 @@ ROLE_DEFAULT_PERSONAS = {
     # which is the whole argument for promoting them.
     "security_architect": "security_architect",
     "data_architect": "data_architect",
+    # Promoted 1 Oct 2026; both already had charters written ahead of the role.
+    "technology_architect": "technology_architect",
+    "application_architect": "application_architect",
     # R1-B36 (TB-0146), 2026-10-05: promoted from unassignable to assignable.
     # None gets a dedicated charter in this PR -- mapped to the closest
     # existing persona's voice; a real charter per persona is follow-up work.
