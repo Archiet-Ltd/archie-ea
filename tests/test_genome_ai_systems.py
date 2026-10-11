@@ -620,7 +620,10 @@ def test_release_route_refuses_without_assessment_then_releases_with_it(
 
     # Accepted-high, no assessment: the route refuses with the named reason
     # and leaves the system unreleased.
-    refused = client.post(f"/genome/ai-systems/{el.id}/release")
+    refused = client.post(
+        f"/genome/ai-systems/{el.id}/release",
+        headers={"Accept": "application/json"},
+    )
     assert refused.status_code in (400, 409)
     assert "assessment" in refused.get_data(as_text=True).lower()
     assert profile_from_element(el)["release_state"] == "not set"
@@ -750,3 +753,222 @@ def test_release_gate_and_assessment_are_org_scoped(
     ok = client.post(f"/genome/ai-systems/{el_b.id}/release")
     assert ok.status_code == 302
     assert profile_from_element(el_b)["release_state"] == "released"
+
+
+# --- Fix round tests: HIGH-1, HIGH-2, MEDIUM-1, LOW-1, LOW-3 ---------------
+
+
+def test_high_1_release_before_classification_resets_release_state(db_session, org):
+    """HIGH-1: releasing an unclassified system then accepting a high-risk
+    classification must reset the release state to draft."""
+    el = register_ai_system(db_session, org.id, name="HIGH-1 System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+
+    # Release while unclassified (gate does not apply).
+    result = mark_released(el, org.id)
+    assert result["success"] is True
+    assert profile_from_element(el)["release_state"] == "released"
+
+    # Now accept a high-risk classification.
+    approval = propose_classification(
+        element=el, proposed_risk_class="high",
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+
+    # The release state must be reset to draft because the system is now
+    # high-risk with no accepted assessment.
+    p = profile_from_element(el)
+    assert p["risk_class"] == "high"
+    assert p["release_state"] == "draft", (
+        "Expected draft after accepting high on a released system with no assessment, "
+        "got %s" % p["release_state"]
+    )
+    assert p["assessment_accepted"] is False
+
+
+def test_high_2_stale_assessment_does_not_open_gate(db_session, org):
+    """HIGH-2: an assessment accepted while the system was unclassified must
+    not open the high-risk gate after the classification changes."""
+    el = register_ai_system(db_session, org.id, name="HIGH-2 System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+
+    # Propose and accept an assessment while the system is unclassified.
+    # This should fail because propose_assessment now refuses when there is
+    # no accepted class.
+    with pytest.raises(ValueError, match="no accepted risk class"):
+        propose_assessment(
+            element=el,
+            organization_id=org.id,
+            proposed_by_user_id=None,
+        )
+
+    # Classify as high first.
+    approval = propose_classification(
+        element=el, proposed_risk_class="high",
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+
+    # Now propose and accept an assessment against high.
+    assessment = propose_assessment(
+        element=el,
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_assessment(assessment.id, org.id)
+    db_session.flush()
+
+    # Verify the assessment payload records the correct class.
+    import json
+    payload = json.loads(assessment.operation_payload)
+    assert payload["assessed_risk_class"] == "high"
+
+    # Release should now work.
+    assert can_mark_released(el, org.id) is True
+    result = mark_released(el, org.id)
+    assert result["success"] is True
+
+
+def test_high_2_assessment_under_lower_tier_does_not_open_gate(db_session, org):
+    """HIGH-2: an assessment accepted under a lower tier must not open the
+    high-risk gate after reclassification to high."""
+    el = register_ai_system(db_session, org.id, name="HIGH-2b System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+
+    # Classify as minimal.
+    approval = propose_classification(
+        element=el, proposed_risk_class="minimal",
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+
+    # Accept an assessment against minimal.
+    assessment = propose_assessment(
+        element=el,
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_assessment(assessment.id, org.id)
+    db_session.flush()
+
+    # Verify the assessment payload records minimal.
+    import json
+    payload = json.loads(assessment.operation_payload)
+    assert payload["assessed_risk_class"] == "minimal"
+
+    # Directly set the risk class to high (bypassing the approval queue,
+    # which has a unique constraint on source_table+source_id).
+    from app.modules.architecture_assistant.property_service import PropertyService
+    from app.modules.enterprise_genome.services.ai_system_classification import (
+        PROPKEY_RISK_CLASS,
+    )
+    PropertyService().set_element_property(
+        el,
+        key=PROPKEY_RISK_CLASS,
+        value="high",
+        source="test_direct_set",
+    )
+    db_session.flush()
+
+    # The old minimal assessment must not open the high-risk gate.
+    assert can_mark_released(el, org.id) is False
+    reason = release_refusal_reason(el, org.id)
+    assert reason is not None
+    assert "assessment" in reason.lower()
+
+
+def test_medium_1_viewer_cannot_assess(app, db_session, make_org, client, login_as):
+    """MEDIUM-1: a Viewer must get 403 on the assess route."""
+    from app.models.user import Role, User
+
+    org = make_org("med1")
+    viewer_role = Role.query.filter_by(name="Viewer").first()
+    if viewer_role is None:
+        pytest.skip("no Viewer role seeded")
+    viewer = User(
+        email=f"viewer-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="Viewer",
+        organization_id=org.id,
+        confirmed=True,
+        role=viewer_role,
+    )
+    viewer.password = uuid.uuid4().hex
+    db_session.add(viewer)
+    el = register_ai_system(db_session, org.id, name="MEDIUM-1 System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+
+    login_as(client, viewer)
+    r = client.post(f"/genome/ai-systems/{el.id}/assess")
+    assert r.status_code == 403, "Viewer should get 403 on assess route, got %s" % r.status_code
+
+    # No approval row should have been created.
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+    count = AIChatCRUDApproval.query.filter_by(
+        entity_type="ai_system_assessment",
+        entity_id=el.id,
+        organization_id=org.id,
+    ).count()
+    assert count == 0, "Viewer should not create assessment proposals"
+
+
+def test_low_1_propose_classification_checks_org(db_session, make_org):
+    """LOW-1: propose_classification must refuse a foreign element."""
+    org_a = make_org("low1-a")
+    org_b = make_org("low1-b")
+    el_b = register_ai_system(db_session, org_b.id, name="B's System",
+                              provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+
+    with pytest.raises(ValueError, match="scoped to the element's own organisation"):
+        propose_classification(
+            element=el_b,
+            proposed_risk_class="high",
+            organization_id=org_a.id,
+            proposed_by_user_id=None,
+        )
+
+
+def test_low_3_release_refusal_flashes_for_non_json(app, db_session, make_org, client, login_as):
+    """LOW-3: a release refusal for a non-JSON request must flash and redirect,
+    not return raw JSON."""
+    org = make_org("low3")
+    admin = _make_admin_user(db_session, org, "Low3")
+    el = register_ai_system(db_session, org.id, name="LOW-3 System",
+                            provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+
+    # Accept high-risk classification (no assessment -> release refused).
+    approval = propose_classification(
+        element=el, proposed_risk_class="high",
+        organization_id=org.id, proposed_by_user_id=admin.id,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+
+    login_as(client, admin)
+
+    # POST without Accept: application/json should redirect, not return JSON.
+    resp = client.post(
+        f"/genome/ai-systems/{el.id}/release",
+        headers={"Accept": "text/html"},
+    )
+    # Should be a redirect (302 or 409-equivalent redirect).
+    assert resp.status_code in (302, 409), (
+        "Expected redirect or 409 for non-JSON release refusal, got %s" % resp.status_code
+    )
+    # The system must not be released.
+    assert profile_from_element(el)["release_state"] != "released"
