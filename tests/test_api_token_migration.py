@@ -46,6 +46,33 @@ def _run_upgrade(app, times=1):
                     module.upgrade()
 
 
+def _run_downgrade(app):
+    """Apply the revision's downgrade() against the app engine, committing."""
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    from app import db
+
+    module = _load_revision()
+    with app.app_context():
+        with db.engine.begin() as connection:
+            context = MigrationContext.configure(connection)
+            with Operations.context(context):
+                module.downgrade()
+
+
+def _has_column(app, table, column):
+    from sqlalchemy import inspect
+
+    from app import db
+
+    with app.app_context():
+        try:
+            return column in {c["name"] for c in inspect(db.engine).get_columns(table)}
+        except Exception:
+            return False
+
+
 def _scalar(app, sql, **params):
     from app import db
 
@@ -88,6 +115,19 @@ def test_migration_runs_twice_without_error(app):
     if "oauth_provider.token" not in app.view_functions:
         pytest.skip("OAuth routes not registered (MCP_ENABLED off)")
     _run_upgrade(app, times=2)  # idempotent: the second run changes nothing
+
+
+def test_downgrade_removes_the_added_columns(app):
+    if "oauth_provider.token" not in app.view_functions:
+        pytest.skip("OAuth routes not registered (MCP_ENABLED off)")
+    _run_upgrade(app)
+    assert _has_column(app, "users", "is_service_user")
+    assert _has_column(app, "oauth_clients", "service_user_id")
+    assert _has_column(app, "oauth_clients", "scope")
+    _run_downgrade(app)
+    assert not _has_column(app, "users", "is_service_user")
+    assert not _has_column(app, "oauth_clients", "service_user_id")
+    assert not _has_column(app, "oauth_clients", "scope")
 
 
 @pytest.fixture

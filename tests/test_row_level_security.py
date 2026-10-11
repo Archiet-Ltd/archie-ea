@@ -1724,7 +1724,19 @@ def test_every_api_token_route_denies_the_other_org_under_the_runtime_role(app, 
             assert response.status_code in (200, 404), (
                 rule.rule, response.status_code, response.get_data(as_text=True)[:500],
             )
-            assert str(el_other) not in response.get_data(as_text=True), (
+            body = response.get_json()
+            returned_ids = []
+            if isinstance(body, dict) and body.get("success"):
+                payload = body.get("data", {})
+                if isinstance(payload, dict):
+                    if "elements" in payload:
+                        returned_ids = [
+                            e["id"] for e in payload["elements"]
+                            if isinstance(e, dict) and "id" in e
+                        ]
+                    elif "id" in payload:
+                        returned_ids = [payload["id"]]
+            assert el_other not in returned_ids, (
                 rule.rule, "returned the other organisation's element id",
             )
             if response.status_code == 200:

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from functools import wraps
 
-from flask import current_app, g
+from flask import g
 from flask_login import current_user
 
 from app.utils.api_response import forbidden_response, unauthorized_response
@@ -70,9 +70,3 @@ def require_api_scope(required_scope: str):
         return wrapped
 
     return decorator
-
-
-def api_resource_value() -> str:
-    """The one resource identifier REST tokens are issued for."""
-    base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
-    return f"{base}/api/v1" if base else None

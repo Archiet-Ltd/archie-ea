@@ -314,6 +314,26 @@ class TestFirstFamilyRouteAccess:
         assert status == 200, body
         assert body["data"]["id"] == el_a.id
 
+    def test_org_b_token_never_sees_org_a_elements(self, app, client, db_session, make_org):
+        """The mirror of test_org_a_token_never_lists_org_b_elements: both
+        routes filter by the token's own organisation explicitly, not only
+        through row-level security, so the boundary holds from either side."""
+        org_a, org_b, el_a, el_b, _token_a = self._seed(db_session, make_org)
+        svc_b = _make_service_user(db_session, org_b, "svc-b@example.com")
+        token_b = _mint_api_token(svc_b, organization_id=org_b.id)
+
+        status, body = _api_get(app, "/api/v1/elements", token_b)
+        assert status == 200, body
+        names = _element_names(body)
+        assert "E-bravo-secret" in names
+        assert "E-alpha-known" not in names, "org B's token saw org A's element"
+
+        status, body = _api_get(app, f"/api/v1/elements/{el_a.id}", token_b)
+        assert status == 404, body
+        status, body = _api_get(app, f"/api/v1/elements/{el_b.id}", token_b)
+        assert status == 200, body
+        assert body["data"]["id"] == el_b.id
+
     def test_mcp_read_token_refused_on_rest_route(self, app, client, db_session, make_org):
         _org_a, _org_b, el_a, _el_b, _token = self._seed(db_session, make_org)
         user = _make_user(db_session, _org_a, "mcp-holder@example.com")
