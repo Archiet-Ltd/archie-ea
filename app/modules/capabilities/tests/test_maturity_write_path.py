@@ -36,16 +36,29 @@ _MATURITY_COLUMNS = r"(?:current|target)_maturity_level"
 _DIRECT_WRITE_PATTERNS = [
     # row.current_maturity_level = value
     re.compile(r"\.\s*" + _MATURITY_COLUMNS + r"\s*="),
+    # setattr(row, "current_maturity_level", value)
+    re.compile(r"setattr\([^)]*" + _MATURITY_COLUMNS),
+    # UPDATE business_capability SET current_maturity_level = ...
+    re.compile(r"SET\s+" + _MATURITY_COLUMNS, re.IGNORECASE),
+    # .update({"current_maturity_level": ...}) — possibly over several lines
+    re.compile(
+        r"\.update\(\s*\{[^}]*[\"']" + _MATURITY_COLUMNS + r"[\"']\s*:", re.DOTALL
+    ),
 ]
 
 
 def direct_maturity_write_hits(text):
     """(line number, line) pairs in ``text`` that write a maturity column."""
-    hits = []
-    for lineno, line in enumerate(text.splitlines(), 1):
-        if any(p.search(line) for p in _DIRECT_WRITE_PATTERNS):
-            hits.append((lineno, line))
-    return hits
+    lines = text.splitlines()
+    found = {}
+    for pattern in _DIRECT_WRITE_PATTERNS:
+        for match in pattern.finditer(text):
+            # Anchor on the line holding the maturity column name.
+            column = re.search(_MATURITY_COLUMNS, match.group(0))
+            offset = match.start() + (column.start() if column else 0)
+            lineno = text.count("\n", 0, offset) + 1
+            found[lineno] = lines[lineno - 1]
+    return sorted(found.items())
 
 
 @pytest.fixture
@@ -954,7 +967,7 @@ def test_roadmap_writer_outside_a_tenant_request_refuses_to_write(
         assert getattr(g, "current_org_id", None) is None
         result = service.calculate_maturity_score(uc_id, responses)
 
-    db_session.expunge_all()
+    db_session.expire_all()
     assert result["success"] is False, result
     assert _capability_state(tenant_ctx, org, cap_id)[0] == 2
     assert _history_rows(db_session, tenant_ctx, org, cap_id) == []
@@ -979,7 +992,7 @@ def test_edit_form_can_clear_a_level_with_a_recorded_trace(
         },
     )
     assert resp.status_code == 302
-    db_session.expunge_all()
+    db_session.expire_all()
 
     current, target, notes, _ = _capability_state(tenant_ctx, org, cap_id)
     assert current is None

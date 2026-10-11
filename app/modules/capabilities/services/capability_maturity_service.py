@@ -61,6 +61,8 @@ def record_capability_maturity(
     assessor_user_id: int | None = None,
     assessor_name: str | None = None,
     assessor_role: str | None = None,
+    clear_current: bool = False,
+    clear_target: bool = False,
     commit: bool = True,
 ) -> BusinessCapability:
     """Record a maturity assessment and append one history row.
@@ -82,6 +84,10 @@ def record_capability_maturity(
         assessor_name: The acting user's display name, stored on the history
             row.
         assessor_role: The acting user's role, stored on the history row.
+        clear_current: Clear the stored current level (set it to not
+            recorded). Cannot be combined with ``current``. The clearing is
+            written into the notes and the history row.
+        clear_target: Clear the stored target level, with the same trace.
         commit: When True, commits the transaction. Pass False when batching:
             the caller commits once after the loop.
 
@@ -94,6 +100,14 @@ def record_capability_maturity(
     # The history table stores a level (NOT NULL) — validate before writing.
     _validate_level(current, "current")
     _validate_level(target, "target")
+    if clear_current and current is not None:
+        raise MaturityValidationError(
+            "current maturity level cannot be both set and cleared"
+        )
+    if clear_target and target is not None:
+        raise MaturityValidationError(
+            "target maturity level cannot be both set and cleared"
+        )
 
     if not isinstance(organization_id, int) or isinstance(organization_id, bool):
         raise CapabilityNotFoundError(
@@ -108,10 +122,26 @@ def record_capability_maturity(
             f"Business capability {capability_id} not found."
         )
 
-    if current is not None:
+    previous_current = capability.current_maturity_level
+    clearing: list[str] = []
+    if clear_current and previous_current is not None:
+        capability.current_maturity_level = None
+        clearing.append(f"Current maturity level cleared (was {previous_current}).")
+    elif current is not None:
         capability.current_maturity_level = current
-    if target is not None:
+    if clear_target and capability.target_maturity_level is not None:
+        clearing.append(
+            f"Target maturity level cleared (was {capability.target_maturity_level})."
+        )
+        capability.target_maturity_level = None
+    elif target is not None:
         capability.target_maturity_level = target
+
+    # A clearing leaves a trace in the notes, appended to whatever notes the
+    # caller supplied (or to the stored notes when none were supplied).
+    if clearing:
+        base = notes if notes is not None else (capability.maturity_assessment_notes or "")
+        notes = (base + "\n" if base else "") + " ".join(clearing)
     if notes is not None:
         capability.maturity_assessment_notes = notes
 
@@ -135,7 +165,13 @@ def record_capability_maturity(
     # already holds a level, record that level in history too so every
     # assessment event (target change, notes update) leaves a trace. Skip
     # entirely only when neither argument nor stored value has a current level.
-    level_for_history = current if current is not None else capability.current_maturity_level
+    level_for_history = (
+        current
+        if current is not None
+        else capability.current_maturity_level
+        if capability.current_maturity_level is not None
+        else previous_current
+    )
     history: CapabilityMaturityAssessment | None = None
     if level_for_history is not None:
         capability.maturity_assessment_date = now
@@ -146,7 +182,7 @@ def record_capability_maturity(
             assessor_name=assessor_name,
             assessor_role=assessor_role,
             maturity_level=level_for_history,
-            target_maturity_level=target,
+            target_maturity_level=capability.target_maturity_level,
             maturity_framework="custom",
             notes=notes,
         )

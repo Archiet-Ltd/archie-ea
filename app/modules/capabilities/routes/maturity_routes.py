@@ -129,6 +129,15 @@ def edit_capability_maturity(capability_id):
             target_level = request.form.get("target_maturity_level")
             notes = request.form.get("assessment_notes", "")
 
+            # "clear" is the explicit way to un-assess a level; a blank value
+            # leaves the stored level unchanged.
+            clear_current = current_level == "clear"
+            clear_target = target_level == "clear"
+            if clear_current:
+                current_level = None
+            if clear_target:
+                target_level = None
+
             # Validate input
             if current_level:
                 try:
@@ -196,6 +205,8 @@ def edit_capability_maturity(capability_id):
                     ),
                     assessor_name=assessor_name,
                     assessor_role=assessor_role,
+                    clear_current=clear_current,
+                    clear_target=clear_target,
                     commit=True,
                 )
             except CapabilityNotFoundError:
@@ -1108,6 +1119,12 @@ def import_maturity_csv():
     caps = BusinessCapability.query.all()
     cap_map = {c.name.strip().lower(): c for c in caps if c.name}
 
+    from flask_login import current_user
+
+    csv_user_id = current_user.id if current_user.is_authenticated else None
+    csv_user_name = current_user.full_name() if current_user.is_authenticated else None
+    csv_user_role = current_user.role_name if current_user.is_authenticated else None
+
     updated = 0
     skipped = 0
     errors = []
@@ -1167,9 +1184,9 @@ def import_maturity_csv():
                     current=current_lvl,
                     target=target_lvl,
                     notes=notes if notes else None,
-                    assessor_user_id=None,
-                    assessor_name=None,
-                    assessor_role=None,
+                    assessor_user_id=csv_user_id,
+                    assessor_name=csv_user_name,
+                    assessor_role=csv_user_role,
                     commit=False,
                 )
                 updated += 1
