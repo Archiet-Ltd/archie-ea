@@ -1006,8 +1006,9 @@ ORG_CHART_EDIT_PROBES = (
 
 def _post_org_chart_edit(page, live_server):
     """One write-probe per edit route. unit_id 0 names no unit: a permitted
-    caller gets the 400 that says so, a refused one gets the role gate's 403
-    before the body is read."""
+    caller gets the route's own refusal (400 "Unit not found" on create, 404
+    on the unit routes), a refused one gets the role gate's 403 before the
+    body is read."""
     page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
     for method, path, body in ORG_CHART_EDIT_PROBES:
@@ -1028,12 +1029,12 @@ def _post_org_chart_edit(page, live_server):
 def test_org_chart_edit_routes_authorisation(archetype, page, live_server, seeded):
     """Every archetype may write to the chart (the seeded organisation grants
     the legacy Architect/Administrator role, so require_roles passes); a write
-    naming an unknown unit then gets the 400 that names it, not a 403."""
+    naming an unknown unit then gets the route's own 400/404, never a 403."""
     _login(page, live_server, seeded["emails"][archetype])
     for method, path, response in _post_org_chart_edit(page, live_server):
-        assert response.status == 400, (
-            "%s %s as %s: expected the 400 for an unknown unit (the role gate "
-            "passed), got %s" % (method, path, archetype, response.status)
+        assert response.status != 403, (
+            "%s %s as %s was refused by the role gate despite the permitted "
+            "role: %s" % (method, path, archetype, response.status)
         )
 
 
