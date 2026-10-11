@@ -2347,23 +2347,23 @@ class ToolExecutor:
     def _tool_record_capability_maturity(self, args: dict) -> dict:
         """Record a maturity assessment on a business capability — EA/BA headline.
 
-        Mirrors the write path in
-        app/modules/capabilities/routes/maturity_routes.py::batch_update_maturity:
-        it writes current_maturity_level / target_maturity_level, recomputes
-        maturity_gap, and stamps maturity_assessment_date. mutates=True / tier
-        'approve', so it flows through the confirmation gate.
+        Delegates to the single write path
+        ``record_capability_maturity`` in
+        app/modules/capabilities/services/capability_maturity_service.py —
+        the same function the maturity routes call. It writes the source row
+        (current_maturity_level / target_maturity_level, maturity_gap,
+        maturity_assessment_date) and appends exactly one history row on
+        capability_maturity_assessment in the same transaction. mutates=True /
+        tier 'approve', so it flows through the confirmation gate.
 
-        DEVIATION from the task brief: the brief cited current_maturity /
-        target_maturity on app/models/capabilities.py. Those columns live on
-        ArchiMateCapability (table archimate_capabilities). The canonical
-        BusinessCapability (app/models/business_capabilities.py, table
-        business_capability) — the one the maturity routes and the heatmap read
-        and write — uses current_maturity_level / target_maturity_level, so this
-        tool writes those. BusinessCapability is a TenantMixin model, so the ORM
-        tenant filter scopes the lookup: a capability in another org is invisible
-        and reads back as not-found, never cross-written.
+        The lookup stays tenant-scoped via the ORM (BusinessCapability is a
+        TenantMixin model): a capability in another org is invisible and reads
+        back as not-found, never cross-written.
         """
-        from datetime import datetime
+        from app.modules.capabilities.services.capability_maturity_service import (
+            CapabilityNotFoundError,
+            record_capability_maturity,
+        )
 
         from app.models.business_capabilities import BusinessCapability
 
@@ -2402,15 +2402,42 @@ class ToolExecutor:
                 "error": f"Business capability {capability_id} not found.",
             }
 
-        cap.current_maturity_level = current
-        if target is not None:
-            cap.target_maturity_level = target
-        # Recompute the gap only when both ends are real; never substitute 0.
-        if cap.current_maturity_level is not None and cap.target_maturity_level is not None:
-            cap.maturity_gap = cap.target_maturity_level - cap.current_maturity_level
-        cap.maturity_assessment_date = datetime.utcnow()
-        cap.updated_at = datetime.utcnow()
-        db.session.commit()
+        # Assessor identity for the history row, as recorded elsewhere in the
+        # product: the acting user's name and role. Best effort — an agent
+        # runner without a resolvable user still records the assessment.
+        assessor_name = None
+        assessor_role = None
+        try:
+            user = _load_acting_user(self.user_id)
+            if user is not None:
+                assessor_name = user.full_name()
+                assessor_role = user.role_name
+        except Exception:
+            logger.warning(
+                "record_capability_maturity: could not resolve assessor for "
+                "user %s; recording without one", self.user_id, exc_info=True
+            )
+
+        try:
+            record_capability_maturity(
+                capability_id=cap.id,
+                organization_id=cap.organization_id,
+                current=current,
+                target=target,
+                notes=None,
+                assessor_user_id=self.user_id,
+                assessor_name=assessor_name,
+                assessor_role=assessor_role,
+                commit=True,
+            )
+        except CapabilityNotFoundError:
+            # A capability that vanished between lookup and write surfaces
+            # honestly as not-found.
+            db.session.rollback()
+            return {
+                "success": False,
+                "error": f"Business capability {capability_id} not found.",
+            }
 
         logger.info(
             "Agent recorded maturity for capability id=%s current=%s target=%s user=%s",
