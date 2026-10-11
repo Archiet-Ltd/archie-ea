@@ -29,6 +29,10 @@ DEMAND_STATUSES = (
     "withdrawn",
 )
 
+# What the person triaging decides to do about a demand. The platform only
+# recommends; this is the recorded decision.
+DEMAND_ROUTES = ("reuse", "buy", "build")
+
 DEMAND_SOURCES = (
     "business_unit",
     "it",
@@ -78,6 +82,8 @@ class Demand(TenantMixin, db.Model):
     triaged_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
     decision_date = db.Column(db.Date)
     decision_rationale = db.Column(db.Text)
+    triage_route = db.Column(db.String(20))     # reuse | buy | build, set by the person triaging
+    triage_route_reasons = db.Column(db.Text)   # the coverage the recommendation was read from
 
     # What it became, and what it touches.
     initiative_id = db.Column(

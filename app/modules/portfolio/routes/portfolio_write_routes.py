@@ -55,8 +55,14 @@ def demands():
     rows = db.session.query(Demand).order_by(Demand.id.desc()).all()
     open_demands = [d for d in rows if not d.is_decided]
     open_demands.sort(key=lambda d: (d.days_awaiting_decision or 0), reverse=True)
+    from app.models.demand import DEMAND_ROUTES
+    from app.modules.portfolio.services.demand_triage import recommend
+
+    recommendations = {d.id: recommend(d.capability_id) for d in open_demands}
     return render_template(
         "portfolio/demands.html",
+        recommendations=recommendations,
+        routes=DEMAND_ROUTES,
         open_demands=open_demands,
         decided=[d for d in rows if d.is_decided],
     )
@@ -69,13 +75,24 @@ def demand_new():
     from flask import render_template
 
     from app.models.demand import DEMAND_SOURCES, Demand
+    from app.modules.portfolio.services.demand_triage import visible_capabilities
+
+    capabilities = visible_capabilities()
 
     if request.method == "POST":
         title = (request.form.get("title") or "").strip()
+        capability_id = _int_or_none(request.form.get("capability_id"))
+        if capability_id is not None and capability_id not in {c.id for c in capabilities}:
+            flash("That capability could not be found.", "error")
+            return render_template(
+                "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form,
+                capabilities=capabilities,
+            ), 400
         if not title:
             flash("A title is required.", "error")
             return render_template(
-                "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form
+                "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form,
+                capabilities=capabilities,
             ), 400
 
         demand = Demand(
@@ -90,6 +107,7 @@ def demand_new():
             requested_for_business_unit=(request.form.get("requested_for_business_unit") or "").strip() or None,
             needed_by_date=_date_or_none(request.form.get("needed_by_date")),
             requested_by_id=_uid(),
+            capability_id=capability_id,
             status="submitted",
         )
         db.session.add(demand)
@@ -97,7 +115,9 @@ def demand_new():
         flash("Demand submitted.", "success")
         return redirect(url_for("portfolio.demands"))
 
-    return render_template("portfolio/demand_form.html", sources=DEMAND_SOURCES, form={})
+    return render_template(
+        "portfolio/demand_form.html", sources=DEMAND_SOURCES, form={}, capabilities=capabilities
+    )
 
 
 @portfolio_bp.route("/demands/<int:demand_id>/decide", methods=["POST"])
@@ -124,6 +144,18 @@ def demand_decide(demand_id):
     if decision == "declined" and not rationale:
         flash("A declined demand needs a rationale.", "error")
         return redirect(url_for("portfolio.demands"))
+
+    from app.models.demand import DEMAND_ROUTES
+    from app.modules.portfolio.services.demand_triage import recommend
+
+    route = (request.form.get("route") or "").strip() or None
+    if route is not None and route not in DEMAND_ROUTES:
+        flash("Unrecognised route.", "error")
+        return redirect(url_for("portfolio.demands"))
+    if route is not None:
+        # Keep the coverage the person was looking at with the route they chose.
+        demand.triage_route = route
+        demand.triage_route_reasons = recommend(demand.capability_id)["reason"]
 
     demand.status = decision
     demand.decision_rationale = rationale or None

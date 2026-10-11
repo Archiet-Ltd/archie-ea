@@ -53,6 +53,18 @@
                   placeholder="The cost of not doing it, or the deadline driving it">{{ form.get('business_justification', '') }}</textarea>
       </div>
 
+      <div>
+        <label for="capability_id" class="block text-sm font-medium mb-1.5">Capability this is about</label>
+        <select id="capability_id" name="capability_id"
+                class="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          <option value="">&mdash;</option>
+          {% for c in capabilities %}
+          <option value="{{ c.id }}" {% if form.get('capability_id')|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-muted-foreground mt-1">Naming the capability lets triage show what already covers it.</p>
+      </div>
+
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label for="source" class="block text-sm font-medium mb-1.5">Source</label>
