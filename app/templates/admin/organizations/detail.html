@@ -87,6 +87,59 @@
         {% endif %}
     </div>
 
+    <!-- Invoice billing (R1-B95 PR 2, TB-0193): net-terms collection for an
+         enterprise organisation invoiced instead of paying by card.
+         Distinct from the Plan field above (set_contract_plan): this starts
+         a real Stripe subscription Stripe invoices on a schedule, not a
+         plan recorded with no billing at all. -->
+    <div class="bg-card rounded-lg border border-border shadow-sm p-6">
+        <h3 class="text-sm font-semibold mb-3">Invoice billing</h3>
+        {% if subscription and subscription.collection_method == 'send_invoice' %}
+        <p class="text-sm text-muted-foreground" data-testid="invoice-billing-status">
+            Invoiced on net-{{ subscription.days_until_due or 30 }} terms
+            {% if subscription.billing_interval %}&middot; {{ subscription.billing_interval }}ly{% endif %}.
+        </p>
+        {% else %}
+        <p class="text-sm text-muted-foreground mb-3">
+            Start net-terms invoice billing instead of a card on file -- Stripe emails this
+            organisation an invoice each period rather than charging a card.
+        </p>
+        <form method="POST" action="{{ url_for('admin.organization_start_invoice_billing', org_id=org.id) }}"
+              class="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block text-xs font-medium text-muted-foreground mb-1" for="invoice-plan">Plan</label>
+                <select id="invoice-plan" name="plan" class="rounded-md border border-border bg-background text-sm px-2 py-1.5">
+                    {% for p in plans %}
+                    <option value="{{ p.key }}" {% if p.key == 'enterprise' %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-muted-foreground mb-1" for="invoice-interval">Interval</label>
+                <select id="invoice-interval" name="interval" class="rounded-md border border-border bg-background text-sm px-2 py-1.5">
+                    <option value="year" selected>Annual</option>
+                    <option value="month">Monthly</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-muted-foreground mb-1" for="invoice-seats">Seats</label>
+                <input id="invoice-seats" name="seats" type="number" min="1" max="10000"
+                       class="w-24 rounded-md border border-border bg-background text-sm px-2 py-1.5">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-muted-foreground mb-1" for="invoice-days">Net terms (days)</label>
+                <input id="invoice-days" name="days_until_due" type="number" value="30" min="1" max="365"
+                       class="w-24 rounded-md border border-border bg-background text-sm px-2 py-1.5">
+            </div>
+            <button type="submit"
+                    class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+                Start invoice billing
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
     <!-- Users Table -->
     <div class="bg-card rounded-lg border border-border shadow-sm">
         <div class="px-6 py-4 border-b border-border">

@@ -5564,7 +5564,7 @@ _ORG_USER_SORT_COLUMNS = {
 @platform_admin_required
 def organization_detail(org_id):
     """View organization details and its users."""
-    from app.services.billing_plans import user_limit_status
+    from app.services.billing_plans import PLANS, current_subscription, user_limit_status
 
     from app.utils.role_access import get_role_display_name
 
@@ -5589,6 +5589,8 @@ def organization_detail(org_id):
     return render_template(
         "admin/organizations/detail.html", org=org, users=users,
         limits=user_limit_status(org.id),
+        subscription=current_subscription(org),
+        plans=PLANS,
         get_role_display_name=get_role_display_name,
         current_sort=sort_key if sort_key in valid_sort_keys else "name",
         current_dir=direction if direction in ("asc", "desc") else "asc",
@@ -5635,6 +5637,48 @@ def organization_edit(org_id):
         return redirect(url_for("admin.organization_detail", org_id=org.id))
 
     return _organization_form(org)
+
+
+@admin_bp_v2.route("/organizations/<int:org_id>/invoice-billing", methods=["POST"])
+@timed_route
+@login_required
+@platform_admin_required
+def organization_start_invoice_billing(org_id):
+    """Start net-terms invoice billing for an organisation (R1-B95 PR 2,
+    TB-0193): an enterprise organisation invoiced instead of paying by
+    card. Distinct from set_contract_plan (above, in organization_edit) --
+    that path records a plan with no billing at all; this one creates a
+    real Stripe subscription that Stripe invoices on a schedule.
+    """
+    from app.services.billing_service import BillingError, BillingNotConfigured, BillingService
+
+    org = Organization.query.get_or_404(org_id)
+    plan_key = request.form.get("plan", "enterprise")
+    interval = request.form.get("interval", "year")
+    try:
+        seats = int(request.form.get("seats") or 0) or None
+    except (TypeError, ValueError):
+        flash("Seats must be a whole number.", "error")
+        return redirect(url_for("admin.organization_detail", org_id=org.id))
+    try:
+        days_until_due = int(request.form.get("days_until_due") or 30)
+    except (TypeError, ValueError):
+        days_until_due = 30
+
+    try:
+        BillingService.start_invoice_billing(org, plan_key, interval, seats, days_until_due)
+        flash(
+            f'Invoice billing started for "{org.name}": net-{days_until_due}, '
+            f"{plan_key} plan.",
+            "success",
+        )
+    except BillingNotConfigured as exc:
+        flash(str(exc), "error")
+    except BillingError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+
+    return redirect(url_for("admin.organization_detail", org_id=org.id))
 
 
 @admin_bp_v2.route("/organizations/<int:org_id>/toggle", methods=["POST"])
