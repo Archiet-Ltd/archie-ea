@@ -21,9 +21,8 @@ test_oauth_flow.py for the run command).
 from __future__ import annotations
 
 import secrets
-import uuid
 
-from app.modules.mcp.tests.test_scope_enforcement import _clear_cached_identity, _mcp_call, _mcp_resource
+from app.modules.mcp.tests.test_scope_enforcement import _clear_cached_identity, _mcp_call
 from app.modules.mcp.tests.test_tools import _make_element
 from app.modules.oauth_provider.tests.test_oauth_flow import _make_user, _register_client
 
@@ -394,7 +393,7 @@ class TestServiceUser:
             db_session, org, "svc-signin@example.com",
             password="an-accidental-password",
         )
-        resp = client.post("/login", data={"email": svc.email, "password": "an-accidental-password"})
+        resp = client.post("/account/login", data={"email": svc.email, "password": "an-accidental-password"})
         assert resp.status_code == 200, "sign-in must not succeed"
         assert "Invalid email or password" in resp.get_data(as_text=True)
 

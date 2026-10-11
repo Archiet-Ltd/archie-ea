@@ -1689,6 +1689,7 @@ def test_every_api_token_route_denies_the_other_org_under_the_runtime_role(app, 
         )
         db.session.add(oc)
         db.session.commit()
+        oc_id = oc.id
         raw_access, _raw_refresh, _row = OAuthToken.issue(
             client_id=oc.client_id,
             user_id=svc_id,
@@ -1697,7 +1698,7 @@ def test_every_api_token_route_denies_the_other_org_under_the_runtime_role(app, 
             grant_type="client_credentials",
             organization_id=home,
         )
-    world.extra_deletes.append(("oauth_clients", "id", [oc.id]))
+    world.extra_deletes.append(("oauth_clients", "id", [oc_id]))
 
     routes = _api_token_routes(app)
     assert routes, "no /api/v1 route accepts an api:* token — the token route family is missing"

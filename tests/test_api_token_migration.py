@@ -39,24 +39,27 @@ def _run_upgrade(app, times=1):
 
     module = _load_revision()
     for _ in range(times):
+        with app.app_context():
+            with db.engine.begin() as connection:
+                context = MigrationContext.configure(connection)
+                with Operations.context(context):
+                    module.upgrade()
+
+
+def _scalar(app, sql, **params):
+    from app import db
+
+    with app.app_context():
+        with db.engine.connect() as connection:
+            return connection.execute(text(sql), params).scalar()
+
+
+def _insert(app, sql, **params):
+    from app import db
+
+    with app.app_context():
         with db.engine.begin() as connection:
-            context = MigrationContext.configure(connection)
-            with Operations.context(context):
-                module.upgrade()
-
-
-def _scalar(sql, **params):
-    from app import db
-
-    with db.engine.connect() as connection:
-        return connection.execute(text(sql), params).scalar()
-
-
-def _insert(sql, **params):
-    from app import db
-
-    with db.engine.begin() as connection:
-        return connection.execute(text(sql), params).scalar()
+            return connection.execute(text(sql), params).scalar()
 
 
 def test_migration_chain_has_a_single_head_and_short_revision_ids():
@@ -98,16 +101,19 @@ def migration_rows(app):
         pytest.skip("OAuth routes not registered (MCP_ENABLED off)")
     suffix = uuid.uuid4().hex[:8]
     org_id = _insert(
+        app,
         "INSERT INTO organizations (name, slug) VALUES (:n, :s) RETURNING id",
         n=f"Mig {suffix}", s=f"mig-{suffix}",
     )
-    role_id = _scalar("SELECT id FROM roles WHERE name = 'Viewer'")
+    role_id = _scalar(app, "SELECT id FROM roles WHERE name = 'Viewer'")
     if role_id is None:
         role_id = _insert(
+            app,
             "INSERT INTO roles (name, permissions, index, default) "
-            "VALUES ('Viewer', 0, 'main', false) RETURNING id"
+            "VALUES ('Viewer', 0, 'main', false) RETURNING id",
         )
     user_id = _insert(
+        app,
         "INSERT INTO users (email, organization_id, confirmed, role_id, first_name, last_name) "
         "VALUES (:e, :o, true, :r, 'Mig', 'User') RETURNING id",
         e=f"mig-{suffix}@example.com", o=org_id, r=role_id,
@@ -120,39 +126,42 @@ def migration_rows(app):
     token_a = f"at-mig-{suffix}-a"
     token_b = f"at-mig-{suffix}-b"
     _insert(
+        app,
         "INSERT INTO oauth_tokens (client_id, user_id, access_token, scope, resource, "
         "grant_type, issued_at, expires_at, organization_id) "
         "VALUES ('svc_mig', :u, :t, 'mcp:read', 'https://x/mcp', 'authorization_code', "
-        "now() - interval '1 hour', now() + interval '1 hour', NULL)",
+        "now() - interval '1 hour', now() + interval '1 hour', NULL) RETURNING id",
         u=user_id, t=token_a,
     )
     from app import db
 
-    with db.engine.begin() as connection:
-        connection.execute(text("SET session_replication_role = replica"))
-        try:
-            connection.execute(
-                text(
-                    "INSERT INTO oauth_tokens (client_id, user_id, access_token, scope, resource, "
-                    "grant_type, issued_at, expires_at, organization_id) "
-                    "VALUES ('svc_mig', 999999999, :t, 'mcp:read', 'https://x/mcp', "
-                    "'authorization_code', now() - interval '1 hour', now() + interval '1 hour', NULL)"
-                ),
-                {"t": token_b},
-            )
-        finally:
-            connection.execute(text("SET session_replication_role = origin"))
+    with app.app_context():
+        with db.engine.begin() as connection:
+            connection.execute(text("SET session_replication_role = replica"))
+            try:
+                connection.execute(
+                    text(
+                        "INSERT INTO oauth_tokens (client_id, user_id, access_token, scope, resource, "
+                        "grant_type, issued_at, expires_at, organization_id) "
+                        "VALUES ('svc_mig', 999999999, :t, 'mcp:read', 'https://x/mcp', "
+                        "'authorization_code', now() - interval '1 hour', now() + interval '1 hour', NULL)"
+                    ),
+                    {"t": token_b},
+                )
+            finally:
+                connection.execute(text("SET session_replication_role = origin"))
 
     def cleanup():
-        from app import db
-
-        with db.engine.begin() as connection:
-            connection.execute(
-                text("DELETE FROM oauth_tokens WHERE access_token = ANY(:t)"),
-                {"t": [token_a, token_b]},
-            )
-            connection.execute(text("DELETE FROM users WHERE id = :i"), {"i": user_id})
-            connection.execute(text("DELETE FROM organizations WHERE id = :i"), {"i": org_id})
+        with app.app_context():
+            with db.engine.begin() as connection:
+                connection.execute(
+                    text("DELETE FROM oauth_tokens WHERE access_token = ANY(:t)"),
+                    {"t": [token_a, token_b]},
+                )
+                connection.execute(text("DELETE FROM users WHERE id = :i"), {"i": user_id})
+                connection.execute(
+                    text("DELETE FROM organizations WHERE id = :i"), {"i": org_id}
+                )
 
     try:
         yield {"org_id": org_id, "user_id": user_id, "token_a": token_a, "token_b": token_b}
@@ -162,26 +171,24 @@ def migration_rows(app):
 
 def test_backfill_assigns_the_users_org_and_revokes_what_it_cannot_fix(app, migration_rows):
     rows = migration_rows
-    user_org = _scalar("SELECT organization_id FROM users WHERE id = :i", i=rows["user_id"])
+    user_org = _scalar(app, "SELECT organization_id FROM users WHERE id = :i", i=rows["user_id"])
     assert user_org is not None
 
     _run_upgrade(app)
 
     assert _scalar(
-        "SELECT organization_id FROM oauth_tokens WHERE access_token = :t",
-        t=rows["token_a"],
+        app, "SELECT organization_id FROM oauth_tokens WHERE access_token = :t", t=rows["token_a"]
     ) == user_org, "the token's organisation was not backfilled from its user"
     assert _scalar(
-        "SELECT organization_id FROM oauth_tokens WHERE access_token = :t",
-        t=rows["token_b"],
+        app, "SELECT organization_id FROM oauth_tokens WHERE access_token = :t", t=rows["token_b"]
     ) is None, "the unfixable token still carries no organisation"
     assert _scalar(
-        "SELECT revoked_at FROM oauth_tokens WHERE access_token = :t",
-        t=rows["token_b"],
+        app, "SELECT revoked_at FROM oauth_tokens WHERE access_token = :t", t=rows["token_b"]
     ) is not None, "an org-less token the backfill cannot fix must be revoked"
     assert _scalar(
-        "SELECT count(*) FROM oauth_tokens WHERE organization_id IS NULL AND revoked_at IS NULL"
+        app,
+        "SELECT count(*) FROM oauth_tokens WHERE organization_id IS NULL AND revoked_at IS NULL",
     ) == 0, "no active token may remain without an organisation"
     assert _scalar(
-        "SELECT count(*) FROM oauth_tokens WHERE organization_id IS NULL"
+        app, "SELECT count(*) FROM oauth_tokens WHERE organization_id IS NULL"
     ) == 1, "exactly the unfixable token stays org-less, and it is revoked"
