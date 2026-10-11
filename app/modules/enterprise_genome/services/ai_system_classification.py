@@ -30,7 +30,10 @@ from datetime import datetime
 from typing import Optional
 
 from app import db
-from app.modules.architecture_assistant.property_service import PropertyService
+from app.modules.architecture_assistant.property_service import (
+    GATE_OWNED_KEYS,
+    PropertyService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +78,45 @@ REFUSAL_PENDING_CLASSIFICATION = (
     "Release refused: the risk classification proposal is still under review."
 )
 
+# A system accepted as a prohibited practice is never released.
+REFUSAL_UNACCEPTABLE = (
+    "Release refused: a system classified as an unacceptable (prohibited) risk "
+    "cannot be released."
+)
+REFUSAL_PROPOSAL_UNDER_REVIEW = (
+    "A classification proposal for this system is already under review; "
+    "decide it in the approval queue before proposing another."
+)
+
+assert GATE_OWNED_KEYS == {PROPKEY_RISK_CLASS, PROPKEY_RELEASE_STATE}
+
 _property_service = PropertyService()
+
+
+def _lock_element(element_id, organization_id: int):
+    """Reload *element* with a row lock so release and classification
+    acceptance serialise on it. Whichever takes the lock second reads the
+    other's committed result before it reads the gate or writes a property.
+    Returns the locked element (the same identity as *element*), or ``None``
+    when it is not in this organisation."""
+    from app.models.models import ArchiMateElement
+
+    db.session.flush()
+    return (
+        ArchiMateElement.query.filter_by(id=element_id, organization_id=organization_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+
+
+def _reset_release_to_draft(element) -> None:
+    _property_service.set_element_property(
+        element,
+        key=PROPKEY_RELEASE_STATE,
+        value="draft",
+        source="classification_approval",
+    )
 
 
 def propose_classification(
@@ -114,6 +155,11 @@ def propose_classification(
         "iso_controls": ISO_CONTROLS.get(proposed_risk_class, []),
     }
 
+    if _pending_classification(element, organization_id) is not None:
+        raise ValueError(REFUSAL_PROPOSAL_UNDER_REVIEW)
+
+    # No source_table/source_id: the approval table allows one row per source,
+    # and a system may be classified more than once over its life.
     approval = create_approval_record(
         organization_id=organization_id,
         operation_type="update",
@@ -122,10 +168,19 @@ def propose_classification(
         summary=f"Classify AI system '{element.name}' as {proposed_risk_class} risk",
         operation_payload=payload,
         user_id=proposed_by_user_id,
-        source_table="archimate_elements",
-        source_id=element.id,
     )
     return approval
+
+
+def _pending_classification(element, organization_id: int):
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    return AIChatCRUDApproval.query.filter_by(
+        entity_type=ENTITY_CLASSIFICATION,
+        entity_id=element.id,
+        organization_id=organization_id,
+        status=ApprovalStatus.PENDING,
+    ).first()
 
 
 def propose_assessment(
@@ -188,9 +243,10 @@ def accept_classification(approval_id: int, organization_id: int) -> bool:
 
     Reads the proposal payload from the approval record and writes the risk
     class onto the element's ``acm_properties`` via the typed property writer.
-    When the accepted class is ``high`` and the system is already released
-    without an accepted assessment, the release state is reset to ``draft``
-    (HIGH-1 fix).
+    When the accepted class is ``unacceptable``, or ``high`` without an
+    assessment made after this acceptance, a released system goes back to
+    ``draft``. The element row is locked while the class is written, so a
+    concurrent release cannot overwrite it.
 
     Works both when called directly (the approval is still pending — this
     function records the accept) and when the approval queue's claim has
@@ -202,7 +258,6 @@ def accept_classification(approval_id: int, organization_id: int) -> bool:
         AIChatCRUDApproval,
         ApprovalStatus,
     )
-    from app.models.models import ArchiMateElement
 
     approval = AIChatCRUDApproval.query.filter_by(
         id=approval_id,
@@ -224,16 +279,19 @@ def accept_classification(approval_id: int, organization_id: int) -> bool:
         logger.error("accept_classification: invalid risk class '%s' in payload", proposed_class)
         return False
 
-    element_id = payload.get("element_id")
-    element = ArchiMateElement.query.filter_by(
-        id=element_id,
-        organization_id=organization_id,
-    ).first()
+    element = _lock_element(payload.get("element_id"), organization_id)
     if element is None:
-        logger.error("accept_classification: element %s not found", element_id)
+        logger.error("accept_classification: element %s not found", payload.get("element_id"))
         return False
 
-    # Write the risk class as a typed property.
+    # Record the accept first, so the new classification's acceptance time is
+    # the reference every earlier assessment is judged against.
+    if approval.status == ApprovalStatus.PENDING:
+        approval.status = ApprovalStatus.APPROVED
+        approval.approved_at = datetime.utcnow()
+        db.session.add(approval)
+        db.session.flush()
+
     _property_service.set_element_property(
         element,
         key=PROPKEY_RISK_CLASS,
@@ -241,27 +299,15 @@ def accept_classification(approval_id: int, organization_id: int) -> bool:
         source="classification_approval",
     )
 
-    # HIGH-1 fix: when accepting a high-risk classification on a system that
-    # is already released but has no accepted assessment, reset the release
-    # state to draft.  A released high-risk system without an assessment is
-    # an unsafe state: the gate was never checked because the system was
-    # unclassified at release time.
-    if proposed_class == "high":
-        current_release = get_release_state(element)
-        if current_release == "released" and not has_accepted_assessment(element, organization_id):
-            _property_service.set_element_property(
-                element,
-                key=PROPKEY_RELEASE_STATE,
-                value="draft",
-                source="classification_approval",
-            )
-
-    # Record the accept when the queue has not already claimed the row.
-    if approval.status == ApprovalStatus.PENDING:
-        approval.status = ApprovalStatus.APPROVED
-        approval.approved_at = datetime.utcnow()
-        db.session.add(approval)
-        db.session.flush()
+    # A released system must not be left in a state the gate would refuse: a
+    # prohibited class is never released, and a high class needs an assessment
+    # made after this classification was accepted.
+    if get_release_state(element) == "released" and (
+        proposed_class == "unacceptable"
+        or (proposed_class == "high" and not has_accepted_assessment(element, organization_id))
+    ):
+        _reset_release_to_draft(element)
+    db.session.flush()
     return True
 
 
@@ -449,15 +495,27 @@ def release_refusal_reason(element, organization_id: int) -> Optional[str]:
     )
 
     # An unresolved tier review keeps the door shut: the classification is a
-    # proposal and changes nothing until an administrator accepts it.
-    pending = AIChatCRUDApproval.query.filter_by(
+    # proposal and changes nothing until an administrator accepts it. A
+    # proposal the queue has claimed but not yet applied counts as unresolved.
+    if _pending_classification(element, organization_id) is not None:
+        return REFUSAL_PENDING_CLASSIFICATION
+
+    latest = AIChatCRUDApproval.query.filter_by(
         entity_type=ENTITY_CLASSIFICATION,
         entity_id=element.id,
         organization_id=organization_id,
-        status=ApprovalStatus.PENDING,
-    ).first()
-    if pending is not None:
-        return REFUSAL_PENDING_CLASSIFICATION
+        status=ApprovalStatus.APPROVED,
+    ).order_by(AIChatCRUDApproval.approved_at.desc(), AIChatCRUDApproval.id.desc()).first()
+    if latest is not None:
+        try:
+            claimed = json.loads(latest.operation_payload).get("proposed_risk_class")
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            claimed = None
+        if claimed in RISK_TIERS and claimed != get_classification(element):
+            return REFUSAL_PENDING_CLASSIFICATION
+
+    if get_classification(element) == "unacceptable":
+        return REFUSAL_UNACCEPTABLE
 
     if assessment_required(element) and not has_accepted_assessment(element, organization_id):
         return REFUSAL_MISSING_ASSESSMENT
@@ -486,6 +544,8 @@ def mark_released(element, organization_id: int) -> dict:
     proposal still under review). The reason is the same message the register
     page shows, so a route can hand it straight back to the caller.
     """
+    if _lock_element(element.id, organization_id) is None:
+        return {"success": False, "reason": "AI system not found"}
     reason = release_refusal_reason(element, organization_id)
     if reason is not None:
         return {"success": False, "reason": reason}
