@@ -636,6 +636,14 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
+          name: smoke-junit-main-${{ matrix.shard }}
+          path: |
+            tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
           name: smoke-main-${{ matrix.shard }}
           path: |
             tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
@@ -696,6 +704,14 @@ jobs:
           pytest tests/smoke/test_adversarial_probes.py -q -p no:randomly
           -m adversarial --timeout=3600 -W ignore::DeprecationWarning
           --junitxml=tests/smoke/_artifacts/chromium-adversarial.xml
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-junit-adversarial
+          path: |
+            tests/smoke/_artifacts/chromium-adversarial.xml
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -777,6 +793,16 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
+          name: smoke-junit-other
+          path: |
+            tests/smoke/_artifacts/chromium-census.xml
+            tests/smoke/_artifacts/chromium-ai-protocol.xml
+            tests/smoke/_artifacts/chromium-guide-history.xml
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
           name: smoke-other
           path: |
             tests/smoke/_artifacts/chromium-census.xml
@@ -805,19 +831,19 @@ jobs:
       - uses: actions/download-artifact@v6
         if: always()
         with:
-          pattern: smoke-{main-*,adversarial,other}
+          pattern: smoke-junit-*
           path: shard-artifacts
       - name: Require all browser reports without skips
         if: always()
         run: >-
           python scripts/ci/check_junit_qualification.py
-          shard-artifacts/smoke-main-0/chromium-main-0.xml
-          shard-artifacts/smoke-main-1/chromium-main-1.xml
-          shard-artifacts/smoke-main-2/chromium-main-2.xml
-          shard-artifacts/smoke-adversarial/chromium-adversarial.xml
-          shard-artifacts/smoke-other/chromium-census.xml
-          shard-artifacts/smoke-other/chromium-ai-protocol.xml
-          shard-artifacts/smoke-other/chromium-guide-history.xml
+          shard-artifacts/smoke-junit-main-0/chromium-main-0.xml
+          shard-artifacts/smoke-junit-main-1/chromium-main-1.xml
+          shard-artifacts/smoke-junit-main-2/chromium-main-2.xml
+          shard-artifacts/smoke-junit-adversarial/chromium-adversarial.xml
+          shard-artifacts/smoke-junit-other/chromium-census.xml
+          shard-artifacts/smoke-junit-other/chromium-ai-protocol.xml
+          shard-artifacts/smoke-junit-other/chromium-guide-history.xml
       - name: Fail if any browser job did not succeed
         if: always() && (needs.smoke-main.result != 'success' || needs.smoke-adversarial.result != 'success' || needs.smoke-other.result != 'success')
         run: |
