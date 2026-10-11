@@ -373,7 +373,7 @@
            permanently false and the bar never rendered;
          - it posted {application_ids, value} while all three endpoints read
            {ids, lifecycle_stage|owner_name|tag}, so every field was ignored;
-         - it collected the value with window.prompt(), which DESIGN.md forbids.
+         - it collected the value in a native browser prompt dialog, which DESIGN.md forbids.
        The Lifecycle / Owner / Tag buttons in the toolbar above now call the real
        bulkUpdateLifecycle() / promptBulkAssignOwner() / promptBulkTag() in
        static/js/applications/list.js. #}
