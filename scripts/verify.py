@@ -94,6 +94,9 @@ class Result:
     baseline: int | None = None
     duration_s: float = 0.0
     remediation: str = ""
+    # Further ratchet measurements of the same gate, {baseline key: value}, for a
+    # gate whose name does not map onto its baseline keys (--update-baseline).
+    extra: dict | None = None
 
 
 @dataclass
@@ -906,6 +909,44 @@ def gate_unregistered_checks(baseline: int) -> Result:
     if count > baseline:
         detail = _run([sys.executable, "scripts/check_unregistered_checks.py"]).stdout[-1800:]
     return Result("unregistered-checks", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
+def gate_background_mechanisms(baseline: int, instances_baseline: int) -> Result:
+    """Every background-work mechanism is in docs/background-mechanisms.yml. RATCHET.
+
+    Static (no boot, no database): fails when a file under app/ (or manage.py) starts
+    rq, celery, apscheduler, threading.Thread, ThreadPoolExecutor, multiprocessing,
+    a detached subprocess or a fork in a function with no register entry, when an
+    entry names something no longer used, and when either the number of files holding
+    `thread` entries (`background_mechanisms_thread`) or the number of thread
+    instances (`background_mechanisms_thread_instances`) rises above its baseline. An
+    empty scan exits 2 and is a FAIL here: finding nothing proves nothing.
+    """
+    script = "scripts/check_background_mechanisms.py"
+
+    def count(flag):
+        proc = _run([sys.executable, script, flag])
+        try:
+            return int(proc.stdout.strip().splitlines()[-1]), proc
+        except (ValueError, IndexError):
+            return None, proc
+
+    files, proc = count("--count")
+    instances, proc2 = count("--count-instances")
+    if files is None or instances is None:
+        bad = proc if files is None else proc2
+        return Result("background-mechanisms", FAIL,
+                      f"could not parse count: {bad.stdout!r} {bad.stderr[:300]}")
+    proc = _run([sys.executable, script])
+    ok = proc.returncode == 0 and files <= baseline and instances <= instances_baseline
+    detail = ""
+    if not ok:
+        detail = proc.stdout[-1800:]
+        if instances > instances_baseline:
+            detail += f"\n  thread instances {instances} > baseline {instances_baseline}"
+    return Result("background-mechanisms", PASS if ok else FAIL, detail, files, baseline,
+                  extra={"background_mechanisms_thread": files,
+                         "background_mechanisms_thread_instances": instances})
 
 
 def gate_null_filters() -> Result:
@@ -1939,6 +1980,15 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_public_repo_hygiene.py; remove the "
                          "content/reference, or mark the line 'hygiene-ok: <reason>'",
              tags=["static", "qa"]),
+        Gate("background-mechanisms",
+             "every background-work mechanism is listed in the one register",
+             "ratchet",
+             lambda: gate_background_mechanisms(
+                 baseline.get("background_mechanisms_thread", 22),
+                 baseline.get("background_mechanisms_thread_instances", 29)),
+             remediation="add the file to docs/background-mechanisms.yml with its class, "
+                         "disposition and tenant_context (see scripts/check_background_mechanisms.py)",
+             tags=["static"]),
         Gate("unregistered-checks",
              "no scripts/check_*.py exists with no Gate(...) entry in build_gates()",
              "ratchet", lambda: gate_unregistered_checks(baseline.get("unregistered_checks", 41)),
@@ -2147,7 +2197,12 @@ def main(argv: list[str] | None = None) -> int:
         results.append(result)
 
     if args.update_baseline:
-        measured = {r.name.replace("-", "_"): r.measured for r in results if r.measured is not None}
+        measured = {}
+        for r in results:
+            if r.extra:
+                measured.update(r.extra)
+            elif r.measured is not None:
+                measured[r.name.replace("-", "_")] = r.measured
         new = {**baseline, **{k: v for k, v in measured.items() if k in baseline}}
         lowered = {k: (baseline[k], new[k]) for k in new if new[k] < baseline.get(k, new[k])}
         save_baseline(new, f"updated {time.strftime('%Y-%m-%d')}")

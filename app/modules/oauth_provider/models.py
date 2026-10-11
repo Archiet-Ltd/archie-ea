@@ -196,6 +196,15 @@ class OAuthClient(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, nullable=False, default=True)
 
+    # Service-client identity: a client-credentials client is bound to exactly
+    # one service user (a non-human account owned by an organisation), and may
+    # only ever be issued the scopes recorded in ``scope`` (space-separated).
+    # Both are nullable because a dynamically-registered public client has
+    # neither. Plain integer, no FK: the users table is declared elsewhere and
+    # the holder is verified at grant time.
+    service_user_id = db.Column(db.Integer, nullable=True, index=True)
+    scope = db.Column(db.String(256), nullable=True)
+
     @classmethod
     def register(cls, *, client_name: str | None = None,
                  redirect_uris: str | None = None) -> OAuthClient:

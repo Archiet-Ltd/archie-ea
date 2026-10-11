@@ -236,6 +236,12 @@ class User(UserMixin, db.Model):
     # admin must hold BOTH this flag AND Permission.ADMINISTER.
     is_platform_admin = db.Column(db.Boolean, default=False)
 
+    # A service account: a non-human identity owned by an organisation, used
+    # only as the subject of client-credentials tokens. It has no password
+    # (sign-in refuses it regardless), no role powers beyond the scopes of
+    # the tokens issued to it, and cannot hold a session. Nullable, add-only.
+    is_service_user = db.Column(db.Boolean, nullable=True, default=False)
+
     @property
     def is_org_admin(self):
         """True when this user is an organisation administrator of their own
@@ -492,6 +498,7 @@ class User(UserMixin, db.Model):
         "solution_updates": True,
         "assignment_changes": True,
         "weekly_digest": True,
+        "digest_frequency": "weekly",
         "mention_notifications": True,
         "show_archimate_names": False,
     }
