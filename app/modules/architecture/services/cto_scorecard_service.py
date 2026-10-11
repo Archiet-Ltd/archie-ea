@@ -20,7 +20,7 @@ from app import db
 from app.models.application_portfolio import ApplicationComponent
 from app.models.architecture_decision import ArchitectureChangeRequest
 from app.models.vendor.vendor_organization import VendorProduct
-from app.services.eol_window import add_months, dependents, lead_months_for, owner_summary
+from app.services.eol_window import add_months, lead_months_for, owner_summaries
 
 
 def supported_version_share(organization_id: int) -> Dict[str, Any]:
@@ -142,26 +142,32 @@ def end_of_support_exposure(
 
     cutoff = add_months(datetime.utcnow(), window_months)
 
-    products = (
-        VendorProduct.query.filter(
+    pairs = (
+        db.session.query(VendorProduct, ApplicationComponent)
+        .join(ApplicationComponent, ApplicationComponent.vendor_product_id == VendorProduct.id)
+        .filter(
+            ApplicationComponent.organization_id == organization_id,
+            ApplicationComponent.deleted_at.is_(None),
             VendorProduct.end_of_life_date.isnot(None),
             VendorProduct.end_of_life_date <= cutoff,
         )
-        .order_by(VendorProduct.end_of_life_date.asc())
+        .order_by(VendorProduct.end_of_life_date.asc(), VendorProduct.id, ApplicationComponent.name)
         .all()
     )
 
+    application_ids = [ac.id for _, ac in pairs]
+    owner_map = owner_summaries(application_ids, organization_id)
+
     rows: List[Dict[str, Any]] = []
-    for product in products:
-        for app_component in dependents(product.id, organization_id):
-            rows.append(
-                {
-                    "vendor_product_id": product.id,
-                    "product_name": product.name,
-                    "end_of_life_date": product.end_of_life_date.date(),
-                    "application_id": app_component.id,
-                    "application_name": app_component.name,
-                    "owners": owner_summary(app_component.id, organization_id),
-                }
-            )
+    for product, app_component in pairs:
+        rows.append(
+            {
+                "vendor_product_id": product.id,
+                "product_name": product.name,
+                "end_of_life_date": product.end_of_life_date.date(),
+                "application_id": app_component.id,
+                "application_name": app_component.name,
+                "owners": owner_map.get(app_component.id, "no owner recorded"),
+            }
+        )
     return rows
