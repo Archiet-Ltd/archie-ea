@@ -5,7 +5,7 @@ Provides validation and analysis services for data architecture models
 according to ArchiMate 3.2 specifications and relationship rules.
 """
 
-from typing import Dict, List  # dead-code-ok
+from typing import Any, Dict, List, Optional  # dead-code-ok
 
 from sqlalchemy.orm import joinedload
 
@@ -18,6 +18,12 @@ from app.models import (  # dead-code-ok
     PhysicalDataModel,
 )
 
+#: R1-B80 multi-hop walk: a hard stop so a cyclic or very long lineage graph
+#: cannot turn one page load into an unbounded query. The brief's own
+#: acceptance ("follow lineage two hops") needs far fewer; this is a safety
+#: ceiling, not a target depth.
+_MAX_LINEAGE_HOPS = 10
+
 
 class DataArchitectureService:
     """
@@ -27,6 +33,181 @@ class DataArchitectureService:
 
     def __init__(self):
         pass
+
+    # ------------------------------------------------------------------ #
+    # R1-B80: multi-hop lineage, held from source through every
+    # transformation to a report, with the owner at each hop.
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _tenant_predicate(model, organization_id: int):
+        """The explicit organization_id == predicate on every tenant read
+        on this path, isolated as its own seam -- same discipline as
+        IntelligenceQueryService's per-concept predicates (ADR 0003)."""
+        return model.organization_id == organization_id
+
+    @staticmethod
+    def _owner_for_element(element, organization_id: int) -> Optional[Dict[str, Any]]:
+        """The element's application's owner, via R1-B03's canonical
+        ownership reader (ApplicationOwner.get_display_rows_for_application)
+        -- never a free-text field read directly, and never a guess when no
+        row exists. Prefers the 'primary' ownership type when more than one
+        row exists; falls back to the first row, same as the fact-sheet
+        reader's own display convention."""
+        from app.models.application_owner import ApplicationOwner
+        from app.models.application_portfolio import ApplicationComponent
+
+        component_id = getattr(element, "application_component_id", None)
+        if not component_id:
+            from app import db
+
+            component_id = db.session.execute(
+                db.select(ApplicationComponent.id)
+                .where(ApplicationComponent.archimate_element_id == element.id)
+                .where(DataArchitectureService._tenant_predicate(ApplicationComponent, organization_id))
+            ).scalars().first()
+        if not component_id:
+            return None
+
+        rows = ApplicationOwner.get_display_rows_for_application(component_id, organization_id)
+        if not rows:
+            return None
+        primary = next((r for r in rows if r["ownership_type"] == "primary"), rows[0])
+        return {"user_name": primary["user_name"], "ownership_type_label": primary["ownership_type_label"]}
+
+    @classmethod
+    def multi_hop_lineage(
+        cls, element_id: int, organization_id: int, max_hops: int = 5
+    ) -> Dict[str, Any]:
+        """Walk the DataLineage graph outward from *element_id* to *max_hops*
+        (capped at _MAX_LINEAGE_HOPS), source through every transformation to
+        a report, each hop carrying its element's owner.
+
+        Breadth-first, bounded and paginated (the existing traversal
+        pattern this brief's "Extends" note names, from
+        IntelligenceQueryService's own single-hop walk) -- not a second
+        graph engine alongside R1-B11's impact engine or R1-B29's
+        projection, just a wider version of the one-hop walk already used
+        by the Ask Data lens, since lineage hops are ArchiMate/DataFlow
+        edges, a different kind of edge from either of those.
+
+        Returns {"hops": [...], "truncated": bool}. Each hop is
+        {"element_id", "element_name", "depth", "direction", "owner"}, in
+        breadth-first order (depth 0 is the starting element). A cycle back
+        to an already-visited element is dropped, not re-walked -- lineage
+        is a flow, not a tree, and a flow that loops back on itself must
+        not be walked forever.
+        """
+        from app import db
+
+        max_hops = max(1, min(max_hops, _MAX_LINEAGE_HOPS))
+
+        start = db.session.execute(
+            db.select(ArchiMateElement)
+            .where(ArchiMateElement.id == element_id)
+            .where(cls._tenant_predicate(ArchiMateElement, organization_id))
+        ).scalar_one_or_none()
+        if start is None:
+            return {"hops": [], "truncated": False}
+
+        visited = {element_id}
+        frontier = [element_id]
+        hops: List[Dict[str, Any]] = [{
+            "element_id": start.id,
+            "element_name": start.name,
+            "depth": 0,
+            "direction": None,
+            "owner": cls._owner_for_element(start, organization_id),
+        }]
+        truncated = False
+
+        for depth in range(1, max_hops + 1):
+            if not frontier:
+                break
+            edges = db.session.execute(
+                db.select(DataLineage)
+                .where(db.or_(
+                    DataLineage.archimate_element_id.in_(frontier),
+                    DataLineage.target_archimate_element_id.in_(frontier),
+                ))
+                .where(cls._tenant_predicate(DataLineage, organization_id))
+            ).scalars().all()
+
+            next_frontier = []
+            for edge in edges:
+                outgoing = edge.archimate_element_id in frontier
+                other_id = edge.target_archimate_element_id if outgoing else edge.archimate_element_id
+                if other_id is None or other_id in visited:
+                    continue
+                other = db.session.execute(
+                    db.select(ArchiMateElement)
+                    .where(ArchiMateElement.id == other_id)
+                    .where(cls._tenant_predicate(ArchiMateElement, organization_id))
+                ).scalar_one_or_none()
+                if other is None:
+                    # Another organisation's element, or deleted -- dropped,
+                    # not named, same rule as the one-hop Ask lens.
+                    continue
+                visited.add(other_id)
+                next_frontier.append(other_id)
+                hops.append({
+                    "element_id": other.id,
+                    "element_name": other.name,
+                    "depth": depth,
+                    "direction": "out" if outgoing else "in",
+                    "owner": cls._owner_for_element(other, organization_id),
+                })
+
+            frontier = next_frontier
+
+        if frontier and len(hops) and (hops[-1]["depth"] == max_hops):
+            # The walk stopped only because it hit the hop ceiling, not
+            # because the graph ran out of edges -- say so, rather than let
+            # an incomplete walk look complete.
+            truncated = True
+
+        return {"hops": hops, "truncated": truncated}
+
+    @classmethod
+    def downstream_impact(
+        cls, element_id: int, organization_id: int, max_hops: int = 5
+    ) -> Dict[str, Any]:
+        """PB-0116: "assess downstream impact on a source field" -- every
+        consumer reachable by an OUTGOING DataLineage edge from
+        *element_id*, ranked by business criticality (the field on
+        ApplicationComponent R1-B39 also reads; "—" when absent, never
+        guessed).
+
+        Reuses ``multi_hop_lineage``'s own walk rather than adding a second
+        traversal: an impact assessment is the same graph, read in one
+        direction only, so every consumer it finds is the same consumer a
+        lineage walk would show.
+        """
+        from app.models.application_portfolio import ApplicationComponent
+
+        walked = cls.multi_hop_lineage(element_id, organization_id, max_hops=max_hops)
+        consumers = [h for h in walked["hops"] if h["direction"] == "out"]
+
+        _CRITICALITY_RANK = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
+
+        def _criticality_for(hop: Dict[str, Any]) -> Optional[str]:
+            from app import db
+
+            component = db.session.execute(
+                db.select(ApplicationComponent.business_criticality)
+                .where(ApplicationComponent.archimate_element_id == hop["element_id"])
+                .where(cls._tenant_predicate(ApplicationComponent, organization_id))
+            ).scalars().first()
+            return component
+
+        ranked = []
+        for hop in consumers:
+            criticality = _criticality_for(hop)
+            ranked.append({**hop, "criticality": criticality or "—"})
+
+        ranked.sort(key=lambda r: _CRITICALITY_RANK.get(r["criticality"], len(_CRITICALITY_RANK)))
+
+        return {"consumers": ranked, "truncated": walked["truncated"]}
 
     def validate_data_model_hierarchy(
         self, conceptual_id: int, logical_id: int, physical_id: int

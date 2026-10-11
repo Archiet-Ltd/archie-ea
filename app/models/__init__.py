@@ -227,6 +227,7 @@ else:
     # Dashboard edits store
     from .dashboard_edit import *  # noqa
     from .data_governance import *  # noqa - DataCatalog, DataQualityMetrics, DataGovernanceWorkflow, DataAccessControl, DataRetentionPolicy
+    from .data_sharing_agreement import *  # noqa - DataSharingAgreement (R1-B80)
     from .data_issue import *  # noqa - DataIssue (R1-B81)
     # agent_charter (R1-B22) was never imported here, so AgentRegistration's
     # relationship to it only resolved when something else happened to

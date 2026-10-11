@@ -1,0 +1,40 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+
+{% block title %}Data lineage — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6">
+  {{ page_shell(
+      title='Data lineage',
+      subtitle='Multi-hop lineage from this element through every transformation, with the owner at each hop.',
+      breadcrumb=[('Home', url_for('main.index')), ('Data governance', url_for('data_governance.entities')), ('Lineage', None)]
+  ) }}
+  {% if truncated %}
+  <p class="mb-4 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-foreground" data-testid="lineage-truncated">
+    Showing the first few hops only — the lineage continues beyond what is shown here.
+  </p>
+  {% endif %}
+  {% if hops %}
+  <ol class="space-y-3" data-testid="lineage-hops">
+    {% for hop in hops %}
+    <li class="rounded-lg border border-border bg-card p-4" data-testid="lineage-hop-{{ hop.element_id }}">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-xs text-muted-foreground">Hop {{ hop.depth }}{% if hop.direction %} &middot; {{ 'from' if hop.direction == 'in' else 'to' }}{% endif %}</p>
+          <h2 class="text-base font-semibold text-foreground truncate">{{ hop.element_name }}</h2>
+        </div>
+        <p class="text-sm text-muted-foreground shrink-0">
+          Owner:
+          {% if hop.owner %}<span class="font-medium text-foreground">{{ hop.owner.user_name }}</span> ({{ hop.owner.ownership_type_label }})
+          {% else %}not recorded{% endif %}
+        </p>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  {{ empty_state(icon='git-fork', headline='No lineage recorded', body='No data lineage edges are recorded for this element yet.') }}
+  {% endif %}
+</div>
+{% endblock %}
