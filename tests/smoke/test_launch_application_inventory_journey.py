@@ -153,3 +153,46 @@ def test_register_an_application_and_list_everything_that_consumes_it(browser, l
     status, _ = api(page, "GET", "/archimate/api/element/%d/impact-graph" % a_id)
     assert status == 404
     context.close()
+
+
+def test_registering_a_lookalike_application_shows_the_existing_one_first(browser, live_server):
+    org = create_fresh_org("application_manager")
+    other = create_fresh_org("application_manager")
+    name = "Harbor Ledger %s" % org["suffix"]
+    context, page = _new_page(browser)
+    sign_in(page, live_server, org["emails"]["application_manager"])
+    _register(page, live_server, name)
+
+    # Typing a lookalike name lists the existing application with a link to it.
+    _open_portfolio(page, live_server)
+    page.get_by_test_id("btn-add-application").click()
+    dialog = page.locator("#modal-create")
+    expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
+    dialog.locator("#ca-name").fill(name + " v2")
+    panel = dialog.locator("#ca-duplicate-check")
+    expect(panel.get_by_role("link", name=name, exact=True)).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(panel).to_contain_text("similar name")
+
+    # Saving is refused until the person confirms none of them is the same one.
+    dialog.get_by_role("button", name="Add Application", exact=True).click()
+    expect(dialog.get_by_text("Confirm that none of the similar applications")).to_be_visible(
+        timeout=PAGE_TIMEOUT)
+    dialog.locator("#ca-confirm-distinct").check()
+    with page.expect_navigation(timeout=PAGE_TIMEOUT):
+        dialog.get_by_role("button", name="Add Application", exact=True).click()
+    page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+    _open_portfolio(page, live_server)
+    expect(_rows(page, name + " v2")).to_have_count(1, timeout=PAGE_TIMEOUT)
+    context.close()
+
+    # A second organisation typing the same name is shown nothing.
+    context, page = _new_page(browser)
+    sign_in(page, live_server, other["emails"]["application_manager"])
+    _open_portfolio(page, live_server)
+    page.get_by_test_id("btn-add-application").click()
+    dialog = page.locator("#modal-create")
+    expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
+    with page.expect_response(lambda r: "registration-check" in r.url, timeout=PAGE_TIMEOUT):
+        dialog.locator("#ca-name").fill(name)
+    expect(dialog.locator("#ca-duplicate-check")).not_to_contain_text("already exist")
+    context.close()

@@ -873,15 +873,27 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="sm:col-span-2">
             <label for="ca-name" class="block text-sm font-medium mb-1">Application Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
-            <input id="ca-name" type="text" x-model="form.name" required maxlength="255" placeholder="e.g. Customer Portal"
+            <input id="ca-name" type="text" x-model="form.name" @input="scheduleCheck()" required maxlength="255" placeholder="e.g. Customer Portal"
               :aria-invalid="fieldInvalid('name') ? 'true' : 'false'"
               :aria-describedby="fieldInvalid('name') ? 'ca-name-error' : null"
               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <p x-show="fieldInvalid('name')" x-cloak id="ca-name-error" role="alert" class="mt-1 text-sm text-destructive-emphasis" x-text="fieldErrors.name"></p>
           </div>
+          <div class="sm:col-span-2" id="ca-duplicate-check" aria-live="polite">
+            <p x-show="checkError" x-cloak class="text-sm text-warning-emphasis" role="alert" x-text="checkError"></p>
+            <template x-if="matches && matches.length > 0"><div class="rounded-md border border-border bg-muted p-3 text-sm">
+              <p class="font-medium mb-2">These applications already exist</p>
+              <ul class="space-y-1" x-ref="matchList"></ul>
+              <label x-show="needsConfirmation" class="mt-3 flex items-center gap-2">
+                <input id="ca-confirm-distinct" type="checkbox" x-model="confirmedDistinct" class="h-4 w-4 rounded border-input">
+                <span>None of these is the application I am registering</span>
+              </label>
+              <p x-show="hasSameName" class="mt-3 text-destructive-emphasis">An application with this exact name exists. Open it rather than registering a second record.</p>
+            </div></template>
+          </div>
           <div>
             <label for="ca-code" class="block text-sm font-medium mb-1">Application Code</label>
-            <input id="ca-code" type="text" x-model="form.application_code" maxlength="50" placeholder="e.g. CUST-PORTAL"
+            <input id="ca-code" type="text" x-model="form.application_code" @input="scheduleCheck()" maxlength="50" placeholder="e.g. CUST-PORTAL"
               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           </div>
           <div>

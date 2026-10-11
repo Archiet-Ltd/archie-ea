@@ -584,6 +584,85 @@ function applicationCreateForm() {
       return !!(this.fieldErrors && this.fieldErrors[field]);
     },
 
+    // Duplicate check: existing applications the new one may repeat, looked up
+    // as the person types. `matches` is null until a check has answered, so an
+    // unanswered check is never shown as "nothing similar".
+    matches: null,
+    checkError: '',
+    confirmedDistinct: false,
+    _checkTimer: null,
+    _checkSeq: 0,
+
+    scheduleCheck() {
+      clearTimeout(this._checkTimer);
+      this.confirmedDistinct = false;
+      const name = this.form.name.trim();
+      const code = this.form.application_code.trim();
+      if (!name && !code) {
+        this.matches = null;
+        this.renderMatches();
+        this.checkError = '';
+        return;
+      }
+      this._checkTimer = setTimeout(() => this.runCheck(name, code), 300);
+    },
+
+    async runCheck(name, code) {
+      const seq = ++this._checkSeq;
+      const params = new URLSearchParams({ name: name, application_code: code });
+      try {
+        const data = await Platform.fetch.get(
+          '/applications/api/registration-check?' + params.toString(), null, { silent: true });
+        if (seq !== this._checkSeq) return;
+        this.matches = Array.isArray(data.matches) ? data.matches : [];
+        this.checkError = '';
+        this.renderMatches();
+      } catch (err) {
+        if (seq !== this._checkSeq) return;
+        this.matches = null;
+        this.renderMatches();
+        this.checkError = 'The duplicate check could not run. Check the application list before saving.';
+      }
+    },
+
+    // Built with DOM calls (textContent, never markup) so a name containing
+    // angle brackets is shown as text.
+    renderMatches() {
+      this.$nextTick(() => {
+        const list = this.$refs.matchList;
+        if (!list) return;
+        list.replaceChildren();
+        for (const m of this.matches || []) {
+          const item = document.createElement('li');
+          item.className = 'flex flex-wrap items-center gap-2';
+          const link = document.createElement('a');
+          link.href = m.url;
+          link.className = 'text-primary underline underline-offset-2';
+          link.textContent = m.name;
+          item.appendChild(link);
+          if (m.application_code) {
+            const code = document.createElement('span');
+            code.className = 'text-muted-foreground';
+            code.textContent = m.application_code;
+            item.appendChild(code);
+          }
+          const why = document.createElement('span');
+          why.className = 'text-muted-foreground';
+          why.textContent = '— ' + String(m.reason || '').toLowerCase();
+          item.appendChild(why);
+          list.appendChild(item);
+        }
+      });
+    },
+
+    get hasSameName() {
+      return !!this.matches && this.matches.some((m) => m.match === 'same_name');
+    },
+
+    get needsConfirmation() {
+      return !!this.matches && this.matches.length > 0 && !this.hasSameName;
+    },
+
     form: {
       name: '',
       application_code: '',
@@ -607,6 +686,10 @@ function applicationCreateForm() {
         this.fieldErrors = { name: 'Application name is required.' };
         this.errorMsg = 'Application name is required.';
         this.$nextTick(() => document.getElementById('ca-name')?.focus());
+        return;
+      }
+      if (this.needsConfirmation && !this.confirmedDistinct) {
+        this.errorMsg = 'Confirm that none of the similar applications is the same one.';
         return;
       }
       this.submitting = true;
