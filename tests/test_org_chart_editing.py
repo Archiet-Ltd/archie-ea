@@ -262,6 +262,46 @@ class TestHierarchyEditing:
             db_session.commit()
             assert unit.name in _actor_names_in_tree(service.build_org_tree())
 
+    def test_cycle_move_and_removal_of_staffed_or_parent_units_are_refused_at_the_route(
+        self, app, db_session, make_org, tenant_ctx, client, login_as
+    ):
+        org = make_org("hier-route-refusals")
+        with tenant_ctx(org.id):
+            top = _make_actor(db_session, org, "Top Unit", "Business Unit")
+            mid = _make_actor(db_session, org, "Mid Unit", "Department")
+            leaf = _make_actor(db_session, org, "Leaf Unit", "Team")
+            _link_actors(db_session, top, mid)
+            _link_actors(db_session, mid, leaf)
+            staffed = _make_actor(db_session, org, "Staffed Unit", "Department")
+            person = _make_user(db_session, org, "routeperson", enterprise_role="enterprise_architect")
+            person.business_unit_id = staffed.id
+        architect = _make_user(
+            db_session, org, "routearchitect", role_name="Architect",
+            enterprise_role="business_architect",
+        )
+        db_session.commit()
+
+        login_as(client, architect)
+
+        # A move that would create a cycle is refused with a plain message.
+        resp = client.patch(
+            f"/organization/chart/api/units/{top.id}/parent",
+            data=json.dumps({"parent_id": leaf.id}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        assert "cycle" in resp.get_json()["error"]["message"]
+
+        # A unit that still has children cannot be removed.
+        resp = client.delete(f"/organization/chart/api/units/{mid.id}")
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        assert "child" in resp.get_json()["error"]["message"]
+
+        # A unit that still has people assigned cannot be removed.
+        resp = client.delete(f"/organization/chart/api/units/{staffed.id}")
+        assert resp.status_code == 400, resp.get_data(as_text=True)
+        assert "people" in resp.get_json()["error"]["message"]
+
     def test_removing_a_leaf_unit_without_people_deletes_it(
         self, app, db_session, make_org, tenant_ctx
     ):
