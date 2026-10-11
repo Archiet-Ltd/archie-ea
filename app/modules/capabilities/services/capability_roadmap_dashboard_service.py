@@ -865,35 +865,50 @@ class CapabilityRoadmapDashboardService:
         maturity_percentage = (total_score / total_weight * 100) if total_weight > 0 else 0
         maturity_level = int(maturity_percentage / 20)
 
+        # The 1-5 scale has no level 0: a score below the first level is
+        # not enough evidence to record anything.
+        if maturity_level < 1:
+            return {
+                "success": False,
+                "error": "Not enough evidence to set a maturity level",
+            }
+
         # Route through the single write path when a corresponding
         # BusinessCapability source exists, so the write leaves a history
         # row and the projection listener keeps UnifiedCapability in sync.
+        # A row sourced from business_capability is never written directly,
+        # whatever its source_id or organisation looks like.
+        from flask import g
+
         from app.modules.capabilities.services.capability_maturity_service import (
+            CapabilityNotFoundError,
             record_capability_maturity,
         )
 
-        bc_id = None
-        bc_org_id = None
-        if capability.source_table == "business_capability" and capability.source_id:
+        caller_org_id = getattr(g, "current_org_id", None)
+        if caller_org_id is None:
+            return {"success": False, "error": "Capability not found"}
+
+        if capability.source_table == "business_capability":
             try:
                 bc_id = int(capability.source_id)
-                bc_org_id = capability.organization_id or capability.source_org_id
             except (ValueError, TypeError):
-                pass
-
-        if bc_id is not None and bc_org_id is not None:
-            record_capability_maturity(
-                capability_id=bc_id,
-                organization_id=bc_org_id,
-                current=maturity_level,
-                assessor_user_id=assessor_id,
-                assessor_role="roadmap assessment",
-                commit=True,
-            )
+                return {"success": False, "error": "Capability not found"}
+            try:
+                record_capability_maturity(
+                    capability_id=bc_id,
+                    organization_id=caller_org_id,
+                    current=maturity_level,
+                    assessor_user_id=assessor_id,
+                    assessor_role="roadmap assessment",
+                    commit=True,
+                )
+            except CapabilityNotFoundError:
+                db.session.rollback()
+                return {"success": False, "error": "Capability not found"}
             db.session.refresh(capability)
         else:
-            # Fallback: write directly on UnifiedCapability when no
-            # BusinessCapability source exists.
+            # No BusinessCapability source exists: write the unified row.
             capability.current_maturity_level = maturity_level
             capability.last_assessment_date = datetime.now()
             if assessor_id:
