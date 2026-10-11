@@ -81,11 +81,23 @@ def _hierarchy_edges():
 
 
 def _unit_subtree_actor_ids(unit_id, children_map):
-    """The unit itself plus every descendant actor id, depth-first."""
-    subtree = [unit_id]
-    for child_id in children_map.get(unit_id, []):
-        subtree.extend(_unit_subtree_actor_ids(child_id, children_map))
-    return subtree
+    """The unit itself plus every descendant actor id.
+
+    Iterative with a seen set: the generic relationship writer has no cycle
+    rule, so a composition loop can already exist in the model and the walk
+    must terminate on it.
+    """
+    seen = set()
+    order = []
+    stack = [unit_id]
+    while stack:
+        current = stack.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        order.append(current)
+        stack.extend(children_map.get(current, []))
+    return order
 
 
 def build_org_tree():
@@ -333,18 +345,27 @@ def remove_unit(*, unit_id):
     if assigned_people:
         raise ValueError("This unit still has people assigned and cannot be removed")
 
-    try:
-        # Detach from its parent and drop every other relationship touching
-        # the element, then delete the actor row and the mirror element
-        # (the element's FK would otherwise reject the delete). Done in one
-        # transaction; a remaining reference anywhere rolls it all back.
-        for rel in ArchiMateRelationship.query.filter(
-            db.or_(
-                ArchiMateRelationship.source_id == unit.archimate_element_id,
-                ArchiMateRelationship.target_id == unit.archimate_element_id,
+    parent_links = _hierarchy_links_to_unit(unit.archimate_element_id)
+    parent_link_ids = {link.id for link in parent_links}
+    other_count = ArchiMateRelationship.query.filter(
+        db.or_(
+            ArchiMateRelationship.source_id == unit.archimate_element_id,
+            ArchiMateRelationship.target_id == unit.archimate_element_id,
+        ),
+        ArchiMateRelationship.id.notin_(parent_link_ids) if parent_link_ids else True,
+    ).count()
+    if other_count:
+        raise ValueError(
+            "This unit is still used in {} other relationship{} and cannot be removed".format(
+                other_count, "" if other_count == 1 else "s"
             )
-        ).all():
-            db.session.delete(rel)
+        )
+
+    try:
+        # Only the unit's parent-hierarchy link goes with it; the actor row
+        # and its mirror element follow in the same transaction.
+        for link in parent_links:
+            db.session.delete(link)
         db.session.delete(unit)
         element = db.session.get(ArchiMateElement, unit.archimate_element_id)
         if element is not None:
