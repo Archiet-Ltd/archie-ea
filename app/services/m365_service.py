@@ -117,7 +117,7 @@ class M365Service:
                         "actions": [
                             {
                                 "type": "Action.OpenUrl",
-                                "title": "Open in A.R.C.H.I.E.",
+                                "title": "Open in Entelim",
                                 "url": action_url,
                             }
                         ],

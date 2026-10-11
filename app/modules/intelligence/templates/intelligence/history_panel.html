@@ -1,0 +1,176 @@
+{# Element History Panel — shows all versions of one element with who/why #}
+{% from 'components/provenance.html' import provenance_badge %}
+
+<div class="space-y-4" x-data="elementHistoryPanel()" x-init="load()">
+    <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-foreground">History</h2>
+        <div class="flex items-center gap-2">
+            <button type="button"
+                    @click="refresh()"
+                    :disabled="loading"
+                    class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none">
+                <i data-lucide="refresh-cw" class="h-4 w-4 mr-2" aria-hidden="true"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <template x-if="loading">
+        <div role="status" aria-label="Loading history" class="h-32 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+    </template>
+
+    <template x-if="error">
+        <div class="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive" x-text="error"></div>
+    </template>
+
+    <template x-if="!loading && !error && versions.length === 0">
+        <p class="text-sm text-muted-foreground">No history recorded for this element.</p>
+    </template>
+
+    <template x-if="!loading && !error && versions.length > 0">
+        <div class="space-y-3" role="list" aria-label="Element versions">
+            <template x-for="(version, index) in versions" :key="version.version_index">
+                <article class="rounded-lg border border-border bg-card p-4" role="listitem">
+                    <header class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground"
+                                  x-text="version.action.toUpperCase()"></span>
+                            <span class="text-xs text-muted-foreground" x-text="'v' + (version.version_index + 1)"></span>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                            <template x-if="version.recorded_at">
+                                <span x-text="formatDateTime(version.recorded_at)"></span>
+                            </template>
+                            <template x-if="!version.recorded_at">
+                                <span>—</span>
+                            </template>
+                            <template x-if="version.source">
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase" x-text="version.source"></span>
+                            </template>
+                        </div>
+                    </header>
+
+                    <div class="grid gap-2 text-sm sm:grid-cols-2">
+                        <div>
+                            <dt class="text-muted-foreground">Valid from</dt>
+                            <dd class="text-foreground font-mono text-xs" x-text="version.valid_from ? formatDateTime(version.valid_from) : '—'"></dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">Valid to</dt>
+                            <dd class="text-foreground font-mono text-xs" x-text="version.valid_to ? formatDateTime(version.valid_to) : 'current'"></dd>
+                        </div>
+                        <template x-if="version.changed_by_name">
+                            <div class="sm:col-span-2">
+                                <dt class="text-muted-foreground">Changed by</dt>
+                                <dd class="text-foreground" x-text="version.changed_by_name"></dd>
+                            </div>
+                        </template>
+                        <template x-if="version.change_reason">
+                            <div class="sm:col-span-2">
+                                <dt class="text-muted-foreground">Reason</dt>
+                                <dd class="text-foreground" x-text="version.change_reason"></dd>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="mt-3">
+                        <button type="button"
+                                @click="toggleSnapshot(index)"
+                                class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                            <i data-lucide="chevron-down" class="h-4 w-4" :class="{ 'rotate-180': openSnapshots.includes(index) }" aria-hidden="true"></i>
+                            <span>Show snapshot</span>
+                        </button>
+                        <template x-if="openSnapshots.includes(index)">
+                            <div class="mt-2 overflow-x-auto rounded-md border border-border bg-muted p-3">
+                                <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(version.snapshot, null, 2)"></pre>
+                            </div>
+                        </template>
+                    </div>
+
+                    <template x-if="version.previous_snapshot">
+                        <div class="mt-3">
+                            <button type="button"
+                                    @click="togglePreviousSnapshot(index)"
+                                    class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                                <i data-lucide="chevron-down" class="h-4 w-4" :class="{ 'rotate-180': openPreviousSnapshots.includes(index) }" aria-hidden="true"></i>
+                                <span>Show previous snapshot (diff)</span>
+                            </button>
+                            <template x-if="openPreviousSnapshots.includes(index)">
+                                <div class="mt-2 space-y-2">
+                                    <div class="rounded-md border border-border bg-muted p-3">
+                                        <p class="text-xs font-medium text-muted-foreground mb-1">Previous version</p>
+                                        <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(version.previous_snapshot, null, 2)"></pre>
+                                    </div>
+                                    <div class="rounded-md border border-border bg-muted p-3">
+                                        <p class="text-xs font-medium text-muted-foreground mb-1">Current version</p>
+                                        <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(version.snapshot, null, 2)"></pre>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </article>
+            </template>
+        </div>
+    </template>
+</div>
+
+<script>
+function elementHistoryPanel() {
+    return {
+        loading: true,
+        error: null,
+        versions: [],
+        openSnapshots: [],
+        openPreviousSnapshots: [],
+
+        async load() {
+            this.loading = true;
+            this.error = null;
+            try {
+                const response = await fetch(`/intelligence/api/history/element/${this.$el.dataset.elementId}`, { // raw-fetch-ok: Alpine.js component, Platform.fetch not available in template context
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                this.versions = data.versions || [];
+            } catch (e) {
+                this.error = 'Could not load history: ' + e.message;
+            } finally {
+                this.loading = false;
+                this.$nextTick(() => lucide.createIcons());
+            }
+        },
+
+        refresh() {
+            this.load();
+        },
+
+        toggleSnapshot(index) {
+            if (this.openSnapshots.includes(index)) {
+                this.openSnapshots = this.openSnapshots.filter(i => i !== index);
+            } else {
+                this.openSnapshots.push(index);
+            }
+        },
+
+        togglePreviousSnapshot(index) {
+            if (this.openPreviousSnapshots.includes(index)) {
+                this.openPreviousSnapshots = this.openPreviousSnapshots.filter(i => i !== index);
+            } else {
+                this.openPreviousSnapshots.push(index);
+            }
+        },
+
+        formatDateTime(iso) {
+            if (!iso) return '—';
+            const d = new Date(iso);
+            return d.toLocaleString(undefined, {
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+    }
+}
+</script>

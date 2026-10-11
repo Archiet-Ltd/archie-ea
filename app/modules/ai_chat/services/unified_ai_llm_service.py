@@ -391,7 +391,7 @@ class UnifiedAILLMService:
         self, change_description: str, scope: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Analyze impact of proposed changes
+        Analyze impact of proposed changes.
 
         Args:
             change_description: Description of changes
@@ -403,14 +403,17 @@ class UnifiedAILLMService:
         if "impact_analysis" not in self.services:
             return {"success": False, "error": "Impact analysis service not available"}
 
-        try:
-            service = self.services["impact_analysis"]
-            result = service.analyze_impact(change_description, scope)
-            return result
-
-        except Exception as e:
-            self.logger.error(f"Impact analysis failed: {e}")
-            return {"success": False, "error": str(e)}
+        # AIImpactAnalysisService requires an application ID and scenario.
+        # This unified entrypoint cannot satisfy that contract from a free-text
+        # description alone. Callers must use analyze_application_impact directly
+        # with a concrete app_id.
+        return {
+            "success": False,
+            "error": (
+                "analyze_change_impact requires a concrete application ID and scenario. "
+                "Use AIImpactAnalysisService.analyze_application_impact(app_id, scenario) directly."
+            ),
+        }
 
     # === CHAT METHODS ===
 

@@ -8,9 +8,10 @@ Supports Manufacturing, Finance, Healthcare, Pharma, Retail, and other industrie
 from datetime import datetime
 
 from app import db
+from app.models.mixins import HybridTenantMixin, TenantMixin
 
 
-class IndustryAPQCFramework(db.Model):
+class IndustryAPQCFramework(HybridTenantMixin, db.Model):
     """
     Industry-specific APQC Process Classification Framework.
 
@@ -89,7 +90,7 @@ class IndustryAPQCFramework(db.Model):
         }
 
 
-class IndustryAPQCProcess(db.Model):
+class IndustryAPQCProcess(HybridTenantMixin, db.Model):
     """
     Industry-specific process within an APQC framework.
 
@@ -208,12 +209,16 @@ class IndustryAPQCProcess(db.Model):
         )
 
 
-class IndustryProcessRecommendation(db.Model):
+class IndustryProcessRecommendation(TenantMixin, db.Model):
     """
     AI-generated process improvement recommendation.
 
     Based on maturity assessments and industry benchmarks,
     provides actionable recommendations for process improvement.
+
+    Unlike the shared framework/process catalogue it references, a generated
+    recommendation is real per-organisation output (like StrategicRecommendation),
+    so it is fenced (TenantMixin) rather than left shared (HybridTenantMixin).
     """
 
     __tablename__ = "industry_process_recommendation"

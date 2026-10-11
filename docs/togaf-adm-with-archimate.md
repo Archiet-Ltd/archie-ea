@@ -77,9 +77,9 @@ this component exist?" later.
 - **Both** — the method gives you the cadence and artifacts; the language makes them
   precise, queryable, and governable. This is the mainstream practice.
 
-## How Archie helps (optional)
+## How Entelim helps (optional)
 
-[Archie](https://github.com/Anioko/archie-ea) implements a TOGAF-aligned solution-design
+[Entelim](https://github.com/Anioko/archie-ea) implements a TOGAF-aligned solution-design
 journey on top of an ArchiMate 3.2 model: it walks Phases A–G — drivers and goals, business
 capabilities, application and technology design, options, and an ARB governance gate — and
 keeps the requirements trace intact throughout.

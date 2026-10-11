@@ -233,7 +233,7 @@ def test_strategic_initiative_goal_link_round_trips(app, ea_user):
         programme = StrategicInitiative(
             name="Constellation", organization_id=org, record_kind="transformation_programme"
         )
-        goal = Goal(name="Retire SCADE by Q4 2026")
+        goal = Goal(name="Retire SCADE by Q4 2026", organization_id=org)
         db.session.add_all([programme, goal])
         db.session.commit()
         programme.goals.append(goal)

@@ -23,10 +23,21 @@ re-implement it.
 from __future__ import annotations
 
 import functools
+import datetime as _dt
 import logging
+import time
+
+from contextlib import nullcontext
+from flask import current_app, has_app_context
 
 from app.extensions import db
-from app.jobs.tenant_safe_job import JobRun, job_lock, run_for_each_tenant
+from app.jobs.tenant_safe_job import (
+    JobRun,
+    TenantResult,
+    job_lock,
+    platform_scope,
+    run_for_each_tenant,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +63,16 @@ def stale_carrying_organization_ids() -> list[int]:
     here enters an identity map a later lookup could serve under the wrong
     tenant.
     """
-    rows = db.session.execute(
-        db.text(
-            "SELECT DISTINCT organization_id FROM archimate_derived_relationships "
-            "WHERE stale = TRUE ORDER BY organization_id"
-        )
-    ).all()
+    # Row-level security shows the runtime role only the session organisation's
+    # rows and this sweep has none yet; it reads the ids of the organisations
+    # that carry stale rows, nothing else.
+    with platform_scope("derived facts sweep: which organisations carry stale derived relationships"):
+        rows = db.session.execute(
+            db.text(
+                "SELECT DISTINCT organization_id FROM archimate_derived_relationships "
+                "WHERE stale = TRUE ORDER BY organization_id"
+            )
+        ).all()
     return [int(row[0]) for row in rows]
 
 
@@ -120,13 +135,57 @@ def recompute_derived_facts_on_demand(app, organization_id: int) -> JobRun:
     lock, which is deliberately off so this tenant's request is never
     blocked by an unrelated tenant's scheduled sweep.
     """
-    return run_for_each_tenant(
-        app,
-        ON_DEMAND_JOB_NAME,
-        functools.partial(_recompute_one_tenant, trigger="on_demand"),
-        organization_ids=[organization_id],
-        use_lock=False,
+    run = JobRun(job_name=ON_DEMAND_JOB_NAME, started_at=_dt.datetime.now(_dt.UTC))
+
+    app_ctx = (
+        nullcontext()
+        if has_app_context() and current_app._get_current_object() is app
+        else app.app_context()
     )
+
+    with app_ctx:
+        started = time.monotonic()
+        try:
+            from app.modules.intelligence.services.derivation_runner import DerivationRunner
+
+            with job_lock(per_tenant_lock_name(organization_id), required=False) as acquired:
+                if not acquired:
+                    value = {"skipped_locked": True}
+                else:
+                    result = DerivationRunner().run_and_persist(
+                        organization_id, trigger="on_demand"
+                    )
+                    value = {
+                        "skipped_locked": False,
+                        "explicit_count": result.explicit_count,
+                        "derived_count": result.derived_count,
+                        "ratio": result.ratio,
+                        "duration_ms": result.duration_ms,
+                        "engine_version": result.engine_version,
+                    }
+            result = TenantResult(
+                organization_id=organization_id,
+                ok=True,
+                duration_ms=int((time.monotonic() - started) * 1000),
+                value=value,
+            )
+        except Exception as exc:  # noqa: BLE001 - surfaced in JobRun
+            logger.exception(
+                "recompute_job: on-demand recompute FAILED for organization_id=%s",
+                organization_id,
+            )
+            db.session.rollback()
+            db.session.remove()
+            result = TenantResult(
+                organization_id=organization_id,
+                ok=False,
+                duration_ms=int((time.monotonic() - started) * 1000),
+                error=repr(exc),
+            )
+
+    run.results.append(result)
+    run.finished_at = _dt.datetime.now(_dt.UTC)
+    return run
 
 
 __all__ = [

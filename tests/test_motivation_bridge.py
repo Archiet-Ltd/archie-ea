@@ -167,6 +167,7 @@ class TestMotivationBridgeLinkModel:
             "enterprise_element_id",
             "archimate_element_id",
             "created_at",
+            "organization_id",  # TenantMixin: this link is now tenant-scoped
         }
 
     def test_bridge_link_has_unique_constraint(self):

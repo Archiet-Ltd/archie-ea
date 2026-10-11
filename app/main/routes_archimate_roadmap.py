@@ -16,6 +16,8 @@ from app.models.implementation_migration import Gap, Plateau  # dead-code-ok
 from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 from app.models.unified_capability import UnifiedCapability  # dead-code-ok
 from app.models.unified_work_package import UnifiedWorkPackage
+from app.services import work_package_service
+from app.utils.tenant import current_organization_id
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +210,12 @@ def archimate_roadmap():
                     for gap in open_gaps[:20]
                 ],
             }
+            _plateaus = Plateau.query.order_by(Plateau.sequence_order.asc()).all()
+            # The count is of this organisation's work packages that realise the
+            # plateau, from the one store (relationships), not the older list.
+            _plateau_wps = work_package_service.plateau_work_package_ids(
+                [p.id for p in _plateaus], current_organization_id()
+            )
             plateaus_list = [
                 {
                     "id": p.id,
@@ -215,9 +223,9 @@ def archimate_roadmap():
                     "description": p.description or "",
                     "sequence_order": p.sequence_order or 0,
                     "target_date": p.target_date.isoformat() if p.target_date else None,
-                    "work_package_count": len(p.work_packages) if p.work_packages else 0,
+                    "work_package_count": len(_plateau_wps.get(p.id, ())),
                 }
-                for p in Plateau.query.order_by(Plateau.sequence_order.asc()).all()
+                for p in _plateaus
             ]
         except Exception as e:
             logger.debug("Gap/Plateau tables may not exist yet: %s", e)
@@ -373,28 +381,23 @@ def create_archimate_work_package():
                 return jsonify({"error": f"Missing required field: {field}"}), 400
 
         # Create new work package
-        new_wp = UnifiedWorkPackage(
+        # Create through the one writer
+        new_wp = work_package_service.create_work_package(
+            organization_id=current_organization_id(),
+            user_id=current_user.id,
             name=data["name"],
             description=data.get("description", ""),
             business_capability=data["business_capability"],
             assigned_to=data.get("assigned_to", "Unassigned"),
             status=data.get("status", "planned"),
-            start_date=datetime.fromisoformat(data["start_date"])
-            if isinstance(data["start_date"], str)
-            else data["start_date"],
-            end_date=datetime.fromisoformat(data["end_date"])
-            if isinstance(data["end_date"], str)
-            else data["end_date"],
+            start_date=data["start_date"],
+            end_date=data["end_date"],
             progress_percentage=data.get("progress_percentage", 0),
             estimated_cost=data.get("estimated_cost", 0),
             priority=data.get("priority", "medium"),
             risk_level=data.get("risk_level", "medium"),
             layer="implementation",  # Default layer for roadmap work packages
-            element_type="WorkPackage",
-            created_by=current_user.id,
         )
-
-        db.session.add(new_wp)
         db.session.commit()
 
         # Return the created work package
@@ -418,6 +421,14 @@ def create_archimate_work_package():
             }
         )
 
+    except work_package_service.WorkPackageNotFound:
+        db.session.rollback()
+        return jsonify({"error": "Work package not found"}), 404
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+
     except Exception as e:
         db.session.rollback()
         logger.error("Error creating ArchiMate work package: %s", e, exc_info=True)
@@ -431,42 +442,25 @@ def update_archimate_work_package(wp_id):
     try:
         data = request.get_json()
 
-        # Get existing work package
-        work_package = UnifiedWorkPackage.query.get_or_404(wp_id)
-
-        # Update fields
-        if "name" in data:
-            work_package.name = data["name"]
-        if "description" in data:
-            work_package.description = data["description"]
-        if "business_capability" in data:
-            work_package.business_capability = data["business_capability"]
-        if "assigned_to" in data:
-            work_package.assigned_to = data["assigned_to"]
-        if "status" in data:
-            work_package.status = data["status"]
-        if "start_date" in data:
-            work_package.start_date = (
-                datetime.fromisoformat(data["start_date"])
-                if isinstance(data["start_date"], str)
-                else data["start_date"]
+        # Update through the one writer
+        fields = {
+            key: data[key]
+            for key in (
+                "name", "description", "business_capability", "capability_ids",
+                "capability_names", "assigned_to", "status", "start_date", "end_date",
+                "progress_percentage", "estimated_cost", "priority", "risk_level",
             )
-        if "end_date" in data:
-            work_package.end_date = (
-                datetime.fromisoformat(data["end_date"])
-                if isinstance(data["end_date"], str)
-                else data["end_date"]
-            )
-        if "progress_percentage" in data:
-            work_package.progress_percentage = data["progress_percentage"]
-        if "estimated_cost" in data:
-            work_package.estimated_cost = data["estimated_cost"]
-        if "priority" in data:
-            work_package.priority = data["priority"]
-        if "risk_level" in data:
-            work_package.risk_level = data["risk_level"]
-
-        work_package.updated_by = current_user.id
+            if key in data
+        }
+        for key in ("capability_ids", "capability_names"):
+            if key in fields and not fields[key]:
+                fields[key] = None
+        work_package = work_package_service.update_work_package(
+            wp_id,
+            organization_id=current_organization_id(),
+            user_id=current_user.id,
+            **fields,
+        )
         db.session.commit()
 
         return jsonify(
@@ -489,6 +483,14 @@ def update_archimate_work_package(wp_id):
             }
         )
 
+    except work_package_service.WorkPackageNotFound:
+        db.session.rollback()
+        return jsonify({"error": "Work package not found"}), 404
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+
     except Exception as e:
         db.session.rollback()
         logger.error("Error updating ArchiMate work package: %s", e, exc_info=True)
@@ -500,14 +502,20 @@ def update_archimate_work_package(wp_id):
 def delete_archimate_work_package(wp_id):
     """Delete ArchiMate work package"""
     try:
-        # Get existing work package
-        work_package = UnifiedWorkPackage.query.get_or_404(wp_id)
-
-        # Delete work package
-        db.session.delete(work_package)
+        work_package_service.delete_work_package(
+            wp_id, organization_id=current_organization_id()
+        )
         db.session.commit()
 
         return jsonify({"success": True, "message": f"ArchiMate work package {wp_id} deleted"})
+
+    except work_package_service.WorkPackageNotFound:
+        db.session.rollback()
+        return jsonify({"error": "Work package not found"}), 404
+
+    except work_package_service.WorkPackageError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
 
     except Exception as e:
         db.session.rollback()

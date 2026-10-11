@@ -64,9 +64,9 @@
 
     {{ metrics_card(
         title='Total cost of ownership',
-        value=('{:,.0f}'.format(app.total_cost_of_ownership) if app.total_cost_of_ownership else '—'),
+        value=annual_cost_formatted,
         icon='banknote',
-        footer_text='License/yr: ' ~ ('{:,.0f}'.format(app.license_cost_annual) if app.license_cost_annual else '—')
+        footer_text='License/yr: ' ~ license_cost_formatted
     ) }}
 
     {{ metrics_card(
@@ -115,9 +115,23 @@
     {% call panel('Identity & ownership', 'id-card') %}
     <dl>
       {{ drow('Type', app.component_type) }}
-      {{ drow('Application owner', app.application_owner) }}
-      {{ drow('Business owner', app.business_owner) }}
-      {{ drow('Technical owner', app.technical_owner) }}
+      <dt class="text-sm text-muted-foreground">Owners</dt>
+      <dd class="text-sm text-foreground font-medium text-right">
+        {% if application_owners %}
+          <div class="space-y-1">
+          {% for o in application_owners %}
+            <div class="flex items-center justify-end gap-2">
+              <span class="text-xs text-muted-foreground">{{ o.ownership_type_label }}</span>
+              <span>{{ o.user_name }}</span>
+            </div>
+          {% endfor %}
+          </div>
+        {% else %}
+          <span class="text-muted-foreground">&mdash;</span>
+        {% endif %}
+      </dd>
+      {{ drow('Business owner (legacy)', app.business_owner) }}
+      {{ drow('Technical owner (legacy)', app.technical_owner) }}
       {{ drow('Business domain', app.business_domain) }}
       {{ drow('Vendor', app.vendor_name) }}
     </dl>

@@ -1187,10 +1187,14 @@ def ensure_capabilities_seeded() -> None:
                 db.session.add(domain)
                 db.session.flush()
 
-        capability = UnifiedCapability(
+        from app.modules.capabilities.services.capability_service import (
+            ensure_capability_record,
+        )
+
+        capability, was_created = ensure_capability_record(
             name=spec.name,
-            description=spec.description,
             level=spec.level,
+            description=spec.description,
             domain_id=domain.id if domain else None,
             category=spec.category,
             capability_type=spec.capability_type,
@@ -1206,9 +1210,8 @@ def ensure_capabilities_seeded() -> None:
             discovered_by_ai=False,
             status="defined",
         )
-        db.session.add(capability)
-        db.session.flush()  # populate ID
-        created += 1
+        if was_created:
+            created += 1
         return capability
 
     def ensure_function(capability: UnifiedCapability, spec: FunctionSpec) -> None:

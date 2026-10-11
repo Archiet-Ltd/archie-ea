@@ -1,8 +1,8 @@
 cff-version: 1.2.0
-message: "If you use Archie, please cite it as below."
-title: "Archie — Open-Source Enterprise Architecture Platform (TOGAF 9.2 · ArchiMate 3.2)"
+message: "If you use Entelim, please cite it as below."
+title: "Entelim — Open-Source Enterprise Architecture Platform (TOGAF 9.2 · ArchiMate 3.2)"
 abstract: >-
-  Archie is an open-source, AI-native enterprise architecture platform for TOGAF 9.2 and
+  Entelim is an open-source, AI-native enterprise architecture platform for TOGAF 9.2 and
   ArchiMate 3.2 — model your application portfolio, run an AI-assisted solution-design
   journey, and govern designs through an Architecture Review Board (ARB).
 type: software

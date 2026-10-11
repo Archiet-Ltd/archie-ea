@@ -3,7 +3,7 @@
 ArchiMate 3.2 models roles structurally but not their CHANGE, and a real
 transformation lives or dies on the people move: which roles retire, which are
 created, who transitions from job A to job B, the headcount delta, and the skills
-gap to close. Archie's `BusinessRole` already carries all of this — `replacement_role_id`
+gap to close. Entelim's `BusinessRole` already carries all of this — `replacement_role_id`
 (role-to-role transition), `deprecated_date`/`operational_status` (retirement),
 `current_filled_positions` + `forecasted_demand` (headcount as-is → to-be),
 `required_skills` (competencies) — but nothing ever READ those fields, so the data

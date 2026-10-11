@@ -8,12 +8,17 @@ One subscription per organization; the org FK is the tenant boundary.
 import enum
 
 from app import db
+from app.models.mixins.core import TenantMixin
 
 
 class SubscriptionPlan(enum.Enum):
     free = "free"
+    # Retired label: rows written before the Startup/Team catalogue carry it.
+    # Its limits are Team's (see app/services/billing_plans.py).
     pro = "pro"
     enterprise = "enterprise"
+    startup = "startup"
+    team = "team"
 
 
 class SubscriptionStatus(enum.Enum):
@@ -38,6 +43,12 @@ class Subscription(db.Model):  # migration-exempt
     )
     stripe_customer_id = db.Column(db.String(255), nullable=True, index=True)
     stripe_subscription_id = db.Column(db.String(255), nullable=True, index=True)
+    # Set only once a refresh call confirms Monelytics (Archiet's shared
+    # billing service, app/services/monelytics_provider.py) holds an active
+    # subscription for this organisation — never at checkout initiation,
+    # before the shopper has paid. NULL for every organisation on the direct
+    # Stripe path, and for one still on Community.
+    monelytics_subscription_id = db.Column(db.String(255), nullable=True, index=True)
     plan = db.Column(
         db.Enum(SubscriptionPlan),
         nullable=False,
@@ -50,6 +61,15 @@ class Subscription(db.Model):  # migration-exempt
     )
     current_period_end = db.Column(db.DateTime, nullable=True)
     seats_purchased = db.Column(db.Integer, nullable=False, default=5)
+    # True while a cancellation is scheduled for current_period_end; the
+    # subscription stays active until then. NULL on rows written before this.
+    cancel_at_period_end = db.Column(db.Boolean, nullable=True)
+    # "month" or "year" — the billing interval of the price the customer
+    # bought. NULL when unknown (free plan, or rows written before this).
+    billing_interval = db.Column(db.String(10), nullable=True)
+    # Creation time of the newest provider event applied to this row, so an
+    # older event delivered late cannot roll the plan back.
+    last_event_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=db.func.now(), nullable=False)
     updated_at = db.Column(
         db.DateTime,
@@ -69,3 +89,22 @@ class Subscription(db.Model):  # migration-exempt
             f"<Subscription org={self.organization_id} "
             f"plan={self.plan.value} status={self.status.value}>"
         )
+
+
+class BillingEvent(TenantMixin, db.Model):  # migration-exempt
+    """One row per payment-provider event already applied to an organisation.
+
+    The provider retries deliveries, so the same event can arrive more than
+    once; a second delivery of a recorded event id is acknowledged and
+    ignored.
+    """
+
+    __tablename__ = "billing_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    provider_event_id = db.Column(db.String(255), nullable=False, unique=True, index=True)
+    event_type = db.Column(db.String(100), nullable=False)
+    received_at = db.Column(db.DateTime, default=db.func.now(), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<BillingEvent {self.provider_event_id} {self.event_type}>"

@@ -1,6 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/canvas_box.html' import canvas_box_entries, canvas_unclassified %}
 {% import 'components/card.html' as card %}
 
 {% macro draft_with_ai(section_key, label) %}
@@ -50,7 +51,9 @@
     fieldApiUrl: {{ url_for('business_case.save_field', business_case_id=business_case.id) | tojson }},
     updateApiUrl: {{ url_for('business_case.update', business_case_id=business_case.id) | tojson }},
     pullFinancialsApiUrl: {{ url_for('business_case.pull_financials', business_case_id=business_case.id) | tojson }},
-    draftSectionApiUrl: {{ url_for('business_case.ai_draft_section', business_case_id=business_case.id) | tojson }}
+    draftSectionApiUrl: {{ url_for('business_case.ai_draft_section', business_case_id=business_case.id) | tojson }},
+    exportApiUrl: {{ url_for('business_case.export_canvas', business_case_id=business_case.id) | tojson }},
+    savedDiagramId: {{ canvas_saved_diagram_id | tojson }}
   })' x-cloak>
 
   {{ page_header(
@@ -90,7 +93,7 @@
           <label for="bc-link-capability" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Linked Capability</label>
           <select id="bc-link-capability" x-model="capabilityId" @change="saveMeta()" data-testid="bc-link-capability"
             class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-            <option value="">None</option>
+            <option value="">Not linked</option>
             {% for cap in capabilities %}
             <option value="{{ cap.id }}">{{ cap.name }}</option>
             {% endfor %}
@@ -100,7 +103,7 @@
           <label for="bc-link-initiative" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Linked Strategic Initiative</label>
           <select id="bc-link-initiative" x-model="strategicInitiativeId" @change="saveMeta()" data-testid="bc-link-initiative"
             class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-            <option value="">None</option>
+            <option value="">Not linked</option>
             {% for init in initiatives %}
             <option value="{{ init.id }}">{{ init.name }}</option>
             {% endfor %}
@@ -110,7 +113,7 @@
           <label for="bc-link-solution" class="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Linked Solution</label>
           <select id="bc-link-solution" x-model="solutionId" @change="saveMeta()" data-testid="bc-link-solution"
             class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-            <option value="">None</option>
+            <option value="">Not linked</option>
             {% for sol in solutions %}
             <option value="{{ sol.id }}">{{ sol.name }}</option>
             {% endfor %}
@@ -119,46 +122,104 @@
       </div>
     </div>
 
-    {# ── Problem / Options / Recommendation ── #}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {% call card.card() %}
-        {% call card.card_header() %}
-          {% call card.card_title(class='text-base flex items-center gap-2') %}
-            <i data-lucide="alert-circle" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Problem Statement
-          {% endcall %}
-          {% call card.card_action() %}{{ draft_with_ai('problem_statement', 'Problem Statement') }}{% endcall %}
-        {% endcall %}
-        {% call card.card_content() %}
-          <textarea x-model="fields.problem_statement" @blur="saveField('problem_statement')"
-            data-testid="bc-textarea-problem_statement" rows="5" placeholder="What business problem or opportunity is driving this case?"
-            class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What business problem or opportunity is driving this case?"></textarea>
-          {{ draft_ai_error('problem_statement') }}
-          <p class="mt-1 h-4 text-xs">
-            <span x-show="savingField === 'problem_statement'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
-            <span x-show="savedField === 'problem_statement'" x-cloak class="text-success-emphasis">Saved</span>
-          </p>
-        {% endcall %}
-      {% endcall %}
-
-      {% call card.card() %}
-        {% call card.card_header() %}
-          {% call card.card_title(class='text-base flex items-center gap-2') %}
-            <i data-lucide="list-checks" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Options Considered
-          {% endcall %}
-          {% call card.card_action() %}{{ draft_with_ai('options_considered', 'Options Considered') }}{% endcall %}
-        {% endcall %}
-        {% call card.card_content() %}
-          <textarea x-model="fields.options_considered" @blur="saveField('options_considered')"
-            data-testid="bc-textarea-options_considered" rows="5" placeholder="What alternatives were evaluated (including do-nothing)?"
-            class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What alternatives were evaluated (including do-nothing)?"></textarea>
-          {{ draft_ai_error('options_considered') }}
-          <p class="mt-1 h-4 text-xs">
-            <span x-show="savingField === 'options_considered'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
-            <span x-show="savedField === 'options_considered'" x-cloak class="text-success-emphasis">Saved</span>
-          </p>
-        {% endcall %}
-      {% endcall %}
+    {# ── Export & share — image through the existing ExportManager over the
+       rendered section content (the reason line of every empty box is
+       already in that DOM, so it is already in the image); the saved-
+       viewpoint formats over the record's saved diagram; share is the
+       existing in-tenant saved-diagram link, only offered once one exists. ── #}
+    <div class="rounded-lg border border-border bg-card p-4 flex flex-wrap items-center gap-3" data-testid="bc-export-share-panel">
+      <div class="flex items-center gap-2 shrink-0">
+        <i data-lucide="share-2" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
+        <span class="text-sm font-medium text-foreground">Export &amp; share</span>
+      </div>
+      <button type="button" @click="exportImage()" data-testid="bc-export-image"
+        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5">
+        <i data-lucide="image" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Export as image
+      </button>
+      <select aria-label="File export format" x-model="exportFormat" data-testid="bc-export-format"
+        class="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-sm">
+        <option value="mermaid">Mermaid (.mmd)</option>
+        <option value="lucid">Lucidchart (.lucid)</option>
+        <option value="archi">Archi (.archimate)</option>
+      </select>
+      <a :href="exportFileUrl" data-testid="bc-export-file"
+        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5">
+        <i data-lucide="download" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Download file
+      </a>
+      <template x-if="shareUrl">
+        <a :href="shareUrl" target="_blank" rel="noopener" data-testid="bc-share-link"
+          class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5">
+          <i data-lucide="link" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Share
+        </a>
+      </template>
+      <span x-show="!shareUrl" x-cloak class="text-xs text-muted-foreground" data-testid="bc-share-unavailable">
+        Save an entry on this canvas to get a share link.
+      </span>
     </div>
+
+    {# ── The business case as a canvas: one section per box, in record
+       order, word for word the same order at 360px, since this section is
+       a single column at every width (no lg:grid-cols-2 here — a section
+       list, not a grid). Non-box panels (Recommendation; the Costs,
+       Benefits & ROI figures) sit beside the box they relate to and are
+       unchanged from today. #}
+    <div id="bc-canvas-content">
+
+    {# 1. Executive summary — composed from the sections below; nothing to
+       derive until a projection exists. #}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base flex items-center gap-2') %}
+          <i data-lucide="file-text" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Executive summary
+        {% endcall %}
+      {% endcall %}
+      {% call card.card_content() %}
+        {{ canvas_box_entries(canvas_zones['executive_summary']) }}
+      {% endcall %}
+    {% endcall %}
+
+    {# 2. Reasons (strategic context) — problem_statement, unchanged. #}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base flex items-center gap-2') %}
+          <i data-lucide="alert-circle" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Reasons (strategic context)
+        {% endcall %}
+        {% call card.card_action() %}{{ draft_with_ai('problem_statement', 'Reasons') }}{% endcall %}
+      {% endcall %}
+      {% call card.card_content() %}
+        {{ canvas_box_entries(canvas_zones['problem_statement']) }}
+        <textarea x-model="fields.problem_statement" @blur="saveField('problem_statement')"
+          data-testid="bc-textarea-problem_statement" rows="5" placeholder="What business problem or opportunity is driving this case?"
+          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What business problem or opportunity is driving this case?"></textarea>
+        {{ draft_ai_error('problem_statement') }}
+        <p class="mt-1 h-4 text-xs">
+          <span x-show="savingField === 'problem_statement'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
+          <span x-show="savedField === 'problem_statement'" x-cloak class="text-success-emphasis">Saved</span>
+        </p>
+      {% endcall %}
+    {% endcall %}
+
+    {# 3. Business options — options_considered, unchanged; the existing
+       Recommendation panel follows it, also unchanged. #}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base flex items-center gap-2') %}
+          <i data-lucide="list-checks" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Business options
+        {% endcall %}
+        {% call card.card_action() %}{{ draft_with_ai('options_considered', 'Business options') }}{% endcall %}
+      {% endcall %}
+      {% call card.card_content() %}
+        {{ canvas_box_entries(canvas_zones['options_considered']) }}
+        <textarea x-model="fields.options_considered" @blur="saveField('options_considered')"
+          data-testid="bc-textarea-options_considered" rows="5" placeholder="What alternatives were evaluated (including do-nothing)?"
+          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="What alternatives were evaluated (including do-nothing)?"></textarea>
+        {{ draft_ai_error('options_considered') }}
+        <p class="mt-1 h-4 text-xs">
+          <span x-show="savingField === 'options_considered'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
+          <span x-show="savedField === 'options_considered'" x-cloak class="text-success-emphasis">Saved</span>
+        </p>
+      {% endcall %}
+    {% endcall %}
 
     {% call card.card(class='border-primary/30') %}
       {% call card.card_header() %}
@@ -179,7 +240,67 @@
       {% endcall %}
     {% endcall %}
 
-    {# ── Costs / ROI ── #}
+    {# 4. Expected benefits — expected_benefits, unchanged. #}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base flex items-center gap-2') %}
+          <i data-lucide="trending-up" class="h-4 w-4 text-success" aria-hidden="true"></i> Expected benefits
+        {% endcall %}
+        {% call card.card_action() %}{{ draft_with_ai('expected_benefits', 'Expected benefits') }}{% endcall %}
+      {% endcall %}
+      {% call card.card_content() %}
+        {{ canvas_box_entries(canvas_zones['expected_benefits']) }}
+        <textarea x-model="fields.expected_benefits" @blur="saveField('expected_benefits')"
+          data-testid="bc-textarea-expected_benefits" rows="5" placeholder="Quantified and qualitative benefits expected"
+          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Quantified and qualitative benefits expected"></textarea>
+        {{ draft_ai_error('expected_benefits') }}
+        <p class="mt-1 h-4 text-xs">
+          <span x-show="savingField === 'expected_benefits'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
+          <span x-show="savedField === 'expected_benefits'" x-cloak class="text-success-emphasis">Saved</span>
+        </p>
+      {% endcall %}
+    {% endcall %}
+
+    {# 5. Expected dis-benefits — no existing field; polarity is the profile,
+       not a number. #}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base flex items-center gap-2') %}
+          <i data-lucide="trending-down" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Expected dis-benefits
+        {% endcall %}
+      {% endcall %}
+      {% call card.card_content() %}
+        {{ canvas_box_entries(canvas_zones['expected_disbenefits']) }}
+      {% endcall %}
+    {% endcall %}
+
+    {# 6. Timescale — no existing field; dates come from the unified work
+       package once it is wired. #}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base flex items-center gap-2') %}
+          <i data-lucide="calendar-clock" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Timescale
+        {% endcall %}
+      {% endcall %}
+      {% call card.card_content() %}
+        {{ canvas_box_entries(canvas_zones['timescale']) }}
+      {% endcall %}
+    {% endcall %}
+
+    {# 7. Costs — no existing field as a canvas box (items shown verbatim,
+       never a default amount); the existing Costs, Benefits & ROI figures
+       panel follows it, unchanged. #}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base flex items-center gap-2') %}
+          <i data-lucide="coins" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Costs
+        {% endcall %}
+      {% endcall %}
+      {% call card.card_content() %}
+        {{ canvas_box_entries(canvas_zones['costs']) }}
+      {% endcall %}
+    {% endcall %}
+
     {% call card.card() %}
       {% call card.card_header() %}
         {% call card.card_title(class='text-base flex items-center gap-2') %}
@@ -248,45 +369,43 @@
       {% endcall %}
     {% endcall %}
 
-    {# ── Expected Benefits / Key Risks ── #}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {% call card.card() %}
-        {% call card.card_header() %}
-          {% call card.card_title(class='text-base flex items-center gap-2') %}
-            <i data-lucide="trending-up" class="h-4 w-4 text-success" aria-hidden="true"></i> Expected Benefits
-          {% endcall %}
-          {% call card.card_action() %}{{ draft_with_ai('expected_benefits', 'Expected Benefits') }}{% endcall %}
-        {% endcall %}
-        {% call card.card_content() %}
-          <textarea x-model="fields.expected_benefits" @blur="saveField('expected_benefits')"
-            data-testid="bc-textarea-expected_benefits" rows="5" placeholder="Quantified and qualitative benefits expected"
-            class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Quantified and qualitative benefits expected"></textarea>
-          {{ draft_ai_error('expected_benefits') }}
-          <p class="mt-1 h-4 text-xs">
-            <span x-show="savingField === 'expected_benefits'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
-            <span x-show="savedField === 'expected_benefits'" x-cloak class="text-success-emphasis">Saved</span>
-          </p>
+    {# 8. Investment appraisal — composed from Costs and Expected benefits;
+       the record's own capex/opex/TCO/ROI/NPV figures stay exactly as they
+       are — this box never computes an appraisal of its own. #}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base flex items-center gap-2') %}
+          <i data-lucide="scale" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i> Investment appraisal
         {% endcall %}
       {% endcall %}
+      {% call card.card_content() %}
+        {{ canvas_box_entries(canvas_zones['investment_appraisal']) }}
+      {% endcall %}
+    {% endcall %}
 
-      {% call card.card() %}
-        {% call card.card_header() %}
-          {% call card.card_title(class='text-base flex items-center gap-2') %}
-            <i data-lucide="shield-alert" class="h-4 w-4 text-destructive" aria-hidden="true"></i> Key Risks
-          {% endcall %}
-          {% call card.card_action() %}{{ draft_with_ai('key_risks', 'Key Risks') }}{% endcall %}
+    {# 9. Major risks — key_risks, unchanged; reads from the risk register
+       once a projection exists, never duplicated. #}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base flex items-center gap-2') %}
+          <i data-lucide="shield-alert" class="h-4 w-4 text-destructive" aria-hidden="true"></i> Major risks
         {% endcall %}
-        {% call card.card_content() %}
-          <textarea x-model="fields.key_risks" @blur="saveField('key_risks')"
-            data-testid="bc-textarea-key_risks" rows="5" placeholder="Delivery, adoption, financial and technical risks"
-            class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Delivery, adoption, financial and technical risks"></textarea>
-          {{ draft_ai_error('key_risks') }}
-          <p class="mt-1 h-4 text-xs">
-            <span x-show="savingField === 'key_risks'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
-            <span x-show="savedField === 'key_risks'" x-cloak class="text-success-emphasis">Saved</span>
-          </p>
-        {% endcall %}
+        {% call card.card_action() %}{{ draft_with_ai('key_risks', 'Major risks') }}{% endcall %}
       {% endcall %}
+      {% call card.card_content() %}
+        {{ canvas_box_entries(canvas_zones['key_risks']) }}
+        <textarea x-model="fields.key_risks" @blur="saveField('key_risks')"
+          data-testid="bc-textarea-key_risks" rows="5" placeholder="Delivery, adoption, financial and technical risks"
+          class="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y" aria-label="Delivery, adoption, financial and technical risks"></textarea>
+        {{ draft_ai_error('key_risks') }}
+        <p class="mt-1 h-4 text-xs">
+          <span x-show="savingField === 'key_risks'" x-cloak class="text-muted-foreground inline-flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…</span>
+          <span x-show="savedField === 'key_risks'" x-cloak class="text-success-emphasis">Saved</span>
+        </p>
+      {% endcall %}
+    {% endcall %}
+
+    {{ canvas_unclassified(canvas_unclassified_count) }}
     </div>
   </div>
 </div>

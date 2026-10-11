@@ -229,6 +229,66 @@ def test_drift_is_org_scoped(app, db_session, make_org):
         assert report_b["summary"]["total"] == 0
 
 
+def test_index_shows_error_not_empty_state_for_unreadable_stored_report(
+    app, db_session, make_org, client, login_as
+):
+    """PR 304 fix round: a stored row that cannot be rendered must show an
+    explicit error, never the "Not yet computed" empty-state copy -- that
+    copy claims no report exists, which is false when one does but cannot be
+    read. The empty state is only correct when there is truly no stored row.
+    """
+    from app.datetime_helpers import utcnow
+    from app.models.drift_report import DriftReport
+    from app.models.user import User
+
+    org_unreadable = make_org("drift-unreadable")
+    org_no_row = make_org("drift-no-row")
+
+    user_unreadable = User(
+        email=f"drift-unreadable-{uuid.uuid4().hex[:8]}@example.com",
+        organization_id=org_unreadable.id,
+        confirmed=True,
+    )
+    user_unreadable.password = "not-used-in-tests-123"
+    db_session.add(user_unreadable)
+
+    user_no_row = User(
+        email=f"drift-no-row-{uuid.uuid4().hex[:8]}@example.com",
+        organization_id=org_no_row.id,
+        confirmed=True,
+    )
+    user_no_row.password = "not-used-in-tests-123"
+    db_session.add(user_no_row)
+    db_session.flush()
+
+    # A stored row whose report_json is not the dict shape the emitter
+    # expects (e.g. a foreign/future format) -- genuinely unreadable, not a
+    # fabricated failure.
+    unreadable = DriftReport(
+        organization_id=org_unreadable.id,
+        report_json=["not", "the", "expected", "dict", "shape"],
+        spec_hash="sha256:unreadable",
+        computed_at=utcnow(),
+        finding_count=0,
+    )
+    db_session.add(unreadable)
+    db_session.commit()
+
+    login_as(client, user_unreadable)
+    resp_unreadable = client.get("/genome/model-health/")
+    assert resp_unreadable.status_code == 200
+    body_unreadable = resp_unreadable.get_data(as_text=True)
+    assert "could not be rendered" in body_unreadable
+    assert "Not yet computed" not in body_unreadable
+
+    login_as(client, user_no_row)
+    resp_no_row = client.get("/genome/model-health/")
+    assert resp_no_row.status_code == 200
+    body_no_row = resp_no_row.get_data(as_text=True)
+    assert "first health scan is being prepared" in body_no_row
+    assert "could not be rendered" not in body_no_row
+
+
 def test_remediation_queues_through_governed_gate_and_applies_nothing(
     app, db_session, make_org
 ):

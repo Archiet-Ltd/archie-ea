@@ -13,7 +13,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT, PASSWORD
+from .conftest import PAGE_TIMEOUT, PASSWORD, type_and_wait
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -82,13 +82,6 @@ def _ready(page, factory):
     )
 
 
-def _type_and_wait(page, prefix, term):
-    box = page.locator("#%s-picker-input" % prefix)
-    box.press_sequentially(term, delay=15)
-    page.wait_for_selector("#%s-picker-listbox [role=option]" % prefix)
-    return box
-
-
 def _pick_by_click(page, prefix, name):
     page.locator("#%s-picker-listbox [role=option]" % prefix, has_text=name).click()
 
@@ -102,7 +95,7 @@ def test_the_risk_question_shows_the_seeded_risk_with_its_blast_radius(
 
     page.locator("#ask-question-risk").click()
     expect(page.locator("#ask-picker-input")).to_be_focused()
-    _type_and_wait(page, "ask", risk_graph["noun"])
+    type_and_wait(page, "ask", risk_graph["noun"])
     _pick_by_click(page, "ask", risk_graph["service_name"])
 
     page.wait_for_selector("[data-ask-risk-row]")
@@ -125,7 +118,7 @@ def test_an_element_with_no_risk_reads_as_an_honest_empty_state(
 
     page.locator("#ask-question-risk").click()
     expect(page.locator("#ask-picker-input")).to_be_focused()
-    _type_and_wait(page, "ask", risk_graph["noun"])
+    type_and_wait(page, "ask", risk_graph["noun"])
     # Gateway has no risk seeded on it, only Service does.
     page.locator("#ask-picker-listbox [role=option]", has_text="Gateway").click()
 
@@ -144,14 +137,14 @@ def test_switching_between_impact_and_risk_keeps_each_questions_own_answer_separ
     _ready(page, "askSurface")
 
     page.locator("#ask-question-impact").click()
-    _type_and_wait(page, "ask", risk_graph["noun"])
+    type_and_wait(page, "ask", risk_graph["noun"])
     _pick_by_click(page, "ask", risk_graph["service_name"])
     page.wait_for_selector("[data-ask-row]")
     expect(page.locator("#ask-results")).to_be_visible()
     expect(page.locator("#ask-risk-results")).to_be_hidden()
 
     page.locator("#ask-question-risk").click()
-    _type_and_wait(page, "ask", risk_graph["noun"])
+    type_and_wait(page, "ask", risk_graph["noun"])
     _pick_by_click(page, "ask", risk_graph["service_name"])
     page.wait_for_selector("[data-ask-risk-row]")
     expect(page.locator("#ask-risk-results")).to_be_visible()

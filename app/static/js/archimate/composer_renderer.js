@@ -765,10 +765,20 @@ let ComposerRenderer = (function() {
      *
      *  Callers:  composer_graph.toggleLayerZones()
      *            composer_persistence.loadSavedViewpoint()   (restore)
+     *
+     *  An optional sixth argument, `zoneDef` ({box_key, label}), turns a
+     *  plain layer band into a canvas box. When given, the rendered label is
+     *  zoneDef.label (falling back to the usual "<Layer> Layer" text when
+     *  zoneDef carries no label of its own — the restore path below only
+     *  persists box_key, not label) and the cell carries 'boxKey' so
+     *  _serializeCanvasExt and the restore path can round-trip which canvas
+     *  box a swimlane is. Entries are not placed into it here — that is a
+     *  later change's projection.
      */
-    function createLayerZone(layer, x, y, w, h) {
+    function createLayerZone(layer, x, y, w, h, zoneDef) {
         let c = layerColor(layer);
-        let displayName = layer.charAt(0).toUpperCase() + layer.slice(1) + ' Layer';
+        let displayName = (zoneDef && zoneDef.label)
+            || (layer.charAt(0).toUpperCase() + layer.slice(1) + ' Layer');
 
         let zone = new joint.shapes.standard.Rectangle({
             position: { x: x || 0, y: y || 0 },
@@ -801,6 +811,9 @@ let ComposerRenderer = (function() {
 
         zone.set('isLayerZone', true);
         zone.set('zoneLayer', layer);
+        if (zoneDef && zoneDef.box_key) {
+            zone.set('boxKey', zoneDef.box_key);
+        }
         return zone;
     }
 
@@ -827,8 +840,8 @@ let ComposerRenderer = (function() {
         else                               { ShapeClass = joint.shapes.archimate.Node; }
 
         /* 17 Aug 2026 composer skin request: the accent stripe and translucent
-           icon backing box are Archie's own "SaaS card" polish, not part of the
-           ArchiMate 3.2 visual notation — real Archi/BiZZdesign/Sparx renders
+           icon backing box are Entelim's own "SaaS card" polish, not part of the
+           ArchiMate 3.2 visual notation — real ArchiMate editor renders
            are a single flat-coloured element with a crisp border and the type
            icon sitting directly on the fill. accentBar is hidden (opacity 0,
            not removed from markup, to avoid touching 5 shapes' selector lists);

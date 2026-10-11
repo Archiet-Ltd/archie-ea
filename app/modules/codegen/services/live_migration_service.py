@@ -1,7 +1,7 @@
 """Generate and run migrations on DEPLOYED SOLUTION databases.
 
 IMPORTANT: This service runs Alembic/SQL on the deployed solution's database,
-NOT on ARCHIE's database. ARCHIE's migration freeze (CLAUDE.md) does not apply
+NOT on Entelim's database. Entelim's migration freeze (CLAUDE.md) does not apply
 to generated solution databases, which are independent PostgreSQL instances
 provisioned by Coolify.
 """

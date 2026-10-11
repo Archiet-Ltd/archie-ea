@@ -29,16 +29,16 @@
                 <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Plan</dt>
                 <dd>
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
-                        {% if org.plan == 'enterprise' %}bg-primary/10 text-primary border border-primary/30
-                        {% elif org.plan == 'pro' %}bg-info/10 text-info border border-info/30
+                        {% if limits.plan_key == 'enterprise' %}bg-primary/10 text-primary border border-primary/30
+                        {% elif limits.plan_key in ('startup', 'team') %}bg-info/10 text-info border border-info/30
                         {% else %}bg-secondary text-secondary-foreground{% endif %}">
-                        {{ org.plan|capitalize }}
+                        {{ limits.plan_name }}
                     </span>
                 </dd>
             </div>
             <div>
                 <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Users</dt>
-                <dd class="text-sm">{{ users|length }} / {{ org.max_users }}</dd>
+                <dd class="text-sm">{{ users|length }} / {{ limits.limit if limits.limit is not none else 'no limit' }}{% if limits.counts == 'editors' %} <span class="text-muted-foreground">({{ limits.used }} editors)</span>{% endif %}</dd>
             </div>
             <div>
                 <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Status</dt>

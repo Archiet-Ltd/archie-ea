@@ -1,0 +1,31 @@
+<div class="border rounded-lg p-5 space-y-3">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">External identifiers</h2>
+    {% if external_links %}
+    <div class="space-y-3">
+        {% for link in external_links %}
+        <div class="rounded-lg border border-border bg-muted/20 p-3">
+            <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                    <dt class="text-muted-foreground">Source system</dt>
+                    <dd class="mt-0.5 font-medium">{{ link.source_system }}</dd>
+                </div>
+                <div>
+                    <dt class="text-muted-foreground">External ID</dt>
+                    <dd class="mt-0.5 font-mono text-xs break-all">{{ link.external_id }}</dd>
+                </div>
+                <div>
+                    <dt class="text-muted-foreground">First seen</dt>
+                    <dd class="mt-0.5 font-medium">{{ link.first_seen.strftime('%d %b %Y') }}</dd>
+                </div>
+                <div>
+                    <dt class="text-muted-foreground">Last seen</dt>
+                    <dd class="mt-0.5 font-medium">{{ link.last_seen.strftime('%d %b %Y') }}</dd>
+                </div>
+            </dl>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-muted-foreground">No external identifiers have been linked to this element.</p>
+    {% endif %}
+</div>

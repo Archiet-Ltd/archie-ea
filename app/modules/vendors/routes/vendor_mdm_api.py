@@ -61,7 +61,15 @@ def bulk_normalize():
 @vendor_mdm_bp.route("/duplicates", methods=["GET"])
 @login_required
 def find_duplicates():
-    """Find potential duplicate vendors or products."""
+    """
+    RETIRED — delegates to MatcherService.
+
+    Callers:
+    - (route, called by clients)
+
+    Instead of maintaining its own algorithm, this now delegates to the
+    matcher for consistent matching across the platform.
+    """
     try:
         name_type = request.args.get("type", "vendor")
         threshold = float(request.args.get("threshold", 0.9))

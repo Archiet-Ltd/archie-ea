@@ -1,7 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 
-{% block title %}Data Entity Catalog — A.R.C.H.I.E.{% endblock %}
+{% block title %}Data Entity Catalog — {{ config.APP_NAME }}{% endblock %}
 
 {% block breadcrumb %}
 {% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
@@ -115,7 +115,8 @@
                 <tr class="border-b hover:bg-accent/50 transition-colors">
                     <td class="px-4 py-3 text-sm text-muted-foreground">{{ loop.index }}</td>
                     <td class="px-4 py-3">
-                        <div class="font-medium text-sm text-foreground">{{ entity.name }}</div>
+                        <a href="{{ url_for('data_architecture.data_entity_detail', entity_id=entity.id) }}"
+                           class="font-medium text-sm text-foreground hover:underline">{{ entity.name }}</a>
                         {% if entity.business_name and entity.business_name != entity.name %}
                         <div class="text-xs text-muted-foreground">{{ entity.business_name }}</div>
                         {% endif %}
@@ -174,7 +175,16 @@
                         <span class="text-xs text-muted-foreground">—</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-3 text-sm text-muted-foreground">{{ entity.system_of_record or '—' }}</td>
+                    <td class="px-4 py-3 text-sm text-muted-foreground">
+                        {% if entity.system_of_record_application %}
+                        {{ entity.system_of_record_application.name }}
+                        {% elif entity.system_of_record %}
+                        <span>{{ entity.system_of_record }}</span>
+                        <span class="text-xs">(legacy label)</span>
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
                     <td class="px-4 py-3 text-right">
                         <a href="{{ url_for('data_architecture.edit_data_entity', entity_id=entity.id) }}"
                            class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">

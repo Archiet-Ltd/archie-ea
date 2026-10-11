@@ -200,7 +200,6 @@ class TestCapabilitiesEndpointParity:
 class TestCapabilitiesServicesImportable:
     """Test that module services are importable."""
 
-    @pytest.mark.skip(reason="Pre-existing: CapabilityTagService has broken SQLAlchemy relationship")
     def test_capability_service(self):
         from app.modules.capabilities.services.capability_service import CapabilityTaxonomyService
 

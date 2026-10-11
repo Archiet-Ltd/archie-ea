@@ -40,7 +40,7 @@ GENOME_VERSION = "2.0.0"
 # no distinct data layer — data_object is application-layer, the rest are
 # business-layer — so the slice is a *logical* projection, per 02_schema.md §2.3.
 #
-# Archie stores element `type` inconsistently: both snake_case ("data_object")
+# Entelim stores element `type` inconsistently: both snake_case ("data_object")
 # and ArchiMate CamelCase ("DataObject") occur in the same table. We normalise
 # to snake_case for matching so both are caught.
 DATA_OBJECT_TYPES = frozenset(
@@ -162,6 +162,7 @@ def build_data_genome_slice(organization_id: int, session=None) -> dict:
     )
 
     systems_by_object: dict[int, list] = {oid: [] for oid in object_ids}
+    system_element_ids: set[int] = set()
     for rel in access_edges:
         if rel.target_id in object_ids:
             obj_id, sys_id = rel.target_id, rel.source_id
@@ -181,6 +182,89 @@ def build_data_genome_slice(organization_id: int, session=None) -> dict:
                 "access_mode": (rel.access_mode or "unspecified"),
             }
         )
+        system_element_ids.add(sys_elem.id)
+
+    # --- 2b. Suppliers linked to each system (ApplicationComponent) ------------
+    # Read VendorContract and primary_vendor_product for each system that is an
+    # ApplicationComponent, following the same pattern as GDPRService._processors_for.
+    suppliers_by_system: dict[int, list] = {sid: [] for sid in system_element_ids}
+    if system_element_ids:
+        from app.models.application_portfolio import ApplicationComponent, VendorContract
+
+        components = (
+            sess.query(ApplicationComponent)
+            .filter(
+                ApplicationComponent.organization_id == organization_id,
+                ApplicationComponent.archimate_element_id.in_(sorted(system_element_ids)),
+            )
+            .all()
+        )
+        component_by_eid = {c.archimate_element_id: c for c in components}
+        # Reverse mapping: ApplicationComponent.id -> archimate_element_id
+        eid_by_component_id = {c.id: c.archimate_element_id for c in components}
+        if component_by_eid:
+            contracts = (
+                sess.query(VendorContract)
+                .filter(
+                    VendorContract.organization_id == organization_id,
+                    VendorContract.application_id.in_(list(eid_by_component_id)),
+                )
+                .order_by(VendorContract.id)
+                .all()
+            )
+            for contract in contracts:
+                vendor = contract.vendor
+                if vendor is None:
+                    continue
+                eid = eid_by_component_id.get(contract.application_id)
+                if eid is not None:
+                    suppliers_by_system[eid].append({
+                        "vendor_id": vendor.id,
+                        "name": vendor.display_name or vendor.name,
+                        "link": "Contract: %s" % (contract.contract_name or "—"),
+                    })
+            for eid, component in component_by_eid.items():
+                product = component.primary_vendor_product
+                vendor = getattr(product, "vendor_organization", None) if product is not None else None
+                if vendor is not None:
+                    suppliers_by_system[eid].append({
+                        "vendor_id": vendor.id,
+                        "name": vendor.display_name or vendor.name,
+                        "link": "Primary vendor product: %s" % (product.name or "—"),
+                    })
+                if (component.vendor_name or "").strip():
+                    suppliers_by_system[eid].append({
+                        "vendor_id": None,
+                        "name": component.vendor_name.strip(),
+                        "link": "Vendor named on the application record",
+                    })
+
+    # --- 2c. Flow relationships touching those objects -------------------------
+    # ArchiMate flow relationships that link to data objects, showing data flows
+    # between systems and the processing activity.
+    flow_edges = (
+        sess.query(ArchiMateRelationship)
+        .filter(ArchiMateRelationship.organization_id == organization_id)
+        .filter(db.func.lower(ArchiMateRelationship.type) == "flow")
+        .order_by(ArchiMateRelationship.id.asc())
+        .all()
+    )
+    flows_by_object: dict[int, list] = {oid: [] for oid in object_ids}
+    for rel in flow_edges:
+        if rel.target_id in object_ids:
+            obj_id, flow_source_id = rel.target_id, rel.source_id
+        elif rel.source_id in object_ids:
+            obj_id, flow_source_id = rel.source_id, rel.target_id
+        else:
+            continue
+        source_elem = by_id.get(flow_source_id)
+        if source_elem is None:
+            continue
+        flows_by_object[obj_id].append({
+            "archimate_element_id": source_elem.id,
+            "name": source_elem.name,
+            "archimate_type": _norm_type(source_elem.type),
+        })
 
     # --- 3. Project one processing-activity node per object --------------------
     activities = []
@@ -196,6 +280,21 @@ def build_data_genome_slice(organization_id: int, session=None) -> dict:
         systems = sorted(
             systems_by_object.get(obj.id, []),
             key=lambda s: (s["archimate_element_id"],),
+        )
+
+        # Collect suppliers for each system linked to this object.
+        suppliers = []
+        seen_vendor = set()
+        for sys_entry in systems:
+            for sup in suppliers_by_system.get(sys_entry["archimate_element_id"], []):
+                key = (sup.get("vendor_id"), sup["name"])
+                if key not in seen_vendor:
+                    seen_vendor.add(key)
+                    suppliers.append(sup)
+
+        flows = sorted(
+            flows_by_object.get(obj.id, []),
+            key=lambda f: (f["archimate_element_id"],),
         )
 
         data_categories = _first(props, "data_categories", "data_category", "categories")
@@ -221,6 +320,8 @@ def build_data_genome_slice(organization_id: int, session=None) -> dict:
             "retention": _first(props, "retention", "retention_period"),
             "data_categories": sorted(str(c) for c in data_categories),
             "systems": systems,
+            "suppliers": suppliers,
+            "flows": flows,
         }
         # Hard invariant — never emit an activity without a resolvable source id.
         if activity["provenance"].get("archimate_element_id") is None:

@@ -55,7 +55,7 @@
                 id="{{ filter.id }}"
                 class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-                <option value="">All {{ filter.label }}</option>
+                <option value="">All {{ filter.label.lower() ~ 'es' if filter.label.lower().endswith('s') else filter.label.lower() ~ 's' }}</option>
                 {% for opt in filter.options %}
                 <option value="{{ opt.value }}" {{ 'selected' if opt.selected else '' }}>{{ opt.label }}</option>
                 {% endfor %}

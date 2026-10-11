@@ -36,6 +36,9 @@ class MultiModalLLMService:
 
         return os.getenv(f"{provider.upper()}_API_KEY")
 
+    def _guard_provider_call(self, provider: str, model: str | None, prompt: str | None) -> None:
+        LLMService._guard_provider_call(provider, model, prompt=prompt)
+
     def encode_image(self, image_path: str) -> str:
         """
         Encode image to base64 for API submission
@@ -189,6 +192,8 @@ class MultiModalLLMService:
             "generationConfig": {"maxOutputTokens": max_tokens, "temperature": temperature},
         }
 
+        self._guard_provider_call("gemini", model, prompt)
+
         async def _invoke() -> Dict[str, Any]:
             response = requests.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
@@ -304,6 +309,8 @@ class MultiModalLLMService:
             "generationConfig": {"maxOutputTokens": max_tokens, "temperature": temperature},
         }
 
+        self._guard_provider_call("gemini", model, prompt)
+
         def _invoke() -> Dict[str, Any]:
             response = requests.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
@@ -362,6 +369,7 @@ class MultiModalLLMService:
         file_name = os.path.basename(pdf_path)
 
         # Start resumable upload
+        self._guard_provider_call("gemini", model, prompt)
         upload_start_resp = requests.post(
             "https://generativelanguage.googleapis.com/upload/v1beta/files",
             params={"key": api_key},
@@ -412,6 +420,8 @@ class MultiModalLLMService:
                 ],
                 "generationConfig": {"maxOutputTokens": max_tokens, "temperature": temperature},
             }
+
+            self._guard_provider_call("gemini", model, prompt)
 
             def _invoke() -> Dict[str, Any]:
                 response = requests.post(

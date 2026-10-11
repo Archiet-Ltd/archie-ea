@@ -78,10 +78,35 @@ class ArchitectureDecision(TenantMixin, db.Model):
     authority_level = db.Column(db.String(30), nullable=True, default='enterprise_arb')
     decision_type = db.Column(db.String(30), nullable=True)
 
+    # Fields the AI chat, workbench and solution-options-advisor creation
+    # paths set that had no home here before they were repointed to write
+    # this table directly instead of the superseded architecture_decision_records
+    # (so the canonical table could become the only writer): affected systems identified for a chat-recorded
+    # decision, free-text assumptions from a workbench-generated one, and an
+    # estimated_effort/business_value pair plus a free-text decider label for
+    # an AI-solution-architect-authored one, where the "decider" is not a
+    # users.id row so decided_by_id cannot carry it.
+    affected_systems = db.Column(db.JSON, nullable=True)
+    assumptions = db.Column(db.Text, nullable=True)
+    estimated_effort = db.Column(db.String(50), nullable=True)
+    business_value = db.Column(db.String(50), nullable=True)
+    decided_by_label = db.Column(db.Text, nullable=True)
+
+    # Review and outcome: a decision can carry a
+    # future date it must be looked at again -- a vendor contract renewal, a
+    # deviation granted "for now" -- and the outcome once that review happens.
+    # Both nullable: most decisions never set a review date, and one that does
+    # has no outcome until the review actually happens.
+    review_date = db.Column(db.Date, nullable=True, index=True)
+    review_outcome = db.Column(db.Text, nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    reviewed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
     # Relationships
     created_by = db.relationship("User", foreign_keys=[created_by_id])
     decided_by = db.relationship("User", foreign_keys=[decided_by_id])
     approved_by = db.relationship("User", foreign_keys=[approved_by_id])
+    reviewed_by = db.relationship("User", foreign_keys=[reviewed_by_id])
     superseded_by = db.relationship('ArchitectureDecision', foreign_keys=[superseded_by_id], remote_side='ArchitectureDecision.id', uselist=False)
 
     def to_dict(self):
@@ -116,7 +141,38 @@ class ArchitectureDecision(TenantMixin, db.Model):
             "decision_type": self.decision_type,
             "source_table": self.source_table,
             "source_id": self.source_id,
+            "affected_systems": self.affected_systems or [],
+            "assumptions": self.assumptions,
+            "estimated_effort": self.estimated_effort,
+            "business_value": self.business_value,
+            "decided_by_label": self.decided_by_label,
+            "review_date": self.review_date.isoformat() if self.review_date else None,
+            "review_outcome": self.review_outcome,
+            "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
+            "reviewed_by_id": self.reviewed_by_id,
         }
+
+    @property
+    def is_due_for_review(self):
+        """A review date has arrived with no outcome recorded for *this*
+        cycle yet.
+
+        Not simply ``review_outcome is None``: recording an outcome together
+        with a next review date (a recurring review, the normal case) leaves
+        ``review_outcome`` set from the just-finished cycle while
+        ``review_date`` moves into the future — checking for "any outcome at
+        all" would then hide the decision from every later cycle forever,
+        once it has been reviewed even a single time. A review recorded
+        before the *current* ``review_date`` belongs to a past cycle and
+        does not count; one recorded on or after it does.
+        """
+        from datetime import date
+
+        return (
+            self.review_date is not None
+            and self.review_date <= date.today()
+            and (self.reviewed_at is None or self.reviewed_at.date() < self.review_date)
+        )
 
     @classmethod
     def next_decision_id(cls):
@@ -132,6 +188,141 @@ class ArchitectureDecision(TenantMixin, db.Model):
         from app.utils.reference_numbers import next_reference
 
         return next_reference("architecture_decisions", "decision_id", "AD-")
+
+    @classmethod
+    def _element_match_clause(cls, element_ids):
+        """The shared ``archimate_element_ids``/``related_element_ids``
+        JSONB-contains predicate, or ``None`` when ``element_ids`` yields no
+        usable id. One place, so ``affecting_elements`` and
+        ``precedent_search`` can never silently drift onto two different
+        answers for "is this decision recorded against this element" --
+        found as a defect (duplicated matching logic) in PR 318 review.
+
+        Two writers record the link in two columns: the decision form writes
+        ``archimate_element_ids`` and the solution-design decision API writes
+        ``related_element_ids``. Both are matched here. Ids are stored as
+        numbers by the decision form; a string id written by an older path
+        still names the same element, so both variants are matched.
+        """
+        from sqlalchemy.dialects.postgresql import JSONB
+
+        ids = set()
+        for raw in element_ids or ():
+            try:
+                ids.add(int(raw))
+            except (TypeError, ValueError):
+                continue
+        if not ids:
+            return None
+        matches = []
+        for column in (cls.archimate_element_ids, cls.related_element_ids):
+            stored = db.cast(column, JSONB)
+            matches += [stored.contains([i]) for i in sorted(ids)]
+            matches += [stored.contains([str(i)]) for i in sorted(ids)]
+        return db.or_(*matches)
+
+    @classmethod
+    def affecting_elements(cls, element_ids, organization_id):
+        """The decisions of ``organization_id`` recorded against any of ``element_ids``.
+
+        This is how a decision is found from the things it governs: the element
+        page, the decision list filtered by element and the explanation of a
+        worked-out connection all read it, so they cannot disagree. The
+        organisation predicate is explicit so the answer is the same with or
+        without a request's tenant context. Newest first.
+        """
+        clause = cls._element_match_clause(element_ids)
+        if clause is None or organization_id is None:
+            return []
+        stmt = (
+            db.select(cls)
+            .where(cls.organization_id == organization_id)
+            .where(clause)
+            .order_by(cls.created_at.desc(), cls.id.desc())
+        )
+        return db.session.execute(stmt).scalars().all()
+
+    @classmethod
+    def due_for_review(cls, organization_id):
+        """The caller's decisions whose review date has arrived with no
+        outcome recorded for *this* cycle yet, earliest due date first.
+
+        Matches ``is_due_for_review``'s own predicate, not a bare
+        ``review_outcome IS NULL``: a recurring review (an outcome recorded
+        together with a next review date) must become due again once that
+        next date arrives, even though ``review_outcome`` already holds the
+        previous cycle's text. ``reviewed_at`` before the current
+        ``review_date`` means that outcome is stale, from a past cycle.
+        """
+        from datetime import date
+
+        if organization_id is None:
+            return []
+        stmt = (
+            db.select(cls)
+            .where(cls.organization_id == organization_id)
+            .where(cls.review_date.isnot(None))
+            .where(cls.review_date <= date.today())
+            .where(
+                db.or_(
+                    cls.reviewed_at.is_(None),
+                    db.cast(cls.reviewed_at, db.Date) < cls.review_date,
+                )
+            )
+            .order_by(cls.review_date.asc(), cls.id.asc())
+        )
+        return db.session.execute(stmt).scalars().all()
+
+    @classmethod
+    def precedent_search(cls, query_text, organization_id, element_ids=None):
+        """The caller's decisions whose title/context/decision/rationale match
+        ``query_text`` (case-insensitive substring), optionally narrowed to
+        decisions recorded against any of ``element_ids``. An architect
+        searches for precedent before ruling on a new case: what did
+        we decide last time something like this came up, and against what.
+
+        Newest first, matching ``affecting_elements``'s own ordering so the
+        two surfaces never disagree on how precedent is ranked.
+        """
+        if organization_id is None:
+            return []
+        text = (query_text or "").strip()
+        if not text and not element_ids:
+            return []
+        stmt = db.select(cls).where(cls.organization_id == organization_id)
+        if text:
+            like = f"%{text}%"
+            stmt = stmt.where(
+                db.or_(
+                    cls.title.ilike(like),
+                    cls.context.ilike(like),
+                    cls.decision.ilike(like),
+                    cls.rationale.ilike(like),
+                )
+            )
+        if element_ids:
+            clause = cls._element_match_clause(element_ids)
+            if clause is not None:
+                stmt = stmt.where(clause)
+        stmt = stmt.order_by(cls.created_at.desc(), cls.id.desc())
+        return db.session.execute(stmt).scalars().all()
+
+    def record_review_outcome(self, outcome_text, reviewed_by_id):
+        """Record the outcome of a due review: what review_date asked for has
+        now happened. Does not touch review_date itself -- the caller (the
+        record-outcome route's own "next review date" field) sets that
+        separately, to a future date for a recurring review or leaves it
+        unset to stop reviewing. ``is_due_for_review``/``due_for_review``
+        compare ``reviewed_at`` against the *current* ``review_date`` rather
+        than checking ``review_outcome`` alone, so a recurring review
+        becomes due again once its next date arrives even though this
+        method leaves the previous cycle's outcome text in place.
+        """
+        from datetime import datetime
+
+        self.review_outcome = outcome_text
+        self.reviewed_at = datetime.utcnow()
+        self.reviewed_by_id = reviewed_by_id
 
 
 VALID_LINK_TYPES = ['governs', 'constrains', 'enables']
@@ -208,6 +399,9 @@ class ArchitectureChangeRequest(TenantMixin, db.Model):
     raised_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     raised_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     closed_at = db.Column(db.DateTime, nullable=True)
+    # R1-B85: the CTO scorecard escalates an open exception; nullable so an
+    # un-escalated row reads as "-", never a fabricated date.
+    escalated_at = db.Column(db.DateTime, nullable=True)
 
     raised_by = db.relationship('User', foreign_keys=[raised_by_id])
     impact_assessments = db.relationship('ChangeImpactAssessment', backref='change_request', lazy='dynamic', cascade='all, delete-orphan')
@@ -228,6 +422,7 @@ class ArchitectureChangeRequest(TenantMixin, db.Model):
             'raised_by_id': self.raised_by_id,
             'raised_at': self.raised_at.isoformat() if self.raised_at else None,
             'closed_at': self.closed_at.isoformat() if self.closed_at else None,
+            'escalated_at': self.escalated_at.isoformat() if self.escalated_at else None,
         }
 
     @classmethod

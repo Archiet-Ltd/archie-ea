@@ -8,7 +8,7 @@ import json
 import os
 from datetime import datetime
 
-from flask import current_app, flash, jsonify, request  # dead-code-ok
+from flask import current_app, flash, g, jsonify, request  # dead-code-ok
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
@@ -58,6 +58,7 @@ def upload_document_file(application_id):
         # Create document record in database (without file_path first to get ID)
         document = ApplicationDocument(
             application_component_id=app.id,
+            organization_id=app.organization_id,
             title=document_title,
             description=document_description,
             file_name=file.filename,
@@ -65,6 +66,7 @@ def upload_document_file(application_id):
             file_path=None,
             file_size=None,
             uploaded_by=uploaded_by,
+            uploaded_by_id=current_user.id if current_user.is_authenticated else None,
         )
 
         db.session.add(document)
@@ -122,18 +124,41 @@ def analyze_document_for_application(application_id):
         provider = request.form.get("provider", "claude")
 
         # Check if analyzing existing document or uploading new one
-        document_id = request.form.get("document_id")
+        document_id_raw = request.form.get("document_id")
         file = None
         file_name = None
         file_content_type = None
 
-        if document_id:
+        if document_id_raw:
+            # Parse at the edge, before any query. Under psycopg 3 a string id
+            # makes SQLAlchemy emit application_documents.id = '5'::VARCHAR,
+            # and PostgreSQL refuses to compare an integer column to varchar
+            # rather than coercing it, turning a bad id into a 500 instead of
+            # a clean refusal.
+            try:
+                document_id = int(document_id_raw)
+            except (TypeError, ValueError):
+                return jsonify({"error": "document_id must be an integer."}), 400
+
             # Analyze existing document
-            # tenant-scoping-ok: cross-org access is closed by the
-            # application_component_id check immediately below, which
-            # rejects any document not FK-scoped to this (org-scoped)
-            # application_id.
-            document = ApplicationDocument.query.get_or_404(document_id)
+            query = ApplicationDocument.query.filter_by(id=document_id)
+            if not getattr(current_user, "is_platform_admin", False):
+                query = query.filter_by(organization_id=g.current_org_id)
+            document = query.first()
+
+            if not document:
+                return jsonify({"error": "Document not found."}), 404
+
+            # Tenant isolation: verify the document belongs to the caller's
+            # organisation. The query above skips the organisation filter for
+            # platform administrators, who can reach any document;
+            # verify_file_access provides a second line of defence, including
+            # unrestricted access for platform admins.
+            from app.middleware.tenant_files import verify_file_access
+
+            if not verify_file_access(document.organization_id):
+                return jsonify({"error": "Access denied."}), 403
+
             if document.application_component_id != application_id:
                 return jsonify(
                     {"error": "Document does not belong to this application"}

@@ -16,9 +16,22 @@ Usage::
 
 import logging
 import secrets
+from typing import Optional
 from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
+
+# Signing algorithms this service will ever accept for an id_token. "none"
+# and every HMAC ("HS*") algorithm are deliberately absent: HS* keys the
+# signature with the IdP's public key material, which every client already
+# holds, so accepting it here would let anyone forge a token.
+_ID_TOKEN_ALGORITHMS = (
+    "RS256", "RS384", "RS512",
+    "PS256", "PS384", "PS512",
+    "ES256", "ES384", "ES512",
+)
+# Clock-skew allowance applied to exp, iat and nbf.
+_ID_TOKEN_LEEWAY_SECONDS = 120
 
 
 class SSONotConfiguredError(Exception):
@@ -30,6 +43,12 @@ class SSOService:
 
     # Simple in-process cache for OIDC discovery documents (URL → dict).
     _discovery_cache: dict = {}
+
+    # In-process cache for JWKS documents (URI -> (fetched_at, jwks)). A signing
+    # key that is not in the cached set is refetched once, so a key rotation at
+    # the IdP does not lock users out for the length of the TTL.
+    _jwks_cache: dict = {}
+    _JWKS_TTL_SECONDS = 300
 
     # ------------------------------------------------------------------
     # Email-domain lookup
@@ -97,6 +116,144 @@ class SSOService:
                 f"Failed to fetch OIDC discovery document from {metadata_url}: {exc}"
             ) from exc
 
+    def _get_jwks(self, jwks_uri: str, *, force: bool = False) -> dict:
+        """Return the IdP's key set, from the cache while it is fresh."""
+        import time
+
+        import requests
+
+        cached = self._jwks_cache.get(jwks_uri)
+        if cached is not None and not force and time.monotonic() - cached[0] < self._JWKS_TTL_SECONDS:
+            return cached[1]
+        try:
+            jwks_resp = requests.get(jwks_uri, timeout=10)
+            jwks_resp.raise_for_status()
+            jwks = jwks_resp.json()
+        except Exception as exc:
+            logger.warning("Failed to fetch JWKS from %s: %s", jwks_uri, exc)
+            raise SSONotConfiguredError(
+                "id_token verification failed: the identity provider's signing keys are unavailable"
+            ) from exc
+        self._jwks_cache[jwks_uri] = (time.monotonic(), jwks)
+        return jwks
+
+    def _verify_id_token(
+        self,
+        id_token: str,
+        config,
+        discovery: dict,
+        expected_nonce: str,
+        access_token: Optional[str] = None,
+    ) -> dict:
+        """Verify id_token signature, issuer, audience, expiry and nonce.
+
+        Uses the IdP's JWKS (from the OIDC discovery document) to verify the
+        JWT signature, decoding with joserfc and validating the claims with
+        authlib's own ``CodeIDToken`` claim class: ``iss``, ``sub``, ``aud``,
+        ``exp`` and ``iat`` are required; ``aud`` must include the configured
+        client_id; ``azp`` is checked when present and required when ``aud``
+        holds more than one value; ``at_hash`` is checked when the token
+        carries one and an access token was passed in; and the ``nonce``
+        claim must equal the nonce generated for this login and kept in the
+        caller's session, so a token captured from another login cannot be
+        replayed here. Only RSA/EC/RSA-PSS signatures are accepted, pinned to
+        whichever of them the discovery document advertises.
+
+        Args:
+            id_token: The ID token string from the token response.
+            config: :class:`app.models.sso_config.SSOConfig` instance.
+            discovery: OIDC discovery document dict (must contain ``jwks_uri``
+                and ``issuer``).
+            expected_nonce: The nonce sent in this login's authorization
+                request. Required: a missing value refuses the token.
+            access_token: The access token issued alongside this id_token, if
+                any, so an ``at_hash`` claim can be checked against it.
+
+        Returns:
+            Dict of decoded JWT claims.
+
+        Raises:
+            :class:`SSONotConfiguredError` on any verification failure.
+        """
+        if not config.client_id:
+            raise SSONotConfiguredError("SSO config has no client_id")
+        if not expected_nonce:
+            raise SSONotConfiguredError(
+                "id_token verification failed: no nonce was issued for this login"
+            )
+
+        jwks_uri = discovery.get("jwks_uri")
+        if not jwks_uri:
+            raise SSONotConfiguredError(
+                "OIDC discovery document missing 'jwks_uri'"
+            )
+
+        issuer = discovery.get("issuer", "")
+        if not issuer:
+            raise SSONotConfiguredError(
+                "OIDC discovery document missing 'issuer'"
+            )
+
+        advertised_algorithms = (
+            discovery.get("id_token_signing_alg_values_supported") or ["RS256"]
+        )
+        allowed_algorithms = [
+            alg for alg in advertised_algorithms if alg in _ID_TOKEN_ALGORITHMS
+        ]
+        if not allowed_algorithms:
+            raise SSONotConfiguredError(
+                "id_token verification failed: the identity provider does not "
+                "advertise an acceptable signing algorithm"
+            )
+
+        claims_options = {
+            "iss": {"essential": True, "value": issuer},
+            "aud": {"essential": True, "value": config.client_id},
+        }
+        claims_params = {
+            "nonce": expected_nonce,
+            "client_id": config.client_id,
+            "access_token": access_token,
+        }
+
+        from authlib.oidc.core import CodeIDToken
+        from joserfc import jwt
+        from joserfc.errors import BadSignatureError, InvalidKeyIdError
+        from joserfc.jwk import KeySet
+        from joserfc.jws import JWSRegistry
+
+        def _decode(jwks: dict) -> dict:
+            key_set = KeySet.import_key_set(jwks)
+            registry = JWSRegistry(algorithms=allowed_algorithms, strict_check_header=False)
+            token = jwt.decode(id_token, key_set, registry=registry)
+            claims = CodeIDToken(token.claims, token.header, claims_options, claims_params)
+            claims.validate(leeway=_ID_TOKEN_LEEWAY_SECONDS)
+            return dict(claims)
+
+        jwks = self._get_jwks(jwks_uri)
+        try:
+            return _decode(jwks)
+        except (InvalidKeyIdError, BadSignatureError) as first_exc:
+            # The signing key may have rotated since the key set was cached:
+            # refetch once and try again before refusing the token. Any other
+            # failure (claims, algorithm, malformed token) refuses at once,
+            # below, with no refetch.
+            try:
+                fresh = self._get_jwks(jwks_uri, force=True)
+            except Exception as fetch_exc:
+                logger.warning("id_token key refetch failed: %s", fetch_exc)
+                raise SSONotConfiguredError("id_token verification failed") from first_exc
+            if fresh == jwks:
+                raise SSONotConfiguredError("id_token verification failed") from first_exc
+            try:
+                return _decode(fresh)
+            except Exception as second_exc:
+                logger.warning("id_token verification failed: %s", second_exc)
+                raise SSONotConfiguredError("id_token verification failed") from second_exc
+        except Exception as exc:
+            logger.warning("id_token verification failed: %s", exc)
+            raise SSONotConfiguredError("id_token verification failed") from exc
+
     def initiate_oidc_flow(self, config, redirect_uri: str) -> dict:
         """Build the OIDC authorization URL.
 
@@ -108,7 +265,9 @@ class SSOService:
             redirect_uri: The callback URL registered with the IdP.
 
         Returns:
-            Dict with keys ``redirect_url`` (str) and ``state`` (str).
+            Dict with keys ``redirect_url``, ``state`` and ``nonce`` (str). The
+            caller must keep ``state`` and ``nonce`` in the login session and
+            hand the nonce back to :meth:`handle_oidc_callback`.
 
         Raises:
             :class:`SSONotConfiguredError` if config is None or setup is incomplete.
@@ -128,18 +287,25 @@ class SSOService:
             )
 
         state = secrets.token_urlsafe(32)
+        nonce = secrets.token_urlsafe(32)
         params = {
             "response_type": "code",
             "client_id": config.client_id,
             "redirect_uri": redirect_uri,
             "scope": "openid email profile",
             "state": state,
+            "nonce": nonce,
         }
         redirect_url = f"{auth_endpoint}?{urlencode(params)}"
-        return {"redirect_url": redirect_url, "state": state}
+        return {"redirect_url": redirect_url, "state": state, "nonce": nonce}
 
     def handle_oidc_callback(
-        self, config, code: str, state: str, redirect_uri: str
+        self,
+        config,
+        code: str,
+        state: str,
+        redirect_uri: str,
+        expected_nonce: Optional[str] = None,
     ) -> dict:
         """Exchange the authorization code for tokens and return user info.
 
@@ -151,6 +317,9 @@ class SSOService:
             code: The authorization code from the IdP callback.
             state: The state parameter (caller should validate before calling).
             redirect_uri: Must match the value used in :meth:`initiate_oidc_flow`.
+            expected_nonce: The nonce :meth:`initiate_oidc_flow` returned for
+                this login. Needed whenever claims come from the id_token
+                (the userinfo endpoint does not use it).
 
         Returns:
             Dict of user-info claims (``email``, ``sub``, ``name``, etc.).
@@ -160,6 +329,8 @@ class SSOService:
         """
         if config is None:
             raise SSONotConfiguredError("No SSO config provided")
+        if not config.client_id:
+            raise SSONotConfiguredError("SSO config has no client_id")
         if not config.idp_metadata_url:
             raise SSONotConfiguredError("SSO config has no idp_metadata_url")
 
@@ -208,21 +379,23 @@ class SSOService:
             except Exception as exc:
                 logger.warning("Userinfo fetch failed (falling back to id_token): %s", exc)
 
-        # Fall back: decode id_token payload (no signature verification needed —
-        # we just exchanged the code back-channel, so the token is trustworthy)
+        # Fall back: verify id_token signature and extract claims
         if not userinfo:
             id_token = token_data.get("id_token", "")
             if id_token:
                 try:
-                    import base64
-                    import json
-
-                    parts = id_token.split(".")
-                    if len(parts) >= 2:
-                        padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
-                        userinfo = json.loads(base64.urlsafe_b64decode(padded))
+                    userinfo = self._verify_id_token(
+                        id_token,
+                        config,
+                        discovery,
+                        expected_nonce or "",
+                        access_token=token_data.get("access_token") or None,
+                    )
+                except SSONotConfiguredError:
+                    raise
                 except Exception as exc:
-                    logger.warning("Failed to decode id_token claims: %s", exc)
+                    logger.warning("id_token verification failed: %s", exc)
+                    raise SSONotConfiguredError("id_token verification failed") from exc
 
         return userinfo
 
@@ -321,25 +494,49 @@ class SSOService:
     # SAML stub
     # ------------------------------------------------------------------
 
-    def initiate_saml_flow(self, config) -> str:  # noqa: ARG002
-        """Build a SAML 2.0 AuthnRequest redirect URL.
+    def initiate_saml_flow(self, config, base_url: str) -> dict:
+        """Build a SAML 2.0 AuthnRequest redirect URL (R1-B12 PR 2, TB-0141).
 
-        .. todo::
-            Full implementation requires the ``python3-saml`` library
-            (``pip install python3-saml``).  Once installed, replace this
-            stub with::
+        Delegates to :class:`app.services.saml_service.SAMLService`, which
+        verifies responses with ``signxml`` against the operator-entered
+        IdP certificate rather than the ``python3-saml``/``xmlsec1`` path
+        this used to stub out.
 
-                from onelogin.saml2.auth import OneLogin_Saml2_Auth
-                auth = OneLogin_Saml2_Auth(request_data, saml_settings)
-                return auth.login()
+        Args:
+            config: :class:`app.models.sso_config.SSOConfig` instance.
+            base_url: This platform's own base URL.
+
+        Returns:
+            Dict with keys ``redirect_url`` and ``request_id`` (str). The
+            caller must keep ``request_id`` in the login session and hand
+            it to :meth:`handle_saml_callback`.
 
         Raises:
-            :class:`SSONotConfiguredError` always, until python3-saml is
-            installed and wired.
+            :class:`SSONotConfiguredError` if config is None or incomplete.
         """
-        if config is None:
-            raise SSONotConfiguredError("No SSO config provided")
-        raise SSONotConfiguredError(
-            "SAML 2.0 federation requires the python3-saml library. "
-            "Install with: pip install python3-saml"
+        from app.services.saml_service import SAMLService
+
+        redirect_url, request_id = SAMLService().build_authn_request(config, base_url)
+        return {"redirect_url": redirect_url, "request_id": request_id}
+
+    def handle_saml_callback(
+        self,
+        config,
+        saml_response_b64: str,
+        base_url: str,
+        expected_request_id: Optional[str] = None,
+    ) -> dict:
+        """Verify a SAML Response and return its asserted claims.
+
+        Delegates to :class:`app.services.saml_service.SAMLService`.
+
+        Raises:
+            :class:`SSONotConfiguredError` (specifically
+            :class:`app.services.saml_service.SAMLVerificationError`) on any
+            verification failure.
+        """
+        from app.services.saml_service import SAMLService
+
+        return SAMLService().verify_and_parse_response(
+            config, saml_response_b64, base_url, expected_request_id
         )

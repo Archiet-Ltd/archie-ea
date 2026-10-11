@@ -1,0 +1,108 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, section_card, empty_state %}
+{% from 'intelligence/_workspace_gate.html' import workspace_gate with context %}
+{% from 'intelligence/_entity_picker.html' import entity_picker with context %}
+
+{% block title %}Traceability{% endblock %}
+
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/traceability.js') }}"></script>
+{% endblock %}
+
+{% macro chain_block(block, key, heading, target_words) %}
+<section class="space-y-3" data-testid="trace-{{ key }}" data-complete="{{ 'true' if block.complete else 'false' }}">
+    <div class="flex items-center justify-between gap-4">
+        <h3 class="text-base font-semibold text-foreground">{{ heading }}</h3>
+        {% if block.complete %}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">Reaches {{ target_words }}</span>
+        {% else %}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/40">Does not reach {{ target_words }}</span>
+        {% endif %}
+    </div>
+    <ul class="space-y-2 text-sm">
+        {% for chain in block.chains %}
+        <li class="rounded-lg border border-border px-3 py-2" data-chain-complete="{{ 'true' if chain.complete else 'false' }}">
+            <span class="text-foreground">
+                {% for element in chain.elements %}{% if not loop.first %} <span class="text-muted-foreground" aria-hidden="true">→</span> {% endif %}<span class="font-medium">{{ element.name or '—' }}</span> <span class="text-muted-foreground">({{ element.type or '—' }})</span>{% endfor %}
+            </span>
+            {% if not chain.complete %}
+            <p class="mt-1 text-muted-foreground">Stops at {{ chain.stops_at.name or '—' }}: nothing recorded leads from it toward {{ target_words }}.</p>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endmacro %}
+
+{% block content %}
+{% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+<div class="p-6 space-y-6" x-data="traceabilitySurface()" data-page-url="{{ url_for('intelligence_ui.traceability') }}">
+    {{ page_shell(
+        title='Traceability',
+        subtitle='Check that a component traces up to a capability and down to the technology it runs on, and see where each chain stops.',
+        breadcrumb=[('Home', home_url), ('Traceability', none)]
+    ) }}
+
+    {% call workspace_gate(home_url) %}
+    <section class="rounded-xl border border-border bg-card p-6">
+        <div class="mx-auto max-w-xl">
+            {{ entity_picker('trace') }}
+        </div>
+    </section>
+
+    {% if element_id is none %}
+        {{ empty_state('route', 'Pick a component to check', 'Choose a team, service or system above to see its chains up to capabilities and down to technology.') }}
+    {% elif result is none or result.state != 'checked' %}
+        {{ empty_state('search-x', 'That element was not found', 'It does not exist in your organisation. Pick another one above.') }}
+    {% else %}
+        {% call section_card(title=result.element.name) %}
+            <p class="mb-4 text-sm text-muted-foreground" data-testid="trace-element" data-element-id="{{ result.element.id }}">
+                {{ result.element.type or '—' }} · chains followed up to {{ result.depth }} steps through realisation, serving, assignment, composition and aggregation.
+            </p>
+            <div class="space-y-6">
+                {{ chain_block(result.up, 'up', 'Up to capability', 'a capability') }}
+                {{ chain_block(result.down, 'down', 'Down to technology', 'technology') }}
+            </div>
+        {% endcall %}
+
+        {% call section_card(title='Suggested relationships') %}
+            <p role="alert" x-show="addError" x-cloak x-text="addError"
+               class="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"></p>
+            {% if result.candidates %}
+            <ul class="space-y-2 text-sm" data-testid="trace-candidates">
+                {% for candidate in result.candidates %}
+                {% set key = candidate.direction ~ '-' ~ candidate.source.id ~ '-' ~ candidate.target.id %}
+                <li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-3 py-2" data-candidate="{{ key }}">
+                    <span class="text-foreground">
+                        <span class="font-medium">{{ candidate.source.name }}</span>
+                        <span class="text-muted-foreground">{{ candidate.relationship_type }}</span>
+                        <span class="font-medium">{{ candidate.target.name }}</span>
+                        <span class="block text-xs text-muted-foreground">Already recorded in the {{ candidate.held_in }}, but not as a relationship.</span>
+                    </span>
+                    <button type="button"
+                            data-candidate-key="{{ key }}"
+                            data-source-id="{{ candidate.source.id }}"
+                            data-target-id="{{ candidate.target.id }}"
+                            data-relationship-type="{{ candidate.relationship_type }}"
+                            :disabled="adding !== null"
+                            @click="addCandidate($event)"
+                            class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 disabled:opacity-50 disabled:pointer-events-none">
+                        Add this relationship
+                    </button>
+                </li>
+                {% endfor %}
+            </ul>
+            {% elif result.up.complete and result.down.complete %}
+            <p class="text-sm text-muted-foreground">Both directions are complete; nothing to suggest.</p>
+            {% else %}
+            <p class="text-sm text-muted-foreground" data-testid="trace-no-candidates">
+                No mapping elsewhere names what is missing, so there is nothing to suggest. Add the relationship where the chain stops.
+            </p>
+            {% endif %}
+        {% endcall %}
+    {% endif %}
+    {% endcall %}
+</div>
+{% endblock %}

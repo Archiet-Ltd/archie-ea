@@ -24,6 +24,8 @@ Max chain depth: 5 (prevent combinatorial explosion).
 import logging
 from typing import Any, Dict, List, Set, Tuple
 
+from app.models.constants import ArchiMateRelationshipType
+
 logger = logging.getLogger(__name__)
 
 # ArchiMate 3.2 relationship strength ordering (strongest → weakest)
@@ -51,8 +53,19 @@ _DERIVATION_TABLE = {
 MAX_DEPTH = 5
 
 
+def _canonical_relationship_type(value: str) -> str:
+    """Return the canonical PascalCase relationship type for derivation logic."""
+
+    normalized = ArchiMateRelationshipType.normalize(value, pascal_case=True)
+    if not normalized:
+        return value
+    return normalized
+
+
 def _derive_type(type_a: str, type_b: str) -> str:
     """Compute the derived relationship type from chaining type_a → type_b."""
+    type_a = _canonical_relationship_type(type_a)
+    type_b = _canonical_relationship_type(type_b)
     # If either is transparent, result is the other
     if type_a in _TRANSPARENT:
         return type_b
@@ -80,6 +93,8 @@ def _rule_id(type_a: str, type_b: str) -> str:
     itself; it mirrors the same branch order so the id always matches the
     branch that actually fired.
     """
+    type_a = _canonical_relationship_type(type_a)
+    type_b = _canonical_relationship_type(type_b)
     if type_a in _TRANSPARENT or type_b in _TRANSPARENT:
         branch = "transparent"
     elif (type_a, type_b) in _DERIVATION_TABLE:
@@ -87,6 +102,40 @@ def _rule_id(type_a: str, type_b: str) -> str:
     else:
         branch = "fallback"
     return f"{branch}:{type_a}:{type_b}"
+
+
+def describe_rule(rule_id):
+    """The rule named by a stored ``rule_id``, in words, or ``None``.
+
+    Reads the same table ``_derive_type`` applies, so the description can only
+    say what the rule actually does. An id this table did not produce (another
+    engine's, or a malformed one) is not guessed at: ``None`` means the rule
+    that produced the connection is not recorded in a form this engine knows.
+    """
+    if not isinstance(rule_id, str):
+        return None
+    parts = rule_id.split(":")
+    if len(parts) != 3:
+        return None
+    branch, type_a, type_b = parts
+    type_a = _canonical_relationship_type(type_a)
+    type_b = _canonical_relationship_type(type_b)
+    if type_a not in STRENGTH_RANK or type_b not in STRENGTH_RANK:
+        return None
+    if _rule_id(type_a, type_b) != rule_id:
+        return None
+    result = _derive_type(type_a, type_b)
+
+    def kind(type_name):
+        word = type_name.lower()
+        return f"{'an' if word[0] in 'aeiou' else 'a'} {word} link"
+
+    words = f"{kind(type_a).capitalize()} followed by {kind(type_b)} gives {kind(result)}"
+    if branch == "transparent":
+        return f"{words}: composition, aggregation, realization and assignment pass a connection through unchanged."
+    if branch == "table":
+        return f"{words}, by the ArchiMate derivation table."
+    return f"{words}: no stronger rule applies, so only the weakest kind of link follows."
 
 
 class ArchiMateDerivationService:
@@ -124,7 +173,7 @@ class ArchiMateDerivationService:
             tgt = rel["target_id"]
             if src not in element_ids or tgt not in element_ids:
                 continue
-            adj.setdefault(src, []).append((tgt, rel["type"], rel["id"]))
+            adj.setdefault(src, []).append((tgt, _canonical_relationship_type(rel["type"]), rel["id"]))
 
         # Existing explicit pairs (source, target) to avoid duplicating
         explicit_pairs: Set[Tuple[int, int]] = set()

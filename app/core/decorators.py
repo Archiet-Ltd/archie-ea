@@ -186,11 +186,16 @@ def guarded_route(
                 if not current_user.is_authenticated:
                     return api_error("Authentication required", 401)
                 if auth == "admin":
-                    is_admin = (
-                        getattr(current_user, "is_admin", False)
-                        or getattr(current_user, "is_superuser", False)
-                    )
-                    if not is_admin:
+                    # R3-1 (PR 428 round 4): ``getattr(current_user,
+                    # "is_admin", False)`` with no call returns the bound
+                    # method, always truthy -- no caller passes
+                    # ``auth="admin"`` today, but the check itself admitted
+                    # everyone. ``is_superuser`` does not exist on ``User``
+                    # at all. Judged against the active organisation, the
+                    # same predicate every other admin check in this PR uses.
+                    from app.middleware.tenant_decorators import is_active_org_admin
+
+                    if not is_active_org_admin(current_user):
                         return api_error("Admin access required", 403)
 
             if roles:

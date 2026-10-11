@@ -38,6 +38,10 @@ pytestmark = pytest.mark.usefixtures("db_session")
 # emits; for the two redirect endpoints it is the Location they must send the
 # user to, asserted instead of the body.
 NAV_PAGES = {
+    "admin.audit_log_viewer": (
+        "/admin/audit-log",
+        "Each entry is sealed to the one before it",
+    ),
     "admin.governance_gates": ("/admin/governance-gates", "Governance Gates"),
     "admin.power_platform_integration": (
         "/admin/integrations/power-platform",
@@ -47,17 +51,30 @@ NAV_PAGES = {
         "/admin/integrations/salesforce",
         "Salesforce Org Discovery",
     ),
-    "admin.seed_management": ("/admin/seed-management", "Seed Management"),
+    # admin.seed_management was folded from platform_admin's Admin zone to
+    # make room for "Audit Log" within the link budget; it is a tile on the
+    # admin dashboard page (Command Center) instead.
     "error_events.errors_dashboard": (
         "/admin/errors",
         "Deduplicated server + client errors, aggregated by fingerprint across every organization.",
     ),
-    "batch_import_view.dashboard": ("/batch-import/", "Batch Import Dashboard"),
+    "intelligence_ui.value_streams_at_risk": (
+        "/intelligence/value-streams-at-risk",
+        "Value streams at risk",
+    ),
+    # Canvas/framework UI fix (24 Sep 2026): batch_import_view.dashboard was
+    # intentionally folded from platform_admin's Admin zone to stay within the
+    # link budget.
     "consolidation_list.dashboard": (
         "/consolidation-list/",
         "Consolidation List Dashboard",
     ),
-    "dashboard_pages.import_history": ("/dashboard/import-history", "Import History"),
+    # Canvas/framework UI fix, round 2 (25 Sep 2026): dashboard_pages.
+    # import_history was intentionally folded from platform_admin's Admin
+    # zone (with Batch Import above) to stay within the link budget once
+    # "Canvases" and "Frameworks" joined every role's Library zone. Both are
+    # tiles on the admin dashboard page instead of a sidebar zone entry --
+    # see app/utils/role_access.py's _ADMIN_LINKS comment.
     "dashboard_pages.rationalization_scorecard": (
         "/dashboard/rationalization/scorecard",
         "Executive Rationalization Scorecard",
@@ -101,6 +118,8 @@ def _make_user(db_session, enterprise_role="platform_admin"):
     ``is_platform_admin`` is set for the same reason: four of these pages sit
     in the Admin zone, which is gated on that real boolean.
     """
+    from sqlalchemy import select
+
     from app.models.organization import Organization
     from app.models.user import Role, User
 
@@ -109,25 +128,31 @@ def _make_user(db_session, enterprise_role="platform_admin"):
     db_session.add(org)
     db_session.flush()
 
-    user = User(
-        email=f"nav-{suffix}@example.com",
-        first_name="Nav",
-        last_name="Verifier",
-        organization_id=org.id,
-        confirmed=True,
-        enterprise_role=enterprise_role,
-        is_platform_admin=True,
-    )
-    db_session.add(user)
-    db_session.flush()
-
     role = Role.query.filter_by(name="Administrator").first()
     if role is None:
         Role.insert_roles()
         role = Role.query.filter_by(name="Administrator").first()
-    user.role = role
-    db_session.flush()
-    return user
+
+    # User's mapper-level audit hook writes its own audit row on the flush
+    # connection. In this rollback-fixture transaction shape that can leave the
+    # connection aborted even when the insert itself succeeds, which would make
+    # this file prove only the fixture breakage rather than whether the sidebar
+    # route renders. Insert the row directly, then load the mapped User back for
+    # login and route guards.
+    inserted = db_session.execute(
+        User.__table__.insert().values(
+            email=f"nav-{suffix}@example.com",
+            first_name="Nav",
+            last_name="Verifier",
+            organization_id=org.id,
+            confirmed=True,
+            enterprise_role=enterprise_role,
+            is_platform_admin=True,
+            role_id=role.id,
+        )
+    )
+    user_id = inserted.inserted_primary_key[0]
+    return db_session.execute(select(User).where(User.id == user_id)).scalar_one()
 
 
 def _login(client, user_id):

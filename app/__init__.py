@@ -45,6 +45,22 @@ def create_app(config=None):
     app.config.from_object(Config[config_name])
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+    # SECURITY: ADMIN_MFA_BYPASS (config.py's SmokeTestingConfig) exists only
+    # so the browser-smoke subprocess can skip the admin MFA gate
+    # (app/services/mfa_service.py::required_for) for fixtures that are not
+    # testing MFA itself. It is a hardcoded class attribute, never read from
+    # an environment variable, a request, a header or a database setting --
+    # but a hardcoded attribute copied onto the wrong config class would
+    # still be a real hole. Refuse to boot at all rather than ever let an
+    # administrator sign in without completing MFA outside a genuine testing
+    # boot.
+    if app.config.get("ADMIN_MFA_BYPASS") and not app.config.get("TESTING"):
+        raise RuntimeError(
+            "ADMIN_MFA_BYPASS is set but TESTING is not -- refusing to "
+            "start. This switch may only be true on a genuine testing "
+            "config (see config.py's SmokeTestingConfig)."
+        )
+
     Config[config_name].init_app(app)
 
     # 1. Extensions (db, csrf, mail, login_manager, compress, migrate, rq, cache)
@@ -59,6 +75,11 @@ def create_app(config=None):
     install_tenant_context(app)
     install_tenant_filter(app)
 
+    # 1b'. Transitional: keep unified_work_packages in step with the four retired
+    # work package stores while their remaining writers are repointed (R1-B04 PR 3).
+    from app.services.work_package_bridge import register as register_work_package_bridge
+    register_work_package_bridge(app)
+
     # 1c. Usage metering: non-blocking after_request event recording
     from app.middleware.usage_tracking import install_usage_tracking
     install_usage_tracking(app)
@@ -66,6 +87,14 @@ def create_app(config=None):
     # 1d. PostHog product analytics: auto-pageview tracking (COM-013)
     from app.middleware.analytics_middleware import install_analytics
     install_analytics(app)
+
+    # 1d-2. First-party, cookieless pageview counting for public marketing
+    # pages -- separate from the PostHog hook above, which only fires for a
+    # signed-in user.
+    from app.middleware.public_analytics_middleware import (
+        install_public_pageview_tracking,
+    )
+    install_public_pageview_tracking(app)
 
     # 1d. SOC 2 audit logging: SQLAlchemy mapper events for controlled models
     from app.middleware.audit_middleware import install_audit_logging

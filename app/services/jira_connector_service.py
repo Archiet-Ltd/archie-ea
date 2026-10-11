@@ -318,7 +318,7 @@ def _build_epic_description(item: Any, solution: Any) -> str:
         parts.append(f"ARB status: {item.status}")
     if item.decision_date:
         parts.append(f"Decided: {item.decision_date.strftime('%Y-%m-%d')}")
-    parts.append("Source: A.R.C.H.I.E. ARB governance platform")
+    parts.append("Source: Entelim ARB governance platform")
     return "\n".join(parts)
 
 

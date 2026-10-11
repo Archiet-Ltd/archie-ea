@@ -1,9 +1,31 @@
 #!/usr/bin/env python
-"""Find raw SQL that reads a tenant-scoped table without an organization predicate.
+"""Find raw SQL that reads a tenant-scoped table without an organization predicate,
+and raw SQL that writes organization_id outside the one command allowed to.
 
-    python scripts/check_raw_sql_tenancy.py            # report
-    python scripts/check_raw_sql_tenancy.py --count    # count only
+    python scripts/check_raw_sql_tenancy.py                       # both rules, report
+    python scripts/check_raw_sql_tenancy.py --count               # reads only, count
+    python scripts/check_raw_sql_tenancy.py --count --rule writes # writes only, count
     python scripts/check_raw_sql_tenancy.py --json
+
+Two rules live here because they are the same shape of problem -- a raw SQL
+string naming a tenant table, found by walking string literals rather than
+trusting a comment -- and one cached tenant-table list serves both.
+
+RULE 1 (reads, the original rule; still the default and the only rule
+``--count``/``--json`` run when ``--rule`` is not given, so the existing
+zero-tolerance gate this file has always driven is untouched). See below.
+
+RULE 2 (writes). A backfill that assigns organization_id to a pre-existing
+row is a one-time repair, and several of them accumulated by separate
+decision before the policy in app/commands/backfill_layer_tenancy.py
+existed: the next one would be another. This rule fails on any
+``UPDATE <tenant table> ... SET organization_id`` string found outside that
+one file, in app/ or scripts/. The dedicated commands that predate the
+policy are the counted, falling ratchet baseline, not an exemption -- they
+are not marked ``tenancy-ok`` for existing here; only a marker whose reason
+names a concrete retirement date or the command's own deletion ticket
+silences a finding, because a marker that says nothing checkable would let
+any future command opt out the same way.
 
 Why
 ---
@@ -45,7 +67,15 @@ Exemptions
 ----------
 Append `tenancy-ok: <reason>` on the line to record a deliberate exception, the
 same convention `design-tokens-ok` uses. Aggregates that are genuinely global,
-and CLI paths with no request context, are the expected users of it.
+and CLI paths with no request context, are the expected users of it. Rule 2
+honours the same marker only when the reason also names a retirement date or
+a deletion ticket, in plain words.
+
+Proven-against: a synthetic `UPDATE business_capability SET organization_id = 1`
+string added to a file under app/, measured the same way the gate measures it
+(`--count --rule writes`, as a subprocess) -- the count rose by one on the
+spot and returned to baseline once the file was removed; automated as
+tests/test_check_raw_sql_tenancy_writes.py.
 """
 
 from __future__ import annotations
@@ -72,6 +102,32 @@ FROM_TABLE = re.compile(r"\b(?:FROM|JOIN|UPDATE|INTO)\s+([a-z_][a-z0-9_]*)", re.
 # `vendor_organization_id` matched and was accepted as tenant scoping,
 # which silently passed two live cross-tenant leaks.
 _ORG_COL = re.compile(r"(?<![A-Za-z0-9_])organization_id(?![A-Za-z0-9_])")
+
+# Rule 2: a write. The table name is captured generically, the same way
+# FROM_TABLE is, and checked against tenant_tables() afterwards rather than
+# being baked into the pattern -- one regex for every table, not one per
+# table. A table name given as an interpolated variable (`UPDATE "{table}"`)
+# does not match this pattern at all: _string_parts turns that into the
+# literal text `{table}`, which is not `[A-Za-z_][A-Za-z0-9_]*`. That is the
+# same value-flow limit this file's own docstring already admits for the
+# parent-FK case on the read side -- a regex cannot chase a variable back to
+# its assignment either.
+_WRITE_ORG = re.compile(
+    r'\bUPDATE\s+"?([A-Za-z_][A-Za-z0-9_]*)"?\s+(?:AS\s+\w+\s+)?(?:\w+\s+)?SET\s+organization_id\b',
+    re.I,
+)
+
+# A marker on a rule-2 finding is honoured only when it names something
+# checkable -- a retirement date or the command's own deletion ticket -- not
+# a bare "tenancy-ok: legacy" that would let any command opt out the same way
+# the dedicated commands are counted, not excused, for.
+_WRITE_MARKER_OK = re.compile(
+    r"tenancy-ok:[^\n]*\b(?:\d{4}-\d{2}-\d{2}|deletion ticket)\b", re.I
+)
+
+# The one file rule 2 does not report on: it is the policy's home, not a
+# violation of it.
+_CANONICAL_BACKFILL = "app/commands/backfill_layer_tenancy.py"
 
 
 def tenant_tables() -> set[str]:
@@ -192,12 +248,111 @@ def scan_file(path: str, tables: set[str]) -> list[tuple[int, str, str]]:
     return findings
 
 
+class _StringLiteralVisitor(ast.NodeVisitor):
+    """Every top-level string literal in a module, one flattened text each --
+    except a module/function/class's own docstring, which documents code, and
+    is not SQL a request will ever send.
+
+    Without that exclusion this file failed on itself: its own docstring, in
+    prose, names the exact synthetic string its Proven-against line records
+    watching the gate fail on.
+
+    `ast.walk` alone would also visit a multi-line f-string's own
+    Constant/Name parts a second time, as if they were separate statements --
+    the same text searched twice under two different line numbers.
+    Overriding `visit_JoinedStr` to fold an f-string via `_string_parts` and
+    not descending further stops that double count.
+    """
+
+    def __init__(self) -> None:
+        self.found: list[tuple[int, str]] = []
+
+    def _visit_body_skipping_docstring(self, node: ast.AST) -> None:
+        body = list(node.body)  # type: ignore[attr-defined]
+        if (
+            body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            body = body[1:]
+        for child in body:
+            self.visit(child)
+
+    def visit_Module(self, node: ast.Module) -> None:  # noqa: N802
+        self._visit_body_skipping_docstring(node)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802
+        self._visit_body_skipping_docstring(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # noqa: N802
+        self._visit_body_skipping_docstring(node)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:  # noqa: N802
+        self._visit_body_skipping_docstring(node)
+
+    def visit_Constant(self, node: ast.Constant) -> None:  # noqa: N802
+        if isinstance(node.value, str):
+            self.found.append((node.lineno, node.value))
+
+    def visit_JoinedStr(self, node: ast.JoinedStr) -> None:  # noqa: N802
+        self.found.append((node.lineno, _string_parts(node)))
+
+
+def scan_file_writes(path: str, tables: set[str]) -> list[tuple[int, str, str]]:
+    """Rule 2: `UPDATE <tenant table> ... SET organization_id` outside the
+    one command that owns that write."""
+    try:
+        source = io.open(path, encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return []
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    lines = source.splitlines()
+    visitor = _StringLiteralVisitor()
+    visitor.visit(tree)
+    findings = []
+    for lineno, blob in visitor.found:
+        for m in _WRITE_ORG.finditer(blob):
+            table = m.group(1).lower()
+            if table not in tables:
+                continue
+            _window = lines[max(0, lineno - 10): lineno + 12]
+            seg_raw = "".join(_window)
+            if "tenancy-ok" in seg_raw and _WRITE_MARKER_OK.search(seg_raw):
+                continue
+            findings.append((lineno, table, blob.strip()[:90]))
+    return findings
+
+
+def _iter_py_files(*dirnames: str):
+    for dirname in dirnames:
+        for root, dirs, files in os.walk(os.path.join(REPO_ROOT, dirname)):
+            dirs[:] = [d for d in dirs if d != "__pycache__"]
+            for fn in files:
+                if fn.endswith(".py"):
+                    yield os.path.join(root, fn)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--count", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--rule",
+        choices=["reads", "writes"],
+        action="append",
+        help="reads: no organization_id predicate at all (rule 1). writes: "
+             "UPDATE ... SET organization_id outside the canonical backfill "
+             "(rule 2). Repeatable. Omitted together with --count or --json "
+             "keeps the original reads-only behaviour the zero-tolerance "
+             "raw-sql-tenancy gate has always measured; omitted with neither "
+             "runs both, for a human reading the full report.",
+    )
     args = parser.parse_args(argv)
 
     tables = tenant_tables()
@@ -205,35 +360,66 @@ def main(argv: list[str] | None = None) -> int:
         print("FAIL: could not determine the tenant-scoped tables", file=sys.stderr)
         return 1
 
-    results = []
-    for root, dirs, files in os.walk(os.path.join(REPO_ROOT, "app")):
-        dirs[:] = [d for d in dirs if d != "__pycache__"]
-        for fn in files:
-            if not fn.endswith(".py"):
-                continue
-            path = os.path.join(root, fn)
+    if args.rule:
+        rules = list(dict.fromkeys(args.rule))
+    elif args.count or args.json:
+        rules = ["reads"]
+    else:
+        rules = ["reads", "writes"]
+
+    read_results = []
+    if "reads" in rules:
+        for path in _iter_py_files("app"):
             for lineno, table, sql in scan_file(path, tables):
-                results.append({
+                read_results.append({
                     "file": os.path.relpath(path, REPO_ROOT).replace("\\", "/"),
                     "line": lineno, "table": table, "sql": sql,
                 })
 
+    write_results = []
+    if "writes" in rules:
+        for path in _iter_py_files("app", "scripts"):
+            rel = os.path.relpath(path, REPO_ROOT).replace("\\", "/")
+            if rel == _CANONICAL_BACKFILL:
+                continue
+            for lineno, table, blob in scan_file_writes(path, tables):
+                write_results.append({"file": rel, "line": lineno, "table": table, "sql": blob})
+
     if args.count:
-        print(len(results))
+        print(len(read_results) + len(write_results))
         return 0
     if args.json:
-        print(json.dumps({"tenant_tables": len(tables), "findings": results}, indent=2))
-        return 1 if results else 0
+        payload = {"tenant_tables": len(tables)}
+        if "reads" in rules:
+            payload["findings"] = read_results
+        if "writes" in rules:
+            payload["write_findings"] = write_results
+        print(json.dumps(payload, indent=2))
+        return 1 if (read_results or write_results) else 0
 
-    for r in results:
-        print(f"  {r['file']}:{r['line']}  [{r['table']}]  {r['sql']}")
-    if results:
-        print(f"\n{len(results)} raw SQL statement(s) read a tenant-scoped table with no "
-              f"organization_id predicate, across {len(tables)} tenant tables.")
-        print("Scope the query, or append 'tenancy-ok: <reason>' if it is deliberately global.")
-        return 1
-    print(f"No unscoped raw SQL found against {len(tables)} tenant-scoped tables.")
-    return 0
+    if "reads" in rules:
+        for r in read_results:
+            print(f"  {r['file']}:{r['line']}  [{r['table']}]  {r['sql']}")
+        if read_results:
+            print(f"\n{len(read_results)} raw SQL statement(s) read a tenant-scoped table with no "
+                  f"organization_id predicate, across {len(tables)} tenant tables.")
+            print("Scope the query, or append 'tenancy-ok: <reason>' if it is deliberately global.")
+        else:
+            print(f"No unscoped raw SQL found against {len(tables)} tenant-scoped tables.")
+
+    if "writes" in rules:
+        for r in write_results:
+            print(f"  {r['file']}:{r['line']}: writes organization_id on tenant table "
+                  f"{r['table']} outside the canonical backfill")
+        if write_results:
+            print(f"\n{len(write_results)} statement(s) write organization_id on a tenant "
+                  f"table outside {_CANONICAL_BACKFILL}.")
+            print("Move the write into that command, or append 'tenancy-ok: <reason>' naming "
+                  "a retirement date or a deletion ticket.")
+        else:
+            print(f"No organization_id write found outside {_CANONICAL_BACKFILL}.")
+
+    return 1 if (read_results or write_results) else 0
 
 
 if __name__ == "__main__":

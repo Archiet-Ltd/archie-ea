@@ -167,6 +167,7 @@ def test_persisted_row_carries_chain_rule_id_confidence_computed_at_depth(
     assert row.computed_at is not None
     assert row.depth == 2
 
+    # tenancy-ok: test query scoped by specific id
     array_len = db_session.execute(
         db.text("SELECT array_length(chain, 1) FROM archimate_derived_relationships WHERE id = :id"),
         {"id": row.id},

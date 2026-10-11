@@ -323,7 +323,7 @@ class SalesforceDiscoveryService:
                         action="salesforce_import_ungoverned",
                         action_description=(
                             f"Salesforce {sf_app.get('kind', 'app')} '{app_rec.name}' "
-                            "imported from org discovery — no owner in ARCHIE. "
+                            "imported from org discovery — no owner in Entelim. "
                             "Requires assignment."
                         ),
                         user_id=user_id,

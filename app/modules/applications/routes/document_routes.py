@@ -2,7 +2,7 @@
 
 import logging
 
-from flask import current_app, flash, redirect, request, send_file, url_for
+from flask import current_app, flash, g, redirect, request, send_file, url_for
 from flask_login import current_user, login_required
 from flask_wtf.csrf import CSRFError, validate_csrf
 from werkzeug.utils import secure_filename
@@ -57,13 +57,16 @@ def update_document_file(id, doc_id):
             )
         )
 
-    try:
-        from app.models.miscellaneous import ApplicationDocument
+    from app.models.miscellaneous import ApplicationDocument
 
-        # tenant-scoping-ok: filtered by id (PK) plus an application_component_id FK.
-        doc = ApplicationDocument.query.filter_by(
-            id=doc_id, application_component_id=id
-        ).first_or_404()
+    query = ApplicationDocument.query.filter_by(
+        id=doc_id, application_component_id=id
+    )
+    if not getattr(current_user, "is_platform_admin", False):
+        query = query.filter_by(organization_id=g.current_org_id)
+    doc = query.first_or_404()
+
+    try:
         doc.title = request.form.get("title", doc.title)
         doc.description = request.form.get("description", doc.description)
         db.session.commit()
@@ -200,6 +203,7 @@ def upload_document_file(application_id):
 
         document = ApplicationDocument(
             application_component_id=app.id,
+            organization_id=app.organization_id,
             title=document_title,
             description=document_description,
             file_name=file.filename,
@@ -207,6 +211,7 @@ def upload_document_file(application_id):
             file_path=None,
             file_size=None,
             uploaded_by=uploaded_by,
+            uploaded_by_id=current_user.id if current_user.is_authenticated else None,
         )
         db.session.add(document)
         db.session.flush()
@@ -252,12 +257,17 @@ def download_document_file(doc_id):
 
     from app.models.miscellaneous import ApplicationDocument
 
-    doc = ApplicationDocument.query.get_or_404(doc_id)
+    query = ApplicationDocument.query.filter_by(id=doc_id)
+    if not getattr(current_user, "is_platform_admin", False):
+        query = query.filter_by(organization_id=g.current_org_id)
+    doc = query.first_or_404()
 
-    # Tenant isolation: verify the document's parent app belongs to current org
+    # Tenant isolation: verify the document belongs to the caller's organisation.
+    # The query above skips the organisation filter for platform administrators,
+    # who can reach any document; verify_file_access provides a second line of
+    # defence, including unrestricted access for platform admins.
     from app.middleware.tenant_files import verify_file_access
-    parent_app = ApplicationComponent.query.get(doc.application_component_id)
-    if parent_app and not verify_file_access(getattr(parent_app, "organization_id", None)):
+    if not verify_file_access(doc.organization_id):
         flash("Access denied.", "error")
         return redirect(url_for("unified_applications.application_list"))
 
@@ -289,6 +299,36 @@ def download_document_file(doc_id):
     return redirect(url_for("unified_applications.application_list"))
 
 
+def _may_delete_document(doc, user):
+    """Return True when *user* may delete *doc*.
+
+    The caller must already have passed tenant isolation (the document belongs
+    to the same organisation as the caller, or the caller is a platform
+    administrator).  This function checks only the ownership rule within that
+    organisation: the uploader may delete, and an admin OF THE ACTIVE
+    organisation may delete.
+
+    D-4 (admin-rbac-active-org continuation): the admin branch used to be
+    ``user.is_admin()`` -- a global ``Permission.ADMINISTER`` flag,
+    independent of which organisation is active in the session
+    (``g.current_org_id``). Since every self-registered user is
+    Administrator of their own organisation, a user who merely accepted a
+    Viewer invitation into another organisation and switched their session
+    into it could delete that organisation's documents too, despite never
+    uploading them -- the exact bug ``admin_required``/``org_admin_required``
+    already fix elsewhere in this PR.
+    """
+    from flask import g
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    active_org_id = getattr(g, "current_org_id", None)
+    if is_platform_admin(user) or rbac_service.is_org_admin(user, active_org_id):
+        return True
+    return doc.uploaded_by_id is not None and doc.uploaded_by_id == user.id
+
+
 @unified_applications_bp.route("/documents/<int:doc_id>/delete", methods=["POST"])
 @login_required
 @audit_log("document_delete")
@@ -298,25 +338,31 @@ def delete_document_file(doc_id):
 
     from app.models.miscellaneous import ApplicationDocument
 
-    doc = ApplicationDocument.query.get_or_404(doc_id)
+    query = ApplicationDocument.query.filter_by(id=doc_id)
+    if not getattr(current_user, "is_platform_admin", False):
+        query = query.filter_by(organization_id=g.current_org_id)
+    doc = query.first_or_404()
     app_id = doc.application_component_id
 
-    # Tenant isolation: verify the parent app belongs to the caller's org.
-    #
-    # ApplicationDocument carries organization_id but not TenantMixin, so no filter
-    # is injected and .get_or_404() returns any tenant's row. Without this, any
-    # authenticated user could destroy any tenant's document - the row and the file
-    # on disk - by walking integer ids, and deletion is not recoverable.
-    #
-    # Both this route and the legacy /dashboard/documents/<id>/delete in
-    # app/application_mgmt/documents_routes.py are registered, so the check has to
-    # exist in both. Fixing only one leaves the door open under a different URL.
+    # Tenant isolation: verify the document belongs to the caller's organisation.
+    # The query above skips the organisation filter for platform administrators,
+    # who can reach any document; verify_file_access provides a second line of
+    # defence, including unrestricted access for platform admins.
     from app.middleware.tenant_files import verify_file_access
-    from app.models.application_portfolio import ApplicationComponent
-    parent_app = ApplicationComponent.query.get(app_id)
-    if parent_app and not verify_file_access(getattr(parent_app, "organization_id", None)):
+    if not verify_file_access(doc.organization_id):
         flash("Access denied.", "danger")
         return redirect(url_for("unified_applications.application_list"))
+
+    # Ownership check: only the uploader (by user id) or an administrator can delete.
+    if not _may_delete_document(doc, current_user):
+        flash("You do not have permission to delete this document.", "error")
+        return redirect(
+            url_for(
+                "unified_applications.application_detail",
+                id=app_id,
+                tab="architecture",
+            )
+        )
 
     # Validate CSRF token manually (consistent with other doc routes in this file)
     try:
@@ -347,24 +393,6 @@ def delete_document_file(doc_id):
                 "unified_applications.application_detail", id=app_id, tab="architecture"
             )
         )
-
-    # Ownership check: only the uploader or an admin can delete
-    if current_user.is_authenticated:
-        is_owner = (
-            hasattr(doc, "uploaded_by")
-            and doc.uploaded_by
-            and doc.uploaded_by == current_user.full_name()
-        )
-        is_admin = hasattr(current_user, "role") and current_user.role in ("admin", "architect")
-        if not is_owner and not is_admin:
-            flash("You do not have permission to delete this document.", "error")
-            return redirect(
-                url_for(
-                    "unified_applications.application_detail",
-                    id=app_id,
-                    tab="architecture",
-                )
-            )
 
     try:
         if doc.file_path and os.path.exists(doc.file_path):

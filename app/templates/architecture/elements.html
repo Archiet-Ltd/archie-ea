@@ -223,11 +223,11 @@
             </button>
             <div class="flex-1"></div>
             <span class="text-sm text-muted-foreground" x-text="totalCount + ' elements'"></span>
-            <a href="/solutions/import/archimate"
+            <a href="{{ url_for('architect_ui.import_oef') }}"
                class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4 py-2"
                data-testid="import-oef-link">
                 <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
-                Import OEF Model
+                Import model file
             </a>
             <button type="button" @click="showCreateModal = true"
                     class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
@@ -303,7 +303,7 @@
             <button type="button" @click="clearFilters()" class="mt-2 text-sm text-primary hover:underline">Clear all filters</button>
             {% if current_user.enterprise_role in ('enterprise_architect', 'platform_admin') or current_user.is_admin() %}
             <p class="mt-3 text-sm text-muted-foreground">
-                <a href="/solutions/import/archimate" class="text-primary hover:underline" data-testid="import-oef-link-empty">Import an existing model (OEF XML)</a>,
+                <a href="{{ url_for('architect_ui.import_oef') }}" class="text-primary hover:underline" data-testid="import-oef-link-empty">Import model file</a>,
                 <a href="/archimate/composer" class="text-primary hover:underline">open the Composer</a> to create elements,
                 or <a href="/admin/abacus-settings" class="text-primary hover:underline">sync from Abacus</a>.
             </p>

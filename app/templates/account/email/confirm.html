@@ -3,9 +3,10 @@
 <body>
 <p>Dear {{ user.full_name() }},</p>
 <p>Welcome to {{ config.APP_NAME }}!</p>
-<p>To confirm your account, please click on the following link:</p>
-<p><a href="{{ confirm_link }}">Confirm Your Account</a></p>
-<p>Sincerely,<br>The {{ config.APP_NAME }} Team</p>
+<p>To confirm your e-mail address, <a href="{{ confirm_link }}">open this link</a>, or paste it into your browser's address bar:</p>
+<p>{{ confirm_link }}</p>
+<p>The link works once{% if expires_at %} and until {{ expires_at.strftime('%d %b %Y %H:%M') }} UTC{% endif %}.</p>
+<p>The {{ config.APP_NAME }} Team</p>
 <p><small>Note: replies to this email address are not monitored.</small></p>
 </body>
 </html>

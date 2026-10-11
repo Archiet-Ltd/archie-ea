@@ -2,8 +2,10 @@
 import logging
 
 from flask import Blueprint, g, jsonify, render_template, request
+from sqlalchemy import String, cast
 
 from app import db
+from app.models.solution_models import Solution
 from app.models.solution_stakeholder import SolutionStakeholder, SolutionStakeholderMapping
 from app.modules.architecture.services.stakeholder_service import StakeholderService
 from app.services.feature_flag_service import FeatureFlagService
@@ -15,6 +17,11 @@ stakeholder_map_ui_bp = Blueprint("stakeholder_map", __name__)
 stakeholder_map_api_bp = Blueprint("stakeholder_map_api", __name__, url_prefix="/api/stakeholders")
 
 
+def _solution_for_current_organisation(solution_id: int):
+    """Return the caller-visible solution, or None when it is not in scope."""
+    return Solution.query.filter_by(id=solution_id).first()
+
+
 # ---------------------------------------------------------------------------
 # UI
 # ---------------------------------------------------------------------------
@@ -24,10 +31,20 @@ stakeholder_map_api_bp = Blueprint("stakeholder_map_api", __name__, url_prefix="
 def stakeholder_map_page():
     """GET /stakeholders/map — Power/Interest grid canvas."""
     from app.models.solution_models import Solution
+    from app.modules.architecture.services.stakeholder_service import (
+        programme_for_map,
+        programmes_for_map,
+    )
+
     solutions = Solution.query.order_by(Solution.name).all()
+    # ?programme_id= opens the map on that programme (the programme screen
+    # links here); an id this organisation cannot see is ignored.
+    initial = programme_for_map(request.args.get("programme_id", type=int))
     return render_template(
         "stakeholders/map.html",
         solutions=solutions,
+        programmes=programmes_for_map(),
+        initial_programme_id=initial.id if initial else None,
     )
 
 
@@ -38,12 +55,28 @@ def stakeholder_map_page():
 @stakeholder_map_api_bp.route("/map-data")
 @login_required
 def map_data():
-    """GET /api/stakeholders/map-data?solution_id=<id>
+    """GET /api/stakeholders/map-data?solution_id=<id> | ?programme_id=<id>
     Returns stakeholder list serialised for the D3 scatter canvas.
     """
     solution_id = request.args.get("solution_id", type=int)
+    programme_id = request.args.get("programme_id", type=int)
 
-    if solution_id:
+    if programme_id:
+        from app.modules.architecture.services.stakeholder_service import programme_for_map
+
+        if programme_for_map(programme_id) is None:
+            return jsonify({"error": "Programme not found"}), 404
+        # Only the stakeholders linked to this programme: an empty programme
+        # map is shown as empty, never filled with other stakeholders.
+        linked_ids = db.session.query(SolutionStakeholderMapping.stakeholder_id).filter_by(
+            programme_id=programme_id
+        ).subquery()
+        stakeholders = SolutionStakeholder.query.filter(
+            SolutionStakeholder.id.in_(linked_ids)
+        ).order_by(SolutionStakeholder.name).all()
+    elif solution_id:
+        if _solution_for_current_organisation(solution_id) is None:
+            return jsonify({"error": "Solution not found"}), 404
         # Stakeholders linked to this solution via mapping table
         linked_ids = db.session.query(SolutionStakeholderMapping.stakeholder_id).filter_by(
             solution_id=solution_id
@@ -51,9 +84,6 @@ def map_data():
         stakeholders = SolutionStakeholder.query.filter(
             SolutionStakeholder.id.in_(linked_ids)
         ).all()
-        # Fallback: return all if none linked
-        if not stakeholders:
-            stakeholders = SolutionStakeholder.query.limit(500).all()
     else:
         stakeholders = SolutionStakeholder.query.limit(500).all()
 
@@ -94,6 +124,11 @@ def search_people():
             User.first_name.ilike(f"%{q}%"),
             User.last_name.ilike(f"%{q}%"),
             User.email.ilike(f"%{q}%"),
+            db.func.concat(
+                db.func.coalesce(cast(User.first_name, String), ""),
+                " ",
+                db.func.coalesce(cast(User.last_name, String), ""),
+            ).ilike(f"%{q}%"),
         )
     ).limit(10).all()
     for u in users:
@@ -115,6 +150,26 @@ def create_stakeholder():
     """
     data = request.get_json(force=True) or {}
     from app.models.solution_stakeholder import StakeholderType, StakeholderAttitude
+
+    programme_id = data.get("programme_id")
+    solution_id = data.get("solution_id")
+    if programme_id:
+        from app.modules.architecture.services.stakeholder_service import programme_for_map
+
+        try:
+            programme_id = int(programme_id)
+        except (ValueError, TypeError):
+            return jsonify({"error": "programme_id must be an integer"}), 400
+        if programme_for_map(programme_id) is None:
+            return jsonify({"error": "Programme not found"}), 404
+
+    if solution_id:
+        try:
+            solution_id = int(solution_id)
+        except (ValueError, TypeError):
+            return jsonify({"error": "solution_id must be an integer"}), 400
+        if _solution_for_current_organisation(solution_id) is None:
+            return jsonify({"error": "Solution not found"}), 404
 
     # Check if linking to existing entity
     business_actor_id = data.get("business_actor_id")
@@ -149,18 +204,15 @@ def create_stakeholder():
     db.session.flush()
 
     # Link to solution if provided
-    solution_id = data.get("solution_id")
     if solution_id:
-        try:
-            solution_id = int(solution_id)
-        except (ValueError, TypeError):
-            db.session.rollback()
-            return jsonify({"error": "solution_id must be an integer"}), 400
         mapping = SolutionStakeholderMapping(
             stakeholder_id=s.id,
             solution_id=solution_id,
         )
         db.session.add(mapping)
+
+    if programme_id:
+        db.session.add(SolutionStakeholderMapping(stakeholder_id=s.id, programme_id=programme_id))
 
     db.session.commit()
     return jsonify(s.to_dict(include_details=False)), 201
@@ -192,6 +244,23 @@ def update_stakeholder(stakeholder_id):
 
     db.session.commit()
     return jsonify(s.to_dict(include_details=False))
+
+
+@stakeholder_map_api_bp.route("/programme-suggestions")
+@login_required
+def programme_suggestions():
+    """GET /api/stakeholders/programme-suggestions?programme_id=<id>
+    Owners recorded for what the programme affects, to add to its map.
+    """
+    from app.modules.architecture.services.stakeholder_service import (
+        programme_for_map,
+        programme_owner_suggestions,
+    )
+
+    programme_id = request.args.get("programme_id", type=int)
+    if programme_for_map(programme_id) is None:
+        return jsonify({"error": "Programme not found"}), 404
+    return jsonify(programme_owner_suggestions(programme_id))
 
 
 # ---------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
 
@@ -1248,7 +1249,7 @@
       <div>
         <div class="flex items-center gap-3 mb-4">
           <div class="w-1 h-5 rounded-full bg-primary"></div>
-          <p class="text-sm font-semibold text-foreground">ArchiMate Elements</p>
+          <p class="text-sm font-semibold text-foreground">Architecture Elements</p>
           <span class="text-xs text-muted-foreground">({{ archimate_elements | length }} elements)</span>
           <button type="button"
                   @click="$dispatch('open-archimate-picker', {linkEndpoint: '/api/solutions/{{ solution.id }}/elements'})"

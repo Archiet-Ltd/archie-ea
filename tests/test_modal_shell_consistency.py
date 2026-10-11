@@ -114,3 +114,55 @@ def test_no_native_dialog_or_console_calls_in_modal_shells():
                 if not src[max(0, m.start() - 15):m.start()].endswith("Platform.modal.")
             ]
             assert not hits, f"{rel} uses banned {banned}"
+
+
+def test_unified_mapping_modal_zindex_is_not_a_tailwind_arbitrary_class():
+    """A CSP fix once moved this modal's z-index onto Tailwind arbitrary-value
+    classes (`z-[var(--modal-z,1000)]` on the root, `z-[calc(var(--modal-z,1000)+1)]`
+    on the panel). Tailwind's JIT compiler does not reliably emit a usable rule
+    for an arbitrary value that mixes a comma and a `+`, so the compiled
+    stylesheet silently dropped the panel's raised z-index and the panel sat
+    level with its own backdrop instead of above it. The working fix sets both
+    z-index levels as real CSS in the nonce-scoped <style> block at the top of
+    the file, and the modal's root and panel elements must never again carry
+    an arbitrary z-[...] class for this. Fail-first: this failed against the
+    Tailwind-arbitrary-class version of the file before the fix, and passes
+    against the <style>-block version."""
+    rel = "app/templates/components/unified_mapping_modal.html"
+    src = _read(rel)
+
+    root_rule = re.search(
+        r"#unified-mapping-modal\s*\{\s*z-index:\s*var\(--modal-z,\s*(\d+)\)\s*;?\s*\}",
+        src,
+    )
+    panel_rule = re.search(
+        r"#unified-mapping-modal\s*\[data-modal-panel\]\s*\{\s*z-index:\s*"
+        r"calc\(var\(--modal-z,\s*(\d+)\)\s*\+\s*(\d+)\)\s*;?\s*\}",
+        src,
+    )
+    assert root_rule, (
+        f"{rel}: no explicit '#unified-mapping-modal {{ z-index: var(--modal-z, N) }}' "
+        "rule in a <style> block"
+    )
+    assert panel_rule, (
+        f"{rel}: no explicit panel z-index rule "
+        "('#unified-mapping-modal [data-modal-panel] { z-index: calc(...) }') "
+        "in a <style> block"
+    )
+    assert root_rule.group(1) == panel_rule.group(1), (
+        f"{rel}: the root and panel z-index rules fall back to different "
+        "--modal-z values"
+    )
+    assert int(panel_rule.group(2)) > 0, (
+        f"{rel}: the panel's z-index must be raised strictly above the root, "
+        "not merely equal to it"
+    )
+
+    root_tag = re.search(r'<div id="unified-mapping-modal"[^>]*>', src)
+    panel_tag = re.search(r"<div data-modal-panel\b[^>]*>", src)
+    assert root_tag and "z-[" not in root_tag.group(0), (
+        f"{rel}: the modal root carries a Tailwind arbitrary z-[...] class again"
+    )
+    assert panel_tag and "z-[" not in panel_tag.group(0), (
+        f"{rel}: the modal panel carries a Tailwind arbitrary z-[...] class again"
+    )

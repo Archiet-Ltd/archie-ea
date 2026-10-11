@@ -1,0 +1,50 @@
+---
+page_family: function-per-segment
+use_case_id: UC-S1-06
+segment_id: S1
+state: on_main
+source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
+capture_status: awaiting_capture
+url_slug: /use-cases/single-point-of-failure
+---
+
+# If our one cloud platform or payment provider goes down, what stops?
+
+**For startup founders and early operators putting the business on one page for the first time.**
+
+## The question
+
+You're five to fifty people, pre-Series B. You've picked the tools — one cloud account, one payment
+processor, maybe one identity provider — because picking one of everything is how a small team
+moves fast. Nobody has mapped what actually depends on each one, because nobody has time to draw
+architecture diagrams for a company this size.
+
+Then a fundraising round, a board meeting, or a new hire who asks "what happens if Stripe goes down"
+makes you realize you don't actually know.
+
+## What Entelim answers
+
+Ask the question in plain words, and Entelim traces every relationship your model has — the ones
+you entered and the ones it worked out on its own — to show exactly what sits downstream. Every
+connection in the answer carries its own reasoning, open to check in a proof drawer, never a number
+you have to take on faith.
+
+## Who this is for
+
+Founders and early operators at a company of five to fifty people, pre-Series B. The person asking
+this is usually the founder themselves, or their first operations or product hire — the one person
+whose head has been the system of record until now.
+
+## Before you ask "isn't this overkill for a company our size?"
+
+Start from what you already use — a Lean Canvas, a Business Model Canvas, or nothing written down
+at all. The underlying model notation is never shown unless you choose to open it. If your canvas
+already lives in Miro or Notion, keep it there: Entelim's own version is the Business Model Canvas,
+where every block gets an AI-drafted suggestion pulled from your own model data, so you start from
+something real instead of a blank box.
+
+## Related
+
+- [Business Model Canvas](/use-cases/business-model-canvas-on-one-page)
+- [Show an investor what we run, in an afternoon](/use-cases/architecture-map-for-due-diligence)
+- [What must be true for our revenue stream](/use-cases/value-streams-at-risk)

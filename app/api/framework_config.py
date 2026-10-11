@@ -17,9 +17,10 @@ import logging
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from app.middleware.tenant_decorators import platform_admin_required
 
 from app import db
+from app.jobs.tenant_safe_job import platform_scope
 from app.decorators import audit_log
 from app.models.framework_configuration import (
     CapabilityFrameworkConfiguration,
@@ -38,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 @framework_config_bp.route("/configurations", methods=["GET"])
-@login_required
+@platform_admin_required
 def get_configurations():
     """
     Get all framework configurations
@@ -106,7 +107,7 @@ def get_configurations():
 
 
 @framework_config_bp.route("/configurations", methods=["POST"])
-@login_required
+@platform_admin_required
 @audit_log("framework_config_create")
 def create_configuration():
     """
@@ -167,7 +168,8 @@ def create_configuration():
             return jsonify({"success": False, "error": "Configuration code already exists"}), 400
 
         # Create configuration
-        configuration = FrameworkConfigurationService.create_configuration(data)
+        with platform_scope("platform administrator creates a shared framework configuration"):
+            configuration = FrameworkConfigurationService.create_configuration(data)
 
         return (
             jsonify(
@@ -185,7 +187,7 @@ def create_configuration():
 
 
 @framework_config_bp.route("/configurations/<int:config_id>", methods=["GET"])
-@login_required
+@platform_admin_required
 def get_configuration(config_id):
     """
     Get framework configuration by ID
@@ -225,7 +227,7 @@ def get_configuration(config_id):
 
 
 @framework_config_bp.route("/configurations/<int:config_id>", methods=["PUT"])
-@login_required
+@platform_admin_required
 @audit_log("framework_config_update")
 def update_configuration(config_id):
     """
@@ -266,7 +268,8 @@ def update_configuration(config_id):
     try:
         data = request.get_json()
 
-        configuration = FrameworkConfigurationService.update_configuration(config_id, data)
+        with platform_scope("platform administrator edits a shared framework configuration"):
+            configuration = FrameworkConfigurationService.update_configuration(config_id, data)
 
         if not configuration:
             return jsonify({"success": False, "error": "Configuration not found"}), 404
@@ -284,7 +287,7 @@ def update_configuration(config_id):
 
 
 @framework_config_bp.route("/configurations/<int:config_id>", methods=["DELETE"])
-@login_required
+@platform_admin_required
 @audit_log("framework_config_delete")
 def delete_configuration(config_id):
     """
@@ -313,7 +316,8 @@ def delete_configuration(config_id):
         description: Server error
     """
     try:
-        success = FrameworkConfigurationService.delete_configuration(config_id)
+        with platform_scope("platform administrator deletes a shared framework configuration"):
+            success = FrameworkConfigurationService.delete_configuration(config_id)
 
         if not success:
             return (
@@ -330,7 +334,7 @@ def delete_configuration(config_id):
 
 
 @framework_config_bp.route("/configurations/<int:config_id>/validate", methods=["POST"])
-@login_required
+@platform_admin_required
 def validate_configuration(config_id):
     """
     Validate framework configuration
@@ -365,7 +369,7 @@ def validate_configuration(config_id):
 
 
 @framework_config_bp.route("/configurations/active", methods=["GET"])
-@login_required
+@platform_admin_required
 def get_active_configuration():
     """
     Get active configuration for organization
@@ -406,7 +410,7 @@ def get_active_configuration():
 
 
 @framework_config_bp.route("/extensions", methods=["GET"])
-@login_required
+@platform_admin_required
 def get_available_extensions():
     """
     Get available framework extensions
@@ -462,7 +466,7 @@ def get_available_extensions():
 
 
 @framework_config_bp.route("/extensions/<extension_code>", methods=["GET"])
-@login_required
+@platform_admin_required
 def get_extension_details(extension_code):
     """
     Get extension details by code
@@ -534,7 +538,7 @@ def get_extension_details(extension_code):
 @framework_config_bp.route(
     "/configurations/<int:config_id>/extensions/<extension_code>/install", methods=["POST"]
 )
-@login_required
+@platform_admin_required
 @audit_log("framework_extension_install")
 def install_extension(config_id, extension_code):
     """
@@ -568,7 +572,8 @@ def install_extension(config_id, extension_code):
         description: Server error
     """
     try:
-        success = FrameworkExtensionService.install_extension(config_id, extension_code)
+        with platform_scope("platform administrator installs an extension on a shared framework configuration"):
+            success = FrameworkExtensionService.install_extension(config_id, extension_code)
 
         if not success:
             return (
@@ -590,7 +595,7 @@ def install_extension(config_id, extension_code):
 
 
 @framework_config_bp.route("/templates", methods=["GET"])
-@login_required
+@platform_admin_required
 def get_configuration_templates():
     """
     Get available configuration templates
@@ -684,7 +689,7 @@ def get_configuration_templates():
 
 
 @framework_config_bp.route("/templates/<int:template_id>/deploy", methods=["POST"])
-@login_required
+@platform_admin_required
 @audit_log("framework_template_deploy")
 def deploy_template(template_id):
     """
@@ -744,12 +749,14 @@ def deploy_template(template_id):
         if "organization_name" in data:
             template_config["organization_name"] = data["organization_name"]
 
-        # Create configuration from template
-        configuration = FrameworkConfigurationService.create_configuration(template_config)
+        # Create configuration from template, and count the use on the shared
+        # template: both rows are platform-wide catalogue rows.
+        with platform_scope("platform administrator deploys a shared framework template"):
+            configuration = FrameworkConfigurationService.create_configuration(template_config)
 
-        # Update template usage count
-        template.usage_count += 1
-        db.session.commit()
+            # Update template usage count
+            template.usage_count += 1
+            db.session.commit()
 
         return jsonify(
             {
@@ -764,7 +771,7 @@ def deploy_template(template_id):
 
 
 @framework_config_bp.route("/migrations", methods=["POST"])
-@login_required
+@platform_admin_required
 @audit_log("framework_migration_create")
 def create_migration_mapping():
     """
@@ -820,7 +827,8 @@ def create_migration_mapping():
             if field not in data:
                 return jsonify({"success": False, "error": f"Missing required field: {field}"}), 400
 
-        migration = FrameworkMigrationService.create_migration_mapping(data)
+        with platform_scope("platform administrator creates a shared framework migration mapping"):
+            migration = FrameworkMigrationService.create_migration_mapping(data)
 
         return (
             jsonify(
@@ -849,7 +857,7 @@ def create_migration_mapping():
 
 
 @framework_config_bp.route("/migrations/<int:migration_id>/execute", methods=["POST"])
-@login_required
+@platform_admin_required
 @audit_log("framework_migration_execute")
 def execute_migration(migration_id):
     """
@@ -876,7 +884,8 @@ def execute_migration(migration_id):
         description: Server error
     """
     try:
-        result = FrameworkMigrationService.execute_migration(migration_id)
+        with platform_scope("platform administrator runs a shared framework migration mapping"):
+            result = FrameworkMigrationService.execute_migration(migration_id)
 
         return jsonify(
             {
@@ -894,7 +903,7 @@ def execute_migration(migration_id):
 
 
 @framework_config_bp.route("/instances", methods=["GET"])
-@login_required
+@platform_admin_required
 def get_framework_instances():
     """
     Get framework instances
@@ -980,7 +989,7 @@ def get_framework_instances():
 
 
 @framework_config_bp.route("/instances", methods=["POST"])
-@login_required
+@platform_admin_required
 @audit_log("framework_instance_create")
 def create_framework_instance():
     """
@@ -1083,7 +1092,7 @@ def create_framework_instance():
 
 
 @framework_config_bp.route("/health", methods=["GET"])
-@login_required
+@platform_admin_required
 def health_check():
     """
     Framework Config API Health Check

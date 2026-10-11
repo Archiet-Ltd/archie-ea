@@ -49,14 +49,28 @@ def test_detail_page_property_matches_fact_sheet_service(app, db_session, make_o
 
 @pytest.mark.usefixtures("db_session")
 def test_fully_populated_record_scores_high_on_both(app, db_session, make_org, tenant_ctx):
+    from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
+    from app.models.user import Role, User
 
     org = make_org("m3-complete-full")
     with tenant_ctx(org.id):
+        Role.insert_roles()
+        role_obj = Role.query.filter_by(name="User").first()
+        owner = User(
+            email="m3-complete-full@example.com",
+            first_name="Jane",
+            last_name="Doe",
+            organization_id=org.id,
+            confirmed=True,
+            role_id=role_obj.id if role_obj else None,
+        )
+        db_session.add(owner)
+        db_session.flush()
+
         component = ApplicationComponent(
             name="Fully Documented App",
             organization_id=org.id,
-            application_owner="Jane Doe",
             business_domain="Finance",
             business_criticality="high",
             lifecycle_status="operational",
@@ -69,6 +83,13 @@ def test_fully_populated_record_scores_high_on_both(app, db_session, make_org, t
             description="Core finance system",
         )
         db_session.add(component)
+        db_session.flush()
+        db_session.add(ApplicationOwner(
+            application_id=component.id,
+            user_id=owner.id,
+            organization_id=org.id,
+            ownership_type="primary",
+        ))
         db_session.commit()
 
         assert component.completeness_score == 100

@@ -29,6 +29,52 @@
             <h3 id="drawer-plain-terms-heading" class="text-sm font-semibold text-foreground">In plain terms</h3>
             <p class="mt-1 text-sm text-foreground" data-plain-terms x-text="drawer.plainTerms"></p>
         </section>
+        <section x-show="drawer.why.state !== 'idle'" x-cloak aria-labelledby="drawer-why-heading" data-why-chain>
+            <h3 id="drawer-why-heading" class="text-sm font-semibold text-foreground">The links behind this</h3>
+            <div x-show="drawer.why.state === 'loading'" x-cloak class="mt-2">
+                {{ skeleton_text(lines=2) }}
+            </div>
+            <p x-show="drawer.why.state === 'unavailable'" x-cloak role="status" class="mt-1 text-sm text-foreground">We could not load the links behind this just now.</p>
+            <div x-show="drawer.why.state === 'ready'" x-cloak class="mt-1 space-y-3">
+                <p x-show="drawer.why.rule" class="text-sm text-muted-foreground" data-why-rule x-text="drawer.why.rule"></p>
+                <p x-show="!drawer.why.rule" class="inline-flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">How it was worked out {{ provenance_badge('missing') }}</p>
+                <p x-show="drawer.why.links.length === 0" class="inline-flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">The links it was worked out from {{ provenance_badge('missing') }}</p>
+                <ol x-show="drawer.why.links.length > 0" class="space-y-2" aria-label="Links, in order">
+                    <template x-for="link in drawer.why.links" :key="link.position">
+                        <li class="min-w-0 rounded-md border border-border p-3 text-sm" data-why-link>
+                            <div x-show="link.resolved" class="space-y-1">
+                                <p x-show="link.sentence" class="break-words text-foreground" x-text="link.sentence"></p>
+                                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 break-words">
+                                    <a x-show="link.sourceHref" :href="link.sourceHref" class="font-medium text-primary hover:underline" x-text="link.sourceName"></a>
+                                    <span x-show="!link.sourceHref">{{ provenance_badge('missing') }}</span>
+                                    <span aria-hidden="true" class="text-muted-foreground">&rarr;</span>
+                                    <a x-show="link.targetHref" :href="link.targetHref" class="font-medium text-primary hover:underline" x-text="link.targetName"></a>
+                                    <span x-show="!link.targetHref">{{ provenance_badge('missing') }}</span>
+                                </p>
+                                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+                                    <span>Drawn by</span>
+                                    <span x-show="link.drawnBy" class="text-foreground" x-text="link.drawnBy"></span>
+                                    <span x-show="!link.drawnBy">{{ provenance_badge('missing') }}</span>
+                                    <span aria-hidden="true">&middot;</span>
+                                    <span x-show="link.drawnAt" x-text="link.drawnAt"></span>
+                                    <span x-show="!link.drawnAt">{{ provenance_badge('missing') }}</span>
+                                </p>
+                            </div>
+                            <p x-show="!link.resolved" class="flex flex-wrap items-center gap-1.5 text-foreground">This link is no longer in the model {{ provenance_badge('missing') }}</p>
+                        </li>
+                    </template>
+                </ol>
+                <div>
+                    <h4 class="text-sm font-medium text-foreground">Decisions about these things</h4>
+                    <ul x-show="drawer.why.decisions.length > 0" class="mt-1 space-y-1 text-sm" data-why-decisions>
+                        <template x-for="decision in drawer.why.decisions" :key="decision.id">
+                            <li class="min-w-0 break-words"><a :href="decision.href" class="font-medium text-primary hover:underline" x-text="decision.title"></a></li>
+                        </template>
+                    </ul>
+                    <p x-show="drawer.why.decisions.length === 0" class="mt-1 text-sm text-muted-foreground">No decision is recorded against them.</p>
+                </div>
+            </div>
+        </section>
         {{ stale_line('drawer.staleLine') }}
         <template x-for="token in [drawer.opened]" :key="token">
             <div>

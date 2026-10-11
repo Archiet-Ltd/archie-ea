@@ -1,0 +1,55 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block title %}Framework Extensions{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6 mx-auto max-w-7xl">
+    {{ page_header(
+        title='Framework Extensions',
+        description='Manage industry-specific framework extensions',
+        breadcrumbs=[
+            {'label': 'Dashboard', 'href': url_for('main.index')},
+            {'label': 'Framework Configuration', 'href': url_for('framework_config_ui.framework_config_dashboard')},
+            {'label': 'Extensions'}
+        ]
+    ) }}
+
+    {% if extensions %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for extension in extensions %}
+        <div class="bg-card rounded-lg border p-6">
+            <div class="flex items-center justify-between mb-4">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-accent text-primary">
+                    {{ extension.extension_type.title() if extension.extension_type else 'General' }}
+                </span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
+                    {{ extension.license_type.title() if extension.license_type else 'Standard' }}
+                </span>
+            </div>
+            <h3 class="text-lg font-semibold text-foreground mb-2">{{ extension.extension_name }}</h3>
+            <p class="text-sm text-muted-foreground mb-4">{{ extension.extension_description or '' }}</p>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="flex items-center">
+                        {% for i in range(extension.quality_score or 0) %}
+                        <svg class="w-4 h-4 text-warning/80" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838 1.19-1.118 1.81l1.07-3.292a1 1 0 00.364-1.118L2.98 8.72c-.783-.57-1.838-1.19-1.119-1.81H2.5a1 1 0 01-.95-.69L1.6 5.03c-.3-.92-1.603-.92-1.902 0z"></path>
+                        </svg>
+                        {% endfor %}
+                    </div>
+                    <span class="text-xs text-muted-foreground">{{ extension.quality_score or 0 }}/5</span>
+                </div>
+                <a href="{{ url_for('framework_config_ui.extension_details', extension_code=extension.extension_code) }}"
+                   class="text-sm text-primary hover:underline">Details</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 text-sm text-muted-foreground">
+        <p>No framework extensions are available yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

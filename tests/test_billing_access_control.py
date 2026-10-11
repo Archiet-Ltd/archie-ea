@@ -5,18 +5,40 @@ from flask import Flask
 from flask_login import LoginManager, UserMixin, login_user
 
 
-def _billing_test_app(monkeypatch, administrator):
+def _billing_test_app(monkeypatch, administrator, *, admin_of=1, home_admin=None):
     from app.modules.admin import billing_routes
+
+    # admin_required also asks rbac_service.is_org_admin about the ACTIVE
+    # organisation (g.current_org_id). No database here, so the OrgRole
+    # lookup is the storage boundary double: an administrator is an
+    # org_admin of organisation 1 (the active one), a non-administrator
+    # has no grant.
+    from flask import g
+    from app.models.org_role import OrgRole
+    monkeypatch.setattr(
+        OrgRole, "get_role",
+        classmethod(lambda cls, org_id, user_id:
+                    "org_admin" if administrator and org_id == admin_of else None),
+    )
 
     class User(UserMixin):
         id = "billing-test"
         organization = None
+        organization_id = 1
 
         def can(self, permission):
             return administrator
 
+        def is_admin(self):
+            return administrator if home_admin is None else home_admin
+
     app = Flask(__name__)
     app.secret_key = "isolated-billing-test"
+
+    @app.before_request
+    def _active_organisation():
+        g.current_org_id = 1
+
     login = LoginManager(app)
     login.user_loader(lambda user_id: User())
     app.register_blueprint(billing_routes.billing_bp, url_prefix="/admin/billing")
@@ -44,6 +66,20 @@ def test_billing_requires_administrator(monkeypatch, method, path, admin_status,
         session["_fresh"] = True
     response = client.open(path, method=method)
     assert response.status_code == (admin_status if administrator else 403)
+
+
+@pytest.mark.parametrize("method,path", [
+    ("GET", "/admin/billing/"), ("POST", "/admin/billing/upgrade"), ("GET", "/admin/billing/portal"),
+])
+def test_admin_of_a_different_organisation_is_refused(monkeypatch, method, path):
+    """Active-org property: holding ADMINISTER and being org_admin of organisation 2
+    must not open organisation 1's billing while organisation 1 is the active one."""
+    app = _billing_test_app(monkeypatch, True, admin_of=2, home_admin=False)
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["_user_id"] = "billing-test"
+        session["_fresh"] = True
+    assert client.open(path, method=method).status_code == 403
 
 
 @pytest.mark.parametrize("administrator", [False, True])

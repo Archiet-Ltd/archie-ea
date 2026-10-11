@@ -15,6 +15,7 @@ from typing import Optional  # dead-code-ok: used by type hints
 from sqlalchemy import Index, Text, UniqueConstraint
 
 from app import db
+from app.models.mixins.core import TenantMixin
 
 HAS_PGVECTOR = False
 Vector = None
@@ -250,12 +251,22 @@ class ApplicationComponentEmbedding(db.Model):
         return f"<ApplicationComponentEmbedding app_id={self.application_component_id}>"
 
 
-class DocumentChunkEmbedding(db.Model):
+class DocumentChunkEmbedding(TenantMixin, db.Model):
     """
     Vector embeddings for document chunks.
     Used for RAG retrieval over uploaded documents in AI Chat.
     Each row stores a ~512-token chunk of an uploaded document together
     with its embedding vector for cosine-similarity search.
+
+    Pre-TenantMixin, this table had no tenant boundary at all: the actual
+    text content of every tenant's uploaded documents, chunked, sat in one
+    unscoped table. Its only current read path (retrieve_document_chunks in
+    document_processing_service.py) is unused by any live caller today, but
+    a `document_id`-less call there does a cosine-similarity search across
+    ALL organisations' chunks with no filter -- fixing this now, before that
+    method gets a caller, closes the leak at its source rather than trusting
+    every future caller to remember to scope it. See
+    app/commands/reconcile_schema.py's `_backfill_document_chunk_organizations`.
     """
 
     __tablename__ = "document_chunk_embeddings"

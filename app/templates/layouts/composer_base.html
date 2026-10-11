@@ -8,16 +8,15 @@
 <head>
     {% include 'partials/_head.html' %}
     <title>{% block title %}{{ config.APP_NAME }}{% endblock %}</title>
-    <script>
-        (function() {
-            let stored = localStorage.getItem('theme');
-            if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            }
-        })();
-    </script>
+    {# Theme init script moved to partials/_head.html — one implementation for both layouts. #}
     {# Accessibility CSS: loaded once via partials/_head.html (asset_url filter) — do not re-include here (ARCH-061) #}
-    <style>[x-cloak] { display: none !important; }</style>
+    <style>
+    [x-cloak] { display: none !important; }
+    @media (max-width: 1023px) {
+      #admin-header { pointer-events: none; }
+      #admin-header > * { pointer-events: auto; }
+    }
+    </style>
     {% block extra_css %}{% endblock %}
     {% block head %}{% endblock %}
     {% block extra_head %}{% endblock %}
@@ -33,7 +32,7 @@
 
     {% block extra_head_js %}{% endblock %}
 </head>
-<body class="h-full bg-background antialiased overflow-hidden"{% if session_idle_timeout_seconds %} data-session-idle-seconds="{{ session_idle_timeout_seconds }}"{% endif %}
+<body class="h-full bg-background text-foreground antialiased overflow-hidden"{% if session_idle_timeout_seconds %} data-session-idle-seconds="{{ session_idle_timeout_seconds }}"{% endif %}
       data-suppress-global-search-shortcut="true">
     <a href="#main-content"
        class="skip-link sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md">
@@ -43,6 +42,19 @@
        class="skip-link sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md">
         Skip to sidebar navigation
     </a>
+
+    <button type="button"
+            x-data="{ isDesktop: window.innerWidth >= 1024 }"
+            x-init="window.addEventListener('resize', () => { isDesktop = window.innerWidth >= 1024; if (isDesktop) { $store.sidebar.open = false; } })"
+            x-show="!isDesktop && !$store.sidebar.open" x-cloak
+            @click="$store.sidebar.open = true"
+            class="fixed top-4 left-4 z-40 lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-input bg-background text-foreground shadow-sm hover:bg-accent transition-colors"
+            aria-controls="admin-sidebar"
+            aria-label="Open sidebar">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+    </button>
 
     <div class="relative flex h-screen overflow-hidden"
          @keydown.ctrl.b.window.prevent="$store.sidebar.toggle()"
@@ -58,16 +70,6 @@
                 });
             }
          }">
-        <button type="button" x-show="!isDesktop && !$store.sidebar.open" x-cloak
-                @click="$store.sidebar.open = true"
-                class="fixed top-4 left-4 z-[60] lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-input bg-background text-foreground shadow-sm hover:bg-accent transition-colors"
-                aria-controls="admin-sidebar"
-                aria-label="Open sidebar">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
-            </svg>
-        </button>
-
         <div x-show="$store.sidebar.open && !isDesktop" x-cloak
              @click="$store.sidebar.open = false"
              x-transition:enter="transition-opacity ease-out duration-200"
@@ -139,14 +141,7 @@
                 stop()  { this.count = Math.max(0, this.count - 1); if (this.count === 0) this.active = false; }
             });
 
-            Alpine.store('theme', {
-                dark: document.documentElement.classList.contains('dark'),
-                toggle() {
-                    this.dark = !this.dark;
-                    document.documentElement.classList.toggle('dark', this.dark);
-                    localStorage.setItem('theme', this.dark ? 'dark' : 'light');
-                }
-            });
+            /* Theme store moved to partials/_head.html — one implementation for both layouts. */
 
             /* Modal store is defined in admin_base and ui/modal.js; do not redefine here. */
 

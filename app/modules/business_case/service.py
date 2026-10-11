@@ -16,6 +16,8 @@ is always the source of truth, financial aggregation is best-effort.
 import logging
 from decimal import Decimal, InvalidOperation
 
+from flask_login import current_user
+
 from app import db
 from app.models.business_case import BUSINESS_CASE_STATUSES, BusinessCase
 from app.models.cost_intelligence import CapabilityCostAllocation
@@ -77,7 +79,13 @@ def list_business_cases():
 
 
 def get_business_case_or_none(business_case_id):
-    return BusinessCase.query.get(business_case_id)
+    # A primary-key .query.get(id) does not reliably carry the ORM tenant
+    # listener's WHERE clause the way a filtered query does, so a guessed id
+    # belonging to another organisation would still be found. Filter
+    # explicitly, the same two-layer rule applied elsewhere in this codebase.
+    return BusinessCase.query.filter_by(
+        id=business_case_id, organization_id=current_user.organization_id
+    ).first()
 
 
 def create_business_case(title, description=None, status=None, created_by_id=None, **fields):
@@ -277,10 +285,10 @@ def aggregate_financials(business_case, apply_missing=True):
             if roi is not None:
                 roi_candidates.append(_to_decimal(roi))
 
-        # UnifiedCapability lives in a parallel capability framework — same
-        # id space is not guaranteed to line up with business_capability, so
-        # this is a purely best-effort secondary lookup, never authoritative.
-        unified = _safe_get(UnifiedCapability, business_case.capability_id)
+        # UnifiedCapability has its own id space, so business_case.capability_id
+        # (a business_capability id) names the projected row only through its
+        # provenance (ADR 0008), never through a coincidentally equal primary key.
+        unified = _safe_projected_capability(business_case.capability_id)
         if unified is not None:
             report["unified_capability"] = {
                 "id": unified.id,
@@ -373,6 +381,21 @@ def _safe_get(model, pk):
         return model.query.get(pk)
     except Exception:
         logger.exception("aggregate_financials: lookup failed for %s id=%s", model.__name__, pk)
+        return None
+
+
+def _safe_projected_capability(capability_id):
+    from app.commands.project_capabilities import SOURCE_TABLE
+
+    try:
+        return UnifiedCapability.query.filter_by(
+            source_table=SOURCE_TABLE, source_id=str(capability_id)
+        ).first()
+    except Exception:
+        logger.exception(
+            "aggregate_financials: UnifiedCapability lookup failed for business_capability id=%s",
+            capability_id,
+        )
         return None
 
 

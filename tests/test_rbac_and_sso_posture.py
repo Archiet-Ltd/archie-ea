@@ -75,7 +75,7 @@ def _make_rbac_user(db_session, org, *, is_org_admin=False, is_platform_admin=Fa
         is_platform_admin=is_platform_admin,
         confirmed=True,
     )
-    user.password = "TestPassw0rd!23"
+    user.password = uuid.uuid4().hex
     db_session.add(user)
     db_session.flush()
     return user
@@ -101,23 +101,34 @@ def test_plain_user_is_rejected_by_the_rbac_gate(app, db_session, rbac_org, logi
     )
 
 
-def test_org_admin_without_administer_permission_is_still_rejected(app, db_session, rbac_org, login_as):
-    """org_admin_required alone is not sufficient — admin_required (the
-    Permission.ADMINISTER check) is a second, independent gate on the same
-    route. This is the layering the RBAC matrix depends on: flipping one
-    flag must not be enough to reach an ADMINISTER-only surface.
+def test_is_org_admin_derives_from_is_admin(app, db_session, rbac_org):
+    """is_org_admin is a derived property that returns is_admin().
+    Setting is_org_admin=True assigns the Administrator role, so the two can
+    never disagree.  The old test that asserted they COULD disagree
+    (is_org_admin=True with admin_permission=False) described a state this
+    change makes impossible by construction.
     """
     user = _make_rbac_user(db_session, rbac_org, is_org_admin=True, admin_permission=False)
     db_session.commit()
-    client = app.test_client()
-    login_as(client, user)
 
-    resp = client.get(_GATED_ROUTE)
-    assert resp.status_code == 403, (
-        f"is_org_admin=True but role lacks Permission.ADMINISTER still "
-        f"reached {_GATED_ROUTE} — got {resp.status_code}. The two gates "
-        "are not actually independent."
+    # After the setter runs, is_admin() must be True because is_org_admin=True
+    # assigned the Administrator role.
+    assert user.is_admin() is True, (
+        "is_org_admin=True must imply is_admin()==True — the setter assigns "
+        "the Administrator role"
     )
+    assert user.is_org_admin is True, (
+        "is_org_admin property must agree with is_admin()"
+    )
+
+
+def test_is_org_admin_false_does_not_grant_admin(app, db_session, rbac_org):
+    """Setting is_org_admin=False on a non-admin user leaves them non-admin."""
+    user = _make_rbac_user(db_session, rbac_org, is_org_admin=False, admin_permission=False)
+    db_session.commit()
+
+    assert user.is_admin() is False
+    assert user.is_org_admin is False
 
 
 def test_org_admin_with_administer_permission_is_admitted(app, db_session, rbac_org, login_as):
@@ -160,6 +171,61 @@ def test_platform_admin_only_route_rejects_a_mere_org_admin(app, db_session, rba
     assert resp.status_code in (403, 404), (
         f"an org_admin (not platform_admin) reached a platform_admin_required "
         f"route — got {resp.status_code}"
+    )
+
+
+def test_platform_admin_can_open_the_team_page(app, db_session, rbac_org, login_as):
+    """/admin/team gated only on the per-org OrgRole table (rbac_service),
+    a vocabulary a platform admin is not necessarily enrolled in for any one
+    org, so a platform admin with no OrgRole row here was refused a page
+    they are entitled to open. A platform admin (the flag plus
+    Permission.ADMINISTER, matching platform_admin_required elsewhere) must
+    reach it regardless of their per-org role.
+    """
+    admin = _make_rbac_user(db_session, rbac_org, is_platform_admin=True, admin_permission=True)
+    db_session.commit()
+    client = app.test_client()
+    login_as(client, admin)
+
+    resp = client.get("/admin/team")
+    assert resp.status_code == 200, (
+        f"a platform admin was refused /admin/team — got {resp.status_code}"
+    )
+
+
+def test_org_admin_via_orgrole_can_still_open_the_team_page(app, db_session, rbac_org, login_as):
+    """The pre-existing path — an OrgRole row of 'org_admin' for this org —
+    must keep working; broadening the gate to also admit platform admins
+    must not narrow it for the org_admin it already served.
+    """
+    from app.models.org_role import OrgRole
+
+    user = _make_rbac_user(db_session, rbac_org, admin_permission=False)
+    db_session.flush()
+    OrgRole.set_role(rbac_org.id, user.id, "org_admin", granted_by_id=user.id)
+    db_session.commit()
+    client = app.test_client()
+    login_as(client, user)
+
+    resp = client.get("/admin/team")
+    assert resp.status_code == 200, (
+        f"an org_admin (OrgRole table) was refused /admin/team — got {resp.status_code}"
+    )
+
+
+def test_plain_member_is_still_rejected_from_the_team_page(app, db_session, rbac_org, login_as):
+    """Broadening /admin/team to admit platform admins must not also admit
+    a plain org member who is neither an org_admin nor a platform admin.
+    """
+    user = _make_rbac_user(db_session, rbac_org, admin_permission=False)
+    db_session.commit()
+    client = app.test_client()
+    login_as(client, user)
+
+    resp = client.get("/admin/team")
+    assert resp.status_code == 403, (
+        f"a plain member (no org_admin, no platform admin) reached /admin/team "
+        f"— got {resp.status_code}"
     )
 
 
@@ -217,10 +283,13 @@ def test_oidc_sign_in_routes_404_when_disabled(app):
 
 
 # The single registered rule that names SAML: the per-organisation callback
-# (app/modules/auth/sso_routes.py). It is the explicit refusal for an
-# organisation whose SSO configuration says SAML: it answers 501 to every
-# request, reads no assertion and signs nobody in. Any other rule that names
-# SAML, in its path or its endpoint, is a SAML sign-in route and must not exist.
+# (app/modules/auth/sso_routes.py). SAML 2.0 is implemented (R1-B12 PR 2):
+# this is now the real Assertion Consumer Service that verifies a POSTed
+# <Response>'s signature against the organisation's configured IdP
+# certificate. A request with no matching session state or SSO
+# configuration still answers 400, never a 5xx -- the request itself is
+# invalid, not a server fault. Any OTHER rule that names SAML, in its path
+# or its endpoint, would be a second SAML route and must not exist.
 _SAML_REFUSAL = ("/auth/sso/callback/saml", "sso.sso_callback_saml")
 
 
@@ -246,17 +315,26 @@ def test_no_saml_sign_in_route_is_registered(app):
     )
 
 
-def test_the_per_organisation_saml_callback_only_refuses(app):
-    """The one SAML-named rule is a GET-only refusal that answers 501."""
+def test_the_per_organisation_saml_callback_is_post_only_and_fails_closed(app):
+    """The one SAML-named rule is the real Assertion Consumer Service
+    (R1-B12 PR 2): POST-only, per the SAML 2.0 HTTP-POST binding the IdP
+    uses to deliver a <Response>, and GET is refused.
+
+    A request with no matching login-session state (no SSOConfig found,
+    nothing to verify against) still answers 400, never a 5xx -- the
+    request itself is invalid, not a server fault.
+    """
     rules = [rule for rule in app.url_map.iter_rules() if rule.endpoint == _SAML_REFUSAL[1]]
     assert len(rules) == 1 and rules[0].rule == _SAML_REFUSAL[0]
-    assert rules[0].methods - {"HEAD", "OPTIONS"} == {"GET"}, (
-        "the per-organisation SAML callback must not accept a POST"
+    assert rules[0].methods - {"HEAD", "OPTIONS"} == {"POST"}, (
+        "the per-organisation SAML callback must be POST-only (HTTP-POST binding)"
     )
 
-    resp = app.test_client().get(_SAML_REFUSAL[0])
-    assert resp.status_code == 501
-    assert "error" in resp.get_json()
+    get_resp = app.test_client().get(_SAML_REFUSAL[0])
+    assert get_resp.status_code == 405
+
+    post_resp = app.test_client().post(_SAML_REFUSAL[0], data={"SAMLResponse": "not-a-real-response"})
+    assert post_resp.status_code < 500
 
 
 @pytest.mark.parametrize("module_path,blueprint_name", [

@@ -40,7 +40,7 @@ def _safe_send_email(app, subject, recipients, html_body):
         from flask_mail import Message
         from app.extensions import mail
 
-        prefix = app.config.get("EMAIL_SUBJECT_PREFIX", "[ARCHIE]")
+        prefix = app.config.get("EMAIL_SUBJECT_PREFIX", "[Entelim]")
         sender = app.config.get("EMAIL_SENDER", mail_username)
         msg = Message(
             subject=f"{prefix} {subject}",
@@ -219,7 +219,7 @@ def _render_maturity_digest_html(data):
 </table>
 
 <p style="font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:8px">
-    This is an automated weekly digest from ARCHIE. To unsubscribe, update your notification
+    This is an automated weekly digest from Entelim. To unsubscribe, update your notification
     preferences in your profile settings.
 </p>
 </body>
@@ -465,7 +465,7 @@ def _render_executive_summary_html(data):
 </table>
 
 <p style="font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:8px">
-    This is an automated weekly summary from ARCHIE. Sent to platform administrators.
+    This is an automated weekly summary from Entelim. Sent to platform administrators.
 </p>
 </body>
 </html>"""
@@ -605,7 +605,7 @@ def _render_error_digest_html(events, since):
 {rows}
 </table>
 <p style="font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:8px">
-    Automated error digest from A.R.C.H.I.E. Sent to platform administrators only.
+    Automated error digest from Entelim. Sent to platform administrators only.
 </p>
 </body>
 </html>"""

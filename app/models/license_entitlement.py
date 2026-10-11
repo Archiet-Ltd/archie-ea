@@ -82,17 +82,21 @@ class LicenseEntitlement(TenantMixin, db.Model):
 
     # Quantities
     quantity_entitled = db.Column(db.Integer, nullable=False, default=0)
-    quantity_deployed = db.Column(db.Integer, nullable=False, default=0)
-    quantity_used = db.Column(db.Integer, nullable=False, default=0)
+    # Deployed and used are often not known when an entitlement is recorded.
+    # NULL means "not recorded" and renders as a dash; a stored 0 would read as
+    # a measured "nobody uses this". Existing databases are relaxed by
+    # `flask reconcile-schema`.
+    quantity_deployed = db.Column(db.Integer, nullable=True)
+    quantity_used = db.Column(db.Integer, nullable=True)
 
     # Cost
     unit_cost = db.Column(db.Numeric(10, 2), nullable=True)
 
     # Compliance
-    compliance_status = db.Column(
-        db.String(50),
-        default="compliant",
-    )  # 'compliant', 'over_deployed', 'under_utilized'
+    # 'compliant', 'over_deployed', 'under_utilized', or NULL while deployment
+    # is not recorded. No column default: SQLAlchemy applies a default when the
+    # attribute is None, which would file an unmeasured licence as compliant.
+    compliance_status = db.Column(db.String(50))
 
     # Sync tracking
     last_usage_sync = db.Column(db.DateTime, nullable=True)
@@ -139,18 +143,34 @@ class LicenseEntitlement(TenantMixin, db.Model):
         }
 
     @property
+    def vendor(self):
+        """The vendor, through the contract the entitlement is held under."""
+        return self.contract.vendor if self.contract is not None else None
+
+    @property
     def utilization_percent(self):
-        """Calculate utilization percentage."""
+        """Used as a percentage of entitled; None when usage is not recorded."""
+        if self.quantity_used is None:
+            return None
         if not self.quantity_entitled or self.quantity_entitled == 0:
             return 0
         return round((self.quantity_used / self.quantity_entitled) * 100, 1)
 
     @property
     def deployment_percent(self):
-        """Calculate deployment percentage."""
+        """Deployed as a percentage of entitled; None when not recorded."""
+        if self.quantity_deployed is None:
+            return None
         if not self.quantity_entitled or self.quantity_entitled == 0:
             return 0
         return round((self.quantity_deployed / self.quantity_entitled) * 100, 1)
+
+    @property
+    def available_quantity(self):
+        """Entitled minus deployed; None when deployment is not recorded."""
+        if self.quantity_deployed is None or self.quantity_entitled is None:
+            return None
+        return self.quantity_entitled - self.quantity_deployed
 
     @property
     def total_cost(self):
@@ -161,17 +181,23 @@ class LicenseEntitlement(TenantMixin, db.Model):
 
     @property
     def unused_value(self):
-        """Calculate value of unused licenses (shelfware)."""
-        if not self.unit_cost:
+        """Calculate value of unused licenses (shelfware).
+
+        Without a unit cost or recorded usage there is nothing to value, so
+        the entitlement contributes nothing to a shelfware total.
+        """
+        if not self.unit_cost or self.quantity_used is None:
             return Decimal("0.00")
         unused = max(0, self.quantity_entitled - self.quantity_used)
         return self.unit_cost * unused
 
     def update_compliance_status(self):
-        """Update compliance status based on quantities."""
-        if self.quantity_deployed > self.quantity_entitled:
+        """Update compliance status based on quantities (None when unknown)."""
+        if self.quantity_deployed is None:
+            self.compliance_status = None
+        elif self.quantity_deployed > self.quantity_entitled:
             self.compliance_status = "over_deployed"
-        elif self.utilization_percent < 50:
+        elif self.utilization_percent is not None and self.utilization_percent < 50:
             self.compliance_status = "under_utilized"
         else:
             self.compliance_status = "compliant"
@@ -193,7 +219,8 @@ class LicenseEntitlement(TenantMixin, db.Model):
         }
 
         for e in entitlements:
-            summary[e.compliance_status] = summary.get(e.compliance_status, 0) + 1
+            status = e.compliance_status or "unknown"
+            summary[status] = summary.get(status, 0) + 1
             summary["total_value"] += e.total_cost
             summary["unused_value"] += e.unused_value
 

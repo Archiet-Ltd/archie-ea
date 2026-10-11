@@ -52,7 +52,6 @@ class SolutionOrchestrationService:
             SolutionAnalysisSession,
             SolutionRecommendation,
         )
-        from app.models.solution_lifecycle_models import SolutionRisk
         from app.models.truly_missing_models import Solution
 
         try:
@@ -110,20 +109,39 @@ class SolutionOrchestrationService:
             db.session.add(solution)
             db.session.flush()
 
-            # Create risk records from recommendation risks
+            # Create risk records from recommendation risks via the canonical
+            # risk register (app/services/risk_service.py) -- the one writer
+            # -- instead of SolutionRisk directly, so the superseded store
+            # gets no new row. risk_service.create_risk commits per call, so
+            # (unlike the single transaction this loop used to share with the
+            # Solution insert above) one malformed risk string can no longer
+            # roll back the Solution or an already-created risk; it is
+            # logged and skipped instead, the same per-item shape already
+            # used by the solution risk CSV import.
+            from app.modules.solutions_strategic.v2.routes.solution_routes import _level_to_int
+            from app.services import risk_service
+
             risks_data = rec.risks or []
+            risks_created = 0
             for risk_text in risks_data:
                 if isinstance(risk_text, str) and risk_text.strip():
-                    risk = SolutionRisk(
-                        solution_id=solution.id,
-                        risk_description=risk_text.strip()[:500],
-                        impact="medium",
-                        probability="medium",
-                        status="open",
-                        created_by_id=user_id,
-                    )
-                    db.session.add(risk)
-                    sync_archimate_element(risk)
+                    try:
+                        text = risk_text.strip()
+                        risk = risk_service.create_risk(
+                            solution_id=solution.id,
+                            title=text[:255],
+                            description=text[:500],
+                            likelihood=_level_to_int("medium"),
+                            impact=_level_to_int("medium"),
+                            owner=None,
+                            mitigation_plan=None,
+                        )
+                        risk_service.add_risk_link(risk.id, "solution", solution.id)
+                        risks_created += 1
+                    except Exception as exc:
+                        logger.warning(
+                            "Error creating risk from recommendation %d: %s", rec.id, exc
+                        )
 
             db.session.commit()
 
@@ -140,7 +158,7 @@ class SolutionOrchestrationService:
                 "solution_id": solution.id,
                 "solution_name": solution.name,
                 "solution_type": solution_type,
-                "risks_created": len(risks_data),
+                "risks_created": risks_created,
             }
 
         except Exception as e:

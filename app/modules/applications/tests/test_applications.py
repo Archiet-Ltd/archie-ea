@@ -91,7 +91,6 @@ class TestMonolithDecomposition:
     def test_list_views_importable(self):
         from app.modules.applications.routes import list_views
 
-        assert hasattr(list_views, "test_simple")
         assert hasattr(list_views, "application_list")
         assert hasattr(list_views, "api_list")
         assert hasattr(list_views, "api_table_data")
@@ -269,7 +268,6 @@ class TestApplicationsEndpointParity:
         """Key list/dashboard endpoints must exist."""
         endpoints = set(app.view_functions.keys())
         must_have = [
-            "unified_applications.test_simple",
             "unified_applications.application_list",
             "unified_applications.api_list",
             "unified_applications.api_table_data",

@@ -158,7 +158,7 @@
                                         throw new Error((data && data.error) || 'User search failed');
                                     }
                                     const q = self.query.toLowerCase();
-                                    self.results = data.users.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)).slice(0, 5);
+                                    self.results = data.users.filter(u => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)).slice(0, 5);
                                     self.showDropdown = self.results.length > 0;
                                     self._searchErrorShown = false;
                                     self.searching = false;

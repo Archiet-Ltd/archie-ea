@@ -13,21 +13,18 @@
 <div class="space-y-6 p-6">
   {{ page_shell(title='Framework Management', subtitle='Manage capability frameworks, extensions, and deployment templates.') }}
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% if has_manufacturing %}
     <a href="{{ url_for('main.framework_management.framework_dashboard') }}"
        class="flex flex-col gap-2 rounded-lg border border-border bg-card p-5 hover:bg-accent transition-colors">
       <div class="text-sm font-medium text-foreground">Manufacturing Dashboard</div>
       <div class="text-xs text-muted-foreground">View manufacturing excellence framework instances and maturity levels.</div>
     </a>
+    {% endif %}
     <a href="{{ url_for('main.framework_management.framework_table') }}"
        class="flex flex-col gap-2 rounded-lg border border-border bg-card p-5 hover:bg-accent transition-colors">
       <div class="text-sm font-medium text-foreground">Framework Instances</div>
       <div class="text-xs text-muted-foreground">Browse all framework instances and their implementation status.</div>
-    </a>
-    <a href="{{ url_for('dashboard.overview') }}"
-       class="flex flex-col gap-2 rounded-lg border border-border bg-card p-5 hover:bg-accent transition-colors">
-      <div class="text-sm font-medium text-foreground">Back to Dashboard</div>
-      <div class="text-xs text-muted-foreground">Return to the main architecture dashboard.</div>
     </a>
   </div>
 

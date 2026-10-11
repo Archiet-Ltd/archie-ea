@@ -58,28 +58,67 @@
     {# ── Ownership ── #}
     <section class="rounded-xl border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Ownership</h2>
-      <p class="text-sm text-muted-foreground">Assign owners to enable governance and accountability.</p>
+      <p class="text-sm text-muted-foreground">Assign owner records below. Legacy text fields are read-only.</p>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {# Legacy text columns — read-only, migrated to application_owners #}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <div>
-          <label for="business_owner" class="block text-sm font-medium mb-1">Business Owner</label>
-          <!-- entity-picker-ok: owners are free-text names, not platform users — Abacus has no structured user data -->
+          <label for="business_owner" class="block text-sm font-medium mb-1">Business Owner (legacy)</label>
           <input type="text" id="business_owner" name="business_owner" value="{{ application.business_owner or '' }}"
-                 placeholder="e.g. Jane Smith"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground" readonly>
+          <p class="text-xs text-muted-foreground mt-1">Migrated to owner records. Edit below.</p>
         </div>
         <div>
-          <label for="technical_owner" class="block text-sm font-medium mb-1">Technical Owner</label>
-          <!-- entity-picker-ok: owners are free-text names -->
+          <label for="technical_owner" class="block text-sm font-medium mb-1">Technical Owner (legacy)</label>
           <input type="text" id="technical_owner" name="technical_owner" value="{{ application.technical_owner or '' }}"
-                 placeholder="e.g. John Doe"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground" readonly>
+          <p class="text-xs text-muted-foreground mt-1">Migrated to owner records. Edit below.</p>
+        </div>
+      </div>
+
+      {# Current owner records from ApplicationOwner #}
+      <div id="owner-list" class="space-y-2 mb-4">
+        <p class="text-sm font-medium">Current owners</p>
+        {% for o in application_owners %}
+        <div class="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
+             data-owner-id="{{ o.id }}">
+          <div>
+            <span class="font-medium">{{ o.user_name }}</span>
+            <span class="text-muted-foreground ml-2">({{ o.ownership_type | capitalize }})</span>
+          </div>
+          <button type="button" class="text-destructive hover:text-destructive-emphasis text-xs remove-owner-btn"
+                  data-owner-id="{{ o.id }}" data-app-id="{{ application.id }}">Remove</button>
+        </div>
+        {% else %}
+        <p class="text-sm text-muted-foreground" id="no-owners-msg">No owners assigned yet.</p>
+        {% endfor %}
+      </div>
+
+      {# Add owner form #}
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+        <div>
+          <label for="owner_picker_search" class="block text-sm font-medium mb-1">Search user</label>
+          <input type="text" id="owner_picker_search"
+                 placeholder="Type at least 2 characters…"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                 data-app-id="{{ application.id }}">
+          <div id="owner_picker_results" class="hidden absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-lg max-h-48 overflow-y-auto"></div>
         </div>
         <div>
-          <label for="business_purpose" class="block text-sm font-medium mb-1">Business Purpose</label>
-          <input type="text" id="business_purpose" name="business_purpose" value="{{ application.business_purpose or '' }}"
-                 placeholder="e.g. Customer data management"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          <label for="owner_type_select" class="block text-sm font-medium mb-1">Role</label>
+          <select id="owner_type_select"
+                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+            <option value="primary">Primary</option>
+            <option value="backup">Backup</option>
+            <option value="technical">Technical</option>
+            <option value="business">Business</option>
+          </select>
+        </div>
+        <div>
+          <button type="button" id="add-owner-btn" disabled
+                  class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 text-sm font-medium transition-colors disabled:opacity-50">
+            <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add owner
+          </button>
         </div>
       </div>
     </section>
@@ -105,6 +144,12 @@
             <option value="{{ current_crit }}" selected>{{ current_crit | capitalize }}</option>
             {% endif %}
           </select>
+        </div>
+        <div>
+          <label for="business_purpose" class="block text-sm font-medium mb-1">Business Purpose</label>
+          <input type="text" id="business_purpose" name="business_purpose" value="{{ application.business_purpose or '' }}"
+                 placeholder="e.g. Core business function, compliance reporting"
+                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
         <div>
           <label for="deployment_status" class="block text-sm font-medium mb-1">Deployment Status</label>
@@ -267,4 +312,9 @@
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/applications/owner_picker.js') }}"></script>
 {% endblock %}

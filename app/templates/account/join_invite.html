@@ -4,18 +4,54 @@
 {% import 'macros/check_password.html' as check with context %}
 
 {% block content %}
-    <div class="flex justify-center">
+    <div class="flex justify-center px-4 py-10">
         <div class="w-full max-w-md">
             <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
                 <div class="flex flex-col space-y-1.5 p-6">
-                    <h2 class="text-2xl font-semibold leading-none tracking-tight">Create your password</h2>
+                    {% if existing %}
+                    <h1 class="text-2xl font-semibold leading-none tracking-tight">Join {{ organisation_name }}</h1>
+                    <p class="text-sm text-muted-foreground">
+                        {% if inviter %}{{ inviter.full_name() }} invited you.{% endif %}
+                        Accepting adds <span class="font-medium text-foreground break-words">{{ email }}</span>
+                        to {{ organisation_name }} with the role <span class="font-medium text-foreground">{{ role or '—' }}</span>.
+                    </p>
+                    {% elif organisation_name %}
+                    <h1 class="text-2xl font-semibold leading-none tracking-tight">Join {{ organisation_name }}</h1>
+                    <p class="text-sm text-muted-foreground">
+                        {% if inviter %}{{ inviter.full_name() }} invited you.{% endif %}
+                        Choose a password for <span class="font-medium text-foreground break-words">{{ email }}</span> to accept.
+                    </p>
+                    {% else %}
+                    <h1 class="text-2xl font-semibold leading-none tracking-tight">Create your password</h1>
                     <p class="text-sm text-muted-foreground">Set up your account by creating a password</p>
+                    {% endif %}
                 </div>
                 <div class="p-6 pt-0">
+                    {% if existing %}
+                    <div class="flex flex-wrap gap-3" data-join-existing>
+                        <form method="POST" action="{{ join_url }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="decision" value="accept">
+                            <button type="submit"
+                                class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                                Accept invitation
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ join_url }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="decision" value="decline">
+                            <button type="submit"
+                                class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                                Decline
+                            </button>
+                        </form>
+                    </div>
+                    {% else %}
                     {{ f.render_form(form) }}
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
-    {{ check.password_check('password', 0) }}
+    {% if not existing %}{{ check.password_check('password', 0) }}{% endif %}
 {% endblock %}

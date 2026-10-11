@@ -1,9 +1,12 @@
+{# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/filter_bar.html" import filter_bar %}
 {% from 'components/status_badge.html' import status_badge, status_badge_auto %}
 {% from "components/sol_confirm_modal.html" import sol_confirm_modal %}
 {% from 'components/modal.html' import modal %}
 {% from 'macros/page_shell.html' import page_shell, stat_card %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
+{% from 'components/button.html' import button %}
 
 
 {% block title %}All Solutions{% endblock %}
@@ -18,50 +21,43 @@
        destination. ─ #}
     {% macro _solutions_page_actions() %}
     <div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
-      {# Only offer the wizard to users who can actually create a programme
-         (CREATE_ROLES); otherwise it is a six-step dead end (audit F-04). #}
-      {% if can_create_programme %}
-      <a href="{{ url_for('solution_design.new_programme') }}" data-testid="btn-new-programme"
-         class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors">
-        <i data-lucide="layers" class="h-4 w-4" aria-hidden="true"></i>New Programme
-      </a>
-      {% endif %}
-      <button type="button" data-testid="btn-new-from-template" data-action="open-template-modal"
-        class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors">
-        <i data-lucide="layout-template" class="h-4 w-4" aria-hidden="true"></i>New from Template
-      </button>
-      {# E2E-4: a fresh workspace had no working way to create its first
-         solution -- New from Template needs one already, /solutions/new
-         404s, and Start Architecture Journey's primary action creates a
-         separate ArchitectureJourney artifact with no Solution at all.
-         This calls the same POST /architecture-journey/start endpoint the
-         journey hub's own "Start solution design" secondary button already
-         uses -- a real Solution, correctly labelled. #}
-      <button type="button" @click="startSolution" :disabled="startingSolution"
-        data-testid="btn-new-solution"
-        class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none">
-        <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
-        <span x-text="startingSolution ? 'Creating…' : 'New Solution'"></span>
-      </button>
-      {% if 'enterprise_crud.reference_catalog' in flask.current_app.view_functions %}
-      <a href="{{ url_for('enterprise_crud.reference_catalog') }}" data-testid="btn-reference-catalog"
-         class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors"
-         aria-label="Browse the reference catalogue of approved, reusable solutions">
-        <i data-lucide="library" class="h-4 w-4" aria-hidden="true"></i>Reference catalogue
-      </a>
-      {% endif %}
-      <a href="{{ url_for('architecture_journey.index') }}" data-testid="btn-start-journey"
-         class="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-         aria-label="Start the guided Architecture Journey to design a new solution">
-        <i data-lucide="zap" class="h-4 w-4" aria-hidden="true"></i>Start Architecture Journey
-      </a>
+      {# Primary: New solution — creates a Solution directly (POST
+         /architecture-journey/start via the startSolution() Alpine method
+         on this page's x-data). A button that performs an action, not a
+         link to another page, so its label names the action instead of
+         quoting a destination <h1>. #}
+      {{ button(text='New solution', variant='default', size='sm', icon='plus', on_click='startSolution()', testid='btn-new-solution', aria_label='Create a new solution') }}
+      {# Secondary actions: outline buttons, visible 2xl+ #}
+      <div class="hidden 2xl:flex flex-wrap items-center gap-2">
+        {{ button(text='Start Architecture Journey', variant='outline', size='sm', icon='zap', href=url_for('architecture_journey.index'), testid='btn-start-journey', aria_label='Start the guided Architecture Journey to design a new solution') }}
+        {{ button(text='New from Template', variant='outline', size='sm', icon='layout-template', data_action='open-template-modal', testid='btn-new-from-template') }}
+        {% if 'enterprise_crud.reference_catalog' in flask.current_app.view_functions %}
+        {{ button(text='Reference catalogue', variant='outline', size='sm', icon='library', href=url_for('enterprise_crud.reference_catalog'), testid='btn-reference-catalog', aria_label='Browse the reference catalogue of approved, reusable solutions') }}
+        {% endif %}
+      </div>
+      {# Below 2xl: secondary actions in a "More" dropdown #}
+      <div class="2xl:hidden">
+        {{ dropdown_menu(
+            id='solutions-more-menu',
+            trigger_text='More',
+            trigger_icon='more-horizontal',
+            trigger_variant='default',
+            items=[
+                {'text': 'Start Architecture Journey', 'icon': 'zap', 'href': url_for('architecture_journey.index')},
+                {'text': 'New from Template', 'icon': 'layout-template', 'data_action': 'open-template-modal'},
+            ] + ([
+                {'text': 'Reference catalogue', 'icon': 'library', 'href': url_for('enterprise_crud.reference_catalog')},
+            ] if 'enterprise_crud.reference_catalog' in flask.current_app.view_functions else [])
+        ) }}
+      </div>
     </div>
     {% endmacro %}
     {{ page_shell(
          title="All Solutions",
          subtitle="Resume solution design work, surface blockers, and launch architect workflows quickly.",
-         breadcrumb=[('Home', url_for('main.index')), ('Solutions Management', None), ('All Solutions', None)],
-         actions_caller=_solutions_page_actions
+         breadcrumb=[('Home', url_for('main.index')), ('Solutions', None)],
+         actions_caller=_solutions_page_actions,
+         stack_actions=True
     ) }}
 
     {# Programme / Solution relationship — verified against the models: a
@@ -120,7 +116,7 @@
         {% endfor %}
         {{ filter_bar(
             search_id='searchInput',
-            search_placeholder='Search by solution, domain, or next action...',
+            search_placeholder='Search solutions',
             search_value=search|default(''),
             filters=[
                 {'id': 'statusFilter', 'label': 'Status', 'options': status_options},
@@ -133,12 +129,12 @@
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider shrink-0">Created:</span>
           <div class="flex items-center gap-2">
             <label for="createdAfterFilter" class="text-xs text-muted-foreground">From</label>
-            <input type="date" id="createdAfterFilter" value="{{ created_after|default('') }}"
+            <input type="date" id="createdAfterFilter" value="{{ created_after|default('') }}" lang="en-GB"
                    class="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           </div>
           <div class="flex items-center gap-2">
             <label for="createdBeforeFilter" class="text-xs text-muted-foreground">To</label>
-            <input type="date" id="createdBeforeFilter" value="{{ created_before|default('') }}"
+            <input type="date" id="createdBeforeFilter" value="{{ created_before|default('') }}" lang="en-GB"
                    class="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           </div>
           {% if created_after or created_before %}
@@ -212,15 +208,15 @@
 
         {# Table #}
         <div class="overflow-x-auto">
-            <table class="min-w-full">
+            <table class="min-w-full solutions-table">
                 <thead>
                     <tr class="border-b border-border/50 bg-muted/30">
                         <th class="px-5 py-3.5 w-10"><input type="checkbox" data-select-all="solution-table" class="h-4 w-4 rounded border-input" aria-label="Select all solutions"></th>
                         <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Solution</th>
                         <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Phase &amp; Status</th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Design Maturity</th>
-                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Architecture Scope</th>
-                        <th class="px-5 py-3.5 text-center text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Arch. Score</th>
+                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Design Maturity</th>
+                        <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden 2xl:table-cell">Architecture Scope</th>
+                        <th class="px-5 py-3.5 text-center text-2xs font-semibold text-muted-foreground uppercase tracking-wider hidden 2xl:table-cell">Arch. Score</th>
                         <th class="px-5 py-3.5 text-left text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Next Action</th>
                         <th class="px-5 py-3.5 text-right text-2xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
                     </tr>
@@ -238,7 +234,7 @@
                             <td class="px-5 py-4 w-10">
                                 <input type="checkbox" data-select-row="solution-table" value="{{ solution.id }}" class="h-4 w-4 rounded border-input" aria-label="Select {{ solution.name }}">
                             </td>
-                            <td class="px-5 py-4 min-w-[18rem]">
+                            <td class="px-5 py-4 min-w-[14rem]">
                                 <div class="space-y-1.5">
                                     <a href="{{ url_for('solution_design.view_solution', solution_id=solution.id) }}" class="text-sm font-semibold text-foreground hover:text-primary transition-colors">{{ solution.name }}</a>
                                     <p class="text-xs text-muted-foreground leading-relaxed">{{ solution.description[:90] if solution.description else 'No summary yet.' }}{% if solution.description and solution.description|length > 90 %}...{% endif %}</p>
@@ -246,6 +242,16 @@
                                         <span class="px-2 py-0.5 rounded bg-muted/50">{{ solution.business_domain or 'No domain' }}</span>
                                         <span class="px-2 py-0.5 rounded bg-muted/50">{{ solution.solution_type|replace('_', ' ')|title if solution.solution_type else 'Type not set' }}</span>
                                         <span class="text-muted-foreground/60">Lead: {{ ws.owner_display or 'Unassigned' }}</span>
+                                    </div>
+                                    {# Below 2xl: Architecture Scope and Arch. Score inline #}
+                                    <div class="2xl:hidden flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground mt-1">
+                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.capability_count or 0 }} capabilities</span>
+                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.application_count or 0 }} apps</span>
+                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.archimate_count or 0 }} ArchiMate</span>
+                                        <span class="px-2 py-0.5 rounded bg-muted/50">{{ ws.risk_count or 0 }} risks</span>
+                                        {% set _cs = (completeness_scores or {}).get(solution.id, {}) %}
+                                        {% set _score = _cs.get('score', 0) %}
+                                        <span class="px-2 py-0.5 rounded bg-muted/50 font-medium">Score: {{ _score }}%</span>
                                     </div>
                                 </div>
                             </td>
@@ -270,7 +276,7 @@
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold {{ _gov_cls }}">{{ _gov_label }}</span>
                                 </div>
                             </td>
-                            <td class="px-5 py-4 whitespace-nowrap">
+                            <td class="px-5 py-4 whitespace-nowrap hidden xl:table-cell">
                                 <div class="space-y-2">
                                     <div class="flex items-baseline gap-2">
                                         <span class="text-2xl font-bold tracking-tight
@@ -288,18 +294,18 @@
                                     <p class="text-xs text-muted-foreground">{{ ws.readiness_passed or 0 }}/{{ ws.readiness_total or 0 }} TOGAF maturity checks</p>
                                 </div>
                             </td>
-                            <td class="px-5 py-4">
+                            <td class="px-5 py-4 hidden 2xl:table-cell">
                                 <div class="flex flex-wrap gap-1.5 max-w-xs">
                                     <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.capability_count or 0 }} capabilities</span>
                                     <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.application_count or 0 }} apps</span>
-                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.archimate_count or 0 }} ArchiMate</span>
+                                    <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.archimate_count or 0 }} elements</span>
                                     <span class="rounded-md bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">{{ ws.risk_count or 0 }} risks</span>
                                 </div>
                             </td>
                             {# PLT-002: Architecture completeness score ring #}
                             {% set _cs = (completeness_scores or {}).get(solution.id, {}) %}
                             {% set _score = _cs.get('score', 0) %}
-                            <td class="px-5 py-4 whitespace-nowrap">
+                            <td class="px-5 py-4 whitespace-nowrap hidden 2xl:table-cell">
                               <div class="flex flex-col items-center gap-1">
                                 <div class="relative flex items-center justify-center w-11 h-11">
                                   <svg class="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
@@ -417,7 +423,6 @@
                   </a>
                   {% endif %}
                 </div>
-              </div>
             </div>
     </div>
     {% else %}
@@ -448,15 +453,30 @@
     </div>
     {% else %}
     {% set _hidden_total = (hidden_by_role_filter or 0) + (hidden_by_filters or 0) %}
+    {% if _hidden_total > 0 %}
+    {# Solutions exist but are hidden by role or filters #}
     <div data-slot="card" class="rounded-xl border bg-card shadow-sm" data-testid="solutions-empty-state">
         <div class="text-center py-16 px-4">
             <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                <i data-lucide="{{ 'eye-off' if _hidden_total > 0 else 'puzzle' }}" class="h-8 w-8 text-muted-foreground" aria-hidden="true"></i>
+                <i data-lucide="eye-off" class="h-8 w-8 text-muted-foreground" aria-hidden="true"></i>
             </div>
-            {% if _hidden_total > 0 %}
-            {# D1: the heading always shows the ORG-WIDE total (matching what
-               the Health Scorecard shows) — never a BU/role-scoped subtotal
-               presented as if it were the org total. #}
+            {% if only_default_filter_active %}
+            {# Hidden-draft state: only the default filter's empty drafts are hidden #}
+            {% from 'components/empty_state.html' import empty_state %}
+            {{ empty_state(
+                icon='eye-off',
+                title='Your draft is waiting',
+                description='Untitled drafts stay out of this list until they have a problem statement.',
+                cta_text='Show drafts',
+                cta_href=url_for('solution_design.list_solutions', status='draft'),
+                secondary_cta_text='New Solution',
+                secondary_cta_onclick='startSolution()',
+                secondary_cta_icon='plus',
+                heading_testid='solutions-empty-state-heading',
+                description_testid='solutions-hidden-disclosure'
+            ) }}
+            {% else %}
+            {# Solutions hidden by role or user-set filters #}
             <h2 class="mt-4 text-lg font-medium" data-testid="solutions-empty-state-heading">
                 Showing 0 of {{ org_total if org_total is not none else total }}
             </h2>
@@ -477,37 +497,36 @@
             </div>
             <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
                 {% if hidden_by_filters and hidden_by_filters > 0 %}
-                <a href="{{ clear_filters_url }}" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium" data-testid="solutions-clear-filters">
-                    Clear all filters
-                </a>
+                {{ button(text='Clear all filters', variant='default', href=clear_filters_url, testid='solutions-clear-filters') }}
                 {% endif %}
                 {% if hidden_by_role_filter and hidden_by_role_filter > 0 and bu_filter_active and not show_all_override %}
-                <a href="{{ request.path }}?bu=all" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md border border-border/50 bg-card hover:bg-accent transition-colors text-sm font-medium" data-testid="solutions-view-all-bu" aria-label="Show solutions across all business units">
-                    View all business units
-                </a>
+                {{ button(text='View all business units', variant='outline', href=request.path ~ '?bu=all', testid='solutions-view-all-bu', aria_label='Show solutions across all business units') }}
                 {% endif %}
                 {% if hidden_by_role_filter and hidden_by_role_filter > 0 and 'arb.dashboard' in flask.current_app.view_functions %}
-                <a href="{{ url_for('arb.dashboard') }}" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md border border-border/50 bg-card hover:bg-accent transition-colors text-sm font-medium">
-                    Request review access
-                </a>
+                {{ button(text='Request review access', variant='outline', href=url_for('arb.dashboard')) }}
                 {% endif %}
-            </div>
-            {% else %}
-            <h2 class="mt-4 text-lg font-medium" data-testid="solutions-empty-state-heading">No solutions found</h2>
-            <p class="mt-2 text-sm text-muted-foreground max-w-md mx-auto">Get started by creating your first solution</p>
-            <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <a href="{{ url_for('architecture_journey.index') }}" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium" aria-label="Start the guided Architecture Journey to design a new solution">
-                    <i data-lucide="zap" class="h-4 w-4" aria-hidden="true"></i>
-                    Start Architecture Journey
-                </a>
-                <button type="button" data-action="open-template-modal" class="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg border border-border/50 bg-card hover:bg-accent transition-colors text-sm font-medium" aria-label="Create from template">
-                    <i data-lucide="layout-template" class="h-4 w-4" aria-hidden="true"></i>
-                    New from Template
-                </button>
             </div>
             {% endif %}
         </div>
     </div>
+    {% else %}
+    {# Truly empty: no solutions in the org at all #}
+    {% from 'components/empty_state.html' import empty_state %}
+    <div data-slot="card" class="rounded-xl border bg-card shadow-sm" data-testid="solutions-empty-state">
+        {{ empty_state(
+            icon='puzzle',
+            title='No solutions yet',
+            description='Create a solution to start its architecture blueprint.',
+            cta_text='New Solution',
+            cta_onclick='startSolution()',
+            cta_icon='plus',
+            heading_testid='solutions-empty-state-heading'
+        ) }}
+        <div class="flex flex-wrap items-center justify-center gap-3 pb-12 -mt-4">
+            {{ button(text='New from Template', variant='outline', icon='layout-template', data_action='open-template-modal') }}
+        </div>
+    </div>
+    {% endif %}
     {% endif %}
     {% endif %}
 

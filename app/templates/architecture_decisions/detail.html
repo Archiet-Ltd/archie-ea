@@ -203,6 +203,81 @@
         </div>
         {% endif %}
 
+        <!-- Assumptions, affected systems and the AI-authored decider label:
+             set by the AI chat, workbench and solution-options-advisor
+             creation paths once they were repointed to write this table
+             directly, but never surfaced here until now. -->
+        {% if decision.assumptions or decision.affected_systems or decision.decided_by_label %}
+        <div class="bg-card border border-border rounded-lg p-6">
+            <h2 class="text-base font-semibold text-foreground mb-3 flex items-center gap-2">
+                <i data-lucide="clipboard-list" class="h-4 w-4 text-muted-foreground"></i>
+                Assumptions &amp; Scope
+            </h2>
+            <dl class="space-y-3 text-sm">
+                {% if decision.decided_by_label %}
+                <div class="flex gap-2">
+                    <dt class="text-muted-foreground shrink-0">Recorded by</dt>
+                    <dd class="text-foreground">{{ decision.decided_by_label }}</dd>
+                </div>
+                {% endif %}
+                {% if decision.assumptions %}
+                <div>
+                    <dt class="text-muted-foreground mb-1">Assumptions</dt>
+                    <dd class="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">{{ decision.assumptions }}</dd>
+                </div>
+                {% endif %}
+                {% if decision.affected_systems %}
+                <div>
+                    <dt class="text-muted-foreground mb-1">Affected systems</dt>
+                    <dd class="flex flex-wrap gap-1.5">
+                        {% for system in decision.affected_systems %}
+                        <span class="text-xs px-2 py-0.5 rounded bg-secondary text-secondary-foreground">{{ system }}</span>
+                        {% endfor %}
+                    </dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+        {% endif %}
+
+        <!-- Review: review_date/review_outcome/reviewed_at/
+             reviewed_by are set by the due-for-review and record-outcome
+             routes but had no home on this page until now. -->
+        {% if decision.review_date or decision.review_outcome %}
+        <div class="bg-card border border-border rounded-lg p-6">
+            <h2 class="text-base font-semibold text-foreground mb-3 flex items-center gap-2">
+                <i data-lucide="calendar-clock" class="h-4 w-4 text-muted-foreground"></i>
+                Review
+            </h2>
+            <dl class="space-y-2 text-sm">
+                {% if decision.review_date %}
+                <div class="flex gap-2">
+                    <dt class="text-muted-foreground shrink-0">Review date</dt>
+                    <dd class="text-foreground">
+                        {{ decision.review_date.strftime('%B %d, %Y') }}
+                        {% if decision.is_due_for_review %}
+                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/20">Due</span>
+                        {% endif %}
+                    </dd>
+                </div>
+                {% endif %}
+                {% if decision.review_outcome %}
+                <div>
+                    <dt class="text-muted-foreground mb-1">Outcome</dt>
+                    <dd class="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">{{ decision.review_outcome }}</dd>
+                </div>
+                <div class="flex gap-2">
+                    <dt class="text-muted-foreground shrink-0">Reviewed by</dt>
+                    <dd class="text-foreground">
+                        {% if decision.reviewed_by %}{{ decision.reviewed_by.username or decision.reviewed_by.email }}{% else %}—{% endif %}
+                        {% if decision.reviewed_at %} on {{ decision.reviewed_at.strftime('%B %d, %Y') }}{% endif %}
+                    </dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+        {% endif %}
+
         <!-- Impacted ArchiMate Elements -->
         <div class="bg-card border border-border rounded-lg p-6">
             <h2 class="text-base font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -213,15 +288,16 @@
             {% if elements %}
             <div class="space-y-2">
                 {% for el in elements %}
-                <div class="flex items-center gap-3 p-2.5 rounded-md bg-muted/40 hover:bg-muted transition-colors">
+                <div class="flex items-center gap-3 p-2.5 rounded-md bg-muted/40 hover:bg-muted transition-colors" data-decision-element>
                     <div class="flex-1 min-w-0">
-                        <span class="font-medium text-sm text-foreground">{{ el.name }}</span>
+                        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=el.id) }}"
+                           class="font-medium text-sm text-primary hover:underline break-words">{{ el.name }}</a>
                     </div>
                     {% if el.layer %}
                     <span class="text-xs px-2 py-0.5 rounded bg-secondary text-secondary-foreground">{{ el.layer }}</span>
                     {% endif %}
-                    {% if el.element_type %}
-                    <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ el.element_type }}</span>
+                    {% if el.type %}
+                    <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{{ el.type }}</span>
                     {% endif %}
                 </div>
                 {% endfor %}

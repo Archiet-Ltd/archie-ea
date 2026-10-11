@@ -31,3 +31,6 @@ playwright>=1.47.0,<2.0.0
 # tests/test_sse_headers.py pins the cross-server WSGI header contract against
 # Waitress without adding an unused server to the production image.
 waitress>=3.0.2,<4.0.0
+# tests/test_high_findings_gate.py drives the high-findings gate; the version
+# matches BANDIT_VERSION in .github/workflows/ci.yml.
+bandit==1.9.4

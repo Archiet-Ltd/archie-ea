@@ -18,12 +18,7 @@ Provides routes for investment prioritization, risk assessment, and strategic de
 from flask import Blueprint, current_app, jsonify, render_template, request
 from flask_login import current_user, login_required
 
-from app.models.application_capability import ApplicationCapabilityMapping
-from app.models.application_portfolio import ApplicationComponent
-from app.models.apqc_process import APQCProcess, ProcessApplicationMapping
-from app.models.archimate_core import ArchiMateElement
 from app.models.business_capability import BusinessCapability
-from app.models.solution_models import SolutionArchiMateElement, solution_applications
 from app.modules.solutions_strategic.v2.services.architecture_governance_service import (
     ArchitectureGovernanceService,
 )
@@ -68,220 +63,6 @@ from datetime import datetime
 from app.utils.pagination import safe_int_arg
 
 strategic_bp = Blueprint("strategic", __name__, url_prefix="/strategic")
-
-
-def _build_solution_impact_fallback(element_id: int, change_type: str = "MODIFY"):
-    """Build a useful impact payload from application/solution relationships."""
-    from app.models.solution_models import Solution
-    from app.models.solution_sad_models import SolutionAPQCProcess
-    from app.models.vendor.vendor_organization import VendorProduct
-    from app.modules.solutions_strategic.v2.routes.solution_design_routes import (
-        _get_solution_capabilities_payload,
-    )
-
-    element = db.session.get(ArchiMateElement, element_id)
-    if not element:
-        return None
-
-    app = None
-    if getattr(element, "application_component_id", None):
-        app = db.session.get(ApplicationComponent, element.application_component_id)
-    if app is None and (element.type or "") == "ApplicationComponent":
-        app = ApplicationComponent.query.filter_by(archimate_element_id=element.id).first()
-
-    direct_dependencies = []
-    indirect_dependencies = []
-    seen_direct = set()
-    seen_indirect = set()
-    solution_ids = set()
-
-    def _push(target, seen, item):
-        key = (item.get("id"), item.get("type"), item.get("name"))
-        if key not in seen:
-            target.append(item)
-            seen.add(key)
-
-    if app is not None:
-        cap_rows = (
-            # tenant-scoping-ok: FK id already org-scoped (application/capability resolved via a TenantMixin model or the current request's own app/solution).
-            db.session.query(BusinessCapability, ApplicationCapabilityMapping)
-            .join(
-                ApplicationCapabilityMapping,
-                ApplicationCapabilityMapping.business_capability_id == BusinessCapability.id,
-            )
-            .filter(ApplicationCapabilityMapping.application_component_id == app.id)
-            .all()
-        )
-        for capability, mapping in cap_rows:
-            _push(
-                direct_dependencies,
-                seen_direct,
-                {
-                    "id": capability.id,
-                    "name": capability.name,
-                    "type": "BusinessCapability",
-                    "level": 2,
-                    "dependency_level": getattr(mapping, "relationship_strength", None)
-                    or getattr(mapping, "gap_severity", None)
-                    or "medium",
-                    "criticality": getattr(mapping, "business_criticality", None) or "",
-                    "app_name": app.name,
-                    "tco": float(getattr(app, "total_cost_of_ownership", 0) or 0),
-                },
-            )
-
-        proc_rows = (
-            db.session.query(APQCProcess)
-            .join(ProcessApplicationMapping)
-            .filter(ProcessApplicationMapping.application_id == app.id)
-            .distinct()
-            .all()
-        )
-        for process in proc_rows:
-            _push(
-                direct_dependencies,
-                seen_direct,
-                {
-                    "id": process.id,
-                    "name": process.process_name,
-                    "type": "BusinessProcess",
-                    "level": 2,
-                    "dependency_level": "medium",
-                    "criticality": "",
-                    "app_name": app.name,
-                    "tco": 0.0,
-                },
-            )
-
-        app_solution_rows = db.session.execute(  # tenant-filtered: scoped via parent FK
-            db.select(solution_applications.c.solution_id).where(
-                solution_applications.c.application_component_id == app.id
-            )
-        ).fetchall()
-        solution_ids.update(row[0] for row in app_solution_rows if row[0])
-
-    linked_solution_rows = SolutionArchiMateElement.query.filter_by(element_id=element_id).all()
-    solution_ids.update(row.solution_id for row in linked_solution_rows if row.solution_id)
-
-    svp_table = db.metadata.tables.get("solution_vendor_products")
-    for solution_id in solution_ids:
-        solution = db.session.get(Solution, solution_id)
-        if not solution:
-            continue
-
-        for capability in _get_solution_capabilities_payload(solution):
-            _push(
-                direct_dependencies,
-                seen_direct,
-                {
-                    "id": capability.get("capability_id") or capability.get("id"),
-                    "name": capability.get("name") or capability.get("capability_name"),
-                    "type": "BusinessCapability",
-                    "level": 2,
-                    "dependency_level": capability.get("gap_severity") or "medium",
-                    "criticality": "",
-                    "app_name": app.name if app else "",
-                    "tco": 0.0,
-                },
-            )
-
-        process_links = SolutionAPQCProcess.query.filter_by(solution_id=solution_id).all()
-        process_ids = [link.apqc_process_id for link in process_links if link.apqc_process_id]
-        if process_ids:
-            for process in APQCProcess.query.filter(APQCProcess.id.in_(process_ids)).all():
-                _push(
-                    direct_dependencies,
-                    seen_direct,
-                    {
-                        "id": process.id,
-                        "name": process.process_name,
-                        "type": "BusinessProcess",
-                        "level": 2,
-                        "dependency_level": "medium",
-                        "criticality": "",
-                        "app_name": app.name if app else "",
-                        "tco": 0.0,
-                    },
-                )
-
-        if svp_table is not None:
-            vp_rows = db.session.execute(  # tenant-filtered: scoped via solution_id FK
-                svp_table.select().where(svp_table.c.solution_id == solution_id)
-            ).fetchall()
-            vp_ids = [row.vendor_product_id for row in vp_rows if row.vendor_product_id]
-            if vp_ids:
-                for product in VendorProduct.query.filter(VendorProduct.id.in_(vp_ids)).all():
-                    _push(
-                        indirect_dependencies,
-                        seen_indirect,
-                        {
-                            "id": product.id,
-                            "name": product.name,
-                            "type": "VendorProduct",
-                            "level": 3,
-                            "dependency_level": "low",
-                            "criticality": "",
-                            "app_name": app.name if app else "",
-                            "tco": 0.0,
-                        },
-                    )
-
-        tech_links = SolutionArchiMateElement.query.filter_by(solution_id=solution_id).all()
-        tech_ids = [
-            row.element_id
-            for row in tech_links
-            if row.element_id and (row.layer_type or "").lower() == "technology"
-        ]
-        if tech_ids:
-            for tech in ArchiMateElement.query.filter(ArchiMateElement.id.in_(tech_ids)).all():
-                _push(
-                    indirect_dependencies,
-                    seen_indirect,
-                    {
-                        "id": tech.id,
-                        "name": tech.name,
-                        "type": tech.type or "Technology",
-                        "level": 3,
-                        "dependency_level": getattr(tech, "dependency_level", None) or "medium",
-                        "criticality": "",
-                        "app_name": app.name if app else "",
-                        "tco": 0.0,
-                    },
-                )
-
-    total_affected = len(direct_dependencies) + len(indirect_dependencies)
-    if total_affected == 0:
-        return None
-
-    weighted_score = len(direct_dependencies) * 3 + len(indirect_dependencies)
-    if weighted_score >= 12:
-        risk_level = "CRITICAL"
-    elif weighted_score >= 8:
-        risk_level = "HIGH"
-    elif weighted_score >= 3:
-        risk_level = "MEDIUM"
-    else:
-        risk_level = "LOW"
-
-    # F-12, Capgemini dry-run: `total_affected * 25000` invented a financial-risk
-    # figure out of a literal per-dependency dollar amount with no source —
-    # exactly the "0 that means not computed" problem CLAUDE.md's
-    # never-invent-data rule calls out. Report the real TCO or nothing.
-    app_tco = float(getattr(app, "total_cost_of_ownership", 0) or 0) if app else 0.0
-    estimated_financial_risk = app_tco if app_tco > 0 else None
-
-    return {
-        "element_id": element_id,
-        "change_type": change_type,
-        "direct_dependencies": direct_dependencies,
-        "indirect_dependencies": indirect_dependencies,
-        "total_affected": total_affected,
-        "weighted_score": weighted_score,
-        "risk_level": risk_level,
-        "estimated_financial_risk": estimated_financial_risk,
-        "analysis_id": None,
-        "fallback_used": True,
-    }
 
 
 @strategic_bp.route("/capability-health")
@@ -439,18 +220,30 @@ def api_impact_analysis():
         if not element_id:
             return jsonify({"error": "element_id is required"}), 400
 
+        cursor = None
+        cursor_raw = data.get("cursor")
+        if cursor_raw is not None:
+            try:
+                cursor = int(cursor_raw)
+            except (TypeError, ValueError):
+                return jsonify({"error": "cursor must be an integer"}), 400
+            if cursor < 0:
+                return jsonify({"error": "cursor must be non-negative"}), 400
+
+        page_size = None
+        page_size_raw = data.get("page_size")
+        if page_size_raw is not None:
+            try:
+                page_size = int(page_size_raw)
+            except (TypeError, ValueError):
+                return jsonify({"error": "page_size must be an integer"}), 400
+            if not (1 <= page_size <= 200):
+                return jsonify({"error": "page_size must be between 1 and 200"}), 400
+
         service = ImpactAnalysisService()
-        analysis = service.analyze_change_impact(element_id, change_type)
-        fallback_analysis = _build_solution_impact_fallback(element_id, change_type)
-        if (
-            fallback_analysis
-            and fallback_analysis.get("total_affected", 0) > analysis.get("total_affected", 0)
-        ):
-            analysis = {
-                **analysis,
-                **fallback_analysis,
-                "analysis_id": analysis.get("analysis_id"),
-            }
+        analysis = service.analyze_change_impact(
+            element_id, change_type, cursor=cursor, page_size=page_size
+        )
         return jsonify(analysis)
     except Exception:
         return jsonify({"error": "An internal error occurred"}), 500
@@ -829,6 +622,22 @@ def api_create_initiative_from_impact():
 # ============================================================================
 
 
+def _health_overrides():
+    """Capability health overrides visible to the caller's organisation.
+
+    An override carries no organisation column; the capability it overrides does.
+    The inner join lets the automatic tenant filter on ``BusinessCapability``
+    apply to every override read or changed here.
+    """
+    return CapabilityHealthOverride.query.join(
+        BusinessCapability, CapabilityHealthOverride.capability_id == BusinessCapability.id
+    )
+
+
+def _health_override_in_org(override_id):
+    return _health_overrides().filter(CapabilityHealthOverride.id == override_id).first()
+
+
 @strategic_bp.route("/api/capability-health/overrides", methods=["POST"])
 @login_required
 @audit_log("create_health_override")
@@ -905,13 +714,13 @@ def api_list_health_overrides():
         active_only = request.args.get("active", "false").lower() == "true"
         capability_id = request.args.get("capability_id", type=int)
         
-        query = CapabilityHealthOverride.query
+        query = _health_overrides()
         
         if active_only:
-            query = query.filter_by(active=True)
+            query = query.filter(CapabilityHealthOverride.active.is_(True))
         
         if capability_id:
-            query = query.filter_by(capability_id=capability_id)
+            query = query.filter(CapabilityHealthOverride.capability_id == capability_id)
         
         overrides = query.order_by(CapabilityHealthOverride.created_at.desc()).all()
         
@@ -930,7 +739,7 @@ def api_list_health_overrides():
 def api_get_health_override(override_id):
     """Get a specific capability health override."""
     try:
-        override = CapabilityHealthOverride.query.get(override_id)
+        override = _health_override_in_org(override_id)
         
         if not override:
             return jsonify({"success": False, "error": "Override not found"}), 404
@@ -948,7 +757,7 @@ def api_update_health_override(override_id):
     """Update an existing capability health override."""
     try:
         
-        override = CapabilityHealthOverride.query.get(override_id)
+        override = _health_override_in_org(override_id)
         
         if not override:
             return jsonify({"success": False, "error": "Override not found"}), 404
@@ -996,7 +805,7 @@ def api_update_health_override(override_id):
 def api_delete_health_override(override_id):
     """Deactivate a capability health override (soft delete)."""
     try:
-        override = CapabilityHealthOverride.query.get(override_id)
+        override = _health_override_in_org(override_id)
         
         if not override:
             return jsonify({"success": False, "error": "Override not found"}), 404

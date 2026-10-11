@@ -272,7 +272,7 @@ class SecurityEnforcement:
         #
         # www.google-analytics.com and cdn.segment.com are likewise removed. Both
         # integrations are gated on config that defaults to empty
-        # (GOOGLE_ANALYTICS_ID, SEGMENT_API_KEY, POSTHOG_API_KEY), so nothing loads
+        # (SEGMENT_API_KEY, POSTHOG_API_KEY), so nothing loads
         # them by default. If a deployment deliberately enables one, it must widen
         # this policy explicitly via the CONTENT_SECURITY_POLICY config key — which
         # makes enabling third-party telemetry a visible, reviewable decision rather

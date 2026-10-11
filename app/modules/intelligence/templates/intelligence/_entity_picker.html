@@ -4,10 +4,12 @@
    highlighted option is tracked with aria-activedescendant. It searches the
    element endpoint the rest of the product already uses, sends only what was
    typed, and never asks for a layer, a type or a vocabulary term. It reads its
-   state and methods from the picker object of the page component around it. #}
+   state and methods from the picker object of the page component around it.
+   `prompt` is the words in the empty box, for a page whose picker offers
+   only some kinds of element (the application's technology panel). #}
 {% from 'components/provenance.html' import provenance_badge %}
 
-{% macro entity_picker(prefix) %}
+{% macro entity_picker(prefix, prompt='Type a team, service or system name') %}
 <div class="space-y-2">
     <div class="relative">
         <input type="text" id="{{ prefix }}-picker-input" x-ref="pickerInput"
@@ -15,8 +17,8 @@
                aria-expanded="false" :aria-expanded="open ? 'true' : 'false'"
                aria-controls="{{ prefix }}-picker-listbox"
                :aria-activedescendant="activeId"
-               aria-label="Type a team, service or system name"
-               placeholder="Type a team, service or system name"
+               aria-label="{{ prompt }}"
+               placeholder="{{ prompt }}"
                autocomplete="off" spellcheck="false"
                x-model="term" @input="onInput()" @keydown="onKeydown($event)" @blur="close()"
                class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">

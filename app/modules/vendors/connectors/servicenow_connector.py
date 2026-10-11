@@ -1,6 +1,6 @@
 """ServiceNow CMDB Connector - Enterprise Integration
 
-Syncs Configuration Items (CIs) from ServiceNow CMDB to A.R.C.H.I.E. applications.
+Syncs Configuration Items (CIs) from ServiceNow CMDB to Entelim applications.
 
 Supports:
 - Application discovery from CMDB
@@ -306,7 +306,7 @@ class ServiceNowConnector:
         snow_app: Dict[str, Any],
         result: ServiceNowSyncResult
     ) -> None:
-        """Sync a single application from ServiceNow to A.R.C.H.I.E.
+        """Sync a single application from ServiceNow to Entelim
         
         Args:
             snow_app: ServiceNow application data dict
@@ -343,7 +343,7 @@ class ServiceNowConnector:
         Returns:
             New ApplicationComponent instance
         """
-        # Map ServiceNow fields to A.R.C.H.I.E. fields
+        # Map ServiceNow fields to Entelim fields
         app = ApplicationComponent(
             external_id=snow_app.get('sys_id'),  # ServiceNow sys_id for tracking
             name=snow_app.get('name', '').strip(),
@@ -428,7 +428,7 @@ class ServiceNowConnector:
         operational_status: Optional[str],
         install_status: Optional[str]
     ) -> str:
-        """Map ServiceNow status to A.R.C.H.I.E. lifecycle status.
+        """Map ServiceNow status to Entelim lifecycle status.
         
         ServiceNow operational_status values:
         1 = Operational, 2 = Non-Operational, 3 = Under Maintenance, 4 = Retired
@@ -438,9 +438,9 @@ class ServiceNowConnector:
             install_status: ServiceNow install_status value
         
         Returns:
-            A.R.C.H.I.E. lifecycle status string
+            Entelim lifecycle status string
         """
-        # Map ServiceNow status codes to A.R.C.H.I.E. lifecycle
+        # Map ServiceNow status codes to Entelim lifecycle
         status_map = {
             '1': 'active',           # Operational
             '2': 'deprecated',       # Non-Operational
@@ -453,13 +453,13 @@ class ServiceNowConnector:
         return status_map.get(str(operational_status), 'active')
     
     def _map_criticality(self, snow_criticality: Optional[str]) -> Optional[str]:
-        """Map ServiceNow criticality to A.R.C.H.I.E. criticality.
+        """Map ServiceNow criticality to Entelim criticality.
         
         Args:
             snow_criticality: ServiceNow criticality value
         
         Returns:
-            A.R.C.H.I.E. criticality string or None
+            Entelim criticality string or None
         """
         if not snow_criticality:
             return None
@@ -479,13 +479,13 @@ class ServiceNowConnector:
         return criticality_map.get(str(snow_criticality).lower(), 'medium')
     
     def _map_hosting_type(self, snow_hosting: Optional[str]) -> Optional[str]:
-        """Map ServiceNow hosting type to A.R.C.H.I.E. hosting type.
+        """Map ServiceNow hosting type to Entelim hosting type.
         
         Args:
             snow_hosting: ServiceNow hosting type value
         
         Returns:
-            A.R.C.H.I.E. hosting type string or None
+            Entelim hosting type string or None
         """
         if not snow_hosting:
             return None

@@ -12,14 +12,18 @@ def test_unclassified_solution_survives_dashboard_reload_and_pipeline_navigation
     from app import create_app, db
 
     app = create_app("testing")
-    params = {"id": seeded["ids"]["solution"], "org": seeded["ids"]["org"]}
+    org_id = seeded["ids"]["org"]
     with app.app_context():
-        prior_phase = db.session.execute(db.text(
-            "SELECT adm_phase FROM solutions WHERE id=:id AND organization_id=:org"
-        ), params).scalar_one()
+        solution_count = db.session.execute(db.text(
+            "SELECT COUNT(*) FROM solutions WHERE organization_id=:org"
+        ), {"org": org_id}).scalar_one()
+        assert solution_count > 0, "seed must create at least one solution"
+        prior_phases = dict(db.session.execute(db.text(
+            "SELECT id, adm_phase FROM solutions WHERE organization_id=:org"
+        ), {"org": org_id}).fetchall())
         db.session.execute(db.text(
-            "UPDATE solutions SET adm_phase=NULL WHERE id=:id AND organization_id=:org"
-        ), params)
+            "UPDATE solutions SET adm_phase=NULL WHERE organization_id=:org"
+        ), {"org": org_id})
         db.session.commit()
     context = browser.new_context()
     try:
@@ -34,10 +38,13 @@ def test_unclassified_solution_survives_dashboard_reload_and_pipeline_navigation
             # Every reload restores that persona default; navigate visibly.
             page.get_by_role("button", name="Overview", exact=True).click()
             card = page.get_by_role("heading", name="Solution Pipeline", exact=True).locator("../..")
-            expect(card).to_contain_text("1 solution without a recorded ADM phase")
+            expect(card).to_contain_text(
+                "%d solution%s without a recorded ADM phase"
+                % (solution_count, "s" if solution_count != 1 else "")
+            )
             expect(card).not_to_contain_text("No solutions yet")
         assert page.goto(live_server + "/dashboard/health", timeout=PAGE_TIMEOUT).status == 200
-        maturity = page.locator('[data-slot="card"]').filter(has=page.get_by_text("Avg Solution Maturity", exact=True))
+        maturity = page.locator('[data-slot="card"]').filter(has=page.locator('[data-slot="card-description"]').get_by_text("Avg Solution Maturity", exact=True))
         expect(maturity.locator('[data-slot="card-title"]')).to_have_text("—")
         distribution = page.get_by_role("heading", name="ADM Phase Distribution", exact=True).locator("../..")
         unknown_row = distribution.get_by_text("Unclassified", exact=True).locator("..")
@@ -51,11 +58,12 @@ def test_unclassified_solution_survives_dashboard_reload_and_pipeline_navigation
         with page.expect_navigation(timeout=PAGE_TIMEOUT) as navigation:
             card.get_by_role("link", name="Open the pipeline", exact=True).click()
         assert navigation.value.status == 200
-        expect(page.locator(f'a[href="/solutions/{params["id"]}"]').first).to_be_visible()
+        expect(page.locator(f'a[href="/solutions/{seeded["ids"]["solution"]}"]').first).to_be_visible()
     finally:
         context.close()
         with app.app_context():
-            db.session.execute(db.text(
-                "UPDATE solutions SET adm_phase=:phase WHERE id=:id AND organization_id=:org"
-            ), {**params, "phase": prior_phase})
+            for solution_id, phase in prior_phases.items():
+                db.session.execute(db.text(
+                    "UPDATE solutions SET adm_phase=:phase WHERE id=:id AND organization_id=:org"
+                ), {"id": solution_id, "org": org_id, "phase": phase})
             db.session.commit()

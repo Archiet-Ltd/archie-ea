@@ -1,7 +1,8 @@
+{# smoke-coverage-ok: plain-language filter wiring — element_type and layer display now use |plain_name and |plain_layer filters #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 
-{% block title %}{{ element_type }}: {{ element.name if element.name else (element.title if element.title else 'Unnamed') }}{% endblock %}
+{% block title %}{{ element_type | plain_name(current_user) }}: {{ element.name if element.name else (element.title if element.title else 'Unnamed') }}{% endblock %}
 
 {# breadcrumb-ok: this page renders its own breadcrumb inline in {% block
    content %} (the <nav> right above the page_shell() call below) rather than
@@ -26,7 +27,7 @@
                 <i data-lucide="chevron-right" class="h-3 w-3 shrink-0" aria-hidden="true"></i>
                 <span class="hover:text-foreground cursor-pointer" @click="activeTab='details'">{{ layer_label }}</span>
                 <i data-lucide="chevron-right" class="h-3 w-3 shrink-0" aria-hidden="true"></i>
-                <a href="{{ url_for('archimate_crud.list_elements', layer=layer, element_type=element_type) }}" class="hover:text-foreground">{{ element_type }}</a>
+                <a href="{{ url_for('archimate_crud.list_elements', layer=layer, element_type=element_type) }}" class="hover:text-foreground">{{ element_type | plain_name(current_user) }}</a>
                 <i data-lucide="chevron-right" class="h-3 w-3 shrink-0" aria-hidden="true"></i>
                 <span class="text-foreground truncate max-w-xs">{{ elem_name }}</span>
     </nav>
@@ -61,10 +62,10 @@
             <!-- Identity badges -->
             <div class="flex flex-wrap items-center gap-2 -mt-3">
                 <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-primary/5 text-primary border-primary/20">
-                    <i data-lucide="layers" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ element_type }}
+                    <i data-lucide="layers" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ element_type | plain_name(current_user) }}
                 </span>
                 <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-info/10 text-info-emphasis border-info/20">
-                    <i data-lucide="stack" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ layer|title }}
+                    <i data-lucide="stack" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ layer | plain_layer(current_user) }}
                 </span>
                 {% if element.scope %}
                 <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-muted text-foreground border-border">
@@ -129,11 +130,11 @@
                 <dl class="space-y-2">
                     <div class="flex justify-between text-sm">
                         <dt class="text-muted-foreground">Type</dt>
-                        <dd class="font-medium">{{ element_type }}</dd>
+                        <dd class="font-medium">{{ element_type | plain_name(current_user) }}</dd>
                     </div>
                     <div class="flex justify-between text-sm">
                         <dt class="text-muted-foreground">Layer</dt>
-                        <dd class="font-medium">{{ layer|title }}</dd>
+                        <dd class="font-medium">{{ layer | plain_layer(current_user) }}</dd>
                     </div>
                     {% if element.scope %}
                     <div class="flex justify-between text-sm">
@@ -218,6 +219,10 @@
             </dl>
         </div>
         {% endif %}
+
+        {% with external_links = external_links|default([]) %}
+        {% include 'intelligence/_external_ids.html' %}
+        {% endwith %}
     </div>
 
     <!-- ── RELATIONSHIPS TAB ── -->
@@ -297,7 +302,7 @@
                         <div class="min-w-0">
                             <a href="{{ url_for('archimate_crud.detail_element', layer=rel.target.layer|lower, element_type=rel.target.type, element_id=rel.target.id) }}"
                                class="text-sm font-medium hover:underline truncate block">{{ rel.target.name }}</a>
-                            <p class="text-xs text-muted-foreground">{{ rel.target.type }} · {{ rel.target.layer }}</p>
+                            <p class="text-xs text-muted-foreground">{{ rel.target.type | plain_name(current_user) }} · {{ rel.target.layer | plain_layer(current_user) }}</p>
                         </div>
                     </div>
                     <a href="{{ url_for('archimate_crud.detail_element', layer=rel.target.layer|lower, element_type=rel.target.type, element_id=rel.target.id) }}"
@@ -326,7 +331,7 @@
                         <div class="min-w-0">
                             <a href="{{ url_for('archimate_crud.detail_element', layer=rel.source.layer|lower, element_type=rel.source.type, element_id=rel.source.id) }}"
                                class="text-sm font-medium hover:underline truncate block">{{ rel.source.name }}</a>
-                            <p class="text-xs text-muted-foreground">{{ rel.source.type }} · {{ rel.source.layer }}</p>
+                            <p class="text-xs text-muted-foreground">{{ rel.source.type | plain_name(current_user) }} · {{ rel.source.layer | plain_layer(current_user) }}</p>
                         </div>
                     </div>
                     <a href="{{ url_for('archimate_crud.detail_element', layer=rel.source.layer|lower, element_type=rel.source.type, element_id=rel.source.id) }}"

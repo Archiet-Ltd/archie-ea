@@ -1,5 +1,5 @@
 {# create_page.html.j2 — Create/edit form for an entity.
-   Context (from ARCHIE): entity (dict with fields, view_create_fields) #}
+   Context (from Entelim): entity (dict with fields, view_create_fields) #}
 {% raw %}{% extends "layout.html" %}
 
 {% block title %}{% endraw %}{% raw %}{{ 'Edit' if edit_mode else 'New' }}{% endraw %} {{ entity.name_display }}{% raw %}{% endblock %}

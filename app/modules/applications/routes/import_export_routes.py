@@ -779,9 +779,17 @@ def _rollback_metadata(history):
 
 
 def _rollback_policy(history, user, now=None):
-    """Shared UI/POST eligibility. POST must additionally validate database targets."""
-    administrator = getattr(user, "is_admin", False)
-    is_admin = administrator() is True if callable(administrator) else administrator is True
+    """Shared UI/POST eligibility. POST must additionally validate database targets.
+
+    R3-1 (PR 428 round 4): ``is_admin()`` was called correctly here (unlike
+    the uncalled-method bug elsewhere), but judged globally -- a home-org
+    admin holding only a Viewer seat in the active organisation could roll
+    back any import there. Judged against the active organisation instead,
+    same as the rest of this PR.
+    """
+    from app.middleware.tenant_decorators import is_active_org_admin
+
+    is_admin = is_active_org_admin(user)
     if history.imported_by_id is None and not is_admin:
         raise PermissionError("Only administrators can rollback legacy imports")
     if history.imported_by_id not in (None, user.id) and not is_admin:

@@ -7,7 +7,7 @@
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
     {{ page_header(
         title='Power Platform CoE Integration',
-        description='Discover and import Power Apps from Microsoft Power Platform into the ARCHIE application portfolio.',
+        description='Discover and import Power Apps from Microsoft Power Platform into the Entelim application portfolio.',
         breadcrumbs=[
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Admin', 'href': url_for('admin.index')},
@@ -106,7 +106,7 @@
             <div>
                 <h2 class="text-base font-semibold">Discover Power Apps</h2>
                 <p class="text-sm text-muted-foreground mt-0.5">
-                    Enumerate all apps in your Power Platform tenant and compare against the ARCHIE portfolio.
+                    Enumerate all apps in your Power Platform tenant and compare against the Entelim portfolio.
                 </p>
             </div>
             <button type="button" id="btn-discover"
@@ -130,7 +130,7 @@
             </div>
             <div class="flex-1 px-6 py-3 text-center">
                 <p class="text-2xl font-semibold text-success" id="stat-linked">0</p>
-                <p class="text-xs text-muted-foreground mt-0.5">Linked in ARCHIE</p>
+                <p class="text-xs text-muted-foreground mt-0.5">Linked in Entelim</p>
             </div>
         </div>
 
@@ -361,7 +361,7 @@
             }
             const msg = 'Import complete — ' +
                 d.imported + ' imported, ' +
-                d.already_exists + ' already in ARCHIE, ' +
+                d.already_exists + ' already in Entelim, ' +
                 d.failed + ' failed.';
             showAlert(msg, d.failed > 0 ? 'warning' : 'success');
         })

@@ -10,6 +10,7 @@ from datetime import datetime
 from enum import Enum
 
 from .. import db
+from .mixins.core import TenantMixin
 
 
 class ReviewStatus(Enum):
@@ -99,13 +100,30 @@ class ConfidenceThreshold(db.Model):
         }
 
 
-class ReviewQueueItem(db.Model):
-    """Individual items in the review queue for human validation."""
+class ReviewQueueItem(TenantMixin, db.Model):
+    """Individual items in the review queue for human validation.
+
+    Each item belongs to one organisation and is only visible to that
+    organisation's users; the tenant filter applies through ``TenantMixin``.
+    """
 
     __tablename__ = "review_queue_items"
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.BigInteger, primary_key=True)
+
+    # Nullable so reconcile-schema can add the column to an existing table (it
+    # only adds nullable columns). The mixin still applies the tenant filter, and a
+    # row with no organisation matches no organisation, so it is listed for
+    # nobody. New rows take the organisation of the creating request or the
+    # background service's reviewed application; there is no default owner.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
     threshold_id = db.Column(db.BigInteger, db.ForeignKey("confidence_thresholds.id"))
 
     # Item identification
@@ -151,6 +169,14 @@ class ReviewQueueItem(db.Model):
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Consolidation: set by `flask backfill-review-queue-approvals` on
+    # the row's canonical ai_chat_crud_approvals copy. NULL until backfilled;
+    # this table stays readable (never dropped), it just stops gaining new
+    # rows once the constructor site is repointed.
+    retired_into_id = db.Column(
+        db.Integer, db.ForeignKey("ai_chat_crud_approvals.id"), nullable=True
+    )
 
     # Relationships
     threshold = db.relationship("ConfidenceThreshold", back_populates="review_items")

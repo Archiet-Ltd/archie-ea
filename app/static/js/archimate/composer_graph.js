@@ -170,11 +170,28 @@ let ComposerGraph = (function() {
                 }
             })
             .catch(function(err) {
+                /* The metamodel refused this type for this pair: keep the
+                   picker open on the same two elements, say why, and name the
+                   types that are allowed so the person can pick one of them. */
+                let refusal = err && err.status === 400 && err.data && Array.isArray(err.data.valid_types)
+                    ? err.data : null;
+                if (refusal) {
+                    self._pendingLink = pendingLink;
+                    self.relPickerRejection = {
+                        message: refusal.error || ('ArchiMate 3.2 does not allow ' + relType + ' here'),
+                        validTypes: refusal.valid_types,
+                    };
+                    self.relPickerOpen = true;
+                    self.statusText = 'Not allowed: ' + relType;
+                    _toast('error', self.relPickerRejection.message);
+                    return;
+                }
                 pendingLink.remove();
                 _toast('error', 'Failed to create relationship: ' + (err.message || err));
                 self.statusText = 'Error: ' + err.message;
             });
 
+            self.relPickerRejection = null;
             self._pendingLink = null;
             self.accessMode = 'readwrite';
             self.flowLabel = '';

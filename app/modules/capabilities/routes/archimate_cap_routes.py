@@ -368,6 +368,10 @@ def api_save_apqc_mappings():
     """
     try:
         from app.models.apqc_process import CapabilityProcessMapping
+        from app.services.apqc_mapping_tenant_fence import (
+            capability_owned_by_caller,
+            fenced_capability_mappings_query,
+        )
 
         data = request.get_json()
         if not data or "mappings" not in data:
@@ -377,19 +381,22 @@ def api_save_apqc_mappings():
         created = 0
         updated = 0
 
-        # Batch-prefetch existing mappings to avoid N+1 queries
+        # Batch-prefetch existing mappings to avoid N+1 queries.
+        # CapabilityProcessMapping has no organization_id of its own; a
+        # caller could read, update or create mappings against another
+        # organisation's capability_id (pr310-v1 review, DEFECT-1).
         _apqc_req_pairs = set()
         for md in mappings_data:
             c_id = md.get("capability_id")
             p_id = md.get("apqc_process_id")
-            if c_id and p_id:
+            if c_id and p_id and capability_owned_by_caller(c_id):
                 _apqc_req_pairs.add((c_id, p_id))
 
         _existing_apqc_mappings = {}
         if _apqc_req_pairs:
             _apqc_cap_ids = [p[0] for p in _apqc_req_pairs]
             _apqc_proc_ids = [p[1] for p in _apqc_req_pairs]
-            _existing_apqc_rows = CapabilityProcessMapping.query.filter(
+            _existing_apqc_rows = fenced_capability_mappings_query().filter(
                 CapabilityProcessMapping.capability_id.in_(_apqc_cap_ids),
                 CapabilityProcessMapping.apqc_process_id.in_(_apqc_proc_ids),
             ).all()
@@ -400,7 +407,14 @@ def api_save_apqc_mappings():
             capability_id = mapping_data.get("capability_id")
             apqc_process_id = mapping_data.get("apqc_process_id")
 
-            if not capability_id or not apqc_process_id:
+            if (
+                not capability_id
+                or not apqc_process_id
+                or (capability_id, apqc_process_id) not in _apqc_req_pairs
+            ):
+                # Missing ids, or capability_id did not belong to the
+                # caller's organisation and was excluded from the owned set
+                # built above -- skip rather than guess.
                 continue
 
             # Check if mapping already exists using prefetched data

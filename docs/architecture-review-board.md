@@ -101,9 +101,9 @@ Before you submit, confirm:
 - **Invisible decisions** — decisions in someone's inbox instead of a durable, searchable
   record.
 
-## How Archie helps (optional)
+## How Entelim helps (optional)
 
-[Archie](https://github.com/Anioko/archie-ea) builds the ARB into the solution-design
+[Entelim](https://github.com/Anioko/archie-ea) builds the ARB into the solution-design
 journey: it scores each solution's **maturity**, runs a **readiness gate** that blocks
 submission until drivers, requirements, and architecture are in place, and on submit
 creates an **ARB review item with an audit trail** — so conformance and the decision

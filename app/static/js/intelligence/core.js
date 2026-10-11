@@ -18,7 +18,11 @@
     var PORTFOLIO_URL = '/api/v1/intelligence/portfolio/';
     var PROGRAMME_URL = '/api/v1/intelligence/programme/';
     var STRATEGY_URL = '/api/v1/intelligence/strategy/';
+    var ACCOUNTABILITY_URL = '/api/v1/intelligence/accountability/';
+    var DATA_URL = '/api/v1/intelligence/data/';
+    var COMPLIANCE_URL = '/api/v1/intelligence/compliance/';
     var RECOMPUTE_URL = '/api/v1/intelligence/derivation/recompute';
+    var DERIVED_URL = '/api/v1/intelligence/derived/';
 
     var ERROR_LINE = 'We could not answer that just now.';
     var BUSY_LINE = 'A recalculation is already running. Try again shortly.';
@@ -67,6 +71,18 @@
 
     function recompute() {
         return Platform.fetch.post(RECOMPUTE_URL, { scope: 'tenant' }, { silent: true });
+    }
+
+    /* Why a worked-out connection exists: the recorded links behind it, who drew
+       each and when, the rule, and the decisions recorded against those
+       elements. Written by the server; the drawer shows it as it arrives. */
+    function fetchExplanation(derivedId) {
+        return Platform.fetch.get(DERIVED_URL + derivedId, {}, { silent: true }).then(function (resp) {
+            if (!resp || !resp.data || !resp.data.explanation) {
+                throw new Error('The explanation was missing from the answer.');
+            }
+            return resp.data.explanation;
+        });
     }
 
     /* L6: risks seeded on an element, each with its own blast-radius rows.
@@ -135,17 +151,32 @@
        ask.js's template reads -- costVariancePct is null (not 0) when the
        package was never costed, matching the server's own not_costed
        reason rather than inventing a number. */
+    /* A signed percentage to one decimal place, e.g. "12.5%" or "-3.0%". The
+       one place a variance is turned into text; templates only show it. */
+    function percentText(value) {
+        if (value == null) return null;
+        return Number(value).toLocaleString('en-GB', {
+            minimumFractionDigits: 1, maximumFractionDigits: 1
+        }) + '%';
+    }
+
     function workPackageModel(wp) {
+        var hasCostVariance = wp.cost_variance_pct != null;
+        var costRedacted = wp.cost_reason === 'financial_data_restricted';
         return {
             workPackageId: wp.work_package_id,
             name: wp.name,
             status: wp.status,
+            statusLabel: statusLabel(wp.status),
             progressPercentage: wp.progress_percentage,
             startDate: wp.start_date,
             endDate: wp.end_date,
             isOverdue: wp.is_overdue,
             owner: wp.owner || null,
-            costVariancePct: wp.cost_variance_pct != null ? wp.cost_variance_pct : null,
+            costVariancePct: hasCostVariance ? wp.cost_variance_pct : null,
+            costVarianceText: hasCostVariance ? percentText(wp.cost_variance_pct) : null,
+            hasCostVariance: hasCostVariance,
+            costRedacted: costRedacted,
             costReason: wp.cost_reason || null,
             affectedRows: wp.affected_rows || [],
             affectedSummary: wp.affected_summary || {}
@@ -176,10 +207,13 @@
        no_budget_recorded reason rather than inventing a number. Success
        metrics are nested as-is (already a small, flat list server-side). */
     function initiativeModel(initiative) {
+        var hasBudgetVariance = initiative.budget_variance_pct != null;
+        var budgetRedacted = initiative.budget_reason === 'financial_data_restricted';
         return {
             initiativeId: initiative.initiative_id,
             name: initiative.name,
             status: initiative.status,
+            statusLabel: statusLabel(initiative.status),
             priority: initiative.priority,
             healthStatus: initiative.health_status,
             completionPercentage: initiative.completion_percentage,
@@ -187,7 +221,10 @@
             targetEndDate: initiative.target_end_date,
             executiveSponsor: initiative.executive_sponsor || null,
             programManager: initiative.program_manager || null,
-            budgetVariancePct: initiative.budget_variance_pct != null ? initiative.budget_variance_pct : null,
+            budgetVariancePct: hasBudgetVariance ? initiative.budget_variance_pct : null,
+            budgetVarianceText: hasBudgetVariance ? percentText(initiative.budget_variance_pct) : null,
+            hasBudgetVariance: hasBudgetVariance,
+            budgetRedacted: budgetRedacted,
             budgetReason: initiative.budget_reason || null,
             successMetrics: (initiative.success_metrics || []).map(function (m) {
                 return {
@@ -205,6 +242,129 @@
 
     function buildInitiatives(payload) {
         return (payload.initiatives || []).map(initiativeModel);
+    }
+
+    /* L4: owners of the element's ApplicationComponent. Currently WITHDRAWN
+       server-side (see IntelligenceQueryService.accountability_for_element's
+       docstring) -- every response carries ownership_reader_not_built and
+       capacity_not_available regardless of element_id, no owners array
+       ever populated. No max_depth/include_derived -- this lens is a pure
+       ownership lookup, not a blast-radius traversal, unlike every other
+       lens. */
+    function fetchAccountability(elementId) {
+        return Platform.fetch.get(ACCOUNTABILITY_URL + elementId, {}, { silent: true }).then(function (resp) {
+            return resp && resp.data ? resp.data : {};
+        });
+    }
+
+    /* One ownership row's server payload turned into the flat camelCase
+       shape ask.js's template reads. organizationUnit passes through
+       as-is (already a small, flat object or null server-side). */
+    function ownerModel(owner) {
+        return {
+            ownerId: owner.owner_id,
+            ownershipType: owner.ownership_type,
+            ownershipPercentage: owner.ownership_percentage,
+            primaryContact: owner.primary_contact || null,
+            contactEmail: owner.contact_email || null,
+            startDate: owner.start_date,
+            endDate: owner.end_date,
+            organizationUnit: owner.organization_unit || null
+        };
+    }
+
+    function buildOwners(payload) {
+        return (payload.owners || []).map(ownerModel);
+    }
+
+    /* L7: the data objects linked to the element, and the lineage flows in
+       and out of it. Steward and owner arrive as free text (recordedAsText),
+       never as a person; a missing value stays null and the template says
+       "not recorded", never a blank or a zero. */
+    function fetchData(elementId) {
+        return Platform.fetch.get(DATA_URL + elementId, {}, { silent: true }).then(function (resp) {
+            return resp && resp.data ? resp.data : {};
+        });
+    }
+
+    function dataObjectModel(obj) {
+        return {
+            id: obj.id,
+            name: obj.name,
+            dataType: obj.data_type || null,
+            classification: obj.data_classification || null,
+            isMasterData: !!obj.is_master_data,
+            containsPii: !!obj.contains_pii,
+            gdprScope: !!obj.gdpr_scope,
+            retentionDays: obj.retention_period_days === undefined ? null : obj.retention_period_days,
+            steward: obj.steward || null,
+            owner: obj.owner || null
+        };
+    }
+
+    function flowModel(flow, elements) {
+        // The server sends other_element_name directly on the flow AND (now
+        // that the elements map exists) a fuller record keyed by id in
+        // elements -- prefer the direct field when present, fall back to
+        // the map so a caller that only has elements (the new graph
+        // rendering) still resolves a name.
+        var entry = elements ? elements[String(flow.other_element_id)] : null;
+        return {
+            direction: flow.direction,
+            otherElementId: flow.other_element_id,
+            otherElementName: flow.other_element_name || (entry && entry.name) || null,
+            lineageType: flow.lineage_type || null,
+            frequency: flow.frequency || null
+        };
+    }
+
+    function buildDataObjects(payload) {
+        return (payload.data_objects || []).map(dataObjectModel);
+    }
+
+    function buildFlows(payload) {
+        var elements = payload.elements || {};
+        return (payload.flows || []).map(function (flow) {
+            return flowModel(flow, elements);
+        });
+    }
+
+    /* Compliance (under L6): the controls the element's application is mapped
+       to, open policy violations and the last scan time. A control with no
+       evidence says so; nothing is shown as a percentage or a zero. */
+    function fetchCompliance(elementId) {
+        return Platform.fetch.get(COMPLIANCE_URL + elementId, {}, { silent: true }).then(function (resp) {
+            return resp && resp.data ? resp.data : {};
+        });
+    }
+
+    function controlModel(c) {
+        return {
+            code: c.code || null,
+            name: c.name,
+            frameworkName: c.framework_name || null,
+            status: c.implementation_status,
+            evidenceRecorded: !!c.evidence_url_recorded,
+            verified: !!c.verified,
+            verifiedDate: c.verified_date || null,
+            noEvidence: !!c.no_evidence
+        };
+    }
+
+    function violationModel(v) {
+        return {
+            policyName: v.policy_name || 'Unnamed policy',
+            severity: v.severity || null,
+            detectedAt: v.detected_at || null
+        };
+    }
+
+    function buildControls(payload) {
+        return (payload.controls || []).map(controlModel);
+    }
+
+    function buildViolations(payload) {
+        return (payload.open_violations || []).map(violationModel);
     }
 
     // ── small helpers ─────────────────────────────────────────────────────
@@ -237,6 +397,23 @@
         var active = document.activeElement;
         var onButton = active && active.hasAttribute && active.hasAttribute('data-recompute-button');
         if (onButton || !active || active === document.body) heading.focus();
+    }
+
+    /* After an answer arrives, scroll its results heading into view and move
+       focus to it so the answer is visible without scrolling and announced
+       for screen readers (the heading already carries tabindex="-1"). */
+    function showResults(heading) {
+        if (!heading) return;
+        heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        heading.focus();
+    }
+
+    /* Convert a snake_case status code to a readable label: "in_progress" →
+       "In Progress", "Active" → "Active". Matches the Python-side pattern
+       status.replace("_", " ").title() used across this codebase. */
+    function statusLabel(status) {
+        if (!status) return '';
+        return status.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
     }
 
     function failureStatus(err) {
@@ -438,10 +615,21 @@
         buildWorkPackages: buildWorkPackages,
         fetchStrategy: fetchStrategy,
         buildInitiatives: buildInitiatives,
+        fetchAccountability: fetchAccountability,
+        buildOwners: buildOwners,
+        fetchData: fetchData,
+        buildDataObjects: buildDataObjects,
+        buildFlows: buildFlows,
+        fetchCompliance: fetchCompliance,
+        buildControls: buildControls,
+        buildViolations: buildViolations,
         recompute: recompute,
+        fetchExplanation: fetchExplanation,
         timeText: timeText,
         refreshIcons: refreshIcons,
         keepPlace: keepPlace,
+        showResults: showResults,
+        statusLabel: statusLabel,
         failureStatus: failureStatus,
         bandFor: bandFor,
         pluralThings: pluralThings,

@@ -987,9 +987,12 @@
         if (!_container) {
             _container = global.document.createElement('div');
             _container.id = CONTAINER_ID;
-            // Positioned fixed, top-right, stacked vertically
+            // Positioned fixed, bottom-right on desktop, top-centre on mobile
             _container.className = [
-                'fixed', 'bottom-4', 'right-4', 'z-[9999]',
+                'fixed', 'top-16', 'left-1/2', '-translate-x-1/2',
+                'sm:top-auto', 'sm:left-auto', 'sm:translate-x-0',
+                'sm:bottom-4', 'sm:right-4',
+                'z-[9999]',
                 'flex', 'flex-col-reverse', 'gap-2',
                 'pointer-events-none',
                 'max-w-sm', 'w-full'

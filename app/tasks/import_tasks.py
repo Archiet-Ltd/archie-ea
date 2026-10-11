@@ -140,6 +140,25 @@ def _make_celery_with_app(flask_app):
 # ---------------------------------------------------------------------------
 
 
+def _job_organization_id(job_id):
+    """Organisation of the user who started batch import *job_id*, or None.
+
+    ``BatchImportJob`` carries no organisation column of its own; it belongs to
+    the organisation of the user who started it. One global read of two integer
+    columns, taken before any tenant scope is entered.
+    """
+    from app import db
+    from app.models.batch_import import BatchImportJob
+    from app.models.user import User
+
+    return db.session.execute(
+        db.select(User.__table__.c.organization_id)
+        .select_from(BatchImportJob.__table__)
+        .join(User.__table__, User.__table__.c.id == BatchImportJob.__table__.c.user_id)
+        .where(BatchImportJob.__table__.c.id == job_id)
+    ).scalar()
+
+
 def _process_job_batches(job_id):
     """
     Process all queued batches for the given *job_id* synchronously.
@@ -148,8 +167,34 @@ def _process_job_batches(job_id):
     the synchronous fallback.  It must be called inside a Flask
     application context.
 
+    A Celery worker has no request and so no tenant: the job's batches are
+    processed inside ``tenant_scope`` of the organisation that started the job,
+    so every element the import writes is filtered and stamped for that
+    organisation alone. When called from a request (the synchronous fallback)
+    the request's own tenant is already the job's and is left as it is.
+
     Returns a dict summarising the outcome.
     """
+    from flask import g
+
+    from app import db
+    from app.jobs.tenant_safe_job import tenant_scope
+
+    if getattr(g, "current_org_id", None) is not None:
+        return _process_job_batches_in_tenant(job_id)
+
+    organization_id = _job_organization_id(job_id)
+    if organization_id is None:
+        logger.error("Job %s not found or has no owning organisation", job_id)
+        return {"success": False, "error": "Job not found", "job_id": job_id}
+    with tenant_scope(organization_id):
+        result = _process_job_batches_in_tenant(job_id)
+        db.session.commit()
+    return result
+
+
+def _process_job_batches_in_tenant(job_id):
+    """The batch loop itself; runs with the job's tenant already set."""
     from app import db
     from app.models.batch_import import (
         BatchImportBatch,

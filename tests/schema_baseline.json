@@ -4255,6 +4255,10 @@
    "uploaded_by": {
     "has_default": false,
     "nullable": true
+   },
+   "uploaded_by_id": {
+    "has_default": false,
+    "nullable": true
    }
   },
   "application_duplication_reports": {
@@ -5603,6 +5607,10 @@
    "notes": {
     "has_default": false,
     "nullable": true
+   },
+   "organization_id": {
+    "has_default": true,
+    "nullable": false
    },
    "organization_unit_id": {
     "has_default": false,
@@ -30392,6 +30400,10 @@
     "has_default": false,
     "nullable": false
    },
+   "organization_id": {
+    "has_default": true,
+    "nullable": false
+   },
    "organization_size": {
     "has_default": false,
     "nullable": true
@@ -30564,6 +30576,10 @@
    },
    "name": {
     "has_default": false,
+    "nullable": false
+   },
+   "organization_id": {
+    "has_default": true,
     "nullable": false
    },
    "parent_unit_id": {
@@ -42648,6 +42664,10 @@
     "has_default": true,
     "nullable": true
    },
+   "organization_id": {
+    "has_default": true,
+    "nullable": false
+   },
    "preferred_vendor_id": {
     "has_default": false,
     "nullable": true
@@ -53367,6 +53387,28 @@
     "nullable": false
    },
    "zoom_level": {
+    "has_default": true,
+    "nullable": true
+   }
+  },
+  "waitlist_signups": {
+   "consent_text": {
+    "has_default": false,
+    "nullable": false
+   },
+   "created_at": {
+    "has_default": true,
+    "nullable": false
+   },
+   "email": {
+    "has_default": false,
+    "nullable": false
+   },
+   "id": {
+    "has_default": true,
+    "nullable": false
+   },
+   "source": {
     "has_default": true,
     "nullable": true
    }

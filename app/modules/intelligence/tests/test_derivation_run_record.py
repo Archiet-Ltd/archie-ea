@@ -103,6 +103,53 @@ def test_measured_zero_is_distinguishable_from_never_ran(app, db_session, make_o
     assert never_ran_record is None
 
 
+def test_run_record_round_trips_utc_timestamps_within_a_few_seconds(
+    app, db_session, make_org
+):
+    from app.modules.intelligence.models.derivation_run import DerivationRun
+    from app.modules.intelligence.services.derivation_runner import DerivationRunner
+
+    org = make_org("dr-run-utc-roundtrip")
+    a = _make_element(db_session, org.id, "a")
+    b = _make_element(db_session, org.id, "b")
+    _make_relationship(db_session, org.id, a, b, "Serving")
+    db_session.commit()
+    org_id = org.id
+
+    run_started_utc = _dt.datetime.now(_dt.timezone.utc)
+    with app.app_context():
+        result = DerivationRunner().run_and_persist(org_id, trigger="on_demand")
+    run_finished_utc = _dt.datetime.now(_dt.timezone.utc)
+
+    with app.app_context():
+        db.session.remove()
+        row = db.session.execute(
+            db.select(DerivationRun)
+            .where(DerivationRun.organization_id == org_id)
+            .order_by(DerivationRun.id.desc())
+        ).scalars().first()
+
+    assert row is not None
+    started_at = row.started_at
+    finished_at = row.finished_at
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=_dt.timezone.utc)
+    else:
+        started_at = started_at.astimezone(_dt.timezone.utc)
+    if finished_at.tzinfo is None:
+        finished_at = finished_at.replace(tzinfo=_dt.timezone.utc)
+    else:
+        finished_at = finished_at.astimezone(_dt.timezone.utc)
+
+    tolerance = _dt.timedelta(seconds=5)
+    assert run_started_utc - tolerance <= started_at <= run_finished_utc + tolerance
+    assert run_started_utc - tolerance <= finished_at <= run_finished_utc + tolerance
+    assert finished_at >= started_at
+    assert abs(
+        ((finished_at - started_at) - _dt.timedelta(milliseconds=result.duration_ms)).total_seconds()
+    ) <= tolerance.total_seconds()
+
+
 # --- Acceptance criterion 3: failed / lock-skipped runs write no row -------
 
 

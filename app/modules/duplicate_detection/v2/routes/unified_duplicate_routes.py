@@ -21,6 +21,7 @@ from flask import (  # dead-code-ok
     url_for,
 )
 from flask_login import current_user, login_required
+from app.middleware.tenant_decorators import platform_admin_required
 
 from app import db
 from app.core.compat import mark_blueprint_guardrailed
@@ -38,6 +39,7 @@ from app.modules.duplicate_detection.services.unified_duplicate_detection_servic
 from app.utils.pagination import safe_int_arg
 from app.models.application_portfolio import ApplicationComponent
 from app.utils.route_guards import require_entity_json
+from app.modules.duplicate_detection.group_access import group_visible_to_caller
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +63,7 @@ def enterprise_dashboard():
 @unified_duplicate_bp_v2.route("/enterprise/run-detection", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_enterprise_detection():
     """Run enterprise-grade duplicate detection"""
     try:
@@ -112,6 +115,7 @@ def get_enterprise_groups():
 @unified_duplicate_bp_v2.route("/enterprise/runs")
 @timed_route
 @login_required
+@platform_admin_required
 def get_enterprise_runs():
     """Get enterprise detection runs"""
     try:
@@ -138,6 +142,7 @@ def simple_dashboard():
 @unified_duplicate_bp_v2.route("/simple/run-detection", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_simple_detection():
     """Run simple duplicate detection with strategy support."""
     try:
@@ -163,6 +168,7 @@ def run_simple_detection():
 @unified_duplicate_bp_v2.route("/simple/run-hybrid", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_hybrid_detection():
     """Run hybrid duplicate detection"""
     try:
@@ -194,6 +200,7 @@ def get_simple_groups():
 @unified_duplicate_bp_v2.route("/simple/runs")
 @timed_route
 @login_required
+@platform_admin_required
 def get_simple_runs():
     """Get simple detection runs with full details for dashboard display."""
     try:
@@ -217,6 +224,7 @@ def get_simple_runs():
 @unified_duplicate_bp_v2.route("/simple/cleanup", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def cleanup_stale_data():
     """Clean up stale duplicate detection data (POST only)"""
     try:
@@ -407,6 +415,7 @@ def get_element_duplicate_groups_api():
 @unified_duplicate_bp_v2.route("/simple/api/run-detection", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_simple_detection_api():
     """Run application consolidation detection API endpoint"""
     try:
@@ -596,7 +605,15 @@ def simple_group_detail(group_id):
                 """
             ),
             {"group_id": group.id, **({"org": _org} if _org is not None else {})},
-        ).mappings()
+        ).mappings().all()  # materialise: a Result has no __bool__/__len__, "if not app_rows" was always False
+
+        if not app_rows:
+            # No member application is visible to the caller's organisation (either the
+            # group has none, or every member belongs to a different organisation).
+            # UnifiedDuplicateGroup itself carries no organisation column, so this is the
+            # only tenant signal available; treat it the same as "group not found" rather
+            # than reveal the group's own name, similarity scores and estimated savings.
+            return "Group not found", 404
 
         for app in app_rows:
             technology_stack = app.get("technology_stack")
@@ -648,6 +665,7 @@ def unified_dashboard():
 @unified_duplicate_bp_v2.route("/unified/run-detection", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_unified_detection():
     """Run unified duplicate detection with specified mode"""
     try:
@@ -681,6 +699,7 @@ def get_unified_groups():
 @unified_duplicate_bp_v2.route("/unified/runs")
 @timed_route
 @login_required
+@platform_admin_required
 def get_unified_runs():
     """Get all detection runs (both enterprise and simple)"""
     try:
@@ -995,6 +1014,7 @@ def api_group_impact(group_id):
 @unified_duplicate_bp_v2.route("/api/statistics/summary")
 @timed_route
 @login_required
+@platform_admin_required
 def api_statistics_summary():
     """Statistics summary for the enterprise dashboard."""
     try:
@@ -1057,6 +1077,7 @@ def api_duplicate_groups():
 @unified_duplicate_bp_v2.route("/api/detection-runs")
 @timed_route
 @login_required
+@platform_admin_required
 def api_detection_runs():
     """Detection runs for the enterprise dashboard."""
     try:
@@ -1079,6 +1100,7 @@ def api_detection_runs():
 @unified_duplicate_bp_v2.route("/run-detection", methods=["POST"])
 @timed_route
 @login_required
+@platform_admin_required
 def run_detection():
     """Run duplicate detection from the enterprise dashboard."""
     try:
@@ -1103,7 +1125,7 @@ def approve_consolidation_recommendation(recommendation_id):
     """Approve a consolidation recommendation."""
     try:
         group = DuplicateGroup.query.get(recommendation_id)
-        if not group:
+        if not group or not group_visible_to_caller(group):
             return jsonify({"success": False, "error": "Recommendation not found"}), 404
         group.status = "approved"
         group.reviewed_at = datetime.utcnow()
@@ -1124,7 +1146,7 @@ def reject_consolidation_recommendation(recommendation_id):
         data = request.get_json() or {}
         reason = data.get("reason", "")
         group = DuplicateGroup.query.get(recommendation_id)
-        if not group:
+        if not group or not group_visible_to_caller(group):
             return jsonify({"success": False, "error": "Recommendation not found"}), 404
         group.status = "rejected"
         group.reviewed_at = datetime.utcnow()
@@ -1154,12 +1176,14 @@ def api_add_group_to_consolidation(group_id):
         group = UnifiedDuplicateGroup.query.get(group_id_int)
         if not group:
             legacy_group = DuplicateGroup.query.get(group_id_int)
-            if not legacy_group:
+            if not legacy_group or not group_visible_to_caller(legacy_group):
                 return jsonify({"success": False, "error": f"Group {group_id} not found"}), 404
             application_ids = [app.id for app in legacy_group.applications]
             group_name = legacy_group.name or f"Duplicate Group {group_id_int}"
             estimated_savings = legacy_group.estimated_savings if hasattr(legacy_group, "estimated_savings") else None
         else:
+            if not group_visible_to_caller(group):
+                return jsonify({"success": False, "error": f"Group {group_id} not found"}), 404
             application_ids = [app.id for app in group.applications.all()]
             group_name = group.name or f"Duplicate Group {group_id_int}"
             estimated_savings = group.estimated_savings if hasattr(group, "estimated_savings") else None
@@ -1235,6 +1259,8 @@ def api_ignore_group(group_id):
 
         group = UnifiedDuplicateGroup.query.get(group_id_int)
         if group:
+            if not group_visible_to_caller(group):
+                return jsonify({"success": False, "error": f"Group {group_id} not found"}), 404
             group.status = "ignored"
             group.resolution_action = "no_action"
             if reason:
@@ -1243,7 +1269,7 @@ def api_ignore_group(group_id):
             return jsonify({"success": True, "group_id": group_id_int, "status": group.status})
 
         legacy_group = DuplicateGroup.query.get(group_id_int)
-        if not legacy_group:
+        if not legacy_group or not group_visible_to_caller(legacy_group):
             return jsonify({"success": False, "error": f"Group {group_id} not found"}), 404
 
         legacy_group.status = "ignored"

@@ -139,7 +139,7 @@ class DocumentIngestionService:
             org_id = solution.organization_id if solution else None
 
             # Create proposal rows
-            from app.models.solution_blueprint_proposal import SolutionBlueprintProposal
+            from app.services.solution_blueprint_service import create_solution_blueprint_proposal
 
             proposals = []
             for el in elements:
@@ -168,7 +168,7 @@ class DocumentIngestionService:
                         }]
                     }
 
-                proposal = SolutionBlueprintProposal(
+                proposal = create_solution_blueprint_proposal(
                     solution_id=solution_id,
                     organization_id=org_id,
                     archimate_type=el_type,
@@ -181,7 +181,6 @@ class DocumentIngestionService:
                     acm_domain=acm_domain,
                     acm_properties=acm_props if acm_props else None,
                 )
-                db.session.add(proposal)
                 proposals.append(proposal)
 
             db.session.commit()

@@ -429,6 +429,122 @@ def audited_intelligence_states(axe_module, axe_engine, browser, live_server, se
     return results
 
 
+# The two canvas pages, each at 1280px and 360px, for an empty tenant (no
+# record has been filled in yet, so every box renders its empty hint rather
+# than content). Baselined like every other page in AUDIT above (a ratchet,
+# not a hard zero) rather than joining Ask/Twin map's never-baselined pair,
+# because these pages' existing macros (page_header, card, the meta panel)
+# are shared with pages already carrying accepted findings and a first run
+# here may find the same ones, not a new defect this change introduced.
+CANVAS_PAGES = [
+    ("business_architect", "Business Model Canvas, 1280px", "bmc", 1280),
+    ("business_architect", "Business Model Canvas, 360px", "bmc", 360),
+    ("business_architect", "Business case, 1280px", "case", 1280),
+    ("business_architect", "Business case, 360px", "case", 360),
+]
+
+
+@pytest.fixture(scope="module")
+def canvas_records(seeded):
+    """One empty BusinessModelCanvas and one empty BusinessCase for the
+    seeded org — the pages under audit 404 without a real row."""
+    from app import create_app, db
+    from app.models.business_case import BusinessCase
+    from app.models.business_model import BusinessModelCanvas
+
+    app = create_app("testing")
+    with app.app_context():
+        canvas = BusinessModelCanvas(name="A11y Audit Canvas", organization_id=seeded["ids"]["org"])
+        case = BusinessCase(title="A11y Audit Case", organization_id=seeded["ids"]["org"])
+        db.session.add_all([canvas, case])
+        db.session.commit()
+        return {"bmc": canvas.id, "case": case.id}
+
+
+@pytest.fixture(scope="module")
+def audited_canvas_pages(axe_module, axe_engine, browser, live_server, seeded, canvas_records):
+    """Run axe on both canvas pages at 1280px and 360px."""
+    _require_rule_set(axe_engine)
+    axe = axe_module.Axe()
+    results = _AuditResults()
+    paths = {
+        "bmc": "/business-model/%d" % canvas_records["bmc"],
+        "case": "/business-case/%d" % canvas_records["case"],
+    }
+    for archetype, label, kind, width in CANVAS_PAGES:
+        ctx = browser.new_context(viewport={"width": width, "height": 900})
+        ctx.set_default_timeout(PAGE_TIMEOUT)
+        ctx.set_default_navigation_timeout(PAGE_TIMEOUT)
+        page = ctx.new_page()
+        try:
+            _login(page, live_server, seeded["emails"][archetype])
+            page.goto(live_server + paths[kind], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            page.wait_for_timeout(1000)
+            report = axe.run(page, options={"runOnly": {"type": "tag", "values": TAGS}})
+            data = report.response if hasattr(report, "response") else report
+            results[label] = {
+                v["id"]: _violation_evidence(v) for v in data.get("violations", [])
+            }
+            results.evaluated[label] = {
+                r["id"] for kind_name in RESULT_KINDS for r in data.get(kind_name, [])
+            }
+        finally:
+            ctx.close()
+    return results
+
+
+def test_canvas_pages_are_audited_at_both_widths(audited_canvas_pages):
+    assert set(audited_canvas_pages) == {label for _a, label, _k, _w in CANVAS_PAGES}
+
+
+def test_canvas_pages_have_no_new_serious_or_critical_violations(audited_canvas_pages):
+    """Same ratchet as test_no_new_serious_or_critical_violations, scoped to
+    the two pages and widths this task adds."""
+    baseline = _load_baseline()
+    regressions = []
+    for label, violations in sorted(audited_canvas_pages.items()):
+        known = baseline.get(label, {})
+        for rule, evidence in sorted(violations.items()):
+            if evidence["impact"] not in BLOCKING:
+                continue
+            was = known.get(rule)
+            if was is None:
+                regressions.append("%s: NEW %s (%s, %d element%s; targets: %s)"
+                                   % (label, rule, evidence["impact"], evidence["count"],
+                                      "" if evidence["count"] == 1 else "s",
+                                      ", ".join(evidence["targets"]) or "unavailable"))
+            elif evidence["count"] > was:
+                regressions.append("%s: %s worsened %d -> %d elements"
+                                   % (label, rule, was, evidence["count"]))
+    assert not regressions, (
+        "%d new or worsened serious/critical WCAG 2.2 AA violation(s) on the canvas "
+        "pages:\n  %s" % (len(regressions), "\n  ".join(regressions)))
+
+
+def test_canvas_pages_all_violations_do_not_increase(audited_canvas_pages):
+    baseline = _load_baseline()
+    regressions = []
+    for label, violations in sorted(audited_canvas_pages.items()):
+        known = baseline.get(label, {})
+        for rule, evidence in sorted(violations.items()):
+            was = known.get(rule)
+            if was is None:
+                regressions.append("%s: NEW %s (%s, %d)"
+                                   % (label, rule, evidence["impact"], evidence["count"]))
+            elif evidence["count"] > was:
+                regressions.append("%s: %s worsened %d -> %d" % (label, rule, was, evidence["count"]))
+    assert not regressions, (
+        "%d accessibility regression(s) on the canvas pages:\n  %s"
+        % (len(regressions), "\n  ".join(regressions)))
+
+
+def test_canvas_pages_target_size_rule_was_evaluated(audited_canvas_pages):
+    """A clean result only means something if the 2.2 rule actually ran."""
+    for label in audited_canvas_pages:
+        assert "target-size" in audited_canvas_pages.evaluated[label], (
+            "the target-size rule did not run on %r" % label)
+
+
 def _dict_value(node, key):
     """The value expression stored under the string constant `key` in a dict literal."""
     for k, v in zip(node.keys, node.values):
@@ -906,7 +1022,7 @@ def test_the_states_of_ask_and_twin_map_have_no_violations(audited_intelligence_
             "the target-size rule did not run on %r, so a clean result says nothing" % label)
 
 
-def test_write_baseline_when_asked(audited):
+def test_write_baseline_when_asked(audited, audited_canvas_pages):
     """Regenerate the accepted set:  SMOKE_A11Y_UPDATE_BASELINE=1 pytest ...
 
     Deliberately a test rather than a script: the audit needs a live server, a
@@ -915,14 +1031,20 @@ def test_write_baseline_when_asked(audited):
     Notes for entries that survive regeneration are carried over; a NEW entry is
     written with no note, so test_every_accepted_baseline_entry_carries_a_date_
     and_a_reason fails until someone says when it was accepted and why.
+
+    Includes the canvas pages (audited_canvas_pages) — they are baselined
+    the same way as every page in AUDIT, unlike Ask/Twin map's
+    never-baselined pair.
     """
     if os.environ.get("SMOKE_A11Y_UPDATE_BASELINE") != "1":
         # This is a maintenance utility, not a release assertion. Count it as
         # a clean no-op instead of making every qualification run carry a skip.
         return
+    combined = dict(audited)
+    combined.update(audited_canvas_pages)
     accepted = {
         p: {r: evidence["count"] for r, evidence in v.items()}
-        for p, v in audited.items()
+        for p, v in combined.items()
     }
     previous_notes = _load_baseline_file().get("accepted_notes", {})
     notes = {}

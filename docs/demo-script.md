@@ -1,4 +1,4 @@
-# Archie — demo script & storyboard
+# Entelim — demo script & storyboard
 
 A persona-driven walkthrough of the platform, used to record the demo video
 (hosted on the [`demo` release](https://github.com/Anioko/archie-ea/releases/tag/demo)).
@@ -7,7 +7,7 @@ It doubles as a guided tour for evaluators and a script anyone can re-record.
 The thread: an architecture team **modernising a legacy customer portal**, seen
 through the people who actually use the product.
 
-## Who uses Archie, and for what
+## Who uses Entelim, and for what
 
 | Persona | What they come to do | Where in the product |
 |---|---|---|
@@ -24,7 +24,7 @@ through the people who actually use the product.
 
 ## Storyboard (the recorded sequence)
 
-1. **Title card** — *A.R.C.H.I.E. — open-source, AI-native enterprise architecture · TOGAF 9.2 · ArchiMate 3.2 · AGPL-3.0.* One `docker compose up` to self-host.
+1. **Title card** — *Entelim — open-source, AI-native enterprise architecture · TOGAF 9.2 · ArchiMate 3.2 · AGPL-3.0.* One `docker compose up` to self-host.
 2. **Sign in** — secure multi-tenant login (typed live).
 3. **Enterprise Architect**
    - Dashboard — *your workspace; portfolio health at a glance.*

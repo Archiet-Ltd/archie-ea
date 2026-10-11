@@ -45,7 +45,7 @@ const securityHeaders = [
 
 const nextConfig = {
 {% if base_path %}
-  // Subpath deployment: ARCHIE preview uses /apps/{id}; standalone deploy overrides with NEXT_PUBLIC_BASE_PATH=""
+  // Subpath deployment: Entelim preview uses /apps/{id}; standalone deploy overrides with NEXT_PUBLIC_BASE_PATH=""
   basePath: process.env.NEXT_PUBLIC_BASE_PATH !== undefined ? process.env.NEXT_PUBLIC_BASE_PATH : "{{ base_path }}",
 {% endif %}
 

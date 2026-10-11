@@ -87,6 +87,11 @@ class ArchiMateRelationshipService:
         },
     }
 
+    # Relationship columns a caller may set through ``properties``.
+    WRITABLE_PROPERTIES = frozenset(
+        {"description", "access_mode", "flow_label", "custom_label", "created_by_id"}
+    )
+
     @classmethod
     def validate_relationship(
         cls,
@@ -119,8 +124,8 @@ class ArchiMateRelationshipService:
             return False, "Self-relationships not allowed for this type"
 
         # Check layer constraints
-        source_layer = source_element.layer.lower()
-        target_layer = target_element.layer.lower()
+        source_layer = (source_element.layer or "").lower()
+        target_layer = (target_element.layer or "").lower()
 
         if rules.get("same_layer_only") and source_layer != target_layer:
             return False, f"{relationship_type} relationships must be within the same layer"
@@ -156,6 +161,8 @@ class ArchiMateRelationshipService:
         relationship_type: str,
         architecture_id: int,
         properties: Optional[Dict] = None,
+        organization_id: Optional[int] = None,
+        rollback: bool = True,
     ) -> Optional[ArchiMateRelationship]:
         """
         Create a validated ArchiMate relationship.
@@ -165,7 +172,13 @@ class ArchiMateRelationshipService:
             target_element: Target ArchiMate element
             relationship_type: Type of relationship
             architecture_id: Architecture model ID
-            properties: Optional relationship properties
+            properties: Optional values for the relationship's own columns
+                (see WRITABLE_PROPERTIES)
+            organization_id: The owning organisation, for a caller with no
+                request context (the tenant default only reads the request)
+            rollback: roll the session's transaction back when the write fails
+                (the default). A caller that holds a savepoint passes False and
+                gets the exception, so only its savepoint is rolled back.
 
         Returns:
             Created ArchiMateRelationship or None if validation failed
@@ -185,8 +198,32 @@ class ArchiMateRelationshipService:
                 source_id=source_element.id,
                 target_id=target_element.id,
                 architecture_id=architecture_id,
-                properties=str(properties) if properties else None,
             )
+            if organization_id is not None:
+                relationship.organization_id = organization_id
+            # The relationship has no free-form properties column (passing one
+            # raised, so this writer never saved anything); each property is
+            # applied to the relationship column of the same name instead.
+            unknown = []
+            for key, value in (properties or {}).items():
+                if key in cls.WRITABLE_PROPERTIES:
+                    setattr(relationship, key, value)
+                else:
+                    unknown.append(key)
+            if unknown:
+                logger.warning("Ignored unknown relationship properties: %s", sorted(unknown))
+
+            # The relationship has no free-form properties column (passing one
+            # raised, so this writer never saved anything); each property is
+            # applied to the relationship column of the same name instead.
+            unknown = []
+            for key, value in (properties or {}).items():
+                if key in cls.WRITABLE_PROPERTIES:
+                    setattr(relationship, key, value)
+                else:
+                    unknown.append(key)
+            if unknown:
+                logger.warning("Ignored unknown relationship properties: %s", sorted(unknown))
 
             db.session.add(relationship)
             db.session.flush()
@@ -198,6 +235,8 @@ class ArchiMateRelationshipService:
 
         except Exception as e:
             logger.error(f"Failed to create relationship: {e}")
+            if not rollback:
+                raise
             db.session.rollback()
             return None
 

@@ -1,20 +1,29 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/canvas_box.html' import canvas_box_entries, canvas_unclassified %}
 
 {% block title %}{{ canvas.name or 'Business Model Canvas' }}{% endblock %}
 
 {% block content %}
+{# Source order (and so the phone/keyboard-tab order below 640px, where the
+   grid collapses to one column) follows the design's stated Business Model
+   Canvas order word for word: Customer Segments, Value Propositions,
+   Channels, Customer Relationships, Revenue Streams, Key Activities, Key
+   Resources, Key Partnerships, Cost Structure. The desktop
+   grid-template-areas below are unchanged (the existing nine-block layout)
+   — grid-area positions a cell independently of source order, so reordering
+   this list only changes tab/phone order, never the desktop visual layout. #}
 {% set bmc_layout = [
-    {'key': 'key_partners', 'label': 'Key Partners', 'icon': 'handshake', 'area': 'kp', 'class': 'bg-card'},
+    {'key': 'customer_segments', 'label': 'Customer Segments', 'icon': 'users', 'area': 'cs', 'class': 'bg-card'},
+    {'key': 'value_propositions', 'label': 'Value Propositions', 'icon': 'gem', 'area': 'vp', 'class': 'bg-primary/5'},
+    {'key': 'channels', 'label': 'Channels', 'icon': 'radio-tower', 'area': 'ch', 'class': 'bg-card'},
+    {'key': 'customer_relationships', 'label': 'Customer Relationships', 'icon': 'heart-handshake', 'area': 'cr', 'class': 'bg-card'},
+    {'key': 'revenue_streams', 'label': 'Revenue Streams', 'icon': 'trending-up', 'area': 'rev', 'class': 'bg-muted/20'},
     {'key': 'key_activities', 'label': 'Key Activities', 'icon': 'zap', 'area': 'ka', 'class': 'bg-card'},
     {'key': 'key_resources', 'label': 'Key Resources', 'icon': 'box', 'area': 'kr', 'class': 'bg-card'},
-    {'key': 'value_propositions', 'label': 'Value Propositions', 'icon': 'gem', 'area': 'vp', 'class': 'bg-primary/5'},
-    {'key': 'customer_relationships', 'label': 'Customer Relationships', 'icon': 'heart-handshake', 'area': 'cr', 'class': 'bg-card'},
-    {'key': 'channels', 'label': 'Channels', 'icon': 'radio-tower', 'area': 'ch', 'class': 'bg-card'},
-    {'key': 'customer_segments', 'label': 'Customer Segments', 'icon': 'users', 'area': 'cs', 'class': 'bg-card'},
+    {'key': 'key_partners', 'label': 'Key Partnerships', 'icon': 'handshake', 'area': 'kp', 'class': 'bg-card'},
     {'key': 'cost_structure', 'label': 'Cost Structure', 'icon': 'trending-down', 'area': 'cost', 'class': 'bg-muted/20'},
-    {'key': 'revenue_streams', 'label': 'Revenue Streams', 'icon': 'trending-up', 'area': 'rev', 'class': 'bg-muted/20'},
 ] %}
 
 <div class="flex-1 overflow-auto" x-data='businessModelCanvas({
@@ -33,7 +42,9 @@
     operatingModelType: {{ (canvas.operating_model_type or '') | tojson }},
     blockApiUrl: {{ url_for('business_model.save_block', canvas_id=canvas.id) | tojson }},
     updateApiUrl: {{ url_for('business_model.update_canvas', canvas_id=canvas.id) | tojson }},
-    draftBlockApiUrl: {{ url_for('business_model.ai_draft_block', canvas_id=canvas.id) | tojson }}
+    draftBlockApiUrl: {{ url_for('business_model.ai_draft_block', canvas_id=canvas.id) | tojson }},
+    exportApiUrl: {{ url_for('business_model.export_canvas', canvas_id=canvas.id) | tojson }},
+    savedDiagramId: {{ canvas_saved_diagram_id | tojson }}
   })' x-cloak>
 
   {{ page_header(
@@ -74,6 +85,41 @@
       </span>
     </div>
 
+    {# ── Export & share — image through the existing ExportManager over the
+       rendered grid (the reason line of every empty box is already in that
+       DOM, so it is already in the image); the saved-viewpoint formats over
+       the record's saved diagram; share is the existing in-tenant saved-
+       diagram link, only offered once one exists. ── #}
+    <div class="rounded-lg border border-border bg-card p-4 flex flex-wrap items-center gap-3" data-testid="bmc-export-share-panel">
+      <div class="flex items-center gap-2 shrink-0">
+        <i data-lucide="share-2" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
+        <span class="text-sm font-medium text-foreground">Export &amp; share</span>
+      </div>
+      <button type="button" @click="exportImage()" data-testid="bmc-export-image"
+        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5">
+        <i data-lucide="image" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Export as image
+      </button>
+      <select aria-label="File export format" x-model="exportFormat" data-testid="bmc-export-format"
+        class="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-sm">
+        <option value="mermaid">Mermaid (.mmd)</option>
+        <option value="lucid">Lucidchart (.lucid)</option>
+        <option value="archi">Archi (.archimate)</option>
+      </select>
+      <a :href="exportFileUrl" data-testid="bmc-export-file"
+        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5">
+        <i data-lucide="download" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Download file
+      </a>
+      <template x-if="shareUrl">
+        <a :href="shareUrl" target="_blank" rel="noopener" data-testid="bmc-share-link"
+          class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5">
+          <i data-lucide="link" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Share
+        </a>
+      </template>
+      <span x-show="!shareUrl" x-cloak class="text-xs text-muted-foreground" data-testid="bmc-share-unavailable">
+        Save an entry on this canvas to get a share link.
+      </span>
+    </div>
+
     {# ── The 9-box Business Model Canvas (classic BMC layout via CSS grid-template-areas) ── #}
     <style>
       .bmc-grid {
@@ -104,24 +150,39 @@
         .bmc-grid > [data-area="cost"] { grid-area: cost; }
         .bmc-grid > [data-area="rev"] { grid-area: rev; }
       }
+      /* Titles wrap only between words (the browser default): no
+         word-break, no overflow-wrap override, no hyphens. Moving
+         "Draft with AI" to an icon-only button (below) gives the title
+         the row width it needs so a normal-wrapping word never has to
+         split. */
+      .bmc-grid .bmc-box-title {
+        display: block;
+        min-width: 0;
+      }
     </style>
-    <div class="bmc-grid" data-testid="bmc-grid">
+    <div id="bmc-grid" class="bmc-grid" data-testid="bmc-grid">
       {% for b in bmc_layout %}
       <div class="{{ b.class }} p-3 flex flex-col" data-area="{{ b.area }}" data-testid="bmc-block-{{ b.key }}">
-        <div class="flex items-center justify-between gap-1.5 mb-2">
-          <div class="flex items-center gap-1.5 min-w-0">
-            <i data-lucide="{{ b.icon }}" class="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden="true"></i>
-            <span class="text-xs font-semibold text-foreground uppercase tracking-wide truncate">{{ b.label }}</span>
+        {# The title takes the full row width; "Draft with AI" is an
+           icon-only button with an accessible name (aria-label) rather than
+           sharing the row as a labelled button — the labelled version left
+           too little width for the title, forcing long titles to break
+           mid-word. items-start (not items-center) keeps the button aligned
+           with the first line when a title wraps to two lines. #}
+        <div class="flex items-start justify-between gap-1.5 mb-2">
+          <div class="flex items-center gap-1.5 min-w-0 flex-1">
+            <i data-lucide="{{ b.icon }}" class="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" aria-hidden="true"></i>
+            <span class="text-xs font-semibold text-foreground uppercase tracking-wide bmc-box-title">{{ b.label }}</span>
           </div>
           <button type="button" @click="draftBlock('{{ b.key }}')" :disabled="draftingBlock === '{{ b.key }}'"
                   data-testid="bmc-draft-ai-{{ b.key }}"
-                  class="shrink-0 inline-flex items-center gap-1 rounded-md text-xs font-medium text-primary hover:bg-primary/10 px-1.5 py-1 disabled:opacity-50 disabled:pointer-events-none"
+                  class="shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-md text-primary hover:bg-primary/10 disabled:opacity-50 disabled:pointer-events-none"
                   aria-label="Draft {{ b.label }} with AI">
             <span x-show="draftingBlock === '{{ b.key }}'" x-cloak class="animate-spin h-2.5 w-2.5 border-2 border-current border-t-transparent rounded-full inline-block"></span>
-            <i data-lucide="sparkles" class="h-2.5 w-2.5" aria-hidden="true" x-show="draftingBlock !== '{{ b.key }}'"></i>
-            <span>Draft with AI</span>
+            <i data-lucide="sparkles" class="h-3 w-3" aria-hidden="true" x-show="draftingBlock !== '{{ b.key }}'"></i>
           </button>
         </div>
+        {% if b.key in canvas_zones %}{{ canvas_box_entries(canvas_zones[b.key]) }}{% endif %}
         <textarea
           x-model="blocks.{{ b.key }}"
           @blur="saveBlock('{{ b.key }}')"
@@ -139,6 +200,8 @@
       </div>
       {% endfor %}
     </div>
+
+    {{ canvas_unclassified(canvas_unclassified_count) }}
   </div>
 </div>
 
@@ -170,6 +233,9 @@ document.addEventListener('alpine:init', () => {
     blockApiUrl: config.blockApiUrl,
     updateApiUrl: config.updateApiUrl,
     draftBlockApiUrl: config.draftBlockApiUrl,
+    exportApiUrl: config.exportApiUrl,
+    savedDiagramId: config.savedDiagramId || null,
+    exportFormat: 'mermaid',
     savingBlock: null,
     savedBlock: null,
     savingMeta: false,
@@ -179,6 +245,26 @@ document.addEventListener('alpine:init', () => {
 
     csrfToken() {
       return document.querySelector('meta[name=csrf-token]')?.content || '';
+    },
+
+    get exportFileUrl() {
+      return this.exportApiUrl + '?format=' + encodeURIComponent(this.exportFormat);
+    },
+
+    // The existing in-tenant saved-diagram share: opening this URL re-derives
+    // membership from the current elements, and a viewer outside this tenant
+    // gets the same "diagram not found" bytes as a missing id — no public or
+    // token-based link is created here.
+    get shareUrl() {
+      return this.savedDiagramId ? ('/archimate/composer?viewpoint_id=' + this.savedDiagramId) : null;
+    },
+
+    // The same shared ExportManager every other page's "Export as image"
+    // button uses, over the rendered grid — the empty-box reason lines sit
+    // in that same DOM, so they are already part of the image.
+    async exportImage() {
+      if (!window.exportToPNG) return;
+      await window.exportToPNG('bmc-grid', 'business-model-canvas-' + this.canvasId, { scale: 2 });
     },
 
     // Advisory only: drafts content into the block's existing textarea

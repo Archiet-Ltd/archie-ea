@@ -177,9 +177,7 @@ def test_edit_archimate_element_page_does_not_500(logged_in_client, db_session, 
     literal report: 'Edit returns HTTP 500'."""
     from app.models.motivation import Goal
 
-    # Goal is not tenant-scoped (no TenantMixin / organization_id column) —
-    # it reaches tenancy only through its linked ArchiMateElement.
-    goal = Goal(name="Route audit goal")
+    goal = Goal(name="Route audit goal", organization_id=org.id)
     db_session.add(goal)
     db_session.flush()
 

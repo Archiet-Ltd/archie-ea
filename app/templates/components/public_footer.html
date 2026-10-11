@@ -1,0 +1,60 @@
+{# Shared public marketing footer — reused by main/index.html and public/page.html
+   so every public page (home, vision, modules, comparisons, use-cases, dogfood,
+   and the site pages below) links to the same set of pages. Do not duplicate
+   this markup in a page template; extend this file instead.
+#}
+<footer class="border-t border-border bg-card">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-16">
+    <div class="grid sm:grid-cols-2 md:grid-cols-5 gap-8 mb-8">
+      <div class="space-y-4">
+        <img src="{{ url_for('static', filename='brand/entelim-logo.svg') }}" alt="Entelim" class="h-6">
+        <ul class="space-y-2 text-sm text-muted-foreground">
+          <li><a href="/features" class="hover:text-foreground transition-colors">Features</a></li>
+          <li><a href="/pricing" class="hover:text-foreground transition-colors">Pricing</a></li>
+          <li><a href="{{ url_for('account.login') }}" class="hover:text-foreground transition-colors">Sign in</a></li>
+          <li><a href="{{ url_for('account.register') }}" class="hover:text-foreground transition-colors">Sign up</a></li>
+        </ul>
+      </div>
+      <div class="space-y-4">
+        <h3 class="font-semibold text-foreground">Explore</h3>
+        <ul class="space-y-2 text-sm text-muted-foreground">
+          <li><a href="/use-cases" class="hover:text-foreground transition-colors">Use cases</a></li>
+          <li><a href="/vs" class="hover:text-foreground transition-colors">Compare</a></li>
+          <li><a href="/architecture-health-check" class="hover:text-foreground transition-colors">Architecture health check</a></li>
+          <li><a href="/team-annual-onboarding" class="hover:text-foreground transition-colors">Team annual plan with onboarding</a></li>
+        </ul>
+      </div>
+      <div class="space-y-4">
+        <h3 class="font-semibold text-foreground">Licensing</h3>
+        <ul class="space-y-2 text-sm text-muted-foreground">
+          <li><span class="public-footer-plain">AGPL-3.0</span></li>
+        </ul>
+      </div>
+      <div class="space-y-4">
+        <h3 class="font-semibold text-foreground">Company</h3>
+        <ul class="space-y-2 text-sm text-muted-foreground">
+          <li><a href="/about" class="hover:text-foreground transition-colors">About</a></li>
+          <li><a href="/contact" class="hover:text-foreground transition-colors">Contact</a></li>
+          <li><span class="public-footer-plain">Archiet Ltd</span></li>
+        </ul>
+      </div>
+      <div class="space-y-4">
+        <h3 class="font-semibold text-foreground">Legal</h3>
+        <ul class="space-y-2 text-sm text-muted-foreground">
+          <li><a href="/security" class="hover:text-foreground transition-colors">Security</a></li>
+          {% for link in legal_links %}
+          <li><a href="{{ link.href }}" class="hover:text-foreground transition-colors" data-legal-link="{{ link.slug }}">{{ link.label }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    <div class="border-t border-border pt-8">
+      <p class="text-sm text-muted-foreground text-center">
+        Entelim is licensed under AGPL-3.0. Made by Archiet Ltd.
+      </p>
+      <p class="text-sm text-muted-foreground text-center mt-2">
+        <a href="#" data-action="openAnalyticsConsentBanner" class="underline hover:text-foreground">Cookie settings</a>
+      </p>
+    </div>
+  </div>
+</footer>

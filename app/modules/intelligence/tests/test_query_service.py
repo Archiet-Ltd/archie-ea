@@ -9,7 +9,7 @@ import uuid
 import pytest
 
 # Fixtures (app, db_session, make_org, tenant_ctx, client, login_as) are
-# discovered via app/modules/intelligence/tests/conftest.py's own import of
+# discovered via app/modules/conftest.py's import of
 # tests.conftest -- pytest resolves fixtures by name without this module
 # importing them itself (see test_derivation_runner.py for the same
 # pattern). No import needed here.
@@ -69,21 +69,25 @@ def _application_component(db_session, org_id, element_id, name="App"):
     return comp
 
 
-def _ownership(db_session, component_id, unit_id, ownership_type="Business Owner"):
+def _ownership(db_session, org_id, component_id, unit_id, ownership_type="Business Owner", end_date=None):
     from app.models.enterprise_intelligence import ApplicationOwnership
 
     row = ApplicationOwnership(
-        application_id=component_id, organization_unit_id=unit_id, ownership_type=ownership_type
+        organization_id=org_id,
+        application_id=component_id,
+        organization_unit_id=unit_id,
+        ownership_type=ownership_type,
+        end_date=end_date,
     )
     db_session.add(row)
     db_session.flush()
     return row
 
 
-def _org_unit(db_session, name="Finance"):
+def _org_unit(db_session, org_id, name="Finance"):
     from app.models.enterprise_intelligence import OrganizationUnit
 
-    unit = OrganizationUnit(name=f"{name} {uuid.uuid4().hex[:6]}")
+    unit = OrganizationUnit(organization_id=org_id, name=f"{name} {uuid.uuid4().hex[:6]}")
     db_session.add(unit)
     db_session.flush()
     return unit
@@ -173,8 +177,8 @@ def test_owner_attaches_when_chain_resolves_and_tenant_matches(app, db_session, 
     b = _element(db_session, org.id, "B")
     _relationship(db_session, org.id, a, b)
     comp = _application_component(db_session, org.id, b.id, name="Owned App")
-    unit = _org_unit(db_session, "Ops")
-    _ownership(db_session, comp.id, unit.id, ownership_type="Business Owner")
+    unit = _org_unit(db_session, org.id, "Ops")
+    _ownership(db_session, org.id, comp.id, unit.id, ownership_type="Business Owner")
     db_session.commit()
 
     with app.test_request_context("/"):
@@ -209,8 +213,8 @@ def test_owner_absent_is_indistinguishable_and_cross_tenant_does_not_leak(app, d
     c_cross_tenant = _element(db_session, org_a.id, "C-cross-tenant")
     _relationship(db_session, org_a.id, a, c_cross_tenant)
     other_tenant_comp = _application_component(db_session, org_b.id, c_cross_tenant.id, name="OrgB App")
-    other_unit = _org_unit(db_session, "OrgB-Secret-Unit")
-    _ownership(db_session, other_tenant_comp.id, other_unit.id)
+    other_unit = _org_unit(db_session, org_b.id, "OrgB-Secret-Unit")
+    _ownership(db_session, org_b.id, other_tenant_comp.id, other_unit.id)
     db_session.commit()
 
     with app.test_request_context("/"):
@@ -224,6 +228,37 @@ def test_owner_absent_is_indistinguishable_and_cross_tenant_does_not_leak(app, d
         assert row["reason"] == "no_ownership_recorded"
         # The other tenant's unit name never appears anywhere in the payload.
         assert "OrgB-Secret-Unit" not in str(row)
+
+
+def test_owner_absent_when_ownership_has_ended(app, db_session, make_org):
+    """An ownership row whose end_date has already passed is not current
+    ownership -- same absence shape as no link at all, not the ended row's
+    unit."""
+    import datetime as _dt
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("qs-owner-ended")
+    a = _element(db_session, org.id, "A")
+    b = _element(db_session, org.id, "B")
+    _relationship(db_session, org.id, a, b)
+    comp = _application_component(db_session, org.id, b.id, name="Formerly Owned App")
+    unit = _org_unit(db_session, org.id, "Ended-Unit")
+    _ownership(
+        db_session, org.id, comp.id, unit.id,
+        end_date=_dt.date.today() - _dt.timedelta(days=1),
+    )
+    db_session.commit()
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org.id
+        result = IntelligenceQueryService.cross_layer_impact(a.id, include_derived=False, with_owner=True)
+
+    row = result["rows"][0]
+    assert row["owner"] is None
+    assert row["reason"] == "no_ownership_recorded"
 
 
 # --- Acceptance criterion 7: derivation_state ---------------------------------
@@ -324,8 +359,8 @@ def test_cross_tenant_component_pointer_does_not_leak_unit_name(app, db_session,
     _relationship(db_session, org_a.id, a, target)
 
     foreign_comp = _application_component(db_session, org_b.id, target.id, name="Foreign App")
-    foreign_unit = _org_unit(db_session, "Foreign-Unit")
-    _ownership(db_session, foreign_comp.id, foreign_unit.id)
+    foreign_unit = _org_unit(db_session, org_b.id, "Foreign-Unit")
+    _ownership(db_session, org_b.id, foreign_comp.id, foreign_unit.id)
     db_session.commit()
 
     with app.test_request_context("/"):
@@ -528,8 +563,8 @@ def test_sec09_tenant_check_blocks_real_cross_tenant_resolution(app, db_session,
 
     target = _element(db_session, org_b.id, "Target")
     comp = _application_component(db_session, org_b.id, target.id, name="OrgB App")
-    unit = _org_unit(db_session, "OrgB-Real-Unit")
-    _ownership(db_session, comp.id, unit.id)
+    unit = _org_unit(db_session, org_b.id, "OrgB-Real-Unit")
+    _ownership(db_session, org_b.id, comp.id, unit.id)
     db_session.commit()
 
     with app.test_request_context("/"):
@@ -561,8 +596,8 @@ def test_mutation_proof_sec09_real_path(app, db_session, make_org, monkeypatch):
 
     target = _element(db_session, org_b.id, "Target")
     comp = _application_component(db_session, org_b.id, target.id, name="OrgB App")
-    unit = _org_unit(db_session, "OrgB-Mut-Unit")
-    _ownership(db_session, comp.id, unit.id)
+    unit = _org_unit(db_session, org_b.id, "OrgB-Mut-Unit")
+    _ownership(db_session, org_b.id, comp.id, unit.id)
     db_session.commit()
 
     # 1) SEC-09 intact: the guarded, real path returns no owner.
@@ -614,8 +649,8 @@ def test_duplicate_component_pointer_resolves_deterministically_not_500(app, db_
     comp2 = ApplicationComponent(name="Second", organization_id=org.id, archimate_element_id=b.id)
     db_session.add_all([comp1, comp2])
     db_session.flush()
-    unit = _org_unit(db_session, "Dup-Unit")
-    _ownership(db_session, comp1.id, unit.id, ownership_type="Business Owner")
+    unit = _org_unit(db_session, org.id, "Dup-Unit")
+    _ownership(db_session, org.id, comp1.id, unit.id, ownership_type="Business Owner")
     db_session.commit()
 
     with app.test_request_context("/"):

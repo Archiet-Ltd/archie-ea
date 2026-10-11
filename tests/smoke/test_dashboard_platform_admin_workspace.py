@@ -26,7 +26,7 @@ def test_platform_admin_sees_workspace_cards_including_ask(browser, live_server,
         assert response.status == 200
         heading = page.get_by_role("heading", name="Your Workspace")
         expect(heading).to_be_visible(timeout=PAGE_TIMEOUT)
-        ask_card = page.get_by_role("link", name="Ask a question")
+        ask_card = page.locator("#main-content").get_by_role("link", name="Ask a question")
         expect(ask_card).to_be_visible()
     finally:
         page.close()

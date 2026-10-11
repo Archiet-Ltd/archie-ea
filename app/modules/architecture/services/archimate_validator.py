@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.orm import joinedload
 
 from app.models import ArchiMateElement, ArchiMateRelationship, ArchitectureModel
+from app.models.constants import ArchiMateLayer, ArchiMateRelationshipType
 from app.models.business_layer import BusinessService
 from app.models.process_data import BusinessProcess
 from app.models.relationship_tables import (
@@ -148,10 +149,10 @@ class ArchiMateValidator:
         return normalized
 
     def _normalize_layer(self, layer: Optional[str]) -> Optional[str]:
-        if not layer:
+        normalized = ArchiMateLayer.normalize(layer)
+        if not normalized:
             return None
-        key = layer.strip().lower()
-        key = self.layer_aliases.get(key, key)
+        key = self.layer_aliases.get(normalized, normalized)
         return key if key in self.layers else key
 
     def _canonical_element_type(self, element_type: Optional[str]) -> Optional[str]:
@@ -162,9 +163,10 @@ class ArchiMateValidator:
         return canonical or key
 
     def _canonical_relationship_type(self, relationship_type: Optional[str]) -> Optional[str]:
-        if not relationship_type:
+        normalized = ArchiMateRelationshipType.normalize(relationship_type, pascal_case=True)
+        if not normalized:
             return None
-        key = relationship_type.strip()
+        key = normalized.strip()
         alias_target = self.relationship_aliases.get(key.lower())
         if alias_target:
             key = alias_target

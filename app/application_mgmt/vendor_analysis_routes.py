@@ -14,6 +14,7 @@ from flask_login import current_user, login_required
 
 from .. import db
 from . import application_mgmt
+from app.middleware.tenant_decorators import is_active_org_admin
 from app.utils.pagination import safe_int_arg
 
 
@@ -98,7 +99,7 @@ def _check_analysis_access(analysis):
     if not analysis:
         return jsonify({"error": "Analysis not found"}), 404
     if analysis.created_by_id != current_user.id:
-        if not (hasattr(current_user, "is_admin") and current_user.is_admin()):
+        if not is_active_org_admin(current_user):
             return jsonify({"error": "Access denied"}), 403
     return None
 
@@ -133,9 +134,7 @@ def vendor_analysis_detail(analysis_id):
     analysis = load_entity(OptionsAnalysis, analysis_id)
     if analysis is None:
         abort(404, description="Analysis not found")
-    if analysis.created_by_id != current_user.id and not (
-        hasattr(current_user, "is_admin") and current_user.is_admin()
-    ):
+    if analysis.created_by_id != current_user.id and not is_active_org_admin(current_user):
         abort(403)
     return render_template(
         "application_mgmt/vendor_analysis_detail.html", analysis_id=analysis_id
@@ -1421,11 +1420,11 @@ def api_get_export_history(analysis_id):
 @application_mgmt.route("/api/capabilities", methods=["GET"])
 @login_required
 def api_get_capabilities():
-    """Get list of business capabilities for dropdown."""
+    """Get list of capabilities for dropdown."""
     try:
-        from app.models.business_capabilities import BusinessCapability
+        from app.models.unified_capability import UnifiedCapability
 
-        capabilities = BusinessCapability.query.order_by(BusinessCapability.name).all()
+        capabilities = UnifiedCapability.query.order_by(UnifiedCapability.name).all()
 
         return jsonify(
             [
@@ -1651,6 +1650,16 @@ def api_get_value_streams():
         current_app.logger.info(
             f"Value streams requested - domain_id: {domain_id}, domain_code: {domain_code}"
         )
+
+        if not domain_id and not domain_code:
+            # No domain filter chosen yet (e.g. the page's initial load,
+            # before the caller narrows by domain) — this is the honest
+            # empty state, not a lookup failure. It used to fall through to
+            # the "domain not found" branch below and answer 404 for a
+            # request that named no domain at all, which is what every one
+            # of this page's own initial loads did.
+            current_app.logger.info("Value streams requested with no domain filter — returning []")
+            return jsonify([])
 
         from app.models.unified_capability import BusinessDomain
 
@@ -2423,8 +2432,9 @@ def api_submit_stakeholder_scores(analysis_id, input_id):
         if not si:
             return jsonify({"error": "Stakeholder input not found"}), 404
 
-        # Only the stakeholder themselves (or admin) can submit
-        if si.stakeholder_id != current_user.id and not current_user.is_admin:
+        # Only the stakeholder themselves (or an admin of the active
+        # organisation -- see tenant_decorators.is_active_org_admin) can submit.
+        if si.stakeholder_id != current_user.id and not is_active_org_admin(current_user):
             return jsonify({"error": "Only the invited stakeholder can submit scores"}), 403
 
         data = request.get_json()
@@ -2530,9 +2540,15 @@ def api_get_stakeholder_consensus(analysis_id):
 )
 @login_required
 def api_remove_stakeholder(analysis_id, input_id):
-    """Remove a stakeholder from an analysis."""
+    """Remove a stakeholder from an analysis (analysis owner or admin only)."""
     try:
-        from app.models.vendor_analysis import StakeholderInput
+        from app.models.vendor_analysis import OptionsAnalysis, StakeholderInput
+
+        # The organisation fence arrives with OptionsAnalysis's tenant column.
+        # tenant-scoping-ok: access is decided by _check_analysis_access (owner or admin) on the next line
+        denied = _check_analysis_access(db.session.get(OptionsAnalysis, analysis_id))
+        if denied:
+            return denied
 
         si = StakeholderInput.query.filter_by(
             id=input_id, analysis_id=analysis_id

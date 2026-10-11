@@ -423,6 +423,7 @@ class ARBGovernanceService:
         rationale: str,
         decided_by_id: int,
         conditions: List[Dict] = None,
+        review_date=None,
     ) -> ARBReviewItem:
         """
         Record the ARB decision for a review item.
@@ -433,6 +434,8 @@ class ARBGovernanceService:
             rationale: Explanation for the decision
             decided_by_id: User ID who recorded the decision
             conditions: Optional conditions for approval
+            review_date: Optional date the board looks at the decision again
+                (stored on the item's follow_up_date; None stays None)
 
         Returns:
             Updated ARBReviewItem
@@ -557,6 +560,9 @@ class ARBGovernanceService:
 
         if conditions:
             item.conditions = conditions
+            item.follow_up_required = True
+        if review_date is not None:
+            item.follow_up_date = review_date
             item.follow_up_required = True
 
         # Update status based on decision

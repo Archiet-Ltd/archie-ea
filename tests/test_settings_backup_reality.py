@@ -26,6 +26,9 @@ def admin_client(app, db_session, make_org, login_as):
         organization_id=org.id,
         role=role,
         confirmed=True,
+        # /settings edits the global system_settings table: platform admin
+        # (flag AND Administrator role), not merely an organisation admin.
+        is_platform_admin=True,
     )
     db_session.add(user)
     db_session.flush()

@@ -221,7 +221,7 @@ def lucidchart_list_documents():
     if org_error is not None:
         return _needs_auth_response()
     config = _service.get_config(org_id)
-    if config is None or not config.enabled or not config.access_token:
+    if config is None or not config.enabled or not _service.get_access_token(config):
         return jsonify({"needs_auth": True, "documents": []}), 200
 
     query = request.args.get("q", type=str)
@@ -238,7 +238,7 @@ def lucidchart_document_contents(document_id: str):
     if org_error is not None:
         return jsonify({"needs_auth": True}), 200
     config = _service.get_config(org_id)
-    if config is None or not config.enabled or not config.access_token:
+    if config is None or not config.enabled or not _service.get_access_token(config):
         return jsonify({"needs_auth": True}), 200
 
     contents = _service.get_document_contents(config, document_id=document_id)
@@ -265,7 +265,7 @@ def register_lucidchart_import_routes(bp: Blueprint) -> None:
         if org_error is not None:
             return _needs_auth_response()
         config = _service.get_config(org_id)
-        if config is None or not config.enabled or not config.access_token:
+        if config is None or not config.enabled or not _service.get_access_token(config):
             return _needs_auth_response()
 
         query = request.args.get("q", type=str)
@@ -282,7 +282,7 @@ def register_lucidchart_import_routes(bp: Blueprint) -> None:
         if org_error is not None:
             return jsonify({"needs_auth": True}), 200
         config = _service.get_config(org_id)
-        if config is None or not config.enabled or not config.access_token:
+        if config is None or not config.enabled or not _service.get_access_token(config):
             return jsonify({"needs_auth": True}), 200
 
         try:

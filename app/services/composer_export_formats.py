@@ -6,7 +6,7 @@ Open Exchange (OEF) export uses — into one more interchange format:
 
 * Mermaid     — a ``flowchart`` for markdown / wikis / PRs.
 * Lucidchart  — a native ``.lucid`` ZIP (document.json in Lucid Standard Import
-                format) that re-opens in Lucid AND round-trips back into ARCHIE.
+                format) that re-opens in Lucid AND round-trips back into Entelim.
 * Archi       — the Archi tool's native ``.archimate`` model XML.
 
 All three preserve element names, ArchiMate types, relationships, and (where the
@@ -128,6 +128,12 @@ def to_mermaid(vp: Dict[str, Any]) -> str:
         fill = _LAYER_FILL[layer]
         lines.append(f"    classDef {layer} fill:{fill},stroke:#1a1a1a,color:#1a1a1a;")
 
+    reasons = vp.get("reasons") or []
+    if reasons:
+        lines.append("")
+        for r in reasons:
+            lines.append(f"    %% {r['box_key']}: {r['reason']}")
+
     return "\n".join(lines) + "\n"
 
 
@@ -165,9 +171,9 @@ def to_lucid_document(vp: Dict[str, Any]) -> Dict[str, Any]:
             "linkedData": [],
         })
 
-    return {
+    document = {
         "version": 1,
-        "title": vp.get("viewpoint_name", "ARCHIE Export"),
+        "title": vp.get("viewpoint_name", "Entelim Export"),
         "product": "lucidchart",
         "pages": [{
             "id": "page-1",
@@ -176,6 +182,14 @@ def to_lucid_document(vp: Dict[str, Any]) -> Dict[str, Any]:
             "lines": lines,
         }],
     }
+    reasons = vp.get("reasons") or []
+    if reasons:
+        # Metadata only — no shape is added for a reason, so re-importing this
+        # file back into the composer never turns an empty box into a
+        # fabricated element. A key of its own so it can never collide with
+        # a Lucid-native key.
+        document["notes"] = [f"{r['box_key']}: {r['reason']}" for r in reasons]
+    return document
 
 
 def to_lucid_zip(vp: Dict[str, Any]) -> bytes:
@@ -221,7 +235,7 @@ def to_archi(vp: Dict[str, Any]) -> str:
             f"{{{_XSI_NS}}}schemaLocation": (
                 f"{_ARCHI_NS} http://www.archimatetool.com/archimate/archimate.xsd"
             ),
-            "name": vp.get("viewpoint_name", "ARCHIE Model"),
+            "name": vp.get("viewpoint_name", "Entelim Model"),
             "id": "model-1",
             "version": "5.0.0",
         },
@@ -298,6 +312,14 @@ def to_archi(vp: Dict[str, Any]) -> str:
             "archimateRelationship": f"r{rel['id']}",
         })
 
+    # One model-level property per empty box, named box_key and reason — the
+    # model's own notes field, not a folder or element, so an empty box is
+    # never re-imported as a fabricated one.
+    for r in vp.get("reasons") or []:
+        ET.SubElement(root, "property", attrib={
+            "key": f"reason:{r['box_key']}", "value": r["reason"],
+        })
+
     raw = ET.tostring(root, encoding="unicode")
     reparsed = minidom.parseString(f'<?xml version="1.0" encoding="UTF-8"?>{raw}')
     return reparsed.toprettyxml(indent="  ", encoding=None)
@@ -339,3 +361,111 @@ def export_saved_viewpoint_lucid(viewpoint_id: int) -> bytes:
 def export_saved_viewpoint_archi(viewpoint_id: int) -> str:
     from app.services.archimate_export_service import load_viewpoint_dict
     return to_archi(load_viewpoint_dict(viewpoint_id))
+
+
+# --------------------------------------------------------------------------- #
+# Canvas export (business-model canvas / business-case pages)                 #
+# --------------------------------------------------------------------------- #
+#
+# A canvas record's export runs over its saved diagram through the same three
+# renderers above — no fourth format, no second exporter — with one addition:
+# a `reasons` entry naming every box with no entry, so the file never leaves
+# an empty box unexplained.
+#
+# The entry-vs-empty check below covers only a template's `type_profile`
+# zones (plain "does an entry with this profile exist on the diagram"), the
+# one membership rule that needs no anchor relationship, attribute value, or
+# risk-register read to answer honestly. A `type_profile_anchor`, `attribute`,
+# `composed` or `register` zone always carries its configured `empty_reason`
+# here; resolving those needs the fuller projection, not the exporter.
+
+def resolve_canvas_saved_diagram_id(record, template_key: str):
+    """The saved diagram id an export or a share link for this canvas record
+    uses.
+
+    The record's own ``saved_diagram_id`` once one exists (``getattr`` with a
+    default so this reads safely before that column exists); otherwise the
+    tenant's own saved diagram of this template's kind — one canvas store per
+    tenant per template in this wave — otherwise ``None`` (nothing saved yet,
+    so export runs over an empty diagram and share has nothing to link to).
+    """
+    saved_diagram_id = getattr(record, "saved_diagram_id", None)
+    if saved_diagram_id:
+        return saved_diagram_id
+
+    from app.models.archimate_core import SavedDiagram
+
+    diagram = (
+        SavedDiagram.query.filter(SavedDiagram.viewpoint_type == template_key)
+        .order_by(SavedDiagram.updated_at.desc())
+        .first()
+    )
+    return diagram.id if diagram else None
+
+
+def canvas_export_reasons(template_key: str, saved_diagram_id=None) -> List[Dict[str, str]]:
+    """``[{box_key, reason}, ...]`` for every zone of ``template_key`` with no
+    matching entry on the given saved diagram (every zone, when there is
+    none).
+
+    A tenant-scoped read (``ArchiMateElement`` and ``SavedDiagram`` are both
+    tenant-scoped models; a query against either carries the organisation
+    predicate automatically) — the same explicit membership check the design
+    uses for a plain ``type_profile`` zone: an entry counts once an element on
+    the diagram carries the zone's ``profile`` in ``acm_properties``.
+    """
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+
+    tpl = CANVAS_TEMPLATES.get(template_key)
+    if not tpl:
+        return []
+
+    profiles_present = set()
+    if saved_diagram_id:
+        from app.models.archimate_core import ArchiMateElement, SavedDiagram
+
+        diagram = SavedDiagram.query.filter(SavedDiagram.id == saved_diagram_id).first()
+        if diagram is not None:
+            element_ids = [p.element_id for p in diagram.positions.all()]
+            if element_ids:
+                els = ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids)).all()
+                for el in els:
+                    profile = (el.acm_properties or {}).get("profile")
+                    if profile:
+                        profiles_present.add(profile)
+
+    reasons = []
+    for zone in tpl.get("zones", []):
+        if zone.get("membership") == "type_profile" and zone.get("profile") in profiles_present:
+            continue
+        reasons.append({
+            "box_key": zone["box_key"],
+            "reason": zone.get("empty_reason") or "canvas_box_empty",
+        })
+    return reasons
+
+
+def export_canvas_viewpoint(template_key: str, saved_diagram_id, fmt: str, name: str = "Canvas"):
+    """Render a canvas record through the same ``render_viewpoint`` dispatch
+    every saved viewpoint uses, with a ``reasons`` section added.
+
+    ``fmt`` is one of ``mermaid``, ``lucid``, ``archi`` — the OEF/XML export
+    stays the generic saved-viewpoint route's, not a canvas one. Works from
+    an empty diagram-free payload when ``saved_diagram_id`` is ``None``, so a
+    canvas with nothing saved yet still exports a file naming every box's
+    reason rather than failing.
+
+    Returns ``(body, mimetype, extension)`` — the same shape ``render_viewpoint``
+    returns.
+    """
+    if fmt not in ("mermaid", "lucid", "archi"):
+        raise ValueError(f"Unsupported canvas export format: {fmt}")
+
+    if saved_diagram_id:
+        from app.services.archimate_export_service import load_viewpoint_dict
+        vp = load_viewpoint_dict(saved_diagram_id)
+    else:
+        vp = {"viewpoint_name": name, "elements": [], "relationships": []}
+
+    vp["reasons"] = canvas_export_reasons(template_key, saved_diagram_id)
+    return render_viewpoint(vp, fmt)

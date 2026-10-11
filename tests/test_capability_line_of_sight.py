@@ -2,7 +2,7 @@
 
 The screen answers three questions about one capability — how good are we, who
 owns it, what are we doing about it — and the whole point is that it must not
-answer any of them by guessing. These tests pin the four ways it could lie:
+answer any of them by guessing. These tests pin the five ways it could lie:
 
 1. an assessed capability shows the levels that were actually recorded;
 2. an unassessed one shows em dashes and is never rendered as Level 1
@@ -11,7 +11,9 @@ answer any of them by guessing. These tests pin the four ways it could lie:
    defaults said otherwise);
 3. missing ownership and missing initiatives are stated in a sentence, not
    rendered as a blank or a zero;
-4. another organization's capability is not reachable at all.
+4. another organization's capability is not reachable at all;
+5. the maturity edit page and its JSON detail do not reach another
+   organisation's capability either.
 
 Written against the shared fixtures in tests/conftest.py (``db_session``
 rolls everything back), per CLAUDE.md.
@@ -48,7 +50,7 @@ def _make_user(db_session, org):
         role=role,
         confirmed=True,
     )
-    user.password = "TestPassw0rd!23"
+    user.password = uuid.uuid4().hex
     db_session.add(user)
     db_session.flush()
     return user
@@ -276,3 +278,149 @@ class TestTenantIsolation:
         # out, so it is indistinguishable from one that never existed.
         assert resp.status_code in (302, 404)
         assert b"Foreign Capability B" not in resp.data
+
+    def test_edit_page_does_not_reach_another_orgs_capability(
+        self, app, db_session, make_org, tenant_ctx, login_as, client
+    ):
+        org_a = make_org("mat-edit-a")
+        org_b = make_org("mat-edit-b")
+        user_a = _make_user(db_session, org_a)
+        suffix = uuid.uuid4().hex[:8]
+        cap_b_id = _make_capability(
+            db_session,
+            tenant_ctx,
+            org_b,
+            name=f"Foreign maturity B-{suffix}",
+            current_maturity_level=2,
+            target_maturity_level=4,
+            maturity_assessment_notes=f"B notes {suffix}",
+        )
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, user_a)
+            resp = client.get(
+                f"/capability-maturity/edit/{cap_b_id}", follow_redirects=False
+            )
+
+        assert resp.status_code == 302
+        assert resp.headers["Location"].endswith("/capability-maturity/search")
+        body = resp.data.decode()
+        assert f"Foreign maturity B-{suffix}" not in body
+        assert f"B notes {suffix}" not in body
+
+        with client.session_transaction() as s:
+            flashes = s.get("_flashes", [])
+        assert flashes == [("error", "Capability not found")]
+
+    def test_json_detail_does_not_reach_another_orgs_capability(
+        self, app, db_session, make_org, tenant_ctx, login_as, client
+    ):
+        org_a = make_org("mat-api-a")
+        org_b = make_org("mat-api-b")
+        user_a = _make_user(db_session, org_a)
+        suffix = uuid.uuid4().hex[:8]
+        cap_b_id = _make_capability(
+            db_session,
+            tenant_ctx,
+            org_b,
+            name=f"Foreign maturity B-{suffix}",
+            current_maturity_level=2,
+            target_maturity_level=4,
+            maturity_assessment_notes=f"B notes {suffix}",
+        )
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, user_a)
+            resp = client.get(f"/capability-maturity/api/capability/{cap_b_id}")
+
+        assert resp.status_code == 404
+        assert resp.get_json() == {"error": "Capability not found"}
+        assert f"Foreign maturity B-{suffix}" not in resp.data.decode()
+
+    def test_own_capability_is_reachable_on_both_routes(
+        self, app, db_session, make_org, tenant_ctx, login_as, client
+    ):
+        org_a = make_org("mat-own-a")
+        user_a = _make_user(db_session, org_a)
+        suffix = uuid.uuid4().hex[:8]
+        cap_a_id = _make_capability(
+            db_session,
+            tenant_ctx,
+            org_a,
+            name=f"Own maturity A-{suffix}",
+            current_maturity_level=1,
+            target_maturity_level=3,
+            maturity_assessment_date=datetime(2026, 4, 1),
+        )
+        db_session.commit()
+
+        with app.app_context():
+            login_as(client, user_a)
+            edit_resp = client.get(
+                f"/capability-maturity/edit/{cap_a_id}", follow_redirects=False
+            )
+            login_as(client, user_a)
+            api_resp = client.get(f"/capability-maturity/api/capability/{cap_a_id}")
+
+        assert edit_resp.status_code == 200
+        assert f"Own maturity A-{suffix}" in edit_resp.data.decode()
+
+        assert api_resp.status_code == 200
+        payload = api_resp.get_json()
+        assert set(payload.keys()) == {
+            "id",
+            "name",
+            "business_domain",
+            "description",
+            "current_maturity_level",
+            "target_maturity_level",
+            "maturity_gap",
+            "strategic_importance",
+            "business_owner",
+            "maturity_assessment_notes",
+            "maturity_assessment_date",
+        }
+        assert payload["name"] == f"Own maturity A-{suffix}"
+        assert payload["maturity_assessment_date"] == "2026-04-01T00:00:00"
+
+    def test_no_tenant_context_fails_closed_on_own_capability(
+        self, app, db_session, make_org, tenant_ctx, login_as, client, monkeypatch
+    ):
+        org_a = make_org("mat-notenant-a")
+        user_a = _make_user(db_session, org_a)
+        suffix = uuid.uuid4().hex[:8]
+        cap_a_id = _make_capability(
+            db_session,
+            tenant_ctx,
+            org_a,
+            name=f"No tenant A-{suffix}",
+            current_maturity_level=2,
+            target_maturity_level=4,
+        )
+        db_session.commit()
+
+        monkeypatch.setattr(
+            "app.modules.capabilities.routes.maturity_routes.current_org_id",
+            lambda: None,
+        )
+
+        with app.app_context():
+            login_as(client, user_a)
+            edit_resp = client.get(
+                f"/capability-maturity/edit/{cap_a_id}", follow_redirects=False
+            )
+            login_as(client, user_a)
+            api_resp = client.get(f"/capability-maturity/api/capability/{cap_a_id}")
+
+        assert edit_resp.status_code == 302
+        assert edit_resp.headers["Location"].endswith("/capability-maturity/search")
+        assert f"No tenant A-{suffix}" not in edit_resp.data.decode()
+
+        with client.session_transaction() as s:
+            flashes = s.get("_flashes", [])
+        assert flashes == [("error", "Capability not found")]
+
+        assert api_resp.status_code == 404
+        assert api_resp.get_json() == {"error": "Capability not found"}

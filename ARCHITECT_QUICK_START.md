@@ -1,5 +1,5 @@
 # ARCHITECT'S QUICK START GUIDE
-## A.R.C.H.I.E. Platform - Get Up and Running
+## Entelim Platform - Get Up and Running
 
 > ## ⚠️ LEGACY DOCUMENT — SETUP STEPS ARE WRONG FOR THIS REPOSITORY
 >
@@ -32,9 +32,9 @@
 
 ## OVERVIEW
 
-A.R.C.H.I.E. (Architecture Repository & Capability Hub with Integrated Expertise) is your enterprise architecture management platform. This guide gets you from zero to productive in 30 minutes.
+Entelim (formerly the Architecture Repository & Capability Hub with Integrated Expertise) is your enterprise architecture management platform. This guide gets you from zero to productive in 30 minutes.
 
-### What Can You Do With A.R.C.H.I.E.?
+### What Can You Do With Entelim?
 
 ✅ **Application Portfolio Management** - Track 1000+ enterprise applications  
 ✅ **Vendor & Technology Analysis** - Manage vendor relationships and licenses  
@@ -931,7 +931,7 @@ After completing this guide, you should be able to:
 - [✅] Troubleshoot common issues
 - [✅] Know where to get help
 
-**Congratulations! You're ready to use A.R.C.H.I.E. for enterprise architecture management.**
+**Congratulations! You're ready to use Entelim for enterprise architecture management.**
 
 ---
 
@@ -1000,5 +1000,5 @@ After completing this guide, you should be able to:
 
 **Document Version:** 1.0  
 **Last Updated:** 2026-02-19  
-**Maintained By:** A.R.C.H.I.E. Development Team  
+**Maintained By:** Entelim Development Team  
 **Next Review:** 2026-03-01

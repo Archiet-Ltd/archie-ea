@@ -302,3 +302,12 @@ class TraceabilityMatrixService:
                     "relationship_type": e.relationship_type,
                 })
         return results
+
+    @staticmethod
+    def trace_from_here_url(goal_id: int) -> str:
+        """Return the permanent-link URL for a goal's traceability chain.
+
+        The "trace from here" action on the traceability matrix renders this
+        URL so a strategy officer can open the full goal trace in one click.
+        """
+        return f"/api/v1/motivation/goals/{goal_id}/trace"
