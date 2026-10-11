@@ -342,3 +342,51 @@ def initiative_link_programme(initiative_id):
     db.session.commit()
     flash(f"Linked to {programme.name}.", "success")
     return redirect(url_for("portfolio.detail", initiative_id=initiative_id))
+
+
+# ── Strategic objectives an initiative serves ─────────────────────────────
+
+@portfolio_bp.route("/initiatives/<int:initiative_id>/goals", methods=["POST"])
+@login_required
+def initiative_goal_add(initiative_id):
+    from app.modules.portfolio.services.initiative_goal_links import (
+        InitiativeGoalLinkError,
+        add_link,
+    )
+
+    goal_id = _int_or_none(request.form.get("goal_id"))
+    if goal_id is None:
+        flash("Choose the goal this initiative serves.", "error")
+        return redirect(url_for("portfolio.detail", initiative_id=initiative_id))
+    try:
+        goal = add_link(initiative_id, goal_id, request.form.get("contribution_level"))
+        db.session.commit()
+    except InitiativeGoalLinkError as exc:
+        db.session.rollback()
+        if exc.status == 404 and exc.message == "Initiative not found.":
+            abort(404)
+        flash(exc.message, "error")
+    else:
+        flash(f"Linked to {goal.name}.", "success")
+    return redirect(url_for("portfolio.detail", initiative_id=initiative_id))
+
+
+@portfolio_bp.route("/initiatives/<int:initiative_id>/goals/<int:goal_id>/remove", methods=["POST"])
+@login_required
+def initiative_goal_remove(initiative_id, goal_id):
+    from app.modules.portfolio.services.initiative_goal_links import (
+        InitiativeGoalLinkError,
+        remove_link,
+    )
+
+    try:
+        remove_link(initiative_id, goal_id)
+        db.session.commit()
+    except InitiativeGoalLinkError as exc:
+        db.session.rollback()
+        if exc.status == 404 and exc.message == "Initiative not found.":
+            abort(404)
+        flash(exc.message, "error")
+    else:
+        flash("Goal link removed.", "success")
+    return redirect(url_for("portfolio.detail", initiative_id=initiative_id))

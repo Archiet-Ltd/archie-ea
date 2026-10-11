@@ -63,6 +63,61 @@
     {% endif %}
   </div>
 
+  {# ── Strategic objectives ─────────────────────────────────────────────────
+     The goals this initiative serves, read by the goal trace from the same rows. #}
+  <div class="rounded-lg border bg-card p-6" id="initiative-goals">
+    <p class="text-sm font-medium text-muted-foreground mb-2">Strategic objectives served</p>
+    {% if goal_links %}
+    <ul class="divide-y">
+      {% for link in goal_links %}
+      <li class="flex flex-wrap items-center justify-between gap-3 py-2">
+        <span class="text-sm font-medium">{{ link.name }}
+          <span class="ml-2 text-xs font-normal text-muted-foreground">{{ link.contribution_level or 'contribution not recorded' }}</span>
+        </span>
+        <form method="post" action="{{ url_for('portfolio.initiative_goal_remove', initiative_id=initiative.id, goal_id=link.goal_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="text-sm text-muted-foreground hover:text-destructive hover:underline">Remove</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-muted-foreground">No objective recorded &mdash; this initiative is not yet tied to a goal.</p>
+    {% endif %}
+    {% if available_goals %}
+    <form method="post" action="{{ url_for('portfolio.initiative_goal_add', initiative_id=initiative.id) }}"
+          class="mt-4 flex flex-wrap items-end gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="flex-1 min-w-[16rem]">
+        <label for="initiative-goal-id" class="block text-xs font-medium mb-1">Goal this initiative serves</label>
+        <select id="initiative-goal-id" name="goal_id" required
+                class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
+          <option value="">Select a goal</option>
+          {% for goal in available_goals %}
+          <option value="{{ goal.id }}">{{ goal.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="initiative-goal-level" class="block text-xs font-medium mb-1">Contribution</label>
+        <select id="initiative-goal-level" name="contribution_level"
+                class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+          <option value="">Not recorded</option>
+          {% for level in contribution_levels %}
+          <option value="{{ level }}">{{ level|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit"
+              class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90">
+        Link goal
+      </button>
+    </form>
+    {% elif not goal_links %}
+    <p class="text-xs text-muted-foreground mt-2">No goals exist yet to link to.</p>
+    {% endif %}
+  </div>
+
   {# ── Money ─────────────────────────────────────────────────────────────── #}
   <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
     <div class="rounded-lg border bg-card p-6">

@@ -10,7 +10,7 @@ all carry TenantMixin, so do_orm_execute injects the organisation predicate.
 """
 import logging
 
-from flask import Blueprint, abort, render_template
+from flask import Blueprint, abort, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
@@ -47,11 +47,19 @@ def index():
     """Initiative list — the portfolio view a steering committee asks for."""
     from app.models.vendor.vendor_organization import EnterpriseInitiative
 
-    initiatives = (
+    from app.modules.portfolio.services.initiative_goal_links import (
+        initiatives_serving_no_objective,
+    )
+
+    all_initiatives = (
         db.session.query(EnterpriseInitiative)
         .order_by(EnterpriseInitiative.name)
         .all()
     )
+    unlinked = initiatives_serving_no_objective()
+    unlinked_ids = {i.id for i in unlinked}
+    only_unlinked = request.args.get("filter") == "no-objective"
+    initiatives = unlinked if only_unlinked else all_initiatives
 
     rows = []
     total_budget = total_spent = 0.0
@@ -93,7 +101,14 @@ def index():
         "unrated": sum(1 for r in rows if not r["health_status"]),
     }
 
-    return render_template("portfolio/index.html", initiatives=rows, summary=summary)
+    summary["no_objective"] = len(unlinked_ids)
+
+    return render_template(
+        "portfolio/index.html",
+        initiatives=rows,
+        summary=summary,
+        only_unlinked=only_unlinked,
+    )
 
 
 @portfolio_bp.route("/<int:initiative_id>")
@@ -112,6 +127,24 @@ def detail(initiative_id):
         initiative.assumptions, key=lambda a: (a.exposure is None, -(a.exposure or 0))
     )
     demands = list(initiative.demands)
+    from app.models.motivation import Goal
+    from app.modules.portfolio.services.initiative_goal_links import (
+        CONTRIBUTION_LEVELS,
+        list_links,
+    )
+
+    goal_links = list_links(initiative.id)
+    linked_goal_ids = {g["goal_id"] for g in goal_links}
+    available_goals = [
+        g
+        for g in db.session.execute(
+            db.select(Goal)
+            .where(Goal.organization_id == current_user.organization_id)
+            .order_by(Goal.name)
+            .limit(500)
+        ).scalars()
+        if g.id not in linked_goal_ids
+    ]
     transformation_programmes = (
         db.session.query(StrategicInitiative)
         .filter(
@@ -145,6 +178,9 @@ def detail(initiative_id):
         non_financial_count=len(benefits) - len(financial),
         assumptions=assumptions,
         demands=demands,
+        goal_links=goal_links,
+        available_goals=available_goals,
+        contribution_levels=CONTRIBUTION_LEVELS,
         work_packages=list(initiative.migration_work_packages),
         transformation_programmes=transformation_programmes,
         linked_programme=(

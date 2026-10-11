@@ -55,6 +55,15 @@
     </div>
   </div>
 
+  <div class="flex flex-wrap items-center gap-3 text-sm" id="objective-filter">
+    {% if only_unlinked %}
+    <span class="font-medium">Showing initiatives serving no objective ({{ summary.count }})</span>
+    <a href="{{ url_for('portfolio.index') }}" class="text-primary underline underline-offset-2">Show all initiatives</a>
+    {% else %}
+    <a href="{{ url_for('portfolio.index', filter='no-objective') }}" class="text-primary underline underline-offset-2">{{ summary.no_objective }} initiative{{ '' if summary.no_objective == 1 else 's' }} serving no objective</a>
+    {% endif %}
+  </div>
+
   <div class="rounded-lg border bg-card overflow-x-auto">
     {# An empty table with nine column headers under it told a reader nothing
        about what this module is or how it gets populated, which is how a
