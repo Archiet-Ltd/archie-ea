@@ -88,7 +88,7 @@ architecture decisions.
 findings and design-to-delivery traceability through 2027.
 
 Delivered today by: [Architecture Model](/modules/architecture-model),
-[Diagrams and Composer](/modules/diagrams).
+[Diagrams and Composer](/modules/diagrams), [Industry Reference Frameworks](/modules/industry-apqc).
 
 <h3 id="data-management">Data Management</h3>
 
