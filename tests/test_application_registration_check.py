@@ -134,3 +134,19 @@ def test_requires_sign_in(app, db_session):
     _clear_login_cache()
     resp = app.test_client().get("/applications/api/registration-check?name=x")
     assert resp.status_code in (302, 401)
+
+
+def test_read_only_role_is_refused_the_check_and_the_create(app, db_session, make_org):
+    role_name = "Viewer"
+    from app.models.user import Role
+
+    Role.insert_roles()
+    org = make_org("regcheck-role-%s" % role_name.lower())
+    client, user = _client_for(app, db_session, org, role="solution_architect")
+    user.role = Role.query.filter_by(name=role_name).one()
+    db_session.flush()
+    resp = _check(client, name="Orbit Billing Platform")
+    assert resp.status_code == 403
+    # the create route is gated the same way, so the check never offers more than the save allows
+    _clear_login_cache()
+    assert client.post("/applications/create", json={"name": "Refused %s" % role_name}).status_code == 403
