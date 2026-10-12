@@ -194,6 +194,32 @@ class Config:
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY") or SECRET_KEY
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
 
+    # MCP server — OAuth-protected endpoint for AI assistants.
+    #
+    # PUBLIC_BASE_URL is the one place the server's externally-reachable
+    # origin is configured. Every absolute URL the OAuth/MCP surface emits
+    # (issuer, authorization/token/registration/revocation endpoints, the
+    # protected-resource metadata, the "resource" identifier itself) is built
+    # from this value — never from the Host header of an incoming request,
+    # and never from a literal fallback host baked into the code. A boot-time
+    # check (see app/_bootstrap/blueprints.py) refuses to start when
+    # MCP_ENABLED is true and this is empty, so a misconfigured deploy fails
+    # loudly instead of quietly serving relative or wrong-host metadata.
+    PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    MCP_ENABLED = _env_bool("MCP_ENABLED", False)
+
+    # DNS rebinding protection for POST /mcp (app/modules/mcp/blueprint.py):
+    # when a request carries an Origin header, it is compared against this
+    # value and refused (403) on a mismatch. Empty by default -- a request
+    # with no Origin header at all (every genuine non-browser MCP client)
+    # is unaffected either way; this only ever rejects a browser-originated
+    # request from an origin that was never allow-listed.
+    MCP_ALLOWED_ORIGIN = os.environ.get("MCP_ALLOWED_ORIGIN", "")
+    OAUTH_REFRESH_TOKEN_DAYS = int(os.environ.get("OAUTH_REFRESH_TOKEN_DAYS", "30"))
+    OAUTH_CLIENT_REGISTRATION_RATE_LIMIT = os.environ.get(
+        "OAUTH_CLIENT_REGISTRATION_RATE_LIMIT", "10 per hour"
+    )
+
     # Email
     MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.sendgrid.net")
     # Parsed, not passed through: any non-empty string is truthy, so

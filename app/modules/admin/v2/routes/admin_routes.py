@@ -1874,9 +1874,7 @@ def trigger_abacus_sync():
         return redirect(url_for("admin.abacus_settings"))
 
     try:
-        from app.modules.admin.v2.services.job_queue_service_v2 import (
-            get_job_queue_service,
-        )
+        from app.services.job_queue_service import get_job_queue_service
 
         job_queue = get_job_queue_service()
         job = job_queue.create_job(
@@ -1938,9 +1936,7 @@ def abacus_sync_status():
 def cancel_abacus_job(job_id):
     """Cancel a running or pending Abacus sync job."""
     try:
-        from app.modules.admin.v2.services.job_queue_service_v2 import (
-            get_job_queue_service,
-        )
+        from app.services.job_queue_service import get_job_queue_service
 
         service = get_job_queue_service()
         success = service.cancel_job(job_id)

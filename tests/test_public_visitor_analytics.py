@@ -116,11 +116,14 @@ class TestPageViewLogging:
     def test_no_raw_ip_or_user_agent_stored_on_the_row(self, client, db_session):
         from app.models.public_visitor_event import PublicVisitorEvent
 
-        _visit(client, "/vision", environ_base={
+        # /vision is a merged-away page (301s to /about, see MERGED_PAGES in
+        # app/services/public_pages.py) -- it never reaches the page-view hook,
+        # which only fires on a 200. /about always renders.
+        _visit(client, "/about", environ_base={
             "REMOTE_ADDR": "203.0.113.77", "HTTP_USER_AGENT": "VerySpecificAgent/9.9",
         })
         row = (
-            PublicVisitorEvent.query.filter_by(event_type="page_view")
+            PublicVisitorEvent.query.filter_by(event_type="page_view", path="/about")
             .order_by(PublicVisitorEvent.id.desc())
             .first()
         )
