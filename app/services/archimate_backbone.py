@@ -194,11 +194,14 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
 
     # Re-entry guard: prevent the before_flush hook from creating a second
     # element when create_backbone_element flushes while this object is
-    # still in session.new.
+    # still in session.new.  Keyed by (session_id, obj_id) so a rollback
+    # in one session does not clear the guard for another.
+    session_id = id(session)
     obj_id = id(obj)
-    if obj_id in _SYNCING:
+    guard_key = (session_id, obj_id)
+    if guard_key in _SYNCING:
         return None
-    _SYNCING.add(obj_id)
+    _SYNCING[guard_key] = True
 
     try:
         element_type, layer = mapping
@@ -245,7 +248,7 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
         obj.archimate_element_id = element.id
         return element
     finally:
-        _SYNCING.discard(obj_id)
+        _SYNCING.pop(guard_key, None)
 
 
 # ============================================================================
@@ -270,7 +273,9 @@ _PENDING: dict = {}
 # Prevents the before_flush hook from creating a second element
 # when sync_archimate_element flushes (via create_backbone_element) while
 # the source row is still in session.new.
-_SYNCING = set()  # type: ignore[var-annotated]
+# Keyed by (session_id, obj_id) so a rollback in one session does not
+# clear the guard for another.
+_SYNCING: dict = {}
 
 # Types that the flush listener auto-creates elements for.  Every other type
 # in ELEMENT_TYPES (Goal, Driver, Requirement, Constraint, Metric, Plateau,
@@ -320,7 +325,7 @@ def _on_before_flush(session, flush_context, instances):
         if org_id is None:
             continue
         # Skip objects that sync_archimate_element is already handling.
-        if id(obj) in _SYNCING:
+        if (id(session), id(obj)) in _SYNCING:
             continue
         element = sync_archimate_element(obj, session=session, flush=False)
         if element is not None:
@@ -378,5 +383,9 @@ def _on_after_rollback(session):
     """
     sid = id(session)
     _PENDING.pop(sid, None)
-    # Also clear _SYNCING entries that might have been left behind.
-    _SYNCING.clear()
+    # Also clear _SYNCING entries for this session only.  The guard is
+    # keyed by (session_id, obj_id); clearing only this session's keys
+    # prevents a rollback in one session from affecting another.
+    for key in list(_SYNCING):
+        if key[0] == sid:
+            _SYNCING.pop(key, None)

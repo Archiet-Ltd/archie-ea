@@ -763,3 +763,62 @@ def test_backfill_flush_failure_clears_pending_map(app):
             )
     finally:
         _cleanup(app, [org_id])
+
+
+def test_backfill_reentry_guard_is_per_session(app):
+    """The re-entry guard is keyed by (session_id, obj_id); a rollback in one
+    session does not clear the guard for another session (fails when the guard
+    is module-global: a rollback in session A clears the guard for session B,
+    causing session B to create duplicate elements)."""
+    from app import db
+    from app.models.implementation_migration import WorkPackage
+    from app.services import archimate_backbone
+
+    orgs = _seed_orgs(app, ["bf-reentry"])
+    org_id = orgs["bf-reentry"]
+    try:
+        with app.app_context():
+            # Session A: create a work package and roll back.
+            session_a = db.session.session_factory()
+            try:
+                wp_a = WorkPackage(
+                    name="Session A WP",
+                    context="application",
+                    organization_id=org_id,
+                )
+                session_a.add(wp_a)
+                session_a.flush()
+                # Rollback should clear only session A's _SYNCING keys.
+                session_a.rollback()
+            finally:
+                session_a.close()
+
+            # Session B: create a work package; it must get exactly one element.
+            session_b = db.session.session_factory()
+            try:
+                wp_b = WorkPackage(
+                    name="Session B WP",
+                    context="application",
+                    organization_id=org_id,
+                )
+                session_b.add(wp_b)
+                session_b.flush()
+                assert wp_b.archimate_element_id is not None, (
+                    "session B must get an element despite session A's rollback"
+                )
+                session_b.commit()
+
+                # Verify exactly one element was created for session B's WP.
+                from app.models.archimate_core import ArchiMateElement
+                elements = session_b.query(ArchiMateElement).filter(
+                    ArchiMateElement.organization_id == org_id,
+                    ArchiMateElement.type == "WorkPackage",
+                ).all()
+                assert len(elements) == 1, (
+                    "exactly one element for session B, not a duplicate "
+                    "caused by a stale guard from session A"
+                )
+            finally:
+                session_b.close()
+    finally:
+        _cleanup(app, [org_id])
