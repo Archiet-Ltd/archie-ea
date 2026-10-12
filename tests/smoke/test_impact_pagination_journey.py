@@ -18,13 +18,21 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 @pytest.fixture(scope="module")
 def pagination_graph(seeded, live_server):
     """A wide fan-out graph with 12 direct dependencies so that
-    page_size=5 produces three pages."""
+    page_size=5 produces three pages. Seeds an ApplicationOwner for
+    one child element with a name that differs from the legacy
+    ownership chain, so the owners-rendering test can distinguish
+    the new owner field from the legacy owner field."""
     from app import create_app, db
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.application_owner import ApplicationOwner
+    from app.models.user import User
+    import uuid
 
     app = create_app("testing")
     org_id = seeded["ids"]["org"]
     out = {}
+    tag = uuid.uuid4().hex[:8]
     with app.app_context():
         root = ArchiMateElement(
             name="Impact Root Platform", type="ApplicationComponent",
@@ -47,10 +55,39 @@ def pagination_graph(seeded, live_server):
                 organization_id=org_id,
             )
             db.session.add(rel)
+
+        # Create a user whose name differs from the legacy ownership chain.
+        owner_user = User(
+            email="impact-owner-user-%s@example.com" % tag, first_name="Alice",
+            last_name="Owner", organization_id=org_id,
+            enterprise_role="application_manager", confirmed=True,
+        )
+        db.session.add(owner_user)
+        db.session.flush()
+
+        # Create an ApplicationComponent for the first child element.
+        owned_child = elements[1]
+        comp = ApplicationComponent(
+            name="Impact Child App", organization_id=org_id,
+            archimate_element_id=owned_child.id,
+        )
+        db.session.add(comp)
+        db.session.flush()
+
+        # Create an ApplicationOwner record — this is the NEW owner path.
+        # No legacy ApplicationOwnership record is created, so the legacy
+        # owner field will be None (renders as — on the old template).
+        db.session.add(ApplicationOwner(
+            user_id=owner_user.id, application_id=comp.id,
+            organization_id=org_id, ownership_type="primary",
+        ))
         db.session.commit()
+
         out["root_id"] = root.id
         out["root_name"] = root.name
         out["all_ids"] = [el.id for el in elements[1:]]
+        out["owned_element_id"] = owned_child.id
+        out["owner_name"] = "Alice Owner"
     return out
 
 
@@ -253,10 +290,19 @@ def test_impact_analysis_pagination_reload_owner_health(page, live_server, seede
 def test_impact_analysis_owners_field_renders_names_or_dash(page, live_server, seeded, pagination_graph):
     """Verify the owners field renders as joined names or — in the
     Impact Analysis page HTML. Navigate to the page, run an analysis,
-    and check the rendered owner cell."""
+    and check the rendered owner cell.
+
+    Seeds an ApplicationOwner for one child element whose person name
+    differs from the legacy ownership chain. On the old template
+    (e235cc06) the Owner cell shows the legacy owner or —, so the
+    assertion that the cell contains the ApplicationOwner's name fails.
+    On the new template (ad312b04) the cell shows the joined owner
+    names from the owners list, so the assertion passes."""
     _login(page, live_server, seeded["emails"]["cto"])
 
     root_id = pagination_graph["root_id"]
+    owned_element_id = pagination_graph["owned_element_id"]
+    owner_name = pagination_graph["owner_name"]
 
     # Navigate to the Impact Analysis page.
     page.goto(live_server + "/strategic/impact-analysis", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -264,9 +310,7 @@ def test_impact_analysis_owners_field_renders_names_or_dash(page, live_server, s
     # Wait for the page to load Alpine.js.
     page.wait_for_timeout(2000)
 
-    # Run an analysis via the API (the page's Alpine component will pick
-    # up the result when we navigate back, but for this test we verify
-    # the API response directly).
+    # Run an analysis via the API.
     url = live_server + "/strategic/api/impact-analysis"
     payload = {"element_id": root_id, "change_type": "MODIFY", "page_size": 50}
     response = page.request.post(url, data=payload, timeout=PAGE_TIMEOUT)
@@ -286,10 +330,69 @@ def test_impact_analysis_owners_field_renders_names_or_dash(page, live_server, s
             assert "name" in owner, "owner entry missing name"
             assert "role" in owner, "owner entry missing role"
 
+    # Find the row for the owned element and verify its owners list.
+    owned_row = None
+    for row in rows:
+        if row["id"] == owned_element_id:
+            owned_row = row
+            break
+    assert owned_row is not None, "owned element not in analysis results"
+    assert len(owned_row["owners"]) > 0, "owned element should have owners"
+    assert owned_row["owners"][0]["name"] == owner_name, (
+        "expected owner name '%s' in API response, got '%s'" % (
+            owner_name, owned_row["owners"][0]["name"]
+        )
+    )
+
+    # Find a row with no owner and verify its owners list is empty.
+    no_owner_row = None
+    for row in rows:
+        if row["id"] != owned_element_id and len(row.get("owners", [])) == 0:
+            no_owner_row = row
+            break
+    assert no_owner_row is not None, "expected at least one row with no owner"
+    assert no_owner_row["owners"] == [], "row with no owner should have empty owners list"
+
     # Verify the rendered page shows the Impact Analysis heading.
     assert page.locator("h1, h2, h3").filter(has_text="Impact Analysis").count() > 0 or \
         page.locator("text=Impact Analysis").count() > 0, (
         "Impact Analysis page heading not found"
+    )
+
+    # Now perform the analysis through the UI to check the rendered cell.
+    # Select the root element and run analysis.
+    search_input = page.locator("input[aria-label='Type to search...']")
+    search_input.fill(pagination_graph["root_name"])
+    page.wait_for_timeout(2000)
+
+    # Click the search result button.
+    search_results = page.locator("button", has_text=pagination_graph["root_name"])
+    if search_results.count() > 0:
+        search_results.first.click()
+        page.wait_for_timeout(1000)
+
+    # Click Analyze Impact.
+    analyze_button = page.locator("button", has_text="Analyze Impact")
+    if analyze_button.count() > 0:
+        analyze_button.click()
+        # Wait for analysis to complete and results to render.
+        page.wait_for_timeout(8000)
+
+    # Check the rendered Owner cell for the owned element.
+    # The cell should contain the ApplicationOwner's name.
+    # On the old template (e235cc06) this shows the legacy owner or —,
+    # so the assertion fails. On the new template (ad312b04) it shows
+    # the joined owner names, so the assertion passes.
+    page_text = page.locator("body").inner_text()
+    assert owner_name in page_text, (
+        "Owner name '%s' not found anywhere on the rendered page. "
+        "On the old template the cell shows the legacy owner or —, "
+        "so this assertion is expected to fail on e235cc06." % owner_name
+    )
+
+    # Also verify a dash is shown for rows with no owner.
+    assert "—" in page_text, (
+        "Expected em dash for rows with no owner, not found in rendered page"
     )
 
 
@@ -320,3 +423,50 @@ def test_cross_org_owners_never_leak(page, live_server, seeded, cross_org_owners
             assert owner.get("name") != org_b_owner_name, (
                 "Org B owner '%s' leaked into org A's response" % org_b_owner_name
             )
+
+
+def test_ask_impact_list_shows_owner_name(page, live_server, seeded, pagination_graph):
+    """The Ask impact list renders the ApplicationOwner's name for an
+    element that has an ApplicationOwner record. On the old JS
+    (e235cc06) the ownerName is derived from row.owner (legacy), which
+    is None for this element, so the owner field shows a missing badge.
+    On the new JS (ad312b04) the ownerName is derived from row.owners,
+    which contains the ApplicationOwner's name."""
+    _login(page, live_server, seeded["emails"]["cto"])
+
+    root_name = pagination_graph["root_name"]
+    owner_name = pagination_graph["owner_name"]
+
+    # Navigate to the Ask page.
+    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(2000)
+
+    # Click the impact question to expand it.
+    impact_button = page.locator("#ask-question-impact")
+    impact_button.click()
+    page.wait_for_timeout(1000)
+
+    # Type the root element name in the picker input.
+    picker_input = page.locator("#ask-picker-input")
+    picker_input.fill(root_name)
+    page.wait_for_timeout(2000)
+
+    # Click the search result.
+    search_results = page.locator("#ask-picker-listbox [role=option]")
+    if search_results.count() > 0:
+        search_results.first.click()
+        # Wait for the impact analysis to complete.
+        page.wait_for_timeout(8000)
+
+    # Check the rendered owner name in the Ask results.
+    # On the old JS (e235cc06) the ownerName is null (legacy owner is
+    # None), so the owner field shows a "missing" badge. On the new JS
+    # (ad312b04) the ownerName is "Alice Owner", so the owner field
+    # shows the name.
+    page_text = page.locator("#ask-results").inner_text() if page.locator("#ask-results").count() > 0 else ""
+    if page_text:
+        assert owner_name in page_text, (
+            "Owner name '%s' not found in Ask impact list. "
+            "On the old JS the ownerName is null (legacy owner is None), "
+            "so this assertion is expected to fail on e235cc06." % owner_name
+        )
