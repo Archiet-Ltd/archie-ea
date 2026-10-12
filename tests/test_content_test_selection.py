@@ -129,3 +129,14 @@ def test_an_empty_selection_is_reported_and_xargs_r_runs_nothing(tmp_path, monke
     if xargs:
         out = subprocess.run([xargs, "-r", "echo", "ran"], input="", capture_output=True, text=True)
         assert out.returncode == 0 and out.stdout == ""
+
+
+def test_selector_and_its_tests_contain_no_control_characters():
+    for rel in ("scripts/ci/content_test_selection.py", "tests/test_content_test_selection.py"):
+        text = (REPO_ROOT / rel).read_text(encoding="utf-8")
+        bad = sorted({hex(ord(c)) for c in text if ord(c) < 32 and c not in "\n\t\r"})
+        assert not bad, (rel, bad)
+
+
+def test_plain_language_is_always_selected():
+    assert "tests/test_plain_language.py" in sel.ALWAYS_INCLUDED

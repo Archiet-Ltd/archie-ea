@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Compute the test files the content-only job runs.
 
-Every test_*.py under tests/ (recursively) outside tests/smoke whose text refers to public pages,
-public templates or the template tree, or that fetches a public route, plus the
+Every test_*.py under tests/ (recursively) outside tests/smoke whose text refers to public
+pages, public templates or the template tree, or that fetches a public route, plus the
 template contract test explicitly. Printed one path per line, sorted.
 """
 
@@ -29,12 +29,16 @@ SELECTION_PATTERN = re.compile(
     # a fetch of a public route: either quote, optionally an f-string
     # the home page
     + r"\.get\(\s*" + _Q + r"/" + _Q + r"|"
-    + r"\.get\(\s*f?" + _Q + r"/(" + PUBLIC_ROUTES + r")|"
+    + r"\.get\(\s*f?" + _Q + r"/(" + PUBLIC_ROUTES + r")(?![A-Za-z0-9_-])|"
     # a public route listed as a string (for example in a route table)
     + _Q + r"/(" + PUBLIC_ROUTES + r")[/\"']"
 )
 
-ALWAYS_INCLUDED: tuple[str, ...] = ("tests/test_template_contracts.py",)
+ALWAYS_INCLUDED: tuple[str, ...] = (
+    "tests/test_template_contracts.py",
+    # fetches /architecture/... pages that render the plain_name template filter
+    "tests/test_plain_language.py",
+)
 
 
 def select_content_tests(root: Path | str = ".") -> list[str]:
