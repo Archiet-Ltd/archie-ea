@@ -599,7 +599,7 @@ jobs:
     name: Browser journeys — main shard ${{ matrix.shard }}
     needs: changes
     runs-on: ubuntu-latest
-    if: ${{ always() && github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -677,7 +677,7 @@ jobs:
     name: Browser journeys — adversarial
     needs: changes
     runs-on: ubuntu-latest
-    if: ${{ always() && github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
@@ -749,7 +749,7 @@ jobs:
     name: Browser journeys — other
     needs: changes
     runs-on: ubuntu-latest
-    if: ${{ always() && github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16

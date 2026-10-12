@@ -76,3 +76,20 @@ def test_a_rename_out_of_code_into_content_is_not_content_only(tmp_path, monkeyp
     changed = d.get_changed_files("main")
     assert "app/svc.py" in changed
     assert d.classify(changed) == "false"
+
+
+def test_every_job_gated_on_the_detector_wraps_both_conditions_in_parentheses():
+    import re
+    from pathlib import Path
+
+    import yaml
+
+    workflow = yaml.safe_load(Path(".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    gated = {
+        name: str(job["if"])
+        for name, job in workflow["jobs"].items()
+        if "needs.changes.outputs.is_content_only" in str(job.get("if", ""))
+    }
+    assert gated, "no job is gated on the detector"
+    for name, expr in gated.items():
+        assert re.search(r"&& \(github\.event_name != 'pull_request' \|\| github\.event\.action != 'labeled' \|\| contains\(.*?'ci-fast'\)\) && \(github\.event_name != 'pull_request' \|\| needs\.changes\.result != 'success'", expr), name
