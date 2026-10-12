@@ -276,8 +276,11 @@ class AccountService:
         ):
             return done(REFUSED_MISSING_CLAIMS)
 
-        # Nobody is signed in yet, so there is no session organisation: the
-        # lookups and the writes below resolve the organisation themselves.
+        # Nobody is signed in yet, so there is no session organisation.
+        # users, organizations and org_roles carry no row-level security
+        # policy: the checks below are the only control on them. The platform
+        # scope is kept, as in request_password_reset, so that any fenced
+        # table touched before sign-in can still be read and written.
         with platform_scope("SSO sign-in: resolve the account for an external identity"):
             linked = find_linked_user(provider, claims, User)
             if linked is not None:
