@@ -23,6 +23,9 @@ from app.modules.enterprise_genome.services.ai_system_classification import (
     accept_assessment,
     release_refusal_reason,
 )
+from app.modules.enterprise_genome.services.ai_system_grounding import (
+    propose_grounding_source,
+)
 from app.modules.enterprise_genome.services.ai_system_profile import (
     RETIRED_MODEL_IDS,
     model_currency,
@@ -1475,3 +1478,436 @@ def test_grounding_source_org_isolation(db_session, make_org):
     result_b = accept_grounding_source(appr_b.id, org_b.id)
     db_session.flush()
     assert result_b is True
+
+
+# --- Fix round: org-scoped obligations, lineage/obligations panels, routes ---
+
+
+def test_obligations_org_isolation_query_returns_nothing_for_wrong_org(
+    db_session, make_org
+):
+    """Querying obligations with another organisation's id returns nothing.
+    Fails on main (no org filter)."""
+    from app.modules.enterprise_genome.services.ai_system_obligations import (
+        get_obligations_for_system,
+    )
+
+    org_a = make_org("obl-iso-a")
+    org_b = make_org("obl-iso-b")
+
+    el_a = register_ai_system(db_session, org_a.id, name="A System",
+                               provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    # Accept classification for A (minimal attaches obligations)
+    approval = propose_classification(
+        element=el_a, proposed_risk_class="minimal",
+        organization_id=org_a.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org_a.id)
+    db_session.flush()
+
+    # A's own org sees obligations
+    ob_a = get_obligations_for_system(el_a.id, org_a.id)
+    assert len(ob_a) > 0, "A's own org should see obligations"
+
+    # B querying A's element with B's org returns nothing
+    ob_b = get_obligations_for_system(el_a.id, org_b.id)
+    assert len(ob_b) == 0, (
+        "B querying A's element with B's org should return no obligations"
+    )
+
+
+def test_register_page_shows_lineage_panel(app, db_session, make_org, client, login_as):
+    """The register page renders a lineage panel per system with providers,
+    data entities and systems using the same provider. Fails on main (no panel)."""
+    from app.models.user import User
+
+    org = make_org("lineage-panel")
+    arch = _make_admin_user(db_session, org, "LineagePanel")
+    el = register_ai_system(db_session, org.id, name="Panel System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    prov = _create_provider_element(db_session, org.id, "Test Provider")
+    de = _create_data_entity(db_session, org.id, "Test Data")
+    _link_elements(db_session, el.id, prov.id, "serving", org_id=org.id)
+    _link_elements(db_session, el.id, de.id, "access", org_id=org.id)
+    db_session.flush()
+
+    login_as(client, arch)
+    body = client.get("/genome/ai-systems").get_data(as_text=True)
+
+    # Lineage panel is rendered
+    assert 'data-testid="lineage-panel"' in body, "Lineage panel not found in register"
+    assert "Test Provider" in body, "Provider name not found in register"
+    assert "Test Data" in body, "Data entity name not found in register"
+
+
+def test_register_page_shows_obligations_panel(
+    app, db_session, make_org, client, login_as
+):
+    """The register page renders an obligations panel per system with title
+    and evidence status. Fails on main (no panel)."""
+    org = make_org("obl-panel")
+    arch = _make_admin_user(db_session, org, "OblPanel")
+    el = register_ai_system(db_session, org.id, name="Obl Panel System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    # Accept classification (minimal attaches obligations)
+    approval = propose_classification(
+        element=el, proposed_risk_class="minimal",
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+
+    login_as(client, arch)
+    body = client.get("/genome/ai-systems").get_data(as_text=True)
+
+    # Obligations panel is rendered
+    assert 'data-testid="obligations-panel"' in body, (
+        "Obligations panel not found in register"
+    )
+    # Should show obligation titles
+    assert "Voluntary code of conduct" in body, (
+        "Obligation title not found in register"
+    )
+
+
+def test_register_page_shows_not_recorded_for_empty_lineage(
+    app, db_session, make_org, client, login_as
+):
+    """A system with no providers or data entities shows 'not recorded'
+    in the lineage panel. Fails on main (no panel)."""
+    org = make_org("empty-lineage")
+    arch = _make_admin_user(db_session, org, "EmptyLineage")
+    el = register_ai_system(db_session, org.id, name="Empty Lineage System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    login_as(client, arch)
+    body = client.get("/genome/ai-systems").get_data(as_text=True)
+
+    assert 'data-testid="lineage-panel"' in body
+    assert "not recorded" in body, (
+        "Empty lineage should show 'not recorded' in the register"
+    )
+
+
+def test_register_page_shows_not_recorded_for_empty_obligations(
+    app, db_session, make_org, client, login_as
+):
+    """A system with no obligations shows 'not recorded' in the obligations
+    panel. Fails on main (no panel)."""
+    org = make_org("empty-obl")
+    arch = _make_admin_user(db_session, org, "EmptyObl")
+    el = register_ai_system(db_session, org.id, name="Empty Obl System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    login_as(client, arch)
+    body = client.get("/genome/ai-systems").get_data(as_text=True)
+
+    assert 'data-testid="obligations-panel"' in body
+    assert "not recorded" in body, (
+        "Empty obligations should show 'not recorded' in the register"
+    )
+
+
+def test_grounding_source_propose_route_requires_general_permission(
+    app, db_session, make_org, client, login_as
+):
+    """The grounding source propose route requires general permission."""
+    from app.models.user import Role, User
+
+    org = make_org("gs-route")
+    viewer_role = Role.query.filter_by(name="Viewer").first()
+    if viewer_role is None:
+        pytest.skip("no Viewer role seeded")
+    viewer = User(
+        email=f"viewer-gs-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="GSViewer",
+        organization_id=org.id,
+        confirmed=True,
+        role=viewer_role,
+    )
+    viewer.password = uuid.uuid4().hex
+    db_session.add(viewer)
+    el = register_ai_system(db_session, org.id, name="GS Route System",
+                             provider="openai", model_id="gpt-4o")
+    de = _create_data_entity(db_session, org.id, "GS Data")
+    db_session.flush()
+
+    login_as(client, viewer)
+    r = client.post(
+        f"/genome/ai-systems/{el.id}/grounding-source/propose",
+        data={"data_entity_id": de.id},
+    )
+    assert r.status_code == 403, (
+        "Viewer should get 403 on grounding source propose route"
+    )
+
+
+def test_grounding_source_accept_route_requires_general_permission(
+    app, db_session, make_org, client, login_as
+):
+    """The grounding source accept route requires general permission."""
+    from app.models.user import Role, User
+
+    org = make_org("gs-accept-route")
+    viewer_role = Role.query.filter_by(name="Viewer").first()
+    if viewer_role is None:
+        pytest.skip("no Viewer role seeded")
+    viewer = User(
+        email=f"viewer-gs-accept-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="GSAcceptViewer",
+        organization_id=org.id,
+        confirmed=True,
+        role=viewer_role,
+    )
+    viewer.password = uuid.uuid4().hex
+    db_session.add(viewer)
+    el = register_ai_system(db_session, org.id, name="GS Accept System",
+                             provider="openai", model_id="gpt-4o")
+    de = _create_data_entity(db_session, org.id, "GS Accept Data")
+    db_session.flush()
+
+    approval = propose_grounding_source(
+        element=el, data_entity_id=de.id,
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+
+    login_as(client, viewer)
+    r = client.post(
+        f"/genome/ai-systems/{el.id}/grounding-source/{approval.id}/accept",
+    )
+    assert r.status_code == 403, (
+        "Viewer should get 403 on grounding source accept route"
+    )
+
+
+def test_grounding_source_refuse_route_requires_general_permission(
+    app, db_session, make_org, client, login_as
+):
+    """The grounding source refuse route requires general permission."""
+    from app.models.user import Role, User
+
+    org = make_org("gs-refuse-route")
+    viewer_role = Role.query.filter_by(name="Viewer").first()
+    if viewer_role is None:
+        pytest.skip("no Viewer role seeded")
+    viewer = User(
+        email=f"viewer-gs-refuse-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="GSRefuseViewer",
+        organization_id=org.id,
+        confirmed=True,
+        role=viewer_role,
+    )
+    viewer.password = uuid.uuid4().hex
+    db_session.add(viewer)
+    el = register_ai_system(db_session, org.id, name="GS Refuse System",
+                             provider="openai", model_id="gpt-4o")
+    de = _create_data_entity(db_session, org.id, "GS Refuse Data")
+    db_session.flush()
+
+    approval = propose_grounding_source(
+        element=el, data_entity_id=de.id,
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+
+    login_as(client, viewer)
+    r = client.post(
+        f"/genome/ai-systems/{el.id}/grounding-source/{approval.id}/refuse",
+    )
+    assert r.status_code == 403, (
+        "Viewer should get 403 on grounding source refuse route"
+    )
+
+
+def test_grounding_source_propose_route_works_for_architect(
+    app, db_session, make_org, client, login_as
+):
+    """An Architect can propose a grounding source through the route."""
+    from app.models.user import Role, User
+
+    org = make_org("gs-propose-arch")
+    arch_role = Role.query.filter_by(name="Architect").first()
+    if arch_role is None:
+        pytest.skip("no Architect role seeded")
+    arch = User(
+        email=f"arch-gs-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="GSArch",
+        organization_id=org.id,
+        confirmed=True,
+        role=arch_role,
+    )
+    arch.password = uuid.uuid4().hex
+    db_session.add(arch)
+    el = register_ai_system(db_session, org.id, name="GS Propose System",
+                             provider="openai", model_id="gpt-4o")
+    de = _create_data_entity(db_session, org.id, "GS Propose Data")
+    db_session.flush()
+
+    login_as(client, arch)
+    r = client.post(
+        f"/genome/ai-systems/{el.id}/grounding-source/propose",
+        data={"data_entity_id": de.id},
+    )
+    assert r.status_code == 302, (
+        "Architect should be able to propose grounding source, got %s" % r.status_code
+    )
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+    approval = AIChatCRUDApproval.query.filter_by(
+        entity_type="ai_system_grounding_source",
+        entity_id=el.id,
+        organization_id=org.id,
+    ).first()
+    assert approval is not None, "Grounding source approval should have been created"
+
+
+def test_grounding_source_accept_route_works_for_architect(
+    app, db_session, make_org, client, login_as
+):
+    """An Architect can accept a grounding source through the route."""
+    from app.models.user import Role, User
+
+    org = make_org("gs-accept-arch")
+    arch_role = Role.query.filter_by(name="Architect").first()
+    if arch_role is None:
+        pytest.skip("no Architect role seeded")
+    arch = User(
+        email=f"arch-gs-accept-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="GSAcceptArch",
+        organization_id=org.id,
+        confirmed=True,
+        role=arch_role,
+    )
+    arch.password = uuid.uuid4().hex
+    db_session.add(arch)
+    el = register_ai_system(db_session, org.id, name="GS Accept Route System",
+                             provider="openai", model_id="gpt-4o")
+    de = _create_data_entity(db_session, org.id, "GS Accept Route Data")
+    db_session.flush()
+
+    approval = propose_grounding_source(
+        element=el, data_entity_id=de.id,
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+
+    login_as(client, arch)
+    r = client.post(
+        f"/genome/ai-systems/{el.id}/grounding-source/{approval.id}/accept",
+    )
+    assert r.status_code == 302, (
+        "Architect should be able to accept grounding source, got %s" % r.status_code
+    )
+
+    # The property should have been written
+    db_session.expire_all()
+    from app.models.models import ArchiMateElement
+    el_reloaded = db_session.get(ArchiMateElement, el.id)
+    props = getattr(el_reloaded, "acm_properties", None) or {}
+    assert "ai_system_grounding_source" in props, (
+        "Grounding source property should have been written"
+    )
+
+
+def test_grounding_source_refuse_route_works_for_architect(
+    app, db_session, make_org, client, login_as
+):
+    """An Architect can refuse a grounding source through the route."""
+    from app.models.user import Role, User
+
+    org = make_org("gs-refuse-arch")
+    arch_role = Role.query.filter_by(name="Architect").first()
+    if arch_role is None:
+        pytest.skip("no Architect role seeded")
+    arch = User(
+        email=f"arch-gs-refuse-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="GSRefuseArch",
+        organization_id=org.id,
+        confirmed=True,
+        role=arch_role,
+    )
+    arch.password = uuid.uuid4().hex
+    db_session.add(arch)
+    el = register_ai_system(db_session, org.id, name="GS Refuse Route System",
+                             provider="openai", model_id="gpt-4o")
+    de = _create_data_entity(db_session, org.id, "GS Refuse Route Data")
+    db_session.flush()
+
+    approval = propose_grounding_source(
+        element=el, data_entity_id=de.id,
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+
+    login_as(client, arch)
+    r = client.post(
+        f"/genome/ai-systems/{el.id}/grounding-source/{approval.id}/refuse",
+    )
+    assert r.status_code == 302, (
+        "Architect should be able to refuse grounding source, got %s" % r.status_code
+    )
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+    db_session.expire_all()
+    approval_reloaded = db_session.get(AIChatCRUDApproval, approval.id)
+    assert approval_reloaded.status == ApprovalStatus.REJECTED, (
+        "Grounding source should have been rejected"
+    )
+
+
+def test_grounding_source_routes_are_org_scoped(
+    app, db_session, make_org, client, login_as
+):
+    """Grounding source routes refuse cross-org access with 404."""
+    org_a = make_org("gs-org-a")
+    org_b = make_org("gs-org-b")
+    arch_a = _make_admin_user(db_session, org_a, "GSAOrgA")
+    arch_b = _make_admin_user(db_session, org_b, "GSAOrgB")
+
+    el_a = register_ai_system(db_session, org_a.id, name="GS Org A System",
+                               provider="openai", model_id="gpt-4o")
+    de_a = _create_data_entity(db_session, org_a.id, "GS Org A Data")
+    db_session.flush()
+
+    approval_a = propose_grounding_source(
+        element=el_a, data_entity_id=de_a.id,
+        organization_id=org_a.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+
+    # B cannot propose for A's element
+    login_as(client, arch_b)
+    r = client.post(
+        f"/genome/ai-systems/{el_a.id}/grounding-source/propose",
+        data={"data_entity_id": de_a.id},
+    )
+    assert r.status_code == 404, (
+        "Cross-org grounding source propose should get 404"
+    )
+
+    # B cannot accept A's approval
+    r = client.post(
+        f"/genome/ai-systems/{el_a.id}/grounding-source/{approval_a.id}/accept",
+    )
+    assert r.status_code == 404, (
+        "Cross-org grounding source accept should get 404"
+    )
+
+    # B cannot refuse A's approval
+    r = client.post(
+        f"/genome/ai-systems/{el_a.id}/grounding-source/{approval_a.id}/refuse",
+    )
+    assert r.status_code == 404, (
+        "Cross-org grounding source refuse should get 404"
+    )
