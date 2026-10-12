@@ -12,6 +12,9 @@
     ('admin.change_account_type', 'Change account type'),
     (deletion_endpoint, 'Delete user')
 ] %}
+{% if 'connected_assistants.admin_user' in flask.current_app.view_functions %}
+    {% set endpoints = endpoints[:-1] + [('connected_assistants.admin_user', 'Connected assistants'), (deletion_endpoint, 'Delete user')] %}
+{% endif %}
 
 {% macro navigation(items) %}
     <nav class="space-y-1">

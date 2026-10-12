@@ -149,25 +149,18 @@ def _enqueue_model_health_scan_if_not_pending(org_id: int) -> bool:
     """Enqueue a background model-health scan for *org_id* through the existing
     job queue, but only if no PENDING or IN_PROGRESS scan already exists for
     this organisation.  Returns True when a new job was created."""
-    from app.extensions import db
-    from app.models.job import Job, JobStatus
-
-    existing = (
-        db.session.query(Job)
-        .filter(
-            Job.task == "model_health_scan",
-            Job.status.in_([JobStatus.PENDING.value, JobStatus.IN_PROGRESS.value]),
-        )
-        .all()
-    )
-    for job in existing:
-        payload = job.payload or {}
-        if payload.get("organization_id") == org_id:
-            return False
-
+    from app.models.job import JobStatus
     from app.services.job_queue_service import get_job_queue_service
 
     service = get_job_queue_service()
+    if service.list_jobs(
+        org_id,
+        limit=1,
+        task="model_health_scan",
+        statuses=[JobStatus.PENDING.value, JobStatus.IN_PROGRESS.value],
+    ):
+        return False
+
     service.create_job(
         name=f"Model-health scan for org {org_id}",
         task="model_health_scan",

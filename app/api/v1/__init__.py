@@ -36,6 +36,7 @@ def after_request(response):
 from .applications import applications_bp
 from .capabilities import capabilities_bp
 from .dashboard import dashboard_bp
+from .elements import elements_v1_bp
 from .enterprise import enterprise_bp
 from .impact import impact_bp
 from .llm import llm_bp
@@ -51,6 +52,7 @@ api_v1_bp.register_blueprint(dashboard_bp, url_prefix="/dashboard")
 api_v1_bp.register_blueprint(mappings_bp, url_prefix="/mappings")
 api_v1_bp.register_blueprint(llm_bp, url_prefix="/llm")
 api_v1_bp.register_blueprint(impact_bp, url_prefix="/impact")
+api_v1_bp.register_blueprint(elements_v1_bp, url_prefix="/elements")
 
 
 # Legacy endpoint redirects with deprecation warnings
