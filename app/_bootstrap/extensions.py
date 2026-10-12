@@ -435,6 +435,32 @@ def init_scheduler(app):
             max_instances=1,
         )
 
+        # Per-owner in-app notification digest: email each opted-in user their
+        # own unread in-app notifications. Daily, like the maturity/summary
+        # digests; per-day idempotency and weekly_digest / digest_frequency
+        # preferences gate what each user actually receives. Runs per
+        # organisation through the tenant-safe harness
+        # (send_owner_digests -> run_for_each_tenant / tenant_scope).
+        def run_owner_digest():
+            with app.app_context():
+                try:
+                    from app._bootstrap._digest_emails import send_owner_digests
+                    send_owner_digests(app)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error(
+                        "APScheduler owner-digest error: %s", exc
+                    )
+
+        scheduler.add_job(
+            func=run_owner_digest,
+            trigger=CronTrigger(hour=7, minute=30),
+            id="owner_digest",
+            name="Per-Owner Notification Digest",
+            replace_existing=True,
+            max_instances=1,
+        )
+
         # An approval past its 15-minute review-by time stays pending and
         # actionable (never auto-expires) but must not go unseen —
         # this notifies each affected organisation's administrators once per

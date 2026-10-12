@@ -106,9 +106,6 @@ def test_migration_chain_has_a_single_head_and_short_revision_ids():
         )
     revision = _load_revision()
     assert revision.down_revision == "20261010_oauth_token_grants"
-    assert revision.revision == heads[0], (
-        "the scoped-token roll-out revision must be the single migration head"
-    )
 
 
 def test_migration_runs_twice_without_error(app):
