@@ -84,6 +84,7 @@ def history_browser(request):
 @pytest.fixture
 def history_page(history_browser):
     contexts, servers, errors, unexpected = [], [], [], []
+    closing = []
 
     def start(*, delayed=False):
         release = Event()
@@ -190,7 +191,9 @@ def history_page(history_browser):
         contexts.append(context)
         page = context.new_page()
         page.on('pageerror', lambda error: errors.append(str(error)))
-        page.on('requestfailed', lambda request: errors.append(request.failure))
+        # A request still in flight when the context closes is reported as failed by
+        # Firefox and WebKit; that is teardown, not a page defect.
+        page.on('requestfailed', lambda request: None if closing else errors.append(request.failure))
         origin = f'http://127.0.0.1:{server.server_port}'
         page.on('request', lambda request: unexpected.append(request.url)
                 if not request.url.startswith(origin + '/') else None)
@@ -199,6 +202,7 @@ def history_page(history_browser):
         return page, state, release
 
     yield start
+    closing.append(True)
     for _, _, release in servers:
         release.set()
     for context in contexts:
