@@ -1089,3 +1089,336 @@ def _jsonld_faq(page: PublicPage, site_url: str) -> dict[str, Any]:
         "url": f"{site_url}{page.url}",
         "mainEntity": _extract_faq_questions(page.body_html),
     }
+
+
+# ── Landing layout (module, use-case and comparison pages) ──────────────────
+# These three families render as a landing page (hero, alternating section
+# bands, link lists as cards, a closing action band) instead of one prose
+# column; every other family keeps the document layout. Keyed on
+# ``page.family`` (the content directory), never ``page.page_family``, so
+# front matter cannot switch a legal or site page into it.
+
+LANDING_FAMILIES: frozenset[str] = frozenset({"module", "function-per-segment", "comparison"})
+
+# The one segment-label table: the /use-cases index groups by it and a
+# use-case page's hero names its segment from it.
+USE_CASE_SEGMENT_LABELS: dict[str, str] = {
+    "S1": "Startups",
+    "S2": "Scale-ups",
+    "S3": "Enterprise architecture teams",
+    "S4": "Services and operations",
+}
+
+# The one icon table: a page's own ``icon:`` front matter wins; a family with
+# no per-page icon falls back here. Lucide names, checked against the vendored
+# v0.344.0 bundle (static/vendor/lucide.min.js).
+_FAMILY_DEFAULT_ICON: dict[str, str] = {
+    "module": "layout-grid",
+    "function-per-segment": "help-circle",
+    "comparison": "scale",
+}
+
+_ICON_NAME_RE = re.compile(r"[a-z0-9-]+")
+_VOID_ELEMENTS = frozenset({"br", "hr", "img"})
+
+
+@dataclass
+class LandingCard:
+    url: str
+    title_html: Markup
+    description: str | None
+    icon: str
+
+
+@dataclass
+class LandingSection:
+    id: str
+    heading_html: Markup
+    body_html: Markup
+    cards: list[LandingCard] | None = None
+
+
+@dataclass
+class Landing:
+    title: str
+    icon: str
+    lead_html: Markup | None
+    intro_html: Markup | None
+    sections: list[LandingSection]
+    breadcrumb: tuple[str, str] | None
+    segment_label: str | None
+    primary_action: tuple[str, str]
+    secondary_action: tuple[str, str] = ("See pricing", "/pricing")
+
+
+@dataclass
+class _Node:
+    """One depth-0 node of an HTML fragment: an element (``tag`` set) or a
+    run of text (``tag`` None). Offsets index into the parsed string."""
+
+    tag: str | None
+    attrs: dict[str, str | None]
+    start: int
+    end: int
+    inner_start: int
+    inner_end: int
+
+
+def _top_level_nodes(fragment: str) -> list[_Node]:
+    """Split ``fragment`` into its depth-0 nodes, tracking element depth with
+    ``html.parser.HTMLParser``. Void elements (br, hr, img) do not change
+    depth, so an ``<h2>`` inside a ``<blockquote>`` or a list is never a
+    depth-0 node. Input is bleach output, so tags are balanced."""
+    from html.parser import HTMLParser
+
+    line_starts = [0]
+    for index, char in enumerate(fragment):
+        if char == "\n":
+            line_starts.append(index + 1)
+
+    nodes: list[_Node] = []
+
+    class _Splitter(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__(convert_charrefs=False)
+            self.depth = 0
+            self.open: _Node | None = None
+            self.text_start: int | None = None
+
+        def _offset(self) -> int:
+            line, col = self.getpos()
+            return line_starts[line - 1] + col
+
+        def _close_text(self, at: int) -> None:
+            if self.text_start is not None:
+                nodes.append(_Node(None, {}, self.text_start, at, self.text_start, at))
+                self.text_start = None
+
+        def _text(self) -> None:
+            if self.depth == 0 and self.text_start is None:
+                self.text_start = self._offset()
+
+        def handle_data(self, data: str) -> None:
+            self._text()
+
+        def handle_entityref(self, name: str) -> None:
+            self._text()
+
+        def handle_charref(self, name: str) -> None:
+            self._text()
+
+        def handle_starttag(self, tag: str, attrs: list) -> None:
+            start = self._offset()
+            starttag = self.get_starttag_text() or ""
+            if self.depth == 0:
+                self._close_text(start)
+                if tag in _VOID_ELEMENTS:
+                    end = start + len(starttag)
+                    nodes.append(_Node(tag, dict(attrs), start, end, end, end))
+                    return
+                self.open = _Node(tag, dict(attrs), start, -1, start + len(starttag), -1)
+            if tag not in _VOID_ELEMENTS:
+                self.depth += 1
+
+        def handle_startendtag(self, tag: str, attrs: list) -> None:
+            start = self._offset()
+            if self.depth == 0:
+                self._close_text(start)
+                end = start + len(self.get_starttag_text() or "")
+                nodes.append(_Node(tag, dict(attrs), start, end, end, end))
+
+        def handle_endtag(self, tag: str) -> None:
+            if tag in _VOID_ELEMENTS:
+                return
+            start = self._offset()
+            self.depth = max(self.depth - 1, 0)
+            if self.depth == 0 and self.open is not None:
+                node = self.open
+                node.inner_end = start
+                node.end = fragment.index(">", start) + 1
+                nodes.append(node)
+                self.open = None
+
+    splitter = _Splitter()
+    splitter.feed(fragment)
+    splitter.close()
+    splitter._close_text(len(fragment))
+    if splitter.open is not None:  # unbalanced input: keep the rest whole
+        node = splitter.open
+        node.end = node.inner_end = len(fragment)
+        nodes.append(node)
+    return nodes
+
+
+def _is_blank(fragment: str, node: _Node) -> bool:
+    return node.tag is None and not fragment[node.start:node.end].strip()
+
+
+def _element_nodes(fragment: str, nodes: list[_Node]) -> list[_Node] | None:
+    """The element nodes of ``nodes``, or ``None`` when any depth-0 text
+    beside them is more than whitespace."""
+    elements = []
+    for node in nodes:
+        if node.tag is None:
+            if not _is_blank(fragment, node):
+                return None
+            continue
+        elements.append(node)
+    return elements
+
+
+def _fragment(html: str) -> Markup | None:
+    """Sanitize a slice of a page body again (so it is balanced and marked
+    trusted in the one place that does that), or ``None`` when empty."""
+    html = html.strip()
+    if not html:
+        return None
+    return _sanitize_html(html)
+
+
+def _slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+def _plain_text(html: str) -> str:
+    import html as _html
+
+    return " ".join(_html.unescape(re.sub(r"<[^>]+>", "", html)).split())
+
+
+def page_icon(page: PublicPage) -> str:
+    """The Lucide icon name for ``page``: its own ``icon`` front matter when
+    that is a non-empty string of lowercase letters, digits and hyphens, else
+    its family's default, else ``"link"``."""
+    own = page.front_matter.get("icon")
+    if isinstance(own, str) and _ICON_NAME_RE.fullmatch(own):
+        return own
+    return _FAMILY_DEFAULT_ICON.get(page.family, "link")
+
+
+def _link_list_cards(body: str, pages_by_url: dict[str, PublicPage]) -> list[LandingCard] | None:
+    """Cards for a section whose body is exactly one ``<ul>`` of items that
+    each hold one internal link and nothing else; ``None`` otherwise."""
+    elements = _element_nodes(body, _top_level_nodes(body))
+    if not elements or len(elements) != 1 or elements[0].tag != "ul":
+        return None
+    ul = elements[0]
+    ul_inner = body[ul.inner_start:ul.inner_end]
+    items = _element_nodes(ul_inner, _top_level_nodes(ul_inner))
+    if not items or any(item.tag != "li" for item in items):
+        return None
+
+    cards: list[LandingCard] = []
+    for item in items:
+        li_inner = ul_inner[item.inner_start:item.inner_end]
+        links = _element_nodes(li_inner, _top_level_nodes(li_inner))
+        if not links or len(links) != 1 or links[0].tag != "a":
+            return None
+        link = links[0]
+        href = link.attrs.get("href") or ""
+        # Internal means a site path: "//host" is protocol-relative, external.
+        if not href.startswith("/") or href.startswith("//"):
+            return None
+        title_html = _fragment(li_inner[link.inner_start:link.inner_end])
+        if title_html is None:
+            return None
+        target = pages_by_url.get(href.split("#", 1)[0].split("?", 1)[0])
+        cards.append(LandingCard(
+            url=href,
+            title_html=title_html,
+            description=target.description if target is not None else None,
+            icon=page_icon(target) if target is not None else "link",
+        ))
+    return cards
+
+
+def build_landing(page: PublicPage) -> Landing | None:
+    """The landing-page view of ``page`` for public/_partials/_landing.html,
+    or ``None`` when ``page.family`` keeps the document layout.
+
+    Splits the sanitized body at its depth-0 ``<h1>`` and ``<h2>`` elements:
+    the first paragraph after the ``<h1>`` is the hero lead, anything else
+    before the first ``<h2>`` is the intro, and each ``<h2>`` starts a
+    section. A section whose body is only a list of internal links becomes a
+    card grid, each card described and iconed from its target page. Every
+    fragment passes through ``_sanitize_html()`` again before it is stored.
+    """
+    if page.family not in LANDING_FAMILIES:
+        return None
+
+    from flask import url_for
+
+    body = str(page.body_html)
+    nodes = _top_level_nodes(body)
+
+    h1_index = next((i for i, n in enumerate(nodes) if n.tag == "h1"), None)
+    before_h1 = ""
+    if h1_index is not None:
+        before_h1 = body[:nodes[h1_index].start]
+        rest = nodes[h1_index + 1:]
+        cursor = nodes[h1_index].end
+    else:
+        rest = nodes
+        cursor = 0
+
+    lead_html = None
+    first_element = next((n for n in rest if not _is_blank(body, n)), None)
+    if first_element is not None and first_element.tag == "p":
+        inner = body[first_element.inner_start:first_element.inner_end]
+        inner_elements = _element_nodes(inner, _top_level_nodes(inner))
+        if inner_elements and len(inner_elements) == 1 and inner_elements[0].tag in ("em", "strong"):
+            only = inner_elements[0]
+            inner = inner[only.inner_start:only.inner_end]
+        lead_html = _fragment(inner)
+        cursor = first_element.end
+
+    h2_nodes = [n for n in rest if n.tag == "h2"]
+    intro_end = h2_nodes[0].start if h2_nodes else len(body)
+    intro_html = _fragment(before_h1 + body[cursor:intro_end])
+
+    pages_by_url: dict[str, PublicPage] | None = None
+    sections: list[LandingSection] = []
+    used_ids: set[str] = set()
+    for index, h2 in enumerate(h2_nodes):
+        heading = body[h2.inner_start:h2.inner_end]
+        base_id = h2.attrs.get("id") or _slugify(_plain_text(heading)) or "section"
+        section_id, suffix = base_id, 2
+        while section_id in used_ids:
+            section_id = f"{base_id}-{suffix}"
+            suffix += 1
+        used_ids.add(section_id)
+
+        section_end = h2_nodes[index + 1].start if index + 1 < len(h2_nodes) else len(body)
+        section_body = body[h2.end:section_end]
+        cards = None
+        if "<ul" in section_body:
+            if pages_by_url is None:
+                pages_by_url = {p.url: p for p in load_all_pages()}
+            cards = _link_list_cards(section_body.strip(), pages_by_url)
+        sections.append(LandingSection(
+            id=section_id,
+            heading_html=_fragment(heading) or Markup(""),
+            body_html=_fragment(section_body) or Markup(""),
+            cards=cards,
+        ))
+
+    parent = _BREADCRUMB_PARENTS.get(page.family)
+    segment_label = None
+    if page.family == "function-per-segment":
+        segment_label = USE_CASE_SEGMENT_LABELS.get(page.front_matter.get("segment_id", ""))
+
+    if page.cta == "waiting_list":
+        primary_action = ("Tell us you need this", "#feature-interest")
+    else:
+        primary_action = ("Start free", url_for("account.register"))
+
+    return Landing(
+        title=page.title,
+        icon=page_icon(page),
+        lead_html=lead_html,
+        intro_html=intro_html,
+        sections=sections,
+        breadcrumb=parent,
+        segment_label=segment_label,
+        primary_action=primary_action,
+    )

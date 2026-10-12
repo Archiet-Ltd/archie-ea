@@ -266,6 +266,7 @@ def product_inquiry_submit():
     from app.services.public_pages import (
         FEATURE_INTEREST_CONSENT_TEXT,
         build_jsonld,
+        build_landing,
         load_page,
     )
 
@@ -331,6 +332,7 @@ def product_inquiry_submit():
         jsonld=build_jsonld(page),
         thanks=thanks,
         error=error,
+        landing=build_landing(page),
     )
 
 
@@ -681,6 +683,7 @@ def public_module(slug):
     from app.services.public_pages import (
         MERGED_PAGES,
         build_jsonld,
+        build_landing,
         get_page_screenshot,
         load_page,
     )
@@ -696,15 +699,8 @@ def public_module(slug):
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
+        landing=build_landing(page),
     )
-
-
-_USE_CASE_SEGMENT_LABELS = {
-    "S1": "Startups",
-    "S2": "Scale-ups",
-    "S3": "Enterprise architecture teams",
-    "S4": "Services and operations",
-}
 
 
 @main.route("/use-cases")
@@ -717,7 +713,7 @@ def public_use_cases_index():
     listing, same as every other nav/index listing -- see
     app/services/public_pages.py::load_feed_pages.
     """
-    from app.services.public_pages import load_feed_pages
+    from app.services.public_pages import USE_CASE_SEGMENT_LABELS, load_feed_pages
 
     pages = [p for p in load_feed_pages() if p.family == "function-per-segment"]
 
@@ -728,7 +724,7 @@ def public_use_cases_index():
 
     ordered_groups = []
     for segment_id in sorted(groups):
-        label = _USE_CASE_SEGMENT_LABELS.get(segment_id, segment_id or "More")
+        label = USE_CASE_SEGMENT_LABELS.get(segment_id, segment_id or "More")
         entries = sorted(groups[segment_id], key=lambda p: p.title.lower())
         ordered_groups.append({"label": label, "pages": entries})
 
@@ -748,6 +744,7 @@ def public_use_case(slug):
     from app.services.public_pages import (
         MERGED_PAGES,
         build_jsonld,
+        build_landing,
         get_page_recording,
         get_page_screenshot,
         load_page,
@@ -769,6 +766,7 @@ def public_use_case(slug):
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page),
         recording=get_page_recording(page),
+        landing=build_landing(page),
     )
 
 
@@ -810,13 +808,16 @@ def public_comparison_hub():
 @main.route("/vs/<slug>")
 def public_comparison(slug):
     """A comparison content page."""
-    from app.services.public_pages import build_jsonld, load_page
+    from app.services.public_pages import build_jsonld, build_landing, load_page
 
     page = load_page("comparison", slug=slug)
     if page is None:
         from flask import abort
         abort(404)
-    return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+    return render_template(
+        "public/page.html", page=page, jsonld=build_jsonld(page),
+        landing=build_landing(page),
+    )
 
 
 @main.route("/vs/avolution")

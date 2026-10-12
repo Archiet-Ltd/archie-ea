@@ -13,6 +13,7 @@ answers_use_cases:
 capture_status: live
 cta: plans
 description: "An application portfolio management tool: one inventory of every application with owner, cost, lifecycle and risk, linked to what depends on it. Start free."
+icon: app-window
 ---
 
 # Application portfolio management tool
