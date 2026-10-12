@@ -341,17 +341,41 @@ def get_gaps_not_addressed(organization_id: int) -> List[Gap]:
     )
 
 
-def count_gaps(organization_id: int) -> int:
+def count_gaps(
+    organization_id: int,
+    gap_type: Optional[str] = None,
+    has_work_package: Optional[bool] = None,
+) -> int:
     """Return the number of gaps in the one gap register for an organisation.
 
     This is the single canonical count used by both the roadmap and the
     gap analysis screen, so they always agree.
+
+    The optional filters mirror the register list readers so a total can be
+    the count of the population listed:
+      gap_type:          only count gaps with this gap_type value
+                         (gap_archimate_service.get_gaps_for_roadmap).
+      has_work_package:  True counts gaps with at least one work package
+                         link in this organisation; False counts gaps with
+                         none (get_gaps_not_addressed). None counts all.
     """
-    return (
-        Gap.query
-        .filter(
-            Gap.organization_id == organization_id,
-            Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-        )
-        .count()
+    query = Gap.query.filter(
+        Gap.organization_id == organization_id,
+        Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
     )
+    if gap_type:
+        query = query.filter(Gap.gap_type == gap_type)
+    if has_work_package is not None:
+        from app.models.implementation_migration import WorkPackage
+
+        subq = (
+            db.session.query(gap_work_packages.c.gap_id)
+            .join(WorkPackage, gap_work_packages.c.work_package_id == WorkPackage.id)
+            .filter(WorkPackage.organization_id == organization_id)
+            .subquery()
+        )
+        if has_work_package:
+            query = query.filter(Gap.id.in_(db.session.query(subq.c.gap_id)))
+        else:
+            query = query.filter(~Gap.id.in_(db.session.query(subq.c.gap_id)))
+    return query.count()
