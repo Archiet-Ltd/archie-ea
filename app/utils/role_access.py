@@ -809,6 +809,7 @@ _MY_WORK_LINKS = {
         # zones; this is the missing one.
         _link("Portfolio", "portfolio.index", "briefcase"),
         _link("Transformation backlog", "portfolio.backlog", "list-ordered"),
+        _link("Recommendations", "intelligence_ui.recommendations_page", "lightbulb"),
         _APPROVAL_INBOX_LINK,
         _link("Rationalization", "unified_applications.rationalization_dashboard", "git-merge"),
         # R1-B34 (TB-0135): the reviewer of a composite score's weights is

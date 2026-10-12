@@ -62,6 +62,8 @@ POLICY = {
     # portfolio.backlog is @login_required only: the open gaps and unscheduled
     # work packages of the viewer's own organisation.
     "/portfolio/backlog":      set(ARCHETYPES),
+    # intelligence_ui.recommendations_page is @login_required only.
+    "/intelligence/recommendations": set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
