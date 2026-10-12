@@ -127,24 +127,12 @@ def detail(initiative_id):
         initiative.assumptions, key=lambda a: (a.exposure is None, -(a.exposure or 0))
     )
     demands = list(initiative.demands)
-    from app.models.motivation import Goal
     from app.modules.portfolio.services.initiative_goal_links import (
         CONTRIBUTION_LEVELS,
         list_links,
     )
 
     goal_links = list_links(initiative.id)
-    linked_goal_ids = {g["goal_id"] for g in goal_links}
-    available_goals = [
-        g
-        for g in db.session.execute(
-            db.select(Goal)
-            .where(Goal.organization_id == current_user.organization_id)
-            .order_by(Goal.name)
-            .limit(500)
-        ).scalars()
-        if g.id not in linked_goal_ids
-    ]
     transformation_programmes = (
         db.session.query(StrategicInitiative)
         .filter(
@@ -179,7 +167,6 @@ def detail(initiative_id):
         assumptions=assumptions,
         demands=demands,
         goal_links=goal_links,
-        available_goals=available_goals,
         contribution_levels=CONTRIBUTION_LEVELS,
         work_packages=list(initiative.migration_work_packages),
         transformation_programmes=transformation_programmes,

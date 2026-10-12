@@ -351,15 +351,17 @@ def initiative_link_programme(initiative_id):
 def initiative_goal_add(initiative_id):
     from app.modules.portfolio.services.initiative_goal_links import (
         InitiativeGoalLinkError,
-        add_link,
+        add_link_for_element,
     )
 
-    goal_id = _int_or_none(request.form.get("goal_id"))
-    if goal_id is None:
+    element_id = _int_or_none(request.form.get("element_id"))
+    if element_id is None:
         flash("Choose the goal this initiative serves.", "error")
         return redirect(url_for("portfolio.detail", initiative_id=initiative_id))
     try:
-        goal = add_link(initiative_id, goal_id, request.form.get("contribution_level"))
+        goal = add_link_for_element(
+            initiative_id, element_id, request.form.get("contribution_level")
+        )
         db.session.commit()
     except InitiativeGoalLinkError as exc:
         db.session.rollback()

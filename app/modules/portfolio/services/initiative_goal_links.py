@@ -92,6 +92,25 @@ def add_link(initiative_id: int, goal_id: int, contribution_level: Optional[str]
     return goal
 
 
+def add_link_for_element(initiative_id: int, element_id: int, contribution_level: Optional[str] = None):
+    """Link an initiative to the goal that the chosen architecture element stands for.
+
+    The element must be the architecture element of a goal in the initiative's
+    own organisation; anything else is refused with the same wording, so the
+    answer does not reveal whether an element exists elsewhere.
+    """
+    initiative, _ = _load(initiative_id)
+    goal = db.session.execute(
+        db.select(Goal).where(
+            Goal.archimate_element_id == element_id,
+            Goal.organization_id == initiative.organization_id,
+        )
+    ).scalars().first()
+    if goal is None:
+        raise InitiativeGoalLinkError("That element is not a goal in your organisation.", 404)
+    return add_link(initiative_id, goal.id, contribution_level)
+
+
 def remove_link(initiative_id: int, goal_id: int) -> None:
     """Remove a link. Flushes; the caller commits."""
     initiative, goal = _load(initiative_id, goal_id)
