@@ -17,8 +17,10 @@ from __future__ import annotations
 # role-gating's addition, the four T-S1 additions, the programme lens's own
 # plateau/gap pair, the two maturity-read-helper additions, the
 # Portfolio-block's three additions, the licence-sync addition and the four
-# connection-explanation additions below (forty-three total), exactly,
-# nothing invented.
+# connection-explanation additions and the impact criticality/recovery-
+# objectives/contract additions below (fifty-two total, re-derived rather
+# than trusted from any one side's own stale count), exactly, nothing
+# invented.
 REASON_CODES = frozenset(
     {
         "no_ownership_recorded",
@@ -120,6 +122,14 @@ REASON_CODES = frozenset(
         "no_capability_linked",
         "value_stream_not_linked_to_model",
         "dependency_direction_unknown",
+        # Impact criticality and recovery objectives: absence conditions on the
+        # cross-layer impact read path that the existing vocabulary does not
+        # cover. Added here, and nowhere else, per this module's own rule that
+        # no endpoint may invent an absence string inline.
+        "no_criticality_recorded",
+        "no_recovery_objective_recorded",
+        # Impact answer: an application with no contract recorded against it.
+        "no_contract_recorded",
         # L7 (Data lens) additions: Ask's Data lens lists the DataObject rows
         # linked to the picked element. Most elements have none, an honest
         # absence; an object with neither a steward nor an owner recorded is a

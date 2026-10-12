@@ -23,6 +23,7 @@ value-streams-at-risk surface.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from app.extensions import db
@@ -66,6 +67,9 @@ CAPACITY_NOT_AVAILABLE_REASON = validate_reason_code("capacity_not_available")
 # Distinct from a "decision pending" state -- the ownership data source IS
 # decided; what doesn't exist yet is a shared, tenant-safe reader for it.
 OWNERSHIP_READER_NOT_BUILT_REASON = validate_reason_code("ownership_reader_not_built")
+NO_CRITICALITY_RECORDED_REASON = validate_reason_code("no_criticality_recorded")
+NO_RECOVERY_OBJECTIVE_RECORDED_REASON = validate_reason_code("no_recovery_objective_recorded")
+NO_CONTRACT_RECORDED_REASON = validate_reason_code("no_contract_recorded")
 NO_DATA_RECORDED_REASON = validate_reason_code("no_data_recorded")
 NO_STEWARD_RECORDED_REASON = validate_reason_code("no_steward_recorded")
 NO_LINEAGE_RECORDED_REASON = validate_reason_code("no_lineage_recorded")
@@ -127,6 +131,83 @@ def _sec09_tenant_check(component_org_id: Optional[int], org_id: int) -> bool:
     return component_org_id == org_id
 
 
+def _contract_tenant_predicate(model, organization_id: int):
+    """The explicit ``organization_id ==`` predicate on the contract select,
+    on top of the ORM tenant filter. Kept as its own seam so the cross-tenant
+    mutation proof can replace exactly this function with a no-op."""
+    return model.organization_id == organization_id
+
+
+def _build_contract_entry(row) -> Dict[str, Any]:
+    """One contract, every value as recorded. ``cost_reason`` is reserved for
+    the route's redaction. ``contract_value`` and ``contract_owner`` are not
+    carried, and nothing is totalled."""
+    return {
+        "contract_id": row.id,
+        "contract_name": row.contract_name,
+        "renewal_date": row.renewal_date.isoformat() if row.renewal_date is not None else None,
+        "end_date": row.end_date.isoformat() if row.end_date is not None else None,
+        "renewal_status": row.renewal_status,
+        "auto_renewal": row.auto_renewal,
+        "notice_period_days": row.notice_period_days,
+        "annual_cost": float(row.annual_cost) if row.annual_cost is not None else None,
+        "currency": row.currency,
+        "contract_risk": row.contract_risk,
+        "vendor_risk": row.vendor_risk,
+        "exit_complexity": row.exit_complexity,
+        "cost_reason": None,
+        "truth_class": "authoritative_fact",
+    }
+
+
+def _build_criticality_block(
+    *,
+    criticality: Optional[str] = None,
+    business_criticality: Optional[str] = None,
+    lifecycle_status: Optional[str] = None,
+    rto_hours: Optional[int] = None,
+    rpo_hours: Optional[int] = None,
+    source: str,
+) -> Dict[str, Any]:
+    """The nine-key criticality block, one shape for both sources (Decision C).
+
+    Rules, in order: ``reason = "no_criticality_recorded"`` and
+    ``critical = None`` when ``criticality`` and ``business_criticality`` are
+    both ``None``; otherwise ``reason = None`` and ``critical`` is true when
+    the lower-cased ``criticality`` is ``mission_critical`` (a component's
+    word) or ``critical`` (a resource's word), or the lower-cased
+    ``business_criticality`` is ``critical`` — the recorded words, compared
+    case-insensitively, nothing else mapped or ranked;
+    ``recovery_reason = "no_recovery_objective_recorded"`` when ``rto_hours``
+    and ``rpo_hours`` are both ``None``, else ``None``. No hour is ever
+    defaulted; ``0`` hours is a recorded value and is emitted as ``0``.
+    """
+    if criticality is None and business_criticality is None:
+        reason = NO_CRITICALITY_RECORDED_REASON
+        critical = None
+    else:
+        reason = None
+        critical = (criticality or "").lower() in {"mission_critical", "critical"} or (
+            (business_criticality or "").lower() == "critical"
+        )
+    recovery_reason = (
+        NO_RECOVERY_OBJECTIVE_RECORDED_REASON
+        if rto_hours is None and rpo_hours is None
+        else None
+    )
+    return {
+        "criticality": criticality,
+        "business_criticality": business_criticality,
+        "lifecycle_status": lifecycle_status,
+        "rto_hours": rto_hours,
+        "rpo_hours": rpo_hours,
+        "critical": critical,
+        "reason": reason,
+        "recovery_reason": recovery_reason,
+        "source": source,
+    }
+
+
 def _licence_tenant_predicate(org_id: int):
     """The explicit ``LicenseEntitlement.organization_id ==`` predicate on
     the portfolio component block's licence read, isolated as its own seam
@@ -145,29 +226,13 @@ def _licence_tenant_predicate(org_id: int):
     return LicenseEntitlement.organization_id == org_id
 
 
-def _resolve_owners_batch(
+def _resolve_components_batch(
     element_ids: List[int], org_id: int
-) -> Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]]:
-    """AA-5/SEC-09 owner attach: element -> component -> ownership -> unit,
-    batched across MANY element ids in a small constant number of queries
-    (M7 fix -- see the build report's B2/NEW-3 sections for why this is now
-    the ONLY owner-resolution implementation on this path; a per-row
-    ``_resolve_owner``/``_find_component_for_element`` pair used to exist
-    alongside this and was deleted as dead code -- ``cross_layer_impact`` is
-    this function's only production caller).
-
-    ``ApplicationComponent`` carries ``TenantMixin`` so the component select
-    below is already fenced by ``do_orm_execute`` (a cross-tenant row is
-    simply not returned in a normal request); ``_sec09_tenant_check`` is the
-    belt-and-braces assertion applied on top of that ORM fencing -- kept for
-    the session-scoped-caller drift it defends against even now that
-    ``ApplicationOwnership`` and ``OrganizationUnit`` carry ``TenantMixin``
-    too and are fenced by the same listener.
-
-    Only CURRENT ownership is attached: a row whose ``end_date`` has already
-    passed is excluded from the select below, the same rule
-    ``accountability_for_element`` applies, so the two owner-resolution
-    paths agree on one element.
+) -> Dict[int, Any]:
+    """The one element-to-component read on this path: one select of
+    ``ApplicationComponent`` where ``archimate_element_id IN distinct ids``,
+    ``order_by(ApplicationComponent.id)``, ``setdefault`` per element id,
+    then only the components that pass ``_sec09_tenant_check``.
 
     ``archimate_element_id`` is indexed but NOT unique (a component created
     before the maintaining listener existed, or by a raw-SQL/import path,
@@ -175,18 +240,19 @@ def _resolve_owners_batch(
     with a deterministic ``order_by(id)`` plus ``setdefault`` below picks the
     same "first" component every time instead of risking
     ``MultipleResultsFound``.
+
+    ``ApplicationComponent`` carries ``TenantMixin`` so the component select
+    below is already fenced by ``do_orm_execute`` (a cross-tenant row is
+    simply not returned in a normal request); ``_sec09_tenant_check`` is the
+    belt-and-braces assertion applied on top of that ORM fencing.
     """
     from datetime import date
 
     from app.models.application_portfolio import ApplicationComponent
-    from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
 
     distinct_ids = sorted(set(element_ids))
-    results: Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {
-        eid: (None, NO_OWNERSHIP_REASON) for eid in distinct_ids
-    }
     if not distinct_ids:
-        return results
+        return {}
 
     components = (
         db.session.execute(
@@ -198,19 +264,44 @@ def _resolve_owners_batch(
         .all()
     )
 
-    # Deterministic "first" component per element_id -- same ordering
-    # _find_component_for_element uses for the single-row case.
+    # Deterministic "first" component per element_id.
     component_by_element: Dict[int, Any] = {}
     for comp in components:
         component_by_element.setdefault(comp.archimate_element_id, comp)
 
-    # SEC-09: drop any component that fails the tenant assertion before it
-    # is ever used to reach ownership/unit data.
-    guarded_components = {
+    # SEC-09: drop any component that fails the tenant assertion.
+    return {
         eid: comp
         for eid, comp in component_by_element.items()
         if _sec09_tenant_check(comp.organization_id, org_id)
     }
+
+
+def _resolve_owners_batch(
+    element_ids: List[int], org_id: int
+) -> Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]]:
+    """AA-5/SEC-09 owner attach: element -> component -> ownership -> unit,
+    batched across MANY element ids in a small constant number of queries
+    (M7 fix -- see the build report's B2/NEW-3 sections for why this is now
+    the ONLY owner-resolution implementation on this path; a per-row
+    ``_resolve_owner``/``_find_component_for_element`` pair used to exist
+    alongside this and was deleted as dead code -- ``cross_layer_impact`` is
+    this function's only production caller).
+
+    ``ApplicationOwnership`` and ``OrganizationUnit`` carry no
+    ``organization_id`` column at all, so they are reached ONLY through the
+    already-fenced, already-asserted component -- never queried first.
+    """
+    from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
+
+    distinct_ids = sorted(set(element_ids))
+    results: Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {
+        eid: (None, NO_OWNERSHIP_REASON) for eid in distinct_ids
+    }
+    if not distinct_ids:
+        return results
+
+    guarded_components = _resolve_components_batch(element_ids, org_id)
     if not guarded_components:
         return results
 
@@ -694,13 +785,31 @@ class IntelligenceQueryService:
         direction: str = "downstream",
         layer: Optional[str] = None,
         with_owner: bool = True,
+        renewal_window_days: int = 90,
         cursor: Optional[int] = None,
         page_size: Optional[int] = None,
     ) -> Dict[str, Any]:
+        """L1 impact answer. Rows whose element is an application component
+        also carry ``contracts`` and ``contracts_reason``: the organisation's
+        ``VendorContract`` rows for that component whose renewal date or end
+        date falls between today and ``renewal_window_days`` from today
+        (inclusive at both ends; a past date is not in the window), as
+        recorded. A component with contract rows but none in the window has
+        ``contracts == []`` (measured); a component with no contract row at
+        all has ``contracts = None`` and ``contracts_reason =
+        "no_contract_recorded"`` -- nothing recorded is not the same as
+        nothing renewing. ``currency``, ``auto_renewal`` and
+        ``notice_period_days`` carry column defaults on the model (``USD``,
+        false, 90) and are passed through as recorded, never reinterpreted.
+        ``contract_flags`` lists the element ids whose ``contracts`` is
+        non-empty. A row whose element is not a component carries neither key.
+        """
         if direction not in VALID_DIRECTIONS:
             raise ValueError(f"direction must be one of {sorted(VALID_DIRECTIONS)}")
         if not (1 <= max_depth <= 10):
             raise ValueError("max_depth must be between 1 and 10")
+        if not (1 <= renewal_window_days <= 3650):
+            raise ValueError("renewal_window_days must be between 1 and 3650")
 
         org_id = current_org_id()
 
@@ -722,6 +831,15 @@ class IntelligenceQueryService:
                     "derivation_state": "not_computed",
                 }
                 reasons = [NO_TENANT_CONTEXT_REASON]
+                criticality_flags: Dict[str, Any] = {
+                    "critical_element_ids": None,
+                    "reason": NO_TENANT_CONTEXT_REASON,
+                }
+                contract_flags: Dict[str, Any] = {
+                    "renewing_element_ids": None,
+                    "reason": NO_TENANT_CONTEXT_REASON,
+                    "window_days": renewal_window_days,
+                }
                 maturity_flags = _maturity_flags(NO_TENANT_CONTEXT_REASON)
             else:
                 from app.models import ArchiMateElement
@@ -739,6 +857,15 @@ class IntelligenceQueryService:
                         "derivation_state": "not_computed",
                     }
                     reasons = [ELEMENT_NOT_FOUND_REASON]
+                    criticality_flags = {
+                        "critical_element_ids": None,
+                        "reason": ELEMENT_NOT_FOUND_REASON,
+                    }
+                    contract_flags = {
+                        "renewing_element_ids": None,
+                        "reason": ELEMENT_NOT_FOUND_REASON,
+                        "window_days": renewal_window_days,
+                    }
                     maturity_flags = _maturity_flags(ELEMENT_NOT_FOUND_REASON)
                 else:
                     explicit_rows = _walk_explicit(element_id, max_depth, direction)
@@ -787,6 +914,81 @@ class IntelligenceQueryService:
                     # then let the derived rows name both of their ends.
                     elements = _resolve_elements_batch(_element_ids_in_rows(rows), org_id)
                     _attach_plain_terms(rows, elements)
+
+                    # Resolve components for criticality block (Decision A's
+                    # call site -- one select per answer, inside the latency
+                    # scope).
+                    components_by_element: Dict[int, Any] = {}
+                    if rows:
+                        components_by_element = _resolve_components_batch(
+                            [row["element_id"] for row in rows], org_id
+                        )
+
+                    # One select of the organisation's contracts for the
+                    # guarded components; grouped in Python by component.
+                    contracts_by_component: Dict[int, List[Any]] = {}
+                    if components_by_element:
+                        from app.models.application_portfolio import VendorContract
+
+                        component_ids = sorted({c.id for c in components_by_element.values()})
+                        contract_rows = db.session.execute(
+                            db.select(
+                                VendorContract.id,
+                                VendorContract.application_id,
+                                VendorContract.contract_name,
+                                VendorContract.renewal_date,
+                                VendorContract.end_date,
+                                VendorContract.renewal_status,
+                                VendorContract.auto_renewal,
+                                VendorContract.notice_period_days,
+                                VendorContract.annual_cost,
+                                VendorContract.currency,
+                                VendorContract.contract_risk,
+                                VendorContract.vendor_risk,
+                                VendorContract.exit_complexity,
+                            )
+                            .where(
+                                VendorContract.application_id.in_(component_ids),
+                                _contract_tenant_predicate(VendorContract, org_id),
+                            )
+                            .order_by(VendorContract.id)
+                        ).all()
+                        for contract_row in contract_rows:
+                            contracts_by_component.setdefault(
+                                contract_row.application_id, []
+                            ).append(contract_row)
+                    today = date.today()
+                    window_end = today + timedelta(days=renewal_window_days)
+
+                    # Resource select for criticality (Decision B) -- keyed by
+                    # the identity map's ids only, so only ids already resolved
+                    # for this tenant are asked for.
+                    resources_by_element: Dict[int, Dict[str, Any]] = {}
+                    if rows:
+                        from app.models.archimate_technology import Resource
+
+                        resource_element_ids = sorted({
+                            row["element_id"] for row in rows
+                            if str(row["element_id"]) in elements
+                        })
+                        if resource_element_ids:
+                            resource_rows = (
+                                db.session.execute(
+                                    db.select(
+                                        Resource.archimate_element_id,
+                                        Resource.criticality,
+                                        Resource.lifecycle_status,
+                                    )
+                                    .where(Resource.archimate_element_id.in_(resource_element_ids))
+                                    .order_by(Resource.id)
+                                )
+                                .all()
+                            )
+                            for archimate_element_id, res_criticality, res_lifecycle_status in resource_rows:
+                                resources_by_element.setdefault(archimate_element_id, {
+                                    "criticality": res_criticality,
+                                    "lifecycle_status": res_lifecycle_status,
+                                })
 
                     # The distinct Capability element ids the identity map
                     # above already resolved under the tenant predicate --
@@ -852,6 +1054,48 @@ class IntelligenceQueryService:
                         # is stripped.
                         row.pop("_endpoints", None)
 
+                        # Attach criticality block (Decision D): a row whose
+                        # element resolves to a guarded component gets the
+                        # component block; a row whose element is a resource
+                        # (but not a component) gets the resource block; a row
+                        # whose element is neither carries no criticality key.
+                        comp = components_by_element.get(row["element_id"])
+                        if comp is not None:
+                            component_contracts = contracts_by_component.get(comp.id)
+                            if component_contracts is None:
+                                row["contracts"] = None
+                                row["contracts_reason"] = NO_CONTRACT_RECORDED_REASON
+                            else:
+                                in_window = []
+                                for contract_row in component_contracts:
+                                    dates = [
+                                        d
+                                        for d in (contract_row.renewal_date, contract_row.end_date)
+                                        if d is not None and today <= d <= window_end
+                                    ]
+                                    if dates:
+                                        in_window.append((min(dates), contract_row.id, contract_row))
+                                in_window.sort(key=lambda item: (item[0], item[1]))
+                                row["contracts"] = [
+                                    _build_contract_entry(item[2]) for item in in_window
+                                ]
+                                row["contracts_reason"] = None
+                            row["criticality"] = _build_criticality_block(
+                                criticality=comp.criticality,
+                                business_criticality=comp.business_criticality,
+                                rto_hours=comp.rto_hours,
+                                rpo_hours=comp.rpo_hours,
+                                source="application_components",
+                            )
+                        else:
+                            resource = resources_by_element.get(row["element_id"])
+                            if resource is not None:
+                                row["criticality"] = _build_criticality_block(
+                                    criticality=resource["criticality"],
+                                    lifecycle_status=resource["lifecycle_status"],
+                                    source="archimate_resources",
+                                )
+
                     explicit_count = sum(1 for r in rows if r["relation"]["kind"] == "explicit")
                     derived_count = sum(1 for r in rows if r["relation"]["kind"] == "derived")
                     stale_count = sum(1 for r in rows if r["relation"].get("stale"))
@@ -876,6 +1120,41 @@ class IntelligenceQueryService:
                     # standing in for "measured, found none".
                     maturity_flags = _maturity_flags(NO_CAPABILITY_IN_CHAIN_REASON, maturity_by_element)
 
+                    # Whole-answer contract flags.
+                    if any("contracts_reason" in row for row in rows):
+                        contract_flags = {
+                            "renewing_element_ids": sorted(
+                                row["element_id"] for row in rows if row.get("contracts")
+                            ),
+                            "reason": None,
+                            "window_days": renewal_window_days,
+                        }
+                    else:
+                        contract_flags = {
+                            "renewing_element_ids": None,
+                            "reason": NO_CONTRACT_RECORDED_REASON,
+                            "window_days": renewal_window_days,
+                        }
+
+                    # Whole-answer criticality flags (Decision E).
+                    any_block = any(
+                        row.get("criticality") is not None for row in rows
+                    )
+                    if any_block:
+                        critical_element_ids = sorted([
+                            row["element_id"] for row in rows
+                            if row.get("criticality", {}).get("critical") is True
+                        ])
+                        criticality_flags = {
+                            "critical_element_ids": critical_element_ids,
+                            "reason": None,
+                        }
+                    else:
+                        criticality_flags = {
+                            "critical_element_ids": None,
+                            "reason": NO_CRITICALITY_RECORDED_REASON,
+                        }
+
         summary["latency_ms"] = scope.latency_ms
 
         # Stable pagination: preserve canonical walk order (explicit rows
@@ -896,6 +1175,8 @@ class IntelligenceQueryService:
             "summary": summary,
             "reasons": reasons,
             "elements": elements,
+            "criticality_flags": criticality_flags,
+            "contract_flags": contract_flags,
             "maturity_flags": maturity_flags,
             "total": total,
             "next_cursor": next_cursor,
