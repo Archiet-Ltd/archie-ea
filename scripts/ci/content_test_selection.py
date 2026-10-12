@@ -18,6 +18,8 @@ PUBLIC_ROUTES = (
     r"pricing|vs|use-cases|modules|vision|legal|connectors|"
     r"about|features|contact|docs|privacy|security|terms|"
     r"architecture-health-check|team-annual-onboarding|"
+    r"data-processing-agreement|cookie-policy|refund-policy|commercial-licence|"
+    r"how-archiet-runs-on-entelim|roles|"
     r"llms-full\.txt|llms\.txt|robots\.txt|sitemap\.xml|llms|sitemap"
 )
 _Q = "[\"']"
@@ -38,6 +40,9 @@ ALWAYS_INCLUDED: tuple[str, ...] = (
     "tests/test_template_contracts.py",
     # fetches /architecture/... pages that render the plain_name template filter
     "tests/test_plain_language.py",
+    # browser tests that load the home page and templates (goto, not client.get)
+    "tests/test_entelim_home_screenshots.py",
+    "tests/test_subresource_integrity.py",
 )
 
 

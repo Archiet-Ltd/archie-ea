@@ -16,6 +16,12 @@ On a push the detector still runs and outputs is_content_only=false, because
 there is no pull request base to compare against; every job runs on a push.
 """
 
+# Why this is separate from scripts/check_smoke_coverage_on_change.py: that script
+# answers a different question (smoke coverage) and tolerates a loose diff. This one
+# gates which CI jobs a PR may skip, so it reads raw git modes (to catch symlinks and
+# submodules), uses -z (paths with odd characters) and --no-renames (a rename out of
+# code still shows the deleted code path), and fails safe: any error runs everything.
+
 from __future__ import annotations
 
 import os

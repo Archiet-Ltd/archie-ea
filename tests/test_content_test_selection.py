@@ -87,8 +87,9 @@ def test_selection_accepts_either_quote_fstrings_slugs_txt_xml_routes_and_subdir
 # route the selector misses fails here instead of silently dropping a test
 # from the content job).
 _LOOSE = re.compile(
-    r"""\.get\(\s*f?['"]/(pricing|vs|use-cases|modules|vision|legal|about|features|"""
-    r"""contact|docs|privacy|security|terms|llms|sitemap|robots)\b"""
+    r"""\.get\(\s*f?['"]/(pricing|vs|use-cases|modules|vision|legal|about|features|connectors|architecture-health-check|team-annual-onboarding|"""
+    r"""contact|docs|privacy|security|terms|llms|sitemap|robots|data-processing-agreement|"""
+    r"""cookie-policy|refund-policy|commercial-licence|how-archiet-runs-on-entelim|roles)\b"""
 )
 
 
