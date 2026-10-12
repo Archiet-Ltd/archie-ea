@@ -71,7 +71,10 @@ def render_card(browser, request):
                 route.abort()
 
         page.route('**/*', respond)
-        page.goto('http://fixture.invalid/', wait_until='networkidle')
+        page.goto('http://fixture.invalid/', wait_until='load')
+        # Ready means Alpine has initialised the fixture component, not that the
+        # network happened to be quiet for 500 ms.
+        page.wait_for_function("() => window.Alpine && document.querySelector('#fixture')._x_dataStack")
         page.evaluate('lucide.createIcons()')
         return page
 
@@ -84,6 +87,9 @@ def render_card(browser, request):
 
 def assert_neutral_card(page, card):
     expect(card).to_be_visible()
+    # Computed colours mid-transition are a blend of two states. Measure only
+    # once the page has no running transition or animation.
+    page.evaluate('() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => null)))')
     expected = page.locator('#reference').evaluate('e => {const s=getComputedStyle(e); return {border:s.borderTopColor, background:s.backgroundColor};}')
     actual = card.evaluate('''e => {
         const s=getComputedStyle(e);
