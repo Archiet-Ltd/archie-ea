@@ -265,39 +265,28 @@ def build_custom_properties(
 
 
 def _read_risk_class(element) -> str:
-    """Read the risk class from the element's typed properties (acm_properties).
+    """Read the risk class through the one gate reader
+    (``ai_system_classification.get_classification``), so the register shows
+    exactly the values the gate would act on: a verbatim copy planted by any
+    other writer is not shown as the gate's class.
 
     Returns the risk tier or ``"not set"`` if none recorded.
     """
-    from .ai_system_classification import PROPKEY_RISK_CLASS, RISK_TIERS
+    from .ai_system_classification import RISK_TIERS, get_classification
 
-    acm = getattr(element, "acm_properties", None) or {}
-    entry = acm.get(PROPKEY_RISK_CLASS)
-    if entry is None:
-        return NOT_SET
-    if isinstance(entry, dict):
-        val = entry.get("value")
-        return val if val in RISK_TIERS else NOT_SET
-    val = str(entry) if entry else ""
-    return val if val in RISK_TIERS else NOT_SET
+    risk = get_classification(element)
+    return risk if risk in RISK_TIERS else NOT_SET
 
 
 def _read_release_state(element) -> str:
-    """Read the release state from the element's typed properties.
+    """Read the release state through the one gate reader
+    (``ai_system_classification.get_release_state``).
 
     Returns ``"draft"``, ``"released"``, or ``"not set"``.
     """
-    from .ai_system_classification import PROPKEY_RELEASE_STATE, RELEASE_STATES
+    from .ai_system_classification import get_release_state
 
-    acm = getattr(element, "acm_properties", None) or {}
-    entry = acm.get(PROPKEY_RELEASE_STATE)
-    if entry is None:
-        return NOT_SET
-    if isinstance(entry, dict):
-        val = entry.get("value")
-        return val if val in RELEASE_STATES else NOT_SET
-    val = str(entry) if entry else ""
-    return val if val in RELEASE_STATES else NOT_SET
+    return get_release_state(element)
 
 
 def _read_release_blocked_reason(element):

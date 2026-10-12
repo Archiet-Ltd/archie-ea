@@ -1564,6 +1564,7 @@ class JourneyOrchestrator:
     def create_element(self, data: dict) -> dict:
         """Create a new ArchiMateElement in this journey's architecture."""
         from app.models.archimate_core import ArchiMateElement, ArchitectureModel
+        from app.modules.architecture_assistant.property_service import PropertyService
 
         arch_model = ArchitectureModel.query.filter_by(solution_id=self.solution_id).first()
         if not arch_model:
@@ -1576,9 +1577,15 @@ class JourneyOrchestrator:
             description=data.get("description", ""),
             architecture_id=arch_model.id,
             acm_source="journey",
-            acm_properties=data.get("acm_properties", {}),
         )
         db.session.add(element)
+        db.session.flush()
+        # Properties go through the canonical typed-property writer, which
+        # refuses the AI system release gate's two keys: an element created
+        # here can never carry the gate's state verbatim.
+        acm_properties = data.get("acm_properties") or {}
+        if isinstance(acm_properties, dict) and acm_properties:
+            PropertyService().merge_element_properties(element, acm_properties, source="user")
         db.session.commit()
         return {
             "id": element.id,
