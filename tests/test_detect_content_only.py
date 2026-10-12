@@ -14,6 +14,10 @@ from scripts.ci import detect_content_only as d
         ("docs/guide.md", False),
         ("docs/background-mechanisms.yml", False),
         ("app/templates/public/home.html", True),
+        ("app/templates/public/email/sales_inquiry.html", False),
+        ("app/templates/public/email/sales_inquiry.txt", False),
+        ("app/templates/public/pricing.html", True),
+        ("app/templates/artefact_share/public.html", False),
         ("tests/test_public_content_pages.py", False),
         ("app/templates/layouts/public_base.html", False),
         ("app/templates/components/public_navbar.html", False),
@@ -34,6 +38,20 @@ def test_all_content_files_are_content_only():
 
 def test_one_code_file_makes_the_change_not_content_only():
     assert d.classify(["content/a.md", "app/routes.py"]) == "false"
+
+
+def test_email_template_diff_runs_everything():
+    """An email template lives under a content prefix but is NOT content, so a
+    diff that touches it alone must run the full suite."""
+    assert d.classify(["app/templates/public/email/sales_inquiry.html"]) == "false"
+    assert d.classify(["app/templates/public/email/sales_inquiry.txt"]) == "false"
+
+
+def test_email_template_change_together_with_content_runs_everything():
+    assert (
+        d.classify(["content/a.md", "app/templates/public/email/sales_inquiry.html"])
+        == "false"
+    )
 
 
 def test_empty_diff_is_not_content_only():
@@ -93,3 +111,69 @@ def test_every_job_gated_on_the_detector_wraps_both_conditions_in_parentheses():
     assert gated, "no job is gated on the detector"
     for name, expr in gated.items():
         assert re.search(r"&& \(github\.event_name != 'pull_request' \|\| github\.event\.action != 'labeled' \|\| contains\(.*?'ci-fast'\)\) && \(github\.event_name != 'pull_request' \|\| needs\.changes\.result != 'success'", expr), name
+
+
+def test_content_page_tests_job_runs_only_when_is_content_only_is_true():
+    """A content-only PR must run the public page tests as a dedicated light job
+    (they would otherwise sit in the skipped shards), and the eight shards plus
+    the browser jobs must skip when the detector says the diff is content-only."""
+    from pathlib import Path
+
+    import yaml
+
+    workflow = yaml.safe_load(Path(".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    jobs = workflow["jobs"]
+
+    content_job = jobs["content-page-tests"]
+    content_if = str(content_job["if"])
+    assert "needs.changes.outputs.is_content_only == 'true'" in content_if, content_if
+    assert "github.event_name == 'pull_request'" in content_if, (
+        "the content page tests job must run only on pull requests -- on push "
+        "to main the full suite already runs them"
+    )
+    assert "postgres" in content_job.get("services", {}), (
+        "the content page tests job needs a Postgres service like tests-shard"
+    )
+
+    pytest_step = next(
+        s["run"]
+        for s in content_job["steps"]
+        if s.get("run", "").startswith("pytest")
+    )
+    for test_file in (
+        "tests/test_public_content_pages.py",
+        "tests/test_public_site_pages.py",
+        "tests/test_public_jsonld.py",
+        "tests/test_legal_pages.py",
+        "tests/test_procurement_pages.py",
+    ):
+        assert test_file in pytest_step, (
+            f"the content page tests job must run {test_file}"
+        )
+
+    # The eight pytest shards, the tests combine job and the browser jobs all
+    # skip when the detector says content-only.
+    for job_id in (
+        "tests-shard",
+        "tests",
+        "smoke",
+        "smoke-main",
+        "smoke-adversarial",
+        "smoke-other",
+        "browser-compatibility",
+        "walkthrough",
+    ):
+        assert "is_content_only != 'true'" in str(jobs[job_id]["if"]), job_id
+
+
+def test_email_template_diff_runs_the_full_suite_header_contract():
+    """A diff touching an email template must run everything -- the detector
+    must report false, and the content page tests job must not run."""
+    from pathlib import Path
+
+    import yaml
+
+    workflow = yaml.safe_load(Path(".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    content_if = str(workflow["jobs"]["content-page-tests"]["if"])
+    assert "needs.changes.outputs.is_content_only == 'true'" in content_if
+    assert d.classify(["app/templates/public/email/sales_inquiry.html"]) == "false"

@@ -5,8 +5,10 @@ Outputs is_content_only=true or is_content_only=false to GITHUB_OUTPUT
 (or stdout if the env var is not set).
 
 Content paths are:
-  - content/          (markdown pages)
-  - public-page templates under app/templates/
+  - content/              (markdown pages)
+  - public-page templates under app/templates/public/, EXCEPT the
+    sales-enquiry email bodies listed in NON_CONTENT_EXCEPTIONS, which
+    change email behaviour rather than the public site.
 
 A PR touching anything outside this list runs the full CI suite.
 Push to main always runs the full suite (the check is skipped).
@@ -24,12 +26,22 @@ import sys
 CONTENT_PREFIXES: tuple[str, ...] = (
     "content/",
     "app/templates/public/",
-    "app/templates/artefact_share/public.html",
+)
+
+# Email templates that live under a content prefix but must NOT count as
+# content: they are the sales-enquiry email bodies, so a change to them must
+# run the full suite (email behaviour can break independently of the site).
+# Checked first, before CONTENT_PREFIXES.
+NON_CONTENT_EXCEPTIONS: tuple[str, ...] = (
+    "app/templates/public/email/",
 )
 
 
 def is_content_path(path: str) -> bool:
     """Return True if *path* is a recognised content-only path."""
+    for exception in NON_CONTENT_EXCEPTIONS:
+        if path.startswith(exception):
+            return False
     for prefix in CONTENT_PREFIXES:
         if prefix.endswith("/"):
             # Directory prefix: match any file under it
