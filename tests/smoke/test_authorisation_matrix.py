@@ -855,10 +855,23 @@ def test_intelligence_impact_route_authorisation(
     )
 
 
+def _anonymous_api_response(page, url):
+    """GET ``url`` with the browser context's own (anonymous) cookie jar.
+
+    An API route is not a page: navigating a browser to it adds a document
+    lifecycle (Firefox's JSON viewer, navigation timeouts) that has nothing to
+    do with whether the server refuses the caller, and a refusal that arrives
+    in milliseconds was reported as a 45 second ``Page.goto`` timeout. The
+    context's request client sends the same request with the same cookies, does
+    not follow redirects (a redirect to sign-in must not pass as a refusal) and
+    answers with the status and body the server sent.
+    """
+    return page.context.request.get(url, max_redirects=0, timeout=PAGE_TIMEOUT)
+
+
 def test_intelligence_impact_route_rejects_anonymous_browser_session(page, live_server, seeded, seeded_interface_element):
     path = "/api/v1/intelligence/impact/%d" % seeded_interface_element
-    response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    assert response is not None
+    response = _anonymous_api_response(page, live_server + path)
     # Corrected against a live run: this is a JSON API route, so
     # login_required answers 401 directly rather than redirecting to the
     # login page (unlike an HTML page route). Tightened per the minor finding
@@ -886,18 +899,12 @@ def test_intelligence_yield_route_authorisation(archetype, page, live_server, se
 
 def test_intelligence_yield_route_rejects_anonymous_browser_session(page, live_server):
     path = "/api/v1/intelligence/yield"
-    response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    assert response is not None
+    response = _anonymous_api_response(page, live_server + path)
     assert response.status == 401
 
 
 def test_transformation_api_rejects_anonymous_browser_session(page, live_server):
-    response = page.goto(
-        live_server + TRANSFORMATION_API_PATH,
-        wait_until="domcontentloaded",
-        timeout=PAGE_TIMEOUT,
-    )
-    assert response is not None
+    response = _anonymous_api_response(page, live_server + TRANSFORMATION_API_PATH)
     assert response.status == 401
     body = response.json()
     assert body["data"] is None
