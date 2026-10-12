@@ -223,9 +223,17 @@ def test_every_ci_job_is_required_or_deliberately_excluded():
 
 
 def test_the_only_exclusion_is_the_image_build_and_it_says_why():
-    assert set(dw.EXCLUDED_CHECKS) == {"Build immutable release image"}
+    assert len(dw.EXCLUDED_CHECKS) == 6
+    assert "Build immutable release image" in dw.EXCLUDED_CHECKS
     reason = dw.EXCLUDED_CHECKS["Build immutable release image"]
     assert "GHCR" in reason and "bind-mounted" in reason
+    for shard_name in ("Browser journeys \u2014 main shard 0",
+                       "Browser journeys \u2014 main shard 1",
+                       "Browser journeys \u2014 main shard 2",
+                       "Browser journeys \u2014 adversarial",
+                       "Browser journeys \u2014 other"):
+        assert shard_name in dw.EXCLUDED_CHECKS
+        assert "aggregate" in dw.EXCLUDED_CHECKS[shard_name]
     # Everything else the CI runs is required, including the jobs that are red today.
     for name in ("Tests (pytest + coverage)", "SAST (bandit)", "Browser journeys (one per archetype)",
                  "Browser compatibility (webkit)", "Browser compatibility (firefox)"):
