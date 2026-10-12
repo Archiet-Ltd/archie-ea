@@ -10,8 +10,10 @@ Content paths are:
     sales-enquiry email bodies listed in NON_CONTENT_EXCEPTIONS, which
     change email behaviour rather than the public site.
 
-A PR touching anything outside this list runs the full CI suite.
-Push to main always runs the full suite (the check is skipped).
+A PR touching anything outside this list runs the full CI suite, and so does a
+change to a symlink or a submodule even when it sits under a content path.
+On a push the detector still runs and outputs is_content_only=false, because
+there is no pull request base to compare against; every job runs on a push.
 """
 
 from __future__ import annotations
@@ -54,13 +56,42 @@ def is_content_path(path: str) -> bool:
     return False
 
 
-def get_changed_files(base_ref: str = "origin/main") -> list[str]:
-    """Return the list of files changed between *base_ref* and HEAD."""
+# File modes that are never content: a symlink or a submodule pointer can
+# redirect to code however innocent the path under a content directory looks.
+NON_REGULAR_MODES: frozenset[str] = frozenset({"120000", "160000"})
+
+
+def _diff_entries(base_ref: str) -> list[tuple[str, str, str]]:
+    """Return (old_mode, new_mode, path) for each file changed since *base_ref*."""
     result = subprocess.run(
-        ["git", "diff", "--name-only", "--no-renames", base_ref, "HEAD"],
+        ["git", "diff", "--raw", "--no-renames", "-z", base_ref, "HEAD"],
         capture_output=True, text=True, check=True,
     )
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    fields = result.stdout.split("\0")
+    entries: list[tuple[str, str, str]] = []
+    i = 0
+    while i + 1 < len(fields):
+        meta = fields[i]
+        if meta.startswith(":"):
+            parts = meta[1:].split()
+            entries.append((parts[0], parts[1], fields[i + 1]))
+            i += 2
+        else:
+            i += 1
+    return entries
+
+
+def get_changed_files(base_ref: str = "origin/main") -> list[str]:
+    """Return the list of files changed between *base_ref* and HEAD."""
+    return [path for _, _, path in _diff_entries(base_ref) if path]
+
+
+def get_non_regular_files(base_ref: str = "origin/main") -> frozenset[str]:
+    """Changed paths that are, or were, a symlink or a submodule."""
+    return frozenset(
+        path for old, new, path in _diff_entries(base_ref)
+        if old in NON_REGULAR_MODES or new in NON_REGULAR_MODES
+    )
 
 
 def base_reference() -> str:
@@ -69,17 +100,18 @@ def base_reference() -> str:
     return f"origin/{base}" if base else "origin/main"
 
 
-def classify(changed: list[str]) -> str:
-    """'true' only when there is at least one changed file and all are content paths."""
+def classify(changed: list[str], non_regular: frozenset[str] | set[str] = frozenset()) -> str:
+    """'true' only when there is at least one changed file and all are regular content files."""
     if not changed:
         return "false"
-    return str(all(is_content_path(f) for f in changed)).lower()
+    return str(all(is_content_path(f) and f not in non_regular for f in changed)).lower()
 
 
 def main() -> int:
     # Any failure to compute the diff means "not content only": the full suite runs.
     try:
-        is_content = classify(get_changed_files(base_reference()))
+        base = base_reference()
+        is_content = classify(get_changed_files(base), get_non_regular_files(base))
     except (subprocess.CalledProcessError, OSError):
         is_content = "false"
 
