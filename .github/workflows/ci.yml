@@ -73,6 +73,7 @@ jobs:
   changes:
     name: Detect changed paths
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     outputs:
       is_content_only: ${{ steps.detect.outputs.is_content_only }}
     steps:
@@ -84,17 +85,24 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Detect content-only changes
         id: detect
-        run: python scripts/ci/detect_content_only.py
+        # Run the detector as it exists on the base branch, so a pull request
+        # cannot change the rules that decide which of its own checks are skipped.
+        # The checked-out copy is the fallback only for the first introduction,
+        # when the base branch has no detector yet.
+        run: |
+          if git show "origin/${GITHUB_BASE_REF:-main}:scripts/ci/detect_content_only.py" > /tmp/detect_content_only.py 2>/dev/null; then
+            python /tmp/detect_content_only.py
+          else
+            python scripts/ci/detect_content_only.py
+          fi
 
   # A content-only PR skips the eight pytest shards and the browser jobs, but
-  # the reviews of PR 546 insisted the public-page tests must still run (a
-  # content change can break tests/test_public_content_pages.py,
-  # test_public_site_pages.py, test_public_jsonld.py, test_legal_pages.py,
-  # test_procurement_pages.py and the content/standards tests, which would
-  # otherwise sit in the skipped shards and let the regression pass unseen).
-  # This light job runs ONLY when the detector says the diff is content-only:
-  # a Postgres service like the tests-shard job, then pytest on exactly those
-  # files. It is deliberately not a required check (see EXCLUDED_CHECKS in
+  # the public-page and template tests must still run (a content change can
+  # break them, and they would otherwise sit in the skipped shards and let the
+  # regression pass unseen). This light job runs ONLY when the detector says the
+  # diff is content-only: a Postgres service like the tests-shard job, then
+  # pytest on the files scripts/ci/content_test_selection.py computes. It is
+  # deliberately not a required check (see EXCLUDED_CHECKS in
   # scripts/deploy_workflow.py): on a push to main this job does not run.
   content-page-tests:
     name: Content page tests
@@ -148,16 +156,13 @@ jobs:
       - name: Apply the capability provenance migration
         run: flask --app manage apply-unified-capability-provenance-migration
       - name: Run the public page tests
+        # The selection is computed, not hand-picked: every test file outside
+        # tests/smoke that refers to public pages or templates, or fetches a
+        # public route, plus the template contract test.
         run: |
-          pytest -q --maxfail=20 -o xfail_strict=true \
-            tests/test_public_content_pages.py tests/test_public_site_pages.py \
-            tests/test_public_jsonld.py tests/test_legal_pages.py \
-            tests/test_procurement_pages.py \
-            tests/test_vs_comparison_hub.py tests/test_start_free_not_waiting_list.py \
-            tests/test_no_operational_intelligence_claim.py \
-            tests/test_seo_geo_plumbing.py tests/test_sitemap_crawl_health.py \
-            tests/test_module_screenshots.py tests/test_public_visitor_analytics.py \
-            tests/test_product_inquiry.py
+          python scripts/ci/content_test_selection.py > content-tests.txt
+          wc -l content-tests.txt
+          xargs -a content-tests.txt pytest -q --maxfail=20 -o xfail_strict=true
 
   secret-scan:
     name: Secret scan (gitleaks)
