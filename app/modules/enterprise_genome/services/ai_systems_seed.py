@@ -32,6 +32,7 @@ from .ai_system_profile import (
     AI_SYSTEM_ELEMENT_TYPE,
     AI_SYSTEM_MARKER,
     build_custom_properties,
+    is_ai_system,
 )
 
 ARCHIE_COPILOT_NAME = "Entelim AI Copilot"
@@ -75,9 +76,25 @@ def register_ai_system(
         .first()
     )
     if existing is not None:
+        was_ai_system = is_ai_system(existing)
         props = dict(existing.custom_properties or {})
         props[AI_SYSTEM_MARKER] = ai_props[AI_SYSTEM_MARKER]
         existing.custom_properties = props
+        if not was_ai_system:
+            # A plain modelled element promoted into the register has never been
+            # through the gate, so its acm_properties cannot honestly carry the
+            # gate's two fields. Drop any verbatim copy rather than let the
+            # register read it as the gate's own state; the gate writes the
+            # fields itself when a classification is accepted and a release
+            # happens.
+            from app.modules.architecture_assistant.property_service import (
+                GATE_OWNED_KEYS,
+            )
+
+            acm = dict(existing.acm_properties or {})
+            for key in GATE_OWNED_KEYS:
+                acm.pop(key, None)
+            existing.acm_properties = acm  # untyped-property-write-ok: removing gate-scoped keys when promoting a plain element into the register (a deletion, not a typed write; PropertyService has no delete)
         session.add(existing)
         session.flush()
         return existing
