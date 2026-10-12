@@ -156,3 +156,4 @@ def detail(initiative_id):
 
 # Bind the write paths to this blueprint (see note beside portfolio_bp above).
 from app.modules.portfolio.routes import portfolio_write_routes  # noqa: E402,F401
+from app.modules.portfolio.routes import portfolio_conflict_routes  # noqa: E402,F401

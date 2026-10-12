@@ -1,0 +1,57 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}Initiative conflicts{% endblock %}
+
+{% block breadcrumb %}
+{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
+{{ breadcrumb_nav(items=[
+    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
+    {'text': 'Portfolio', 'href': url_for('portfolio.index')},
+    {'text': 'Conflicts', 'current': true}
+]) }}
+{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6 mx-auto">
+
+  {{ page_shell(title='Initiative conflicts', subtitle='Initiatives running in the same quarter that serve the same capability or have the same owner') }}
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="rounded-lg border p-4 text-sm {% if category == 'error' %}border-destructive/30 bg-destructive/5 text-destructive-emphasis{% else %}border-success/30 bg-success/5 text-success-emphasis{% endif %}" role="alert">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="get" action="{{ url_for('portfolio.conflicts') }}" class="flex flex-wrap items-end gap-3">
+    <div>
+      <label for="conflict-quarter" class="block text-xs font-medium mb-1">Quarter</label>
+      <input id="conflict-quarter" name="quarter" type="text" value="{{ quarter_value }}" pattern="[0-9]{4}-[Qq][1-4]" placeholder="2026-Q4"
+             class="h-9 w-32 rounded-md border border-input bg-background px-2 text-sm">
+    </div>
+    <button type="submit" class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90">Show conflicts</button>
+    <p class="text-sm text-muted-foreground">{{ result.quarter.start.strftime('%d %b %Y') }} &ndash; {{ result.quarter.end.strftime('%d %b %Y') }} &middot; {{ result.running_count }} initiative{{ '' if result.running_count == 1 else 's' }} running</p>
+  </form>
+
+  <div class="rounded-lg border bg-card" data-testid="conflict-list">
+    {% for c in result.conflicts %}
+    <div class="px-6 py-4 border-b last:border-0">
+      <p class="font-medium">{{ 'Same capability' if c.kind == 'capability' else 'Same owner' }}: {{ c.subject }}</p>
+      <ul class="mt-2 list-disc pl-5 text-sm">
+        {% for i in c.initiatives %}<li>{{ i.name }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% else %}
+    <p class="text-sm text-muted-foreground py-10 text-center">No conflicts recorded for this quarter.</p>
+    {% endfor %}
+  </div>
+
+  {% if result.undated %}
+  <div class="rounded-lg border bg-card p-6">
+    <p class="text-sm font-medium">Not checked: no start date recorded ({{ result.undated|length }})</p>
+    <p class="text-sm text-muted-foreground mt-1">{% for i in result.undated %}{{ i.name }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
