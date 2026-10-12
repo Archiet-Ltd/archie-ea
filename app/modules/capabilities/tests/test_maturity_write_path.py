@@ -1098,7 +1098,7 @@ def test_guard_patterns_catch_every_form_of_direct_write():
 
 
 # --------------------------------------------------------------------------- #
-# MEDIUM-1 — three writers now route through the service and leave history.   #
+# Three writers now route through the service and leave history.              #
 # --------------------------------------------------------------------------- #
 
 def test_enterprise_crud_put_routes_maturity_through_service(
