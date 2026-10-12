@@ -93,6 +93,26 @@ EXCLUDED_CHECKS = {
         "a bind-mounted source checkout (see the header of scripts/deploy_verified.sh). "
         "A registry or buildx outage must not block a deploy that never uses the image."
     ),
+    "Browser journeys \u2014 main shard 0": (
+        "a shard of the Browser journeys main selection; the aggregate "
+        "\"Browser journeys (one per archetype)\" is the required check."
+    ),
+    "Browser journeys \u2014 main shard 1": (
+        "a shard of the Browser journeys main selection; the aggregate "
+        "\"Browser journeys (one per archetype)\" is the required check."
+    ),
+    "Browser journeys \u2014 main shard 2": (
+        "a shard of the Browser journeys main selection; the aggregate "
+        "\"Browser journeys (one per archetype)\" is the required check."
+    ),
+    "Browser journeys \u2014 adversarial": (
+        "a dedicated job for adversarial probes; the aggregate "
+        "\"Browser journeys (one per archetype)\" is the required check."
+    ),
+    "Browser journeys \u2014 other": (
+        "a dedicated job for census, ai-protocol and guide-history journeys; "
+        "the aggregate \"Browser journeys (one per archetype)\" is the required check."
+    ),
 }
 CHECK_APP_SLUG = "github-actions"
 MAX_CHECK_PAGES = 10

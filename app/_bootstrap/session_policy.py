@@ -165,7 +165,7 @@ def init_session_policy(app):
 
     @app.before_request
     def _enforce_session_policy():
-        from flask import request, session
+        from flask import g, request, session
         from flask_login import current_user, logout_user
 
         # Static assets and the liveness probe must not keep a session alive:
@@ -186,6 +186,26 @@ def init_session_policy(app):
             return None
 
         if not authenticated:
+            return None
+
+        # A genuine MCP client authenticates with a bearer token ONLY -- no
+        # session cookie, no "_sid" at all, ever (see
+        # app/modules/oauth_provider/identity.py's flask-login
+        # request_loader, which never calls login_user() and never touches
+        # the session). This whole hook is a *session*-idle-timeout and
+        # *session*-revocation policy: it has nothing to check for a request
+        # that was never authenticated via a session in the first place, and
+        # the fail-closed revocation branch below would otherwise reject
+        # every bearer-only call outright (no "_sid" in the session ->
+        # session_registry.is_active(None) -> False -> 401 "revoked"), which
+        # is exactly the production bug this fixes. The bearer token's own
+        # lifecycle (OAuthToken.is_active -- revocation/expiry -- plus the
+        # resource/organization checks in identity.py) is the authorization
+        # control for this path instead; this is a narrow, request-scoped
+        # exemption that only ever applies when the identity loader itself
+        # already set the marker below, and never changes behaviour for any
+        # session-cookie-authenticated request.
+        if getattr(g, "auth_mode", None) == "bearer":
             return None
 
         # --- Server-side revocation check (logout / password-change) -----

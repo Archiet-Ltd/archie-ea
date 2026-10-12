@@ -187,6 +187,13 @@ def revoke_all_for_user(user_id, reason, except_sid=None):
             row.revoked_at = now
             row.revoked_reason = reason
         db.session.commit()
+        # An assistant connected through OAuth is a session in every way that
+        # matters here (it acts as this person), so it ends with the rest --
+        # whatever device is kept via except_sid. Same transaction boundary,
+        # same failure behaviour: a failure raises to the caller below.
+        from app.modules.oauth_provider.models import OAuthToken
+
+        OAuthToken.revoke_all_for_user(user_id)
         return len(rows)
     except Exception:
         logger.error("session_registry: revoke_all_for_user failed for user_id=%s reason=%s", user_id, reason, exc_info=True)

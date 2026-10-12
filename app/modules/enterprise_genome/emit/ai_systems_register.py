@@ -19,6 +19,10 @@ from __future__ import annotations
 
 from markupsafe import Markup, escape
 
+from app.modules.enterprise_genome.services.ai_system_classification import (
+    REFUSAL_MISSING_ASSESSMENT,
+)
+
 EM_DASH = "—"
 
 # Human labels for the machine enum values. A value the profile could not
@@ -62,8 +66,158 @@ def _flags_cell(flags: list[str]) -> str:
     return " · ".join(labels)
 
 
-def emit_ai_systems_register(slice_data: dict) -> Markup:
-    """Emit the register table for a slice. Returns a ``Markup`` fragment."""
+def _owner_cell(owner, element_id=None, can_write=False) -> str:
+    """Render an owner dict as a display name, or em dash if unset, with a
+    debounced user picker to assign (or change) the owner. The picker renders
+    only for a viewer the owner route would admit (``can_write`` — the route
+    needs general permission) and only inside a request, where the page
+    script that drives it is loaded."""
+    name = EM_DASH if owner is None else (owner.get("user_name") or EM_DASH)
+    parts = [str(escape(name))]
+    if element_id is not None and can_write:
+        from flask import has_request_context, url_for
+
+        if has_request_context():
+            url = url_for("ai_systems_genome.ai_system_set_owner", element_id=element_id)
+            # raw-html-ok: the owners URL is escaped; every other fragment is a fixed literal
+            parts.append(
+                '<div class="relative mt-1" data-owner-picker data-owners-url="'
+                + str(escape(url)) + '">'
+                '<input type="text" data-owner-search autocomplete="off" '
+                'aria-label="Search for an owner" placeholder="Assign owner…" '
+                'class="h-7 w-40 rounded border border-border bg-card px-2 text-xs">'
+                '<button type="button" data-owner-save disabled '
+                'class="ml-1 h-7 rounded-md border border-border bg-card px-2 text-xs '
+                'font-medium text-foreground hover:bg-accent disabled:opacity-50">Set</button>'
+                '<div data-owner-results role="listbox" '
+                'class="hidden absolute z-10 mt-1 w-64 rounded-md border border-border '
+                'bg-card shadow-lg max-h-48 overflow-y-auto"></div></div>'
+            )
+    return "".join(parts)
+
+
+def _action_form(element_id: int, endpoint: str, label: str, enabled: bool = True) -> str:
+    """A small CSP-safe POST form: hidden csrf token + labelled button.
+
+    Empty string outside a request context (no CSRF token to mint), so the
+    deterministic emitter stays byte-stable in unit tests that never render a
+    live page; a real register render carries the live forms. Also empty when
+    *enabled* is false: a control whose route would refuse the viewer is not
+    drawn at all.
+    """
+    if not enabled:
+        return ""
+    from flask import has_request_context, url_for
+    from flask_wtf.csrf import generate_csrf
+
+    if not has_request_context():
+        return ""
+    action = url_for(endpoint, element_id=element_id)
+    token = generate_csrf()
+    # raw-html-ok: action and token are escaped below; label is a fixed
+    # literal from this module, never user text.
+    return (
+        '<form method="POST" action="' + str(escape(action)) + '" class="inline-block">'
+        '<input type="hidden" name="csrf_token" value="' + str(escape(token)) + '">'
+        '<button type="submit" '
+        'class="h-7 rounded-md border border-border bg-card px-3 text-xs font-medium '
+        'text-foreground hover:bg-accent">' + str(escape(label)) + "</button></form>"
+    )
+
+
+def _release_cell(system: dict, can_release: bool = False, can_write: bool = False) -> str:
+    """The Release state cell: the state, the gate refusal reason when release
+    is blocked, and the admin actions (Release / Attach assessment / Classify).
+
+    Each control renders only for a viewer whose role the underlying route
+    admits: Release for an administrator (``can_release``), Attach assessment
+    for general permission (``can_write``). A viewer who would be refused 403
+    is not shown the button.
+
+    CSP-safe: plain markup only, all text escaped, no inline handlers. The
+    action forms render only inside a request (where a CSRF token exists);
+    outside one, only the text is produced.
+    """
+    state = system.get("release_state")
+    reason = system.get("release_blocked_reason")
+    element_id = system.get("archimate_element_id")
+
+    parts = [_cell(state)]
+    if reason:
+        parts.append(
+            f'<p class="text-xs text-destructive mt-1">{_cell(reason)}</p>'  # raw-html-ok: _cell() escapes internally
+        )
+        if element_id is not None and reason == REFUSAL_MISSING_ASSESSMENT:
+            attach = _action_form(
+                element_id,
+                "ai_systems_genome.ai_system_attach_assessment",
+                "Attach assessment",
+                enabled=can_write,
+            )
+            if attach:
+                parts.append(f'<div class="mt-1">{attach}</div>')  # raw-html-ok: _action_form() escapes its action URL, csrf token and label
+    elif state != "released" and element_id is not None:
+        release = _action_form(
+            element_id,
+            "ai_systems_genome.ai_system_release",
+            "Release",
+            enabled=can_release,
+        )
+        if release:
+            parts.append(f'<div class="mt-1">{release}</div>')  # raw-html-ok: _action_form() escapes its action URL, csrf token and label
+
+    return "".join(parts)
+
+
+def _classify_cell(system: dict, can_write: bool = False) -> str:
+    """The Risk class cell: the current class and a classify form to propose
+    a new (or first) classification. The form renders only inside a request
+    context and only for a viewer the classify route would admit
+    (``can_write`` — general permission)."""
+    risk_class = system.get("risk_class")
+    element_id = system.get("archimate_element_id")
+
+    parts = [_cell(risk_class)]
+    if element_id is not None and can_write:
+        from flask import has_request_context, url_for
+        from flask_wtf.csrf import generate_csrf
+
+        if has_request_context():
+            action = url_for("ai_systems_genome.ai_system_classify", element_id=element_id)
+            token = generate_csrf()
+            parts.append(
+                '<form method="POST" action="' + str(escape(action)) + '" class="inline-block mt-1">'
+                '<input type="hidden" name="csrf_token" value="' + str(escape(token)) + '">'
+                '<select name="risk_class" aria-label="Risk class" '
+                'class="h-7 rounded border border-border bg-card px-2 text-xs">'
+                '<option value="high">High</option>'
+                '<option value="limited">Limited</option>'
+                '<option value="minimal">Minimal</option>'
+                '<option value="unacceptable">Unacceptable</option>'
+                '</select>'
+                '<button type="submit" class="h-7 rounded-md border border-border bg-card px-2 '
+                'text-xs font-medium text-foreground hover:bg-accent ml-1">Classify</button>'
+                '</form>'
+            )
+
+    return "".join(parts)
+
+
+def emit_ai_systems_register(
+    slice_data: dict,
+    *,
+    can_release: bool = False,
+    can_write: bool = False,
+) -> Markup:
+    """Emit the register table for a slice.
+
+    ``can_release`` (administrator of the organisation) decides whether the
+    Release form renders; ``can_write`` (general permission) decides whether
+    the Classify, Attach-assessment and owner-assignment controls render —
+    exactly the roles the corresponding routes admit. Both default to false so
+    a caller that does not pass the viewer's permissions emits the read-only
+    register. Returns a ``Markup`` fragment.
+    """
     systems = slice_data.get("systems") or []
     counts = slice_data.get("counts") or {}
     spec_hash = slice_data.get("spec_hash") or ""
@@ -89,6 +243,9 @@ def emit_ai_systems_register(slice_data: dict) -> Markup:
             f'<td class="px-3 py-2 text-sm">{_tri_cell(gov.get("approval_gate"))}</td>'  # raw-html-ok: _tri_cell() (defined above) returns only 'Yes'/'No'/em-dash literals
             f'<td class="px-3 py-2 text-sm">{_tri_cell(gov.get("human_review"))}</td>'  # raw-html-ok: _tri_cell() (defined above) returns only 'Yes'/'No'/em-dash literals
             f'<td class="px-3 py-2 text-sm">{_cell(s.get("data_sensitivity"))}</td>'  # raw-html-ok: _cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_classify_cell(s, can_write=can_write)}</td>'  # raw-html-ok: _classify_cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_release_cell(s, can_release=can_release, can_write=can_write)}</td>'  # raw-html-ok: _release_cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_owner_cell(s.get("owner"), s.get("archimate_element_id"), can_write=can_write)}</td>'  # raw-html-ok: _owner_cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm text-destructive">{_flags_cell(flags)}</td>'  # raw-html-ok: _flags_cell() (defined above) escapes internally
             "</tr>"
         )
@@ -97,7 +254,7 @@ def emit_ai_systems_register(slice_data: dict) -> Markup:
         body = "".join(rows)
     else:
         body = (
-            '<tr><td colspan="9" class="px-3 py-6 text-sm text-muted-foreground text-center">'
+            '<tr><td colspan="12" class="px-3 py-6 text-sm text-muted-foreground text-center">'
             "No AI systems modelled yet.</td></tr>"
         )
 
@@ -110,6 +267,9 @@ def emit_ai_systems_register(slice_data: dict) -> Markup:
         "Approval gate",
         "Human review",
         "Data sensitivity",
+        "Risk class",
+        "Release state",
+        "Owner",
         "Risk flags",
     ]
     head = "".join(
