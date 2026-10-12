@@ -273,7 +273,11 @@ def test_solution_architect_asks_why_two_things_are_connected(browser, live_serv
         dialog.locator("[data-full-detail-toggle]").click()
         chain = dialog.locator("ol[aria-label='Chain'] li > span[x-text='link']")
         expect(chain).to_have_text([ledger, checkout, portal], timeout=PAGE_TIMEOUT)
-        derived_id = int(dialog.locator("[data-full-detail-region] dd").last.inner_text().strip())
+        # The id is the last detail value; read it only once it is a number, so
+        # a placeholder shown while the detail loads is never parsed.
+        derived_value = dialog.locator("[data-full-detail-region] dd").last
+        expect(derived_value).to_have_text(re.compile(r"^\s*\d+\s*$"), timeout=PAGE_TIMEOUT)
+        derived_id = int(derived_value.inner_text().strip())
         page.keyboard.press("Escape")
         expect(dialog).to_be_hidden(timeout=PAGE_TIMEOUT)
         return derived_id
