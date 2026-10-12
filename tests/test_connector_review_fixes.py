@@ -692,3 +692,253 @@ class TestN4CredentialPromotedOnlyAfterTheWriteSucceeds:
         assert vault.retrieve(org_a.id, "jira", "api_token") is None, (
             "a credential must not go live when the write it belongs to failed"
         )
+
+
+class TestF1LegacyJiraRowAsMainSavedItAuthenticates:
+    def test_legacy_jira_row_as_main_saved_it_authenticates(self, db_session, org_a):
+        """main's own save path encrypted the token then decoded it to str
+        before storing it in the JSON config column -- confirm the read
+        path decrypts that shape, not just raw bytes."""
+        import base64
+
+        from app.models.connector_config import ConnectorConfig
+        from app.modules.codegen.services.credential_encryption import encrypt_credential
+        from app.services.jira_connector_service import JiraConnectorService
+
+        encrypted_bytes = encrypt_credential("legacy-plaintext-token")
+        legacy_value_as_main_stored_it = encrypted_bytes.decode("utf-8")
+
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Legacy Jira",
+            config={"email": "legacy@example.com", "api_token_encrypted": legacy_value_as_main_stored_it},
+        )
+        db_session.add(cfg)
+        db_session.flush()
+
+        headers = JiraConnectorService()._get_headers(cfg)
+
+        expected = base64.b64encode(b"legacy@example.com:legacy-plaintext-token").decode()
+        assert headers["Authorization"] == f"Basic {expected}", (
+            "a legacy row's decoded-str ciphertext must decrypt to the real token, "
+            "not be sent as the raw ciphertext"
+        )
+
+
+class TestF2RotationDropsTheSupersededRowKey:
+    def test_an_approved_rotation_removes_the_old_secret_from_the_row(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+        from app.models.connector_config import ConnectorConfig
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Probe Jira",
+            config={"email": "probe@example.com", "api_token": "stale-legacy-value"},
+        )
+        db_session.add(cfg)
+        db_session.commit()
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors/jira",
+            data={
+                "instance_url": "https://probe.atlassian.net",
+                "email": "probe@example.com",
+                "api_token": "fresh-rotated-token",
+                "default_project_key": "ARCH",
+                "enabled": "on",
+            },
+        )
+        proposal = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
+        assert proposal is not None
+
+        approver = _make_admin(db_session, org_a.id, "F2Approver")
+        db_session.commit()
+        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        assert result.get("success") is True, result
+
+        db_session.refresh(cfg)
+        assert "api_token" not in cfg.config, (
+            "a rotation must drop the superseded row key, not leave it beside the vault value"
+        )
+
+    def test_a_plain_config_edit_with_no_rotation_still_keeps_h2s_original_protection(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        """F2's drop must only fire on an actual rotation -- a config-only
+        update (no new credential in this change) must still carry the
+        existing sensitive key forward, exactly as H2 already proved."""
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        cfg_id = _create_approved_jira_connector(db_session, org_a, admin_a, client, login_as)
+
+        from app.models.connector_config import ConnectorConfig
+
+        cfg = ConnectorConfig.query.get(cfg_id)
+        cfg.config = {**cfg.config, "api_token": "untouched-legacy-value"}
+        db_session.commit()
+
+        client.post(
+            "/admin/connectors/jira",
+            data={
+                "instance_url": "https://probe2.atlassian.net",
+                "email": "probe2@example.com",
+                "api_token": "",  # no new secret in this change
+                "default_project_key": "ARCH",
+                "enabled": "on",
+            },
+        )
+        proposal = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
+        assert proposal is not None
+
+        approver = _make_admin(db_session, org_a.id, "F2NoRotationApprover")
+        db_session.commit()
+        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        assert result.get("success") is True, result
+
+        db_session.refresh(cfg)
+        assert cfg.config.get("api_token") == "untouched-legacy-value", (
+            "H2's original protection must still hold when no rotation happened"
+        )
+
+
+def _create_approved_jira_connector(db_session, org, admin, client, login_as):
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    login_as(client, admin)
+    client.post(
+        "/admin/connectors/jira",
+        data={
+            "instance_url": "https://initial.atlassian.net",
+            "email": "initial@example.com",
+            "api_token": "initial-token",
+            "default_project_key": "ARCH",
+            "enabled": "on",
+        },
+    )
+    proposal = AIChatCRUDApproval.query.filter_by(
+        organization_id=org.id, entity_type="connectors", status=ApprovalStatus.PENDING
+    ).first()
+    approver = _make_admin(db_session, org.id, "SetupApprover")
+    db_session.commit()
+    AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+
+    from app.models.connector_config import ConnectorConfig
+
+    return ConnectorConfig.query.filter_by(organization_id=org.id, connector_type="jira").first().id
+
+
+class TestMigrateConnectorRowSecrets:
+    def test_moves_a_legacy_value_into_the_vault_and_clears_the_row(self, db_session, org_a):
+        from app.commands.migrate_connector_row_secrets import migrate_connector_row_secrets
+        from app.models.connector_config import ConnectorConfig
+        from app.modules.codegen.services.credential_encryption import encrypt_credential
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        encrypted = encrypt_credential("legacy-value").decode("utf-8")
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Legacy Jira",
+            config={"email": "legacy@example.com", "api_token": encrypted},
+        )
+        db_session.add(cfg)
+        db_session.commit()
+
+        stats = migrate_connector_row_secrets()
+        assert stats["moved_to_vault"] == 1
+
+        vault = OrgCredentialVault()
+        assert vault.retrieve(org_a.id, "jira", "api_token") == "legacy-value"
+
+        db_session.refresh(cfg)
+        assert "api_token" not in cfg.config
+
+        # Idempotent: nothing left to migrate on a second run.
+        stats_again = migrate_connector_row_secrets()
+        assert stats_again["legacy_values_found"] == 0
+
+    def test_does_not_overwrite_an_existing_vault_value_just_clears_the_row(self, db_session, org_a):
+        from app.commands.migrate_connector_row_secrets import migrate_connector_row_secrets
+        from app.models.connector_config import ConnectorConfig
+        from app.modules.codegen.services.credential_encryption import encrypt_credential
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        vault = OrgCredentialVault()
+        vault.store(org_id=org_a.id, connector_type="jira", credential_type="api_token", value="real-current-token")
+
+        stale_encrypted = encrypt_credential("stale-value").decode("utf-8")
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Legacy Jira",
+            config={"email": "legacy@example.com", "api_token": stale_encrypted},
+        )
+        db_session.add(cfg)
+        db_session.commit()
+
+        stats = migrate_connector_row_secrets()
+        assert stats["row_already_superseded_by_vault"] == 1
+        assert vault.retrieve(org_a.id, "jira", "api_token") == "real-current-token"
+
+        db_session.refresh(cfg)
+        assert "api_token" not in cfg.config
+
+
+class TestN6GenericPageCredentialReachesTheConnector:
+    def test_a_jira_connector_added_through_the_generic_page_can_authenticate(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        """The generic /admin/connectors page stores its credential under
+        the "credentials" blob, not the per-connector-type named vault key
+        -- confirm build_connector and JiraConnectorService both still find
+        it there."""
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors",
+            data={
+                "connector_type": "jira",
+                "name": "Generic-Page Jira",
+                "config_json": '{"instance_url": "https://generic.atlassian.net", "email": "generic@example.com"}',
+                "credential": "generic-page-token",
+                "enabled": "1",
+            },
+        )
+        proposal = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
+        assert proposal is not None
+
+        approver = _make_admin(db_session, org_a.id, "N6Approver")
+        db_session.commit()
+        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        assert result.get("success") is True, result
+
+        from app.models.connector_config import ConnectorConfig
+        from app.services.connector_framework import build_connector
+        from app.services.jira_connector_service import JiraConnectorService
+
+        cfg = ConnectorConfig.query.filter_by(organization_id=org_a.id, connector_type="jira").first()
+        assert cfg is not None
+
+        connector = build_connector(cfg, org_a.id)
+        assert connector.config.config["api_token"] == "generic-page-token"
+
+        headers = JiraConnectorService()._get_headers(cfg)
+        import base64
+        expected = base64.b64encode(b"generic@example.com:generic-page-token").decode()
+        assert headers["Authorization"] == f"Basic {expected}"

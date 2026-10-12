@@ -538,6 +538,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register ServiceNow connector config backfill CLI: {e}")
 
+# Jira/M365 connector row-secret migration (F1, cloud-review-pr448-a85f082b-v1.md)
+    try:
+        from app.commands import migrate_connector_row_secrets
+        migrate_connector_row_secrets.init_app(app)
+        app.logger.info("✅ Connector row-secret migration CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register connector row-secret migration CLI: {e}")
+
     # Cost fact store backfill
     try:
         from app.commands import backfill_cost_facts

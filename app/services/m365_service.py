@@ -181,9 +181,14 @@ class M365Service:
         if config.organization_id:
             from app.modules.codegen.services.credential_vault import OrgCredentialVault
 
-            client_secret = OrgCredentialVault().retrieve(
-                config.organization_id, "m365", "client_secret"
-            )
+            vault = OrgCredentialVault()
+            client_secret = vault.retrieve(config.organization_id, "m365", "client_secret")
+            if not client_secret:
+                # N6: a connector added through the generic /admin/connectors
+                # page stores its secret under the "credentials" blob, not
+                # this connector type's named key.
+                generic = vault.retrieve_credentials(config.organization_id, "m365") or {}
+                client_secret = generic.get("credential") or None
 
         if not client_secret:
             client_secret_stored = cfg_data.get("client_secret", "")

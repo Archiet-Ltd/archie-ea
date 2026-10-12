@@ -294,6 +294,18 @@ CONNECTOR_CREDENTIAL_TYPES = {
     "servicenow": "client_secret",
 }
 
+# F2 (cloud-review-pr448-a85f082b-v1.md): the legacy config keys each
+# connector type's secret used to live under, before it moved to the
+# vault. H2's carry-forward (below, in apply_connector_change) must drop
+# these -- not preserve them -- whenever this approval is actually
+# rotating the vault credential, or the superseded value sits on the row
+# forever beside its replacement.
+CONNECTOR_LEGACY_CONFIG_KEYS = {
+    "jira": {"api_token", "api_token_encrypted"},
+    "m365": {"client_secret"},
+    "servicenow": {"client_secret"},
+}
+
 # Connector types surfaced by the connectors page. A type is only offered
 # from a per-organisation configuration row already in the system; this is
 # the display order, not an allowlist -- the permit gate is
@@ -659,8 +671,32 @@ def apply_connector_change(
             # at all). Carry forward anything sensitive already on the row
             # that the new config omits, so an update never silently wipes a
             # token the service still reads from here. H2.
+            #
+            # F2 (cloud-review-pr448-a85f082b-v1.md): H2's own carry-forward
+            # kept a rotated secret on the row beside its vault replacement
+            # forever, because it could not tell "nothing new to carry"
+            # apart from "something new is replacing this". Checking
+            # whether this approval actually staged a new credential for
+            # this connector type tells the two apart: drop the legacy key
+            # when it is being superseded; keep H2's original protection
+            # otherwise (a plain config edit with no credential change).
+            is_rotating = False
+            if approval is not None:
+                legacy_credential_type = CONNECTOR_CREDENTIAL_TYPES.get(connector_type)
+                if legacy_credential_type:
+                    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+                    staged = OrgCredentialVault().retrieve(
+                        resolved, connector_type,
+                        OrgCredentialVault._staged_type(legacy_credential_type, approval.id),
+                    )
+                    is_rotating = staged is not None
+            legacy_keys = CONNECTOR_LEGACY_CONFIG_KEYS.get(connector_type, set()) if is_rotating else set()
+
             existing_config = cfg.config or {}
             for key, value in existing_config.items():
+                if key in legacy_keys:
+                    continue
                 if key not in new_config and _is_sensitive_key(key):
                     new_config[key] = value
             cfg.config = new_config
@@ -914,11 +950,25 @@ def _credential_field_map(connector_type: str, org_id: int, config: dict) -> dic
 
     vault = OrgCredentialVault()
 
+    def _secret(credential_type: str) -> str:
+        # N6 (cloud-review-pr448-a85f082b-v1.md): the per-connector forms
+        # store their secret under this connector type's own named vault
+        # key, but the generic /admin/connectors page always stores under
+        # "credentials" as {"credential": "..."} regardless of connector
+        # type -- a connector added through that page had no api_token/
+        # client_secret key for build_connector to find at all. Fall back
+        # to the generic blob so either save path reaches the connector.
+        value = vault.retrieve(org_id, connector_type, credential_type)
+        if value:
+            return value
+        generic = vault.retrieve_credentials(org_id, connector_type) or {}
+        return generic.get("credential", "") or ""
+
     if connector_type == "jira":
         return {
             "base_url": config.get("instance_url", ""),
             "username": config.get("email", ""),
-            "api_token": vault.retrieve(org_id, "jira", "api_token") or "",
+            "api_token": _secret("api_token"),
             "project_keys": [config["default_project_key"]] if config.get("default_project_key") else [],
         }
 
@@ -934,7 +984,7 @@ def _credential_field_map(connector_type: str, org_id: int, config: dict) -> dic
         return {
             "base_url": config.get("instance_url", ""),
             "client_id": config.get("client_id", ""),
-            "client_secret": vault.retrieve(org_id, "servicenow", "client_secret") or "",
+            "client_secret": _secret("client_secret"),
         }
 
     # No field map for this connector type: fall back to the generic
