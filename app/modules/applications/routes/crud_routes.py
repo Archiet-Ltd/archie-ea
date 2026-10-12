@@ -8,7 +8,7 @@ api_delete_application, api_bulk_consolidate.
 
 import json
 import logging
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from flask import (
     current_app,
