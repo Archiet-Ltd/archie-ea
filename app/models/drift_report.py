@@ -23,6 +23,10 @@ class DriftReport(TenantMixin, db.Model):
     spec_hash = db.Column(db.String(128), nullable=False)
     computed_at = db.Column(db.DateTime, nullable=False)
     finding_count = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    # Findings an architect has judged to be false positives, keyed by finding
+    # key, each with the reason given. Kept apart from report_json so a re-scan
+    # (which replaces the report) never discards a recorded decision.
+    dismissals = db.Column(db.JSON, nullable=True)
 
     __table_args__ = (
         db.UniqueConstraint("organization_id", name="uq_drift_reports_org"),
