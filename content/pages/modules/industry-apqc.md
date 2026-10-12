@@ -3,7 +3,7 @@ page_family: module
 module_label: "Industry Reference Frameworks"
 endpoint: industry_apqc.industry_apqc_dashboard
 source: app/modules/modules_directory/routes.py + app/utils/role_access.py, read 2026-09-23
-state: on_main
+state: in_review
 answers_use_cases:
   - {id: UC-S4-02, segment: S4}
 capture_status: live
