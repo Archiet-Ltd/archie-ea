@@ -1289,7 +1289,12 @@ def test_obligations_org_isolation(db_session, make_org):
         get_obligations_for_system,
     )
 
+    # A's obligations (high without assessment -> no obligations)
     ob_a = get_obligations_for_system(el_a.id, org_a.id)
+    assert len(ob_a) == 0, "A's high-risk system without assessment should have no obligations"
+    # B's obligations exist (minimal class attaches obligations)
+    ob_b = get_obligations_for_system(el_b.id, org_b.id)
+    assert len(ob_b) > 0, "B's minimal-risk system should have obligations"
     # When querying from B's perspective, element A is in A's org so the
     # obligations are scoped to A's element. B cannot access A's element.
     from app.models.models import ArchiMateElement
@@ -1453,15 +1458,20 @@ def test_grounding_source_org_isolation(db_session, make_org):
     )
     db_session.flush()
     appr_b = propose_grounding_source(
-        element = el_b, data_entity_id = de_b.id,
-        organization_id = org_b.id, proposed_by_user_id = None,
+        element=el_b, data_entity_id=de_b.id,
+        organization_id=org_b.id, proposed_by_user_id=None,
     )
     db_session.flush()
 
-# B cannot approve A's approval
+    # B cannot approve A's approval
     from app.modules.enterprise_genome.services.ai_system_grounding import (
         accept_grounding_source,
     )
     result = accept_grounding_source(appr_a.id, org_b.id)
     db_session.flush()
     assert result is False
+
+    # B can approve its own approval
+    result_b = accept_grounding_source(appr_b.id, org_b.id)
+    db_session.flush()
+    assert result_b is True
