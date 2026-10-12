@@ -6,8 +6,10 @@ Emails degrade gracefully: if SMTP is not configured, content is logged instead.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from html import escape
+
+from app import db
 
 logger = logging.getLogger(__name__)
 
@@ -645,3 +647,175 @@ def send_error_digest(app):
         len(new_events), len(recipients),
     )
     return {"new_events": len(new_events), "recipients": len(recipients)}
+
+
+# ---------------------------------------------------------------------------
+# Per-owner in-app notification digest (PR 1 notification store)
+# ---------------------------------------------------------------------------
+# Lives in this file with the platform digests, as the decision record names.
+# A user who opted in receives their own unread in-app notifications by email,
+# run once per organisation through the same tenant-safe job harness here uses
+# (run_for_each_tenant / tenant_scope), not a private organisation loop. Every
+# query explicitly filters Notification.organization_id, because Notification is
+# NOT a TenantMixin model, so the ORM isolation listeners do not auto-scope it.
+
+
+def _get_owners_with_items(organization_id: int):
+    """(user, [notifications]) for each owner in *organization_id* with unread,
+    not-yet-emailed notifications."""
+    from app.models.models import Notification
+    from app.models.user import User
+
+    rows = (
+        db.session.query(User, Notification)
+        .filter(
+            User.organization_id == organization_id,
+            Notification.organization_id == organization_id,
+            Notification.user_id == User.id,
+            Notification.read.is_(False),
+            Notification.email_sent_at.is_(None),
+        )
+        .all()
+    )
+    return rows
+
+
+def _should_send_digest(user):
+    """Whether this user opted in (weekly_digest on and digest_frequency not off)."""
+    if not user.get_notification_preference("weekly_digest"):
+        return False
+    freq = user.get_notification_preference("digest_frequency")
+    if freq == "off":
+        return False
+    return True
+
+
+def _already_sent_today(user_id: int) -> bool:
+    """Whether a digest was already sent to this user today (per-day idempotency)."""
+    from app.models.models import Notification
+
+    today = date.today()
+    today_start = datetime(today.year, today.month, today.day)
+    tomorrow_start = today_start + timedelta(days=1)
+
+    sent = (
+        db.session.query(Notification.id)
+        .filter(
+            Notification.user_id == user_id,
+            Notification.email_sent_at >= today_start,
+            Notification.email_sent_at < tomorrow_start,
+        )
+        .first()
+    )
+    return sent is not None
+
+
+def send_owner_digest(organization_id: int) -> dict:
+    """Send one per-owner digest for *organization_id* — the per-organisation
+    unit the tenant-safe harness invokes inside ``tenant_scope``.
+
+    Returns {"sent", "skipped", "total_items", "errors"}.
+    """
+    result = {"sent": 0, "skipped": False, "total_items": 0, "errors": []}
+
+    owner_rows = _get_owners_with_items(organization_id)
+    if not owner_rows:
+        result["skipped"] = True
+        logger.info("Owner digest: org %s has no undigested notifications", organization_id)
+        return result
+
+    user_notifications = {}
+    for user, notif in owner_rows:
+        if user.id not in user_notifications:
+            user_notifications[user.id] = {"user": user, "items": []}
+        user_notifications[user.id]["items"].append(notif)
+
+    result["total_items"] = len(owner_rows)
+
+    for uid, data in user_notifications.items():
+        user = data["user"]
+        items = data["items"]
+
+        try:
+            if not _should_send_digest(user):
+                logger.info(
+                    "Owner digest: user %s in org %s opted out (preferences)",
+                    user.id, organization_id,
+                )
+                continue
+
+            if _already_sent_today(user.id):
+                logger.info(
+                    "Owner digest: user %s in org %s already sent today",
+                    user.id, organization_id,
+                )
+                continue
+
+            items_html = "".join(
+                f"<li><a href=\"{escape(item.url or '#')}\">{escape(item.message[:200])}</a></li>"
+                for item in items[:20]
+            )
+            if not items_html:
+                items_html = "<li>No new notifications.</li>"
+
+            html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1f2937;max-width:640px;margin:0 auto;padding:16px">
+<h2 style="color:#111827;border-bottom:2px solid #2563eb;padding-bottom:8px">
+    Your Notification Digest
+</h2>
+<p style="color:#6b7280">You have {len(items)} unread notification(s):</p>
+<ul>{items_html}</ul>  <!-- raw-html-ok: items_html is built entirely from escape()'d parts above -->
+<p style="font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:8px">
+    This is an automated digest from Entelim. To change your notification preferences,
+    visit your account settings.
+</p>
+</body>
+</html>"""
+
+            from flask import current_app
+            _safe_send_email(
+                current_app._get_current_object(),
+                "Your Notification Digest",
+                [user.email],
+                html,
+            )
+
+            now = datetime.utcnow()
+            for item in items:
+                item.email_sent_at = now
+            db.session.commit()
+
+            result["sent"] += 1
+            logger.info(
+                "Owner digest: sent %d items to user %s in org %s",
+                len(items), user.id, organization_id,
+            )
+
+        except Exception as exc:
+            logger.exception(
+                "Owner digest: failed for user %s in org %s: %s",
+                user.id, organization_id, exc,
+            )
+            result["errors"].append(str(exc))
+
+    if result["sent"] == 0 and not result["errors"]:
+        result["skipped"] = True
+
+    return result
+
+
+def send_owner_digests(app, *, organization_ids=None):
+    """Send the per-owner notification digest to every active organisation.
+
+    Uses ``run_for_each_tenant`` so each organisation's rows are isolated and
+    each user's digest carries only that organisation's notifications.
+    ``organization_ids`` restricts the run (tests use a single org). Returns a
+    ``JobRun`` (like send_data_maturity_digest).
+    """
+    from app.jobs.tenant_safe_job import run_for_each_tenant
+
+    return run_for_each_tenant(
+        app, "owner_digest", send_owner_digest, organization_ids=organization_ids
+    )
