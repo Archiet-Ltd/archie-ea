@@ -560,6 +560,7 @@ def test_jobs_skip_on_non_ci_fast_labeled_events():
         "secret-scan", "static-gates", "boot-health", "tests-shard",
         "tests", "db-gates", "security-sast", "smoke",
         "browser-compatibility", "walkthrough", "dependency-audit",
+        "content-page-tests",
     }
     for job_id in gating_jobs:
         job = jobs[job_id]

@@ -86,6 +86,79 @@ jobs:
         id: detect
         run: python scripts/ci/detect_content_only.py
 
+  # A content-only PR skips the eight pytest shards and the browser jobs, but
+  # the reviews of PR 546 insisted the public-page tests must still run (a
+  # content change can break tests/test_public_content_pages.py,
+  # test_public_site_pages.py, test_public_jsonld.py, test_legal_pages.py,
+  # test_procurement_pages.py and the content/standards tests, which would
+  # otherwise sit in the skipped shards and let the regression pass unseen).
+  # This light job runs ONLY when the detector says the diff is content-only:
+  # a Postgres service like the tests-shard job, then pytest on exactly those
+  # files. It is deliberately not a required check (see EXCLUDED_CHECKS in
+  # scripts/deploy_workflow.py): on a push to main this job does not run.
+  content-page-tests:
+    name: Content page tests
+    needs: changes
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only == 'true') && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Create an isolated virtual environment for this job's dependencies
+        # Same reason as tests-shard: a self-hosted runner's leftover ~/.local
+        # site-packages must not shadow this job's dependencies.
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || {
+            echo "::warning::pip install from the cache failed; retrying without it"
+            pip install --no-cache-dir -r requirements.txt
+          }
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - name: Create schema
+        run: |
+          python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+      - name: Apply the capability provenance migration
+        run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Run the public page tests
+        run: |
+          pytest -q --maxfail=20 -o xfail_strict=true \
+            tests/test_public_content_pages.py tests/test_public_site_pages.py \
+            tests/test_public_jsonld.py tests/test_legal_pages.py \
+            tests/test_procurement_pages.py \
+            tests/test_vs_comparison_hub.py tests/test_start_free_not_waiting_list.py \
+            tests/test_no_operational_intelligence_claim.py \
+            tests/test_seo_geo_plumbing.py tests/test_sitemap_crawl_health.py \
+            tests/test_module_screenshots.py tests/test_public_visitor_analytics.py \
+            tests/test_product_inquiry.py
+
   secret-scan:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
