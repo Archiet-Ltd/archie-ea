@@ -52,7 +52,7 @@ def is_content_path(path: str) -> bool:
     for prefix in CONTENT_PREFIXES:
         if prefix.endswith("/"):
             # Directory prefix: match any file under it
-            if path.startswith(prefix) or path == prefix.rstrip("/"):
+            if path.startswith(prefix):
                 return True
         else:
             # Exact file match

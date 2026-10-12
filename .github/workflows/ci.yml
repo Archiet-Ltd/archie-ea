@@ -83,9 +83,6 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-      - name: Install deps
-        run: python -m pip install --upgrade pip
       - name: Detect content-only changes
         id: detect
         run: python scripts/ci/detect_content_only.py
@@ -210,7 +207,7 @@ jobs:
   tests-shard:
     name: Tests (pytest + coverage) — shard ${{ matrix.shard }}
     needs: changes
-    if: ${{ (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.outputs.is_content_only != 'true') }}
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     # Same-repository runs (push/dispatch and same-repo PRs) select a runner
     # via repository variables: vars.CI_FAST_RUNNER takes precedence when the
     # PR carries the ci-fast label, vars.CI_SHARD_RUNNER routes to a managed
@@ -374,7 +371,7 @@ jobs:
   tests:
     name: Tests (pytest + coverage)
     needs: [tests-shard, changes]
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.outputs.is_content_only != 'true') }}
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     # Same runner selection as tests-shard above: vars.CI_FAST_RUNNER takes
     # precedence when the PR carries the ci-fast label, vars.CI_SHARD_RUNNER
     # routes to a managed pool when set, otherwise the job falls back to the
@@ -590,7 +587,7 @@ jobs:
   smoke:
     name: Browser journeys (one per archetype)
     needs: changes
-    if: ${{ (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.outputs.is_content_only != 'true') }}
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     runs-on: ubuntu-latest
     # Renders real pages in a real browser against a real database. Every cheaper
     # layer has passed defects this catches: a front end blocked by integrity
@@ -681,7 +678,7 @@ jobs:
   browser-compatibility:
     name: Browser compatibility (${{ matrix.browser }})
     needs: changes
-    if: ${{ (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.outputs.is_content_only != 'true') }}
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -777,7 +774,7 @@ jobs:
   walkthrough:
     name: Level 10 archetype walkthrough
     needs: changes
-    if: ${{ (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.outputs.is_content_only != 'true') }}
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     runs-on: ubuntu-latest
     # docs/TESTING_STANDARD.md level 10: not "does it break?" but "can this
     # archetype do their job, and could they have FOUND the page?". It runs as a
