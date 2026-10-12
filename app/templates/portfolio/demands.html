@@ -80,6 +80,19 @@
             {% endfor %}
           </ul>
           {% endif %}
+          {% if rec.route in ('reuse', 'extend') %}
+          <p class="mt-3 font-medium">Licences already held</p>
+          {% if rec.licences %}
+          <ul class="mt-1 list-disc pl-5" data-testid="demand-licences-{{ d.id }}">
+            {% for l in rec.licences %}
+            <li>{{ l.product }} &mdash; {{ l.entitled }} entitled,
+              {% if l.used is not none %}{{ l.used }} used{% if l.spare is not none %}, {{ l.spare }} spare{% endif %}{% else %}usage not recorded{% endif %}</li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-muted-foreground">No licence is recorded against these applications.</p>
+          {% endif %}
+          {% endif %}
         </div>
 
         <form method="post" action="{{ url_for('portfolio.demand_decide', demand_id=d.id) }}"
