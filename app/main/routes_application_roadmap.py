@@ -3,7 +3,7 @@
 from app.services.archimate_backbone import sync_archimate_element
 from datetime import datetime
 
-from flask import flash, jsonify, redirect, render_template, request, url_for
+from flask import flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -13,6 +13,7 @@ from app.main.views import main
 from app.models.application_layer import ApplicationComponent
 from app.models.archimate_core import ArchiMateElement
 from app.models.implementation_migration import Gap, Plateau, WorkPackage
+from app.models.unified_work_package import UnifiedWorkPackage
 
 
 @main.route("/applications/<int:id>/roadmap")
@@ -124,6 +125,50 @@ def application_roadmap(id):
                     else None,
                 }
             )
+
+        # The one work package store keeps rows created directly on it (an
+        # auto-generated work package, or the decommission work package from
+        # the retirement action). Rows merged in from the legacy store carry
+        # source_table and are already listed above through the legacy query,
+        # so only rows created on the store itself are appended here -- a
+        # decommission work package for this application appears on the
+        # roadmap through the same list.
+        unified_work_packages = []
+        try:
+            unified_work_packages = (
+                UnifiedWorkPackage.query.filter(
+                    UnifiedWorkPackage.organization_id == getattr(g, "current_org_id", None),
+                    UnifiedWorkPackage.application_component_id == id,
+                    UnifiedWorkPackage.source_table.is_(None),
+                )
+                .order_by(UnifiedWorkPackage.end_date.asc(), UnifiedWorkPackage.priority.desc())
+                .all()
+            )
+        except Exception:
+            db.session.rollback()
+        for uwp in unified_work_packages:
+            work_packages_list.append({
+                "id": uwp.id,
+                "name": uwp.name,
+                "description": uwp.description or "",
+                "transformation_type": uwp.element_type or "Modernization",
+                "assigned_to": uwp.assigned_to or "Unassigned",
+                "status": uwp.status,
+                "start_date": uwp.start_date.isoformat() if uwp.start_date else None,
+                "target_date": uwp.end_date.isoformat() if uwp.end_date else None,
+                "progress_percentage": 0,
+                "estimated_effort_hours": uwp.estimated_effort_hours or 0,
+                "priority": uwp.priority,
+                "sequence_order": 0,
+                "application_phase": uwp.togaf_phase or "Implementation",
+                "archimate_element": "ApplicationComponent",
+                "archimate_element_id": uwp.archimate_element_id,
+                "archimate_element_name": None,
+                "plateau_id": None,
+                "plateau_name": None,
+                "capability_id": None,
+                "capability_name": None,
+            })
 
         return render_template(
             "applications/roadmap.html",

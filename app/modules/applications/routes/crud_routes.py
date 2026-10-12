@@ -8,7 +8,7 @@ api_delete_application, api_bulk_consolidate.
 
 import json
 import logging
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from flask import (
     current_app,
@@ -342,6 +342,71 @@ def application_detail(id):
     from app.application_mgmt.routes import render_application_detail
 
     return render_application_detail(id)
+
+
+@unified_applications_bp.route("/<int:id>/retire", methods=["POST"])
+@login_required
+@audit_log("application_retire")
+def retire_application(id):
+    """Mark an application for retirement.
+
+    Creates exactly one decommission work package on the one work package
+    store through the one writer, linked to this application and carrying a
+    planned end date. Marking the application again returns the same single
+    row -- there is never a second decommission work package for one app.
+    """
+    org_id = g.current_org_id
+    app_obj = _verify_app_in_org(id, org_id, raise_not_found=True)
+
+    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.services.work_package_service import create_work_package
+
+    now_utc = datetime.utcnow()
+    planned_end = (request.form.get("end_date") or "").strip() or (
+        now_utc.date() + timedelta(days=365)
+    ).isoformat()
+
+    # The recorded reason travels in both the visible description and the
+    # structured marker (queryable and idempotent). source_type stays on the
+    # store's own vocabulary ("application" -- there is no retirement type),
+    # with the kind recorded in source_data.
+    marker = json.dumps({
+        "kind": "retirement",
+        "requested_at": now_utc.isoformat(),
+    })
+    existing = (
+        UnifiedWorkPackage.query.filter(
+            UnifiedWorkPackage.organization_id == org_id,
+            UnifiedWorkPackage.application_component_id == id,
+            UnifiedWorkPackage.source_type == "application",
+            UnifiedWorkPackage.source_data.like('%"kind": "retirement"%'),
+        )
+        .first()
+    )
+    if existing is not None:
+        flash(f"{app_obj.name} is already marked for retirement.", "info")
+        return redirect(url_for("unified_applications.application_detail", id=id))
+
+    create_work_package(
+        organization_id=org_id,
+        user_id=current_user.id,
+        name=f"Decommission {app_obj.name}",
+        description=(
+            f"Decommission work package: {app_obj.name} was marked for "
+            f"retirement from the application page on {now_utc.date().isoformat()} "
+            f"with a planned end date of {planned_end}."
+        ),
+        application_component_id=id,
+        end_date=planned_end,
+        status="planned",
+        priority="medium",
+        layer="implementation",
+        source_type="application",
+        source_data=marker,
+    )
+    db.session.commit()
+    flash(f"{app_obj.name} marked for retirement.", "success")
+    return redirect(url_for("unified_applications.application_detail", id=id))
 
 
 @unified_applications_bp.route("/<int:id>/fact-sheet")

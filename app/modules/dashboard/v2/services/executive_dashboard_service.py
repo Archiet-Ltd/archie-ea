@@ -7,6 +7,8 @@ VendorOrganization, and ArchiMateElement models.
 
 import logging
 
+from flask import g
+
 from app import db
 
 logger = logging.getLogger(__name__)
@@ -189,8 +191,20 @@ class ExecutiveDashboardService:
             return {"total": None, "covered": None, "percentage": None}
 
     def _get_portfolio_stats(self):
-        """Counts for solutions, applications, vendors, ArchiMate elements."""
-        stats = {"solutions": 0, "applications": 0, "vendors": 0, "archimate_elements": 0}
+        """Counts for solutions, applications, vendors, ArchiMate elements.
+
+        ``retiring_applications`` counts the applications marked for
+        retirement from the same rows that surfaced them: distinct
+        application ids among the decommission work packages on the one
+        work package store, so one retirement action contributes exactly
+        one to the count no matter how often it is repeated."""
+        stats = {
+            "solutions": 0,
+            "applications": 0,
+            "vendors": 0,
+            "archimate_elements": 0,
+            "retiring_applications": 0,
+        }
         try:
             from app.models.solution_models import Solution
 
@@ -218,6 +232,32 @@ class ExecutiveDashboardService:
             stats["archimate_elements"] = db.session.query(db.func.count(ArchiMateElement.id)).scalar() or 0
         except Exception as exc:
             logger.warning("Executive dashboard: ArchiMate count unavailable: %s", exc)
+
+        try:
+            from app.models.unified_work_package import UnifiedWorkPackage
+
+            org_id = getattr(g, "current_org_id", None)
+            if org_id is not None:
+                stats["retiring_applications"] = (
+                    db.session.query(
+                        db.func.count(
+                            db.func.distinct(UnifiedWorkPackage.application_component_id)
+                        )
+                    )
+                    .filter(
+                        UnifiedWorkPackage.organization_id == org_id,
+                        UnifiedWorkPackage.source_data.like('%"kind": "retirement"%'),
+                    )
+                    .scalar()
+                    or 0
+                )
+            else:
+                stats["retiring_applications"] = 0
+        except Exception as exc:
+            logger.warning(
+                "Executive dashboard: retiring application count unavailable: %s", exc
+            )
+            stats["retiring_applications"] = 0
 
         return stats
 

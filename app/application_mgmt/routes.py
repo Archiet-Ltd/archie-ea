@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 from flask import (
     current_app,
     flash,
+    g,
     jsonify,
     redirect,
     render_template,
@@ -2266,6 +2267,32 @@ def render_application_detail(id):
     except Exception:
         db.session.rollback()
 
+    # --- Work packages: the one work package store, scoped to this
+    # organisation and this application. A decommission work package created
+    # by the retirement action appears here with its planned end date.
+    app_work_packages = []
+    try:
+        from app.models.unified_work_package import UnifiedWorkPackage
+
+        unified_rows = (
+            UnifiedWorkPackage.query.filter(
+                UnifiedWorkPackage.organization_id == getattr(g, "current_org_id", None),
+                UnifiedWorkPackage.application_component_id == app_obj.id,
+            )
+            .order_by(UnifiedWorkPackage.end_date.asc(), UnifiedWorkPackage.id.desc())
+            .all()
+        )
+        app_work_packages = [
+            {
+                "name": wp.name,
+                "status": wp.status,
+                "target_date": wp.end_date or wp.start_date,
+            }
+            for wp in unified_rows
+        ]
+    except Exception:
+        db.session.rollback()
+
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
@@ -2343,7 +2370,7 @@ def render_application_detail(id):
         physical_facilities=[],
         physical_distribution_networks=[],
         physical_materials=[],
-        work_packages=[],
+        work_packages=app_work_packages,
         deliverables=[],
         plateaus=[],
         gaps=[],

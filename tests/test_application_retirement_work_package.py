@@ -56,7 +56,7 @@ class TestRetirementAction:
 
         org, user = _org_user(db_session, make_org, "retire-one")
         app_obj = _app(db_session, org, "Retire-Me")
-        user_id, app_id = user.id, app_obj.id
+        org_id, user_id, app_id = org.id, user.id, app_obj.id
         db_session.commit()
         db_session.expunge_all()
 
@@ -65,7 +65,7 @@ class TestRetirementAction:
 
         assert response.status_code in (302, 303)
         rows = UnifiedWorkPackage.query.filter(
-            UnifiedWorkPackage.organization_id == org.id,
+            UnifiedWorkPackage.organization_id == org_id,
             UnifiedWorkPackage.application_component_id == app_id,
         ).all()
         assert len(rows) == 1
@@ -88,7 +88,7 @@ class TestRetirementAction:
 
         org, user = _org_user(db_session, make_org, "retire-twice")
         app_obj = _app(db_session, org, "Retire-Idem")
-        user_id, app_id = user.id, app_obj.id
+        org_id, user_id, app_id = org.id, user.id, app_obj.id
         db_session.commit()
         db_session.expunge_all()
 
@@ -99,7 +99,7 @@ class TestRetirementAction:
         assert first.status_code in (302, 303)
         assert second.status_code in (302, 303)
         count = UnifiedWorkPackage.query.filter(
-            UnifiedWorkPackage.organization_id == org.id,
+            UnifiedWorkPackage.organization_id == org_id,
             UnifiedWorkPackage.application_component_id == app_id,
         ).count()
         assert count == 1
@@ -131,7 +131,6 @@ class TestRetirementAction:
 
         _login_read(db_session, client, login_as, user_id)
         client.post(f"/applications/{app_id}/retire")
-        db_session.expunge_all()
 
         roadmap = client.get(f"/applications/{app_id}/roadmap")
         assert roadmap.status_code == 200
@@ -145,7 +144,7 @@ class TestRetirementAction:
         org_a, user_a = _org_user(db_session, make_org, "retire-fence-a")
         org_b, _user_b = _org_user(db_session, make_org, "retire-fence-b")
         app_b = _app(db_session, org_b, "Retire-Foreign")
-        user_a_id, app_b_id = user_a.id, app_b.id
+        org_a_id, user_a_id, app_b_id = org_a.id, user_a.id, app_b.id
         db_session.commit()
         db_session.expunge_all()
 
@@ -154,7 +153,7 @@ class TestRetirementAction:
 
         assert response.status_code == 404
         count = UnifiedWorkPackage.query.filter(
-            UnifiedWorkPackage.organization_id == org_a.id,
+            UnifiedWorkPackage.organization_id == org_a_id,
             UnifiedWorkPackage.application_component_id == app_b_id,
         ).count()
         assert count == 0
