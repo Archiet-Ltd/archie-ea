@@ -9,7 +9,7 @@ import logging
 import threading
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from app import db
 from app.models import Job, JobStatus
@@ -26,13 +26,51 @@ class JobQueueService:
         self._shutdown_event = threading.Event()
         self._worker_thread: Optional[threading.Thread] = None
 
-    def create_job(self, name: str, task: str, payload: Optional[Dict[str, Any]] = None) -> Job:
-        """Create a new job in the queue."""
-        job = Job(name=name, task=task, payload=payload or {}, status=JobStatus.PENDING.value)
+    def create_job(
+        self,
+        name: str,
+        task: str,
+        payload: Optional[Dict[str, Any]] = None,
+        organization_id: Optional[int] = None,
+    ) -> Job:
+        """Create a new job in the queue.
+
+        A job that belongs to one organisation carries its id in the payload
+        (``organization_id``), which is where the worker and ``list_jobs`` read it.
+        """
+        payload = dict(payload or {})
+        if organization_id is not None:
+            payload["organization_id"] = organization_id
+        job = Job(name=name, task=task, payload=payload, status=JobStatus.PENDING.value)
         db.session.add(job)
         db.session.commit()
         logger.info(f"Created job {job.id}: {name}")
         return job
+
+    def list_jobs(
+        self,
+        organization_id: int,
+        limit: int = 50,
+        task: Optional[str] = None,
+        statuses: Optional[List[str]] = None,
+    ) -> List[Job]:
+        """Most recent jobs belonging to one organisation, newest first.
+
+        ``organization_id`` must be the caller's own organisation (``g.current_org_id``
+        or the organisation a worker is running for), never a value taken from a
+        request parameter: the argument is trusted as given. Only jobs whose payload
+        names this organisation are returned; a job with no organisation in its
+        payload (platform-wide work) is never listed here. ``task`` and ``statuses``
+        narrow the list to one task name and to jobs in any of those statuses.
+        """
+        query = Job.query.filter(
+            Job.payload["organization_id"].as_string() == str(organization_id)
+        )
+        if task is not None:
+            query = query.filter(Job.task == task)
+        if statuses:
+            query = query.filter(Job.status.in_(list(statuses)))
+        return query.order_by(Job.created_at.desc(), Job.id.desc()).limit(limit).all()
 
     def get_job(self, job_id: int) -> Optional[Job]:
         """Get a job by ID."""

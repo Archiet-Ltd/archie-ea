@@ -4291,7 +4291,7 @@ provides foundation for subsequent architecture development phases.
         """
         try:
             from app.models.workflow_models import WorkflowRunWatcher
-            from app.models.models import Notification
+            from app.services.notification_service import NotificationService
 
             watchers = WorkflowRunWatcher.query.filter_by(
                 workflow_instance_id=instance.id
@@ -4303,12 +4303,12 @@ provides foundation for subsequent architecture development phases.
             nested = db.session.begin_nested()
             try:
                 for watcher in watchers:
-                    notif = Notification(
+                    NotificationService.create(
                         user_id=watcher.user_id,
                         message=message,
                         url=f"/ea-workflows/instance/{instance.id}",
+                        organization_id=getattr(instance, "organization_id", None),
                     )
-                    db.session.add(notif)
                 nested.commit()
             except Exception:
                 nested.rollback()
