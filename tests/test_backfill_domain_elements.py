@@ -463,6 +463,13 @@ def test_backfill_one_bad_row_does_not_discard_the_batch(app):
             assert vc["created"] == 2, "good rows only"
             assert vc["errors"] == 1, "the unnamed row is an error, not a silent skip"
             assert vc["duplicates"] == []
+            # Error details must include the unnamed row's id.
+            assert len(vc["error_details"]) == 1
+            err_id, err_reason = vc["error_details"][0]
+            assert err_id is not None, "error details must include the record id"
+            assert "name" in err_reason.lower() or "title" in err_reason.lower(), (
+                "error reason must explain why the row failed"
+            )
 
             fresh = db.session.session_factory()
             try:

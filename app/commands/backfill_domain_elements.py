@@ -68,7 +68,8 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
     so instead of silently counting zero.
 
     Returns a dict with per-type stats:
-        {type_name: {"created": int, "scanned": int, "duplicates": [...], "errors": int}}
+        {type_name: {"created": int, "scanned": int, "duplicates": [...],
+                     "errors": int, "error_details": [(record_id, reason), ...]}}
     """
     from app.models.archimate_core import ArchiMateElement
     from app.services.archimate_backbone import ELEMENT_TYPES, sync_archimate_element
@@ -129,6 +130,7 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
 
         created = 0
         errors = 0
+        error_details = []
 
         if not dry_run:
             for record in records:
@@ -140,8 +142,10 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
                         element = sync_archimate_element(record, session=session)
                         if element is not None:
                             created += 1
-                except Exception:
+                except Exception as exc:
                     errors += 1
+                    record_id = getattr(record, "id", None)
+                    error_details.append((record_id, str(exc)))
 
             # Persist this type block before moving on. Without this the
             # command reports "Created N" and leaves nothing behind, and a
@@ -153,6 +157,7 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
             "scanned": len(records),
             "duplicates": duplicates,
             "errors": errors,
+            "error_details": error_details,
         }
 
     return stats
@@ -204,6 +209,12 @@ def backfill_domain_elements_command(org_id, dry_run):
                     f"  {type_name}: '{dup['name']}' -- "
                     f"kept id={dup['kept_id']}, removed ids={dup['removed_ids']}"
                 )
+
+    if total_errors:
+        click.echo(f"\nErrors: {total_errors}")
+        for type_name, s in stats.items():
+            for record_id, reason in s.get("error_details", []):
+                click.echo(f"  {type_name}: record id={record_id} -- {reason}")
 
     if total_scanned == 0:
         click.echo("\nEvery domain record already has an ArchiMate element. Nothing to do.")
