@@ -45,11 +45,6 @@ def _client_for(app, db_session, org, role="platform_admin"):
     return client, user
 
 
-@pytest.fixture
-def two_orgs(app, db_session, make_org):
-    org_a, org_b = make_org("regcheck-a"), make_org("regcheck-b")
-
-
 def _goal(db_session, org, name=None):
     from app.models.motivation import Goal
 
