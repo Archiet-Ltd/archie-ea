@@ -50,84 +50,68 @@ def overview():
         format_health_score,
     )
 
-    metrics = {
-        "applications": 0,
-        "vendors": 0,
-        "users": 0,
-        "active_sessions": 0,
-    }
-    try:
-        metrics["applications"] = (
-            db.session.query(db.func.count(ApplicationComponent.id)).scalar() or 0
-        )
-        metrics["vendors"] = (
-            db.session.query(db.func.count(VendorOrganization.id)).scalar() or 0
-        )
-        metrics["users"] = (
-            db.session.query(db.func.count(User.id))
-            .filter(User.organization_id == g.current_org_id)
-            .scalar()
-            or 0
-        )
+    # A figure the query could not produce is None (shown as a dash), never 0:
+    # a zero the reader cannot tell from a measured zero is worse than a gap.
+    def _measure(label, query):
+        try:
+            return query() or 0
+        except Exception as exc:
+            logger.warning("dashboard overview %s unavailable: %s", label, exc)
+            db.session.rollback()
+            return None
 
-        active_sessions_query = db.session.query(db.func.count(User.id)).filter(
+    metrics = {
+        "applications": _measure(
+            "application count",
+            lambda: db.session.query(db.func.count(ApplicationComponent.id)).scalar(),
+        ),
+        "vendors": _measure(
+            "vendor count",
+            lambda: db.session.query(db.func.count(VendorOrganization.id)).scalar(),
+        ),
+        "users": _measure(
+            "user count",
+            lambda: db.session.query(db.func.count(User.id))
+            .filter(User.organization_id == g.current_org_id)
+            .scalar(),
+        ),
+    }
+
+    def _active_sessions():
+        query = db.session.query(db.func.count(User.id)).filter(
             User.organization_id == g.current_org_id
         )
         if hasattr(User, "confirmed"):
-            active_sessions_query = active_sessions_query.filter(User.confirmed.is_(True))
-        metrics["active_sessions"] = active_sessions_query.scalar() or 0
-    except Exception as exc:
-        logger.warning("dashboard overview core metrics unavailable: %s", exc)
-        db.session.rollback()
+            query = query.filter(User.confirmed.is_(True))
+        return query.scalar()
+
+    metrics["active_sessions"] = _measure("active session count", _active_sessions)
 
     # Navigation hub stats
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.consolidation_list import ConsolidationListEntry
+    from app.models.solution_models import Solution
+
     nav_stats = {
-        "elements": 0,
-        "relationships": 0,
-        "consolidation": 0,
-        "solutions": 0,
-        "capabilities": 0,
+        "elements": _measure(
+            "element count", lambda: db.session.query(db.func.count(ArchiMateElement.id)).scalar()
+        ),
+        "relationships": _measure(
+            "relationship count",
+            lambda: db.session.query(db.func.count(ArchiMateRelationship.id)).scalar(),
+        ),
+        "consolidation": _measure(
+            "consolidation count",
+            lambda: db.session.query(db.func.count(ConsolidationListEntry.id)).scalar(),
+        ),
+        "solutions": _measure(
+            "solution count", lambda: db.session.query(db.func.count(Solution.id)).scalar()
+        ),
+        "capabilities": _measure(
+            "capability count",
+            lambda: db.session.query(db.func.count(BusinessCapability.id)).scalar(),
+        ),
     }
-    try:
-        from app.models.archimate_core import ArchiMateElement
-
-        nav_stats["elements"] = (
-            db.session.query(db.func.count(ArchiMateElement.id)).scalar() or 0
-        )
-    except Exception:
-        db.session.rollback()
-
-    try:
-        from app.models.archimate_core import ArchiMateRelationship
-
-        nav_stats["relationships"] = (
-            db.session.query(db.func.count(ArchiMateRelationship.id)).scalar() or 0
-        )
-    except Exception:
-        db.session.rollback()
-
-    try:
-        from app.models.consolidation_list import ConsolidationListEntry
-
-        nav_stats["consolidation"] = (
-            db.session.query(db.func.count(ConsolidationListEntry.id)).scalar() or 0
-        )
-    except Exception:
-        db.session.rollback()
-
-    try:
-        from app.models.solution_models import Solution
-
-        nav_stats["solutions"] = db.session.query(db.func.count(Solution.id)).scalar() or 0
-    except Exception:
-        db.session.rollback()
-
-    try:
-        nav_stats["capabilities"] = (
-            db.session.query(db.func.count(BusinessCapability.id)).scalar() or 0
-        )
-    except Exception:
-        db.session.rollback()
 
     # Per-ArchiMate-3.2-layer element counts, driving the dashboard's by-layer
     # architecture lens (replacing the ambiguous "Architect"/"Business" persona
@@ -606,8 +590,15 @@ def overview():
     # ApplicationCapabilityMapping counts collected while building capability_health.
     capability_mapping_count = sum(c.get("app_count", 0) for c in capability_health)
     applications_count = metrics.get("applications") or 0
+    # An application count that could not be read is not a sparse estate: the
+    # guided setup view tells a person their portfolio is empty, so it is shown
+    # only when the count was measured.
     dashboard_mode = (
-        "guided" if applications_count < 5 and capability_mapping_count == 0 else "data"
+        "guided"
+        if metrics.get("applications") is not None
+        and applications_count < 5
+        and capability_mapping_count == 0
+        else "data"
     )
 
     guided_steps = []
