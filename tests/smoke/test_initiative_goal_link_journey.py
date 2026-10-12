@@ -19,6 +19,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 def _seed(org_id):
     from app import create_app, db
+    from app.models.archimate_core import ArchiMateElement
     from app.models.motivation import Goal
     from app.models.vendor.vendor_organization import EnterpriseInitiative
 
@@ -26,9 +27,17 @@ def _seed(org_id):
     suffix = uuid.uuid4().hex[:6]
     with app.app_context():
         goal = Goal(name="Grow Retail %s" % suffix, organization_id=org_id)
+        distractor = Goal(name="Grow Wholesale %s" % suffix, organization_id=org_id)
         linked = EnterpriseInitiative(name="Digital Checkout %s" % suffix, organization_id=org_id)
         bare = EnterpriseInitiative(name="Back Office Tidy %s" % suffix, organization_id=org_id)
-        db.session.add_all([goal, linked, bare])
+        db.session.add_all([goal, distractor, linked, bare])
+        db.session.flush()
+        for g in (goal, distractor):
+            if g.archimate_element_id is None:
+                el = ArchiMateElement(name=g.name, type="Goal", layer="motivation", organization_id=org_id)
+                db.session.add(el)
+                db.session.flush()
+                g.archimate_element_id = el.id
         db.session.commit()
         out = {"goal": goal.name, "linked": linked.name, "linked_id": linked.id, "bare": bare.name}
         db.session.remove()
@@ -52,7 +61,9 @@ def test_architect_links_an_initiative_to_a_goal(browser, live_server):
               wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     section = page.locator("#initiative-goals")
     expect(section).to_contain_text("No objective recorded")
-    section.locator("#initiative-goal-id").select_option(label=seeded["goal"])
+    picker = section.get_by_role("combobox", name="Type a goal name")
+    picker.fill(seeded["goal"])
+    section.get_by_role("option", name=seeded["goal"]).click()
     section.locator("#initiative-goal-level").select_option("primary")
     with page.expect_navigation(timeout=PAGE_TIMEOUT):
         section.get_by_role("button", name="Link goal").click()

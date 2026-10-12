@@ -48,9 +48,17 @@ def _client_for(app, db_session, org, role="platform_admin"):
 def _goal(db_session, org, name=None):
     from app.models.motivation import Goal
 
+    from app.models.archimate_core import ArchiMateElement
+
     goal = Goal(name=name or "Goal %s" % uuid.uuid4().hex[:6], organization_id=org.id)
     db_session.add(goal)
     db_session.flush()
+    if goal.archimate_element_id is None:
+        element = ArchiMateElement(name=goal.name, type="Goal", layer="motivation", organization_id=org.id)
+        db_session.add(element)
+        db_session.flush()
+        goal.archimate_element_id = element.id
+        db_session.flush()
     return goal
 
 
@@ -80,7 +88,7 @@ def test_link_is_saved_and_listed(world, db_session):
     org, client, _ = world["a"]
     goal, initiative = _goal(db_session, org), _initiative(db_session, org)
     resp = _post(client, "/portfolio/initiatives/%d/goals" % initiative.id,
-                 {"goal_id": goal.id, "contribution_level": "primary"})
+                 {"element_id": goal.archimate_element_id, "contribution_level": "primary"})
     assert resp.status_code == 302
     from app.modules.portfolio.services.initiative_goal_links import list_links
 
@@ -95,7 +103,7 @@ def test_link_is_saved_and_listed(world, db_session):
 def test_goal_trace_sees_the_link(world, db_session):
     org, client, _ = world["a"]
     goal, initiative = _goal(db_session, org), _initiative(db_session, org)
-    _post(client, "/portfolio/initiatives/%d/goals" % initiative.id, {"goal_id": goal.id})
+    _post(client, "/portfolio/initiatives/%d/goals" % initiative.id, {"element_id": goal.archimate_element_id})
     from app.modules.architecture.services.motivation_layer_service import MotivationLayerService
 
     trace = MotivationLayerService.get_goal_trace(goal.id, org.id)
@@ -106,7 +114,7 @@ def test_goal_trace_sees_the_link(world, db_session):
 def test_link_can_be_removed(world, db_session):
     org, client, _ = world["a"]
     goal, initiative = _goal(db_session, org), _initiative(db_session, org)
-    _post(client, "/portfolio/initiatives/%d/goals" % initiative.id, {"goal_id": goal.id})
+    _post(client, "/portfolio/initiatives/%d/goals" % initiative.id, {"element_id": goal.archimate_element_id})
     _post(client, "/portfolio/initiatives/%d/goals/%d/remove" % (initiative.id, goal.id))
     from app.modules.portfolio.services.initiative_goal_links import list_links
 
@@ -144,7 +152,7 @@ def test_other_organisations_goal_cannot_be_linked(world, db_session):
     org_b = world["b"][0]
     foreign_goal = _goal(db_session, org_b)
     initiative = _initiative(db_session, org_a)
-    _post(client_a, "/portfolio/initiatives/%d/goals" % initiative.id, {"goal_id": foreign_goal.id})
+    _post(client_a, "/portfolio/initiatives/%d/goals" % initiative.id, {"element_id": foreign_goal.archimate_element_id})
     from app.modules.portfolio.services.initiative_goal_links import list_links
 
     assert list_links(initiative.id) == []
@@ -155,7 +163,7 @@ def test_other_organisation_cannot_change_an_initiative(world, db_session):
     _, client_b, _ = world["b"]
     initiative = _initiative(db_session, org_a)
     goal = _goal(db_session, org_a)
-    resp = _post(client_b, "/portfolio/initiatives/%d/goals" % initiative.id, {"goal_id": goal.id})
+    resp = _post(client_b, "/portfolio/initiatives/%d/goals" % initiative.id, {"element_id": goal.archimate_element_id})
     assert resp.status_code == 404
     from app.models.motivation import initiative_goals
 
@@ -169,7 +177,7 @@ def test_list_of_initiatives_serving_no_objective(world, db_session):
     org, client, _ = world["a"]
     linked, bare = _initiative(db_session, org), _initiative(db_session, org)
     goal = _goal(db_session, org)
-    _post(client, "/portfolio/initiatives/%d/goals" % linked.id, {"goal_id": goal.id})
+    _post(client, "/portfolio/initiatives/%d/goals" % linked.id, {"element_id": goal.archimate_element_id})
     _clear_login_cache()
     page = client.get("/portfolio/?filter=no-objective").get_data(as_text=True)
     assert bare.name in page
@@ -202,3 +210,27 @@ def test_unlinked_list_never_shows_another_organisations_initiatives(world, db_s
     _clear_login_cache()
     page = client_b.get("/portfolio/?filter=no-objective").get_data(as_text=True)
     assert bare_a.name not in page
+
+
+def test_element_that_is_not_a_goal_is_refused(world, db_session):
+    from app.models.archimate_core import ArchiMateElement
+
+    org, client, _ = world["a"]
+    initiative = _initiative(db_session, org)
+    node = ArchiMateElement(name="Plain node", type="Node", layer="technology", organization_id=org.id)
+    db_session.add(node)
+    db_session.flush()
+    _post(client, "/portfolio/initiatives/%d/goals" % initiative.id, {"element_id": node.id})
+    from app.modules.portfolio.services.initiative_goal_links import list_links
+
+    assert list_links(initiative.id) == []
+
+
+def test_missing_element_is_refused_with_a_message(world, db_session):
+    org, client, _ = world["a"]
+    initiative = _initiative(db_session, org)
+    resp = _post(client, "/portfolio/initiatives/%d/goals" % initiative.id, {})
+    assert resp.status_code == 302
+    _clear_login_cache()
+    page = client.get("/portfolio/%d" % initiative.id).get_data(as_text=True)
+    assert "data-goal-picker" in page

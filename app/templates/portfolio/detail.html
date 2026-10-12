@@ -84,19 +84,15 @@
     {% else %}
     <p class="text-sm text-muted-foreground">No objective recorded &mdash; this initiative is not yet tied to a goal.</p>
     {% endif %}
-    {% if available_goals %}
+    {% if 'intelligence_ui.twin_map' in flask.current_app.view_functions %}
+    {% from 'intelligence/_entity_picker.html' import entity_picker with context %}
     <form method="post" action="{{ url_for('portfolio.initiative_goal_add', initiative_id=initiative.id) }}"
-          class="mt-4 flex flex-wrap items-end gap-3">
+          class="mt-4 flex flex-wrap items-end gap-3" x-data="elementChoice('goalpick', 'Goal')" data-goal-picker>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="element_id" :value="chosenId">
       <div class="flex-1 min-w-[16rem]">
-        <label for="initiative-goal-id" class="block text-xs font-medium mb-1">Goal this initiative serves</label>
-        <select id="initiative-goal-id" name="goal_id" required
-                class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
-          <option value="">Select a goal</option>
-          {% for goal in available_goals %}
-          <option value="{{ goal.id }}">{{ goal.name }}</option>
-          {% endfor %}
-        </select>
+        <label class="block text-xs font-medium mb-1">Goal this initiative serves</label>
+        {{ entity_picker('goalpick', prompt='Type a goal name') }}
       </div>
       <div>
         <label for="initiative-goal-level" class="block text-xs font-medium mb-1">Contribution</label>
@@ -108,13 +104,13 @@
           {% endfor %}
         </select>
       </div>
-      <button type="submit"
-              class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90">
+      <button type="submit" :disabled="!chosenId"
+              class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
         Link goal
       </button>
     </form>
-    {% elif not goal_links %}
-    <p class="text-xs text-muted-foreground mt-2">No goals exist yet to link to.</p>
+    {% else %}
+    <p class="text-xs text-muted-foreground mt-2">Goal search is not available right now.</p>
     {% endif %}
   </div>
 
@@ -464,4 +460,10 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/portfolio/element_choice.js') }}"></script>
 {% endblock %}
