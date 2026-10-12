@@ -75,24 +75,22 @@ def demand_new():
     from flask import render_template
 
     from app.models.demand import DEMAND_SOURCES, Demand
-    from app.modules.portfolio.services.demand_triage import visible_capabilities
-
-    capabilities = visible_capabilities()
+    from app.modules.portfolio.services.demand_triage import capability_for_element
 
     if request.method == "POST":
         title = (request.form.get("title") or "").strip()
-        capability_id = _int_or_none(request.form.get("capability_id"))
-        if capability_id is not None and capability_id not in {c.id for c in capabilities}:
-            flash("That capability could not be found.", "error")
+        element_id = _int_or_none(request.form.get("capability_element_id"))
+        capability = capability_for_element(element_id) if element_id is not None else None
+        if element_id is not None and capability is None:
+            flash("That element is not a capability you can use.", "error")
             return render_template(
-                "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form,
-                capabilities=capabilities,
+                "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form
             ), 400
+        capability_id = capability.id if capability is not None else None
         if not title:
             flash("A title is required.", "error")
             return render_template(
-                "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form,
-                capabilities=capabilities,
+                "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form
             ), 400
 
         demand = Demand(
@@ -115,9 +113,7 @@ def demand_new():
         flash("Demand submitted.", "success")
         return redirect(url_for("portfolio.demands"))
 
-    return render_template(
-        "portfolio/demand_form.html", sources=DEMAND_SOURCES, form={}, capabilities=capabilities
-    )
+    return render_template("portfolio/demand_form.html", sources=DEMAND_SOURCES, form={})
 
 
 @portfolio_bp.route("/demands/<int:demand_id>/decide", methods=["POST"])
