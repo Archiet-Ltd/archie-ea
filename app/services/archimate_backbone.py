@@ -188,6 +188,11 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
     from app import db
 
     session = session or db.session
+    # Resolve the underlying Session instance.  _on_before_flush receives the
+    # underlying session, but callers may pass the scoped_session proxy; using
+    # the same object for the re-entry guard key ensures the guard matches.
+    if hasattr(session, 'registry'):
+        session = session.registry()
     type_name = type(obj).__name__
     mapping = ELEMENT_TYPES.get(type_name)
     if mapping is None:
@@ -234,10 +239,10 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
         description = _first_attr(obj, DESCRIPTION_FIELDS)
         if description is None and type_name in DESCRIPTION_TEMPLATES:
             template = DESCRIPTION_TEMPLATES[type_name]
-            name_for_desc = name
+            fmt_args = {"name": name}
             if type_name == "ApplicationInterface":
-                name_for_desc = getattr(obj, "interface_type", name)
-            description = template.format(name=name_for_desc)
+                fmt_args["interface_type"] = getattr(obj, "interface_type", name)
+            description = template.format(**fmt_args)
 
         element = create_backbone_element(
             element_type=element_type,
