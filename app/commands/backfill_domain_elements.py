@@ -11,9 +11,20 @@ Usage:
 The command is idempotent: running it again on a fully-linked organisation
 creates nothing and reports no duplicates.
 
+The command commits once per type block, so what it reports as created is
+really persisted, and each record is created inside its own savepoint: one
+unrepresentable row (a row with no name/title to mirror, for example) is
+counted as an error and rolled back on its own without discarding the rest of
+the batch.
+
 Duplicates: when a domain record has more than one ArchiMateElement pointing
 at it, the oldest element (lowest id) is kept and the others are listed with
 their ids. No element is ever silently removed.
+
+Elements are written by exactly one helper -- ``sync_archimate_element`` from
+app/services/archimate_backbone.py, the same helper the flush listener uses --
+so a backfilled element carries the same name fallback, description and
+provenance property as a listener-created one.
 """
 
 import click
@@ -22,42 +33,20 @@ from flask.cli import with_appcontext
 from app import db
 
 
-# Each entry: (model_class, name_field, element_type, element_layer,
-#              description_template)
-# The model_class is imported lazily inside the handler.
+# Every domain record of the nine types must have exactly one element node.
+# Each entry is the dotted path of the domain model. The element mapping
+# (type, layer, name fallback, description, provenance) lives in ONE place --
+# ELEMENT_TYPES in app/services/archimate_backbone.py -- so a backfilled
+# element and a listener-created element can never drift apart.
 _DOMAIN_TYPES = [
-    # application
-    ("app.models.application_portfolio.ApplicationComponent",
-     "name", "ApplicationComponent", "Application",
-     "Application: {name}"),
-    # capability
-    ("app.models.business_capabilities.BusinessCapability",
-     "name", "Capability", "Strategy",
-     "Business capability: {name}"),
-    # risk
-    ("app.models.risk.Risk",
-     "title", "Assessment", "Motivation",
-     "Risk: {title}"),
-    # contract
-    ("app.models.application_portfolio.VendorContract",
-     "contract_name", "Contract", "Business",
-     "Vendor contract: {contract_name}"),
-    # interface
-    ("app.models.application_layer.ApplicationInterface",
-     "name", "ApplicationInterface", "Application",
-     "{interface_type} interface"),
-    # data entity
-    ("app.models.process_data.DataEntity",
-     "name", "DataObject", "application",
-     "Data object for entity: {name}"),
-    # work package
-    ("app.models.implementation_migration.WorkPackage",
-     "name", "WorkPackage", "Implementation",
-     "Work package: {name}"),
-    # compliance control
-    ("app.models.application_compliance.ApplicationComplianceControl",
-     "id", "BusinessObject", "Business",
-     "Compliance control mapping: app={application_id}, control={control_id}"),
+    "app.models.application_portfolio.ApplicationComponent",
+    "app.models.business_capabilities.BusinessCapability",
+    "app.models.risk.Risk",
+    "app.models.application_portfolio.VendorContract",
+    "app.models.application_layer.ApplicationInterface",
+    "app.models.process_data.DataEntity",
+    "app.models.implementation_migration.WorkPackage",
+    "app.models.application_compliance.ApplicationComplianceControl",
 ]
 
 
@@ -68,30 +57,15 @@ def _import_model(path):
     return getattr(module, class_name)
 
 
-def _resolve_name(row, name_field):
-    """Get the display name from a row, handling different field names."""
-    value = getattr(row, name_field, None)
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    return f"{row.__class__.__name__}-{row.id}"
-
-
-def _truncate_name(name, max_len=100):
-    """Truncate a name to fit ArchiMateElement.name (String(100))."""
-    if len(name) <= max_len:
-        return name
-    return name[: max_len - 1] + "\u2026"
-
-
 def backfill_domain_elements(org_id, dry_run=False, session=None):
     """Create missing ArchiMate elements for every domain record type.
 
     ``session`` is optional; defaults to ``db.session``. Pass an explicit
     session in tests that wrap ``db.session`` in a rollback transaction.
 
-    Uses ``sync_archimate_element`` from the backbone for types that are
-    mapped in ``ELEMENT_TYPES`` (Risk, WorkPackage, ApplicationComplianceControl),
-    falling back to direct creation for other domain types.
+    Every listed type must be mapped in ``ELEMENT_TYPES``; there is no second
+    writer to fall back to, so an unmapped type is a bug and the command says
+    so instead of silently counting zero.
 
     Returns a dict with per-type stats:
         {type_name: {"created": int, "scanned": int, "duplicates": [...], "errors": int}}
@@ -104,9 +78,14 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
 
     stats = {}
 
-    for model_path, name_field, element_type, element_layer, desc_template in _DOMAIN_TYPES:
+    for model_path in _DOMAIN_TYPES:
         model = _import_model(model_path)
         type_key = model.__name__
+        if type_key not in ELEMENT_TYPES:
+            raise KeyError(
+                "%s is not mapped in archimate_backbone.ELEMENT_TYPES; "
+                "there is no fallback writer for it" % type_key
+            )
 
         # Find records in this organisation that have no element
         records = session.query(model).filter(
@@ -126,7 +105,7 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
             # (orphans that may be duplicates of each other)
             orphan_query = session.query(ArchiMateElement).filter(
                 ArchiMateElement.organization_id == org_id,
-                ArchiMateElement.type == element_type,
+                ArchiMateElement.type == ELEMENT_TYPES[type_key][0],
             )
             if linked_ids:
                 orphan_query = orphan_query.filter(~ArchiMateElement.id.in_(linked_ids))
@@ -154,35 +133,20 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
         if not dry_run:
             for record in records:
                 try:
-                    # Use sync_archimate_element for types mapped in the
-                    # backbone (creates with provenance, name rules, org check).
-                    if type_key in ELEMENT_TYPES:
+                    # The one element writer -- the same helper the flush
+                    # listener uses. Each record runs inside its own
+                    # savepoint so a failure rolls back just that record.
+                    with session.begin_nested():
                         element = sync_archimate_element(record, session=session)
                         if element is not None:
                             created += 1
-                    else:
-                        # Fallback for unmapped types: create directly.
-                        name = _resolve_name(record, name_field)
-                        element = ArchiMateElement(
-                            name=_truncate_name(name),
-                            type=element_type,
-                            layer=element_layer,
-                            description=desc_template.format(
-                                **{k: getattr(record, k, "") for k in
-                                   ["name", "title", "contract_name", "interface_type"]}
-                            ) if desc_template else None,
-                            organization_id=org_id,
-                        )
-                        session.add(element)
-                        session.flush()
-                        record.archimate_element_id = element.id
-                        created += 1
                 except Exception:
-                    session.rollback()
                     errors += 1
 
-            if created:
-                session.flush()
+            # Persist this type block before moving on. Without this the
+            # command reports "Created N" and leaves nothing behind, and a
+            # later rollback would silently discard the whole run.
+            session.commit()
 
         stats[type_key] = {
             "created": created,

@@ -1,8 +1,10 @@
 """Tests for the per-organisation domain-element backfill command.
 
 Creates missing ArchiMate elements for every domain record type in one
-organisation. Must be idempotent, respect tenant boundaries, report duplicates,
-and never silently remove elements.
+organisation. Must persist what it reports (fresh sessions see the elements
+and the back-links), isolate one bad row per record (a savepoint, not a whole
+batch rollback), write elements through the same helper the flush listener
+uses, and never silently remove elements.
 """
 
 import pytest
@@ -22,6 +24,90 @@ def _clear_element(db_session, record):
             db_session.flush()
             db_session.delete(el)
             db_session.flush()
+
+
+def _seed_orgs(app, labels):
+    """Create one organisation per label, really committed.
+
+    The persistence tests below cannot use the db_session fixture: they must
+    prove the command's work is visible to a fresh session on another
+    connection, which requires a real commit of the seed as well.
+    """
+    from app import db
+    from app.models.organization import Organization
+    import uuid
+
+    suffix = uuid.uuid4().hex[:8]
+    orgs = {}
+    with app.app_context():
+        for label in labels:
+            org = Organization(name=f"Test {label} {suffix}", slug=f"test-{label}-{suffix}")
+            db.session.add(org)
+            orgs[label] = org
+        db.session.commit()
+        return {label: org.id for label, org in orgs.items()}
+
+
+def _seed_contract(app, org_id, contract_name, description=None):
+    """Insert a VendorContract with plain SQL.
+
+    The SQL insert bypasses the model's before_insert element mirror, so the
+    row reaches the database without an element -- exactly the legacy data the
+    backfill exists for. Really committed.
+    """
+    from app import db
+    from sqlalchemy import text
+
+    with app.app_context():
+        row_id = db.session.execute(
+            text(
+                """
+                INSERT INTO vendor_contracts
+                    (contract_name, contract_description, start_date, organization_id)
+                VALUES
+                    (:name, :description, '2026-01-01', :org_id)
+                RETURNING id
+                """
+            ),
+            {"name": contract_name, "description": description, "org_id": org_id},
+        ).scalar()
+        db.session.commit()
+        return row_id
+
+
+def _cleanup(app, org_ids):
+    """Delete everything the app-context tests created.
+
+    An organisation cannot be deleted while the append-only transformation
+    outbox holds element events for it, so the delete runs with the app's own
+    repair flag enabled -- the same escape hatch the app's envelope-repair
+    flows use (app/models/transformation_db_guards.py) -- scoped to this
+    deletion only.
+    """
+    from app import db
+    from sqlalchemy import text
+
+    with app.app_context():
+        db.session.execute(text("SELECT set_config('archie.signed_envelope_repair', 'on', true)"))
+        db.session.execute(
+            text("DELETE FROM transformation_outbox_events WHERE organization_id = ANY(:ids)"),
+            {"ids": list(org_ids)},
+        )
+        for table, column in (
+            ("work_packages", "organization_id"),
+            ("application_components", "organization_id"),
+            ("vendor_contracts", "organization_id"),
+            ("archimate_elements", "organization_id"),
+        ):
+            db.session.execute(
+                text(f"DELETE FROM {table} WHERE {column} = ANY(:ids)"),
+                {"ids": list(org_ids)},
+            )
+        db.session.execute(
+            text("DELETE FROM organizations WHERE id = ANY(:ids)"),
+            {"ids": list(org_ids)},
+        )
+        db.session.commit()
 
 
 def test_backfill_creates_missing_elements(db_session, make_org, tenant_ctx):
@@ -188,7 +274,7 @@ def test_every_record_type_has_a_handler():
         "WorkPackage",
         "ApplicationComplianceControl",
     }
-    actual_types = {path.rsplit(".", 1)[1] for path, _, _, _, _ in _DOMAIN_TYPES}
+    actual_types = {path.rsplit(".", 1)[1] for path in _DOMAIN_TYPES}
     assert expected_types == actual_types, (
         f"backfill must handle all domain types. "
         f"Missing: {expected_types - actual_types}. "
@@ -268,3 +354,230 @@ def test_backfill_reports_duplicates_with_kept_and_removed_ids(
         dup = dups[0]
         assert dup["kept_id"] == min(ids)
         assert sorted(dup["removed_ids"]) == sorted(ids[1:])
+
+
+def test_backfill_commits_and_fresh_session_sees_elements_and_links(app):
+    """The command persists its work: elements and back-links are visible to a
+    session created after the run, from outside the session the command used
+    (fails on the no-commit revision: zero persisted)."""
+    from sqlalchemy import text
+
+    from app import db
+    from app.commands.backfill_domain_elements import backfill_domain_elements
+    from app.models.application_portfolio import VendorContract
+
+    orgs = _seed_orgs(app, ["bf-e2e-a", "bf-e2e-b"])
+    try:
+        with app.app_context():
+            _seed_contract(app, orgs["bf-e2e-a"], "End to End A", "Desc A")
+            _seed_contract(app, orgs["bf-e2e-b"], "End to End B", "Desc B")
+
+            stats = backfill_domain_elements(orgs["bf-e2e-a"])
+            assert stats["VendorContract"]["created"] == 1
+
+            # Fresh query outside the session the command ran in.
+            fresh = db.session.session_factory()
+            try:
+                a_row = fresh.query(VendorContract).filter_by(
+                    organization_id=orgs["bf-e2e-a"],
+                ).one()
+                assert a_row.archimate_element_id is not None
+                element = fresh.get(ArchiMateElement, a_row.archimate_element_id)
+                assert element is not None
+                assert element.organization_id == orgs["bf-e2e-a"]
+                assert element.name == "End to End A"
+                assert element.type == "Contract"
+
+                # The other organisation's row is never returned, changed or named.
+                b_row = fresh.query(VendorContract).filter_by(
+                    organization_id=orgs["bf-e2e-b"],
+                ).one()
+                assert b_row.archimate_element_id is None
+                other_elements = fresh.query(ArchiMateElement).filter_by(
+                    organization_id=orgs["bf-e2e-b"],
+                ).count()
+                assert other_elements == 0
+            finally:
+                fresh.close()
+    finally:
+        _cleanup(app, list(orgs.values()))
+
+
+def test_backfill_one_bad_row_does_not_discard_the_batch(app):
+    """One unrepresentable row (no name to mirror) is rolled back on its own
+    and counted as an error; every good row before and after it is persisted.
+    Counts reflect the persisted rows, not the attempted ones (fails on the
+    per-record full-rollback revision: zero persisted)."""
+    from app import db
+    from app.commands.backfill_domain_elements import backfill_domain_elements
+    from app.models.application_portfolio import VendorContract
+
+    orgs = _seed_orgs(app, ["bf-batch-a", "bf-batch-b"])
+    try:
+        with app.app_context():
+            _seed_contract(app, orgs["bf-batch-a"], "Batch Good A")
+            _seed_contract(app, orgs["bf-batch-a"], "")
+            _seed_contract(app, orgs["bf-batch-a"], "Batch Good B")
+            _seed_contract(app, orgs["bf-batch-b"], "Batch Other Org")
+
+            stats = backfill_domain_elements(orgs["bf-batch-a"])
+            vc = stats["VendorContract"]
+            assert vc["created"] == 2, "good rows only"
+            assert vc["errors"] == 1, "the unnamed row is an error, not a silent skip"
+            assert vc["duplicates"] == []
+
+            fresh = db.session.session_factory()
+            try:
+                rows = {
+                    r.contract_name: r
+                    for r in fresh.query(VendorContract).all()
+                }
+                assert rows["Batch Good A"].archimate_element_id is not None
+                assert rows["Batch Good B"].archimate_element_id is not None
+                assert rows[""].archimate_element_id is None
+
+                group = fresh.query(ArchiMateElement).filter(
+                    ArchiMateElement.organization_id == orgs["bf-batch-a"],
+                ).all()
+                assert len(group) == 2, "persisted rows only"
+
+                # The bad batch in org A never touches org B's rows.
+                assert fresh.query(ArchiMateElement).filter_by(
+                    organization_id=orgs["bf-batch-b"],
+                ).count() == 0
+            finally:
+                fresh.close()
+    finally:
+        _cleanup(app, list(orgs.values()))
+
+
+def test_backfill_uses_the_same_writer_as_a_listener_created_element(
+    db_session, make_org, tenant_ctx,
+):
+    """A backfilled element carries the same name fallback, description and
+    provenance property as the element the shared writer -- the helper the
+    flush listener uses -- produces for an identical row (fails on the
+    fallback-writer revision)."""
+    from app.commands.backfill_domain_elements import backfill_domain_elements
+    from app.models.application_portfolio import ApplicationComponent
+    from app.services.archimate_backbone import sync_archimate_element
+
+    org = make_org("bf-one-writer")
+    with tenant_ctx(org.id):
+        a = ApplicationComponent(
+            name="Writer", description="Shared description", organization_id=org.id,
+        )
+        b = ApplicationComponent(
+            name="Writer", description="Shared description", organization_id=org.id,
+        )
+        db_session.add_all([a, b])
+        db_session.flush()
+        _clear_element(db_session, a)
+        _clear_element(db_session, b)
+
+        # Reference element: created by the one writer the flush listener uses.
+        reference = sync_archimate_element(a, session=db_session)
+        assert reference is not None
+
+        stats = backfill_domain_elements(org.id, session=db_session)
+        assert stats["ApplicationComponent"]["created"] == 1
+
+        backfilled = db_session.get(ArchiMateElement, b.archimate_element_id)
+        assert backfilled is not None
+        assert backfilled.name == reference.name == "Writer"
+        assert backfilled.description == reference.description == "Shared description"
+        assert backfilled.type == reference.type == "ApplicationComponent"
+        assert backfilled.layer == reference.layer == "Application"
+        assert backfilled.organization_id == reference.organization_id == org.id
+        assert backfilled.custom_properties == reference.custom_properties
+        assert backfilled.custom_properties == {"source_model": "ApplicationComponent"}
+
+
+def test_backfill_rollback_path_leaves_exactly_one_element_per_row(app):
+    """The rollback path: a work package flushed before the command runs keeps
+    its element (the command commits each type block), a work package added in
+    the same session after a rollback gets exactly one element, and a row that
+    is rolled back has none (fails on the no-commit revision: the flushed
+    element vanishes with the rollback)."""
+    from app import db
+    from app.commands.backfill_domain_elements import backfill_domain_elements
+    from app.models.application_portfolio import VendorContract
+    from app.models.implementation_migration import WorkPackage
+
+    orgs = _seed_orgs(app, ["bf-rb"])
+    org_id = orgs["bf-rb"]
+    try:
+        with app.app_context():
+            # A row for the command to do real work on.
+            _seed_contract(app, org_id, "Backfill Target")
+
+            wp1 = WorkPackage(
+                name="Flushed First", context="application", organization_id=org_id,
+            )
+            db.session.add(wp1)
+            db.session.flush()
+            flushed_element_id = wp1.archimate_element_id
+            assert flushed_element_id is not None  # element created by the flush listener
+
+            # The command commits each type block, so the flushed element above
+            # is persisted by the run itself.
+            stats = backfill_domain_elements(org_id)
+            assert stats["VendorContract"]["created"] == 1
+
+            # Roll the session back. On the fixed command nothing pending is
+            # lost; on the no-commit revision this discards the flushed
+            # element and the run's own creations.
+            db.session.rollback()
+            db.session.expire_all()
+
+            # A work package rolled back must leave nothing behind.
+            doomed = WorkPackage(
+                name="Rolled Back Row", context="application", organization_id=org_id,
+            )
+            db.session.add(doomed)
+            db.session.flush()
+            db.session.rollback()
+            db.session.expire_all()
+
+            # Another work package in the same session: exactly one element,
+            # and the two earlier work packages keep exactly one each.
+            survivor = WorkPackage(
+                name="Added After", context="application", organization_id=org_id,
+            )
+            db.session.add(survivor)
+            db.session.flush()
+            assert survivor.archimate_element_id is not None
+            db.session.commit()
+
+            fresh = db.session.session_factory()
+            try:
+                rows = {
+                    r.name: r
+                    for r in fresh.query(WorkPackage).filter_by(organization_id=org_id).all()
+                }
+                assert set(rows) == {"Flushed First", "Added After"}
+                assert rows["Flushed First"].archimate_element_id is not None
+                assert rows["Added After"].archimate_element_id is not None
+
+                wp_elements = fresh.query(ArchiMateElement).filter(
+                    ArchiMateElement.organization_id == org_id,
+                    ArchiMateElement.type == "WorkPackage",
+                ).all()
+                assert len(wp_elements) == 2  # exactly one element per row
+                assert {e.id for e in wp_elements} == {
+                    rows["Flushed First"].archimate_element_id,
+                    rows["Added After"].archimate_element_id,
+                }
+                assert flushed_element_id in {e.id for e in wp_elements}
+
+                # The command's own creations survived the rollback too.
+                contract = fresh.query(VendorContract).filter_by(
+                    organization_id=org_id,
+                ).one()
+                contract_element = fresh.get(ArchiMateElement, contract.archimate_element_id)
+                assert contract_element is not None
+                assert contract_element.type == "Contract"
+            finally:
+                fresh.close()
+    finally:
+        _cleanup(app, list(orgs.values()))
