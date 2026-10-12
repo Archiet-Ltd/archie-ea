@@ -45,7 +45,7 @@ licence instead of AGPL.
 | Derivation / impact analysis | Not part of the tool's own stated scope | Built in — shows its reasoning for every connection it works out |
 | Plain-language questions over an element | Not part of the tool's own stated scope | Built in — pick an element, get a fixed set of questions (what breaks and who gets called, what's at risk, what we're trying to achieve and more) answered directly |
 | Governance workflows | Not part of the tool's own stated scope | Built in |
-| Pricing | Free | Published at /pricing; free to self-host under AGPL |
+| Pricing | Free | Published on the [pricing page](/pricing); free to self-host under AGPL |
 
 ## What Entelim already does
 
@@ -62,14 +62,43 @@ licence instead of AGPL.
 ArchiMate Open Exchange is the working path across; since Archi's own format is ArchiMate-based
 already, that tends to be a more direct path than for tools built on a proprietary notation.
 
-## Frequently asked
+## Frequently asked questions
 
-**Is Archi the same kind of product as Entelim?**
-No. Archi, by its own description, is a free and open source editor for creating and sketching
-ArchiMate models and diagrams — you build the model by hand. Entelim is a platform: it derives
-relationships from a model, runs governance workflows over it, and answers plain-language questions
-about it.
+### Is Archi the same kind of product as Entelim?
 
-**Do we have to publish our code if we use Entelim?**
-No. Self-hosting is free under AGPL, the same free and open-source basis Archi itself is built on.
-A commercial licence is available for organisations that don't want AGPL's obligations.
+No. Archi describes itself as a free, open source editor for creating ArchiMate models and sketches, so you build the model by hand. Entelim is a platform on top of ArchiMate: it derives relationships from your model, runs governance workflows over it, and answers a fixed set of questions about any element you pick.
+
+### How do we move from Archi to Entelim, and how much work is it?
+
+Archi produces ArchiMate Open Exchange files, and Entelim imports both those and Archi files, so there is no conversion step. Import the file with batch import, then check the element counts and relationships in the import history. If you want it done for you, the [architecture health check](/architecture-health-check) costs a fixed $4,500.
+
+### Will we lose data moving from Archi?
+
+Elements, relationships and properties come across in the file. Nothing is removed from Archi by importing, and your Archi file is unchanged, so you can compare the two element by element. Keep the Archi file as your original.
+
+### What would Entelim cost us compared with Archi?
+
+Archi is free, and so is the Entelim Community plan for up to three people, as is self-hosting under AGPL. The difference appears when you want the platform around the model: Startup is $49 a month for up to ten people, and Team is $29 per editor a month, or $290 billed annually, with read-only members free.
+
+### What would we give up by leaving Archi?
+
+Nothing, if you do not have to: you can keep drawing in Archi and import the file whenever you want the analysis. What Archi gives you is a desktop editor for drawing, and you would only give that up if your team stops using it for modelling and works in Entelim's browser tools instead.
+
+### What would we gain by adding Entelim to Archi?
+
+Derived connections with a proof drawer that shows the reasoning, questions anyone can ask by picking an element, such as what breaks and who gets called, duplicate detection across your application list, a business case from your own figures and a review board workflow. Several people can work in one shared model.
+
+### Can we run Archi and Entelim side by side?
+
+Yes. Model in Archi, import the Open Exchange or Archi file into Entelim, and ask your questions there. Re-import after changes; the import history shows what came in and when.
+
+### Do we have to publish our code if we use Entelim?
+
+No. Self-hosting is free under AGPL, and a commercial licence is available for organisations that do not want AGPL's obligations.
+
+## Sources
+
+The facts about Archi on this page come from the public pages below, each read on the date shown.
+
+- [archimatetool.com](https://www.archimatetool.com/), read 4 October 2026. Describes Archi as the open source modelling toolkit for creating ArchiMate models and sketches.
+- [Archi repository on GitHub](https://github.com/archimatetool/archi), read 4 October 2026. Describes Archi as a free, open source, cross-platform tool and editor to create ArchiMate models, for all levels of enterprise architecture practice.
