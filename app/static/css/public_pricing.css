@@ -1,0 +1,113 @@
+/* Pricing page: plan cards, billing toggle, comparison table, bands, FAQ.
+   Loaded by public/pricing.html only. The lead (H1 + answer block) and the page's
+   outer width now reuse .public-container/.public-page-content from public_site.css
+   (the template craft fixes' shared system) instead of a parallel set of rules;
+   only the pricing-specific pieces below (cards, table, toggle, bands, FAQ) stay here.
+   Colours are the shadcn tokens. */
+
+.pricing-page { --pp-border: hsl(var(--border)); --pp-muted: hsl(var(--muted-foreground)); --pp-fg: hsl(var(--foreground)); --pp-primary: hsl(var(--primary)); }
+.pricing-page .pp-section { margin-top: 4rem; }
+.pricing-page .pp-section--first { margin-top: 3rem; }
+@media (min-width: 768px) { .pricing-page .pp-section { margin-top: 6rem; } .pricing-page .pp-section--first { margin-top: 3rem; } }
+
+/* Lead paragraphs: first reads as normal text, the rest as supporting detail. */
+.pricing-page .pp-lead p { margin: 0 0 1rem; color: var(--pp-muted); }
+.pricing-page .pp-lead p:first-of-type { color: var(--pp-fg); }
+.pricing-page h2 { font-size: 1.5rem; line-height: 1.25; font-weight: 600; margin: 0 0 1rem; }
+@media (min-width: 768px) { .pricing-page h2 { font-size: 1.875rem; } }
+.pricing-page .pp-sub { color: var(--pp-muted); max-width: 42.5rem; line-height: 1.7; margin: 0 0 2rem; }
+
+/* Buttons: one 44px / 8px system */
+.pricing-page .pp-btn {
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  min-height: 2.75rem; height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem;
+  font-size: 0.9375rem; font-weight: 500; line-height: 1; text-decoration: none; white-space: nowrap;
+  border: 1px solid hsl(var(--input)); background: hsl(var(--background)); color: var(--pp-fg);
+  transition: background-color .15s;
+}
+.pricing-page .pp-btn:hover { background: hsl(var(--accent)); }
+.pricing-page .pp-btn--primary { background: var(--pp-primary); border-color: var(--pp-primary); color: hsl(var(--primary-foreground)); }
+.pricing-page .pp-btn--primary:hover { background: hsl(var(--primary) / .9); }
+#pp-bill-year:focus-visible ~ .pp-toggle label[for="pp-bill-year"], #pp-bill-month:focus-visible ~ .pp-toggle label[for="pp-bill-month"],
+.pricing-page .pp-btn:focus-visible,
+.pricing-page summary:focus-visible, .pricing-page a:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+
+/* Monthly / annual toggle: two radios, no script. State lives in :checked. */
+.pricing-page .pp-toggle { display: inline-flex; padding: 0.25rem; gap: 0.25rem; border: 1px solid var(--pp-border); border-radius: 0.75rem; background: hsl(var(--muted)); margin-bottom: 2rem; }
+.pricing-page .pp-radio { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.pricing-page .pp-toggle label { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem; font-size: 0.9375rem; font-weight: 500; cursor: pointer; color: var(--pp-muted); }
+.pricing-page .pp-toggle .pp-save { margin-left: 0.5rem; font-size: 0.8125rem; font-weight: 600; color: hsl(var(--success-emphasis)); }
+#pp-bill-year:checked ~ .pp-toggle label[for="pp-bill-year"],
+#pp-bill-month:checked ~ .pp-toggle label[for="pp-bill-month"] { background: hsl(var(--background)); color: var(--pp-fg); box-shadow: 0 1px 2px hsl(var(--foreground) / .12); }
+.pricing-page [data-interval] { display: none; }
+#pp-bill-year:checked ~ .pp-plans [data-interval="year"],
+#pp-bill-month:checked ~ .pp-plans [data-interval="month"],
+.pricing-page [data-interval="both"] { display: block; }
+#pp-bill-year:checked ~ .pp-plans a[data-interval="year"],
+#pp-bill-month:checked ~ .pp-plans a[data-interval="month"] { display: inline-flex; }
+#pp-bill-year:checked ~ .pp-plans span[data-interval="year"],
+#pp-bill-month:checked ~ .pp-plans span[data-interval="month"] { display: inline; }
+
+/* Plan cards: four across, stack on narrow screens */
+.pricing-page .pp-plans { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+@media (min-width: 640px) { .pricing-page .pp-plans { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .pricing-page .pp-plans { grid-template-columns: repeat(4, 1fr); } }
+.pricing-page .pp-card { display: flex; flex-direction: column; padding: 1.5rem; border: 1px solid var(--pp-border); border-radius: 0.75rem; background: hsl(var(--card)); }
+.pricing-page .pp-card h3 { font-size: 1.25rem; font-weight: 600; margin: 0; }
+.pricing-page .pp-for { margin: 0.5rem 0 1.25rem; min-height: 3.5rem; color: var(--pp-muted); font-size: 0.9375rem; line-height: 1.5; }
+.pricing-page .pp-price { font-size: 3rem; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin: 0; }
+.pricing-page .pp-price small { font-size: 0.9375rem; font-weight: 400; letter-spacing: 0; color: var(--pp-muted); margin-left: 0.25rem; }
+.pricing-page .pp-note { margin: 0.5rem 0 1.25rem; min-height: 2.75rem; color: var(--pp-muted); font-size: 0.875rem; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.pricing-page .pp-card .pp-btn { width: 100%; }
+.pricing-page .pp-list { list-style: none; margin: 1.5rem 0 0; padding: 1.5rem 0 0; border-top: 1px solid var(--pp-border); display: grid; gap: 0.75rem; font-size: 0.9375rem; line-height: 1.5; }
+.pricing-page .pp-list li { position: relative; padding-left: 1.5rem; }
+.pricing-page .pp-list li::before { content: ""; position: absolute; left: 0; top: 0.4rem; width: 0.375rem; height: 0.75rem; border: solid hsl(var(--success-emphasis)); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.pricing-page .pp-list .pp-lead-in { font-weight: 600; padding-left: 0; }
+.pricing-page .pp-list .pp-lead-in::before { display: none; }
+.pricing-page .pp-alt { margin-top: 0.75rem; text-align: center; font-size: 0.875rem; min-height: 1.25rem; }
+
+/* Comparison table: sticky plan headers */
+/* No overflow on the wrapper: overflow-x:auto would make it the scroll container and the sticky header would pin to it, not the page. */
+.pricing-page .pp-table-wrap { border: 1px solid var(--pp-border); border-radius: 0.75rem; }
+.pricing-page table.pp-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 0.9375rem; }
+.pricing-page .pp-table th, .pricing-page .pp-table td { padding: 0.875rem 1rem; text-align: center; border-bottom: 1px solid var(--pp-border); background: hsl(var(--background)); }
+.pricing-page .pp-table thead th { position: sticky; top: 0; z-index: 2; font-size: 1rem; font-weight: 600; border-bottom: 2px solid var(--pp-border); }
+.pricing-page .pp-table th[scope="row"], .pricing-page .pp-table thead th:first-child { text-align: left; font-weight: 500; width: 32%; }
+.pricing-page .pp-table tbody th.pp-group { background: hsl(var(--muted)); font-weight: 600; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--pp-muted); }
+.pricing-page .pp-table tr:last-child td, .pricing-page .pp-table tr:last-child th { border-bottom: 0; }
+.pricing-page .pp-yes::before { content: ""; display: inline-block; width: 0.4rem; height: 0.8rem; border: solid hsl(var(--success-emphasis)); border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-2px); }
+.pricing-page .pp-no { color: var(--pp-muted); }
+
+/* Roadmap list */
+.pricing-page .pp-grow { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border: 1px solid var(--pp-border); border-radius: 0.75rem; overflow: hidden; }
+.pricing-page .pp-grow li { display: grid; grid-template-columns: 7rem 1fr; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--pp-border); line-height: 1.6; }
+.pricing-page .pp-grow li:last-child { border-bottom: 0; }
+.pricing-page .pp-grow time { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Bands */
+.pricing-page .pp-band { background: hsl(var(--muted)); border-block: 1px solid var(--pp-border); }
+.pricing-page .pp-band .pp-wrap { padding-block: 3rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1.5rem; }
+.pricing-page .pp-band h2 { margin-bottom: 0.5rem; }
+.pricing-page .pp-band p { margin: 0; max-width: 42.5rem; line-height: 1.7; color: var(--pp-muted); }
+.pricing-page .pp-services { display: grid; gap: 1.5rem; grid-template-columns: 1fr; }
+@media (min-width: 768px) { .pricing-page .pp-services { grid-template-columns: repeat(2, 1fr); } }
+.pricing-page .pp-services .pp-card p { margin: 0.5rem 0 1rem; color: var(--pp-muted); line-height: 1.6; }
+.pricing-page .pp-services .pp-card .pp-btn { width: auto; align-self: flex-start; margin-top: auto; }
+
+/* FAQ */
+.pricing-page .pp-faq { max-width: 42.5rem; }
+.pricing-page .pp-faq details { border-bottom: 1px solid var(--pp-border); }
+.pricing-page .pp-faq summary { cursor: pointer; padding: 1rem 0; font-weight: 600; font-size: 1.0625rem; list-style: none; display: flex; justify-content: space-between; gap: 1rem; }
+.pricing-page .pp-faq summary::-webkit-details-marker { display: none; }
+.pricing-page .pp-faq summary::after { content: "+"; font-weight: 400; color: var(--pp-muted); }
+.pricing-page .pp-faq details[open] summary::after { content: "\2212"; }
+.pricing-page .pp-faq details p { margin: 0 0 1rem; line-height: 1.7; color: var(--pp-muted); }
+.pricing-page .pp-faq a, .pricing-page .pp-link { color: var(--pp-primary); text-decoration: underline; }
+.pricing-page .pp-price--sm { font-size: 2rem; }
+@media (max-width: 639px) {
+  .pricing-page table.pp-table { font-size: 0.8125rem; }
+  .pricing-page .pp-table th, .pricing-page .pp-table td { padding: 0.625rem 0.25rem; }
+  .pricing-page .pp-table thead th { font-size: 0.6875rem; }
+  .pricing-page .pp-table th[scope="row"], .pricing-page .pp-table thead th:first-child { width: 34%; padding-left: 0.5rem; }
+  .pricing-page .pp-grow li { grid-template-columns: 1fr; gap: 0.25rem; }
+}

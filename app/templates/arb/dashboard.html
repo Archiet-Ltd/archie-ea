@@ -76,7 +76,7 @@
                 <div class="flex items-center gap-2">
                     <i data-lucide="sparkles" class="h-4 w-4 text-primary" aria-hidden="true"></i>
                     {% call card_title(class='text-lg') %}AI queue triage{% endcall %}
-                    <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">AI-suggested draft</span>
+                    <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-info-emphasis">AI-suggested draft</span>
                 </div>
                 <button type="button" @click="generate()" :disabled="loading"
                         class="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
