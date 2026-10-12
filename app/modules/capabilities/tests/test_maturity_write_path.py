@@ -653,7 +653,7 @@ def test_missing_capability_reads_as_not_found(db_session, make_org, tenant_ctx)
 
 # --------------------------------------------------------------------------- #
 # AC6 — target-only or notes-only recording appends a history row when the    #
-#       capability already has a current level (LOW-2 fix).                    #
+#       capability already has a current level.                                    #
 # --------------------------------------------------------------------------- #
 
 def test_target_only_recording_appends_history_when_current_level_exists(
@@ -724,7 +724,7 @@ def test_notes_only_recording_appends_history_when_current_level_exists(
 def test_all_blank_batch_redirects_with_error(
     app, db_session, make_org, tenant_ctx, login_as
 ):
-    """LOW-3: an entirely blank batch submission (no level, no notes) flashes
+    """An entirely blank batch submission (no level, no notes) flashes
     an error and does not write to any row."""
     org = make_org("write-org")
     cap_id = _make_capability(
@@ -1199,7 +1199,7 @@ def test_governance_update_routes_maturity_through_service_for_bc_source(
 
 
 # --------------------------------------------------------------------------- #
-# LOW-1 — a submission that changes nothing records no assessment.            #
+# A submission that changes nothing records no assessment.                    #
 # --------------------------------------------------------------------------- #
 
 def test_noop_edit_submission_records_nothing(
@@ -1234,7 +1234,7 @@ def test_noop_edit_submission_records_nothing(
 
 
 # --------------------------------------------------------------------------- #
-# LOW-2 — a clearing history row carries status='cleared'.                    #
+# A clearing history row carries status='cleared'.                            #
 # --------------------------------------------------------------------------- #
 
 def test_clear_current_history_row_has_cleared_status(
@@ -1264,7 +1264,7 @@ def test_clear_current_history_row_has_cleared_status(
 
 
 # --------------------------------------------------------------------------- #
-# LOW-3 — the guard's SQL pattern catches any column after SET.               #
+# The guard's SQL pattern catches any column after SET.                       #
 # --------------------------------------------------------------------------- #
 
 def test_guard_sql_pattern_catches_any_column_after_set():
@@ -1278,7 +1278,7 @@ def test_guard_sql_pattern_catches_any_column_after_set():
 
 
 # --------------------------------------------------------------------------- #
-# LOW-4 — the roadmap writer rejects responses outside 0-5.                   #
+# The roadmap writer rejects responses outside 0-5.                           #
 # --------------------------------------------------------------------------- #
 
 def test_roadmap_writer_rejects_response_above_five(

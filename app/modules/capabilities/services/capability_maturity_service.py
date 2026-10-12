@@ -122,7 +122,7 @@ def record_capability_maturity(
             f"Business capability {capability_id} not found."
         )
 
-    # LOW-1: return early when nothing changes — no write, no history row.
+    # return early when nothing changes — no write, no history row.
     if (
         current is None
         and target is None
