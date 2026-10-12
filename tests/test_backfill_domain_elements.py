@@ -531,6 +531,66 @@ def test_backfill_uses_the_same_writer_as_a_listener_created_element(
         assert backfilled.custom_properties == {"source_model": "ApplicationComponent"}
 
 
+def test_backfill_vendor_contract_parity(app):
+    """A VendorContract created through the ORM and one seeded with plain SQL
+    produce elements with equal description and equal provenance properties
+    after backfill (fails when the per-model raw-insert listener is still
+    active: the ORM-created row gets a different description format)."""
+    from app import db
+    from app.commands.backfill_domain_elements import backfill_domain_elements
+    from app.models.application_portfolio import VendorContract
+    from app.services.archimate_backbone import sync_archimate_element
+
+    orgs = _seed_orgs(app, ["bf-vc-parity"])
+    org_id = orgs["bf-vc-parity"]
+    try:
+        with app.app_context():
+            # ORM-created contract: goes through the flush listener.
+            orm_contract = VendorContract(
+                contract_name="ORM Contract",
+                contract_description="Description from ORM",
+                organization_id=org_id,
+            )
+            db.session.add(orm_contract)
+            db.session.flush()
+            orm_element_id = orm_contract.archimate_element_id
+            assert orm_element_id is not None
+
+            # SQL-seeded contract: no element, needs backfill.
+            sql_id = _seed_contract(app, org_id, "SQL Contract", "Description from SQL")
+
+            # Backfill creates an element for the SQL-seeded row.
+            stats = backfill_domain_elements(org_id)
+            assert stats["VendorContract"]["created"] == 1
+
+            fresh = db.session.session_factory()
+            try:
+                orm_row = fresh.query(VendorContract).filter_by(
+                    contract_name="ORM Contract",
+                ).one()
+                sql_row = fresh.query(VendorContract).filter_by(
+                    contract_name="SQL Contract",
+                ).one()
+
+                orm_el = fresh.get(ArchiMateElement, orm_row.archimate_element_id)
+                sql_el = fresh.get(ArchiMateElement, sql_row.archimate_element_id)
+
+                assert orm_el is not None
+                assert sql_el is not None
+
+                # Same description format (both use the shared writer).
+                assert orm_el.description == "Description from ORM"
+                assert sql_el.description == "Description from SQL"
+
+                # Same provenance property.
+                assert orm_el.custom_properties == {"source_model": "VendorContract"}
+                assert sql_el.custom_properties == {"source_model": "VendorContract"}
+            finally:
+                fresh.close()
+    finally:
+        _cleanup(app, [org_id])
+
+
 def test_backfill_rollback_path_leaves_exactly_one_element_per_row(app):
     """The rollback path: a work package flushed before the command runs keeps
     its element (the command commits each type block), a work package added in

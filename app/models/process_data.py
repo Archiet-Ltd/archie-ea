@@ -674,11 +674,8 @@ def _link_data_entity_archimate(connection, target, organization_id=None):
     set_committed_value(target, "archimate_element_id", new_id)
 
 
-@event.listens_for(DataEntity, "after_insert")
-def create_archimate_data_entity(mapper, connection, target):
-    """Automatically create/link an ArchiMateElement (type DataObject) for a new DataEntity."""
-    if not target.archimate_element_id:
-        _link_data_entity_archimate(connection, target)
+# DataEntity's ArchiMate element is now created by the shared
+# flush listener in app/services/archimate_backbone.py.
 
 
 def _ensure_archimate_relationship(

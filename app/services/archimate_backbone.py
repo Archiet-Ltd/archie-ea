@@ -70,6 +70,17 @@ ELEMENT_TYPES: Dict[str, tuple] = {
     "DataEntity": ("DataObject", "application"),
 }
 
+# Per-type description templates for the five domain types.  These preserve
+# the same description format the per-model raw-insert listeners used, so a
+# backfilled element and a listener-created element are identical.
+DESCRIPTION_TEMPLATES: Dict[str, str] = {
+    "ApplicationComponent": "Application: {name}",
+    "VendorContract": "Vendor contract: {name}",
+    "ApplicationInterface": "{interface_type} interface",
+    "BusinessCapability": "Business capability: {name}",
+    "DataEntity": "Data object for entity: {name}",
+}
+
 # Where each model keeps its display name. Checked in order.
 NAME_FIELDS = ("name", "title", "risk_name", "goal_name", "driver_name",
                "constraint_name", "requirement_text", "description",
@@ -211,6 +222,16 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
         properties = dict(provenance or {})
         properties["source_model"] = type_name
 
+        # Build description: use the per-type template when one exists,
+        # otherwise fall back to the object's own description field.
+        description = getattr(obj, "description", None)
+        if description is None and type_name in DESCRIPTION_TEMPLATES:
+            template = DESCRIPTION_TEMPLATES[type_name]
+            name_for_desc = name
+            if type_name == "ApplicationInterface":
+                name_for_desc = getattr(obj, "interface_type", name)
+            description = template.format(name=name_for_desc)
+
         element = create_backbone_element(
             element_type=element_type,
             layer=layer,
@@ -260,6 +281,11 @@ FLUSH_LISTENER_ALLOW_LIST = frozenset({
     "UnifiedWorkPackage",
     "Risk",
     "ApplicationComplianceControl",
+    "ApplicationComponent",
+    "VendorContract",
+    "ApplicationInterface",
+    "BusinessCapability",
+    "DataEntity",
 })
 
 
