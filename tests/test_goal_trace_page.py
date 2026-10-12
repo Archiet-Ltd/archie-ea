@@ -149,3 +149,8 @@ def test_operations_user_reaches_the_value_streams_page(app, db_session, make_or
     _clear_login_cache()
     resp = client.get("/intelligence/value-streams-at-risk")
     assert resp.status_code == 200
+
+
+def test_goal_trace_requires_sign_in(app, db_session):
+    resp = app.test_client().get("/architecture/goals/1/trace")
+    assert resp.status_code in (302, 401)
