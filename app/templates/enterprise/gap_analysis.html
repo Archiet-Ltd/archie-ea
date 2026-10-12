@@ -116,6 +116,74 @@
             </div>
         </div>
     </div>
+
+    <!-- Gaps Not Addressed -->
+    <div data-slot="card" class="rounded-xl border bg-card">
+        <div class="p-6">
+            <h3 class="font-semibold mb-4">Gaps Not Addressed by Any Work Package</h3>
+            <p class="text-sm text-muted-foreground mb-4">
+                These gaps have no work package linked to them. They remain open risks
+                in the transition from baseline to target architecture.
+            </p>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b">
+                            <th class="text-left p-3 font-medium">Gap</th>
+                            <th class="text-left p-3 font-medium">Type</th>
+                            <th class="text-left p-3 font-medium">Priority</th>
+                            <th class="text-left p-3 font-medium">Status</th>
+                            <th class="text-left p-3 font-medium">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        {% for gap in not_addressed_gaps|default([]) %}
+                        <tr class="border-b hover:bg-muted/50">
+                            <td class="p-3">
+                                <div class="font-medium">
+                                    <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
+                                       class="hover:underline" data-testid="not-addressed-gap-link-{{ gap.id }}">{{ gap.name|default('—', true) }}</a>
+                                </div>
+                                <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
+                            </td>
+                            <td class="p-3">{{ gap.gap_type|default('Unknown') }}</td>
+                            <td class="p-3">
+                                {% if gap.priority == 'Critical' %}
+                                    {{ status_badge(gap.priority|default('Normal'), 'error') }}
+                                {% elif gap.priority == 'High' %}
+                                    {{ status_badge(gap.priority|default('Normal'), 'warning') }}
+                                {% else %}
+                                    {{ status_badge(gap.priority|default('Normal'), 'neutral') }}
+                                {% endif %}
+                            </td>
+                            <td class="p-3">
+                                {% if gap.resolution_status == 'resolved' %}
+                                    {{ status_badge(gap.resolution_status|default('identified'), 'success') }}
+                                {% elif gap.resolution_status == 'in_progress' %}
+                                    {{ status_badge(gap.resolution_status|default('identified'), 'info') }}
+                                {% else %}
+                                    {{ status_badge(gap.resolution_status|default('identified'), 'neutral') }}
+                                {% endif %}
+                            </td>
+                            <td class="p-3">
+                                <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
+                                   class="px-3 py-1.5 text-sm rounded-md border hover:bg-muted inline-block">
+                                    View Details
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="p-6 text-center text-muted-foreground">
+                                All gaps are addressed by work packages.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 <script>
     function gapAnalysisTable() {

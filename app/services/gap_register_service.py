@@ -18,7 +18,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
-from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION
+from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION, Plateau
+from app.models.relationship_tables import gap_work_packages
 
 log = logging.getLogger(__name__)
 
@@ -250,3 +251,107 @@ def create_gap(
     db.session.add(gap)
     db.session.flush()
     return gap, True
+
+
+def link_gap_to_plateau(
+    gap_id: int, plateau_id: int, organization_id: int
+) -> Gap:
+    """Link a gap to a plateau within the same organisation.
+
+    Both the gap and the plateau must belong to *organization_id*.
+    Raises ValueError if either does not, or if the link already exists.
+
+    Flushes but does not commit: the caller controls the transaction boundary.
+    """
+    gap = Gap.query.filter_by(id=gap_id, organization_id=organization_id).first()
+    if gap is None:
+        raise ValueError("Gap not found in this organisation")
+
+    plateau = Plateau.query.filter_by(id=plateau_id, organization_id=organization_id).first()
+    if plateau is None:
+        raise ValueError("Plateau not found in this organisation")
+
+    if plateau in gap.plateaus:
+        raise ValueError("Gap is already linked to this plateau")
+
+    gap.plateaus.append(plateau)
+    db.session.flush()
+    return gap
+
+
+def unlink_gap_from_plateau(
+    gap_id: int, plateau_id: int, organization_id: int
+) -> Gap:
+    """Remove the link between a gap and a plateau within the same organisation.
+
+    Raises ValueError if either the gap or the plateau does not belong to
+    the organisation, or if no link exists.
+    """
+    gap = Gap.query.filter_by(id=gap_id, organization_id=organization_id).first()
+    if gap is None:
+        raise ValueError("Gap not found in this organisation")
+
+    plateau = Plateau.query.filter_by(id=plateau_id, organization_id=organization_id).first()
+    if plateau is None:
+        raise ValueError("Plateau not found in this organisation")
+
+    if plateau not in gap.plateaus:
+        raise ValueError("Gap is not linked to this plateau")
+
+    gap.plateaus.remove(plateau)
+    db.session.flush()
+    return gap
+
+
+def get_plateau_gaps(plateau_id: int, organization_id: int) -> List[Gap]:
+    """Return all gaps linked to a plateau within the organisation.
+
+    Raises ValueError if the plateau does not belong to the organisation.
+    """
+    plateau = Plateau.query.filter_by(id=plateau_id, organization_id=organization_id).first()
+    if plateau is None:
+        raise ValueError("Plateau not found in this organisation")
+    return list(plateau.gaps)
+
+
+def get_gaps_not_addressed(organization_id: int) -> List[Gap]:
+    """Return gaps that have no work package addressing them.
+
+    A gap is "addressed" when it has at least one entry in the
+    gap_work_packages junction table.  This queries the unified work
+    package store (WorkPackage model) through the existing many-to-many
+    relationship.
+    """
+    from app.models.implementation_migration import WorkPackage
+
+    subq = (
+        db.session.query(gap_work_packages.c.gap_id)
+        .join(WorkPackage, gap_work_packages.c.work_package_id == WorkPackage.id)
+        .filter(WorkPackage.organization_id == organization_id)
+        .subquery()
+    )
+    return (
+        Gap.query
+        .filter(
+            Gap.organization_id == organization_id,
+            Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+            ~Gap.id.in_(db.session.query(subq.c.gap_id)),
+        )
+        .all()
+    )
+
+
+def count_gaps(organization_id: int) -> int:
+    """Return the number of gaps in the one gap register for an organisation.
+
+    This is the single canonical count used by both the roadmap and the
+    gap analysis screen, so they always agree.
+    """
+    return (
+        Gap.query
+        .filter(
+            Gap.organization_id == organization_id,
+            Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+        )
+        .count()
+    )

@@ -396,7 +396,9 @@ def strategic_planning_dashboard():
     """Strategic Planning Dashboard"""
     try:
         # Get strategic metrics with ArchiMate fallback for empty tables
-        gap_count = Gap.query.filter(Gap.gap_kind != "plateau_transition").count()
+        from app.services.gap_register_service import count_gaps
+
+        gap_count = count_gaps(current_user.organization_id)
         if gap_count == 0:
             gap_count = ArchiMateElement.query.filter(
                 ArchiMateElement.type.in_(["Gap", "GAP"])
@@ -890,15 +892,21 @@ def gap_analysis():
     column = _GAP_SORT_COLUMNS.get(sort_key, Gap.name)
     order = column.desc() if direction == "desc" else column.asc()
     try:
+        from app.services.gap_register_service import count_gaps, get_gaps_not_addressed
+
         gaps = (
             Gap.query.filter(Gap.gap_kind != "plateau_transition")
             .order_by(order, Gap.id)
             .limit(500)
             .all()
         )
+        total_gap_count = count_gaps(current_user.organization_id)
+        not_addressed_gaps = get_gaps_not_addressed(current_user.organization_id)
 
         return render_template(
             "enterprise/gap_analysis.html", gaps=gaps,
+            total_gap_count=total_gap_count,
+            not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",
             current_dir=direction if direction in ("asc", "desc") else "asc",
         )
@@ -950,8 +958,10 @@ def ai_architecture_analysis():
         )
 
         # Total counts
+        from app.services.gap_register_service import count_gaps
+
         total_recommendations = AIRecommendation.query.count()
-        total_gaps = Gap.query.filter(Gap.gap_kind != "plateau_transition").count()
+        total_gaps = count_gaps(current_user.organization_id)
 
         return render_template(
             "enterprise/ai_architecture_analysis.html",
@@ -1187,7 +1197,9 @@ def enterprise_dashboard():
         software_modules_count = SoftwareModule.query.count()
 
         # Gaps with ArchiMate fallback for empty tables
-        gaps_count = Gap.query.filter(Gap.gap_kind != "plateau_transition").count()
+        from app.services.gap_register_service import count_gaps
+
+        gaps_count = count_gaps(current_user.organization_id)
         if gaps_count == 0:
             gaps_count = ArchiMateElement.query.filter(
                 ArchiMateElement.type.in_(["Gap", "GAP"])
