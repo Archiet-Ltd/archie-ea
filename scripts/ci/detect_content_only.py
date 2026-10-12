@@ -70,17 +70,25 @@ def get_changed_files(base_ref: str = "origin/main") -> list[str]:
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
-def main() -> int:
-    base_ref = os.environ.get("GITHUB_BASE_REF", "origin/main")
-    # For push events or when there is no PR base, check against origin/main
-    # but never skip on push to main (the caller handles that via job-level if).
-    changed = get_changed_files(base_ref)
+def base_reference() -> str:
+    """The remote-tracking ref of the pull request's target branch."""
+    base = os.environ.get("GITHUB_BASE_REF", "").strip()
+    return f"origin/{base}" if base else "origin/main"
 
+
+def classify(changed: list[str]) -> str:
+    """'true' only when there is at least one changed file and all are content paths."""
     if not changed:
-        # No changed files means nothing to skip.
+        return "false"
+    return str(all(is_content_path(f) for f in changed)).lower()
+
+
+def main() -> int:
+    # Any failure to compute the diff means "not content only": the full suite runs.
+    try:
+        is_content = classify(get_changed_files(base_reference()))
+    except (subprocess.CalledProcessError, OSError):
         is_content = "false"
-    else:
-        is_content = str(all(is_content_path(f) for f in changed)).lower()
 
     output = os.environ.get("GITHUB_OUTPUT", "")
     if output:
