@@ -310,6 +310,16 @@ else:
     from .technology_layer import *  # noqa - Node, Device, SystemSoftware, TechnologyInterface, Path, CommunicationNetwork, TechnologyService
     from .truly_missing_models import *  # noqa - Solution, SolutionPattern, SolutionContract
     from .adm_kanban import ADMPhase, KanbanBoard, KanbanCard, KanbanCardComment, KanbanCardAttachment, ADMPhaseStep  # noqa: F401
+
+    # Model modules that a service used to import on first use. Each adds
+    # relationships to models loaded here (or is a table a delete cascades into),
+    # so when it was imported lazily create_all() at boot never saw its tables
+    # and the first user delete after that import failed on a missing table.
+    from .adm_kanban_junctions import (  # noqa: F401
+        BusinessInitiative, CardApplication, CardArchiMateElement, CardCapability,
+        CardDependency, CardInitiative, CardSystem, System,
+    )
+    from . import adm_phase_approval, adm_audit_log, adm_portfolio  # noqa: F401
     from .solution_architect_models import *  # noqa - SolutionAnalysisSession, SolutionProblemDefinition, etc.
     from app.models.solution_architect_models import RequirementChangeLog  # noqa: F401
     from .solution_lifecycle_models import *  # noqa - SolutionRisk, SolutionTCOItem, SolutionMetric, SolutionPlateau
