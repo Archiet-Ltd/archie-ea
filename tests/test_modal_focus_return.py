@@ -77,6 +77,11 @@ def modal_page(modal_browser):
         path=str(ROOT / "app" / route.request.url[len(BASE) + 1:])))
     page.route(BASE + "/", lambda route: route.fulfill(content_type="text/html", body=HTML))
     page.goto(BASE + "/")
+    # modal.js starts its visibility observer in a timer set 100 ms after
+    # DOMContentLoaded. A timer registered now is due later than that one, and
+    # timers run in due order, so when this resolves the observer is running on
+    # any engine and at any load, without guessing a sleep.
+    page.evaluate("() => new Promise(resolve => setTimeout(resolve, 100))")
     yield page
     page.close()
     assert errors == []
@@ -217,9 +222,7 @@ def test_microtask_open_without_focus_change_does_not_reuse_click_origin(modal_p
 
 def test_observed_close_cannot_uninert_background_or_steal_new_modal_focus(modal_page):
     page = modal_page
-    # The existing fallback observer starts 100 ms after DOMContentLoaded.
-    # This is fixture initialization, not extra time for a focus assertion.
-    page.wait_for_timeout(150)
+    # The fallback observer is already running: the fixture waited for it.
     page.get_by_role("button", name="Open observed", exact=True).click()
     expect(page.locator("#observed :focus")).to_have_count(1)
     page.get_by_role("button", name="Replace observed", exact=True).click()
