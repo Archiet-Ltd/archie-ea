@@ -1041,3 +1041,156 @@ class TestD1MigrateCommandRespectsAGenericBlobSupersession:
 
         db_session.refresh(cfg)
         assert "api_token" not in cfg.config
+
+
+def _delegate(db_session, org_id, *actions):
+    """Mark *actions* as delegated by *org_id* so they apply directly."""
+    from app.models.organization import Organization
+
+    org = Organization.query.get(org_id)
+    settings = dict(org.settings or {})
+    delegation = dict(settings.get("connector_action_delegation") or {})
+    for action in actions:
+        delegation[action] = True
+    settings["connector_action_delegation"] = delegation
+    org.settings = settings
+    db_session.flush()
+
+
+class TestDelegatedOrganisationRotationAlsoDropsTheSupersededRowKey:
+    """Delta review (reviews/pr448-2dc5a9d5d.md): D1/F2's is_rotating check
+    was computed only "if approval is not None", so a delegated
+    organisation -- whose apply_connector_change runs with no approval at
+    all -- always saw is_rotating=False. The legacy row key was carried
+    forward forever for every delegated rotation, on every save route: the
+    exact condition D1 and F2 exist to remove. Fixed by having each save
+    route set payload["credential_provided"] itself (the only place that
+    actually knows a credential is part of this change, on either path)
+    instead of inferring the signal from approval/vault state later."""
+
+    def test_delegated_jira_rotation_drops_the_legacy_row_key(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.models.connector_config import ConnectorConfig
+
+        _delegate(db_session, org_a.id, "update", "create")
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Delegated Jira",
+            config={
+                "instance_url": "https://delegated.atlassian.net",
+                "email": "delegated@example.com",
+                "api_token": "stale-legacy-value",
+            },
+        )
+        db_session.add(cfg)
+        db_session.commit()
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors/jira",
+            data={
+                "instance_url": "https://delegated.atlassian.net",
+                "email": "delegated@example.com",
+                "api_token": "rotated-delegated-token",
+                "default_project_key": "ARCH",
+                "enabled": "on",
+            },
+        )
+
+        db_session.refresh(cfg)
+        assert "api_token" not in cfg.config, (
+            "a delegated-organisation rotation must also drop the "
+            "superseded row key, not just a queued one"
+        )
+
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        assert OrgCredentialVault().retrieve(org_a.id, "jira", "api_token") == "rotated-delegated-token"
+
+    def test_delegated_m365_rotation_drops_the_legacy_row_key(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.models.connector_config import ConnectorConfig
+
+        _delegate(db_session, org_a.id, "update", "create")
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="m365",
+            name="Delegated M365",
+            config={
+                "tenant_id": "tenant-1",
+                "client_id": "client-1",
+                "client_secret": "stale-legacy-value",
+            },
+        )
+        db_session.add(cfg)
+        db_session.commit()
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors/m365",
+            data={
+                "tenant_id": "tenant-1",
+                "client_id": "client-1",
+                "client_secret": "rotated-delegated-secret",
+                "site_id": "",
+                "folder_path": "",
+                "teams_webhook_url": "",
+                "enabled": "1",
+            },
+        )
+
+        db_session.refresh(cfg)
+        assert "client_secret" not in cfg.config, (
+            "a delegated-organisation rotation must also drop the "
+            "superseded row key, not just a queued one"
+        )
+
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        assert OrgCredentialVault().retrieve(org_a.id, "m365", "client_secret") == "rotated-delegated-secret"
+
+    def test_delegated_generic_page_rotation_drops_the_legacy_row_key(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.models.connector_config import ConnectorConfig
+
+        _delegate(db_session, org_a.id, "update", "create")
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Delegated Generic-Page Jira",
+            config={
+                "instance_url": "https://generic-delegated.atlassian.net",
+                "email": "generic-delegated@example.com",
+                "api_token": "stale-legacy-value",
+            },
+        )
+        db_session.add(cfg)
+        db_session.commit()
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors",
+            data={
+                "connector_type": "jira",
+                "connector_id": str(cfg.id),
+                "name": "Delegated Generic-Page Jira",
+                "config_json": '{"instance_url": "https://generic-delegated.atlassian.net", "email": "generic-delegated@example.com"}',
+                "credential": "rotated-via-generic-page-delegated",
+                "enabled": "1",
+            },
+        )
+
+        db_session.refresh(cfg)
+        assert "api_token" not in cfg.config, (
+            "a delegated-organisation rotation through the generic page "
+            "must also drop the superseded row key"
+        )
+
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        creds = OrgCredentialVault().retrieve_credentials(org_a.id, "jira")
+        assert creds.get("credential") == "rotated-via-generic-page-delegated"

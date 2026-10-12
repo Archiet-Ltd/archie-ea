@@ -180,6 +180,12 @@ def connectors_save():
         "name": name or connector_type,
         "config": config,
         "status": "active" if enabled else "inactive",
+        # This route is the only place that knows a credential is part of
+        # this change, on the delegated path as much as the queued one --
+        # carry that fact in the payload itself rather than having
+        # apply_connector_change try to re-derive it from approval/vault
+        # state later.
+        "credential_provided": bool(credential),
     }
     result = propose_or_apply_connector_change(
         org_id=org_id,
@@ -396,6 +402,7 @@ def m365_config_save():
             "enabled": enabled,
         },
         "status": "active" if enabled else "inactive",
+        "credential_provided": bool(client_secret_raw),
     }
     result = propose_or_apply_connector_change(
         org_id=org_id,
@@ -541,6 +548,7 @@ def servicenow_config_save():
             "enabled": enabled,
         },
         "status": "active" if enabled else "inactive",
+        "credential_provided": bool(secret),
     }
     result = propose_or_apply_connector_change(
         org_id=org_id,
@@ -720,6 +728,7 @@ def jira_config_save():
             "enabled": enabled,
         },
         "status": "active" if enabled else "inactive",
+        "credential_provided": bool(api_token_raw),
     }
     result = propose_or_apply_connector_change(
         org_id=org_id,
