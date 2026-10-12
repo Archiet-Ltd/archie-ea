@@ -28,4 +28,4 @@ Coming soon. Join the waiting list and we'll tell you the day it ships.
 
 ## Related
 
-- [Pull our systems and initiatives from Jira and GitHub](/use-cases/import-from-jira-and-github)
+- [How do I stop typing every system into Entelim by hand?](/use-cases/import-from-jira-and-github)
