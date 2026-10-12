@@ -1,0 +1,32 @@
+{# Shared shell for the "Tell us more" hub and its five sections
+   (onboarding-redesign-v3 §3). Deliberately not `_wizard_shell.html`
+   (layouts/base.html): that shell has no sidebar/nav on purpose, for the
+   linear, five-screen, one-user-in-one-sitting P0 walkthrough. Tell us more
+   is the opposite shape — optional, reachable from several places (Screen 4,
+   Screen 5, the modules directory), done in any order over multiple
+   sessions — so it uses the standard admin shell (nav, search, the same
+   chrome every other signed-in page has) rather than the distraction-free
+   wizard one; a person arriving from the directory or returning later should
+   land somewhere they can also navigate away from normally. Same card
+   chrome as the wizard shell's screens for visual consistency of the
+   sections themselves. #}
+{% extends 'layouts/admin_base.html' %}
+
+{% block title %}{{ page_title | default('Tell us more') }} — A.R.C.H.I.E.{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center px-4 py-10">
+    <div class="w-full max-w-2xl">
+        <div class="mb-4">
+            <a href="{{ back_href | default(url_for('onboarding.gaps')) }}"
+               class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+                <i data-lucide="arrow-left" class="h-4 w-4" aria-hidden="true"></i>
+                {{ back_label | default('Back') }}
+            </a>
+        </div>
+        <div class="bg-card rounded-2xl border border-border shadow-lg overflow-hidden">
+            {% block tell_us_more_content %}{% endblock %}
+        </div>
+    </div>
+</div>
+{% endblock %}
