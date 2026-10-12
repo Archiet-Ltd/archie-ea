@@ -105,6 +105,6 @@ def test_home_page_footer_and_navbar_links_are_clickable(browser, live_server):
         page.wait_for_timeout(300)
         page.locator('footer a[href="/about"]').first.click()
         page.wait_for_url(lambda url: url.rstrip("/").endswith("/about"), timeout=PAGE_TIMEOUT)
-        assert page.locator("h1", has_text="We are building Enterprise Intelligence Management").count() == 1
+        assert page.locator("h1", has_text="We are building the company brain").count() == 1
     finally:
         ctx.close()

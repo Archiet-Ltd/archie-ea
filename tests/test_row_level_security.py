@@ -42,18 +42,20 @@ from sqlalchemy.pool import NullPool
 
 REPO = Path(__file__).resolve().parents[1]
 MIGRATION_PATH = REPO / "migrations" / "versions" / "20261008_row_level_security.py"
+NOTIF_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261011_notif_rls.py"
 RUNTIME_ROLE = "archie_rls_test_runtime"
 RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run
 
 
-def _load_migration():
-    spec = importlib.util.spec_from_file_location("rls_migration_under_test", MIGRATION_PATH)
+def _load_migration(path, name):
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-MIGRATION = _load_migration()
+MIGRATION = _load_migration(MIGRATION_PATH, "rls_migration_under_test")
+NOTIF_MIGRATION = _load_migration(NOTIF_MIGRATION_PATH, "notif_rls_migration_under_test")
 
 
 def _apply_policies(engine):
@@ -62,6 +64,21 @@ def _apply_policies(engine):
         context = MigrationContext.configure(connection)
         with Operations.context(context):
             MIGRATION.upgrade()
+
+
+def _apply_notif_policies(engine):
+    """Run the notifications fence upgrade() on ``engine`` (idempotent).
+
+    ``notification`` rows live under row-level security decided in
+    ``20261011_notif_rls``, which the base 20261008 fence does not cover. The
+    fixture applies it so the notification isolation tests below run against
+    the real policy, including the NULL-org rule that keeps a legacy row visible
+    to its owning user.
+    """
+    with engine.begin() as connection:
+        context = MigrationContext.configure(connection)
+        with Operations.context(context):
+            NOTIF_MIGRATION.upgrade()
 
 
 class RlsEnv:
@@ -124,6 +141,7 @@ def rls(app, _schema):
             text(f"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {RUNTIME_ROLE}")
         )
     _apply_policies(owner)
+    _apply_notif_policies(owner)
     runtime = create_engine(
         url.set(username=RUNTIME_ROLE, password=RUNTIME_PASSWORD), poolclass=NullPool
     )
@@ -178,6 +196,23 @@ class World:
                 {"n": name, "c": code, "o": org_id},
             ).scalar_one()
         self.shared_codes.append(code)
+        return row_id
+
+    def notification(self, user_id, organization_id, message):
+        """A notifications row for ``user_id``, optionally owned by ``organization_id``.
+
+        ``organization_id=None`` models the legacy NULL-org rows the backfill
+        leaves behind for a user with no organisation.
+        """
+        with self.rls.owner.begin() as connection:
+            row_id = connection.execute(
+                text(
+                    "INSERT INTO notifications (user_id, organization_id, message, url, read) "
+                    "VALUES (:u, :o, :m, '/n', false) RETURNING id"
+                ),
+                {"u": user_id, "o": organization_id, "m": message},
+            ).scalar_one()
+        self.extra_deletes.append(("notifications", "id", [row_id]))
         return row_id
 
     def cleanup(self):
@@ -478,6 +513,93 @@ def test_tenant_cannot_move_its_row_to_another_organisation(rls, world):
             connection.execute(
                 text("UPDATE application_components SET organization_id = :b WHERE id = :i"),
                 {"b": b, "i": a_id},
+            )
+
+
+# --------------------------------------------------------------------------- #
+# Notifications: writer must stamp the organisation; legacy NULL-org rows stay
+# visible to their owning user and never leak to another organisation
+# --------------------------------------------------------------------------- #
+
+
+def test_notification_service_creates_a_bell_notification_visible_to_its_owner_under_the_runtime_role(
+    app, rls, world
+):
+    """A bell notification created for a user is visible to that user when the
+    application runs as the non-owner, NOBYPASSRLS runtime role.
+
+    Fails without the fix: NotificationService.create used to leave
+    organization_id NULL, and the notifications INSERT policy refuses a NULL
+    organisation, so the row was never created (it was silently swallowed by
+    the caller's try/except or a savepoint rollback) and the bell never showed
+    it.
+    """
+    from app import db
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.services.notification_service import NotificationService
+
+    a = world.org("a")
+    user_id = _make_user(world, a, "bell", role="Architect")
+
+    created = None
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        with tenant_scope(a):
+            created = NotificationService.create(
+                user_id=user_id, message="bell msg", url="/api/notifications"
+            )
+            db.session.commit()
+            world.extra_deletes.append(("notifications", "id", [created.id]))
+
+    # Under the session organisation, the owner's own row is visible.
+    with rls.runtime_tx(a) as connection:
+        rows = connection.execute(
+            text("SELECT id FROM notifications WHERE user_id = :u AND message = 'bell msg'"),
+            {"u": user_id},
+        ).all()
+    assert len(rows) == 1
+
+
+def test_notifications_are_isolated_between_organisations_under_the_runtime_role(rls, world):
+    """Org A can never read org B's notifications at the database level, and a
+    legacy NULL-org notification stays visible to its owning organisation's
+    user (never to another organisation's context)."""
+    a, b = world.org("a"), world.org("b")
+    user_a = _make_user(world, a, "ua", role="Architect")
+    user_b = _make_user(world, b, "ub", role="Architect")
+    n_a = world.notification(user_a, a, "org-a secret")
+    n_b = world.notification(user_b, b, "org-b secret")
+    n_legacy = world.notification(user_a, None, "legacy null-org")
+
+    with rls.runtime_tx(a) as connection:
+        seen_a = {r[0] for r in connection.execute(text("SELECT id FROM notifications"))}
+    with rls.runtime_tx(b) as connection:
+        seen_b = {r[0] for r in connection.execute(text("SELECT id FROM notifications"))}
+
+    assert n_a in seen_a and n_b not in seen_a
+    assert n_legacy in seen_a        # the owning user's own legacy row stays visible
+    assert n_b in seen_b and n_a not in seen_b
+    assert n_legacy not in seen_b    # never leaked into the other organisation's context
+
+
+def test_notification_writer_cannot_stamp_another_organisations_context(rls, world):
+    """A notification written under org A context must carry org A; stamping it
+    wrong (or leaving it NULL) is refused by the fence, which is exactly why the
+    writers resolve the organisation from the recipient user."""
+    a, b = world.org("a"), world.org("b")
+    user_a = _make_user(world, a, "ua", role="Architect")
+
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(a) as connection:
+            connection.execute(
+                text("INSERT INTO notifications (user_id, organization_id, message) VALUES (:u, :b, 'x')"),
+                {"u": user_a, "b": b},
+            )
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(a) as connection:
+            connection.execute(
+                text("INSERT INTO notifications (user_id, organization_id, message) VALUES (:u, NULL, 'x')"),
+                {"u": user_a},
             )
 
 
@@ -1600,3 +1722,146 @@ def test_unified_work_package_unique_element_and_conflict_inserts_are_not_hidden
                 ),
                 {"o": a, "e": element},
             )
+
+
+# --------------------------------------------------------------------------- #
+# Token-accepting /api/v1 routes probed under the runtime (non-owner) role
+# --------------------------------------------------------------------------- #
+
+
+def _api_token_routes(app):
+    """Every registered /api/v1 route that accepts an api:* token.
+
+    Enumerated from the application URL map (not a hard-coded list), so a
+    route added later is probed too, and a route family that silently stops
+    being token-accepting fails here.
+    """
+    routes = []
+    for rule in app.url_map.iter_rules():
+        if not rule.rule.startswith("/api/v1"):
+            continue
+        if "GET" not in rule.methods:
+            continue
+        view = app.view_functions.get(rule.endpoint)
+        if view is not None and getattr(view, "_api_token_scope", None):
+            routes.append((rule, view._api_token_scope))
+    return routes
+
+
+def test_every_api_token_route_denies_the_other_org_under_the_runtime_role(app, rls, world, client):
+    """For every route that accepts an api:* token, organisation A's token
+    against organisation B's resource ids yields no B data — run as the
+    runtime role from this harness, not as the table owner. Fails on main,
+    where no /api/v1 route accepts a token at all."""
+    # The bearer mechanism only exists in builds with the connector on; in a
+    # plain build the oauth routes are not registered and this probe is not
+    # applicable. When the mechanism IS on but the token route family is
+    # missing, the probe fails (that is the point).
+    if "oauth_provider.token" not in app.view_functions:
+        pytest.skip("OAuth routes not registered (MCP_ENABLED off)")
+
+    from app import db
+    from app.models.user import User as _U
+    from app.modules.oauth_provider.models import OAuthClient, OAuthToken, _new_client_id, hash_secret
+
+    home = world.org("home")
+    other = world.org("other")
+
+    with rls.owner.begin() as connection:
+        el_home = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('RLS-Home', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": home},
+        ).scalar_one()
+        el_other = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('RLS-Other', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": other},
+        ).scalar_one()
+        viewer_role_id = connection.execute(
+            text("SELECT id FROM roles WHERE name = 'Viewer'")
+        ).scalar_one()
+        svc_id = connection.execute(
+            text(
+                "INSERT INTO users (email, organization_id, confirmed, role_id, first_name, last_name, is_service_user) "
+                "VALUES (:e, :o, true, :r, 'Service', 'Read', true) RETURNING id"
+            ),
+            {"e": f"rls-svc-{uuid.uuid4().hex[:8]}@example.com", "o": home, "r": viewer_role_id},
+        ).scalar_one()
+    world.extra_deletes.append(("archimate_elements", "id", [el_home, el_other]))
+    world.user_ids.append(svc_id)
+
+    base = (app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+    assert base, "PUBLIC_BASE_URL must be set for the token resource identifier"
+    api_resource = f"{base}/api/v1"
+
+    with app.app_context():
+        oc = OAuthClient(
+            client_id=_new_client_id("svc"),
+            client_name="Probe Reader",
+            client_secret_hash=hash_secret("probe-secret"),
+            grant_types="client_credentials",
+            scope="api:read",
+            service_user_id=svc_id,
+            is_active=True,
+        )
+        db.session.add(oc)
+        db.session.commit()
+        oc_id = oc.id
+        raw_access, _raw_refresh, _row = OAuthToken.issue(
+            client_id=oc.client_id,
+            user_id=svc_id,
+            scope="api:read",
+            resource=api_resource,
+            grant_type="client_credentials",
+            organization_id=home,
+        )
+    world.extra_deletes.append(("oauth_clients", "id", [oc_id]))
+
+    routes = _api_token_routes(app)
+    assert routes, "no /api/v1 route accepts an api:* token — the token route family is missing"
+
+    # One probe value per route variable. A token route added later with a
+    # variable not listed here fails the probe loudly until its value is
+    # supplied — deliberate, so the probe cannot silently skip a route.
+    probe_values = {"element_id": el_other}
+    adapter = app.url_map.bind("localhost")
+
+    with _app_runs_as(app, rls.runtime):
+        for rule, required_scope in routes:
+            assert required_scope == "api:read", (rule.rule, required_scope)
+            missing = [arg for arg in rule.arguments if arg not in probe_values]
+            assert not missing, (
+                f"{rule.rule} takes {missing} which the probe cannot build — "
+                "extend probe_values in this test"
+            )
+            url = adapter.build(rule.endpoint, {a: probe_values[a] for a in rule.arguments})
+            with app.app_context():
+                db.session.remove()
+            response = client.get(url, headers={"Authorization": f"Bearer {raw_access}"})
+            assert response.status_code in (200, 404), (
+                rule.rule, response.status_code, response.get_data(as_text=True)[:500],
+            )
+            body = response.get_json()
+            returned_ids = []
+            if isinstance(body, dict) and body.get("success"):
+                payload = body.get("data", {})
+                if isinstance(payload, dict):
+                    if "elements" in payload:
+                        returned_ids = [
+                            e["id"] for e in payload["elements"]
+                            if isinstance(e, dict) and "id" in e
+                        ]
+                    elif "id" in payload:
+                        returned_ids = [payload["id"]]
+            assert el_other not in returned_ids, (
+                rule.rule, "returned the other organisation's element id",
+            )
+            if response.status_code == 200:
+                # The token granted a real, scoped read — its own org's data
+                # comes back, and only its own.
+                assert "RLS-Home" in response.get_data(as_text=True), rule.rule

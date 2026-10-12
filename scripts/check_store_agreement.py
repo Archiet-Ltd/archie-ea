@@ -429,6 +429,10 @@ CONCEPTS = {
                 distinct="application_id",
                 tenant_via=[("application_id", "application_components"),
                             ("created_by_id", "users")]),
+        Surface("orm:CostFact(applications)", "orm",
+                "app.models.cost_fact.CostFact",
+                filter_eq={"element_type": "application"},
+                distinct="element_id"),
     ],
     # /procurement/contracts renders VendorContract for the organisation as
     # HTML; its query is the orm:VendorContract surface.
