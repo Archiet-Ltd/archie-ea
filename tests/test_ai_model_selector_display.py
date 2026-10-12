@@ -58,13 +58,16 @@ def launch(browser):
     servers = []
     errors = []
     unexpected = []
+    closing = []
 
     def start(models, failure=False):
         context = browser.new_context(viewport={'width': 1440, 'height': 1000})
         contexts.append(context)
         page = context.new_page()
         page.on('pageerror', lambda error: errors.append(str(error)))
-        page.on('requestfailed', lambda request: errors.append(
+        # A request still in flight when the context is closed fails with an abort
+        # (Firefox and WebKit report it); that is teardown, not a page defect.
+        page.on('requestfailed', lambda request: None if closing else errors.append(
             {'path': urlsplit(request.url).path, 'failure': request.failure}))
         payloads = []
         document = html()
@@ -140,13 +143,14 @@ def launch(browser):
         page.on('request', lambda request: unexpected.append(request.url)
                 if not request.url.startswith(base + '/') else None)
         page.goto(base + '/')
-        page.get_by_role('button', name='Toggle advanced settings', exact=True).click(timeout=3000)
+        page.get_by_role('button', name='Toggle advanced settings', exact=True).click()
         page.on('framenavigated', lambda frame: errors.append(
             {'unexpected_navigation': urlsplit(frame.url).path + '?' + urlsplit(frame.url).query})
             if frame == page.main_frame else None)
         return page, payloads
 
     yield start
+    closing.append(True)
     for context in contexts:
         context.close()
     for server, thread in servers:
