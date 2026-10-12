@@ -60,31 +60,13 @@ MERGED_PAGES: dict[str, str] = {
 }
 
 HELD_PAGE_URLS: frozenset[str] = frozenset({
-    "/modules/capability-maturity",
-    "/use-cases/capability-maturity-heatmap",
-    "/modules/industry-apqc",
+    # /modules/integrations is mid-transition to the new /connectors hub on
+    # a separate branch; left here rather than touched by this fix to avoid
+    # colliding with that change.
     "/modules/integrations",
-    "/use-cases/canvas-dependencies",
-    "/use-cases/lean-canvas",
-    "/use-cases/reference-packs",
-    "/use-cases/website-first-look",
-    "/use-cases/website-full-profile",
-    "/use-cases/systems-with-no-owner",
-    "/use-cases/import-from-jira-and-github",
-    "/use-cases/match-systems-across-jira-and-servicenow",
-    "/use-cases/architecture-change-tracking",
-    "/use-cases/pagerduty-and-datadog-incidents",
-    "/use-cases/connector-candidates",
-    "/use-cases/leanix-ardoq-import",
-    "/use-cases/servicenow-cmdb-mapping",
-    "/use-cases/ai-assistant-for-your-architecture",
-    "/use-cases/derivation-yield",
-    "/use-cases/workforce-planning",
-    "/use-cases/adopt-reference-pack",
-    "/use-cases/see-your-own-twin",
-    "/use-cases/set-up-in-an-afternoon",
-    "/use-cases/demo-on-a-company-like-mine",
-    "/use-cases/what-we-can-and-cannot-tell",
+    # /docs has no front-matter state field of its own (it is a plain site
+    # page, not a module/use-case), so is_held's state-based half cannot see
+    # it -- this is its only hold mechanism.
     "/docs",
 })
 
@@ -367,22 +349,33 @@ class PublicPage:
         """Out of the sitemap, llms.txt/llms-full.txt and every nav/index
         listing, but still reachable at its own URL with a noindex tag.
 
-        True for a HOLD-verdict page (``HELD_PAGE_URLS`` -- not built yet)
-        and for a page withdrawn from discovery via front matter
-        ``state: not_planned`` (a feature that shipped as a page, then had
-        its release item pulled, with nothing left to build towards) --
-        both are the same "still reachable, just not advertised" case to
-        every caller, so one property covers both reasons.
+        True for a HOLD-verdict page (``HELD_PAGE_URLS`` -- a hold with no
+        front-matter mechanism of its own, e.g. a site page like /docs) and
+        for any page whose own front matter sets an explicit ``state`` other
+        than ``"on_main"`` -- ``missing``, ``briefed``, ``in_review``,
+        ``held`` and ``not_planned`` are all the same "not ready to
+        advertise" case from this property's point of view, so a page is
+        trusted to say so of itself rather than needing a second,
+        hand-maintained list entry kept in sync by hand. A page with no
+        ``state`` field at all (most site/vs/legal pages) is not held by
+        this half of the check -- only ``HELD_PAGE_URLS`` can hold those.
+
+        This was two checks before (``HELD_PAGE_URLS`` plus a literal
+        ``state == "not_planned"`` match): a page whose state had moved on
+        to ``on_main`` could still sit in ``HELD_PAGE_URLS`` from before it
+        was finished, with nothing forcing the two back into agreement
+        (found live: /use-cases/import-from-jira-and-github and
+        /modules/industry-apqc, both on_main, both still noindexed). One
+        check, with the page's own state as the only thing that can say
+        "ready", removes that drift instead of auditing it by hand again.
 
         A MERGE-verdict page (``MERGED_PAGES``) is a different case --
         its own URL 301s to a parent instead of rendering at all -- so it
         is not folded into this property; see load_feed_pages(), which
         checks both ``is_held`` and ``MERGED_PAGES`` separately.
         """
-        return (
-            self.url in HELD_PAGE_URLS
-            or self.front_matter.get("state") == "not_planned"
-        )
+        state = self.front_matter.get("state")
+        return self.url in HELD_PAGE_URLS or (state is not None and state != "on_main")
 
     @property
     def description(self) -> str | None:
