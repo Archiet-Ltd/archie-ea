@@ -826,24 +826,24 @@ def test_llms_txt_no_duplicate_urls(app):
 
 
 def test_llms_txt_first_sentence_not_glued_to_title(app):
-    """For ai-chat, the extracted sentence in llms.txt does not start with the page title."""
+    """For portfolio, the extracted sentence in llms.txt does not start with the page title."""
     from app.services.public_pages import load_page
 
-    page = load_page("module", slug="ai-chat")
-    assert page is not None, "ai-chat page not found"
+    page = load_page("module", slug="portfolio")
+    assert page is not None, "portfolio page not found"
 
     with app.test_client() as client:
         rv = client.get("/llms.txt")
         assert rv.status_code == 200
         text = rv.data.decode()
 
-    # Find the line for ai-chat in the Capabilities section
+    # Find the line for portfolio in the Capabilities section
     import re
 
-    # Pattern: - [AI Chat](https://entelim.org/modules/ai-chat) — <sentence>
+    # Pattern: - [Portfolio](https://entelim.org/modules/portfolio) — <sentence>
     pattern = rf"\[{re.escape(page.title)}\]\(https://entelim\.org{re.escape(page.url)}\) — ([^\n]+)"
     match = re.search(pattern, text)
-    assert match is not None, "ai-chat entry not found in llms.txt Capabilities section"
+    assert match is not None, "portfolio entry not found in llms.txt Capabilities section"
 
     sentence = match.group(1).strip()
     # The sentence must not start with the page title (glued)

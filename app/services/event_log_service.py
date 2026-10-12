@@ -79,6 +79,12 @@ def relay_outbox_batch(batch_size: int = 500) -> int:
         .filter(OperationOutboxEvent.published_at.is_(None))
         .order_by(OperationOutboxEvent.id)
         .limit(batch_size)
+        # Take every row lock now, in id order, rather than one per row as the
+        # loop below updates them: a transaction locking the same rows in a
+        # different order (another relay worker, a fixture tearing rows down)
+        # could otherwise close a cycle and be killed with "deadlock detected".
+        # Rows another transaction holds are left to it and picked up next run.
+        .with_for_update(skip_locked=True)
         .all()
     )
     if not rows:
