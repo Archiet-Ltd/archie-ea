@@ -2414,8 +2414,8 @@ def sso_settings():
 
 
 def _render_sso_settings(new_scim_token=None):
-    """The SSO settings page: group mappings plus the SCIM token panel
-    (R1-B26). ``new_scim_token`` is the raw token, shown once on the response
+    """The SSO settings page: group mappings plus the SCIM token panel.
+    ``new_scim_token`` is the raw token, shown once on the response
     that creates it and never again."""
     from app.models.miscellaneous import SSOGroupRoleMapping
     from app.services import provisioning_service

@@ -1,6 +1,6 @@
-"""The twelve review defects on PR 424 (R1-B26 PR 1 fix round).
+"""The twelve review defects on PR 424 (fix round).
 
-Each test names its defect id (D-01 ... D-12) or the coordinator note (F-04).
+Each test names its defect id (D-01... D-12) or the coordinator note (F-04).
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def _plan(db_session, org, plan, seats):
 
 def _count(db_session, table, org_id):
     return db_session.execute(
-        text(f"SELECT count(*) FROM {table} WHERE organization_id = :o"), {"o": org_id}
+        text(f"SELECT count(*) FROM {table} WHERE organization_id =:o"), {"o": org_id}
     ).scalar_one()
 
 
@@ -203,7 +203,7 @@ def test_d02_a_read_only_reactivation_on_a_full_editors_plan_succeeds(client, db
     reader = make_user(db_session, org, "reader")
     db_session.add(OrgRole(organization_id=org.id, user_id=reader.id, role="viewer"))
     db_session.flush()
-    make_user(db_session, org, "editor")  # the one editor seat
+    make_user(db_session, org, "editor") # the one editor seat
     provisioning_service.deactivate_user(reader, reason="leaver_deprovisioned", actor="test")
     _row, raw = issue_token(db_session, org)
 
@@ -539,11 +539,11 @@ def _header_set(resp):
     logins that straddle a second boundary carry equal cookie names and
     attributes but different signed values -- a real timing flake, not a
     behavioural difference. Normalise the value, keep the cookie name and
-    every attribute (HttpOnly, Path, SameSite, ...) intact.
+    every attribute (HttpOnly, Path, SameSite,...) intact.
     """
 
     def _normalise(key, value):
-        value = re.sub(r"nonce-[A-Za-z0-9_\-=+/]+", "nonce-", value)  # the CSP nonce is per request
+        value = re.sub(r"nonce-[A-Za-z0-9_\-=+/]+", "nonce-", value) # the CSP nonce is per request
         if key == "set-cookie":
             value = re.sub(r"^([^=]+)=[^;]*", r"\1=<redacted>", value)
         return value
@@ -595,7 +595,7 @@ def test_d07_form_logins_answer_a_deactivated_user_exactly_like_a_wrong_password
         assert right[0] == wrong[0]
         assert right[1] == wrong[1]
         assert right[2] == wrong[2]
-        assert right[3] == wrong[3]  # D-07: equal full header set, Set-Cookie included
+        assert right[3] == wrong[3] # D-07: equal full header set, Set-Cookie included
         assert "Invalid email or password." in right[1]
         assert "not active" not in right[1]
 
@@ -825,7 +825,7 @@ def test_d12_a_null_timestamp_omits_its_key(client, db_session, make_org):
     org = make_org("d12b")
     give_unlimited_plan(db_session, org)
     old = make_user(db_session, org, "oldtimer")
-    db_session.execute(text("UPDATE users SET created_at = NULL, updated_at = NULL WHERE id = :i"),
+    db_session.execute(text("UPDATE users SET created_at = NULL, updated_at = NULL WHERE id =:i"),
                        {"i": old.id})
     db_session.expire(old)
     _row, raw = issue_token(db_session, org)

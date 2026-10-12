@@ -1,4 +1,4 @@
-"""SCIM provisioning tables (R1-B26 PR 1, TB-0143).
+"""SCIM provisioning tables.
 
 ``ScimToken`` is the per-organisation bearer credential an identity provider
 presents at ``/scim/v2``. Only the sha256 digest is stored (the same

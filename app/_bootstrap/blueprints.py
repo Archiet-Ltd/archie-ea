@@ -41,14 +41,14 @@ class _RegistrationFailureCapture(logging.Handler):
                     "message": record.getMessage(),
                 }
             )
-        except Exception:  # noqa: BLE001 — a broken record must never break boot
+        except Exception: # noqa: BLE001 — a broken record must never break boot
             pass
 
 
 def init_blueprints(app):
     """Register every blueprint / module on *app*, recording any failures.
 
-    Thin wrapper around :func:`_init_blueprints` that captures the warnings the
+    Thin wrapper around:func:`_init_blueprints` that captures the warnings the
     registration helpers emit when a module fails to import, and stashes them on
     ``app.extensions["blueprint_registration_failures"]``.
     """
@@ -197,7 +197,7 @@ def _init_blueprints(app):
     # --- SSO federation (COM-005) ---
     _register_sso(app)
 
-    # --- SCIM 2.0 provisioning (R1-B26) ---
+    # --- SCIM 2.0 provisioning ---
     _register_scim(app, csrf)
 
     # --- Standalone feature blueprints the v2 module paths omit ---
@@ -304,7 +304,7 @@ CANONICAL_BLUEPRINTS = {
     'arb', 'arb_workflow',
     'consolidation_list',
     'unified_ai_chat',
-    # 'implementation_planning',  # Not canonical, but NOT dead: it is still
+    # 'implementation_planning', # Not canonical, but NOT dead: it is still
     # registered elsewhere and serves 26 live rules under /implementation/*
     # (verified against app.url_map). The previous note here said "all routes
     # 404", which is false and has already misled one change. Deregistering it
@@ -329,7 +329,7 @@ def _register_sso(app):
 
 
 def _register_scim(app, csrf):
-    """Register the SCIM 2.0 provisioning blueprint (R1-B26 PR 1).
+    """Register the SCIM 2.0 provisioning blueprint.
 
     csrf.exempt: bearer-token only. The blueprint never reads the session
     cookie, so there is no ambient credential for a forged request to ride.
@@ -349,7 +349,7 @@ def _register_scim(app, csrf):
 
         if rate_limiting.limiter is not None:
             rate_limiting.limiter.exempt(scim_bp)
-        app.logger.info("[SCIM] SCIM 2.0 provisioning blueprint registered at /scim/v2 (R1-B26)")
+        app.logger.info("[SCIM] SCIM 2.0 provisioning blueprint registered at /scim/v2")
     except Exception as exc:
         app.logger.warning("[SCIM] Could not register SCIM blueprint (non-fatal): %s", exc)
 
@@ -633,7 +633,7 @@ def _register_always_on_apis(app, csrf):
     # request_loader). Registered unconditionally — it checks MCP_ENABLED
     # itself and is a no-op while the flag is off — so the mechanism exists
     # in every build regardless of which blueprints below actually register.
-    from app.modules.oauth_provider import identity as _oauth_identity  # noqa: F401
+    from app.modules.oauth_provider import identity as _oauth_identity # noqa: F401
 
     # OAuth 2.1 authorization server (the provider side; the client side is
     # already in app/modules/account/ for SSO) and the MCP Streamable HTTP
@@ -731,7 +731,7 @@ def _register_always_on_apis(app, csrf):
 
         app.register_blueprint(dynamic_dashboards)
     except ImportError:
-        pass  # module deleted; dashboard routes disabled
+        pass # module deleted; dashboard routes disabled
 
     # Unified Low Priority
     from app.routes.unified_low_priority_routes import unified_low_priority_bp
@@ -1568,20 +1568,20 @@ def _register_persona_modules(app):
     """
     try:
         from app.modules.my_applications import my_applications_bp
-        from app.modules.my_applications import routes as _my_app_routes  # noqa: F401
+        from app.modules.my_applications import routes as _my_app_routes # noqa: F401
 
         app.register_blueprint(my_applications_bp)
         logger.info("[Blueprint] my_applications registered (/my-applications)")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e: # noqa: BLE001
         logger.error("[Blueprint] my_applications FAILED to register: %s", e)
 
     try:
         from app.modules.procurement import procurement_bp
-        from app.modules.procurement import routes as _proc_routes  # noqa: F401
+        from app.modules.procurement import routes as _proc_routes # noqa: F401
 
         app.register_blueprint(procurement_bp)
         logger.info("[Blueprint] procurement registered (/procurement)")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e: # noqa: BLE001
         logger.error("[Blueprint] procurement FAILED to register: %s", e)
 
     # All-modules directory (shell-overhaul Wave 1, Task 3 fix round). Not
@@ -1590,11 +1590,11 @@ def _register_persona_modules(app):
     # user reach anything by URL; this just makes that discoverable.
     try:
         from app.modules.modules_directory import modules_directory_bp
-        from app.modules.modules_directory import routes as _modules_dir_routes  # noqa: F401
+        from app.modules.modules_directory import routes as _modules_dir_routes # noqa: F401
 
         app.register_blueprint(modules_directory_bp)
         logger.info("[Blueprint] modules_directory registered (/modules)")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e: # noqa: BLE001
         logger.error("[Blueprint] modules_directory FAILED to register: %s", e)
 
 
@@ -1656,7 +1656,7 @@ def _register_misc_blueprints(app, csrf):
             app.logger.info(
                 "[BLUEPRINT] Vendor JSON API registered at /api/vendors (always-on)"
             )
-        except Exception as e:  # pragma: no cover - defensive
+        except Exception as e: # pragma: no cover - defensive
             app.logger.warning(f"[BLUEPRINT] Vendor JSON API registration failed: {e}")
 
     if "vendor_management" not in app.blueprints:
@@ -1669,7 +1669,7 @@ def _register_misc_blueprints(app, csrf):
             app.logger.info(
                 "[BLUEPRINT] Vendor Management registered (always-on)"
             )
-        except Exception as e:  # pragma: no cover - defensive
+        except Exception as e: # pragma: no cover - defensive
             app.logger.warning(
                 f"[BLUEPRINT] Vendor Management registration failed: {e}"
             )
@@ -1825,7 +1825,7 @@ def _register_late_apis(app, csrf, **flags):
             app.logger.info(
                 "[BLUEPRINT] Import batch v2 registered (guardrail-enabled)"
             )
-            _ff_import_batch = True  # skip legacy below
+            _ff_import_batch = True # skip legacy below
         except Exception as e:
             app.logger.warning("Failed to register Import Batch v2: %s", e)
             _ff_import_batch_v2 = False
@@ -2338,9 +2338,9 @@ def _register_enterprise_exports(app, csrf):
     - ArchiMate XML: Open Exchange Format (Sparx EA/BiZZdesign compatible)
     
     Endpoints:
-    - GET  /api/export/solutions/{id}/pdf
-    - GET  /api/export/solutions/{id}/pptx
-    - GET  /api/export/portfolio/excel
+    - GET /api/export/solutions/{id}/pdf
+    - GET /api/export/solutions/{id}/pptx
+    - GET /api/export/portfolio/excel
     - POST /api/export/archimate/xml
     """
     try:

@@ -110,7 +110,7 @@ VIEW_OPT_OUT = {
 # justification, or it belongs in VIEW_OPT_OUT instead of here.
 BLUEPRINT_OPT_OUT = {
     "health": "Unauthenticated monitoring probes (liveness/readiness), no session to ride.",
-    "scim": "SCIM 2.0 provisioning (R1-B26): authenticated only by a per-organisation "
+    "scim": "SCIM 2.0 provisioning: authenticated only by a per-organisation "
             "bearer token and never reads the session cookie, so there is no ambient "
             "credential a forged request could ride.",
 }
@@ -200,7 +200,7 @@ def assert_csrf_coverage(app):
     unjustified = result["exempt_unjustified"]
     if unjustified:
         lines = "\n".join(
-            f"  - {e['dest']} ({', '.join(e['methods'])} {e['rule']})" for e in unjustified
+            f" - {e['dest']} ({', '.join(e['methods'])} {e['rule']})" for e in unjustified
         )
         raise CsrfCoverageError(
             "CSRF coverage gate failed: the following write routes are "

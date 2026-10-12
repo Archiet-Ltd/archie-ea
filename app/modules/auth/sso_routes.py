@@ -5,12 +5,12 @@ Blueprint: ``sso``
 
 Routes
 ------
-GET  /auth/sso/initiate?email=...    Look up domain config; redirect to IdP.
-GET  /auth/sso/callback/oidc         Handle OIDC callback; provision user; login.
-POST /auth/sso/callback/saml         Handle SAML Response; provision user; login.
-GET  /admin/sso                      Show SSO config form (admin only).
-POST /admin/sso                      Save SSO config (admin only).
-POST /admin/sso/test                 Test the saved config without enforcing it (admin only).
+GET /auth/sso/initiate?email=... Look up domain config; redirect to IdP.
+GET /auth/sso/callback/oidc Handle OIDC callback; provision user; login.
+POST /auth/sso/callback/saml Handle SAML Response; provision user; login.
+GET /admin/sso Show SSO config form (admin only).
+POST /admin/sso Save SSO config (admin only).
+POST /admin/sso/test Test the saved config without enforcing it (admin only).
 """
 
 import logging
@@ -244,7 +244,7 @@ def _finish_sso(config, org, claims, *, test_mode: bool):
     from app.services import mfa_service, session_registry
 
     if not user.is_active:
-        # R1-B26: a deactivated user is refused before any MFA step or session.
+        # A deactivated user is refused before any MFA step or session.
         flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
         return redirect(url_for("account.login"))
 

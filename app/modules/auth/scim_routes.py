@@ -1,4 +1,4 @@
-"""SCIM 2.0 provisioning endpoints (R1-B26 PR 1, TB-0143), mounted at ``/scim/v2``.
+"""SCIM 2.0 provisioning endpoints, mounted at ``/scim/v2``.
 
 An organisation's identity provider creates, updates, reads, lists and
 deactivates that organisation's users, and manages group membership, with a
@@ -290,7 +290,7 @@ def _apply_user_value(attrs, key, value, op):
             email = value
         if email:
             attrs["email"] = str(email)
-    # Anything else (displayName, title, extension attributes ...) is ignored.
+    # Anything else (displayName, title, extension attributes...) is ignored.
 
 
 def _attrs_from_patch(body):

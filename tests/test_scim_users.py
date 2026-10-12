@@ -1,4 +1,4 @@
-"""SCIM 2.0 Users, discovery, token handling, audit and throttling (R1-B26 PR 1).
+"""SCIM 2.0 Users, discovery, token handling, audit and throttling.
 
 Two-organisation isolation is in tests/test_scim_tenant_isolation.py; group
 behaviour in tests/test_scim_groups.py; deactivation in
@@ -383,7 +383,7 @@ class TestAudit:
         group = call(client, "POST", "/Groups", raw, {"displayName": "Auditors"}).get_json(force=True)
         call(client, "PATCH", f"/Groups/{group['id']}", raw, patch_body(
             {"op": "add", "path": "members", "value": [{"value": uid}]}))
-        call(client, "GET", "/Users", "scim_wrong")  # failed authentication
+        call(client, "GET", "/Users", "scim_wrong") # failed authentication
         provisioning_service.revoke_scim_token(org.id, row.id, "user:1")
 
         actions = [r.action for r in self._actions(org.id)]

@@ -1,4 +1,4 @@
-"""Provisioning, leaver removal and the leaver transfer list (R1-B26 PR 1, TB-0143).
+"""Provisioning, leaver removal and the leaver transfer list.
 
 The one place that creates a user from an identity provider, deactivates and
 reactivates one, revokes their credentials, records SCIM group membership,
@@ -151,9 +151,9 @@ def create_or_update_user(org_id, attrs, *, source, user=None, actor=None, link_
     Returns ``(user, created, changed)`` where ``changed`` is a list of the
     attribute names that changed (never values). Commits.
 
-    Raises :class:`EmailInOtherOrganisation` when the email belongs to another
+    Raises:class:`EmailInOtherOrganisation` when the email belongs to another
     organisation's account (the rule the SSO sign-in has always applied, now
-    shared), and, for SCIM only, :class:`ProtectedUserError` for platform
+    shared), and, for SCIM only,:class:`ProtectedUserError` for platform
     administrators and a 409 for the configured ``ADMIN_EMAIL``; SCIM also
     refuses to change the ``userName`` of an organisation administrator.
 
@@ -180,7 +180,7 @@ def create_or_update_user(org_id, attrs, *, source, user=None, actor=None, link_
     if user is None:
         existing = None
         if link_only and attrs.get("external_id") and attrs.get("sso_provider"):
-            pair = User.query.filter(  # tenant-scoping-ok: pre-auth SSO callback, no org context yet; the pair is unique per IdP.
+            pair = User.query.filter( # tenant-scoping-ok: pre-auth SSO callback, no org context yet; the pair is unique per IdP.
                 User.external_id == attrs["external_id"],
                 User.sso_provider == attrs["sso_provider"],
             )
@@ -434,11 +434,10 @@ def reactivate_user(user, *, actor, actor_id=None):
 
 
 def revoke_user_credentials(user, reason):
-    """Revoke every credential the user holds: all sessions, and every
-    outstanding account token. The single hook later token stores call into.
-
-    # OAuth access and refresh tokens (PR 347, ``app/modules/oauth_provider``)
-    # are not on main yet; when that store lands, revoke the user's tokens here.
+    """Revoke every credential the user holds: all sessions, every
+    outstanding account token, and (via session_registry.revoke_all_for_user)
+    every connected-assistant OAuth token -- a session in every way that
+    matters here, so it ends with the rest.
     """
     reason = (reason or REASON_LEAVER)[:32]
     session_registry.revoke_all_for_user(user.id, reason)
@@ -653,15 +652,15 @@ def recompute_roles(org_id, user_ids):
             continue
         rows = (
             db.session.query(SSOGroupRoleMapping)
-            .join(ScimGroupMembership, ScimGroupMembership.group_mapping_id == SSOGroupRoleMapping.id)
-            .filter(
+.join(ScimGroupMembership, ScimGroupMembership.group_mapping_id == SSOGroupRoleMapping.id)
+.filter(
                 ScimGroupMembership.organization_id == org_id,
                 ScimGroupMembership.user_id == user.id,
                 SSOGroupRoleMapping.organization_id == org_id,
                 SSOGroupRoleMapping.is_active.is_(True),
                 SSOGroupRoleMapping.role_name != ROLE_PLATFORM_ADMIN,
             )
-            .all()
+.all()
         )
         names = [r.sso_group_name for r in rows if r.role_name in VALID_ROLES]
         role = sso_service.map_groups_to_role(names, org_id) if names else None
@@ -774,7 +773,7 @@ def authenticate_scim_token(raw):
 def leaver_ownerships(org_id):
     """Deactivated users of ``org_id`` with every ownership row each holds.
 
-    Returns a list of ``{"user": User, "ownerships": [dict, ...]}`` sorted by
+    Returns a list of ``{"user": User, "ownerships": [dict,...]}`` sorted by
     when they were deactivated; a deactivated user with no ownership still
     appears (with an empty list) so the administrator sees who left.
     """
@@ -783,8 +782,8 @@ def leaver_ownerships(org_id):
 
     leavers = (
         User.query.filter(User.organization_id == org_id, User.deactivated_at.isnot(None))
-        .order_by(User.deactivated_at.desc(), User.id)
-        .all()
+.order_by(User.deactivated_at.desc(), User.id)
+.all()
     )
     if not leavers:
         return []
@@ -822,8 +821,8 @@ def active_users(org_id):
     """Active users of ``org_id`` an ownership may be handed to."""
     return (
         User.query.filter(User.organization_id == org_id, User.deactivated_at.is_(None))
-        .order_by(User.first_name, User.last_name, User.email)
-        .all()
+.order_by(User.first_name, User.last_name, User.email)
+.all()
     )
 
 
@@ -832,11 +831,11 @@ def transfer_ownership(org_id, owner_row_id, new_user_id, *, actor, effective_da
     same organisation, through the one ownership record.
 
     ``actor`` is the administrator's user id. ``effective_date`` and
-    ``recommended_by`` are reserved for the successor recommendation (R1-B63)
+    ``recommended_by`` are reserved for the successor recommendation
     and are not used yet. Returns ``(row, removed_duplicate)``.
 
-    Raises :class:`NotFoundError` for a row that is not in ``org_id`` (or whose
-    holder is still active) and :class:`ProvisioningError` for a target that is
+    Raises:class:`NotFoundError` for a row that is not in ``org_id`` (or whose
+    holder is still active) and:class:`ProvisioningError` for a target that is
     not an active user of ``org_id``.
     """
     row = ApplicationOwner.query.filter(

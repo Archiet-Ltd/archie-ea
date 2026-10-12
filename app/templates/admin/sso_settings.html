@@ -280,7 +280,7 @@
         </div>
     </div>
 
-    <!-- SCIM provisioning (R1-B26) -->
+    <!-- SCIM provisioning -->
     <div id="scim-provisioning" class="mt-8" data-slot="card">
         <div class="rounded-xl border-2 border-input bg-card">
             <div class="p-4 sm:p-6 border-b flex items-center justify-between gap-4">
@@ -314,7 +314,7 @@
                                 class="inline-flex items-center rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
                                 @click="navigator.clipboard.writeText(document.getElementById('scim-token-value').textContent.trim()); copied = true"
                                 aria-label="Copy the SCIM token">
-                            <span x-text="copied ? 'Copied' : 'Copy'">Copy</span>
+                            <span x-text="copied ? 'Copied': 'Copy'">Copy</span>
                         </button>
                     </div>
                 </div>

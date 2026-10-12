@@ -37,7 +37,7 @@ AUTH_TABLE = "auth"
 
 
 def _request_context():
-    """Return (ip, user_agent) for the current request, ('' , '') outside one."""
+    """Return (ip, user_agent) for the current request, ('', '') outside one."""
     try:
         from flask import request
 
@@ -76,7 +76,7 @@ def record_login_failure(email=None):
             # g.current_org_id is unset at this point, and the whole purpose of
             # the lookup is to discover which org (if any) the address belongs
             # to. Scoping it would make every failed attempt unattributable.
-            user = User.query.filter(User.email.ilike(email)).first()  # tenant-scoping-ok: pre-authentication lookup; no tenant context exists yet
+            user = User.query.filter(User.email.ilike(email)).first() # tenant-scoping-ok: pre-authentication lookup; no tenant context exists yet
         except Exception as exc:
             logger.debug("auth audit: user lookup failed for failed login: %s", exc)
     return _record(ACTION_LOGIN_FAILED, user=user, extra={"attempted_email": email})
@@ -131,7 +131,7 @@ def _record(action, user=None, extra=None, organization_id=None, record_id=None,
         return None
 
 
-# --- Provisioning and leaver events (R1-B26 PR 1, TB-0143) -----------------
+# --- Provisioning and leaver events -----------------
 # Each action is at most 20 characters (AuditLog.action is String(20)). The
 # ``extra`` dict records the actor, the names of changed attributes and, for
 # transfers, the from/to users and the item -- never a secret or a raw token.
@@ -290,8 +290,8 @@ def recent_auth_events(user_id, limit=5):
             q = q.filter(AuditLog.organization_id == org_id)
         return (
             q.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
-            .limit(limit)
-            .all()
+.limit(limit)
+.all()
         )
     except Exception:
         logger.warning("auth audit: recent_auth_events lookup failed", exc_info=True)

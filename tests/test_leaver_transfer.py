@@ -1,4 +1,4 @@
-"""The leaver list and ownership transfer (R1-B26 PR 1, acceptance criterion 6)."""
+"""The leaver list and ownership transfer (acceptance criterion 6)."""
 
 from __future__ import annotations
 
@@ -106,7 +106,7 @@ def test_transfer_updates_the_same_row_audits_it_and_the_owners_api_shows_the_ne
 
     login_as(client, world["admin_a"])
     owners = client.get(f"/applications/{world['app'].id}/owners")
-    if owners.status_code == 404:  # blueprint prefix differs: fall back to the model read the route uses
+    if owners.status_code == 404: # blueprint prefix differs: fall back to the model read the route uses
         from app.models.application_owner import ApplicationOwner
 
         rows = ApplicationOwner.get_display_rows_for_application(world["app"].id, world["org_a"].id)

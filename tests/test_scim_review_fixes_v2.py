@@ -1,6 +1,6 @@
-"""The open defects of the PR 424 v2 review (R1-B26 PR 1, fix round 2).
+"""The open defects of the PR 424 v2 review (fix round 2).
 
-Each test names its defect id (N-01 ... N-05, D-07).
+Each test names its defect id (N-01... N-05, D-07).
 """
 
 from __future__ import annotations
@@ -234,7 +234,7 @@ def test_n04_reactivation_is_refused_when_another_organisation_of_theirs_is_full
     db_session.flush()
     provisioning_service.deactivate_user(leaver, reason="leaver_deprovisioned", actor="test")
     sub = Subscription.query.filter_by(organization_id=org_c.id).one()
-    sub.seats_purchased = 2  # C is now at 2 of 2
+    sub.seats_purchased = 2 # C is now at 2 of 2
     db_session.flush()
 
     with pytest.raises(PlanLimitReached):
@@ -281,7 +281,7 @@ def test_d07_api_login_headers_of_a_deactivated_account_equal_a_wrong_password(
         lambda *a, **k: touched.append(1) or real(*a, **k),
     )
     right = client.post("/api/auth/login", json={"email": leaver.email, "password": _PASSWORD})
-    assert touched == []  # nothing touched the session for a deactivated account
+    assert touched == [] # nothing touched the session for a deactivated account
     wrong = client.post("/api/auth/login", json={"email": leaver.email, "password": "not-the-password"})
     assert right.status_code == wrong.status_code == 401
     assert right.get_data() == wrong.get_data()

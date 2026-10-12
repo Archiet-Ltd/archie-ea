@@ -58,11 +58,11 @@ _DEFAULT_ABSOLUTE_ADMIN = timedelta(hours=4)
 #: the defect the old client-side "extend" button had, since it pinged /health.
 _EXEMPT_ENDPOINTS = {
     "static",
-    "global_health_check",   # /health
-    "health.health",         # /health (blueprint duplicate)
+    "global_health_check", # /health
+    "health.health", # /health (blueprint duplicate)
     "healthz",
-    "version_endpoint",      # /version
-    "csp_report",            # /api/csp-report
+    "version_endpoint", # /version
+    "csp_report", # /api/csp-report
 }
 
 
@@ -179,7 +179,7 @@ def init_session_policy(app):
         if endpoint in _EXEMPT_ENDPOINTS or request.path.startswith("/static/"):
             return None
 
-        # SCIM (R1-B26) is bearer-token only and never reads the session
+        # SCIM is bearer-token only and never reads the session
         # cookie, so a stale cookie sent alongside must not turn a
         # provisioning call into a sign-in redirect.
         if request.blueprint == "scim":
@@ -187,7 +187,7 @@ def init_session_policy(app):
 
         try:
             authenticated = bool(current_user and current_user.is_authenticated)
-            # R1-B26: Flask-Login's ``is_authenticated`` is ``is_active`` on a
+            # Flask-Login's ``is_authenticated`` is ``is_active`` on a
             # User, so a deactivated user reads as anonymous here. Look at the
             # loaded user itself so the session, the remember-me cookie and the
             # audit trail are all dealt with, not just left to ``login_required``.

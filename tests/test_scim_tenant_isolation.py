@@ -1,4 +1,4 @@
-"""Two-organisation SCIM isolation (R1-B26 PR 1, acceptance criterion 2).
+"""Two-organisation SCIM isolation (acceptance criterion 2).
 
 Organisation A's token must not list, read, create, update or deactivate
 organisation B's users, nor read or change B's groups. Every assertion checks

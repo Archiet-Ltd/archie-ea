@@ -44,7 +44,7 @@ from app.modules.account.routes import mail_views
 from app.modules.account.services.account_service import AccountService
 
 # Blueprint name MUST be "account" (not "account_v2") because the shared
-# AccountService uses url_for("account.confirm", ...) etc.  The 3-tier
+# AccountService uses url_for("account.confirm",...) etc. The 3-tier
 # fallback in _bootstrap/blueprints.py guarantees only one tier is active,
 # so there is no name collision.
 account_bp_v2 = Blueprint("account", __name__)
@@ -54,7 +54,7 @@ _svc = AccountService
 
 
 @account_bp_v2.route("/login", methods=["GET", "POST"])
-@rate_limit(10, "1m", methods=("POST",))  # SECURITY: Brute-force protection on credential submits only
+@rate_limit(10, "1m", methods=("POST",)) # SECURITY: Brute-force protection on credential submits only
 @timed_route
 def login():
     """Log in an existing user."""
@@ -121,7 +121,7 @@ def login():
             session.permanent = True
             try:
                 audit_logger.log_authentication(success=True)
-            except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
+            except Exception: # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
                 pass
             # V-06: audit_logger writes to `audit_events`, which nothing
             # surfaces. Record the same event in `soc2_audit_log`, the table
@@ -143,7 +143,7 @@ def login():
         else:
             try:
                 audit_logger.log_authentication(success=False)
-            except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
+            except Exception: # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
                 pass
             # V-06: failed-login monitoring needs the attempt in the surfaced
             # audit table, attributed to the account it targeted where one exists.
@@ -189,7 +189,7 @@ def _complete_login_after_mfa(user):
     session.permanent = True
     try:
         audit_logger.log_authentication(success=True)
-    except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
+    except Exception: # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
         pass
     _login_entry = auth_audit.record_login_success(user)
     if _login_entry is not None:
@@ -202,7 +202,7 @@ def _complete_login_after_mfa(user):
 
 
 @account_bp_v2.route("/mfa-challenge", methods=["GET", "POST"])
-@rate_limit(10, "1m", methods=("POST",))  # SECURITY: brute-force protection on code submits
+@rate_limit(10, "1m", methods=("POST",)) # SECURITY: brute-force protection on code submits
 @timed_route
 def mfa_challenge():
     """Multi-factor step for an administrator mid-login (R1-B12 PR 2,
@@ -250,7 +250,7 @@ def mfa_challenge():
 
 
 @account_bp_v2.route("/register", methods=["GET", "POST"])
-@rate_limit(5, "1m", methods=("POST",))  # SECURITY: Anti-abuse on registration submits only
+@rate_limit(5, "1m", methods=("POST",)) # SECURITY: Anti-abuse on registration submits only
 @timed_route
 def register():
     """Register a new user, and send them a confirmation email."""
@@ -264,7 +264,7 @@ def logout():
     """Log out the current user."""
     try:
         audit_logger.log_logout()
-    except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
+    except Exception: # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
         pass
     # V-06: logout is a session-forensics event too; record it in the surfaced
     # audit table while current_user is still resolvable.
@@ -338,7 +338,7 @@ def session_keepalive():
 
 
 @account_bp_v2.route("/reset-password", methods=["GET", "POST"])
-@rate_limit(5, "1m", methods=("POST",))  # SECURITY: each POST can send mail
+@rate_limit(5, "1m", methods=("POST",)) # SECURITY: each POST can send mail
 @timed_route
 def reset_password_request():
     """Respond to existing user's request to reset their password."""
@@ -420,7 +420,7 @@ def change_email(token):
 
 @account_bp_v2.route("/confirm-account", methods=["GET", "POST"])
 @login_required
-@rate_limit(3, "1m", methods=("POST",))  # SECURITY: each POST sends mail
+@rate_limit(3, "1m", methods=("POST",)) # SECURITY: each POST sends mail
 @timed_route
 def confirm_request():
     """Respond to new user's request to confirm their account."""
@@ -706,7 +706,7 @@ def sso_callback(provider):
     # when `user` was already resolved above.
     db.session.commit()
 
-    # R1-B26 PR 1: a leaver deactivated through the identity-provider
+    # A leaver deactivated through the identity-provider
     # lifecycle must not still be able to sign in via SSO. Checked after
     # the nOAuth-protected identity resolution above (never skips that
     # check), before anything else mints a session.

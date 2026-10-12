@@ -1,4 +1,4 @@
-"""The SCIM provisioning revision (R1-B26 PR 1, acceptance criterion 10).
+"""The SCIM provisioning revision (acceptance criterion 10).
 
 On an empty database ``schema-upgrade`` reaches the new head, ``db downgrade
 -1`` then ``db upgrade`` round-trips, running the revision's ``upgrade()``

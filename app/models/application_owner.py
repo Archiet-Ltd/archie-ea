@@ -10,7 +10,7 @@ ADR Reference: docs/adr/0011-application-manager-persona.md
 
 from datetime import datetime
 
-from .. import db
+from.. import db
 
 
 class ApplicationOwner(db.Model):
@@ -83,7 +83,7 @@ class ApplicationOwner(db.Model):
         db.String(50),
         nullable=False,
         default="primary",
-    )  # 'primary', 'backup', 'technical', 'business'
+    ) # 'primary', 'backup', 'technical', 'business'
 
     # Timestamps
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -174,8 +174,8 @@ class ApplicationOwner(db.Model):
                 user.id: user
                 for user in db.session.execute(
                     db.select(User)
-                    .where(User.organization_id == organization_id)
-                    .where(User.id.in_(user_ids))
+.where(User.organization_id == organization_id)
+.where(User.id.in_(user_ids))
                 ).scalars()
             }
 
@@ -195,7 +195,7 @@ class ApplicationOwner(db.Model):
                 ),
                 "assigned_at": row.assigned_at.isoformat() if row.assigned_at else None,
                 "assigned_by": row.assigned_by,
-                # False when the owner has been deactivated (R1-B26): the
+                # False when the owner has been deactivated: the
                 # fact sheet marks them; the row stays until an administrator
                 # transfers it from the leaver list.
                 "owner_active": bool(user.is_active) if user is not None else True,
@@ -245,8 +245,8 @@ class ApplicationOwner(db.Model):
                 user.id: user
                 for user in db.session.execute(
                     db.select(User)
-                    .where(User.organization_id == organization_id)
-                    .where(User.id.in_(user_ids))
+.where(User.organization_id == organization_id)
+.where(User.id.in_(user_ids))
                 ).scalars()
             }
 
@@ -266,7 +266,7 @@ class ApplicationOwner(db.Model):
                 ),
                 "assigned_at": row.assigned_at.isoformat() if row.assigned_at else None,
                 "assigned_by": row.assigned_by,
-                # False when the owner has been deactivated (R1-B26): the
+                # False when the owner has been deactivated: the
                 # fact sheet marks them; the row stays until an administrator
                 # transfers it from the leaver list.
                 "owner_active": bool(user.is_active) if user is not None else True,

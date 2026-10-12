@@ -1,4 +1,4 @@
-"""Leaver transfer list (R1-B26 PR 1, TB-0143).
+"""Leaver transfer list.
 
 Shows each deactivated user of the caller's organisation with every
 application and element they still own, and lets an administrator move each

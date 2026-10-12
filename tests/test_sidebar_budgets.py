@@ -113,7 +113,7 @@ def test_sidebar_link_budget_is_31():
     platform_admin-only link (owner, charter and delegated limits per
     registered agent); no fold is available for the same reason as above.
 
-    Leavers (R1-B26 PR 1, 7 Oct 2026): raised 33 -> 34. One new
+    Leavers (7 Oct 2026): raised 33 -> 34. One new
     administrator-only link (departed users and the ownerships to hand over);
     no fold is available for the same reason as above.
     """
@@ -471,7 +471,7 @@ def test_platform_admin_zone_link_total_is_pinned():
     and delegated limits, closest existing persona to the brief's
     "Organisation Administrator".
 
-    30 -> 31 (R1-B26 PR 1, 7 Oct 2026): "Leavers" added to platform_admin's
+    30 -> 31 (7 Oct 2026): "Leavers" added to platform_admin's
     Admin zone — the list of departed users and the ownerships to hand over.
     """
     assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 31
@@ -499,7 +499,7 @@ def test_get_sidebar_zones_defaults_for_unknown_role():
 def test_get_sidebar_zones_never_raises_for_none_user():
     zones = get_sidebar_zones(None)
     # Must not raise and must return the default role's zone structure.
-    assert len(zones) >= 3  # home, my_work, library at minimum
+    assert len(zones) >= 3 # home, my_work, library at minimum
     zone_names = {z["zone"] for z in zones}
     assert zone_names >= {"home", "my_work", "library"}
 

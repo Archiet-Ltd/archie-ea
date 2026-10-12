@@ -1,4 +1,4 @@
-"""Shared helpers for the SCIM provisioning and leaver tests (R1-B26 PR 1)."""
+"""Shared helpers for the SCIM provisioning and leaver tests."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""SCIM provisioning and leaver removal (R1-B26 PR 1, TB-0143).
+"""SCIM provisioning and leaver removal.
 
 Adds the deactivation state to users (deactivated_at, deactivation_reason,
 provisioned_via), the per-organisation SCIM bearer-token table (hash only) and

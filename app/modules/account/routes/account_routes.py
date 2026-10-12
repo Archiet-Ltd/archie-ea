@@ -34,9 +34,9 @@ _log = logging.getLogger(__name__)
 from app.services import buy_intent
 from app.services.rate_limiter import rate_limit
 
-from . import mail_views
-from ..services.account_service import AccountService
-from ..forms.account_forms import (
+from. import mail_views
+from..services.account_service import AccountService
+from..forms.account_forms import (
     ChangeEmailForm,
     ChangePasswordForm,
     LoginForm,
@@ -49,7 +49,7 @@ _svc = AccountService
 
 
 @account_bp.route("/login", methods=["GET", "POST"])
-@rate_limit(10, "1m", methods=("POST",))  # SECURITY: Brute-force protection on credential submits only
+@rate_limit(10, "1m", methods=("POST",)) # SECURITY: Brute-force protection on credential submits only
 def login():
     """Log in an existing user."""
     # Opening /login while already signed in must not disturb the existing
@@ -211,7 +211,7 @@ def _complete_login_after_mfa(user):
 
 
 @account_bp.route("/mfa-challenge", methods=["GET", "POST"])
-@rate_limit(10, "1m", methods=("POST",))  # SECURITY: brute-force protection on code submits
+@rate_limit(10, "1m", methods=("POST",)) # SECURITY: brute-force protection on code submits
 def mfa_challenge():
     """Multi-factor step for an administrator mid-login (R1-B12 PR 2,
     TB-0144/PB-0100).
@@ -265,7 +265,7 @@ def mfa_challenge():
 
 
 @account_bp.route("/register", methods=["GET", "POST"])
-@rate_limit(5, "1m", methods=("POST",))  # SECURITY: Anti-abuse on registration submits only
+@rate_limit(5, "1m", methods=("POST",)) # SECURITY: Anti-abuse on registration submits only
 def register():
     """Register a new user, and send them a confirmation email."""
     return mail_views.register_view()
@@ -411,7 +411,7 @@ def save_preferences():
 
 
 @account_bp.route("/reset-password", methods=["GET", "POST"])
-@rate_limit(5, "1m", methods=("POST",))  # SECURITY: each POST can send mail
+@rate_limit(5, "1m", methods=("POST",)) # SECURITY: each POST can send mail
 def reset_password_request():
     """Respond to existing user's request to reset their password."""
     return mail_views.reset_request_view()
@@ -486,7 +486,7 @@ def change_email(token):
 
 @account_bp.route("/confirm-account", methods=["GET", "POST"])
 @login_required
-@rate_limit(3, "1m", methods=("POST",))  # SECURITY: each POST sends mail
+@rate_limit(3, "1m", methods=("POST",)) # SECURITY: each POST sends mail
 def confirm_request():
     """Respond to new user's request to confirm their account."""
     return mail_views.confirm_request_view()
@@ -737,7 +737,7 @@ def sso_callback(provider):
     # when `user` was already resolved above.
     db.session.commit()
 
-    # R1-B26 PR 1: a leaver deactivated through the identity-provider
+    # A leaver deactivated through the identity-provider
     # lifecycle must not still be able to sign in via SSO. Checked after
     # the nOAuth-protected identity resolution above (never skips that
     # check), before anything else mints a session.

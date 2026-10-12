@@ -1,5 +1,5 @@
-"""A user deactivated through SCIM is refused everywhere (R1-B26 PR 1,
-acceptance criterion 3): next request, every sign-in path, sessions and
+"""A user deactivated through SCIM is refused everywhere (acceptance
+criterion 3): next request, every sign-in path, sessions and
 outstanding account tokens revoked, remember-me cookie, no session minted."""
 
 from __future__ import annotations
@@ -155,6 +155,40 @@ def test_outstanding_account_tokens_are_revoked(client, db_session, org, token):
     assert len(rows) == 2 and all(r.revoked_at is not None for r in rows)
 
 
+def test_connected_assistant_oauth_tokens_are_revoked(client, db_session, org, token):
+    """A leaver's connected-assistant OAuth tokens must stop authenticating,
+    the same as their sessions and account tokens -- Nemotron re-review of
+    PR 424 found no test covered this path (session_registry.revoke_all_for_user
+    already revokes OAuthToken rows; this proves it end to end, not just by
+    reading the source)."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.modules.oauth_provider.models import OAuthToken
+
+    user = _member(db_session, org)
+    oauth_token = OAuthToken(
+        client_id="probe-assistant",
+        user_id=user.id,
+        access_token="probe-access-token-hash",
+        refresh_token="probe-refresh-token-hash",
+        scope="read",
+        grant_type="authorization_code",
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        organization_id=org.id,
+    )
+    db_session.add(oauth_token)
+    db_session.flush()
+    token_id = oauth_token.id
+    assert OAuthToken.query.get(token_id).revoked_at is None
+
+    call(client, "DELETE", f"/Users/{user.id}", token)
+
+    reloaded = OAuthToken.query.get(token_id)
+    assert reloaded.revoked_at is not None, (
+        "deprovisioning a user must revoke their connected-assistant OAuth tokens"
+    )
+
+
 def test_the_remember_me_cookie_does_not_bring_them_back(app, client, db_session, org, token):
     user = _member(db_session, org)
     assert _login(client, user, remember=True).status_code in (302, 303)
@@ -190,7 +224,7 @@ def test_is_active_is_a_real_sql_predicate_for_the_existing_filters(db_session, 
     gone = _member(db_session, org, "gone")
     kept = _member(db_session, org, "kept")
     provisioning_service.deactivate_user(gone, reason="leaver_deprovisioned", actor="test")
-    ids = {u.id for u in User.query.filter(User.organization_id == org.id).filter(User.is_active == True).all()}  # noqa: E712
+    ids = {u.id for u in User.query.filter(User.organization_id == org.id).filter(User.is_active == True).all()} # noqa: E712
     assert kept.id in ids and gone.id not in ids
     assert gone.is_active is False and kept.is_active is True
 

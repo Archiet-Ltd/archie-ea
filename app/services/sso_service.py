@@ -61,7 +61,7 @@ class SSOService:
             email: User's email address (e.g. "alice@acme.com").
 
         Returns:
-            :class:`app.models.sso_config.SSOConfig` or ``None``.
+:class:`app.models.sso_config.SSOConfig` or ``None``.
         """
         if not email or "@" not in email:
             return None
@@ -99,7 +99,7 @@ class SSOService:
             Parsed JSON dict.
 
         Raises:
-            :class:`SSONotConfiguredError` on network / parsing failure.
+:class:`SSONotConfiguredError` on network / parsing failure.
         """
         if metadata_url in self._discovery_cache:
             return self._discovery_cache[metadata_url]
@@ -161,7 +161,7 @@ class SSOService:
 
         Args:
             id_token: The ID token string from the token response.
-            config: :class:`app.models.sso_config.SSOConfig` instance.
+            config::class:`app.models.sso_config.SSOConfig` instance.
             discovery: OIDC discovery document dict (must contain ``jwks_uri``
                 and ``issuer``).
             expected_nonce: The nonce sent in this login's authorization
@@ -173,7 +173,7 @@ class SSOService:
             Dict of decoded JWT claims.
 
         Raises:
-            :class:`SSONotConfiguredError` on any verification failure.
+:class:`SSONotConfiguredError` on any verification failure.
         """
         if not config.client_id:
             raise SSONotConfiguredError("SSO config has no client_id")
@@ -261,16 +261,16 @@ class SSOService:
         then constructs the redirect URL with PKCE-style ``state`` token.
 
         Args:
-            config: :class:`app.models.sso_config.SSOConfig` instance.
+            config::class:`app.models.sso_config.SSOConfig` instance.
             redirect_uri: The callback URL registered with the IdP.
 
         Returns:
             Dict with keys ``redirect_url``, ``state`` and ``nonce`` (str). The
             caller must keep ``state`` and ``nonce`` in the login session and
-            hand the nonce back to :meth:`handle_oidc_callback`.
+            hand the nonce back to:meth:`handle_oidc_callback`.
 
         Raises:
-            :class:`SSONotConfiguredError` if config is None or setup is incomplete.
+:class:`SSONotConfiguredError` if config is None or setup is incomplete.
         """
         if config is None:
             raise SSONotConfiguredError("No SSO config provided")
@@ -313,11 +313,11 @@ class SSOService:
         exchanges the code, then calls ``userinfo_endpoint`` for claims.
 
         Args:
-            config: :class:`app.models.sso_config.SSOConfig` instance.
+            config::class:`app.models.sso_config.SSOConfig` instance.
             code: The authorization code from the IdP callback.
             state: The state parameter (caller should validate before calling).
-            redirect_uri: Must match the value used in :meth:`initiate_oidc_flow`.
-            expected_nonce: The nonce :meth:`initiate_oidc_flow` returned for
+            redirect_uri: Must match the value used in:meth:`initiate_oidc_flow`.
+            expected_nonce: The nonce:meth:`initiate_oidc_flow` returned for
                 this login. Needed whenever claims come from the id_token
                 (the userinfo endpoint does not use it).
 
@@ -325,7 +325,7 @@ class SSOService:
             Dict of user-info claims (``email``, ``sub``, ``name``, etc.).
 
         Raises:
-            :class:`SSONotConfiguredError` if config is None or network errors occur.
+:class:`SSONotConfiguredError` if config is None or network errors occur.
         """
         if config is None:
             raise SSONotConfiguredError("No SSO config provided")
@@ -411,14 +411,14 @@ class SSOService:
         ``external_id`` from the IdP claims.
 
         Args:
-            org: :class:`app.models.organization.Organization` instance.
+            org::class:`app.models.organization.Organization` instance.
             userinfo: Dict of OIDC claims (``email``, ``sub``, ``name``, etc.).
 
         Returns:
-            :class:`app.models.user.User` instance (persisted to DB).
+:class:`app.models.user.User` instance (persisted to DB).
 
         Raises:
-            :class:`SSONotConfiguredError` if email is missing from claims.
+:class:`SSONotConfiguredError` if email is missing from claims.
         """
         email = (userinfo.get("email") or "").strip().lower()
         if not email:
@@ -444,7 +444,7 @@ class SSOService:
         sub = userinfo.get("sub", email)
 
         # The lookup, the cross-organisation refusal and the creation live in
-        # the one provisioning service (R1-B26), shared with SCIM.
+        # the one provisioning service, shared with SCIM.
         from app.services import provisioning_service
 
         try:
@@ -478,22 +478,22 @@ class SSOService:
     def initiate_saml_flow(self, config, base_url: str) -> dict:
         """Build a SAML 2.0 AuthnRequest redirect URL (R1-B12 PR 2, TB-0141).
 
-        Delegates to :class:`app.services.saml_service.SAMLService`, which
+        Delegates to:class:`app.services.saml_service.SAMLService`, which
         verifies responses with ``signxml`` against the operator-entered
         IdP certificate rather than the ``python3-saml``/``xmlsec1`` path
         this used to stub out.
 
         Args:
-            config: :class:`app.models.sso_config.SSOConfig` instance.
+            config::class:`app.models.sso_config.SSOConfig` instance.
             base_url: This platform's own base URL.
 
         Returns:
             Dict with keys ``redirect_url`` and ``request_id`` (str). The
             caller must keep ``request_id`` in the login session and hand
-            it to :meth:`handle_saml_callback`.
+            it to:meth:`handle_saml_callback`.
 
         Raises:
-            :class:`SSONotConfiguredError` if config is None or incomplete.
+:class:`SSONotConfiguredError` if config is None or incomplete.
         """
         from app.services.saml_service import SAMLService
 
@@ -509,11 +509,11 @@ class SSOService:
     ) -> dict:
         """Verify a SAML Response and return its asserted claims.
 
-        Delegates to :class:`app.services.saml_service.SAMLService`.
+        Delegates to:class:`app.services.saml_service.SAMLService`.
 
         Raises:
-            :class:`SSONotConfiguredError` (specifically
-            :class:`app.services.saml_service.SAMLVerificationError`) on any
+:class:`SSONotConfiguredError` (specifically
+:class:`app.services.saml_service.SAMLVerificationError`) on any
             verification failure.
         """
         from app.services.saml_service import SAMLService

@@ -1,4 +1,4 @@
-"""SCIM Groups (R1-B26 PR 1): a group is an ``SSOGroupRoleMapping`` row, and
+"""SCIM Groups: a group is an ``SSOGroupRoleMapping`` row, and
 membership recomputes ``enterprise_role`` through the one resolver."""
 
 from __future__ import annotations

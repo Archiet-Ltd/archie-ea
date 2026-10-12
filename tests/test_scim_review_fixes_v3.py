@@ -1,6 +1,6 @@
-"""The defects of the PR 424 v3 review (R1-B26 PR 1, fix round 3).
+"""The defects of the PR 424 v3 review (fix round 3).
 
-Each test names its defect id (V3-01 ... V3-06). Every refusal is tested with an
+Each test names its defect id (V3-01... V3-06). Every refusal is tested with an
 active subject and with a deactivated one.
 """
 
@@ -313,7 +313,7 @@ def test_v3_02_a_scim_external_id_never_resolves_a_global_sign_in(
     _org_c, org_b = _orgs(db_session, make_org, f"v302{label}")
     member = make_user(db_session, org_b, "member")
     real_sub = f"real-{uuid.uuid4().hex[:6]}"
-    # external_id_for("azure", ...) stores the tenant-qualified oid+tid
+    # external_id_for("azure",...) stores the tenant-qualified oid+tid
     # composite, not the raw `sub` -- supply both so the stored identity is
     # deterministic and distinct from the attacker's below.
     real_claims = {"email": member.email, "sub": real_sub, "tid": "contoso", "oid": real_sub}
@@ -387,7 +387,7 @@ def test_v3_04_no_stored_pair_links_and_an_unknown_email_creates_one_account(
     other = make_user(db_session, org_b, "otherprov", external_id="g-sub", sso_provider="google")
     rows = User.query.count()
 
-    # external_id_for("azure", ...) stores the tid+oid composite, not `sub`.
+    # external_id_for("azure",...) stores the tid+oid composite, not `sub`.
     new_claims = {"email": member.email, "sub": "new-sub", "tid": "contoso", "oid": "new-sub"}
     _resp, snap = _run_callback(
         app, monkeypatch, _module(label), new_claims,

@@ -18,7 +18,7 @@ cross-tenant IDOR — 0 vulnerable. This file covers what that audit did not:
      accepting requests. The application registers no SAML sign-in route and
      the service has no SAML assertion method; both are asserted from the URL
      map and the class, not from a response code.
-  3. SCIM posture — SCIM 2.0 provisioning exists at /scim/v2 (R1-B26 PR 1).
+  3. SCIM posture — SCIM 2.0 provisioning exists at /scim/v2.
      This file pins that every route there refuses a missing, malformed or
      revoked token and another organisation's id; the behaviour itself is
      covered by tests/test_scim_users.py, tests/test_scim_groups.py and
@@ -97,7 +97,7 @@ def test_plain_user_is_rejected_by_the_rbac_gate(app, db_session, rbac_org, logi
 def test_is_org_admin_derives_from_is_admin(app, db_session, rbac_org):
     """is_org_admin is a derived property that returns is_admin().
     Setting is_org_admin=True assigns the Administrator role, so the two can
-    never disagree.  The old test that asserted they COULD disagree
+    never disagree. The old test that asserted they COULD disagree
     (is_org_admin=True with admin_permission=False) described a state this
     change makes impossible by construction.
     """
@@ -269,7 +269,7 @@ def test_oidc_sign_in_routes_404_when_disabled(app):
     adapter = app.url_map.bind("localhost")
     client = app.test_client()
     for path in ("/account/sso/azure", "/account/sso/callback/azure"):
-        adapter.match(path)  # raises NotFound when no rule is registered for the path
+        adapter.match(path) # raises NotFound when no rule is registered for the path
         assert client.get(path).status_code == 404, (
             f"{path} must answer 404 while SSO is disabled"
         )
@@ -370,14 +370,14 @@ def test_sso_service_has_no_saml_assertion_method():
 
 
 # ---------------------------------------------------------------------------
-# SCIM posture — every route is token-gated and tenant-bound (R1-B26 PR 1).
+# SCIM posture — every route is token-gated and tenant-bound.
 # ---------------------------------------------------------------------------
 
 
 def test_every_scim_route_refuses_no_token_a_revoked_token_and_another_organisations_token(
     db_session, make_org, client
 ):
-    """SCIM provisioning landed with R1-B26 (this test used to pin "SCIM is
+    """SCIM provisioning landed (this test used to pin "SCIM is
     absent", and said to update it, not delete it, when that changed).
 
     Every route the application registers under ``/scim/v2``, in every method:

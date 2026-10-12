@@ -1,4 +1,4 @@
-"""Row-level security on scim_group_memberships (R1-B26 PR 1 fencing follow-up).
+"""Row-level security on scim_group_memberships (fencing follow-up).
 
 A new fencing revision, not an edit to the applied ``20261008_row_level_security``
 (Alembic runs a revision once): ``scim_group_memberships`` is a new table added by
@@ -60,7 +60,7 @@ def _skip_reason(bind, table: str):
     has_column = bind.execute(
         text(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
-            "WHERE table_schema = 'public' AND table_name = :t "
+            "WHERE table_schema = 'public' AND table_name =:t "
             "AND column_name = 'organization_id')"
         ),
         {"t": table},
@@ -84,16 +84,16 @@ def _skip_reason(bind, table: str):
 def _fence(bind, table: str) -> None:
     # Table name is a literal module constant; nothing here is user input.
     for name, (command, using, check) in zip(TENANT_POLICIES, _TENANT_DEFINITIONS):
-        bind.execute(text(f"DROP POLICY IF EXISTS {name} ON public.{table}"))  # nosec B608 - table names from a literal constant
+        bind.execute(text(f"DROP POLICY IF EXISTS {name} ON public.{table}")) # nosec B608 - table names from a literal constant
         clause = ""
         if using is not None:
             clause += f" USING ({using})"
         if check is not None:
             clause += f" WITH CHECK ({check})"
         bind.execute(
-            text(f"CREATE POLICY {name} ON public.{table} FOR {command}{clause}")  # nosec B608 - table names from a literal constant
+            text(f"CREATE POLICY {name} ON public.{table} FOR {command}{clause}") # nosec B608 - table names from a literal constant
         )
-    bind.execute(text(f"ALTER TABLE public.{table} ENABLE ROW LEVEL SECURITY"))  # nosec B608 - table names from a literal constant
+    bind.execute(text(f"ALTER TABLE public.{table} ENABLE ROW LEVEL SECURITY")) # nosec B608 - table names from a literal constant
 
 
 def upgrade():
@@ -113,5 +113,5 @@ def downgrade():
         if _skip_reason(bind, table) is not None:
             continue
         for name in TENANT_POLICIES:
-            bind.execute(text(f"DROP POLICY IF EXISTS {name} ON public.{table}"))  # nosec B608 - table names from a literal constant
-        bind.execute(text(f"ALTER TABLE public.{table} DISABLE ROW LEVEL SECURITY"))  # nosec B608 - table names from a literal constant
+            bind.execute(text(f"DROP POLICY IF EXISTS {name} ON public.{table}")) # nosec B608 - table names from a literal constant
+        bind.execute(text(f"ALTER TABLE public.{table} DISABLE ROW LEVEL SECURITY")) # nosec B608 - table names from a literal constant
