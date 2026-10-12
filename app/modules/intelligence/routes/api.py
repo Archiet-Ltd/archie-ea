@@ -8,6 +8,7 @@
   GET  /api/v1/intelligence/portfolio/<element_id>
   GET  /api/v1/intelligence/programme/<element_id>
   GET  /api/v1/intelligence/strategy/<element_id>
+  GET  /api/v1/intelligence/operational/<element_id>
   GET  /api/v1/intelligence/accountability/<element_id>
   GET  /api/v1/intelligence/data/<element_id>
   GET  /api/v1/intelligence/compliance/<element_id>
@@ -812,6 +813,43 @@ def strategy_for_element(element_id: int):
             "elements": result.get("elements") or {},
         }
     )
+
+
+@intelligence_api.route("/operational/<int:element_id>", methods=["GET"])
+@login_required
+def operational_for_element(element_id: int):
+    """The Operational lens: "what has changed around this element since
+    we last checked, and is anything out of date?" Serialises
+    ``IntelligenceQueryService.operational_for_element`` through
+    ``success_response`` -- no business logic here (task 02 constraint).
+    """
+    include_stale, err = _parse_bool_param(
+        request.args.get("include_stale"), default=True, param_name="include_stale"
+    )
+    if err is not None:
+        return err
+
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    result = IntelligenceQueryService().operational_for_element(
+        element_id,
+        organization_id=organization_id,
+        include_stale=include_stale,
+    )
+
+    if result.get("reasons") == [_ELEMENT_NOT_FOUND_REASON]:
+        return not_found_response("Element")
+
+    return success_response(result)
 
 
 @intelligence_api.route("/accountability/<int:element_id>", methods=["GET"])

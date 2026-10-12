@@ -7,22 +7,29 @@ an element to its ApplicationComponent for the one existing deep link),
 ``programme_for_element`` (L5, "what are we changing, is it on time and on
 budget" -- reuses the same traversal per work-package seed), ``strategy_for_element``
 (L2, "what are we trying to achieve, and how's it tracking" -- reuses the
-same traversal per initiative seed) and ``value_streams_at_risk`` -- "which
+same traversal per initiative seed), ``value_streams_at_risk`` -- "which
 value streams depend on a capability below threshold", the curated path
-only (T-S1). Coverage over derived and explicit relationships for the
-value-stream question is reserved for a later task and is not added here.
-``accountability_for_element`` (L4) exists as a route and question card
-but is currently WITHDRAWN -- it returns an honest
+only (T-S1) -- and ``operational_for_element`` (the Operational lens, "what
+has changed around this element since we last checked, and is anything out
+of date" -- reads the baseline-drift engine's pure comparison seam, the
+model-consistency scan, the derived-fact store's own staleness readers and
+the live health probe; writes nothing). Coverage over derived and explicit
+relationships for the value-stream question is reserved for a later task
+and is not added here. ``accountability_for_element`` (L4) exists as a
+route and question card but is currently WITHDRAWN -- it returns an honest
 ``ownership_reader_not_built`` reason on every call: the ownership data
 source is decided, no shared tenant-safe reader for it exists yet, and a
 real tenant-scoping fix to ``OrganizationUnit`` is needed before one is
 safe to build -- see the method's own docstring. Five of six lenses in
 ``intelligence-lenses-v1.md`` are currently answered, plus the Strategic
-value-streams-at-risk surface.
+value-streams-at-risk surface and the Operational lens (outside that
+original six-lens framework).
 """
 
 from __future__ import annotations
 
+import logging
+from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from app.extensions import db
@@ -32,6 +39,8 @@ from app.modules.intelligence.services.derived_facts import list_derived_facts
 from app.modules.intelligence.services.latency_probe import record_query_latency
 from app.modules.intelligence.services.plain_terms import plain_terms_sentence
 from app.modules.intelligence.services.reason_codes import validate_reason_code
+
+logger = logging.getLogger(__name__)
 
 VALID_DIRECTIONS = {"downstream", "upstream", "both"}
 
@@ -53,6 +62,10 @@ NO_WORK_PACKAGE_RECORDED_REASON = validate_reason_code("no_work_package_recorded
 NOT_COSTED_REASON = validate_reason_code("not_costed")
 NO_INITIATIVE_LINKED_REASON = validate_reason_code("no_initiative_linked")
 NO_BUDGET_RECORDED_REASON = validate_reason_code("no_budget_recorded")
+SOURCE_UNAVAILABLE_REASON = validate_reason_code("source_unavailable")
+NO_BASELINE_CAPTURED_REASON = validate_reason_code("no_baseline_captured")
+BASELINE_LACKS_MODEL_SNAPSHOT_REASON = validate_reason_code("baseline_lacks_model_snapshot")
+FEED_NOT_CONNECTED_REASON = validate_reason_code("feed_not_connected")
 # Distinct from NO_OWNERSHIP_REASON above ("no_ownership_recorded") -- that
 # one describes a single element's missing owner field inside the L1 impact
 # traversal; this one describes an ApplicationComponent with zero
@@ -2442,5 +2455,293 @@ class IntelligenceQueryService:
             "reasons": [],
             "elements": all_elements,
         }
+
+    def operational_for_element(
+        self,
+        element_id: int,
+        *,
+        organization_id: int,
+        include_stale: bool = True,
+    ) -> Dict[str, Any]:
+        """The Operational lens: "what has changed around this element
+        since we last checked, and is anything out of date?" -- four
+        internal sources, each read through its own canonical accessor,
+        none re-implemented here:
+
+          * ``ArchitectureMonitoringService.compare_to_baseline`` -- the
+            pure comparison seam. Never a method that persists alerts as a
+            side effect of running the comparison: a GET through this
+            method writes nothing.
+          * ``detect_model_drift`` -- the model-consistency scan, filtered
+            to findings that name this element.
+          * ``list_derived_facts``/``latest_derivation_run`` -- the
+            derived-fact store's own staleness readers.
+          * ``HealthService.check_database``/``check_cache`` -- the
+            answer's own basis: whether the twin could be trusted to be
+            current when it answered.
+
+        Fabrication rule (enforced here, asserted in tests): a block's
+        count is ``None`` with a reason whenever the comparison behind it
+        did not run; a ``0`` is only ever a real comparison that ran and
+        found nothing.
+        """
+        from app.models import ArchiMateElement, ArchiMateRelationship
+        from app.modules.architecture.services.architecture_monitoring_service import (
+            ArchitectureMonitoringService,
+        )
+        from app.modules.genome.services.drift_detector import detect_model_drift
+        from app.modules.intelligence.services.derived_facts import latest_derivation_run
+        from app.modules.intelligence.services.operational_sources import registered_adapter
+        from app.modules.monitoring.services.health_service import HealthService
+
+        def _now_iso() -> str:
+            return datetime.utcnow().isoformat() + "Z"
+
+        def _empty_answer(reason: str) -> Dict[str, Any]:
+            return {
+                "element": None,
+                "read_at": _now_iso(),
+                "probe": None,
+                "baseline": None,
+                "moved_since_baseline": None,
+                "consistency_findings": [],
+                "stale_derivations": None,
+                "external": None,
+                "reasons": [reason],
+            }
+
+        with record_query_latency("operational_for_element") as scope:
+            scope.organization_id = organization_id
+
+            if organization_id is None:
+                return _empty_answer(NO_TENANT_CONTEXT_REASON)
+
+            element = db.session.execute(
+                db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
+            ).scalar_one_or_none()
+            if element is None:
+                return _empty_answer(ELEMENT_NOT_FOUND_REASON)
+
+            reasons: List[str] = []
+
+            # --- probe: the answer's own basis -----------------------------
+            try:
+                db_health = HealthService.check_database()
+            except Exception as exc:  # a probe exception never blocks the rest of the answer
+                logger.exception(
+                    "operational_for_element: database probe raised: %s", exc
+                )
+                db_health = {"status": "unhealthy", "response_time_ms": None}
+            try:
+                cache_health = HealthService.check_cache()
+            except Exception as exc:
+                logger.exception("operational_for_element: cache probe raised: %s", exc)
+                cache_health = {"status": "unhealthy", "response_time_ms": None}
+
+            probe_reason = (
+                None if db_health.get("status") == "healthy" else SOURCE_UNAVAILABLE_REASON
+            )
+            if probe_reason is not None:
+                reasons.append(probe_reason)
+            probe = {
+                "database": {
+                    "status": db_health.get("status"),
+                    "response_time_ms": db_health.get("response_time_ms"),
+                },
+                "cache": {"status": cache_health.get("status")},
+                "reason": probe_reason,
+            }
+
+            # --- baseline / moved_since_baseline ---------------------------
+            monitoring = ArchitectureMonitoringService(organization_id)
+            active_baseline = monitoring.get_monitoring_status().get("active_baseline")
+
+            def _alerts_for_element() -> List[Dict[str, Any]]:
+                unacknowledged = monitoring.get_alerts(acknowledged=False, limit=10000)
+                return [
+                    {
+                        "alert_id": a["id"],
+                        "severity": a["severity"],
+                        "title": a["title"],
+                        "created_at": a["created_at"],
+                        "truth_class": "derived_intelligence",
+                    }
+                    for a in unacknowledged.get("alerts", [])
+                    if a.get("affected_element_id") == element_id
+                ]
+
+            if active_baseline is None:
+                reasons.append(NO_BASELINE_CAPTURED_REASON)
+                baseline = {
+                    "baseline_id": None,
+                    "name": None,
+                    "captured_at": None,
+                    "truth_class": "authoritative_fact",
+                    "reason": NO_BASELINE_CAPTURED_REASON,
+                }
+                moved_since_baseline = {
+                    "element_changed": None,
+                    "relationships_added": None,
+                    "relationships_removed": None,
+                    "derived_recomputed": None,
+                    "alerts": [],
+                    "truth_class": "derived_intelligence",
+                    "reason": NO_BASELINE_CAPTURED_REASON,
+                }
+            else:
+                baseline = {
+                    "baseline_id": active_baseline["id"],
+                    "name": active_baseline["name"],
+                    "captured_at": active_baseline["created_at"],
+                    "truth_class": "authoritative_fact",
+                    "reason": None,
+                }
+                analysis = monitoring.compare_to_baseline()
+                model_drift = analysis.model_drift or {}
+
+                if model_drift.get("reason") == "baseline_lacks_model_snapshot":
+                    reasons.append(BASELINE_LACKS_MODEL_SNAPSHOT_REASON)
+                    moved_since_baseline = {
+                        "element_changed": None,
+                        "relationships_added": None,
+                        "relationships_removed": None,
+                        "derived_recomputed": None,
+                        "alerts": _alerts_for_element(),
+                        "truth_class": "derived_intelligence",
+                        "reason": BASELINE_LACKS_MODEL_SNAPSHOT_REASON,
+                    }
+                else:
+                    changed_element_ids = set(model_drift.get("changed_element_ids") or [])
+                    added_ids = set(model_drift.get("added_relationship_ids") or [])
+                    removed_ids = set(model_drift.get("removed_relationship_ids") or [])
+
+                    touching_ids: set = set()
+                    diff_ids = added_ids | removed_ids
+                    if diff_ids:
+                        diff_int_ids = [int(rid) for rid in diff_ids]
+                        rows = (
+                            db.session.execute(
+                                db.select(ArchiMateRelationship.id).where(
+                                    ArchiMateRelationship.id.in_(diff_int_ids),
+                                    db.or_(
+                                        ArchiMateRelationship.source_id == element_id,
+                                        ArchiMateRelationship.target_id == element_id,
+                                    ),
+                                )
+                            )
+                            .scalars()
+                            .all()
+                        )
+                        touching_ids = {str(rid) for rid in rows}
+
+                    moved_since_baseline = {
+                        "element_changed": str(element_id) in changed_element_ids,
+                        "relationships_added": len(added_ids & touching_ids),
+                        "relationships_removed": len(removed_ids & touching_ids),
+                        "derived_recomputed": model_drift.get("derived_recomputed"),
+                        "alerts": _alerts_for_element(),
+                        "truth_class": "derived_intelligence",
+                        "reason": None,
+                    }
+
+            # --- consistency_findings: the model-consistency scan, filtered
+            findings_report = detect_model_drift(organization_id)
+            consistency_findings = [
+                {
+                    "type": finding.get("type"),
+                    "statement": finding.get("why"),
+                    "spec_hash": findings_report.get("spec_hash"),
+                    "elements": finding.get("elements"),
+                    "truth_class": "derived_intelligence",
+                }
+                for finding in findings_report.get("findings", [])
+                if element_id
+                in {e.get("archimate_element_id") for e in finding.get("elements", [])}
+            ]
+
+            # --- stale_derivations -------------------------------------
+            run = latest_derivation_run(organization_id)
+            if run is None:
+                reasons.append(DERIVATION_NOT_COMPUTED_REASON)
+                stale_derivations = {
+                    "count": None,
+                    "rows": [],
+                    "last_run_at": None,
+                    "reason": DERIVATION_NOT_COMPUTED_REASON,
+                }
+            else:
+                stale_rows = [
+                    row
+                    for row in list_derived_facts(
+                        organization_id,
+                        include_stale=True,
+                        source_element_id=element_id,
+                        target_element_id=element_id,
+                        direction="both",
+                    )
+                    if row.get("stale")
+                ]
+                rows_out = [
+                    {
+                        "derived_id": row["id"],
+                        "rule_id": row["rule_id"],
+                        # Not exposed by the canonical reader (list_derived_facts'
+                        # serialisation carries no per-row stale_since column
+                        # today) -- reported honestly as not-available rather
+                        # than adding a second read path over this store.
+                        "stale_since": None,
+                        "stale_reason": row.get("reason"),
+                        "truth_class": "derived_intelligence",
+                    }
+                    for row in stale_rows
+                ] if include_stale else []
+                stale_derivations = {
+                    "count": len(stale_rows),
+                    "rows": rows_out,
+                    "last_run_at": run.finished_at.isoformat() if run.finished_at else None,
+                    "reason": None,
+                }
+
+            # --- external: no adapter registered today ----------------------
+            adapter = registered_adapter(organization_id)
+            if adapter is None:
+                reasons.append(FEED_NOT_CONNECTED_REASON)
+                external = {
+                    "incidents": None,
+                    "changes": None,
+                    "telemetry": None,
+                    "reason": FEED_NOT_CONNECTED_REASON,
+                }
+            else:  # pragma: no cover - no adapter is registered by this task
+                external = {
+                    "incidents": None,
+                    "changes": None,
+                    "telemetry": None,
+                    "reason": FEED_NOT_CONNECTED_REASON,
+                }
+
+            deduped_reasons: List[str] = []
+            for reason in reasons:
+                if reason not in deduped_reasons:
+                    deduped_reasons.append(reason)
+
+            payload = {
+                "element": {
+                    "id": element.id,
+                    "name": element.name,
+                    "type": element.type,
+                    "layer": element.layer,
+                },
+                "read_at": _now_iso(),
+                "probe": probe,
+                "baseline": baseline,
+                "moved_since_baseline": moved_since_baseline,
+                "consistency_findings": consistency_findings,
+                "stale_derivations": stale_derivations,
+                "external": external,
+                "reasons": deduped_reasons,
+            }
+
+        return payload
 
 __all__ = ["IntelligenceQueryService"]

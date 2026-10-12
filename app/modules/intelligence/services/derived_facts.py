@@ -213,6 +213,30 @@ def derived_fact_aggregates(organization_id: int) -> Dict[str, Any]:
     }
 
 
+def stale_derived_fact_ids(organization_id: int) -> List[int]:
+    """This tenant's stale ``DerivedRelationship`` ids, explicitly scoped.
+
+    ``derived_fact_aggregates(organization_id)`` returns ``stale_count`` (a
+    number) but not which rows; a caller that needs to tell "the same facts
+    are stale" from "a different fact went stale" (not only that the count
+    held steady) needs the id set itself. The staleness filter is applied
+    here, in this module, rather than re-implemented at the call site --
+    this module's own docstring is the one place that filter belongs. Must
+    be called inside ``app.app_context()``; the explicit ``organization_id
+    ==`` predicate is defence-in-depth on top of the tenant-isolation
+    listener, matching this module's pattern.
+    """
+    from app.modules.intelligence.models.derived_relationship import DerivedRelationship
+
+    rows = db.session.execute(
+        db.select(DerivedRelationship.id).where(
+            DerivedRelationship.organization_id == organization_id,
+            DerivedRelationship.stale.is_(True),
+        )
+    ).scalars().all()
+    return list(rows)
+
+
 def latest_derivation_run(organization_id: int):
     """T-005 (D5/D6/D7): the most recent completed ``DerivationRun`` for a
     tenant, or ``None`` when derivation has never completed for it.
@@ -303,4 +327,5 @@ __all__ = [
     "get_derived_fact",
     "latest_derivation_run",
     "list_derived_facts",
+    "stale_derived_fact_ids",
 ]

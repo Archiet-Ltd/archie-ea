@@ -85,15 +85,13 @@ def test_register_mounts_exactly_the_api_and_ui_blueprints():
     # confirmed pre-existing by running this test against main with the L2
     # diff stashed out (it already failed there: 7 != 4). Corrected to the
     # real count rather than only bumped for this brief's own addition.
-    # Drifted out of sync again: R1-B39 added the catalogue list, catalogue
-    # run and ask routes without updating this count. Corrected to the real
-    # count (confirmed by running this test against the real app) rather
-    # than only bumped for that brief's own addition.
-    assert len(bp.deferred_functions) == 16, (
-        "exactly sixteen routes: POST .../recompute, GET .../derived/<id>, "
+    # The Operational lens route takes it from sixteen to seventeen.
+    assert len(bp.deferred_functions) == 17, (
+        "exactly seventeen routes: POST .../recompute, GET .../derived/<id>, "
         "GET .../impact/<element_id>, GET .../risk/<element_id>, "
         "GET .../portfolio/<element_id>, GET .../programme/<element_id>, "
-        "GET .../strategy/<element_id>, GET .../accountability/<element_id>, "
+        "GET .../strategy/<element_id>, GET .../operational/<element_id>, "
+        "GET .../accountability/<element_id>, "
         "GET .../data/<element_id>, GET .../compliance/<element_id>, "
         "GET .../traceability/<element_id>, "
         "GET .../value-streams-at-risk, GET .../yield, "

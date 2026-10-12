@@ -25,6 +25,7 @@ Reuses:
 import hashlib
 import json
 import logging
+import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -32,8 +33,10 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
+from sqlalchemy import or_
 
 from app import db
+from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 from app.models.unified_capability import UnifiedCapability
 
@@ -113,6 +116,10 @@ class ArchitectureBaseline:
     vendor_snapshot: List[Dict[str, Any]]
     checksum: str
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # None means "captured before the model dimension existed" -- never {}.
+    # A baseline captured after this change always has a dict here (even an
+    # empty-estate one), so the drift comparison can tell the two cases apart.
+    model_snapshot: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -130,8 +137,68 @@ class DriftAnalysis:
     health_drift: Dict[str, Any]
     gap_drift: Dict[str, Any]
     vendor_drift: Dict[str, Any]
+    model_drift: Dict[str, Any]
     alerts: List[Dict[str, Any]]
     summary: str
+
+
+@dataclass
+class _TenantState:
+    """One organisation's monitoring cache.
+
+    Lives only in the module-level ``_STATE`` map below, keyed by
+    organization_id -- never as a class attribute of
+    ArchitectureMonitoringService, which is what made the old cache
+    process-wide and shared by every tenant's instance.
+    """
+
+    baselines: Dict[str, ArchitectureBaseline] = field(default_factory=dict)
+    alerts: Dict[str, ArchitectureAlert] = field(default_factory=dict)
+    status: MonitoringStatus = MonitoringStatus.ACTIVE
+    last_scan_time: Optional[datetime] = None
+    scan_interval_minutes: int = 60
+    active_baseline_id: Optional[str] = None
+    db_loaded: bool = False
+    # Set on every instantiation that reuses this entry and on every active-
+    # baseline change; read by _evict_stale_state's TTL check below.
+    last_touched: float = field(default_factory=time.time)
+
+
+# Per-organisation cache, one entry per tenant that has instantiated the
+# service in this process. Replaces the old class-level _baselines / _alerts /
+# _status / ... attributes, which every tenant's instance shared. Unlike
+# _health_metrics_cache (capability_health_service.py, TTL 60s, capped at 256
+# tenants) this had no eviction at all until this entry grew without bound
+# for the life of the process; it now shares that cache's TTL and is also
+# dropped the moment a tenant's active baseline changes, since that is the
+# one field most likely to be read stale by a concurrent worker process that
+# made the change.
+_STATE: Dict[int, _TenantState] = {}
+
+_STATE_TTL_SECONDS = 60
+
+
+def _evict_stale_state(organization_id: int) -> None:
+    """Drop ``organization_id``'s entry if it has not been touched inside
+    the TTL, so the next access reloads a fresh one from the database."""
+    entry = _STATE.get(organization_id)
+    if entry is not None and (time.time() - entry.last_touched) >= _STATE_TTL_SECONDS:
+        _STATE.pop(organization_id, None)
+
+
+def _tenant_capability_filter(organization_id: int):
+    """Own rows plus NULL-owner reference rows.
+
+    Mirrors the request-scoped SELECT predicate the do_orm_execute listener
+    installs for UnifiedCapability (app/models/unified_capability.py:587-590):
+    that listener is a no-op with no Flask request on the stack, so a CLI
+    command or scheduled job reading through this service needs the same
+    predicate applied explicitly.
+    """
+    return or_(
+        UnifiedCapability.organization_id == organization_id,
+        UnifiedCapability.organization_id.is_(None),
+    )
 
 
 class ArchitectureMonitoringService:
@@ -143,16 +210,11 @@ class ArchitectureMonitoringService:
     - Drift detection algorithms
     - Alert generation and management
     - Integration with existing services
-    """
 
-    # In-memory cache (backed by database via MonitoringBaseline / MonitoringAlert models)
-    _baselines: Dict[str, ArchitectureBaseline] = {}
-    _alerts: Dict[str, ArchitectureAlert] = {}
-    _status: MonitoringStatus = MonitoringStatus.ACTIVE
-    _last_scan_time: Optional[datetime] = None
-    _scan_interval_minutes: int = 60
-    _active_baseline_id: Optional[str] = None
-    _db_loaded: bool = False
+    One instance is scoped to one organisation (``organization_id``,
+    required): its cached state, and every row it reads or writes, belongs
+    to that tenant only.
+    """
 
     # Alert thresholds
     COVERAGE_DECREASE_WARNING_THRESHOLD = 5  # 5% decrease
@@ -160,20 +222,49 @@ class ArchitectureMonitoringService:
     HEALTH_SCORE_WARNING_THRESHOLD = 10  # 10 point decrease
     HEALTH_SCORE_CRITICAL_THRESHOLD = 20  # 20 point decrease
 
-    def __init__(self):
-        """Initialize the Architecture Monitoring Service."""
+    def __init__(self, organization_id: int):
+        """Initialize the Architecture Monitoring Service for one organisation.
+
+        organization_id is required: a service with no tenant would have to
+        fall back to an unfiltered, cross-tenant read, which is the defect
+        this class exists to not have.
+        """
+        if organization_id is None:
+            raise ValueError("ArchitectureMonitoringService requires an organization_id")
+        self.organization_id = organization_id
+        _evict_stale_state(organization_id)
+        self._state = _STATE.setdefault(organization_id, _TenantState())
+        self._state.last_touched = time.time()
         self._ensure_loaded()
 
+    @classmethod
+    def reset_state(cls, organization_id: Optional[int] = None) -> None:
+        """Clear the cached monitoring state for one organisation, or all of them.
+
+        Test-only for the *manual, immediate* form: production code relies on
+        the TTL and active-baseline-change eviction above instead of calling
+        this directly.
+        """
+        if organization_id is None:
+            _STATE.clear()
+        else:
+            _STATE.pop(organization_id, None)
+
     def _ensure_loaded(self):
-        """Load baselines and alerts from database if not already loaded."""
-        if self._db_loaded:
+        """Load this organisation's baselines and alerts from the database if not already loaded."""
+        if self._state.db_loaded:
             return
         try:
             from app.models.policy_monitoring import MonitoringAlert as MAModel
             from app.models.policy_monitoring import MonitoringBaseline as MBModel
 
-            # Load baselines
-            for row in MBModel.query.all():
+            # Explicit predicate over the mixin's own request-scoped filter:
+            # defence in depth (the same two-layer rule query_service.py
+            # documents), so a call with no Flask request on the stack is
+            # scoped too.
+            for row in MBModel.query.filter(
+                MBModel.organization_id == self.organization_id
+            ).all():
                 snapshot = json.loads(row.snapshot_data) if row.snapshot_data else {}
                 baseline = ArchitectureBaseline(
                     id=row.baseline_id,
@@ -188,13 +279,19 @@ class ArchitectureMonitoringService:
                     vendor_snapshot=snapshot.get("vendors", []),
                     checksum=row.checksum,
                     metadata=snapshot.get("metadata", {}),
+                    # No default {}: a JSON blob with no "model" key was
+                    # written before this dimension existed, and that is a
+                    # different fact from an empty snapshot.
+                    model_snapshot=snapshot.get("model"),
                 )
-                self._baselines[row.baseline_id] = baseline
+                self._state.baselines[row.baseline_id] = baseline
                 if row.is_active:
-                    self._active_baseline_id = row.baseline_id
+                    self._state.active_baseline_id = row.baseline_id
 
             # Load alerts
-            for row in MAModel.query.all():
+            for row in MAModel.query.filter(
+                MAModel.organization_id == self.organization_id
+            ).all():
                 alert = ArchitectureAlert(
                     id=row.alert_id,
                     alert_type=row.alert_type,
@@ -214,19 +311,19 @@ class ArchitectureMonitoringService:
                     acknowledged_at=row.acknowledged_at.isoformat() if row.acknowledged_at else None,
                     metadata=json.loads(row.alert_metadata) if row.alert_metadata else {},
                 )
-                self._alerts[row.alert_id] = alert
+                self._state.alerts[row.alert_id] = alert
 
-            self._db_loaded = True
+            self._state.db_loaded = True
             logger.info(
-                "Loaded %d baselines and %d alerts from database",
-                len(self._baselines), len(self._alerts),
+                "Loaded %d baselines and %d alerts from database for organization %s",
+                len(self._state.baselines), len(self._state.alerts), self.organization_id,
             )
         except Exception as e:
             logger.warning("Could not load monitoring data from database: %s", e)
-            self._db_loaded = True  # Don't retry on every call
+            self._state.db_loaded = True  # Don't retry on every call
 
     def _persist_baseline(self, baseline: ArchitectureBaseline):
-        """Save or update a baseline in the database."""
+        """Save or update a baseline in the database, scoped to this tenant."""
         try:
             from app.models.policy_monitoring import MonitoringBaseline as MBModel
 
@@ -237,9 +334,12 @@ class ArchitectureMonitoringService:
                 "gaps": baseline.gap_snapshot,
                 "vendors": baseline.vendor_snapshot,
                 "metadata": baseline.metadata,
+                "model": baseline.model_snapshot,
             })
 
-            existing = MBModel.query.filter_by(baseline_id=baseline.id).first()
+            existing = MBModel.query.filter_by(
+                baseline_id=baseline.id, organization_id=self.organization_id
+            ).first()
             if existing:
                 existing.name = baseline.name
                 existing.snapshot_data = snapshot_data
@@ -247,10 +347,11 @@ class ArchitectureMonitoringService:
             else:
                 row = MBModel(
                     baseline_id=baseline.id,
+                    organization_id=self.organization_id,
                     name=baseline.name,
                     description=baseline.description,
                     created_by=baseline.created_by,
-                    is_active=(baseline.id == self._active_baseline_id),
+                    is_active=(baseline.id == self._state.active_baseline_id),
                     snapshot_data=snapshot_data,
                     checksum=baseline.checksum,
                 )
@@ -262,11 +363,13 @@ class ArchitectureMonitoringService:
             db.session.rollback()
 
     def _persist_alert(self, alert: ArchitectureAlert):
-        """Save or update an alert in the database."""
+        """Save or update an alert in the database, scoped to this tenant."""
         try:
             from app.models.policy_monitoring import MonitoringAlert as MAModel
 
-            existing = MAModel.query.filter_by(alert_id=alert.id).first()
+            existing = MAModel.query.filter_by(
+                alert_id=alert.id, organization_id=self.organization_id
+            ).first()
             if existing:
                 existing.acknowledged = alert.acknowledged
                 existing.acknowledged_by = alert.acknowledged_by
@@ -277,6 +380,7 @@ class ArchitectureMonitoringService:
             else:
                 row = MAModel(
                     alert_id=alert.id,
+                    organization_id=self.organization_id,
                     alert_type=alert.alert_type,
                     severity=alert.severity,
                     title=alert.title,
@@ -300,38 +404,53 @@ class ArchitectureMonitoringService:
             db.session.rollback()
 
     def _delete_baseline_from_db(self, baseline_id: str):
-        """Remove a baseline from the database."""
+        """Remove a baseline from the database, scoped to this tenant."""
         try:
             from app.models.policy_monitoring import MonitoringBaseline as MBModel
 
-            MBModel.query.filter_by(baseline_id=baseline_id).delete()
+            MBModel.query.filter_by(
+                baseline_id=baseline_id, organization_id=self.organization_id
+            ).delete()
             db.session.commit()
         except Exception as e:
             logger.error("Failed to delete baseline %s from DB: %s", baseline_id, e)
             db.session.rollback()
 
     def _delete_alert_from_db(self, alert_id: str):
-        """Remove an alert from the database."""
+        """Remove an alert from the database, scoped to this tenant."""
         try:
             from app.models.policy_monitoring import MonitoringAlert as MAModel
 
-            MAModel.query.filter_by(alert_id=alert_id).delete()
+            MAModel.query.filter_by(
+                alert_id=alert_id, organization_id=self.organization_id
+            ).delete()
             db.session.commit()
         except Exception as e:
             logger.error("Failed to delete alert %s from DB: %s", alert_id, e)
             db.session.rollback()
 
     def _update_active_baseline_in_db(self):
-        """Update which baseline is marked active in the database."""
+        """Update which baseline is marked active in the database, scoped to this tenant."""
         try:
             from app.models.policy_monitoring import MonitoringBaseline as MBModel
 
-            MBModel.query.update({MBModel.is_active: False})
-            if self._active_baseline_id:
-                MBModel.query.filter_by(baseline_id=self._active_baseline_id).update(
-                    {MBModel.is_active: True}
-                )
+            MBModel.query.filter_by(organization_id=self.organization_id).update(
+                {MBModel.is_active: False}
+            )
+            if self._state.active_baseline_id:
+                MBModel.query.filter_by(
+                    baseline_id=self._state.active_baseline_id,
+                    organization_id=self.organization_id,
+                ).update({MBModel.is_active: True})
             db.session.commit()
+            # The active baseline is the one field in this cache another
+            # worker process is most likely to change concurrently (a second
+            # gunicorn worker handling the same tenant's activate/delete
+            # call). Drop this tenant's entry now rather than wait out the
+            # TTL, so the next instantiation -- in this process or, after the
+            # next request lands here, any other -- reloads it from the
+            # database instead of serving what this process last cached.
+            _STATE.pop(self.organization_id, None)
         except Exception as e:
             logger.error("Failed to update active baseline in DB: %s", e)
             db.session.rollback()
@@ -348,8 +467,8 @@ class ArchitectureMonitoringService:
             Dict with monitoring status information
         """
         active_baseline = None
-        if self._active_baseline_id and self._active_baseline_id in self._baselines:
-            baseline = self._baselines[self._active_baseline_id]
+        if self._state.active_baseline_id and self._state.active_baseline_id in self._state.baselines:
+            baseline = self._state.baselines[self._state.active_baseline_id]
             active_baseline = {
                 "id": baseline.id,
                 "name": baseline.name,
@@ -358,7 +477,7 @@ class ArchitectureMonitoringService:
 
         # Count alerts by severity
         alert_counts = {"info": 0, "warning": 0, "critical": 0, "total": 0, "unacknowledged": 0}
-        for alert in self._alerts.values():
+        for alert in self._state.alerts.values():
             alert_counts["total"] += 1
             alert_counts[alert.severity] += 1
             if not alert.acknowledged:
@@ -366,11 +485,11 @@ class ArchitectureMonitoringService:
 
         return {
             "success": True,
-            "status": self._status.value,
-            "last_scan_time": self._last_scan_time.isoformat() if self._last_scan_time else None,
-            "scan_interval_minutes": self._scan_interval_minutes,
+            "status": self._state.status.value,
+            "last_scan_time": self._state.last_scan_time.isoformat() if self._state.last_scan_time else None,
+            "scan_interval_minutes": self._state.scan_interval_minutes,
             "active_baseline": active_baseline,
-            "total_baselines": len(self._baselines),
+            "total_baselines": len(self._state.baselines),
             "alerts": alert_counts,
             "thresholds": {
                 "coverage_decrease_warning": self.COVERAGE_DECREASE_WARNING_THRESHOLD,
@@ -391,10 +510,10 @@ class ArchitectureMonitoringService:
             Dict with result
         """
         try:
-            self._status = MonitoringStatus(status)
+            self._state.status = MonitoringStatus(status)
             return {
                 "success": True,
-                "status": self._status.value,
+                "status": self._state.status.value,
                 "message": f"Monitoring status set to {status}",
             }
         except ValueError:
@@ -425,7 +544,7 @@ class ArchitectureMonitoringService:
             Dict with configuration result
         """
         if scan_interval_minutes is not None:
-            self._scan_interval_minutes = max(5, scan_interval_minutes)  # Min 5 minutes
+            self._state.scan_interval_minutes = max(5, scan_interval_minutes)  # Min 5 minutes
 
         if coverage_warning_threshold is not None:
             self.COVERAGE_DECREASE_WARNING_THRESHOLD = coverage_warning_threshold
@@ -442,7 +561,7 @@ class ArchitectureMonitoringService:
         return {
             "success": True,
             "configuration": {
-                "scan_interval_minutes": self._scan_interval_minutes,
+                "scan_interval_minutes": self._state.scan_interval_minutes,
                 "coverage_warning_threshold": self.COVERAGE_DECREASE_WARNING_THRESHOLD,
                 "coverage_critical_threshold": self.COVERAGE_DECREASE_CRITICAL_THRESHOLD,
                 "health_warning_threshold": self.HEALTH_SCORE_WARNING_THRESHOLD,
@@ -491,13 +610,26 @@ class ArchitectureMonitoringService:
             # Capture vendor status
             vendor_snapshot = self._capture_vendor_snapshot()
 
-            # Calculate checksum for integrity
+            # Capture the model itself: element/relationship ids and the
+            # derived-fact aggregates (the sixth dimension).
+            model_snapshot = self._capture_model_snapshot()
+
+            # Calculate checksum for integrity. model_snapshot's captured_at
+            # is excluded: it is wall-clock time, not estate content, and
+            # including it would give an unchanged estate a new checksum on
+            # every single capture -- the same reason none of the other five
+            # snapshots carry a capture timestamp inside their own hashed
+            # content either.
+            model_snapshot_for_checksum = {
+                k: v for k, v in model_snapshot.items() if k != "captured_at"
+            }
             checksum = self._calculate_baseline_checksum(
                 capabilities_snapshot,
                 coverage_snapshot,
                 health_snapshot,
                 gap_snapshot,
                 vendor_snapshot,
+                model_snapshot_for_checksum,
             )
 
             baseline = ArchitectureBaseline(
@@ -511,13 +643,14 @@ class ArchitectureMonitoringService:
                 health_snapshot=health_snapshot,
                 gap_snapshot=gap_snapshot,
                 vendor_snapshot=vendor_snapshot,
+                model_snapshot=model_snapshot,
                 checksum=checksum,
             )
 
-            self._baselines[baseline_id] = baseline
+            self._state.baselines[baseline_id] = baseline
 
             if set_as_active:
-                self._active_baseline_id = baseline_id
+                self._state.active_baseline_id = baseline_id
 
             # Persist to database
             self._persist_baseline(baseline)
@@ -533,7 +666,7 @@ class ArchitectureMonitoringService:
                     "created_by": baseline.created_by,
                     "description": baseline.description,
                     "checksum": baseline.checksum,
-                    "is_active": baseline_id == self._active_baseline_id,
+                    "is_active": baseline_id == self._state.active_baseline_id,
                     "stats": {
                         "capabilities_count": len(capabilities_snapshot),
                         "gaps_count": len(gap_snapshot),
@@ -558,10 +691,10 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with baseline details
         """
-        if baseline_id not in self._baselines:
+        if baseline_id not in self._state.baselines:
             return {"success": False, "error": "Baseline not found"}
 
-        baseline = self._baselines[baseline_id]
+        baseline = self._state.baselines[baseline_id]
 
         return {
             "success": True,
@@ -572,7 +705,7 @@ class ArchitectureMonitoringService:
                 "created_by": baseline.created_by,
                 "description": baseline.description,
                 "checksum": baseline.checksum,
-                "is_active": baseline_id == self._active_baseline_id,
+                "is_active": baseline_id == self._state.active_baseline_id,
                 "capabilities_snapshot": baseline.capabilities_snapshot,
                 "coverage_snapshot": baseline.coverage_snapshot,
                 "health_snapshot": baseline.health_snapshot,
@@ -590,7 +723,7 @@ class ArchitectureMonitoringService:
             Dict with list of baselines
         """
         baselines = []
-        for baseline in self._baselines.values():
+        for baseline in self._state.baselines.values():
             baselines.append(
                 {
                     "id": baseline.id,
@@ -599,7 +732,7 @@ class ArchitectureMonitoringService:
                     "created_by": baseline.created_by,
                     "description": baseline.description,
                     "checksum": baseline.checksum,
-                    "is_active": baseline.id == self._active_baseline_id,
+                    "is_active": baseline.id == self._state.active_baseline_id,
                 }
             )
 
@@ -610,7 +743,7 @@ class ArchitectureMonitoringService:
             "success": True,
             "baselines": baselines,
             "total": len(baselines),
-            "active_baseline_id": self._active_baseline_id,
+            "active_baseline_id": self._state.active_baseline_id,
         }
 
     def set_active_baseline(self, baseline_id: str) -> Dict[str, Any]:
@@ -623,11 +756,11 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with result
         """
-        if baseline_id not in self._baselines:
+        if baseline_id not in self._state.baselines:
             return {"success": False, "error": "Baseline not found"}
 
-        self._active_baseline_id = baseline_id
-        baseline = self._baselines[baseline_id]
+        self._state.active_baseline_id = baseline_id
+        baseline = self._state.baselines[baseline_id]
 
         return {
             "success": True,
@@ -645,15 +778,15 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with result
         """
-        if baseline_id not in self._baselines:
+        if baseline_id not in self._state.baselines:
             return {"success": False, "error": "Baseline not found"}
 
-        if baseline_id == self._active_baseline_id:
-            self._active_baseline_id = None
+        if baseline_id == self._state.active_baseline_id:
+            self._state.active_baseline_id = None
 
-        del self._baselines[baseline_id]
+        del self._state.baselines[baseline_id]
         self._delete_baseline_from_db(baseline_id)
-        if baseline_id == self._active_baseline_id:
+        if baseline_id == self._state.active_baseline_id:
             self._update_active_baseline_in_db()
 
         return {"success": True, "message": "Baseline deleted successfully"}
@@ -672,7 +805,7 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with scan results and any new alerts
         """
-        if self._status == MonitoringStatus.PAUSED:
+        if self._state.status == MonitoringStatus.PAUSED:
             return {
                 "success": False,
                 "error": "Monitoring is paused. Resume monitoring to trigger scans.",
@@ -683,11 +816,11 @@ class ArchitectureMonitoringService:
             new_alerts = []
 
             # If no active baseline, just capture current state
-            if not self._active_baseline_id:
+            if not self._state.active_baseline_id:
                 # Run gap discovery
                 gap_results = self._run_gap_discovery()
 
-                self._last_scan_time = scan_start
+                self._state.last_scan_time = scan_start
 
                 return {
                     "success": True,
@@ -699,12 +832,12 @@ class ArchitectureMonitoringService:
                 }
 
             # Perform drift analysis against active baseline
-            drift_analysis = self.analyze_drift(self._active_baseline_id)
+            drift_analysis = self.analyze_drift(self._state.active_baseline_id)
 
             if drift_analysis.get("success"):
                 new_alerts = drift_analysis.get("alerts", [])
 
-            self._last_scan_time = scan_start
+            self._state.last_scan_time = scan_start
             scan_duration = (datetime.utcnow() - scan_start).total_seconds()
 
             return {
@@ -719,12 +852,87 @@ class ArchitectureMonitoringService:
 
         except Exception as e:
             logger.error(f"Error during scan: {e}")
-            self._status = MonitoringStatus.ERROR
+            self._state.status = MonitoringStatus.ERROR
             return {"success": False, "error": str(e)}
+
+    def compare_to_baseline(self, baseline_id: Optional[str] = None) -> DriftAnalysis:
+        """Pure comparison: capture the current state, diff it against a
+        baseline, and return the result. Writes nothing -- no alert
+        persistence, no cache mutation, no ``_last_scan_time`` update. A GET
+        through this seam never writes.
+
+        Raises:
+            LookupError: no baseline id was given and none is active, or the
+                given id names no baseline this tenant holds.
+        """
+        target_baseline_id = baseline_id or self._state.active_baseline_id
+
+        if not target_baseline_id or target_baseline_id not in self._state.baselines:
+            raise LookupError("No valid baseline for comparison")
+
+        baseline = self._state.baselines[target_baseline_id]
+        analysis_time = datetime.utcnow()
+
+        # Capture current state, all six dimensions.
+        current_capabilities = self._capture_capabilities_snapshot()
+        current_coverage = self._capture_coverage_snapshot()
+        current_health = self._capture_health_snapshot()
+        current_gaps = self._capture_gap_snapshot()
+        current_vendors = self._capture_vendor_snapshot()
+        current_model = self._capture_model_snapshot()
+
+        # Analyze each dimension
+        coverage_drift = self._analyze_coverage_drift(
+            baseline.coverage_snapshot, current_coverage
+        )
+
+        health_drift = self._analyze_health_drift(baseline.health_snapshot, current_health)
+
+        gap_drift = self._analyze_gap_drift(baseline.gap_snapshot, current_gaps)
+
+        vendor_drift = self._analyze_vendor_drift(baseline.vendor_snapshot, current_vendors)
+
+        capability_drift = self._analyze_capability_drift(
+            baseline.capabilities_snapshot, current_capabilities
+        )
+
+        model_drift = self._analyze_model_drift(baseline.model_snapshot, current_model)
+
+        # Generate alerts based on drift -- in memory only; this seam does
+        # not persist them (no alert type reads the model dimension yet).
+        alerts = self._generate_drift_alerts(
+            coverage_drift, health_drift, gap_drift, vendor_drift, capability_drift
+        )
+
+        critical_count = sum(1 for a in alerts if a.severity == AlertSeverity.CRITICAL.value)
+        warning_count = sum(1 for a in alerts if a.severity == AlertSeverity.WARNING.value)
+        info_count = sum(1 for a in alerts if a.severity == AlertSeverity.INFO.value)
+
+        summary = self._generate_drift_summary(
+            coverage_drift, health_drift, gap_drift, len(alerts)
+        )
+
+        return DriftAnalysis(
+            baseline_id=baseline.id,
+            baseline_name=baseline.name,
+            analysis_timestamp=analysis_time.isoformat(),
+            total_drifts=len(alerts),
+            critical_drifts=critical_count,
+            warning_drifts=warning_count,
+            info_drifts=info_count,
+            coverage_drift=coverage_drift,
+            health_drift=health_drift,
+            gap_drift=gap_drift,
+            vendor_drift=vendor_drift,
+            model_drift=model_drift,
+            alerts=[asdict(a) for a in alerts],
+            summary=summary,
+        )
 
     def analyze_drift(self, baseline_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Analyze architecture drift against a baseline.
+        Analyze architecture drift against a baseline, persisting the
+        alerts the comparison found.
 
         Args:
             baseline_id: ID of baseline to compare against (uses active if not provided)
@@ -732,78 +940,28 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with drift analysis results
         """
-        target_baseline_id = baseline_id or self._active_baseline_id
-
-        if not target_baseline_id or target_baseline_id not in self._baselines:
-            return {"success": False, "error": "No valid baseline for comparison"}
-
-        baseline = self._baselines[target_baseline_id]
-        analysis_time = datetime.utcnow()
-
         try:
-            # Capture current state
-            current_capabilities = self._capture_capabilities_snapshot()
-            current_coverage = self._capture_coverage_snapshot()
-            current_health = self._capture_health_snapshot()
-            current_gaps = self._capture_gap_snapshot()
-            current_vendors = self._capture_vendor_snapshot()
+            analysis = self.compare_to_baseline(baseline_id)
 
-            # Analyze each dimension
-            coverage_drift = self._analyze_coverage_drift(
-                baseline.coverage_snapshot, current_coverage
-            )
-
-            health_drift = self._analyze_health_drift(baseline.health_snapshot, current_health)
-
-            gap_drift = self._analyze_gap_drift(baseline.gap_snapshot, current_gaps)
-
-            vendor_drift = self._analyze_vendor_drift(baseline.vendor_snapshot, current_vendors)
-
-            capability_drift = self._analyze_capability_drift(
-                baseline.capabilities_snapshot, current_capabilities
-            )
-
-            # Generate alerts based on drift
-            alerts = self._generate_drift_alerts(
-                coverage_drift, health_drift, gap_drift, vendor_drift, capability_drift
-            )
-
-            # Store new alerts
+            # Store new alerts. compare_to_baseline returns them already
+            # flattened to plain dicts (DriftAnalysis.alerts); rebuild the
+            # ArchitectureAlert objects this cache and _persist_alert need.
+            alerts = [ArchitectureAlert(**a) for a in analysis.alerts]
             for alert in alerts:
-                self._alerts[alert.id] = alert
+                self._state.alerts[alert.id] = alert
                 self._persist_alert(alert)
-
-            # Calculate totals
-            critical_count = sum(1 for a in alerts if a.severity == AlertSeverity.CRITICAL.value)
-            warning_count = sum(1 for a in alerts if a.severity == AlertSeverity.WARNING.value)
-            info_count = sum(1 for a in alerts if a.severity == AlertSeverity.INFO.value)
-
-            # Generate summary
-            summary = self._generate_drift_summary(
-                coverage_drift, health_drift, gap_drift, len(alerts)
-            )
-
-            drift_result = DriftAnalysis(
-                baseline_id=baseline.id,
-                baseline_name=baseline.name,
-                analysis_timestamp=analysis_time.isoformat(),
-                total_drifts=len(alerts),
-                critical_drifts=critical_count,
-                warning_drifts=warning_count,
-                info_drifts=info_count,
-                coverage_drift=coverage_drift,
-                health_drift=health_drift,
-                gap_drift=gap_drift,
-                vendor_drift=vendor_drift,
-                alerts=[asdict(a) for a in alerts],
-                summary=summary,
-            )
 
             return {
                 "success": True,
-                "drift_analysis": asdict(drift_result),
-                "alerts": [asdict(a) for a in alerts],
+                "drift_analysis": asdict(analysis),
+                "alerts": analysis.alerts,
             }
+
+        except LookupError as e:
+            # No baseline to compare against is a routine, expected outcome
+            # (a tenant that has never captured one), not a failure -- no
+            # ERROR log for it.
+            return {"success": False, "error": str(e)}
 
         except Exception as e:
             logger.error(f"Error analyzing drift: {e}")
@@ -834,7 +992,7 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with alerts
         """
-        alerts = list(self._alerts.values())
+        alerts = list(self._state.alerts.values())
 
         # Apply filters
         if severity:
@@ -875,10 +1033,10 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with alert details
         """
-        if alert_id not in self._alerts:
+        if alert_id not in self._state.alerts:
             return {"success": False, "error": "Alert not found"}
 
-        return {"success": True, "alert": asdict(self._alerts[alert_id])}
+        return {"success": True, "alert": asdict(self._state.alerts[alert_id])}
 
     def acknowledge_alert(
         self, alert_id: str, acknowledged_by: Optional[str] = None
@@ -893,10 +1051,10 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with result
         """
-        if alert_id not in self._alerts:
+        if alert_id not in self._state.alerts:
             return {"success": False, "error": "Alert not found"}
 
-        alert = self._alerts[alert_id]
+        alert = self._state.alerts[alert_id]
         alert.acknowledged = True
         alert.acknowledged_by = acknowledged_by
         alert.acknowledged_at = datetime.utcnow().isoformat()
@@ -921,8 +1079,8 @@ class ArchitectureMonitoringService:
         not_found = 0
 
         for alert_id in alert_ids:
-            if alert_id in self._alerts:
-                alert = self._alerts[alert_id]
+            if alert_id in self._state.alerts:
+                alert = self._state.alerts[alert_id]
                 alert.acknowledged = True
                 alert.acknowledged_by = acknowledged_by
                 alert.acknowledged_at = datetime.utcnow().isoformat()
@@ -945,10 +1103,10 @@ class ArchitectureMonitoringService:
         Returns:
             Dict with result
         """
-        to_remove = [aid for aid, alert in self._alerts.items() if alert.acknowledged]
+        to_remove = [aid for aid, alert in self._state.alerts.items() if alert.acknowledged]
 
         for alert_id in to_remove:
-            del self._alerts[alert_id]
+            del self._state.alerts[alert_id]
             self._delete_alert_from_db(alert_id)
 
         return {
@@ -962,16 +1120,33 @@ class ArchitectureMonitoringService:
     # =========================================================================
 
     def _capture_capabilities_snapshot(self) -> List[Dict[str, Any]]:
-        """Capture snapshot of all capabilities."""
+        """Capture snapshot of all capabilities visible to this tenant."""
         try:
-            capabilities = UnifiedCapability.query.all()
+            capabilities = UnifiedCapability.query.filter(
+                _tenant_capability_filter(self.organization_id)
+            ).all()
             snapshot = []
 
             for cap in capabilities:
-                # Get mapping count
-                mapping_count = UnifiedApplicationCapabilityMapping.query.filter_by(
-                    unified_capability_id=cap.id, is_active=True
-                ).count()
+                # Get mapping count. UnifiedApplicationCapabilityMapping carries no
+                # organization_id (no listener fences it), and a reference
+                # capability (organization_id IS NULL, admitted above by
+                # _tenant_capability_filter) can be mapped by another tenant's
+                # ApplicationComponent -- so the predicate goes on the component,
+                # not the capability.
+                mapping_count = (
+                    UnifiedApplicationCapabilityMapping.query.join(
+                        ApplicationComponent,
+                        ApplicationComponent.id
+                        == UnifiedApplicationCapabilityMapping.application_component_id,
+                    )
+                    .filter(
+                        UnifiedApplicationCapabilityMapping.unified_capability_id == cap.id,
+                        UnifiedApplicationCapabilityMapping.is_active.is_(True),
+                        ApplicationComponent.organization_id == self.organization_id,
+                    )
+                    .count()
+                )
 
                 snapshot.append(
                     {
@@ -1004,7 +1179,9 @@ class ArchitectureMonitoringService:
     def _capture_coverage_snapshot(self) -> Dict[str, Any]:
         """Capture snapshot of coverage metrics."""
         try:
-            capabilities = UnifiedCapability.query.all()
+            capabilities = UnifiedCapability.query.filter(
+                _tenant_capability_filter(self.organization_id)
+            ).all()
 
             total_coverage = 0
             covered_count = 0
@@ -1012,9 +1189,23 @@ class ArchitectureMonitoringService:
             coverage_by_domain = defaultdict(lambda: {"total": 0, "covered": 0})
 
             for cap in capabilities:
-                mappings = UnifiedApplicationCapabilityMapping.query.filter_by(
-                    unified_capability_id=cap.id, is_active=True
-                ).all()
+                # Same predicate-on-the-component reasoning as
+                # _capture_capabilities_snapshot above: a reference capability's
+                # mapping count/coverage must not include another tenant's
+                # ApplicationComponent.
+                mappings = (
+                    UnifiedApplicationCapabilityMapping.query.join(
+                        ApplicationComponent,
+                        ApplicationComponent.id
+                        == UnifiedApplicationCapabilityMapping.application_component_id,
+                    )
+                    .filter(
+                        UnifiedApplicationCapabilityMapping.unified_capability_id == cap.id,
+                        UnifiedApplicationCapabilityMapping.is_active.is_(True),
+                        ApplicationComponent.organization_id == self.organization_id,
+                    )
+                    .all()
+                )
 
                 if mappings:
                     avg_coverage = sum(m.coverage_percentage or 0 for m in mappings) / len(mappings)
@@ -1122,12 +1313,26 @@ class ArchitectureMonitoringService:
             return []
 
     def _capture_vendor_snapshot(self) -> List[Dict[str, Any]]:
-        """Capture snapshot of vendor product status."""
+        """Capture snapshot of vendor product status.
+
+        Scoped to this tenant's own vendor mappings (VendorProductCapability,
+        TenantMixin), not the shared VendorProduct catalogue: a tenant with
+        no mappings gets an honest empty snapshot, not every vendor's
+        products.
+        """
         try:
-            from app.models.vendor.vendor_organization import VendorProduct
+            from app.models.vendor.vendor_organization import VendorProduct, VendorProductCapability
 
             vendors = []
-            products = VendorProduct.query.all()
+            products = (
+                VendorProduct.query.join(
+                    VendorProductCapability,
+                    VendorProductCapability.vendor_product_id == VendorProduct.id,
+                )
+                .filter(VendorProductCapability.organization_id == self.organization_id)
+                .distinct()
+                .all()
+            )
 
             for product in products:
                 vendors.append(
@@ -1145,6 +1350,118 @@ class ArchitectureMonitoringService:
         except Exception as e:
             logger.warning(f"Could not capture vendor snapshot: {e}")
             return []
+
+    @staticmethod
+    def _element_content_hash(el) -> str:
+        """A one-way digest of what makes this element itself: name, type,
+        layer, its typed-property JSON, and documentation.
+
+        ArchiMateElement carries no per-row modification timestamp in this
+        schema (only deleted_at); a rename or a re-layer is otherwise
+        invisible to a snapshot restricted to ids and never shows up as a
+        change. The hash lets a comparison detect that edit without storing
+        the name (or any other field) itself in the snapshot -- only the
+        digest is kept, which does not reveal what it was taken over.
+
+        ``layer`` is canonicalised before hashing: the column's own type
+        decorator (``_ArchiMateLayerType``) lower-cases it on the way back
+        out of a SELECT, but an element captured in the same session it was
+        written in has not made that round trip yet and still carries its
+        as-assigned spelling, which would otherwise hash differently from
+        the same element re-read later and register a one-off phantom
+        change.
+        """
+        from app.models.models import canonical_archimate_layer
+
+        payload = json.dumps(
+            {
+                "name": el.name,
+                "type": el.type,
+                "layer": canonical_archimate_layer(el.layer),
+                "custom_properties": el.custom_properties,
+                "documentation": el.documentation,
+            },
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+    @staticmethod
+    def _relationship_content_hash(rel) -> str:
+        """A one-way digest of what makes this relationship itself: type,
+        source, target, and its connection-spec properties. Same reasoning
+        as _element_content_hash: only the digest is kept.
+        """
+        payload = json.dumps(
+            {
+                "type": rel.type,
+                "source_id": rel.source_id,
+                "target_id": rel.target_id,
+                "connection_spec": rel.connection_spec,
+            },
+            sort_keys=True,
+            default=str,
+        )
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+    def _capture_model_snapshot(self) -> Dict[str, Any]:
+        """Capture the model's own drift surface: this tenant's element and
+        relationship ids with a content hash each, plus the derived-fact
+        aggregates -- so a comparison can say whether the modelled estate
+        moved since the baseline, not only the intelligence built on it.
+
+        Ids and content hashes only, never the fields the hash is taken
+        over: no element or relationship name, description or other
+        property leaves this method. Reads with the explicit organisation
+        predicate the genome drift detector uses
+        (app/modules/genome/services/drift_detector.py), so a call with no
+        Flask request on the stack -- a job, or this service's own callers
+        outside a request -- is scoped too, not relying only on the
+        request-scoped tenant filter.
+        """
+        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+        from app.modules.intelligence.services.derived_facts import (
+            derived_fact_aggregates,
+            stale_derived_fact_ids,
+        )
+
+        elements = ArchiMateElement.query.filter(
+            ArchiMateElement.organization_id == self.organization_id,
+            ArchiMateElement.deleted_at.is_(None),
+        ).all()
+        # ArchiMateRelationship has no soft-delete column (the genome drift
+        # detector filters it by organization_id only, the same predicate
+        # here).
+        relationships = ArchiMateRelationship.query.filter(
+            ArchiMateRelationship.organization_id == self.organization_id,
+        ).all()
+
+        derived = derived_fact_aggregates(self.organization_id)
+        computed_at = derived.get("computed_at")
+        # The staleness filter lives in derived_facts.py, not re-implemented
+        # here (that module is the one read path over the derived-fact
+        # store, with the filter applied in one place).
+        stale_ids = sorted(str(rid) for rid in stale_derived_fact_ids(self.organization_id))
+
+        return {
+            "elements": {str(el.id): self._element_content_hash(el) for el in elements},
+            "relationships": {
+                str(rel.id): self._relationship_content_hash(rel) for rel in relationships
+            },
+            "derived": {
+                "derived_count": derived.get("derived_count"),
+                "stale_count": derived.get("stale_count"),
+                "computed_at": computed_at.isoformat() if computed_at else None,
+                "stale_ids": stale_ids,
+            },
+            # Outside the checksummed payload (_calculate_baseline_checksum
+            # is called on capabilities/coverage/health/gaps/vendors/model,
+            # and this key changes on every capture regardless of the
+            # estate) -- capture_baseline reads it back out before hashing,
+            # so two baselines over an identical estate get identical
+            # checksums.
+            "captured_at": datetime.utcnow().isoformat(),
+        }
 
     def _calculate_baseline_checksum(self, *snapshots) -> str:
         """Calculate checksum of baseline data for integrity."""
@@ -1277,6 +1594,122 @@ class ArchitectureMonitoringService:
             "has_changes": len(new_caps) > 0
             or len(removed_caps) > 0
             or len(maturity_regressions) > 0,
+        }
+
+    def _analyze_model_drift(
+        self,
+        baseline_model: Optional[Dict[str, Any]],
+        current_model: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Analyze drift in the model itself: which element/relationship ids
+        were added, removed or changed in place, and what happened to
+        derivation since the baseline.
+
+        A baseline captured before this dimension existed carries no
+        "model" key in its persisted snapshot (``_ensure_loaded`` reads it
+        back as ``None``, never ``{}``) -- every count is ``None`` with the
+        ``baseline_lacks_model_snapshot`` reason in that case, not a
+        fabricated ``0``: a ``0`` means a real comparison ran and found no
+        change, whereas ``None`` means no comparison could run at all.
+
+        No alert is generated from this dimension in this task.
+        """
+        if baseline_model is None:
+            return {
+                "reason": "baseline_lacks_model_snapshot",
+                "elements_changed": None,
+                "relationships_added": None,
+                "relationships_removed": None,
+                "derived_recomputed": None,
+                "changed_element_ids": [],
+                "added_relationship_ids": [],
+                "removed_relationship_ids": [],
+            }
+
+        baseline_elements = baseline_model.get("elements", {}) or {}
+        current_elements = current_model.get("elements", {}) or {}
+        baseline_element_ids = set(baseline_elements)
+        current_element_ids = set(current_elements)
+
+        # Ids present on both sides whose content hash differs are a real,
+        # in-place edit (a rename, a re-layer, a property change) -- not
+        # merely present/absent, which the id-set alone already covers via
+        # added/removed below.
+        common_element_ids = baseline_element_ids & current_element_ids
+        changed_element_ids = sorted(
+            eid
+            for eid in common_element_ids
+            if baseline_elements.get(eid) != current_elements.get(eid)
+        )
+        added_element_ids = sorted(current_element_ids - baseline_element_ids)
+        removed_element_ids = sorted(baseline_element_ids - current_element_ids)
+
+        baseline_relationships = baseline_model.get("relationships", {}) or {}
+        current_relationships = current_model.get("relationships", {}) or {}
+        baseline_relationship_ids = set(baseline_relationships)
+        current_relationship_ids = set(current_relationships)
+        common_relationship_ids = baseline_relationship_ids & current_relationship_ids
+        changed_relationship_ids = sorted(
+            rid
+            for rid in common_relationship_ids
+            if baseline_relationships.get(rid) != current_relationships.get(rid)
+        )
+        added_relationship_ids = sorted(current_relationship_ids - baseline_relationship_ids)
+        removed_relationship_ids = sorted(baseline_relationship_ids - current_relationship_ids)
+
+        baseline_derived = baseline_model.get("derived", {}) or {}
+        current_derived = current_model.get("derived", {}) or {}
+        baseline_derived_count = baseline_derived.get("derived_count")
+        current_derived_count = current_derived.get("derived_count")
+        baseline_stale_count = baseline_derived.get("stale_count")
+        current_stale_count = current_derived.get("stale_count")
+        baseline_stale_ids = set(baseline_derived.get("stale_ids") or [])
+        current_stale_ids = set(current_derived.get("stale_ids") or [])
+        newly_stale_ids = sorted(current_stale_ids - baseline_stale_ids)
+        resolved_stale_ids = sorted(baseline_stale_ids - current_stale_ids)
+        baseline_computed_at = baseline_derived.get("computed_at")
+        current_computed_at = current_derived.get("computed_at")
+        derived_recomputed = (
+            1
+            if current_computed_at is not None
+            and (baseline_computed_at is None or current_computed_at > baseline_computed_at)
+            else 0
+        )
+
+        return {
+            "elements_changed": len(changed_element_ids),
+            "elements_added": len(added_element_ids),
+            "elements_removed": len(removed_element_ids),
+            "relationships_changed": len(changed_relationship_ids),
+            "relationships_added": len(added_relationship_ids),
+            "relationships_removed": len(removed_relationship_ids),
+            "derived_recomputed": derived_recomputed,
+            # derived_count/stale_count deltas plus the stale set itself: two
+            # snapshots can carry the same stale_count while a different
+            # fact went stale and another recovered, which a bare count
+            # cannot show.
+            "derived_count_delta": (
+                None
+                if baseline_derived_count is None or current_derived_count is None
+                else current_derived_count - baseline_derived_count
+            ),
+            "stale_count_delta": (
+                None
+                if baseline_stale_count is None or current_stale_count is None
+                else current_stale_count - baseline_stale_count
+            ),
+            "newly_stale_ids": newly_stale_ids,
+            "resolved_stale_ids": resolved_stale_ids,
+            "derived_computed_at": {
+                "baseline": baseline_computed_at,
+                "current": current_computed_at,
+            },
+            "changed_element_ids": changed_element_ids,
+            "added_element_ids": added_element_ids,
+            "removed_element_ids": removed_element_ids,
+            "changed_relationship_ids": changed_relationship_ids,
+            "added_relationship_ids": added_relationship_ids,
+            "removed_relationship_ids": removed_relationship_ids,
         }
 
     def _run_gap_discovery(self) -> Dict[str, Any]:

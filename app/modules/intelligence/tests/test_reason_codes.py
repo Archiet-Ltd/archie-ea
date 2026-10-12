@@ -1,7 +1,7 @@
 """T-001 acceptance criterion 13: the DE-14 reason-code vocabulary is closed.
 
 Mapping:
-    13 -> test_reason_codes_has_exactly_forty_three_members,
+    13 -> test_reason_codes_has_exactly_fifty_one_members,
           test_unknown_reason_code_is_rejected_not_passed_through
 
 T-004 (US-1) added two members -- ``no_tenant_context`` and
@@ -43,9 +43,11 @@ reality more than once already (found and corrected multiple times,
 independently, by different lenses' briefs each adding a member without
 re-deriving the true count); merging branches that each added members
 independently (L2/L4/role-gating, T-S1, the maturity read helper, the
-programme lens's own plateau/gap pair, and the Portfolio-block additions) is
-the same class of drift, resolved here by re-deriving the real count (39)
-rather than trusting any one side's own stale number.
+programme lens's own plateau/gap pair, the Portfolio-block additions, the
+baseline-drift engine's model dimension's ``baseline_lacks_model_snapshot``,
+and the Operational lens's own ``no_baseline_captured``) is the same class
+of drift, resolved here by re-deriving the real count rather than trusting
+any one side's own stale number.
 """
 
 from __future__ import annotations
@@ -64,8 +66,9 @@ from app.modules.intelligence.services.reason_codes import (
 # Strategy lenses' four additions, the Accountability lens's two plus its
 # withdrawal reason, role-gating's addition, T-S1's four additions, the
 # programme lens's own plateau/gap pair, the maturity read helper's two
-# additions, the Portfolio-block's four additions and the connection
-# explanation's four.
+# additions, the Portfolio-block's four additions, the connection
+# explanation's four, the baseline-drift engine's model-dimension
+# addition, and the Operational lens's own addition.
 _EXPECTED = {
     "no_ownership_recorded",
     "no_maturity_recorded",
@@ -90,6 +93,8 @@ _EXPECTED = {
     "no_work_package_recorded",
     "not_costed",
     "no_budget_recorded",
+    "baseline_lacks_model_snapshot",
+    "no_baseline_captured",
     "no_ownership_records",
     "capacity_not_available",
     "financial_data_restricted",
@@ -119,8 +124,8 @@ _EXPECTED = {
 }
 
 
-def test_reason_codes_has_exactly_forty_nine_members():
-    assert len(REASON_CODES) == 49
+def test_reason_codes_has_exactly_fifty_one_members():
+    assert len(REASON_CODES) == 51
     assert REASON_CODES == frozenset(_EXPECTED)
 
 

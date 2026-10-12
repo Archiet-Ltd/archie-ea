@@ -333,16 +333,16 @@ def test_expanded_chain_marks_an_unresolved_link_instead_of_dropping_it(
     assert "source_id" not in expanded[1]
 
 
-def test_module_registers_exactly_sixteen_routes(app):
-    """The impact, risk, portfolio, programme, strategy, accountability,
-    data, compliance, traceability, value-streams-at-risk, yield, catalogue
-    list, catalogue run and ask routes all mount on this same existing
-    blueprint rather than a new one each. Still exactly one blueprint, now
-    sixteen routes on it -- all six lenses of the catalogue, the L7 data
-    lens, the L6 compliance lens, the traceability check over the impact
-    walk, the Strategic value-streams-at-risk surface,
-    recompute/derived/yield, and R1-B39's query catalogue (list + run) and
-    plain-language ask endpoints.
+def test_module_registers_exactly_seventeen_routes(app):
+    """The impact, risk, portfolio, programme, strategy, operational,
+    accountability, data, compliance, traceability, value-streams-at-risk,
+    yield, catalogue list, catalogue run and ask routes all mount on this
+    same existing blueprint rather than a new one each. Still exactly one
+    blueprint, now seventeen routes on it -- all six lenses of the
+    catalogue, the Operational lens, the L7 data lens, the L6 compliance
+    lens, the traceability check over the impact walk, the Strategic
+    value-streams-at-risk surface, recompute/derived/yield, and R1-B39's
+    query catalogue (list + run) and plain-language ask endpoints.
     """
     rules = [
         rule for rule in app.url_map.iter_rules() if rule.endpoint.startswith("intelligence_api.")
@@ -357,6 +357,7 @@ def test_module_registers_exactly_sixteen_routes(app):
         "intelligence_api.portfolio_component_for_element",
         "intelligence_api.programme_for_element",
         "intelligence_api.strategy_for_element",
+        "intelligence_api.operational_for_element",
         "intelligence_api.accountability_for_element",
         "intelligence_api.data_for_element",
         "intelligence_api.compliance_for_element",
