@@ -322,6 +322,10 @@ def admin_sso():
                 "error",
             )
             return redirect(url_for("sso.admin_sso"))
+        domain_problem = _svc.domain_claim_problem(org_id, email_domain)
+        if domain_problem:
+            flash(domain_problem, "error")
+            return redirect(url_for("sso.admin_sso"))
 
         if config is None:
             if not org_id:

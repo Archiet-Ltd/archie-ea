@@ -46,6 +46,19 @@ def _make_user(db_session, org_id, email):
     return user
 
 
+def _configure_sso(db_session, org, email_domain):
+    """Give ``org`` an SSO configuration that lists ``email_domain``, as an
+    organisation whose own sign-in provisions these addresses has."""
+    from app.models.sso_config import SSOConfig
+
+    config = SSOConfig(
+        organization_id=org.id, protocol="oidc", enabled=True, email_domain=email_domain
+    )
+    db_session.add(config)
+    db_session.flush()
+    return config
+
+
 class TestProvisionUserIsTenantScoped:
     def test_refuses_to_attach_to_an_existing_user_in_a_different_org(
         self, db_session, org_a, org_b
@@ -76,6 +89,7 @@ class TestProvisionUserIsTenantScoped:
     def test_still_provisions_a_new_user_for_the_correct_org(self, db_session, org_a):
         from app.services.sso_service import SSOService
 
+        _configure_sso(db_session, org_a, "example.com")
         email = f"newuser-{uuid.uuid4().hex[:8]}@example.com"
         svc = SSOService()
         user = svc.provision_user(org_a, {"email": email, "sub": "real-idp-sub"})
@@ -86,6 +100,7 @@ class TestProvisionUserIsTenantScoped:
     def test_still_updates_an_existing_user_in_the_same_org(self, db_session, org_a):
         from app.services.sso_service import SSOService
 
+        _configure_sso(db_session, org_a, "example.com")
         email = f"sameorg-{uuid.uuid4().hex[:8]}@example.com"
         existing = _make_user(db_session, org_a.id, email)
 

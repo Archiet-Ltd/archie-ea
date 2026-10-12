@@ -33,6 +33,49 @@ _ID_TOKEN_ALGORITHMS = (
 # Clock-skew allowance applied to exp, iat and nbf.
 _ID_TOKEN_LEEWAY_SECONDS = 120
 
+# Domains of public mailbox providers. No single organisation owns the
+# addresses in them, so none may be claimed for an organisation's sign-in.
+# The one list of these domains in the product.
+PUBLIC_MAILBOX_DOMAINS = frozenset({
+    "gmail.com",
+    "googlemail.com",
+    "outlook.com",
+    "hotmail.com",
+    "live.com",
+    "msn.com",
+    "yahoo.com",
+    "icloud.com",
+    "me.com",
+    "aol.com",
+    "proton.me",
+    "protonmail.com",
+    "gmx.com",
+    "mail.com",
+    "yandex.com",
+    "zoho.com",
+})
+
+_MSG_MISSING_SUBJECT = (
+    "Your identity provider did not return the details needed to sign you in."
+)
+_MSG_OUTSIDE_DOMAINS = (
+    "This email address is not in a domain your organisation's SSO is configured for."
+)
+_MSG_LINKED_ELSEWHERE = (
+    "This account is linked to a different sign-in. Contact your administrator."
+)
+_MSG_PASSWORD_ONLY = "This account signs in with a password."
+_MSG_OTHER_ORGANISATION = (
+    "This email address belongs to a different organisation's "
+    "account and cannot sign in through this organisation's SSO."
+)
+# How the connection notice names an organisation's sign-in when its
+# configuration carries no display name of its own.
+_DEFAULT_PROVIDER_LABEL = "your organisation's single sign-on"
+# The sso_provider value per-organisation sign-in writes, for OIDC and SAML
+# alike, so a returning member matches whichever protocol the org uses.
+_ORG_SSO_PROVIDER = "oidc"
+
 
 class SSONotConfiguredError(Exception):
     """Raised when SSO is not configured or a required env var is missing."""
@@ -57,6 +100,10 @@ class SSOService:
     def get_config_for_email(self, email: str):
         """Return the enabled SSOConfig whose domain matches *email*, or None.
 
+        When more than one enabled configuration lists the domain, none of
+        them is returned: the address falls back to password sign-in and a
+        warning names the configurations involved.
+
         Args:
             email: User's email address (e.g. "alice@acme.com").
 
@@ -65,7 +112,7 @@ class SSOService:
         """
         if not email or "@" not in email:
             return None
-        domain = email.split("@", 1)[1].lower()
+        domain = email.split("@", 1)[1].strip().lower()
         try:
             from app.models.sso_config import SSOConfig
 
@@ -73,9 +120,16 @@ class SSOService:
             # pre-authentication (no org context yet) -- the domain match
             # itself is the scoping mechanism.
             configs = SSOConfig.query.filter_by(enabled=True).all()
-            for config in configs:
-                if domain in config.email_domains:
-                    return config
+            matches = [config for config in configs if domain in config.email_domains]
+            if len(matches) > 1:
+                logger.warning(
+                    "More than one enabled SSO configuration lists the same email "
+                    "domain (config ids %s); using password sign-in for it.",
+                    sorted(config.id for config in matches),
+                )
+                return None
+            if matches:
+                return matches[0]
         except Exception as exc:
             logger.warning("SSO config lookup failed (non-fatal): %s", exc)
             try:
@@ -83,6 +137,95 @@ class SSOService:
                 db.session.rollback()
             except Exception as exc:
                 logger.debug("suppressed error in SSOService.get_config_for_email (app/services/sso_service.py): %s", exc)
+        return None
+
+    def config_for_login(self, email: str):
+        """The enabled SSOConfig the sign-in form should send *email* to, or None.
+
+        The one decision both account blueprints' ``login()`` make before the
+        password check. A configuration is returned only when its domain
+        matches and the address is not already held by an account outside
+        that configuration's organisation; an account of another
+        organisation, and a platform administrator, sign in with a password.
+        None means "carry on to the password check".
+        """
+        config = self.get_config_for_email(email)
+        if config is None or not config.enabled:
+            return None
+        try:
+            from app.models.user import User
+
+            user = User.find_by_email(email)
+        except Exception as exc:
+            logger.warning("SSO sign-in account lookup failed (non-fatal): %s", exc)
+            try:
+                from app import db
+
+                db.session.rollback()
+            except Exception as rollback_exc:
+                logger.debug("suppressed error in SSOService.config_for_login: %s", rollback_exc)
+            return None
+        if user is not None and (
+            user.organization_id != config.organization_id
+            or getattr(user, "is_platform_admin", False)
+        ):
+            return None
+        return config
+
+    # ------------------------------------------------------------------
+    # Domain claims (admin configuration)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def split_email_domains(raw: Optional[str]) -> list:
+        """Split a submitted ``email_domain`` value the way
+        :attr:`app.models.sso_config.SSOConfig.email_domains` reads it back:
+        comma-separated, each stripped and lower-cased, blanks dropped."""
+        if not raw:
+            return []
+        return [d.strip().lower() for d in raw.split(",") if d.strip()]
+
+    def domains_claimed_by_other_orgs(self, org_id, domains) -> dict:
+        """``{domain: organization_id}`` for each of *domains* that another
+        organisation's SSO configuration already lists, enabled or not."""
+        wanted = set(domains)
+        if not wanted:
+            return {}
+        from app.models.sso_config import SSOConfig
+
+        # tenant-scoping-ok: a domain claim is checked against every other
+        # organisation's configuration; only domains and org ids are read.
+        query = SSOConfig.query
+        if org_id is not None:
+            query = query.filter(SSOConfig.organization_id != org_id)
+        claimed = {}
+        for config in query.all():
+            for domain in config.email_domains:
+                if domain in wanted:
+                    claimed.setdefault(domain, config.organization_id)
+        return claimed
+
+    def domain_claim_problem(self, org_id, raw_email_domain: Optional[str]) -> Optional[str]:
+        """Why organisation *org_id* may not save *raw_email_domain*, or None.
+
+        Refuses a public mailbox domain and a domain another organisation's
+        configuration already lists. Re-saving a domain this organisation
+        already lists is allowed.
+        """
+        domains = self.split_email_domains(raw_email_domain)
+        for domain in domains:
+            if domain in PUBLIC_MAILBOX_DOMAINS:
+                return (
+                    f"{domain} is a public email provider's domain and cannot be "
+                    "used for your organisation's single sign-on."
+                )
+        claimed = self.domains_claimed_by_other_orgs(org_id, domains)
+        for domain in domains:
+            if domain in claimed:
+                return (
+                    f"{domain} is already used by another organisation's single "
+                    "sign-on and cannot be added here."
+                )
         return None
 
     # ------------------------------------------------------------------
@@ -404,11 +547,25 @@ class SSOService:
     # ------------------------------------------------------------------
 
     def provision_user(self, org, userinfo: dict):
-        """Create or update a User record from IdP-supplied claims.
+        """Resolve the account an organisation's IdP has signed in, creating
+        it when the address is new. Shared by the OIDC and SAML callbacks.
 
-        Looks up by email first. Creates a confirmed SSO user if not found.
-        Always syncs ``first_name``, ``last_name``, ``sso_provider``, and
-        ``external_id`` from the IdP claims.
+        In order:
+
+        - The claims must carry a subject (``sub``); the address is never
+          used as the identity key.
+        - A member of *org* already linked to this subject is returned
+          (names refreshed) without looking the address up. A platform
+          administrator is refused.
+        - Otherwise the address must be in one of the domains *org*'s SSO
+          configuration lists.
+        - The address is looked up case-insensitively. An account in another
+          organisation, a platform administrator, and an account already
+          linked to a different sign-in are refused, unchanged.
+        - An unlinked member of *org* is linked to this subject. If it
+          already signed in with a password, the account's own address is
+          told that a sign-in method was connected.
+        - An unknown address is created in *org*.
 
         Args:
             org: :class:`app.models.organization.Organization` instance.
@@ -418,14 +575,21 @@ class SSOService:
             :class:`app.models.user.User` instance (persisted to DB).
 
         Raises:
-            :class:`SSONotConfiguredError` if email is missing from claims.
+            :class:`SSONotConfiguredError` when the sign-in is refused;
+            nothing has been created or changed.
         """
         from app import db
+        from app.jobs.tenant_safe_job import platform_scope
         from app.models.user import User
 
         email = (userinfo.get("email") or "").strip().lower()
         if not email:
             raise SSONotConfiguredError("IdP did not provide an email claim")
+
+        raw_sub = userinfo.get("sub")
+        if raw_sub is None or not str(raw_sub).strip():
+            raise SSONotConfiguredError(_MSG_MISSING_SUBJECT)
+        sub = str(raw_sub)
 
         # Resolve name from claims, honouring attribute_mapping overrides
         attr_map: dict = {}
@@ -444,51 +608,92 @@ class SSOService:
             given_name = parts[0]
             family_name = parts[1] if len(parts) > 1 else ""
 
-        sub = userinfo.get("sub", email)
-
-        user = User.query.filter_by(email=email).first()
-        if user is not None and org and user.organization_id != org.id:
-            # The email matched an existing user who belongs to a different
-            # organisation than the one whose SSO config produced this login.
-            # email_domain on SSOConfig is operator-entered with no ownership
-            # verification, so one organisation's admin can configure it to
-            # claim another organisation's real domain; without this check,
-            # a login through that config would silently attach to and take
-            # over the other organisation's existing user (updating their
-            # external_id/sso_provider) rather than being refused. Refuse
-            # rather than create a second account under the same email too,
-            # since email is the identity email/password sign-in already
-            # keys on elsewhere in this codebase.
-            raise SSONotConfiguredError(
-                "This email address belongs to a different organisation's "
-                "account and cannot sign in through this organisation's SSO."
-            )
-        if user is None:
-            user = User(
-                email=email,
-                first_name=given_name,
-                last_name=family_name,
-                confirmed=True,
-                sso_provider="oidc",
-                external_id=sub,
-            )
-            if org:
-                user.organization_id = org.id
-            db.session.add(user)
-        else:
-            # Update mutable IdP-owned fields
+        def _refresh_names(user) -> None:
             if given_name:
                 user.first_name = given_name
             if family_name:
                 user.last_name = family_name
-            user.sso_provider = "oidc"
-            if sub:
-                user.external_id = sub
-            if org and not user.organization_id:
-                user.organization_id = org.id
 
-        db.session.commit()
+        config = getattr(org, "sso_config", None) if org is not None else None
+        configured_domains = config.email_domains if config is not None else []
+        domain = email.rsplit("@", 1)[1] if "@" in email else ""
+        send_connection_notice = False
+
+        # Nobody is signed in yet, so there is no session organisation; the
+        # account lookups and the write (whose seat check reads the
+        # organisation's subscription) run in the platform scope, as the
+        # password-reset request does.
+        with platform_scope("single sign-on: resolve the account for a person who is not signed in yet"):
+            linked = None
+            if org is not None:
+                # tenant-scoping-ok: the organisation is part of the key
+                linked = User.query.filter_by(
+                    organization_id=org.id,
+                    sso_provider=_ORG_SSO_PROVIDER,
+                    external_id=sub,
+                ).first()
+            if linked is not None:
+                if linked.is_platform_admin:
+                    raise SSONotConfiguredError(_MSG_PASSWORD_ONLY)
+                _refresh_names(linked)
+                db.session.commit()
+                return linked
+
+            if org is None or not domain or domain not in configured_domains:
+                raise SSONotConfiguredError(_MSG_OUTSIDE_DOMAINS)
+
+            user = User.find_by_email(email)
+            if user is not None and user.organization_id != org.id:
+                # email_domain on SSOConfig is operator-entered with no
+                # ownership verification, so an address can reach this
+                # organisation's sign-in while its account belongs to another
+                # organisation. Refuse rather than attach to that account or
+                # create a second one under the same address.
+                raise SSONotConfiguredError(_MSG_OTHER_ORGANISATION)
+
+            if user is None:
+                user = User(
+                    email=email,
+                    first_name=given_name,
+                    last_name=family_name,
+                    confirmed=True,
+                    sso_provider=_ORG_SSO_PROVIDER,
+                    external_id=sub,
+                )
+                user.organization_id = org.id
+                db.session.add(user)
+            else:
+                if user.is_platform_admin:
+                    raise SSONotConfiguredError(_MSG_PASSWORD_ONLY)
+                if user.external_id and (
+                    user.external_id != sub
+                    or (user.sso_provider or _ORG_SSO_PROVIDER) != _ORG_SSO_PROVIDER
+                ):
+                    raise SSONotConfiguredError(_MSG_LINKED_ELSEWHERE)
+                send_connection_notice = (
+                    not user.external_id and user.password_hash is not None
+                )
+                _refresh_names(user)
+                user.sso_provider = _ORG_SSO_PROVIDER
+                user.external_id = sub
+
+            db.session.commit()
+
+        if send_connection_notice:
+            from app.modules.account.services.account_service import AccountService
+
+            AccountService.notify_sign_in_method_connected(
+                user, self._provider_label(config)
+            )
         return user
+
+    @staticmethod
+    def _provider_label(config) -> str:
+        """How the connection notice names an organisation's sign-in."""
+        label = getattr(config, "display_name", None) if config is not None else None
+        if isinstance(label, str) and label.strip():
+            return label.strip()
+        return _DEFAULT_PROVIDER_LABEL
 
     # ------------------------------------------------------------------
     # SAML stub

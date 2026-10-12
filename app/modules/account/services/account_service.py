@@ -239,6 +239,43 @@ class AccountService:
         return "requested"
 
     @staticmethod
+    def notify_sign_in_method_connected(user, provider_label):
+        """Tell the account holder that a sign-in method was connected.
+
+        The one sender of this notice, for every path that connects an
+        external sign-in to an account that already signed in another way.
+        The message goes to the account's own address only, names the
+        sign-in method and the time in UTC, and carries no organisation name
+        and no link token. It is sent after the response, like the password
+        reset link. Never raises: a notice that cannot be sent must not stop
+        the sign-in it reports.
+        """
+        from datetime import datetime, timezone
+
+        from app.flask_email import deliver_email_after_response, mail_available
+
+        user_id = getattr(user, "id", None)
+        try:
+            if not mail_available():
+                _log.info(
+                    "sign-in method connected for user %s; no mail server, notice not sent",
+                    user_id,
+                )
+                return
+            deliver_email_after_response(
+                recipient=user.email,
+                subject="A sign-in method was connected to your account",
+                template="account/email/sign_in_method_connected",
+                user=user,
+                provider_label=provider_label,
+                connected_at=datetime.now(timezone.utc),
+            )
+        except Exception:
+            _log.error(
+                "sign-in method notice for user %s could not be sent", user_id, exc_info=True
+            )
+
+    @staticmethod
     def reset_link_usable(token):
         from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
 

@@ -73,12 +73,12 @@ def login():
     if form.validate_on_submit():
         # COM-005: Check email-domain SSO config before password auth.
         # If the user's org has SSO configured and enabled, redirect to IdP.
+        # config_for_login decides (one decision shared with the v2 login).
         try:
             from app.services.sso_service import SSOService
 
-            _sso_svc = SSOService()
-            _sso_cfg = _sso_svc.get_config_for_email(form.email.data)
-            if _sso_cfg is not None and _sso_cfg.enabled:
+            _sso_cfg = SSOService().config_for_login(form.email.data)
+            if _sso_cfg is not None:
                 return redirect(
                     url_for("sso.sso_initiate", email=form.email.data)
                 )
