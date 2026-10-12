@@ -348,8 +348,9 @@ def count_gaps(
 ) -> int:
     """Return the number of gaps in the one gap register for an organisation.
 
-    This is the single canonical count used by both the roadmap and the
-    gap analysis screen, so they always agree.
+    Plateau-transition gaps are excluded from the count.  This is the single
+    canonical count used by both the roadmap and the gap analysis screen, so
+    they always agree.
 
     The optional filters mirror the register list readers so a total can be
     the count of the population listed:
