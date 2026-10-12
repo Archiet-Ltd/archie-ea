@@ -52,6 +52,22 @@
     </div>
   </div>
 
+  <div class="mt-6 rounded-lg border border-border bg-card p-4" data-testid="end-of-support-exposure">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">End-of-support exposure, next {{ exposure_window_months }} months</h2>
+    {% if exposure %}
+    <ul class="divide-y divide-border text-sm">
+      {% for row in exposure %}
+      <li class="py-2" data-testid="exposure-row-{{ row.application_id }}">
+        <p class="font-medium text-foreground">{{ row.product_name }} — {{ row.end_of_life_date|format_date }}</p>
+        <p class="text-muted-foreground">{{ row.application_name }} — owner: {{ row.owners }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ empty_state(icon='calendar-x', headline='Nothing reaches end of support in the next ' ~ exposure_window_months ~ ' months', body='No technology product this organisation depends on ends support inside the window.') }}
+    {% endif %}
+  </div>
+
   <div class="mt-6 rounded-lg border border-border bg-card p-4" data-testid="store-agreement-panel">
     <h2 class="text-sm font-semibold text-muted-foreground mb-2">Surfaces disagreeing</h2>
     {% if agreement.error %}

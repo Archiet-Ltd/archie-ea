@@ -14,12 +14,13 @@ computing a parallel figure:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from app import db
 from app.models.application_portfolio import ApplicationComponent
 from app.models.architecture_decision import ArchitectureChangeRequest
 from app.models.vendor.vendor_organization import VendorProduct
+from app.services.eol_window import add_months, lead_months_for, owner_summaries
 
 
 def supported_version_share(organization_id: int) -> Dict[str, Any]:
@@ -112,3 +113,61 @@ def store_agreement_findings(organization_id: int) -> Dict[str, Any]:
         return {"findings": findings, "notes": notes + compare_notes, "error": None}
     except Exception as exc:  # noqa: BLE001 - surfaced to the page, not swallowed
         return {"findings": [], "notes": [], "error": str(exc)[:300]}
+
+
+def end_of_support_exposure(
+    organization_id: int, window_months: Optional[int] = None
+) -> List[Dict[str, Any]]:
+    """The applications that depend on a technology product reaching end of
+    support within the window, soonest end-of-support date first, each with
+    its owner summary.
+
+    A read model, not a second store: the date is VendorProduct's own
+    end_of_life_date (entered or imported on the product record) and the
+    window, dependents and ownership readers are the shared
+    app.services.eol_window helpers the alert scanner imports too -- nothing
+    is stored here a second time.
+
+    ``window_months`` defaults to the organisation's configured lead time
+    (lead_months_for), and when given explicitly must be a whole number of
+    months between 1 and 60. A product with no date recorded is never listed
+    (never a computed-looking date).
+    """
+    if window_months is None:
+        window_months = lead_months_for(organization_id)
+    elif not isinstance(window_months, int) or isinstance(window_months, bool) or not (
+        1 <= window_months <= 60
+    ):
+        raise ValueError("window_months must be a whole number of months between 1 and 60")
+
+    cutoff = add_months(datetime.utcnow(), window_months)
+
+    pairs = (
+        db.session.query(VendorProduct, ApplicationComponent)
+        .join(ApplicationComponent, ApplicationComponent.vendor_product_id == VendorProduct.id)
+        .filter(
+            ApplicationComponent.organization_id == organization_id,
+            ApplicationComponent.deleted_at.is_(None),
+            VendorProduct.end_of_life_date.isnot(None),
+            VendorProduct.end_of_life_date <= cutoff,
+        )
+        .order_by(VendorProduct.end_of_life_date.asc(), VendorProduct.id, ApplicationComponent.name)
+        .all()
+    )
+
+    application_ids = [ac.id for _, ac in pairs]
+    owner_map = owner_summaries(application_ids, organization_id)
+
+    rows: List[Dict[str, Any]] = []
+    for product, app_component in pairs:
+        rows.append(
+            {
+                "vendor_product_id": product.id,
+                "product_name": product.name,
+                "end_of_life_date": product.end_of_life_date.date(),
+                "application_id": app_component.id,
+                "application_name": app_component.name,
+                "owners": owner_map.get(app_component.id, "no owner recorded"),
+            }
+        )
+    return rows
