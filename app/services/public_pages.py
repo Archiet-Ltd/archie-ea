@@ -221,12 +221,6 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
     ),
     "roadmaps": "0 gaps detected; plateaus with no description and 0 gaps",
     "value-streams": "0 stages and 0 capabilities on every value stream",
-    "digital-twin": (
-        "no seeded demonstration organisation or browser available when the "
-        "page was written to capture Ask with an impact answer and the "
-        "provenance drawer open, the twin map, or model history with a "
-        "seeded change -- needs a real capture run, not a placeholder"
-    ),
 }
 
 # The one live use-case page: same screen as the capability-maturity module

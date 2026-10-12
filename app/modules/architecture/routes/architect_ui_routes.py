@@ -745,12 +745,40 @@ def element_traceability(element_id):
     impact_service = ArchiMateImpactService()
     chain = service.get_element_chain(element_id)
     impact_summary = impact_service.get_impact_summary(element_id)
+    from app.models.motivation import Goal
+
+    goal = db.session.execute(
+        db.select(Goal).where(
+            Goal.archimate_element_id == element.id,
+            Goal.organization_id == current_user.organization_id,
+        )
+    ).scalars().first()
     return render_template(
         "archimate_views/element_traceability.html",
         element=element,
         chain=chain,
         impact_summary=impact_summary,
+        goal=goal,
     )
+
+
+@architect_ui_bp.route("/architecture/goals/<int:goal_id>/trace")
+@login_required
+def goal_trace_page(goal_id):
+    """A goal's recorded chain down to capabilities, initiatives, work packages and applications.
+
+    The page is the permanent link for the trace: it shows the same answer as
+    the goal trace API, with each hop naming the record it came from. A goal
+    with nothing recorded says so rather than showing an empty success.
+    """
+    from flask import abort
+
+    from app.modules.architecture.services.motivation_layer_service import MotivationLayerService
+
+    trace = MotivationLayerService.get_goal_trace(goal_id, current_user.organization_id)
+    if trace.get("goal") is None:
+        abort(404)
+    return render_template("archimate_views/goal_trace.html", trace=trace)
 
 
 @architect_ui_bp.route("/api/archimate/traceability/<int:element_id>")

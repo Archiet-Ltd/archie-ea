@@ -1,0 +1,64 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}Goal trace: {{ trace.goal.name }}{% endblock %}
+
+{% block breadcrumb %}
+{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
+{{ breadcrumb_nav(items=[
+    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
+    {'text': 'Traceability', 'href': url_for('architect_ui.traceability_matrix')},
+    {'text': 'Goal trace', 'current': true}
+]) }}
+{% endblock %}
+
+{% macro hop_list(title, rows, empty_text, testid) %}
+<section class="rounded-lg border bg-card p-6" data-testid="{{ testid }}">
+  <h2 class="text-lg font-semibold">{{ title }}</h2>
+  {% if rows %}
+  <ul class="mt-3 divide-y">
+    {% for row in rows %}
+    <li class="py-2 text-sm">
+      <span class="font-medium">{{ row.name }}</span>
+      {% if row.status %}<span class="ml-2 text-xs text-muted-foreground">{{ row.status }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="mt-2 text-sm text-muted-foreground">{{ empty_text }}</p>
+  {% endif %}
+</section>
+{% endmacro %}
+
+{% block content %}
+<div class="p-6 space-y-6 mx-auto">
+
+  {{ page_shell(title=trace.goal.name, subtitle='Goal trace: capabilities, initiatives, work packages and applications recorded against this goal') }}
+
+  {% if trace.trace_status == 'not_recorded' %}
+  <div class="rounded-lg border border-border bg-muted p-4 text-sm" role="status" data-testid="trace-not-recorded">
+    Nothing is recorded below this goal yet. Link a capability or an initiative to it and the chain will appear here.
+  </div>
+  {% endif %}
+
+  <p class="text-sm text-muted-foreground">This page is the permanent link for this trace.</p>
+
+  {{ hop_list('Capabilities', trace.capabilities, 'No capability realises this goal.', 'trace-capabilities') }}
+  {{ hop_list('Initiatives', trace.enterprise_initiatives + trace.strategic_initiatives, 'No initiative serves this goal.', 'trace-initiatives') }}
+  {{ hop_list('Work packages', trace.work_packages, 'No work package is recorded under these initiatives.', 'trace-work-packages') }}
+  {{ hop_list('Applications', trace.application_components, 'No application is recorded under these initiatives.', 'trace-applications') }}
+
+  <section class="rounded-lg border bg-card p-6">
+    <h2 class="text-lg font-semibold">Where each step comes from</h2>
+    {% set hops = trace.capability_hops + trace.initiative_hops + trace.work_package_hops %}
+    {% if hops %}
+    <ul class="mt-3 list-disc pl-5 text-sm text-muted-foreground">
+      {% for hop in hops %}<li>{{ hop.source }} &rarr; {{ hop.target }} ({{ hop.relationship_type|replace('_', ' ') }})</li>{% endfor %}
+    </ul>
+    {% else %}
+    <p class="mt-2 text-sm text-muted-foreground">No step is recorded.</p>
+    {% endif %}
+  </section>
+
+</div>
+{% endblock %}
