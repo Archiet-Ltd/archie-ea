@@ -773,7 +773,16 @@ def test_org_admin_can_reset_a_members_sign_in_link(app, db_session, make_org, l
     from app.security.audit import AuditEvent
     from app.services.sso_service import SSONotConfiguredError, SSOService
 
+    from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
+
     org = make_org("scope-reset")
+    # Four people share this organisation; an unlimited plan keeps the seat
+    # check out of a test that is not about it.
+    db_session.add(Subscription(
+        organization_id=org.id, plan=SubscriptionPlan.enterprise,
+        status=SubscriptionStatus.active, seats_purchased=0,
+    ))
+    db_session.flush()
     other_org = make_org("scope-reset-other")
     domain = _domain("acme")
     _configure_sso(db_session, org, domain)
