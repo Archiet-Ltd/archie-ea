@@ -120,7 +120,10 @@ def compute_nav_counts(org_id, ttl=_NAV_COUNTS_TTL):
         memo[org_id] = dict(counts)
     else:
         entry = {"data": dict(counts), "timestamp": time.time()}
-        if all(v == 0 for v in counts.values()):
+        # Emptiness is judged on the tenant's own counts: vendors are global, so
+        # one vendor row anywhere would otherwise keep a brand-new, empty
+        # organisation on the long TTL and hide its first writes from other workers.
+        if all(v == 0 for k, v in counts.items() if k != "vendors"):
             entry["ttl"] = 5
         _nav_counts_cache[org_id] = entry
     return counts

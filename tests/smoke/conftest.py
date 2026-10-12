@@ -796,7 +796,7 @@ ARCHETYPES = [
     "solution_architect", "enterprise_architect", "business_architect",
     "arb_member", "portfolio_manager", "cto", "procurement",
     "application_manager", "platform_admin", "security_architect",
-    "data_architect",
+    "data_architect", "technology_architect", "application_architect",
     # R1-B36 (TB-0146): promoted from unassignable to assignable.
     "finance", "compliance", "risk", "operations", "non_technical_owner",
 ]
