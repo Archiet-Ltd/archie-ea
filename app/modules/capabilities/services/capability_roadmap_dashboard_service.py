@@ -851,6 +851,17 @@ class CapabilityRoadmapDashboardService:
         total_weight = 0
         category_scores = defaultdict(list)
 
+        # LOW-4: reject any response outside 0-5 before scoring.
+        for question in questions:
+            question_id = question["id"]
+            if question_id in responses:
+                value = responses[question_id]
+                if not isinstance(value, int) or value < 0 or value > 5:
+                    return {
+                        "success": False,
+                        "error": "Responses must be between 0 and 5",
+                    }
+
         for question in questions:
             question_id = question["id"]
             if question_id in responses:

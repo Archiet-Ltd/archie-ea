@@ -122,6 +122,16 @@ def record_capability_maturity(
             f"Business capability {capability_id} not found."
         )
 
+    # LOW-1: return early when nothing changes — no write, no history row.
+    if (
+        current is None
+        and target is None
+        and not clear_current
+        and not clear_target
+        and (notes is None or notes == capability.maturity_assessment_notes)
+    ):
+        return capability
+
     previous_current = capability.current_maturity_level
     clearing: list[str] = []
     if clear_current and previous_current is not None:
@@ -185,6 +195,7 @@ def record_capability_maturity(
             target_maturity_level=capability.target_maturity_level,
             maturity_framework="custom",
             notes=notes,
+            status="cleared" if clearing else None,
         )
         db.session.add(history)
 

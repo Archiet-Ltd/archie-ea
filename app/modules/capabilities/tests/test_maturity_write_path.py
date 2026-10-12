@@ -38,8 +38,11 @@ _DIRECT_WRITE_PATTERNS = [
     re.compile(r"\.\s*" + _MATURITY_COLUMNS + r"\s*="),
     # setattr(row, "current_maturity_level", value)
     re.compile(r"setattr\([^)]*" + _MATURITY_COLUMNS),
-    # UPDATE business_capability SET current_maturity_level = ...
-    re.compile(r"SET\s+" + _MATURITY_COLUMNS, re.IGNORECASE),
+    # UPDATE business_capability SET ... current_maturity_level = ...
+    re.compile(
+        r"UPDATE\s+business_capability\b[^;]*?\b" + _MATURITY_COLUMNS + r"\s*=",
+        re.IGNORECASE | re.DOTALL,
+    ),
     # .update({"current_maturity_level": ...}) — possibly over several lines
     re.compile(
         r"\.update\(\s*\{[^}]*[\"']" + _MATURITY_COLUMNS + r"[\"']\s*:", re.DOTALL
@@ -1094,3 +1097,211 @@ def test_guard_patterns_catch_every_form_of_direct_write():
     ]
     for snippet in must_pass:
         assert not direct_maturity_write_hits(snippet), snippet
+
+
+# --------------------------------------------------------------------------- #
+# MEDIUM-1 — three writers now route through the service and leave history.   #
+# --------------------------------------------------------------------------- #
+
+def test_enterprise_crud_put_routes_maturity_through_service(
+    app, db_session, make_org, tenant_ctx, login_as
+):
+    """Enterprise CRUD PUT now calls record_capability_maturity and leaves a
+    history row.  Fails on 34f281ec where the PUT wrote directly with no
+    history."""
+    org = make_org("write-org")
+    cap_id = _make_capability(
+        db_session, tenant_ctx, org,
+        current_maturity_level=2, target_maturity_level=3,
+    )
+    with tenant_ctx(org.id):
+        from app.models.business_capabilities import BusinessCapability
+        name = BusinessCapability.query.filter_by(id=cap_id).first().name
+    db_session.expunge_all()
+    client = _logged_in_client(app, db_session, org, login_as)
+    resp = client.put(
+        f"/enterprise/capabilities/{cap_id}",
+        json={"name": name, "current_maturity_level": "5", "target_maturity_level": ""},
+    )
+    assert resp.status_code == 200, (resp.status_code, resp.get_json())
+    db_session.expire_all()
+    current, target, _, _ = _capability_state(tenant_ctx, org, cap_id)
+    assert current == 5
+    assert target is None
+    rows = _history_rows(db_session, tenant_ctx, org, cap_id)
+    assert len(rows) == 1, "enterprise CRUD PUT must leave a history row"
+
+
+def test_ai_data_interaction_update_routes_maturity_through_service(
+    app, db_session, make_org, tenant_ctx
+):
+    """AIDataInteractionService.update_capability now routes maturity through
+    the service and leaves a history row.  Fails on 34f281ec where the
+    setattr loop wrote directly with no history."""
+    from app.modules.ai_chat.services.ai_data_interaction_service import (
+        AIDataInteractionService,
+    )
+    org = make_org("write-org")
+    cap_id = _make_capability(
+        db_session, tenant_ctx, org, current_maturity_level=2
+    )
+    from app.models.user import Role, User
+    role = Role.query.filter_by(name="Administrator").first()
+    if role is None:
+        Role.insert_roles()
+        role = Role.query.filter_by(name="Administrator").first()
+    user = User(
+        email=f"ai-data-{uuid.uuid4().hex[:8]}@example.com",
+        first_name="AI", last_name="Service",
+        organization_id=org.id, role=role, confirmed=True,
+    )
+    user.password = uuid.uuid4().hex
+    db_session.add(user)
+    db_session.flush()
+    with tenant_ctx(org.id):
+        res = AIDataInteractionService(user_id=user.id).update_capability(
+            cap_id, {"current_maturity_level": 5}
+        )
+    assert res.get("success") is True, res
+    db_session.expire_all()
+    current, _, _, _ = _capability_state(tenant_ctx, org, cap_id)
+    assert current == 5
+    rows = _history_rows(db_session, tenant_ctx, org, cap_id)
+    assert len(rows) == 1, "AI data interaction update must leave a history row"
+
+
+def test_governance_update_routes_maturity_through_service_for_bc_source(
+    app, db_session, make_org, tenant_ctx, login_as
+):
+    """Governance update for a business_capability-sourced row now routes
+    through the service and leaves a history row on the source.  Fails on
+    34f281ec where the unified row was written directly and the source was
+    untouched."""
+    from app.models.unified_capability import UnifiedCapability
+    org = make_org("write-org")
+    cap_id = _make_capability(
+        db_session, tenant_ctx, org, current_maturity_level=2
+    )
+    with tenant_ctx(org.id):
+        uc_id = UnifiedCapability.query.filter_by(
+            source_table="business_capability", source_id=str(cap_id)
+        ).first().id
+    db_session.expunge_all()
+    client = _logged_in_client(app, db_session, org, login_as)
+    resp = client.post(
+        f"/capability-governance/api/update-governance/{uc_id}",
+        json={"current_maturity_level": 5},
+    )
+    assert resp.status_code == 200, (resp.status_code, resp.get_json())
+    db_session.expire_all()
+    current, _, _, _ = _capability_state(tenant_ctx, org, cap_id)
+    assert current == 5
+    rows = _history_rows(db_session, tenant_ctx, org, cap_id)
+    assert len(rows) == 1, "governance update must leave a history row"
+
+
+# --------------------------------------------------------------------------- #
+# LOW-1 — a submission that changes nothing records no assessment.            #
+# --------------------------------------------------------------------------- #
+
+def test_noop_edit_submission_records_nothing(
+    app, db_session, make_org, tenant_ctx, login_as
+):
+    """Posting the edit form with both selects on 'Leave unchanged' and the
+    notes as stored must not append a history row.  Fails on 34f281ec where
+    the service appended a row even when nothing changed."""
+    org = make_org("write-org")
+    cap_id = _make_capability(
+        db_session, tenant_ctx, org,
+        current_maturity_level=3, target_maturity_level=4,
+        maturity_assessment_notes="as stored",
+    )
+    client = _logged_in_client(app, db_session, org, login_as)
+    resp = client.post(
+        f"/capability-maturity/edit/{cap_id}",
+        data={
+            "current_maturity_level": "",
+            "target_maturity_level": "",
+            "assessment_notes": "as stored",
+        },
+    )
+    assert resp.status_code == 302
+    db_session.expire_all()
+    current, target, notes, _ = _capability_state(tenant_ctx, org, cap_id)
+    assert current == 3
+    assert target == 4
+    assert notes == "as stored"
+    rows = _history_rows(db_session, tenant_ctx, org, cap_id)
+    assert len(rows) == 0, "no-op edit must not append a history row"
+
+
+# --------------------------------------------------------------------------- #
+# LOW-2 — a clearing history row carries status='cleared'.                    #
+# --------------------------------------------------------------------------- #
+
+def test_clear_current_history_row_has_cleared_status(
+    db_session, make_org, tenant_ctx
+):
+    """A clearing of the current level must set status='cleared' on the
+    history row so future readers can distinguish a clearing from an
+    assessment.  Fails on 34f281ec where the cleared level was stored as
+    the maturity_level."""
+    from app.modules.capabilities.services.capability_maturity_service import (
+        record_capability_maturity,
+    )
+    org = make_org("write-org")
+    cap_id = _make_capability(
+        db_session, tenant_ctx, org, current_maturity_level=3
+    )
+    with tenant_ctx(org.id):
+        record_capability_maturity(
+            capability_id=cap_id, organization_id=org.id,
+            current=None, clear_current=True, commit=True,
+        )
+    rows = _history_rows(db_session, tenant_ctx, org, cap_id)
+    assert len(rows) == 1
+    assert rows[0].status == "cleared", (
+        f"expected status='cleared', got {rows[0].status!r}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# LOW-3 — the guard's SQL pattern catches any column after SET.               #
+# --------------------------------------------------------------------------- #
+
+def test_guard_sql_pattern_catches_any_column_after_set():
+    """The UPDATE SET pattern must match when the maturity column is not the
+    first column after SET.  Fails on 34f281ec where the pattern only
+    matched SET current_maturity_level at the start."""
+    snippet = "UPDATE business_capability SET name = :n, current_maturity_level = :l"
+    assert direct_maturity_write_hits(snippet), (
+        "SQL pattern must catch maturity column anywhere after SET"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# LOW-4 — the roadmap writer rejects responses outside 0-5.                   #
+# --------------------------------------------------------------------------- #
+
+def test_roadmap_writer_rejects_response_above_five(
+    app, db_session, make_org, tenant_ctx
+):
+    """A response value above 5 must be rejected before scoring, not raise
+    an uncaught MaturityValidationError.  Fails on 34f281ec where a value
+    of 6 produced a level above 5 and raised."""
+    from app.modules.capabilities.services.capability_roadmap_dashboard_service import (
+        CapabilityRoadmapDashboardService,
+    )
+    org = make_org("write-org")
+    cap_id = _make_capability(
+        db_session, tenant_ctx, org, current_maturity_level=2
+    )
+    uc_id = _unified_row_id(tenant_ctx, org, cap_id)
+    service = CapabilityRoadmapDashboardService()
+    with tenant_ctx(org.id):
+        questions = service.get_maturity_assessment_questions(uc_id)["questions"]
+    responses = {q["id"]: 6 for q in questions}
+    with tenant_ctx(org.id):
+        result = service.calculate_maturity_score(uc_id, responses)
+    assert result["success"] is False, result
+    assert "between 0 and 5" in result.get("error", "").lower(), result
