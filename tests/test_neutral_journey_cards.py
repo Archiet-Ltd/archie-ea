@@ -71,7 +71,7 @@ def render_card(browser, request):
                 route.abort()
 
         page.route('**/*', respond)
-        page.goto('http://fixture.invalid/', wait_until='load')
+        page.goto('http://fixture.invalid/', wait_until='domcontentloaded')
         # Ready means Alpine has initialised the fixture component, not that the
         # network happened to be quiet for 500 ms.
         page.wait_for_function("() => window.Alpine && document.querySelector('#fixture')._x_dataStack")
