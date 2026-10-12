@@ -226,6 +226,44 @@ def test_backfill_dry_run_changes_nothing(db_session, make_org, tenant_ctx):
         assert app.archimate_element_id is None
 
 
+def test_backfill_dry_run_cli_exits_zero_and_prints_total(app):
+    """The CLI --dry-run flag exits 0 and prints TOTAL in the output."""
+    from click.testing import CliRunner
+
+    from app.commands.backfill_domain_elements import (
+        backfill_domain_elements_command,
+    )
+    from app.models.application_portfolio import VendorContract
+
+    orgs = _seed_orgs(app, ["bf-cli-dry"])
+    org_id = orgs["bf-cli-dry"]
+    try:
+        with app.app_context():
+            _seed_contract(app, org_id, "CLI Dry Run Target")
+
+        runner = CliRunner()
+        result = runner.invoke(
+            backfill_domain_elements_command,
+            ["--org-id", str(org_id), "--dry-run"],
+        )
+        assert result.exit_code == 0, (
+            f"CLI dry-run exited {result.exit_code}: {result.output}"
+        )
+        assert "TOTAL" in result.output
+
+        # Fresh session: nothing was written.
+        with app.app_context():
+            from app import db
+            from app.models.archimate_core import ArchiMateElement
+
+            elements = db.session.query(ArchiMateElement).filter(
+                ArchiMateElement.organization_id == org_id,
+            ).count()
+            assert elements == 0, "dry run must not create any elements"
+    finally:
+        _cleanup(app, [org_id])
+
+
 def test_backfill_handles_multiple_types(db_session, make_org, tenant_ctx):
     """Backfill creates missing elements for multiple domain record types."""
     from app.commands.backfill_domain_elements import backfill_domain_elements

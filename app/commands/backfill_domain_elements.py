@@ -190,7 +190,7 @@ def backfill_domain_elements_command(org_id, dry_run):
         total_errors += s["errors"]
         total_duplicates += len(s["duplicates"])
         action = "Would create" if dry_run else "Created"
-        click.echo(f"{type_name:30s} {s[action.split()[-1].lower() if dry_run else 'created']:8d} "
+        click.echo(f"{type_name:30s} {s['created']:8d} "
                    f"{s['scanned']:8d} {s['errors']:8d}")
 
     click.echo("-" * 60)
