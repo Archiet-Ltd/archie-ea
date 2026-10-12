@@ -32,7 +32,7 @@ def _bare_app(db_session, org):
 
 
 class TestUnmeasuredCostAndRiskInputs:
-    def test_app_with_no_cost_and_no_risk_records_scores_those_inputs_null(
+    def test_app_with_no_cost_and_no_risk_records_inputs_are_null(
         self, app, db_session, make_org, tenant_ctx
     ):
         from app.services.rationalization_scoring_service import RationalizationScoringService
@@ -88,13 +88,13 @@ class TestUnmeasuredCostAndRiskInputs:
         )
         db_session.add(user)
         app_obj = _bare_app(db_session, org)
-        app_id = app_obj.id
+        user_id, app_id = user.id, app_obj.id
         db_session.commit()
         db_session.expunge_all()
 
         from app.models.user import User as UserModel
 
-        login_as(client, db_session.get(UserModel, user.id))
+        login_as(client, db_session.get(UserModel, user_id))
         response = client.get(f"/applications/rationalization/api/evidence-trail/{app_id}")
 
         assert response.status_code == 200

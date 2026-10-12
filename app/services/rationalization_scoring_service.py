@@ -38,13 +38,13 @@ from app.services.decorators import transactional
 logger = logging.getLogger(__name__)
 
 
-def _average_dimension(scores_list, attribute):
+def _average_dimension(rows, attribute):
     """Average a score attribute over the rows that measured it.
 
     An unmeasured input is stored as None; averaging only the measured rows
     keeps the portfolio average truthful, and None is reported when nothing
     in the portfolio measured that input."""
-    values = [getattr(s, attribute) for s in scores_list if getattr(s, attribute) is not None]
+    values = [getattr(s, attribute) for s in rows if getattr(s, attribute) is not None]
     if not values:
         return None
     return round(sum(values) / len(values), 2)
