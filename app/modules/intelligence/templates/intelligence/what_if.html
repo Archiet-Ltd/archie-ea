@@ -1,0 +1,91 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, section_card, empty_state %}
+{% from 'intelligence/_workspace_gate.html' import workspace_gate with context %}
+{% from 'intelligence/_entity_picker.html' import entity_picker with context %}
+
+{% block title %}What-if comparison{% endblock %}
+
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/what_if.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+{% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+<div class="p-6 space-y-6" x-data="whatIfSurface()" data-page-url="{{ url_for('intelligence_ui.what_if') }}" data-chosen="{{ element_ids|join(',') }}">
+    {{ page_shell(
+        title='What-if comparison',
+        subtitle='Choose up to three systems, teams or services and compare what stops if each one is retired or fails.',
+        breadcrumb=[('Home', home_url), ('What-if comparison', none)]
+    ) }}
+
+    {% call workspace_gate(home_url) %}
+    <section class="rounded-xl border border-border bg-card p-6">
+        <div class="mx-auto max-w-xl">
+            {{ entity_picker('whatif', 'Type a system, team or service name to add') }}
+            {% if result and result.truncated %}
+            <p class="mt-2 text-sm text-muted-foreground" data-testid="whatif-truncated">Only the first {{ result.max }} are compared.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    {% if not result %}
+        {{ empty_state('git-compare', 'Pick something to compare', 'Choose a system, team or service above. Add a second and a third to see them side by side.') }}
+    {% else %}
+    <section class="grid gap-4 md:grid-cols-3" data-testid="whatif-columns">
+        {% for s in result.scenarios %}
+        <div class="rounded-xl border border-border bg-card p-6 space-y-4" data-testid="whatif-scenario" data-element-id="{{ s.element_id }}">
+            {% if not s.found %}
+            <h2 class="text-base font-semibold text-foreground">Not found</h2>
+            <p class="text-sm text-muted-foreground">That element does not exist in your organisation.</p>
+            {% else %}
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <h2 class="text-base font-semibold text-foreground">{{ s.name or '—' }}</h2>
+                    <p class="text-xs text-muted-foreground">{{ s.type or '—' }}</p>
+                </div>
+                {% set remaining = element_ids|reject('equalto', s.element_id)|list %}
+                <a class="text-xs underline text-muted-foreground" aria-label="Remove {{ s.name }} from the comparison"
+                   href="{{ url_for('intelligence_ui.what_if', element=remaining) if remaining else url_for('intelligence_ui.what_if') }}">Remove</a>
+            </div>
+            <dl class="grid grid-cols-3 gap-2 text-sm">
+                <div><dt class="text-xs text-muted-foreground">Affected</dt><dd class="text-xl font-bold" data-testid="whatif-affected">{{ s.affected|length }}</dd></div>
+                <div><dt class="text-xs text-muted-foreground">Directly</dt><dd class="text-xl font-bold">{{ s.direct_count }}</dd></div>
+                <div><dt class="text-xs text-muted-foreground">Capabilities</dt><dd class="text-xl font-bold">{{ s.capability_count }}</dd></div>
+            </dl>
+            {% if s.layers %}
+            <p class="text-xs text-muted-foreground">
+                {% for l in s.layers %}{{ l.layer|capitalize }} {{ l.count }}{% if not loop.last %} · {% endif %}{% endfor %}
+            </p>
+            {% endif %}
+            {% if s.affected %}
+            <ul class="space-y-1 text-sm max-h-96 overflow-y-auto" data-testid="whatif-affected-list">
+                {% for a in s.affected %}
+                <li class="flex items-baseline justify-between gap-2">
+                    <span class="min-w-0"><span class="font-medium">{{ a.name or '—' }}</span> <span class="text-muted-foreground">({{ a.type or '—' }})</span></span>
+                    <span class="shrink-0 text-xs text-muted-foreground">{{ 'direct' if a.depth == 1 else a.depth ~ ' steps' }}{% if a.owner %} · {{ a.owner }}{% endif %}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-sm text-muted-foreground" data-testid="whatif-nothing">Nothing recorded depends on this element.</p>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endfor %}
+    </section>
+
+    {% if result.shared %}
+    {% call section_card(title='Affected by more than one') %}
+    <ul class="space-y-1 text-sm" data-testid="whatif-shared">
+        {% for a in result.shared %}
+        <li><span class="font-medium">{{ a.name or '—' }}</span> <span class="text-muted-foreground">({{ a.type or '—' }})</span></li>
+        {% endfor %}
+    </ul>
+    {% endcall %}
+    {% endif %}
+    {% endif %}
+    {% endcall %}
+</div>
+{% endblock %}
