@@ -4,7 +4,8 @@ Vocabulary
 ----------
 The four EU AI Act risk tiers and ISO/IEC 42001 control references. The
 classification is a **proposal** — it arrives as an approval-queue record and
-changes nothing until an administrator accepts it.
+changes nothing until another user with general permission accepts it in the
+approval queue.
 
 Reuse
 -----
@@ -32,6 +33,7 @@ from typing import Optional
 from app import db
 from app.modules.architecture_assistant.property_service import (
     GATE_OWNED_KEYS,
+    GATE_SOURCES,
     PropertyService,
 )
 
@@ -73,7 +75,8 @@ REFUSAL_MISSING_ASSESSMENT = (
     "it can be released."
 )
 # A classification proposal that is still pending means the tier review is
-# unresolved; the door stays shut until an administrator decides it.
+# unresolved; the door stays shut until another user with general permission
+# decides it in the approval queue.
 REFUSAL_PENDING_CLASSIFICATION = (
     "Release refused: the risk classification proposal is still under review."
 )
@@ -106,6 +109,54 @@ def _lock_element(element_id, organization_id: int):
         ArchiMateElement.query.filter_by(id=element_id, organization_id=organization_id)
         .with_for_update()
         .populate_existing()
+        .first()
+    )
+
+
+def _gate_entry(element, key):
+    """The gate-written value dict for *key*, or ``None`` when the gate has
+    not written it.
+
+    Only a dict whose ``source`` is one of the gate's own sources counts. Any
+    value stored verbatim by another writer (journey create-element, the seed's
+    upsert, an import) is ignored, so the gate stays the only authority on its
+    own two fields — closing every present and future verbatim writer in one
+    place.
+    """
+    props = getattr(element, "acm_properties", None) or {}
+    entry = props.get(key)
+    if entry is None or not isinstance(entry, dict):
+        return None
+    if entry.get("source") not in GATE_SOURCES:
+        return None
+    return entry
+
+
+def _latest_approved_classification(element_id: int, organization_id: int):
+    """The most recently approved classification proposal for *element* in
+    *organization_id*, or ``None`` when there is none.
+
+    Every lookup that needs 'the classification an assessment was made against'
+    goes through this one query, so the assessment's recorded approval id and
+    the gate's comparison can never disagree about which classification is
+    current.
+    """
+    from app.models.ai_chat_crud_approval import (
+        AIChatCRUDApproval,
+        ApprovalStatus,
+    )
+
+    return (
+        AIChatCRUDApproval.query.filter_by(
+            entity_type=ENTITY_CLASSIFICATION,
+            entity_id=element_id,
+            organization_id=organization_id,
+            status=ApprovalStatus.APPROVED,
+        )
+        .order_by(
+            AIChatCRUDApproval.approved_at.desc(),
+            AIChatCRUDApproval.id.desc(),
+        )
         .first()
     )
 
@@ -154,6 +205,15 @@ def propose_classification(
         "proposed_risk_class": proposed_risk_class,
         "iso_controls": ISO_CONTROLS.get(proposed_risk_class, []),
     }
+
+    # Serialise proposals on the element row before the pending check, so two
+    # requests cannot both pass it in the same instant and record two pending
+    # proposals for one system.
+    locked = _lock_element(element.id, organization_id)
+    if locked is None:
+        raise ValueError(
+            "Classification proposals are scoped to the element's own organisation"
+        )
 
     if _pending_classification(element, organization_id) is not None:
         raise ValueError(REFUSAL_PROPOSAL_UNDER_REVIEW)
@@ -217,9 +277,16 @@ def propose_assessment(
             "Cannot propose an assessment for a system with no accepted risk class"
         )
 
+    # Record WHICH accepted classification this assessment is made against, so
+    # accepting the assessment later can never make it evidence for a newer
+    # classification. The comparison in has_accepted_assessment keys off this
+    # id, not the accept time.
+    classification = _latest_approved_classification(element.id, organization_id)
+
     payload = {
         "element_id": element.id,
         "assessed_risk_class": assessed_class,
+        "classification_approval_id": classification.id if classification is not None else None,
     }
     if notes:
         payload["notes"] = notes.strip()
@@ -298,6 +365,22 @@ def accept_classification(approval_id: int, organization_id: int) -> bool:
         value=proposed_class,
         source="classification_approval",
     )
+
+    # A new classification supersedes every still-pending assessment for the
+    # element: an examination proposed under the old class says nothing about
+    # the new one, so it must not linger as a candidate that a later accept
+    # could turn into the new class's evidence. Only this organisation's rows
+    # are touched.
+    pending_assessments = AIChatCRUDApproval.query.filter_by(
+        entity_type=ENTITY_ASSESSMENT,
+        entity_id=element.id,
+        organization_id=organization_id,
+        status=ApprovalStatus.PENDING,
+    ).all()
+    for pending in pending_assessments:
+        pending.status = ApprovalStatus.REJECTED
+        pending.rejected_reason = "superseded by a new classification"
+        db.session.add(pending)
 
     # A released system must not be left in a state the gate would refuse: a
     # prohibited class is never released, and a high class needs an assessment
@@ -387,29 +470,26 @@ def get_classification(element) -> Optional[str]:
     """Read the current risk classification from the element's typed properties.
 
     Returns the risk tier string (e.g. ``"high"``) or ``None`` if not set.
+    Only a value the gate itself wrote (``source`` in the gate's own sources)
+    is trusted; a verbatim copy planted by any other writer reads as unset.
     """
-    props = getattr(element, "acm_properties", None) or {}
-    entry = props.get(PROPKEY_RISK_CLASS)
+    entry = _gate_entry(element, PROPKEY_RISK_CLASS)
     if entry is None:
         return None
-    if isinstance(entry, dict):
-        return entry.get("value")
-    return str(entry) if entry else None
+    return entry.get("value")
 
 
 def get_release_state(element) -> str:
     """Read the current release state from the element's typed properties.
 
-    Returns ``"draft"``, ``"released"``, or ``"not set"``.
+    Returns ``"draft"``, ``"released"``, or ``"not set"``. Only a value the
+    gate itself wrote is trusted; a verbatim copy planted by any other writer
+    reads as ``"not set"``.
     """
-    props = getattr(element, "acm_properties", None) or {}
-    entry = props.get(PROPKEY_RELEASE_STATE)
+    entry = _gate_entry(element, PROPKEY_RELEASE_STATE)
     if entry is None:
         return NOT_SET
-    if isinstance(entry, dict):
-        val = entry.get("value")
-        return val if val in RELEASE_STATES else NOT_SET
-    val = str(entry) if entry else ""
+    val = entry.get("value")
     return val if val in RELEASE_STATES else NOT_SET
 
 
@@ -434,12 +514,13 @@ def assessment_accepted_for(element, organization_id: int) -> Optional[bool]:
 
 def has_accepted_assessment(element, organization_id: int) -> bool:
     """True when an accepted ``ai_system_assessment`` exists for *element*
-    whose assessed risk class matches the current accepted class and whose
-    approval is later than the classification's acceptance time.
+    that was made against the current accepted classification.
 
-    This prevents a stale assessment (accepted under a lower tier or while
-    unclassified) from opening the high-risk gate after the classification
-    changes.
+    The assessment's payload records the id of the classification approval it
+    was proposed under; only an assessment whose recorded id equals the latest
+    approved classification counts. An assessment accepted later under an older
+    classification can never open the gate — accepting an assessment does not
+    make the examination later.
     """
     from app.models.ai_chat_crud_approval import (
         AIChatCRUDApproval,
@@ -450,13 +531,9 @@ def has_accepted_assessment(element, organization_id: int) -> bool:
     if current_class is None:
         return False
 
-    # Find the classification approval time so we can compare.
-    classification = AIChatCRUDApproval.query.filter_by(
-        entity_type=ENTITY_CLASSIFICATION,
-        entity_id=element.id,
-        organization_id=organization_id,
-        status=ApprovalStatus.APPROVED,
-    ).order_by(AIChatCRUDApproval.approved_at.desc()).first()
+    classification = _latest_approved_classification(element.id, organization_id)
+    if classification is None:
+        return False
 
     accepted = AIChatCRUDApproval.query.filter_by(
         entity_type=ENTITY_ASSESSMENT,
@@ -470,13 +547,12 @@ def has_accepted_assessment(element, organization_id: int) -> bool:
             payload = json.loads(row.operation_payload)
         except (json.JSONDecodeError, TypeError):
             continue
-        assessed_class = payload.get("assessed_risk_class")
-        if assessed_class != current_class:
+        # The assessment must have been made against THIS classification...
+        if payload.get("classification_approval_id") != classification.id:
             continue
-        # The assessment must have been approved after the classification.
-        if classification is not None and classification.approved_at is not None:
-            if row.approved_at is None or row.approved_at < classification.approved_at:
-                continue
+        # ...and must describe the class that classification accepted.
+        if payload.get("assessed_risk_class") != current_class:
+            continue
         return True
 
     return False
@@ -489,23 +565,14 @@ def release_refusal_reason(element, organization_id: int) -> Optional[str]:
     response and the register page, so the route's refusal and what the page
     shows can never drift apart.
     """
-    from app.models.ai_chat_crud_approval import (
-        AIChatCRUDApproval,
-        ApprovalStatus,
-    )
-
     # An unresolved tier review keeps the door shut: the classification is a
-    # proposal and changes nothing until an administrator accepts it. A
-    # proposal the queue has claimed but not yet applied counts as unresolved.
+    # proposal and changes nothing until another user with general permission
+    # accepts it. A proposal the queue has claimed but not yet applied counts
+    # as unresolved.
     if _pending_classification(element, organization_id) is not None:
         return REFUSAL_PENDING_CLASSIFICATION
 
-    latest = AIChatCRUDApproval.query.filter_by(
-        entity_type=ENTITY_CLASSIFICATION,
-        entity_id=element.id,
-        organization_id=organization_id,
-        status=ApprovalStatus.APPROVED,
-    ).order_by(AIChatCRUDApproval.approved_at.desc(), AIChatCRUDApproval.id.desc()).first()
+    latest = _latest_approved_classification(element.id, organization_id)
     if latest is not None:
         try:
             claimed = json.loads(latest.operation_payload).get("proposed_risk_class")
