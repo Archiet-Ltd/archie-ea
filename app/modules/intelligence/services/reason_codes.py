@@ -120,6 +120,11 @@ REASON_CODES = frozenset(
         "no_capability_linked",
         "value_stream_not_linked_to_model",
         "dependency_direction_unknown",
+        # Accountability answer for a capability: no capability of this
+        # organisation mirrors the element, and a capability with no RACI
+        # assignment recorded against it.
+        "no_capability_in_chain",
+        "no_raci_recorded",
         # L7 (Data lens) additions: Ask's Data lens lists the DataObject rows
         # linked to the picked element. Most elements have none, an honest
         # absence; an object with neither a steward nor an owner recorded is a
@@ -153,7 +158,6 @@ REASON_CODES = frozenset(
         # for a later reader) an answer with no Capability element in its
         # chain at all.
         "no_maturity_target_recorded",
-        "no_capability_in_chain",
         # The Portfolio lens's component block adds cost, health and
         # licence facts read from the columns already entered on the
         # resolved ApplicationComponent (and the two tables keyed off it).
