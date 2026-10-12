@@ -1,9 +1,8 @@
 """Tests for ``IntelligenceQueryService.accountability_for_element`` (L4):
 
 The method now answers from the canonical ``cross_layer_impact`` walk:
-collects every unique owner from the affected elements and returns them.
-The withdrawn empty answer (``ownership_reader_not_built``) is replaced
-by this real answer.
+collects every unique owner from the affected elements and returns them
+as the ``owners`` array.
 
 Fixtures (app, db_session, make_org) are discovered via
 app/modules/conftest.py's import of tests.conftest,

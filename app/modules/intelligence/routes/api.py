@@ -824,12 +824,10 @@ def accountability_for_element(element_id: int):
     params: this lens is a pure ownership lookup, not a blast-radius
     traversal, unlike every other lens on this blueprint.
 
-    The ownership read itself is currently WITHDRAWN -- see the service
-    method's own docstring (a real tenant-isolation gap found in external
-    review of the original PR; no shared, tenant-safe reader exists yet).
-    This route's element/tenant pre-checks are unchanged and still real;
-    only the body of the answer is a permanent honest empty state until
-    that reader exists.
+    The ownership read resolves ApplicationOwner records for the
+    element's ApplicationComponent and returns them as the ``owners``
+    array. When no ownership records exist, the array is empty and the
+    response carries a ``no_ownership_records`` reason.
     """
     organization_id = current_organization_id()
     if organization_id is None:

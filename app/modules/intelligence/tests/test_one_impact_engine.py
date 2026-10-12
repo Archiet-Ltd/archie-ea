@@ -745,8 +745,7 @@ def test_accountability_returns_owners_from_walk(app, db_session, make_org):
         g.current_org_id = org.id
         result = IntelligenceQueryService.accountability_for_element(a.id)
 
-    # The accountability answer must return owners from the walk,
-    # not an empty withdrawn answer.
+    # The accountability answer must return owners from the walk.
     assert "owners" in result, "accountability_for_element missing owners key"
     assert len(result["owners"]) > 0, (
         "accountability_for_element returned empty owners — "

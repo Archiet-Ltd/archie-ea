@@ -11,14 +11,10 @@ same traversal per initiative seed) and ``value_streams_at_risk`` -- "which
 value streams depend on a capability below threshold", the curated path
 only (T-S1). Coverage over derived and explicit relationships for the
 value-stream question is reserved for a later task and is not added here.
-``accountability_for_element`` (L4) exists as a route and question card
-but is currently WITHDRAWN -- it returns an honest
-``ownership_reader_not_built`` reason on every call: the ownership data
-source is decided, no shared tenant-safe reader for it exists yet, and a
-real tenant-scoping fix to ``OrganizationUnit`` is needed before one is
-safe to build -- see the method's own docstring. Five of six lenses in
-``intelligence-lenses-v1.md`` are currently answered, plus the Strategic
-value-streams-at-risk surface.
+``accountability_for_element`` (L4) resolves ApplicationOwner records for
+the element's ApplicationComponent and returns them as the ``owners``
+array. When no ownership records exist, the array is empty and the
+response carries a ``no_ownership_records`` reason.
 """
 
 from __future__ import annotations
@@ -57,14 +53,14 @@ NO_BUDGET_RECORDED_REASON = validate_reason_code("no_budget_recorded")
 # one describes a single element's missing owner field inside the L1 impact
 # traversal; this one describes an ApplicationComponent with zero
 # ApplicationOwnership rows at all, a different absence condition on a
-# different table, for L4. Currently unused -- accountability_for_element's
-# ownership read is withdrawn (see its own docstring), so nothing produces
-# this today; kept in the closed vocabulary for whichever reader replaces
-# the withdrawn one, not removed on the strength of a temporary gap.
+# different table, for L4. Now produced by accountability_for_element
+# when the walk finds no owners; kept in the closed vocabulary.
 NO_OWNERSHIP_RECORDS_REASON = validate_reason_code("no_ownership_records")
 CAPACITY_NOT_AVAILABLE_REASON = validate_reason_code("capacity_not_available")
 # Distinct from a "decision pending" state -- the ownership data source IS
-# decided; what doesn't exist yet is a shared, tenant-safe reader for it.
+# decided; the tenant-safe batch reader exists and is used by
+# accountability_for_element. This reason code is kept in the closed
+# vocabulary for backward compatibility but is no longer produced.
 OWNERSHIP_READER_NOT_BUILT_REASON = validate_reason_code("ownership_reader_not_built")
 NO_DATA_RECORDED_REASON = validate_reason_code("no_data_recorded")
 NO_STEWARD_RECORDED_REASON = validate_reason_code("no_steward_recorded")
@@ -1692,14 +1688,13 @@ class IntelligenceQueryService:
         """L4, "who's accountable for ___, and can they take on more?":
 
         Answers from the canonical ``cross_layer_impact`` walk: collects
-        every unique owner from the affected elements and returns them.
-        The withdrawn empty answer (``ownership_reader_not_built``) is
-        replaced by this real answer; the old route and question card
-        are unchanged, only the query itself is re-enabled.
+        every unique owner from the affected elements and returns them
+        as the ``owners`` array. When no ownership records exist, the
+        array is empty and the response carries a ``no_ownership_records``
+        reason.
 
         ``capacity_not_available`` is kept as ``True`` -- capacity data
-        is not yet connected (the same honest state the withdrawn answer
-        returned, unchanged by this redirect).
+        is not yet connected.
         """
         result = IntelligenceQueryService.cross_layer_impact(
             element_id,
