@@ -73,7 +73,6 @@ jobs:
   changes:
     name: Detect changed paths
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
     outputs:
       is_content_only: ${{ steps.detect.outputs.is_content_only }}
     steps:

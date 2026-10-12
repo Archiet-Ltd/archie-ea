@@ -11,9 +11,12 @@ from scripts.ci import detect_content_only as d
     "path,expected",
     [
         ("content/pages/pricing.md", True),
-        ("docs/guide.md", True),
+        ("docs/guide.md", False),
+        ("docs/background-mechanisms.yml", False),
         ("app/templates/public/home.html", True),
-        ("tests/test_public_content_pages.py", True),
+        ("tests/test_public_content_pages.py", False),
+        ("app/templates/layouts/public_base.html", False),
+        ("app/templates/components/public_navbar.html", False),
         ("app/models/user.py", False),
         ("migrations/versions/abc.py", False),
         (".github/workflows/ci.yml", False),
@@ -26,7 +29,7 @@ def test_is_content_path(path, expected):
 
 
 def test_all_content_files_are_content_only():
-    assert d.classify(["content/a.md", "docs/b.md"]) == "true"
+    assert d.classify(["content/a.md", "app/templates/public/home.html"]) == "true"
 
 
 def test_one_code_file_makes_the_change_not_content_only():
@@ -52,3 +55,24 @@ def test_failure_to_diff_runs_everything(monkeypatch, capsys):
     monkeypatch.setattr(d, "get_changed_files", boom)
     assert d.main() == 0
     assert "is_content_only=false" in capsys.readouterr().out
+
+
+def test_a_rename_out_of_code_into_content_is_not_content_only(tmp_path, monkeypatch):
+    def git(*a):
+        subprocess.run(["git", *a], cwd=tmp_path, check=True, capture_output=True)
+
+    git("init", "-q", "-b", "main")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "t")
+    (tmp_path / "app").mkdir()
+    (tmp_path / "content").mkdir()
+    (tmp_path / "app" / "svc.py").write_text("x = 1\n" * 40)
+    git("add", "-A")
+    git("commit", "-qm", "base")
+    git("checkout", "-q", "-b", "pr")
+    git("mv", "app/svc.py", "content/svc.md")
+    git("commit", "-qm", "move")
+    monkeypatch.chdir(tmp_path)
+    changed = d.get_changed_files("main")
+    assert "app/svc.py" in changed
+    assert d.classify(changed) == "false"

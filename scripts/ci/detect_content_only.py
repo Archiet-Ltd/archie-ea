@@ -6,9 +6,7 @@ Outputs is_content_only=true or is_content_only=false to GITHUB_OUTPUT
 
 Content paths are:
   - content/          (markdown pages)
-  - docs/             (documentation)
   - public-page templates under app/templates/
-  - page-level tests (unit tests for public pages)
 
 A PR touching anything outside this list runs the full CI suite.
 Push to main always runs the full suite (the check is skipped).
@@ -25,25 +23,8 @@ import sys
 # Files are exact paths.
 CONTENT_PREFIXES: tuple[str, ...] = (
     "content/",
-    "docs/",
     "app/templates/public/",
     "app/templates/artefact_share/public.html",
-    "app/templates/components/public_footer.html",
-    "app/templates/components/public_navbar.html",
-    "app/templates/layouts/public_base.html",
-    "tests/test_public_content_pages.py",
-    "tests/test_public_site_pages.py",
-    "tests/test_public_jsonld.py",
-    "tests/test_public_visitor_analytics.py",
-    "tests/test_legal_pages.py",
-    "tests/test_page_shell_macros.py",
-    "tests/test_page_guide_history_database.py",
-    "tests/test_page_guide_history_policy.py",
-    "tests/test_m2_compliance_pages_crosslinked.py",
-    "tests/test_procurement_pages.py",
-    "tests/test_transformation_room_public_journey.py",
-    "tests/csp/probe_pages.py",
-    "tests/csp/verify_real_pages.py",
 )
 
 
@@ -64,7 +45,7 @@ def is_content_path(path: str) -> bool:
 def get_changed_files(base_ref: str = "origin/main") -> list[str]:
     """Return the list of files changed between *base_ref* and HEAD."""
     result = subprocess.run(
-        ["git", "diff", "--name-only", base_ref, "HEAD"],
+        ["git", "diff", "--name-only", "--no-renames", base_ref, "HEAD"],
         capture_output=True, text=True, check=True,
     )
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
