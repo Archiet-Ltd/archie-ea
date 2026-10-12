@@ -826,3 +826,26 @@ def test_release_control_shown_only_to_administrators(app, db_session, make_org,
     login_as(client, arch)
     body = client.get("/genome/ai-systems").get_data(as_text=True)
     assert f"/genome/ai-systems/{el.id}/release" not in body, "Architect sees Release"
+
+
+# ── 9. Owner-picker consolidation ──────────────────────────────────────────
+
+
+def test_exactly_one_file_has_api_users_type_ahead():
+    """Exactly one file under app/static/js contains the /api/users type-ahead
+    call (Platform.fetch.get with q: parameter). A second copy would mean the
+    duplicate ai_system_owner_picker.js was not fully removed."""
+    import glob
+    import os
+
+    js_dir = os.path.join(os.path.dirname(__file__), "..", "app", "static", "js")
+    pattern = "Platform.fetch.get('/api/users', { q:"
+    matches = []
+    for path in glob.glob(os.path.join(js_dir, "**", "*.js"), recursive=True):
+        with open(path) as f:
+            if pattern in f.read():
+                matches.append(os.path.relpath(path, js_dir))
+    assert len(matches) == 1, (
+        "Expected exactly 1 file with the /api/users type-ahead call, "
+        "got %d: %s" % (len(matches), ", ".join(matches))
+    )
