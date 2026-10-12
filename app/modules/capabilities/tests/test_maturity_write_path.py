@@ -44,6 +44,23 @@ _DIRECT_WRITE_PATTERNS = [
     re.compile(
         r"\.update\(\s*\{[^}]*[\"']" + _MATURITY_COLUMNS + r"[\"']\s*:", re.DOTALL
     ),
+    # setattr with a variable field name: the file contains both setattr( and
+    # a string literal naming a maturity column.  This catches loops like
+    #   for field in ("current_maturity_level", "target_maturity_level"):
+    #       setattr(cap, field, value)
+    # Exemptions (seeds and create paths that set an initial value on a new
+    # row, never update an existing row's maturity):
+    #   - application_capability_catalog.py:1208-1209  (new-row kwargs)
+    #   - dual_capability_mapping_service.py:186-187   (new-row kwargs)
+    #   - vendor_capability_linker.py                  (CLI seed)
+    #   - backfill_capability_catalogs.py              (backfill seed)
+    #   - seed_demo_company.py                         (demo seed)
+    #   - seed_strategic_demo.py                       (demo seed)
+    #   - enterprise_crud_routes.py:create_capability  (POST create path)
+    re.compile(
+        r"setattr\(.*" + _MATURITY_COLUMNS,
+        re.DOTALL,
+    ),
 ]
 
 
@@ -1063,6 +1080,9 @@ def test_guard_patterns_catch_every_form_of_direct_write():
         "UPDATE business_capability\n   SET target_maturity_level = 2",
         'Model.query.update({"current_maturity_level": 2})',
         "q.update({\n    'target_maturity_level': 2,\n})",
+        # Variable field name in a loop — the DOTALL pattern catches
+        # setattr( anywhere in the same text as a maturity column literal.
+        "for field in ('current_maturity_level',):\n    setattr(cap, field, v)",
     ]
     for snippet in must_hit:
         assert direct_maturity_write_hits(snippet), snippet
