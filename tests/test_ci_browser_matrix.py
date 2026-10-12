@@ -678,7 +678,7 @@ def test_content_only_pr_runs_page_tests_and_skips_heavy_jobs():
             "github": {
                 "event_name": event_name,
                 "event": {"action": action,
-                         "pull_request": {"labels": [{"name": l} for l in labels]}},
+                         "pull_request": {"labels": [{"name": label} for label in labels]}},
             },
             "needs": {
                 "changes": {"result": changes_result,
