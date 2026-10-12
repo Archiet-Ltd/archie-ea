@@ -563,14 +563,99 @@ jobs:
       - name: bandit (fail on any open high-severity finding)
         run: python scripts/ci/bandit_gate.py --high
 
-  smoke:
-    name: Browser journeys (one per archetype)
+  # ── Browser journey shards ──────────────────────────────────────────────
+  # The old single smoke job ran five pytest steps sequentially (~70 min).
+  # These three parallel jobs each boot their own app and database (no shared
+  # state) and upload their junit reports as artifacts. The aggregate job
+  # below (same job id `smoke`, same required-check name) downloads all
+  # reports and runs check_junit_qualification.py on the same five categories.
+  #
+  # Runner use: 3 smoke-main shards + 1 adversarial + 1 other = 5 jobs
+  # instead of 1. On a self-hosted pool with 6+ runners this adds no queue
+  # delay; on a smaller pool the shorter individual jobs may still finish
+  # sooner than the old 70-minute serial job.
+
+  smoke-main:
+    name: Browser journeys — main shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
-    # Renders real pages in a real browser against a real database. Every cheaper
-    # layer has passed defects this catches: a front end blocked by integrity
-    # hashes, handlers that 500 on their first row, and pages returning 200 while
-    # rendering blank values.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_smoke
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_smoke
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_smoke
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret-0123456789abcdef
+      SMOKE_BOOT_TIMEOUT: "300"
+      SMOKE_PAGE_TIMEOUT: "45000"
+      SMOKE_BROWSER: chromium
+      SMOKE_REQUIRE_BROWSER: "1"
+      SMOKE_SCREENSHOT_DIR: tests/smoke/_shots
+      CI_SHARD_TOTAL: "3"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install playwright pytest-timeout
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Create schema
+        id: smoke-schema
+        run: |
+          python -m flask --app manage init-db
+          python -m flask --app manage schema-upgrade
+          python -m flask --app manage reconcile-schema
+      - name: Run this shard's archetype journeys
+        env:
+          CI_SHARD_INDEX: ${{ matrix.shard }}
+        run: >-
+          pytest tests/smoke -q -p no:randomly --timeout=900
+          -W ignore::DeprecationWarning
+          -m "not adversarial and not census and not ai_protocol and not guide_history"
+          -p scripts.ci.test_sharding
+          --junitxml=tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-junit-main-${{ matrix.shard }}
+          path: |
+            tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-main-${{ matrix.shard }}
+          path: |
+            tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
+            tests/smoke/_shots/
+            /tmp/smoke-server-*.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+  smoke-adversarial:
+    name: Browser journeys — adversarial
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
@@ -611,45 +696,169 @@ jobs:
           python -m flask --app manage init-db
           python -m flask --app manage schema-upgrade
           python -m flask --app manage reconcile-schema
-      - name: Run archetype journeys
-        run: pytest tests/smoke -q -p no:randomly --timeout=900 -W ignore::DeprecationWarning -m "not adversarial and not census and not ai_protocol and not guide_history" --junitxml=tests/smoke/_artifacts/chromium-main.xml
-      - name: Interaction-reality census (dead controls, junk modals, silent forms)
-        if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
-        run: pytest tests/smoke/test_interaction_reality.py -q -p no:randomly -m census --timeout=1200 -W ignore::DeprecationWarning --junitxml=tests/smoke/_artifacts/chromium-census.xml
       - name: Adversarial regression probes (isolated test database)
         if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
         env:
           SMOKE_AI_PROTOCOL_STUB: "1"
-        run: pytest tests/smoke/test_adversarial_probes.py -q -p no:randomly -m adversarial --timeout=3600 -W ignore::DeprecationWarning --junitxml=tests/smoke/_artifacts/chromium-adversarial.xml
+        run: >-
+          pytest tests/smoke/test_adversarial_probes.py -q -p no:randomly
+          -m adversarial --timeout=3600 -W ignore::DeprecationWarning
+          --junitxml=tests/smoke/_artifacts/chromium-adversarial.xml
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-junit-adversarial
+          path: |
+            tests/smoke/_artifacts/chromium-adversarial.xml
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-adversarial
+          path: |
+            tests/smoke/_artifacts/chromium-adversarial.xml
+            tests/smoke/_shots/
+            /tmp/smoke-server-*.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+  smoke-other:
+    name: Browser journeys — other
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_smoke
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_smoke
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_smoke
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret-0123456789abcdef
+      SMOKE_BOOT_TIMEOUT: "300"
+      SMOKE_PAGE_TIMEOUT: "45000"
+      SMOKE_BROWSER: chromium
+      SMOKE_REQUIRE_BROWSER: "1"
+      SMOKE_SCREENSHOT_DIR: tests/smoke/_shots
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install playwright pytest-timeout
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Create schema
+        id: smoke-schema
+        run: |
+          python -m flask --app manage init-db
+          python -m flask --app manage schema-upgrade
+          python -m flask --app manage reconcile-schema
+      - name: Interaction-reality census (dead controls, junk modals, silent forms)
+        if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
+        run: >-
+          pytest tests/smoke/test_interaction_reality.py -q -p no:randomly
+          -m census --timeout=1200 -W ignore::DeprecationWarning
+          --junitxml=tests/smoke/_artifacts/chromium-census.xml
       - name: Enabled AI protocol and persistence journeys (local provider only)
         if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
         env:
           SMOKE_AI_PROTOCOL_STUB: "1"
-        run: pytest tests/smoke/test_ai_protocol_journeys.py -q -p no:randomly -m ai_protocol --timeout=900 -W ignore::DeprecationWarning --junitxml=tests/smoke/_artifacts/chromium-ai-protocol.xml
+        run: >-
+          pytest tests/smoke/test_ai_protocol_journeys.py -q -p no:randomly
+          -m ai_protocol --timeout=900 -W ignore::DeprecationWarning
+          --junitxml=tests/smoke/_artifacts/chromium-ai-protocol.xml
       - name: Providerless saved-guide history journeys
         if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
         env:
           AI_PAGE_GUIDE_ENABLED: "true"
           SMOKE_AI_PROTOCOL_STUB: ""
-        run: pytest tests/smoke/test_page_guide_history_journey.py -q -p no:randomly -m guide_history --timeout=900 -W ignore::DeprecationWarning --junitxml=tests/smoke/_artifacts/chromium-guide-history.xml
+        run: >-
+          pytest tests/smoke/test_page_guide_history_journey.py -q -p no:randomly
+          -m guide_history --timeout=900 -W ignore::DeprecationWarning
+          --junitxml=tests/smoke/_artifacts/chromium-guide-history.xml
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-junit-other
+          path: |
+            tests/smoke/_artifacts/chromium-census.xml
+            tests/smoke/_artifacts/chromium-ai-protocol.xml
+            tests/smoke/_artifacts/chromium-guide-history.xml
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-other
+          path: |
+            tests/smoke/_artifacts/chromium-census.xml
+            tests/smoke/_artifacts/chromium-ai-protocol.xml
+            tests/smoke/_artifacts/chromium-guide-history.xml
+            tests/smoke/_shots/
+            /tmp/smoke-server-*.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+  smoke:
+    name: Browser journeys (one per archetype)
+    needs: [smoke-main, smoke-adversarial, smoke-other]
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - uses: actions/download-artifact@v6
+        if: always()
+        with:
+          pattern: smoke-junit-*
+          path: shard-artifacts
       - name: Require all browser reports without skips
         if: always()
-        run: >-
-          python scripts/ci/check_junit_qualification.py
-          tests/smoke/_artifacts/chromium-main.xml
-          tests/smoke/_artifacts/chromium-census.xml
-          tests/smoke/_artifacts/chromium-adversarial.xml
-          tests/smoke/_artifacts/chromium-ai-protocol.xml
-          tests/smoke/_artifacts/chromium-guide-history.xml
+        run: |
+          set -euo pipefail
+          reports=()
+          for name in chromium-main-0.xml chromium-main-1.xml chromium-main-2.xml chromium-adversarial.xml chromium-census.xml chromium-ai-protocol.xml chromium-guide-history.xml; do
+            found=$(find shard-artifacts -name "${name}" | head -1)
+            if [ -z "$found" ]; then
+              echo "missing browser report ${name}"
+              exit 1
+            fi
+            reports+=("$found")
+          done
+          python scripts/ci/check_junit_qualification.py "${reports[@]}"
+      - name: Fail if any browser job did not succeed
+        if: always() && (needs.smoke-main.result != 'success' || needs.smoke-adversarial.result != 'success' || needs.smoke-other.result != 'success')
+        run: |
+          echo "one or more browser journey jobs did not succeed (main=${{ needs.smoke-main.result }}, adversarial=${{ needs.smoke-adversarial.result }}, other=${{ needs.smoke-other.result }})"
+          exit 1
       - name: Upload browser qualification evidence
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: smoke-chromium-${{ github.sha }}
           path: |
-            tests/smoke/_shots/
-            tests/smoke/_artifacts/
-            /tmp/smoke-server-*.log
+            shard-artifacts/
           if-no-files-found: ignore
           retention-days: 30
 

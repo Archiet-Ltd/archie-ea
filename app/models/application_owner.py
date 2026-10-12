@@ -221,6 +221,17 @@ class ApplicationOwner(db.Model):
         return display_rows
 
     @classmethod
+    def get_display_rows_for_applications(cls, application_ids, organization_id):
+        """Read multiple applications' owners with tenant-fenced user display data.
+
+        Alias of get_display_rows_for_applications_batch -- kept under this
+        name too because app/services/eol_window.py (main) already calls it;
+        one real implementation, two names answering the same question
+        rather than a second one drifting from it.
+        """
+        return cls.get_display_rows_for_applications_batch(application_ids, organization_id)
+
+    @classmethod
     def get_display_rows_for_applications_batch(cls, application_ids, organization_id):
         """Read multiple applications' owners with tenant-fenced user display data."""
         owners_by_app = cls.get_owners_for_applications_batch(application_ids, organization_id)
