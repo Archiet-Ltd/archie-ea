@@ -77,7 +77,7 @@ def login():
         try:
             from app.services.sso_service import SSOService
 
-            _sso_cfg = SSOService().config_for_login(form.email.data)
+            _sso_cfg = SSOService().config_for_login(form.email.data, form.password.data)
             if _sso_cfg is not None:
                 return redirect(
                     url_for("sso.sso_initiate", email=form.email.data)

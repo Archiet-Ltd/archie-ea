@@ -204,6 +204,17 @@ def test_returning_member_matched_by_org_and_subject(db_session, make_org):
     assert _users_with_email(db_session, f"alice.renamed@{domain}") == []
     assert _users_with_email(db_session, "alice@elsewhere.example") == []
 
+    # Another member's address with alice's subject still reaches alice: an
+    # implementation that looked the address up first would land on bob.
+    bob = _make_user(db_session, org, f"bob@{domain}",
+                     external_id="subject-bob", sso_provider="oidc")
+    bob_before = _snapshot(bob)
+    alice_email = _reload(db_session, member.id).email
+    crossed = SSOService().provision_user(org, {"email": f"bob@{domain}", "sub": "subject-alice"})
+    assert crossed.id == member.id
+    assert _snapshot(_reload(db_session, bob.id)) == bob_before
+    assert _reload(db_session, member.id).email == alice_email
+
 
 # --------------------------------------------------------------------------- #
 # TS-22  P-4 (re-pointing)                                                     #
@@ -378,9 +389,10 @@ def test_login_does_not_redirect_another_orgs_user_to_the_claiming_idp(app, db_s
     own_member = _make_user(db_session, org_x, f"quinn@{claimed}", password=_PASSWORD)
     db_session.commit()
 
-    assert SSOService().config_for_login(other_orgs_user.email) is None
-    assert SSOService().config_for_login(own_member.email).id == config.id
-    assert SSOService().config_for_login(f"newcomer@{claimed}").id == config.id
+    assert SSOService().config_for_login(other_orgs_user.email, _PASSWORD) is None
+    assert SSOService().config_for_login(own_member.email, _PASSWORD).id == config.id
+    assert SSOService().config_for_login(f"newcomer@{claimed}", _PASSWORD).id == config.id
+    assert SSOService().config_for_login(other_orgs_user.email, "wrong-password").id == config.id
 
     client = _anonymous_client(app)
     resp = _post_login(client, other_orgs_user.email)
@@ -470,7 +482,7 @@ def test_contested_domain_fails_closed_to_password(db_session, make_org, caplog)
 
     with caplog.at_level(logging.WARNING, logger="app.services.sso_service"):
         assert SSOService().get_config_for_email(address) is None
-        assert SSOService().config_for_login(address) is None
+        assert SSOService().config_for_login(address, _PASSWORD) is None
 
     warnings = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
     assert any(str(first.id) in m and str(second.id) in m for m in warnings), warnings
@@ -659,3 +671,264 @@ def test_saml_assertion_outside_configured_domains_is_refused(app, db_session, m
     created = _users_with_email(db_session, inside)
     assert len(created) == 1 and created[0].organization_id == org.id
     assert _session_user_id(ok_client) == str(created[0].id)
+
+
+# --------------------------------------------------------------------------- #
+# TS-30, TS-31  SAML subject                                                   #
+# --------------------------------------------------------------------------- #
+
+_SAML_ASSERTION_NS = "urn:oasis:names:tc:SAML:2.0:assertion"
+_TRANSIENT = "urn:oasis:names:tc:SAML:2.0:nameid-format:transient"
+_PERSISTENT = "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+_SUBJECT_ID = "urn:oasis:names:tc:SAML:attribute:subject-id"
+_PAIRWISE_ID = "urn:oasis:names:tc:SAML:attribute:pairwise-id"
+
+
+def _assertion(name_id, *, name_id_format=None, attributes=()):
+    """A parsed <saml:Assertion> with one NameID and the given attributes.
+    No signature: _extract_claims takes the already-verified assertion."""
+    from lxml import etree
+
+    ns = _SAML_ASSERTION_NS
+    assertion = etree.Element(f"{{{ns}}}Assertion", nsmap={"saml": ns})
+    subject = etree.SubElement(assertion, f"{{{ns}}}Subject")
+    element = etree.SubElement(subject, f"{{{ns}}}NameID")
+    if name_id_format is not None:
+        element.set("Format", name_id_format)
+    element.text = name_id
+    statement = etree.SubElement(assertion, f"{{{ns}}}AttributeStatement")
+    for name, value in attributes:
+        attribute = etree.SubElement(statement, f"{{{ns}}}Attribute", Name=name)
+        etree.SubElement(attribute, f"{{{ns}}}AttributeValue").text = value
+    return assertion
+
+
+def test_saml_transient_nameid_uses_the_stable_subject_attribute(db_session, make_org):
+    from app.services.saml_service import SAMLService
+    from app.services.sso_service import SSOService
+
+    org = make_org("scope-saml-transient")
+    domain = _domain("acme")
+    _configure_sso(db_session, org, domain, protocol="saml")
+    email = f"alice@{domain}"
+    attributes = (("email", email), (_SUBJECT_ID, "alice-7@acme"))
+
+    first_claims = SAMLService()._extract_claims(
+        _assertion("T1", name_id_format=_TRANSIENT, attributes=attributes))
+    second_claims = SAMLService()._extract_claims(
+        _assertion("T2", name_id_format=_TRANSIENT, attributes=attributes))
+    assert first_claims["sub"] == "alice-7@acme"
+    assert second_claims["sub"] == "alice-7@acme"
+    assert first_claims["email"] == email
+
+    first = SSOService().provision_user(org, first_claims)
+    assert first.external_id == "alice-7@acme"
+    second = SSOService().provision_user(org, second_claims)
+    assert second.id == first.id
+    assert len(_users_with_email(db_session, email)) == 1
+
+    # pairwise-id wins over subject-id, whichever order they arrive in.
+    both = SAMLService()._extract_claims(_assertion(
+        "T3", name_id_format=_TRANSIENT,
+        attributes=(("email", email), (_SUBJECT_ID, "alice-7@acme"), (_PAIRWISE_ID, "pairwise-alice")),
+    ))
+    assert both["sub"] == "pairwise-alice"
+
+
+def test_saml_transient_nameid_without_a_stable_subject_is_refused():
+    from app.services.saml_service import (
+        _MSG_TRANSIENT_SUBJECT,
+        SAMLService,
+        SAMLVerificationError,
+    )
+
+    with pytest.raises(SAMLVerificationError) as refused:
+        SAMLService()._extract_claims(_assertion(
+            "T1", name_id_format=_TRANSIENT, attributes=(("email", "erin@acme.example"),)))
+    assert str(refused.value) == _MSG_TRANSIENT_SUBJECT
+
+    # A transient value is never the address either.
+    with pytest.raises(SAMLVerificationError) as no_subject:
+        SAMLService()._extract_claims(_assertion("t1@acme.example", name_id_format=_TRANSIENT))
+    assert str(no_subject.value) == _MSG_TRANSIENT_SUBJECT
+
+    # Positive controls: a persistent NameID, and one with no Format, are the
+    # subject exactly as before.
+    persistent = SAMLService()._extract_claims(_assertion(
+        " persistent-1 ", name_id_format=_PERSISTENT, attributes=(("email", "erin@acme.example"),)))
+    assert persistent["sub"] == "persistent-1"
+    plain = SAMLService()._extract_claims(_assertion("Carol@Acme.example"))
+    assert plain["sub"] == "Carol@Acme.example"
+    assert plain["email"] == "carol@acme.example"
+
+
+# --------------------------------------------------------------------------- #
+# TS-32  Resetting a member's sign-in link                                     #
+# --------------------------------------------------------------------------- #
+
+
+def test_org_admin_can_reset_a_members_sign_in_link(app, db_session, make_org, login_as):
+    import json
+
+    from app.security.audit import AuditEvent
+    from app.services.sso_service import SSONotConfiguredError, SSOService
+
+    org = make_org("scope-reset")
+    other_org = make_org("scope-reset-other")
+    domain = _domain("acme")
+    _configure_sso(db_session, org, domain)
+    admin = _org_admin(db_session, org)
+    member = _make_user(db_session, org, f"ivy@{domain}", external_id="old-subject", sso_provider="oidc")
+    outsider = _make_user(db_session, other_org, f"jon-{uuid.uuid4().hex[:6]}@other.example",
+                          external_id="outsider-subject", sso_provider="oidc")
+    operator = _make_user(db_session, org, f"operator@{domain}", password=_PASSWORD,
+                          external_id="operator-subject", sso_provider="oidc", is_platform_admin=True)
+    plain = _make_user(db_session, org, f"kim@{domain}", password=_PASSWORD)
+    db_session.commit()
+
+    def events():
+        db_session.expire_all()
+        return AuditEvent.query.filter_by(action="sso_link_reset", resource_id=str(member.id)).all()
+
+    # The lockout: a new subject for an already-linked member is refused.
+    with pytest.raises(SSONotConfiguredError) as locked:
+        SSOService().provision_user(org, {"email": member.email, "sub": "new-subject"})
+    assert "linked to a different sign-in" in str(locked.value)
+
+    client = app.test_client()
+    login_as(client, admin)
+    resp = client.post(f"/admin/team/member/{member.id}/reset-sign-in")
+    assert resp.status_code in (302, 303)
+    assert resp.headers["Location"].endswith("/admin/team"), resp.headers["Location"]
+    assert any("Single sign-on link reset." in m for m in _flashes(client))
+    reset = _reload(db_session, member.id)
+    assert (reset.external_id, reset.sso_provider) == (None, None)
+
+    recorded = events()
+    assert len(recorded) == 1
+    details = json.loads(recorded[0].details)
+    assert details["organization_id"] == org.id
+    assert details["actor_id"] == admin.id
+    assert details["previous_provider"] == "oidc"
+    assert "old-subject" not in recorded[0].details
+    assert member.email not in recorded[0].details
+
+    # The next sign-in links the member to the new subject.
+    relinked = SSOService().provision_user(org, {"email": member.email, "sub": "new-subject"})
+    assert relinked.id == member.id
+    assert relinked.external_id == "new-subject"
+
+    # Another organisation's member is not found, and stays as it was.
+    outsider_before = _snapshot(outsider)
+    login_as(client, admin)
+    assert client.post(f"/admin/team/member/{outsider.id}/reset-sign-in").status_code == 404
+    assert _snapshot(_reload(db_session, outsider.id)) == outsider_before
+
+    # A platform administrator in the same organisation is refused with the error flash.
+    operator_before = _snapshot(operator)
+    flash_client = app.test_client()
+    login_as(flash_client, admin)
+    refused = flash_client.post(f"/admin/team/member/{operator.id}/reset-sign-in")
+    assert refused.status_code in (302, 303)
+    assert "A platform administrator's sign-in cannot be reset here." in _flashes(flash_client)
+    assert _snapshot(_reload(db_session, operator.id)) == operator_before
+
+    # A member who is not an admin is refused exactly as the Team page refuses them.
+    relinked_before = _snapshot(_reload(db_session, member.id))
+    plain_client = app.test_client()
+    login_as(plain_client, plain)
+    team_status = plain_client.get("/admin/team").status_code
+    assert team_status == 403
+    login_as(plain_client, plain)
+    assert plain_client.post(f"/admin/team/member/{member.id}/reset-sign-in").status_code == team_status
+    assert _snapshot(_reload(db_session, member.id)) == relinked_before
+
+    assert len(events()) == 1
+
+
+# --------------------------------------------------------------------------- #
+# TS-33, TS-34  The sign-in form does not reveal what an address holds         #
+# --------------------------------------------------------------------------- #
+
+
+def _claimed_domain_accounts(db_session, make_org, label):
+    claimed = _domain(label)
+    org = make_org(f"scope-{label}")
+    config = _configure_sso(db_session, org, claimed)
+    _make_user(db_session, org, f"admin@{claimed}", password=_PASSWORD, is_platform_admin=True)
+    _make_user(db_session, org, f"member@{claimed}", password=_PASSWORD)
+    _make_user(db_session, org, f"nopass@{claimed}", is_platform_admin=True)
+    db_session.commit()
+    return claimed, config
+
+
+def _without_email_param(location):
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    parts = urlsplit(location)
+    query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k != "email"]
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+def test_login_form_does_not_reveal_platform_administrators(app, db_session, make_org):
+    claimed, _ = _claimed_domain_accounts(db_session, make_org, "operatorcorp")
+
+    locations = []
+    for local in ("admin", "member", "nopass", "newcomer"):
+        client = _anonymous_client(app)
+        resp = _post_login(client, f"{local}@{claimed}", password="wrong-password")
+        assert resp.status_code in (302, 303), local
+        location = resp.headers.get("Location", "")
+        assert "/auth/sso/initiate" in location, (local, location)
+        assert _session_user_id(client) is None, local
+        locations.append(_without_email_param(location))
+    assert len(set(locations)) == 1, locations
+
+    # The administrator who knows the password still reaches the password path.
+    admin_client = _anonymous_client(app)
+    admin_resp = _post_login(admin_client, f"admin@{claimed}")
+    assert admin_resp.status_code in (302, 303)
+    assert "/auth/sso/initiate" not in admin_resp.headers.get("Location", "")
+
+    # Positive control: an organisation member with the right password still goes to the IdP.
+    member_client = _anonymous_client(app)
+    member_resp = _post_login(member_client, f"member@{claimed}")
+    assert member_resp.status_code in (302, 303)
+    assert "/auth/sso/initiate" in member_resp.headers.get("Location", "")
+
+
+def test_config_for_login_runs_exactly_one_hash_check_per_claimed_address(db_session, make_org,
+                                                                          monkeypatch):
+    import app.services.sso_service as sso_service
+    from app.services.sso_service import SSOService
+
+    claimed, config = _claimed_domain_accounts(db_session, make_org, "hashcorp")
+    real = sso_service.check_password_hash
+    calls = []
+
+    def counting(stored, password):
+        calls.append(stored)
+        return real(stored, password)
+
+    monkeypatch.setattr(sso_service, "check_password_hash", counting)
+
+    for email, password, expect_config in (
+        (f"admin@{claimed}", "wrong-password", True),
+        (f"admin@{claimed}", _PASSWORD, False),
+        (f"member@{claimed}", _PASSWORD, True),
+        (f"nopass@{claimed}", _PASSWORD, True),
+        (f"newcomer@{claimed}", _PASSWORD, True),
+    ):
+        before = len(calls)
+        result = SSOService().config_for_login(email, password)
+        assert len(calls) == before + 1, email
+        if expect_config:
+            assert result is not None and result.id == config.id, email
+        else:
+            assert result is None, email
+
+    # An address in a domain no configuration lists takes the ordinary
+    # password path, which does its own check.
+    before = len(calls)
+    assert SSOService().config_for_login(f"someone@{_domain('unclaimed')}", _PASSWORD) is None
+    assert len(calls) == before

@@ -46,6 +46,17 @@ _SAML_NS = {
 # allowance as the OIDC id_token leeway in sso_service.py.
 _CLOCK_SKEW_SECONDS = 120
 
+_NAMEID_FORMAT_TRANSIENT = "urn:oasis:names:tc:SAML:2.0:nameid-format:transient"
+# SAML V2.0 Subject Identifier Attributes Profile, in order of preference.
+_STABLE_SUBJECT_ATTRIBUTES = (
+    "urn:oasis:names:tc:SAML:attribute:pairwise-id",
+    "urn:oasis:names:tc:SAML:attribute:subject-id",
+)
+_MSG_TRANSIENT_SUBJECT = (
+    "Your identity provider sent a temporary sign-in identifier that changes every time. "
+    "Ask your administrator to have it send a persistent NameID or a subject-id attribute."
+)
+
 
 class SAMLVerificationError(SSONotConfiguredError):
     """Raised when a SAML AuthnRequest cannot be built or a Response's
@@ -306,11 +317,22 @@ class SAMLService:
                 return None
 
     def _extract_claims(self, assertion) -> dict:
-        """Pull email/name/sub out of the Subject and AttributeStatement."""
+        """Pull email/name/sub out of the Subject and AttributeStatement.
+
+        A transient NameID changes at every sign-in, so it is never the
+        subject and never the address: the subject then comes from the
+        pairwise-id attribute, else the subject-id attribute, and the
+        assertion is refused when neither is present. Any other NameID
+        format, or none, is the subject as it always was.
+        """
         claims: dict = {}
 
         name_id = assertion.find("saml:Subject/saml:NameID", namespaces=_SAML_NS)
-        if name_id is not None and name_id.text:
+        transient = (
+            name_id is not None
+            and (name_id.get("Format") or "").strip() == _NAMEID_FORMAT_TRANSIENT
+        )
+        if name_id is not None and name_id.text and not transient:
             claims["sub"] = name_id.text.strip()
             if "@" in name_id.text:
                 claims["email"] = name_id.text.strip().lower()
@@ -336,6 +358,18 @@ class SAMLService:
                 claims.setdefault("family_name", value)
             else:
                 claims.setdefault(name, value)
+
+        if transient:
+            # Only a stable subject attribute may be the subject here, never
+            # the NameID and never any other attribute.
+            claims.pop("sub", None)
+            for attribute in _STABLE_SUBJECT_ATTRIBUTES:
+                stable = (claims.get(attribute) or "").strip()
+                if stable:
+                    claims["sub"] = stable
+                    break
+            if not claims.get("sub"):
+                raise SAMLVerificationError(_MSG_TRANSIENT_SUBJECT)
 
         if not claims.get("email"):
             raise SAMLVerificationError(

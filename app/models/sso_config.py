@@ -13,6 +13,15 @@ from app import db
 logger = logging.getLogger(__name__)
 
 
+def split_email_domains(raw):
+    """The configured domains in an ``email_domain`` value: comma-separated, each stripped and
+    lower-cased, blanks dropped. The one implementation; SSOConfig.email_domains and the
+    /admin/sso domain check both call it."""
+    if not raw:
+        return []
+    return [d.strip().lower() for d in raw.split(",") if d.strip()]
+
+
 class SSOConfig(db.Model):  # migration-exempt
     """Per-organisation SSO configuration for SAML 2.0 / OIDC federation."""
 
@@ -122,9 +131,7 @@ class SSOConfig(db.Model):  # migration-exempt
     @property
     def email_domains(self):
         """Return list of configured email domains (supports comma-separated)."""
-        if not self.email_domain:
-            return []
-        return [d.strip().lower() for d in self.email_domain.split(",") if d.strip()]
+        return split_email_domains(self.email_domain)
 
     def sp_entity_id_or_default(self, base_url):
         """This organisation's SAML SP entity id, falling back to a URL

@@ -19,6 +19,8 @@ import secrets
 from typing import Optional
 from urllib.parse import urlencode
 
+from werkzeug.security import check_password_hash, generate_password_hash
+
 logger = logging.getLogger(__name__)
 
 # Signing algorithms this service will ever accept for an id_token. "none"
@@ -75,6 +77,10 @@ _DEFAULT_PROVIDER_LABEL = "your organisation's single sign-on"
 # The sso_provider value per-organisation sign-in writes, for OIDC and SAML
 # alike, so a returning member matches whichever protocol the org uses.
 _ORG_SSO_PROVIDER = "oidc"
+# Verified against when the address has no account or no password, so every
+# sign-in-form decision for a claimed domain costs one hash check and the
+# response time does not reveal which kind of account an address is.
+_DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(32))
 
 
 class SSONotConfiguredError(Exception):
@@ -139,15 +145,16 @@ class SSOService:
                 logger.debug("suppressed error in SSOService.get_config_for_email (app/services/sso_service.py): %s", exc)
         return None
 
-    def config_for_login(self, email: str):
+    def config_for_login(self, email: str, password: str):
         """The enabled SSOConfig the sign-in form should send *email* to, or None.
 
         The one decision both account blueprints' ``login()`` make before the
-        password check. A configuration is returned only when its domain
-        matches and the address is not already held by an account outside
-        that configuration's organisation; an account of another
-        organisation, and a platform administrator, sign in with a password.
-        None means "carry on to the password check".
+        password check. A configuration is returned for every address in the
+        matching domain, except that an account outside the configuration's
+        organisation, or a platform administrator, is sent to the password
+        check when, and only when, the submitted password is correct for that
+        account. Exactly one password hash check runs for every address in a
+        claimed domain. None means "carry on to the password check".
         """
         config = self.get_config_for_email(email)
         if config is None or not config.enabled:
@@ -165,9 +172,22 @@ class SSOService:
             except Exception as rollback_exc:
                 logger.debug("suppressed error in SSOService.config_for_login: %s", rollback_exc)
             return None
-        if user is not None and (
-            user.organization_id != config.organization_id
-            or getattr(user, "is_platform_admin", False)
+        stored_hash = getattr(user, "password_hash", None) if user is not None else None
+        # Exactly one hash check for every address in a claimed domain (see
+        # _DUMMY_PASSWORD_HASH). An account outside this organisation, or a
+        # platform administrator, may use the password path only when the
+        # password it submitted is right; anyone else, and anyone with a wrong
+        # password, is sent to the organisation's identity provider, so the
+        # answer does not reveal what kind of account an address holds.
+        password_ok = check_password_hash(stored_hash or _DUMMY_PASSWORD_HASH, password or "")
+        password_ok = password_ok and stored_hash is not None
+        if (
+            password_ok
+            and user is not None
+            and (
+                user.organization_id != config.organization_id
+                or getattr(user, "is_platform_admin", False)
+            )
         ):
             return None
         return config
@@ -175,15 +195,6 @@ class SSOService:
     # ------------------------------------------------------------------
     # Domain claims (admin configuration)
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def split_email_domains(raw: Optional[str]) -> list:
-        """Split a submitted ``email_domain`` value the way
-        :attr:`app.models.sso_config.SSOConfig.email_domains` reads it back:
-        comma-separated, each stripped and lower-cased, blanks dropped."""
-        if not raw:
-            return []
-        return [d.strip().lower() for d in raw.split(",") if d.strip()]
 
     def domains_claimed_by_other_orgs(self, org_id, domains) -> dict:
         """``{domain: organization_id}`` for each of *domains* that another
@@ -212,7 +223,9 @@ class SSOService:
         configuration already lists. Re-saving a domain this organisation
         already lists is allowed.
         """
-        domains = self.split_email_domains(raw_email_domain)
+        from app.models.sso_config import split_email_domains
+
+        domains = split_email_domains(raw_email_domain)
         for domain in domains:
             if domain in PUBLIC_MAILBOX_DOMAINS:
                 return (
@@ -619,10 +632,12 @@ class SSOService:
         domain = email.rsplit("@", 1)[1] if "@" in email else ""
         send_connection_notice = False
 
-        # Nobody is signed in yet, so there is no session organisation; the
-        # account lookups and the write (whose seat check reads the
-        # organisation's subscription) run in the platform scope, as the
-        # password-reset request does.
+        # Nobody is signed in yet, so there is no session organisation.
+        # users, organizations, sso_configs and subscriptions carry no
+        # row-level security policy, so the checks below are the only thing
+        # that decides this sign-in. The platform scope changes nothing for
+        # these tables today; it keeps the lookups working if one of them is
+        # fenced later.
         with platform_scope("single sign-on: resolve the account for a person who is not signed in yet"):
             linked = None
             if org is not None:
@@ -685,6 +700,57 @@ class SSOService:
             AccountService.notify_sign_in_method_connected(
                 user, self._provider_label(config)
             )
+        return user
+
+    def reset_member_sign_in_link(self, org_id: int, user_id: int, *, actor_id: Optional[int], reason: str):
+        """Clear a member's single sign-on link so the organisation's identity
+        provider links the account again at the next sign-in.
+
+        The one way a sign-in link is cleared, used by the Team page and by
+        the operator runbook. Only a member of organisation *org_id* is
+        reached, never a platform administrator. A member with no link is
+        returned unchanged. Each reset writes an ``sso_link_reset`` audit
+        event that carries neither the old subject nor the address; a failed
+        audit write is logged and never undoes the reset.
+
+        Raises:
+            LookupError: no such user in organisation *org_id*.
+            PermissionError: the user is a platform administrator.
+        """
+        from app import db
+        from app.models.user import User
+
+        user = db.session.get(User, user_id)
+        if user is None or user.organization_id != org_id:
+            raise LookupError("No such member in this organisation.")
+        if user.is_platform_admin:
+            raise PermissionError("A platform administrator's sign-in cannot be reset here.")
+        if not user.external_id:
+            return user
+
+        previous_provider = user.sso_provider
+        user.external_id = None
+        user.sso_provider = None
+        db.session.commit()
+
+        try:
+            from app.security.audit import AuditEventSeverity, AuditEventType, audit_logger
+
+            audit_logger.log_event(
+                AuditEventType.SECURITY_EVENT,
+                AuditEventSeverity.MEDIUM,
+                "sso_link_reset",
+                resource_type="user",
+                resource_id=str(user.id),
+                details={
+                    "organization_id": org_id,
+                    "actor_id": actor_id,
+                    "reason": reason,
+                    "previous_provider": previous_provider,
+                },
+            )
+        except Exception as exc:
+            logger.warning("Audit write for a sign-in link reset failed (non-fatal): %s", exc)
         return user
 
     @staticmethod
