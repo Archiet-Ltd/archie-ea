@@ -660,4 +660,67 @@ def test_shard_postgres_service_uses_dynamic_port():
     )
 
 
+def test_content_only_pr_runs_page_tests_and_skips_heavy_jobs():
+    """Evaluating the real workflow expressions with GitHub precedence: a
+    content-only pull request runs the Content page tests job and skips the
+    eight pytest shards and every browser job; a diff touching an email
+    template runs everything; a plain code change runs everything."""
+    jobs = _ci_jobs()
+    heavy = ["tests-shard", "tests", "smoke", "smoke-main",
+             "smoke-adversarial", "smoke-other", "browser-compatibility",
+             "walkthrough"]
+    light = ["secret-scan", "static-gates", "boot-health", "db-gates",
+             "security-sast", "dependency-audit"]
 
+    def ctx(is_content_only: str, event_name="pull_request", action="synchronize",
+            labels=(), changes_result="success"):
+        return {
+            "github": {
+                "event_name": event_name,
+                "event": {"action": action,
+                         "pull_request": {"labels": [{"name": l} for l in labels]}},
+            },
+            "needs": {
+                "changes": {"result": changes_result,
+                            "outputs": {"is_content_only": is_content_only}},
+            },
+            "_labels": list(labels),
+        }
+
+    def runs(job_id: str, c) -> bool:
+        if_expr = jobs[job_id].get("if")
+        if not if_expr:
+            return True
+        # always() is true in GitHub; the local evaluator has no such
+        # function, so substitute an equivalent always-true comparison.
+        expr = _strip_expr(if_expr).replace("always()", "1 == 1")
+        return bool(_eval_github_expr(expr, c))
+
+    # 1. Content-only sync: page tests run, heavy jobs skip.
+    c = ctx("true")
+    assert runs("content-page-tests", c)
+    for job_id in heavy:
+        assert not runs(job_id, c), f"{job_id} must skip on a content-only PR"
+
+    # 2. Email template diff: everything runs (detector says false). The heavy
+    #    jobs run the full suite; the content page tests job skips because it
+    #    exists only for content-only PRs.
+    c = ctx("false")
+    for job_id in heavy + ["secret-scan"]:
+        assert runs(job_id, c), f"{job_id} must run when the diff is not content-only"
+    assert not runs("content-page-tests", c)
+
+    # 3. Plain code change: everything runs, page tests job stays off.
+    c = ctx("false")
+    for job_id in heavy:
+        assert runs(job_id, c), f"{job_id} must run on a code change"
+    assert not runs("content-page-tests", c)
+
+    # 4. Content-only PR with the ci-fast label: the label forces the run.
+    c = ctx("true", action="labeled", labels=["ci-fast"])
+    assert runs("content-page-tests", c)
+
+    # 5. Content-only PR with an unrelated label: nothing re-runs.
+    c = ctx("true", action="labeled", labels=["bug"])
+    for job_id in heavy + ["content-page-tests"] + light:
+        assert not runs(job_id, c), f"{job_id} must skip on a non-ci-fast labeled event"
