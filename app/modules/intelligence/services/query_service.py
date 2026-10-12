@@ -1005,6 +1005,12 @@ class IntelligenceQueryService:
             for row in rows:
                 row["owner"] = None
                 row["owners"] = []
+                # The row's own reason (e.g. a derived staleness reason) is
+                # kept; without owner resolution there is no owner-absence
+                # reason, so the key holds its builder value (None for an
+                # explicit row) rather than being dropped from the row.
+                existing_reason = row.get("reason")
+                row["reason"] = existing_reason if existing_reason else None
 
         return {
             "rows": rows,
