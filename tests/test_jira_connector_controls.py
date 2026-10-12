@@ -6,6 +6,7 @@ The base-layout wrapper substitutes navigation/auth context, not page controls.
 import json
 import mimetypes
 import re
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Event, Thread
@@ -40,6 +41,22 @@ def jira_html():
                        csrf_token=lambda: 'synthetic-csrf-value',
                        get_flashed_messages=lambda **kwargs: [])
     return env.get_template('admin/connectors/jira.html').render(cfg={}, connector=None)
+
+
+def wait_for_flag(page, flag, seconds=20):
+    """Wait for a fixture-side ``Event`` while the browser keeps running.
+
+    ``Event.wait`` blocks the thread that dispatches Playwright's callbacks and a
+    fixed three seconds is less than a cold Firefox needs on a loaded runner to
+    run the click handler and send the request. Polling through the page keeps it
+    serviced and leaves a deadline wide enough to mean "never sent".
+    """
+    deadline = time.monotonic() + seconds
+    while not flag.is_set():
+        if time.monotonic() > deadline:
+            return False
+        page.wait_for_timeout(25)
+    return True
 
 
 @pytest.fixture(scope='module', params=['chromium', 'firefox', 'webkit'])
@@ -127,11 +144,13 @@ def test_connection_feedback_pending_cleanup_and_double_click(jira_browser, view
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(origin + PAGE_PATH, wait_until='load')
         assert errors == [], f'Current Jira page failed to parse: {errors}'
+        # The click handler calls Platform.fetch; act only once it exists.
+        page.wait_for_function("() => window.Platform && Platform.fetch && typeof Platform.fetch.post === 'function'")
         for field, value in INPUT.items():
             page.locator('#' + field).fill(value)
         button = page.locator('#test-jira-btn')
         getattr(button, gesture)()
-        assert started.wait(3), 'Ordinary button gesture did not send a connection test'
+        assert wait_for_flag(page, started), 'Ordinary button gesture did not send a connection test'
         expect(button).to_be_disabled()
         expect(button).to_have_text('Testing…')
         result = page.locator('#jira-test-result')
