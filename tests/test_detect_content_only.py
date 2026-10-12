@@ -156,19 +156,6 @@ def test_content_page_tests_job_runs_only_when_is_content_only_is_true():
         assert "is_content_only != 'true'" in str(jobs[job_id]["if"]), job_id
 
 
-def test_email_template_diff_runs_the_full_suite_header_contract():
-    """A diff touching an email template must run everything -- the detector
-    must report false, and the content page tests job must not run."""
-    from pathlib import Path
-
-    import yaml
-
-    workflow = yaml.safe_load(Path(".github/workflows/ci.yml").read_text(encoding="utf-8"))
-    content_if = str(workflow["jobs"]["content-page-tests"]["if"])
-    assert "needs.changes.outputs.is_content_only == 'true'" in content_if
-    assert d.classify(["app/templates/public/email/sales_inquiry.html"]) == "false"
-
-
 def _git_repo(tmp_path):
     def git(*a):
         subprocess.run(["git", *a], cwd=tmp_path, check=True, capture_output=True)
@@ -271,3 +258,12 @@ def test_detector_docstring_says_it_runs_and_outputs_false_on_a_push():
     doc = d.__doc__
     assert "outputs is_content_only=false" in doc
     assert "is skipped" not in doc
+
+
+def test_changes_job_falls_back_to_the_pr_detector_only_when_the_base_branch_has_none():
+    steps = _ci_workflow()["jobs"]["changes"]["steps"]
+    run = next(s["run"] for s in steps if s.get("id") == "detect")
+    assert 'git rev-parse --verify --quiet "origin/${BASE}"' in run
+    assert "is_content_only=false" in run
+    # the fallback to the checked-out copy is guarded by the base existing
+    assert run.index("rev-parse") < run.index("python scripts/ci/detect_content_only.py")

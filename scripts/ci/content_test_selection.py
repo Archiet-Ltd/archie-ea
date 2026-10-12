@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Compute the test files the content-only job runs.
 
-Every tests/test_*.py outside tests/smoke whose text refers to public pages,
+Every test_*.py under tests/ (recursively) outside tests/smoke whose text refers to public pages,
 public templates or the template tree, or that fetches a public route, plus the
 template contract test explicitly. Printed one path per line, sorted.
 """
@@ -12,11 +12,26 @@ import re
 import sys
 from pathlib import Path
 
+# Public route roots: the section prefixes, the site page slugs under
+# content/pages/site and the machine-readable .txt / .xml routes.
+PUBLIC_ROUTES = (
+    r"pricing|vs|use-cases|modules|vision|legal|connectors|"
+    r"about|features|contact|docs|privacy|security|terms|"
+    r"architecture-health-check|team-annual-onboarding|"
+    r"llms-full\.txt|llms\.txt|robots\.txt|sitemap\.xml|llms|sitemap"
+)
+_Q = "[\"']"
+
 SELECTION_PATTERN = re.compile(
-    r'public_pages|templates/public|rglob\("\*\.html"\)|TEMPLATE_ROOT|TEMPLATES|'
-    r'client\.get\("/(pricing|vs|use-cases|modules|vision|legal|llms|sitemap)?|'
-    # A public route listed as a string (for example in a route table) counts too.
-    r'"/(pricing|vs|use-cases|modules|vision|legal|llms|sitemap)[/"]'
+    r"public_pages|templates/public|"
+    # rglob with either quote style
+    + r"rglob\(" + _Q + r"\*\.html" + _Q + r"\)|TEMPLATE_ROOT|TEMPLATES|"
+    # a fetch of a public route: either quote, optionally an f-string
+    # the home page
+    + r"\.get\(\s*" + _Q + r"/" + _Q + r"|"
+    + r"\.get\(\s*f?" + _Q + r"/(" + PUBLIC_ROUTES + r")|"
+    # a public route listed as a string (for example in a route table)
+    + _Q + r"/(" + PUBLIC_ROUTES + r")[/\"']"
 )
 
 ALWAYS_INCLUDED: tuple[str, ...] = ("tests/test_template_contracts.py",)
@@ -28,7 +43,7 @@ def select_content_tests(root: Path | str = ".") -> list[str]:
     tests_dir = base / "tests"
     smoke_dir = tests_dir / "smoke"
     selected: set[str] = set()
-    for path in tests_dir.glob("test_*.py"):
+    for path in tests_dir.rglob("test_*.py"):
         if smoke_dir in path.parents:
             continue
         try:

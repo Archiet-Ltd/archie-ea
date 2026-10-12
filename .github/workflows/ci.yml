@@ -87,13 +87,17 @@ jobs:
         id: detect
         # Run the detector as it exists on the base branch, so a pull request
         # cannot change the rules that decide which of its own checks are skipped.
-        # The checked-out copy is the fallback only for the first introduction,
-        # when the base branch has no detector yet.
+        # The checked-out copy is the fallback only for the first introduction:
+        # the base branch exists but has no detector yet. If the base branch
+        # cannot be resolved at all, nothing is trusted and everything runs.
         run: |
+          BASE="${GITHUB_BASE_REF:-main}"
           if git show "origin/${GITHUB_BASE_REF:-main}:scripts/ci/detect_content_only.py" > /tmp/detect_content_only.py 2>/dev/null; then
             python /tmp/detect_content_only.py
-          else
+          elif git rev-parse --verify --quiet "origin/${BASE}" >/dev/null; then
             python scripts/ci/detect_content_only.py
+          else
+            echo "is_content_only=false" | tee -a "${GITHUB_OUTPUT:-/dev/null}"
           fi
 
   # A content-only PR skips the eight pytest shards and the browser jobs, but
@@ -155,14 +159,25 @@ jobs:
           flask --app manage reconcile-schema
       - name: Apply the capability provenance migration
         run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Install Chromium for the browser tests in the selection
+        run: python -m playwright install --with-deps chromium
       - name: Run the public page tests
         # The selection is computed, not hand-picked: every test file outside
         # tests/smoke that refers to public pages or templates, or fetches a
-        # public route, plus the template contract test.
+        # public route, plus the template contract test. No --maxfail: the
+        # whole run is recorded in content-tests.xml so the merge gate can
+        # accept failures only when every failing id is a known failure.
         run: |
           python scripts/ci/content_test_selection.py > content-tests.txt
           wc -l content-tests.txt
-          xargs -a content-tests.txt pytest -q --maxfail=20 -o xfail_strict=true
+          xargs -r pytest -q -o xfail_strict=true --junitxml=content-tests.xml < content-tests.txt
+      - name: Upload the content test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: content-tests-junit
+          path: content-tests.xml
+          if-no-files-found: ignore
 
   secret-scan:
     name: Secret scan (gitleaks)
