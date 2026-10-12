@@ -835,15 +835,18 @@ jobs:
           path: shard-artifacts
       - name: Require all browser reports without skips
         if: always()
-        run: >-
-          python scripts/ci/check_junit_qualification.py
-          shard-artifacts/smoke-junit-main-0/chromium-main-0.xml
-          shard-artifacts/smoke-junit-main-1/chromium-main-1.xml
-          shard-artifacts/smoke-junit-main-2/chromium-main-2.xml
-          shard-artifacts/smoke-junit-adversarial/chromium-adversarial.xml
-          shard-artifacts/smoke-junit-other/chromium-census.xml
-          shard-artifacts/smoke-junit-other/chromium-ai-protocol.xml
-          shard-artifacts/smoke-junit-other/chromium-guide-history.xml
+        run: |
+          set -euo pipefail
+          reports=()
+          for name in chromium-main-0.xml chromium-main-1.xml chromium-main-2.xml chromium-adversarial.xml chromium-census.xml chromium-ai-protocol.xml chromium-guide-history.xml; do
+            found=$(find shard-artifacts -name "${name}" | head -1)
+            if [ -z "$found" ]; then
+              echo "missing browser report ${name}"
+              exit 1
+            fi
+            reports+=("$found")
+          done
+          python scripts/ci/check_junit_qualification.py "${reports[@]}"
       - name: Fail if any browser job did not succeed
         if: always() && (needs.smoke-main.result != 'success' || needs.smoke-adversarial.result != 'success' || needs.smoke-other.result != 'success')
         run: |
