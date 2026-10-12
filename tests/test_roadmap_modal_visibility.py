@@ -64,6 +64,12 @@ def page(browser):
     p.route(BASE + '/', lambda route: route.fulfill(content_type='text/html', body=page_html()))
     p.goto(BASE + '/')
     p.wait_for_function('window.Alpine && window.Platform && window.Platform.modal')
+    # `window.Alpine` exists as soon as its script has run; the roadmap component
+    # is usable once Alpine has started it and removed x-cloak from the page.
+    p.wait_for_function('''() => {
+        const root = document.querySelector('[x-data="applicationRoadmapCrud()"]');
+        return !!(root && root._x_dataStack) && document.querySelectorAll('[x-cloak]').length === 0;
+    }''')
     yield p
     context.close()
     assert errors == [], 'Browser runtime errors: ' + '; '.join(errors)
@@ -72,7 +78,7 @@ def page(browser):
 def test_first_add_click_opens_then_cancel_allows_reopen(page):
     """A closed overlay must never intercept the first Add Work Package click."""
     trigger = page.get_by_role('button', name='Add Work Package', exact=True)
-    trigger.click(timeout=3000)
+    trigger.click()
     modal = page.locator(MODAL)
     expect(modal).to_be_visible()
     expect(modal).to_have_attribute('aria-hidden', 'false')
@@ -105,7 +111,7 @@ def test_initial_and_dismissed_dialog_have_no_layout_or_pointer_surface(page):
 
 def test_edit_opens_with_existing_values_and_keyboard_stays_in_dialog(page):
     row = page.get_by_role('row').filter(has_text='Existing migration')
-    row.get_by_role('button', name='Edit', exact=True).click(timeout=3000)
+    row.get_by_role('button', name='Edit', exact=True).click()
     modal = page.locator(MODAL)
     expect(modal.get_by_role('heading', name='Edit Work Package', exact=True)).to_be_visible()
     expect(modal.get_by_label('Name', exact=True)).to_have_value('Existing migration')
