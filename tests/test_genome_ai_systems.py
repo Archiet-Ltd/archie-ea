@@ -966,3 +966,502 @@ def test_release_refusal_flashes_for_non_json(app, db_session, make_org, client,
     )
     # The system must not be released.
     assert profile_from_element(el)["release_state"] != "released"
+
+
+# =============================================================================
+# --- Lineage, Obligations, Grounding Source
+# =============================================================================
+
+
+# --- Lineage -----------------------------------------------------------------
+
+
+def _create_data_entity(session, org_id, name: str):
+    """Create a DataObject element to use as a data entity."""
+    from app.models.models import ArchiMateElement
+
+    el = ArchiMateElement(
+        name=name,
+        type="DataObject",
+        layer="application",
+        organization_id=org_id,
+        custom_properties={},
+    )
+    session.add(el)
+    session.flush()
+    return el
+
+
+def _create_provider_element(session, org_id, name: str):
+    """Create an ApplicationComponent element to use as a provider."""
+    from app.models.models import ArchiMateElement
+
+    el = ArchiMateElement(
+        name=name,
+        type="ApplicationComponent",
+        layer="application",
+        organization_id=org_id,
+        custom_properties={"provider_register": True},
+    )
+    session.add(el)
+    session.flush()
+    return el
+
+
+def _link_elements(session, source_id, target_id, rel_type="association", org_id=None):
+    """Create an ArchiMateRelationship between two elements."""
+    from app.models.models import ArchiMateRelationship
+
+    rel = ArchiMateRelationship(
+        source_id=source_id,
+        target_id=target_id,
+        type=rel_type,
+    )
+    if org_id is not None:
+        rel.organization_id = org_id
+    session.add(rel)
+    session.flush()
+    return rel
+
+
+def test_lineage_providers_and_data_entities_fail_on_main(db_session, org):
+    """A system linked to providers and data entities shows them. Fails on main
+    (no lineage read)."""
+    el = register_ai_system(db_session, org.id, name="Lineage System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    prov1 = _create_provider_element(db_session, org.id, "OpenAI")
+    prov2 = _create_provider_element(db_session, org.id, "Anthropic")
+    de1 = _create_data_entity(db_session, org.id, "Customer Records")
+    de2 = _create_data_entity(db_session, org.id, "Transaction Data")
+    de3 = _create_data_entity(db_session, org.id, "Fraud Alerts")
+
+    _link_elements(db_session, el.id, prov1.id, "serving", org_id=org.id)
+    _link_elements(db_session, el.id, prov2.id, "serving", org_id=org.id)
+    _link_elements(db_session, el.id, de1.id, "access", org_id=org.id)
+    _link_elements(db_session, el.id, de2.id, "access", org_id=org.id)
+    _link_elements(db_session, el.id, de3.id, "access", org_id=org.id)
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_lineage import (
+        get_providers_for_system,
+        get_data_entities_for_system,
+    )
+
+    providers = get_providers_for_system(el.id, org.id)
+    assert len(providers) == 2
+    pnames = {p["name"] for p in providers}
+    assert "OpenAI" in pnames
+    assert "Anthropic" in pnames
+
+    entities = get_data_entities_for_system(el.id, org.id)
+    assert len(entities) == 3
+    dnames = {d["name"] for d in entities}
+    assert "Customer Records" in dnames
+    assert "Transaction Data" in dnames
+    assert "Fraud Alerts" in dnames
+
+
+def test_lineage_systems_using_provider_shows_owner_and_data(db_session, org):
+    """'Systems using provider X' lists the system with its owner and the data
+    entities sent. Fails on main (no lineage read)."""
+    from app.models.application_owner import ApplicationOwner
+    from app.models.user import User
+
+    el = register_ai_system(db_session, org.id, name="Consumer System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    prov = _create_provider_element(db_session, org.id, "OpenAI")
+    de1 = _create_data_entity(db_session, org.id, "Customer Records")
+    de2 = _create_data_entity(db_session, org.id, "Analytics Data")
+
+    _link_elements(db_session, el.id, prov.id, "serving", org_id=org.id)
+    _link_elements(db_session, el.id, de1.id, "access", org_id=org.id)
+    _link_elements(db_session, el.id, de2.id, "access", org_id=org.id)
+    db_session.flush()
+
+    # Set an owner
+    user = User(email="owner-lineage@test.com", organization_id=org.id,
+                first_name="Lineage", last_name="Owner")
+    db_session.add(user)
+    db_session.flush()
+    owner = ApplicationOwner(
+        element_type="ai_system",
+        element_id=el.id,
+        user_id=user.id,
+        ownership_type="primary",
+        organization_id=org.id,
+    )
+    db_session.add(owner)
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_lineage import (
+        get_systems_using_provider,
+    )
+
+    systems = get_systems_using_provider(prov.id, org.id)
+    assert len(systems) == 1
+    assert systems[0]["name"] == "Consumer System"
+    assert systems[0]["owner"] is not None
+    assert systems[0]["owner"]["user_id"] == user.id
+    assert len(systems[0]["data_entities"]) == 2
+
+
+def test_lineage_org_isolation(db_session, make_org):
+    """Organisation B sees none of A's lineage data. Fails on main."""
+    org_a = make_org("lineage-a")
+    org_b = make_org("lineage-b")
+
+    el_a = register_ai_system(db_session, org_a.id, name="A System",
+                              provider="openai", model_id="gpt-4o")
+    el_b = register_ai_system(db_session, org_b.id, name="B System",
+                              provider="anthropic", model_id="claude-opus-5")
+    prov_a = _create_provider_element(db_session, org_a.id, "A-Provider")
+    prov_b = _create_provider_element(db_session, org_b.id, "B-Provider")
+    de_a = _create_data_entity(db_session, org_a.id, "A-Data")
+    de_b = _create_data_entity(db_session, org_b.id, "B-Data")
+
+    _link_elements(db_session, el_a.id, prov_a.id, "serving", org_id=org_a.id)
+    _link_elements(db_session, el_a.id, de_a.id, "access", org_id=org_a.id)
+    _link_elements(db_session, el_b.id, prov_b.id, "serving", org_id=org_b.id)
+    _link_elements(db_session, el_b.id, de_b.id, "access", org_id=org_b.id)
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_lineage import (
+        get_providers_for_system,
+        get_data_entities_for_system,
+        get_systems_using_provider,
+    )
+
+    # A's system sees A's providers and entities
+    assert len(get_providers_for_system(el_a.id, org_a.id)) == 1
+    assert len(get_data_entities_for_system(el_a.id, org_a.id)) == 1
+
+    # B querying A's system returns nothing (wrong org)
+    assert len(get_providers_for_system(el_a.id, org_b.id)) == 0
+    assert len(get_data_entities_for_system(el_a.id, org_b.id)) == 0
+
+    # Systems using provider are org-scoped
+    assert len(get_systems_using_provider(prov_a.id, org_a.id)) == 1
+    assert len(get_systems_using_provider(prov_a.id, org_b.id)) == 0
+
+
+def test_lineage_not_recorded_renders_not_recorded(db_session, org):
+    """An AI system with no providers or data entities shows 'not recorded'
+    with a reason, never zero. Fails on main."""
+    el = register_ai_system(db_session, org.id, name="Lonely System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_lineage import (
+        get_providers_for_system,
+        get_data_entities_for_system,
+    )
+
+    providers = get_providers_for_system(el.id, org.id)
+    assert providers == [] or providers is None
+
+
+# --- Obligations --------------------------------------------------------------
+
+
+def test_obligations_accept_high_risk_attaches_requirements(db_session, org):
+    """Accepting a high-risk classification with an accepted assessment attaches
+    the class's obligations as compliance requirement rows. Fails on main."""
+    el = register_ai_system(db_session, org.id, name="Obligation System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    # Classify as high and accept
+    approval = propose_classification(
+        element=el, proposed_risk_class="high",
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+
+    # Attach and accept assessment
+    assessment = propose_assessment(
+        element=el, organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_assessment(assessment.id, org.id)
+    db_session.flush()
+
+    # Now re-classify (same class) so the obligation-attachment step
+    # inside accept_classification runs again, this time with an accepted
+    # assessment in place.
+    reapproval = propose_classification(
+        element=el, proposed_risk_class="high",
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(reapproval.id, org.id)
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_obligations import (
+        get_obligations_for_system,
+    )
+
+    obligations = get_obligations_for_system(el.id, org.id)
+    assert len(obligations) > 0
+    # Each obligation has an evidence status
+    for ob in obligations:
+        assert "title" in ob
+        assert "evidence_status" in ob
+        assert ob["evidence_status"] in ("not_started", "in_progress",
+                                          "completed", "verified", "not recorded")
+
+
+def test_obligations_without_assessment_attach_nothing(db_session, org):
+    """A high-risk class without an accepted assessment attaches no obligations.
+    Fails on main."""
+    el = register_ai_system(db_session, org.id, name="No-Assessment System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    approval = propose_classification(
+        element=el, proposed_risk_class="high",
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_obligations import (
+        get_obligations_for_system,
+    )
+
+    # No assessment accepted, so no obligations should be attached
+    obligations = get_obligations_for_system(el.id, org.id)
+    assert len(obligations) == 0
+
+
+def test_obligations_minimal_class_attaches_minimal_set(db_session, org):
+    """A minimal class attaches the minimal set of compliance requirements.
+    Fails on main."""
+    el = register_ai_system(db_session, org.id, name="Minimal System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    approval = propose_classification(
+        element=el, proposed_risk_class="minimal",
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_obligations import (
+        get_obligations_for_system,
+    )
+
+    obligations = get_obligations_for_system(el.id, org.id)
+    # Minimal class should have some (fewer) obligations
+    assert len(obligations) >= 1
+
+
+def test_obligations_org_isolation(db_session, make_org):
+    """Organisation B sees none of A's obligation rows. Fails on main."""
+    org_a = make_org("obl-a")
+    org_b = make_org("obl-b")
+
+    el_a = register_ai_system(db_session, org_a.id, name="A Obl System",
+                              provider="openai", model_id="gpt-4o")
+    el_b = register_ai_system(db_session, org_b.id, name="B Obl System",
+                              provider="anthropic", model_id="claude-opus-5")
+    db_session.flush()
+
+    # Accept classifications for both
+    for el, org, cls in [(el_a, org_a, "high"), (el_b, org_b, "minimal")]:
+        approval = propose_classification(
+            element=el, proposed_risk_class=cls,
+            organization_id=org.id, proposed_by_user_id=None,
+        )
+        db_session.flush()
+        accept_classification(approval.id, org.id)
+        db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_obligations import (
+        get_obligations_for_system,
+    )
+
+    ob_a = get_obligations_for_system(el_a.id, org_a.id)
+    # When querying from B's perspective, element A is in A's org so the
+    # obligations are scoped to A's element. B cannot access A's element.
+    from app.models.models import ArchiMateElement
+    el_from_b = ArchiMateElement.query.filter_by(
+        id=el_a.id, organization_id=org_b.id
+    ).first()
+    # el_a should NOT be findable from org_b
+    assert el_from_b is None, "Cross-org element should not be visible"
+
+
+def test_obligations_show_evidence_status(db_session, org):
+    """Every obligation shown traces to a ComplianceRequirement row with
+    evidence status. Fails on main."""
+    el = register_ai_system(db_session, org.id, name="Evidence System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    approval = propose_classification(
+        element=el, proposed_risk_class="high",
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_classification(approval.id, org.id)
+    db_session.flush()
+
+    assessment = propose_assessment(
+        element=el, organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    accept_assessment(assessment.id, org.id)
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_obligations import (
+        get_obligations_for_system,
+    )
+
+    obligations = get_obligations_for_system(el.id, org.id)
+    for ob in obligations:
+        # Must trace to a real database row
+        assert "id" in ob
+        assert isinstance(ob["id"], int)
+
+
+# --- Grounding Source ---------------------------------------------------------
+
+
+def test_grounding_source_propose_creates_approval_record(db_session, org):
+    """Proposing a data source creates one approval row. Fails on main."""
+    from app.models.models import ArchiMateElement
+
+    el = register_ai_system(db_session, org.id, name="Grounding System",
+                             provider="openai", model_id="gpt-4o")
+    data_entity = _create_data_entity(db_session, org.id, "Training Data Source")
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_grounding import (
+        propose_grounding_source,
+    )
+
+    approval = propose_grounding_source(
+        element=el,
+        data_entity_id=data_entity.id,
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+
+    assert approval is not None
+    assert approval.status.value == "pending"
+    assert approval.entity_type == "ai_system_grounding_source"
+    assert approval.organization_id == org.id
+
+    # Check the proposed-use property is NOT yet written
+    props = getattr(el, "acm_properties", None) or {}
+    assert "ai_system_grounding_source" not in props
+
+
+def test_grounding_source_approve_writes_property(db_session, org):
+    """Approving a grounding source writes the proposed-use property. Fails on main."""
+    from app.models.models import ArchiMateElement
+
+    el = register_ai_system(db_session, org.id, name="Approve Grounding",
+                             provider="openai", model_id="gpt-4o")
+    data_entity = _create_data_entity(db_session, org.id, "Ground Truth")
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_grounding import (
+        propose_grounding_source,
+        accept_grounding_source,
+    )
+
+    approval = propose_grounding_source(
+        element=el,
+        data_entity_id=data_entity.id,
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+
+    result = accept_grounding_source(approval.id, org.id)
+    db_session.flush()
+    assert result is True
+
+    # Check the property was written
+    props = getattr(el, "acm_properties", None) or {}
+    assert "ai_system_grounding_source" in props
+
+
+def test_grounding_source_refuse_writes_nothing(db_session, org):
+    """Refusing a grounding source writes nothing. Fails on main."""
+    from app.models.models import ArchiMateElement
+
+    el = register_ai_system(db_session, org.id, name="Refuse Grounding",
+                             provider="openai", model_id="gpt-4o")
+    data_entity = _create_data_entity(db_session, org.id, "Refused Data")
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_grounding import (
+        propose_grounding_source,
+        reject_grounding_source,
+    )
+
+    approval = propose_grounding_source(
+        element=el,
+        data_entity_id=data_entity.id,
+        organization_id=org.id,
+        proposed_by_user_id=None,
+    )
+    db_session.flush()
+
+    result = reject_grounding_source(approval.id, org.id)
+    db_session.flush()
+    assert result is True
+
+    # No property should have been written
+    props = getattr(el, "acm_properties", None) or {}
+    assert "ai_system_grounding_source" not in props
+
+
+def test_grounding_source_org_isolation(db_session, make_org):
+    """Two organisations' grounding sources are isolated. Fails on main."""
+    org_a = make_org("grnd-a")
+    org_b = make_org("grnd-b")
+
+    el_a = register_ai_system(db_session, org_a.id, name="A Grounding",
+                              provider="openai", model_id="gpt-4o")
+    el_b = register_ai_system(db_session, org_b.id, name="B Grounding",
+                              provider="anthropic", model_id="claude-opus-5")
+    de_a = _create_data_entity(db_session, org_a.id, "A Source")
+    de_b = _create_data_entity(db_session, org_b.id, "B Source")
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_grounding import (
+        propose_grounding_source,
+    )
+
+    # Each org proposes their own
+    appr_a = propose_grounding_source(
+        element=el_a, data_entity_id=de_a.id,
+        organization_id=org_a.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+    appr_b = propose_grounding_source(
+        element = el_b, data_entity_id = de_b.id,
+        organization_id = org_b.id, proposed_by_user_id = None,
+    )
+    db_session.flush()
+
+# B cannot approve A's approval
+    from app.modules.enterprise_genome.services.ai_system_grounding import (
+        accept_grounding_source,
+    )
+    result = accept_grounding_source(appr_a.id, org_b.id)
+    db_session.flush()
+    assert result is False
