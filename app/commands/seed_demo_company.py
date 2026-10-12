@@ -707,6 +707,59 @@ _APPLICATIONS = [
     ("Data Warehouse", "Data Warehouse", "active", "healthy"),
 ]
 
+# Portfolio profile for each application above: the Abacus lifecycle code the
+# Applications tiles count ("2.1 strategic", "2.2 tactical", "3. sunset",
+# "5. decommissioned"), the component type, the vendor of record and the one
+# capability it primarily enables. Without these the Applications screen shows
+# four zero tiles, "Not mapped" on every row and "0 of 20 have a vendor".
+# (app name) -> (lifecycle, component_type, vendor, capability code)
+_APP_PROFILE = {
+    "Event Relay": ("2.1 strategic", "Integration Service", "Confluent", "LQ-CAP-EVENT-PROCESSING"),
+    "Calibration Ledger": ("2.1 strategic", "Business Application", "Lantern Quay (in-house)", "LQ-CAP-CALIBRATION"),
+    "Dispatch Planner": ("2.2 tactical", "Business Application", "Oracle", "LQ-CAP-FULFILMENT"),
+    "Inventory Manager": ("2.2 tactical", "Business Application", "SAP", "LQ-CAP-INVENTORY"),
+    "Field Service Scheduler": ("2.1 strategic", "Business Application", "ServiceNow", "LQ-CAP-FIELD-SERVICE"),
+    "Compliance Reporter": ("2.1 strategic", "Business Application", "Workiva", "LQ-CAP-COMPLIANCE"),
+    "Supplier Portal": ("2.1 strategic", "Business Application", "Coupa", "LQ-CAP-SUPPLIER"),
+    "Workforce Planner": ("2.2 tactical", "Business Application", "Workday", "LQ-CAP-WORKFORCE"),
+    "Quality Monitor": ("2.1 strategic", "Business Application", "Lantern Quay (in-house)", "LQ-CAP-QUALITY"),
+    "Sensor Data Hub": ("2.1 strategic", "Data Platform", "Microsoft", "LQ-CAP-WATER-QUALITY"),
+    "Firmware Distribution Service": ("2.2 tactical", "Platform Service", "Lantern Quay (in-house)", "LQ-CAP-ASSET-LIFECYCLE"),
+    "Customer Portal": ("2.2 tactical", "Business Application", "Salesforce", "LQ-CAP-FULFILMENT"),
+    "Finance System": ("2.2 tactical", "Business Application", "Oracle", "LQ-CAP-DEMAND"),
+    "Document Management": ("3. sunset", "Business Application", "OpenText", "LQ-CAP-COMPLIANCE"),
+    "Identity Provider": ("2.1 strategic", "Platform Service", "Okta", "LQ-CAP-INTEGRATION"),
+    "Monitoring Dashboard": ("2.2 tactical", "Platform Service", "Datadog", "LQ-CAP-INCIDENT"),
+    "Alert Manager": ("5. decommissioned", "Platform Service", "PagerDuty", "LQ-CAP-INCIDENT"),
+    "Reporting Engine": ("3. sunset", "Data Platform", "Microsoft", "LQ-CAP-ANALYTICS"),
+    "Integration Bus": ("2.2 tactical", "Integration Service", "MuleSoft", "LQ-CAP-INTEGRATION"),
+    "Data Warehouse": ("2.1 strategic", "Data Platform", "Snowflake", "LQ-CAP-ANALYTICS"),
+}
+
+# ── architecture review board queue ────────────────────────────────────────
+# (review_number, title, review_type, priority, status, days_since_submitted,
+#  days_to_decision or None while undecided, decision or None)
+_ARB_REVIEWS = [
+    ("LQ-ARB-2026-001", "Migrate the event backbone to a managed message broker",
+     "architecture_change", "high", "approved", 62, 11, "approved"),
+    ("LQ-ARB-2026-002", "Adopt Okta as the single identity provider",
+     "technology_selection", "high", "approved", 55, 8, "approved"),
+    ("LQ-ARB-2026-003", "Consolidate supplier onboarding into Supplier Portal",
+     "architecture_change", "medium", "approved_with_conditions", 48, 14, "approved_with_conditions"),
+    ("LQ-ARB-2026-004", "Retire the manual inventory reconciliation spreadsheet",
+     "architecture_change", "low", "rejected", 41, 6, "rejected"),
+    ("LQ-ARB-2026-005", "Replace Document Management with a managed records service",
+     "technology_selection", "medium", "approved", 33, 9, "approved"),
+    ("LQ-ARB-2026-006", "Adopt predictive maintenance for field service",
+     "architecture_change", "high", "under_review", 12, None, None),
+    ("LQ-ARB-2026-007", "Move the Data Warehouse to a lakehouse pattern",
+     "architecture_change", "critical", "under_review", 9, None, None),
+    ("LQ-ARB-2026-008", "Standardise API gateway across customer-facing services",
+     "standards_exception", "medium", "submitted", 5, None, None),
+    ("LQ-ARB-2026-009", "Introduce a vendor risk score into supplier selection",
+     "architecture_change", "low", "submitted", 2, None, None),
+]
+
 # ── application owners ─────────────────────────────────────────────────────
 
 # Owner users: create a User row for each person named as an owner so the
@@ -1083,7 +1136,6 @@ def seed_demo_company() -> dict:
     from app.models import ArchiMateElement, ArchiMateRelationship
     from app.models.application_portfolio import ApplicationComponent
     from app.models.application_owner import ApplicationOwner
-    from app.models.unified_capability import UnifiedCapability
     from app.models.risk import Risk, RiskStatus
     from app.models.enterprise_intelligence import PortfolioInitiative
     from app.models.unified_work_package import UnifiedWorkPackage
@@ -1192,10 +1244,13 @@ def seed_demo_company() -> dict:
             if app_name in existing_apps:
                 continue
             el = elements.get(el_name)
+            profile = _APP_PROFILE.get(app_name)
             app = ApplicationComponent(
                 name=app_name,
                 organization_id=org_id,
-                lifecycle_status=lifecycle,
+                lifecycle_status=profile[0] if profile else lifecycle,
+                component_type=profile[1] if profile else None,
+                vendor_name=profile[2] if profile else None,
                 health_status=health,
                 archimate_element_id=el.id if el else None,
                 application_code=f"LQ-{app_name.upper().replace(' ', '-')[:20]}",
@@ -1212,6 +1267,30 @@ def seed_demo_company() -> dict:
         if apps_created:
             db.session.flush()
         stats["applications_created"] = apps_created
+
+        # Backfill the portfolio profile onto applications seeded before it
+        # existed (re-running the command on an existing demo database must
+        # fix the tiles, not leave them at zero). Only fills what is unset or
+        # still the old blanket "active" default.
+        profile_updated = 0
+        for app_name, app in _resolve_apps(org_id).items():
+            profile = _APP_PROFILE.get(app_name)
+            if profile is None:
+                continue
+            changed = False
+            if app.lifecycle_status == "active":
+                app.lifecycle_status = profile[0]
+                changed = True
+            if not app.component_type:
+                app.component_type = profile[1]
+                changed = True
+            if not app.vendor_name:
+                app.vendor_name = profile[2]
+                changed = True
+            profile_updated += changed
+        if profile_updated:
+            db.session.flush()
+        stats["applications_profiled"] = profile_updated
 
         # ── 6. application owners ───────────────────────────────────────
         # Create owner user accounts first.
@@ -1272,25 +1351,114 @@ def seed_demo_company() -> dict:
         stats["application_owners_created"] = owners_created
 
         # ── 7. capabilities ─────────────────────────────────────────────
+        # The application-to-capability mapping table (what the Applications
+        # screen's Capability column reads) points at business_capability, and
+        # ADR 0008's write-time projection copies each business_capability row
+        # into unified_capabilities with its provenance. So the capability is
+        # written once, as a business_capability row, and the unified row is
+        # the projection of it -- not a second hand-written copy. A database
+        # seeded before this existed already holds unlinked unified rows with
+        # the same codes; those are left as they are (the (organisation, code)
+        # index would refuse a second row) and only a fresh seed gets mappings.
+        from app.models.business_capabilities import BusinessCapability
+
         existing_caps = _resolve_caps(org_id)
+        existing_bcs = {
+            b.code: b
+            for b in db.session.query(BusinessCapability)
+            .filter(BusinessCapability.organization_id == org_id)
+            .all()
+        }
         caps_created = 0
         for name, code, current, target, level in _CAPABILITIES:
-            if code in existing_caps:
+            if code in existing_caps or code in existing_bcs:
                 continue
-            cap = UnifiedCapability(
+            bc = BusinessCapability(
                 name=name,
                 code=code,
                 organization_id=org_id,
-                scope="tenant",
                 level=level,
                 current_maturity_level=current,
                 target_maturity_level=target,
+                maturity_assessment_date=_dt.datetime.utcnow(),
             )
-            db.session.add(cap)
+            db.session.add(bc)
+            existing_bcs[code] = bc
             caps_created += 1
         if caps_created:
             db.session.flush()
         stats["capabilities_created"] = caps_created
+
+        # ── 7b. application-to-capability mappings ──────────────────────
+        from app.models.application_capability import ApplicationCapabilityMapping
+
+        mapped = {
+            (m.application_component_id, m.business_capability_id)
+            for m in db.session.query(ApplicationCapabilityMapping)
+            .filter(ApplicationCapabilityMapping.organization_id == org_id)
+            .all()
+        }
+        mappings_created = 0
+        for app_name, app in _resolve_apps(org_id).items():
+            profile = _APP_PROFILE.get(app_name)
+            bc = existing_bcs.get(profile[3]) if profile else None
+            if bc is None or (app.id, bc.id) in mapped:
+                continue
+            db.session.add(ApplicationCapabilityMapping(
+                organization_id=org_id,
+                application_component_id=app.id,
+                business_capability_id=bc.id,
+                support_level="full",
+                coverage_percentage=80,
+                is_primary_enabler=True,
+                is_active=True,
+            ))
+            mappings_created += 1
+        if mappings_created:
+            db.session.flush()
+        stats["capability_mappings_created"] = mappings_created
+
+        # ── 7c. architecture review board queue ─────────────────────────
+        from app.models.architecture_review_board import ARBReviewItem
+
+        users = _resolve_users(org_id)
+        submitter = users.get(_DEMO_USER_EMAIL)
+        reviewer = users.get("ivo.reed@lantern-quay.example.com") or submitter
+        existing_reviews = {
+            r.review_number
+            for r in db.session.query(ARBReviewItem)
+            .filter(ARBReviewItem.review_number.like("LQ-ARB-%"))
+            .all()
+        }
+        now = _dt.datetime.utcnow()
+        reviews_created = 0
+        for number, title, rtype, priority, status, age, took, decision in _ARB_REVIEWS:
+            if number in existing_reviews or submitter is None:
+                continue
+            submitted = now - _dt.timedelta(days=age)
+            item = ARBReviewItem(
+                review_number=number,
+                title=title,
+                review_type=rtype,
+                priority=priority,
+                status=status,
+                organization_id=org_id,
+                submitter_id=submitter.id,
+                submitted_at=submitted,
+                reviewer_id=reviewer.id,
+                review_started_at=submitted + _dt.timedelta(days=1),
+            )
+            if decision:
+                decided = submitted + _dt.timedelta(days=took)
+                item.decision = decision
+                item.decision_date = decided
+                item.decided_by_id = reviewer.id
+                item.review_completed_at = decided
+            db.session.add(item)
+            reviews_created += 1
+        if reviews_created:
+            db.session.flush()
+        stats["arb_reviews_created"] = reviews_created
 
         # ── 8. risks ────────────────────────────────────────────────────
         existing_risks = {

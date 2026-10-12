@@ -7,10 +7,10 @@ source: docs/eim-category-positioning-v1.md section 2; docs/artifacts/feature-st
 
 # The eighteen capabilities of Enterprise Intelligence Management
 
-Enterprise Intelligence Management is one living, explainable model of your enterprise, turned into
-answers, insights, recommendations and simulations. Entelim delivers it through eighteen
-capabilities, grouped into five questions every enterprise asks: set direction, know what you run,
-stay in control, get answers before you need them, and connect and trust.
+Enterprise Intelligence Management is the company brain: one living, explainable model of your
+enterprise, turned into answers, insights, recommendations and simulations. Entelim delivers it
+through eighteen capabilities, grouped into five questions every enterprise asks: set direction,
+know what you run, stay in control, get answers before you need them, and connect and trust.
 
 ## Set direction
 
@@ -88,7 +88,7 @@ architecture decisions.
 findings and design-to-delivery traceability through 2027.
 
 Delivered today by: [Architecture Model](/modules/architecture-model),
-[Diagrams and Composer](/modules/diagrams).
+[Diagrams and Composer](/modules/diagrams), [Industry Reference Frameworks](/modules/industry-apqc).
 
 <h3 id="data-management">Data Management</h3>
 
@@ -115,9 +115,9 @@ Delivered today by: [Org Chart and RACI](/modules/org-chart).
 <h3 id="operations-and-service-management">Operations and Service Management</h3>
 
 Bring the live state of the business into the model (services, incidents, changes, service levels
-and telemetry) so the twin reflects what is happening now, not what was drawn last quarter.
+and telemetry) so the company brain reflects what is happening now, not what was drawn last quarter.
 
-This is where the twin goes live. Service mapping and reconciliation with your configuration records
+This is where the company brain goes live. Service mapping and reconciliation with your configuration records
 start in Q1 2027, and incidents, changes, telemetry and service levels on the model arrive in
 Q2 2027.
 
@@ -193,7 +193,8 @@ derived, and you can see the model as it stood on any past date.
 without being asked in Q1 2027; forecasts from Q3 2027; recommendations tracked to measured outcomes
 from Q4 2027.
 
-Delivered today by: [What breaks if this fails, and who gets called](/use-cases/what-breaks-and-who-gets-called).
+Delivered today by: [Digital Twin](/modules/digital-twin),
+[What breaks if this fails, and who gets called](/use-cases/what-breaks-and-who-gets-called).
 
 <h3 id="simulation-and-scenario-planning">Simulation and Scenario Planning</h3>
 

@@ -479,3 +479,9 @@ workflow_nodes
 workflow_pipelines
 workflow_run_watchers
 workflow_templates
+# oauth_authorization_codes: redeemed by hash at the token endpoint before an organisation is known
+# oauth_clients: registered before any user or organisation exists (dynamic client registration)
+# oauth_tokens: looked up by token hash before the organisation is known; the row carries organization_id and every use is checked against it
+oauth_authorization_codes
+oauth_clients
+oauth_tokens

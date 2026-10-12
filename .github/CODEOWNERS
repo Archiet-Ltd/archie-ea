@@ -1,0 +1,9 @@
+# The OAuth authorization server, the MCP endpoint, and the bridge/fencing
+# utilities both of them are the only callers of — one bridge
+# (app/utils/internal_api.py), one fencing function
+# (app/utils/text_sanitization.py) — are security-sensitive surfaces. Any
+# change to them should get a look from whoever owns this integration.
+/app/modules/oauth_provider/ @Anioko
+/app/modules/mcp/ @Anioko
+/app/utils/internal_api.py @Anioko
+/app/utils/text_sanitization.py @Anioko
