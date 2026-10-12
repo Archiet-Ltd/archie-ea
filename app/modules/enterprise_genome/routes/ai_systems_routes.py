@@ -46,6 +46,20 @@ from app.decorators import admin_required
 from app._decorators_base import permission_required
 from app.models import Permission
 from app.modules.enterprise_genome.emit.ai_systems_register import emit_ai_systems_register
+from app.modules.enterprise_genome.services.ai_system_grounding import (
+    ENTITY_GROUNDING_SOURCE,
+    accept_grounding_source,
+    propose_grounding_source,
+    reject_grounding_source,
+)
+from app.modules.enterprise_genome.services.ai_system_lineage import (
+    get_data_entities_for_system,
+    get_providers_for_system,
+    get_systems_using_provider,
+)
+from app.modules.enterprise_genome.services.ai_system_obligations import (
+    get_obligations_for_system,
+)
 from app.modules.enterprise_genome.services.ai_systems_seed import (
     register_ai_system,
     seed_archie_copilot,
@@ -112,6 +126,20 @@ def ai_systems():
     slice_data = None
     if org_id is not None:
         slice_data = build_ai_systems_slice(org_id, db.session)
+        # Enrich each system with lineage and obligations data
+        for s in slice_data.get("systems", []):
+            el_id = s.get("archimate_element_id")
+            if el_id:
+                s["providers"] = get_providers_for_system(el_id, org_id)
+                s["data_entities"] = get_data_entities_for_system(el_id, org_id)
+                s["obligations"] = get_obligations_for_system(el_id, org_id)
+                # For each provider, find systems using it
+                provider_systems = {}
+                for p in s.get("providers", []):
+                    pid = p.get("id")
+                    if pid:
+                        provider_systems[pid] = get_systems_using_provider(pid, org_id)
+                s["provider_systems"] = provider_systems
         register_html = emit_ai_systems_register(
             slice_data,
             can_release=_may_release(current_user, org_id),
@@ -386,3 +414,130 @@ def ai_system_delete_owner(element_id, owner_id):
     db.session.delete(record)
     db.session.commit()
     return "", 204
+
+
+# --- Grounding source routes -------------------------------------------------
+
+
+@ai_systems_genome_bp.route(
+    "/ai-systems/<int:element_id>/grounding-source/propose", methods=["POST"]
+)
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_propose_grounding_source(element_id):
+    """Propose a data entity as a grounding source for an AI system.
+
+    Creates a pending approval record in the approval queue. The source is NOT
+    applied — another user with general permission accepts it in the approval
+    queue. Org-scoped: another organisation's element id is refused.
+    """
+    org_id = _current_org_id()
+    if org_id is None:
+        return redirect(url_for("ai_systems_genome.ai_systems"))
+
+    element = _org_scoped_element(element_id, org_id)
+    if element is None:
+        abort(404)
+
+    data_entity_id = request.form.get("data_entity_id", type=int)
+    if not data_entity_id:
+        flash("A data entity id is required to propose a grounding source.", "error")
+        return redirect(url_for("ai_systems_genome.ai_systems"))
+
+    try:
+        propose_grounding_source(
+            element=element,
+            data_entity_id=data_entity_id,
+            organization_id=org_id,
+            proposed_by_user_id=current_user.id,
+        )
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        logger.exception(
+            "Grounding source proposal failed for org %s element %s",
+            org_id, element_id,
+        )
+        flash("The grounding source proposal could not be recorded.", "error")
+
+    return redirect(url_for("ai_systems_genome.ai_systems"))
+
+
+@ai_systems_genome_bp.route(
+    "/ai-systems/<int:element_id>/grounding-source/<int:approval_id>/accept",
+    methods=["POST"],
+)
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_accept_grounding_source(element_id, approval_id):
+    """Accept a proposed grounding source.
+
+    Reads the proposal payload from the approval record and writes the
+    grounding source property onto the element's acm_properties. Org-scoped.
+    """
+    org_id = _current_org_id()
+    if org_id is None:
+        return redirect(url_for("ai_systems_genome.ai_systems"))
+
+    element = _org_scoped_element(element_id, org_id)
+    if element is None:
+        abort(404)
+
+    try:
+        result = accept_grounding_source(approval_id, org_id)
+        if result:
+            db.session.commit()
+            flash("Grounding source approved.", "success")
+        else:
+            db.session.rollback()
+            flash("Could not approve grounding source.", "error")
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        logger.exception(
+            "Grounding source accept failed for org %s approval %s",
+            org_id, approval_id,
+        )
+        flash("The grounding source could not be approved.", "error")
+
+    return redirect(url_for("ai_systems_genome.ai_systems"))
+
+
+@ai_systems_genome_bp.route(
+    "/ai-systems/<int:element_id>/grounding-source/<int:approval_id>/refuse",
+    methods=["POST"],
+)
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_refuse_grounding_source(element_id, approval_id):
+    """Refuse a proposed grounding source.
+
+    The system stays unchanged; no property is written. Org-scoped.
+    """
+    org_id = _current_org_id()
+    if org_id is None:
+        return redirect(url_for("ai_systems_genome.ai_systems"))
+
+    element = _org_scoped_element(element_id, org_id)
+    if element is None:
+        abort(404)
+
+    try:
+        result = reject_grounding_source(approval_id, org_id)
+        if result:
+            db.session.commit()
+            flash("Grounding source refused.", "success")
+        else:
+            db.session.rollback()
+            flash("Could not refuse grounding source.", "error")
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        logger.exception(
+            "Grounding source refuse failed for org %s approval %s",
+            org_id, approval_id,
+        )
+        flash("The grounding source could not be refused.", "error")
+
+    return redirect(url_for("ai_systems_genome.ai_systems"))
