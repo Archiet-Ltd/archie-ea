@@ -142,7 +142,7 @@ def launch(browser):
 
         page.on('request', lambda request: unexpected.append(request.url)
                 if not request.url.startswith(base + '/') else None)
-        page.goto(base + '/')
+        page.goto(base + '/', wait_until='domcontentloaded')
         page.get_by_role('button', name='Toggle advanced settings', exact=True).click()
         page.on('framenavigated', lambda frame: errors.append(
             {'unexpected_navigation': urlsplit(frame.url).path + '?' + urlsplit(frame.url).query})
