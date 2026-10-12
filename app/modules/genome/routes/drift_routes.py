@@ -45,6 +45,12 @@ from app.modules.genome.services.drift_detector import (
     FINDING_ORPHANED,
     detect_model_drift,
 )
+from app.modules.genome.services.finding_dismissals import (
+    clean_reason,
+    dismiss,
+    restore,
+    split_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,23 +98,37 @@ def _csrf_input() -> str:
     return f'<input type="hidden" name="csrf_token" value="{token}">'  # raw-html-ok: token is server-generated via flask_wtf's generate_csrf(), never user input
 
 
+def _actor_label() -> str:
+    """Who is acting, for the record kept with a dismissal."""
+    name = " ".join(
+        part
+        for part in (
+            getattr(current_user, "first_name", None),
+            getattr(current_user, "last_name", None),
+        )
+        if part
+    )
+    return name or getattr(current_user, "email", None) or "Unknown user"
+
+
 def _render_stored_report(stored) -> tuple:
     """Render the HTML and summary from a stored DriftReport row.
 
-    Returns (report_html, summary) or (None, None) if the stored report is
-    missing or unrenderable.
+    Returns (report_html, summary, dismissed) or (None, None, []) if the stored
+    report is missing or unrenderable. Dismissed findings are left out of the
+    html and summary and returned separately with their recorded reasons.
     """
     if stored is None or stored.report_json is None:
-        return None, None
+        return None, None, []
     try:
-        report = stored.report_json
+        report, dismissed = split_report(stored.report_json, stored.dismissals)
         summary = report.get("summary")
         html = emit_drift_report_html(report)
         html = html.replace(DRIFT_CSRF_PLACEHOLDER, _csrf_input())
-        return Markup(html), summary  # nosec B704
+        return Markup(html), summary, dismissed  # nosec B704
     except Exception as exc:
         logger.warning("Failed to render stored drift report: %s", exc)
-        return None, None
+        return None, None, []
 
 
 def _enabled_provider_ids():
@@ -177,6 +197,7 @@ def index():
     report_html = None
     error = None
     summary = None
+    dismissed = []
     computed_at = None
     pending = False
     if org_id is None:
@@ -187,7 +208,7 @@ def index():
 
             stored = DriftReport.for_org(org_id)
             if stored is not None:
-                report_html, summary = _render_stored_report(stored)
+                report_html, summary, dismissed = _render_stored_report(stored)
                 if report_html is None:
                     error = (
                         "Stored model-health report could not be rendered. "
@@ -209,6 +230,7 @@ def index():
         "genome/model_health.html",
         report_html=report_html,
         summary=summary,
+        dismissed=dismissed,
         error=error,
         org_id=org_id,
         computed_at=computed_at,
@@ -242,6 +264,52 @@ def rescan():
     except Exception as exc:
         logger.warning("Drift rescan failed for org %s: %s", org_id, exc)
         flash(f"Model-health scan failed: {exc}", "error")
+    return redirect(url_for("genome_drift.index"))
+
+
+@genome_drift_bp.route("/dismiss", methods=["POST"])
+@login_required
+def dismiss_finding():
+    """Dismiss one finding as a false positive, recording the reason given."""
+    org_id = _active_org_id()
+    if org_id is None:
+        flash("No active organization for the current user.", "error")
+        return redirect(url_for("genome_drift.index"))
+    reason = clean_reason(request.form.get("reason"))
+    if reason is None:
+        flash("Give a reason (at least a few words) to dismiss a finding.", "error")
+        return redirect(url_for("genome_drift.index"))
+    from app.extensions import db
+    from app.models.drift_report import DriftReport
+
+    stored = DriftReport.for_org(org_id)
+    key = (request.form.get("finding_key") or "").strip()
+    if stored is None or not dismiss(stored, key, reason, _actor_label()):
+        flash("That finding is no longer in the report; nothing was dismissed.", "error")
+        return redirect(url_for("genome_drift.index"))
+    db.session.commit()
+    flash("Finding dismissed. It stays listed below with your reason.", "success")
+    return redirect(url_for("genome_drift.index"))
+
+
+@genome_drift_bp.route("/restore", methods=["POST"])
+@login_required
+def restore_finding():
+    """Return a dismissed finding to the open list."""
+    org_id = _active_org_id()
+    if org_id is None:
+        flash("No active organization for the current user.", "error")
+        return redirect(url_for("genome_drift.index"))
+    from app.extensions import db
+    from app.models.drift_report import DriftReport
+
+    stored = DriftReport.for_org(org_id)
+    key = (request.form.get("finding_key") or "").strip()
+    if stored is None or not restore(stored, key):
+        flash("That finding was not dismissed.", "error")
+        return redirect(url_for("genome_drift.index"))
+    db.session.commit()
+    flash("Finding restored to the open list.", "success")
     return redirect(url_for("genome_drift.index"))
 
 

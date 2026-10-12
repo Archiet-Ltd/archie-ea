@@ -34,6 +34,33 @@
         </div>
         {{ report_html }}
     </div>
+    {% if dismissed %}
+    <section class="bg-card border border-border rounded-lg p-4" id="dismissed-findings">
+        <h2 class="text-sm font-semibold text-foreground mb-2">
+            Dismissed as false positives
+            <span class="text-muted-foreground font-normal">({{ dismissed|length }})</span>
+        </h2>
+        <ul class="space-y-2">
+            {% for d in dismissed %}
+            <li class="p-3 border border-border rounded-lg genome-drift-dismissed">
+                <p class="text-sm text-foreground">{{ d.finding.why }}</p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                    Reason: <span class="text-foreground">{{ d.reason }}</span>
+                    &middot; {{ d.by }}{% if d.at %} &middot; {{ d.at[:10] }}{% endif %}
+                </p>
+                <form method="post" action="{{ url_for('genome_drift.restore_finding') }}" class="mt-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="finding_key" value="{{ d.key }}">
+                    <button type="submit"
+                            class="inline-flex items-center px-3 py-1 text-xs rounded-md border border-border text-foreground hover:bg-muted transition-colors">
+                        Restore to open list
+                    </button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
     <p class="text-xs text-muted-foreground">
         Each finding carries the ArchiMate element id(s) it concerns. "Propose governed fix"
         queues a genome patch through the existing approval gate — it validates and grounds

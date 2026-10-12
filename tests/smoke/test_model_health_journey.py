@@ -16,7 +16,7 @@ _TIMESTAMP_RE = re.compile(
 )
 
 
-def _seed_model_health_fixture(app):
+def _seed_model_health_fixture(app, enterprise_role="solution_architect"):
     from app import db
     from app.models.archimate_core import ArchiMateElement
     from app.models.drift_report import DriftReport
@@ -45,7 +45,7 @@ def _seed_model_health_fixture(app):
             first_name="Smoke",
             last_name="Health",
             organization_id=org.id,
-            enterprise_role="solution_architect",
+            enterprise_role=enterprise_role,
             confirmed=True,
         )
         user.role = architect_role
@@ -146,5 +146,39 @@ def test_model_health_rescan_persists_timestamp_and_findings(browser, live_serve
             seeded["orphan_name"], timeout=PAGE_TIMEOUT
         )
         assert _page_timestamp(page) == stored_timestamp
+    finally:
+        context.close()
+
+
+def test_enterprise_architect_dismisses_a_finding_with_a_reason(browser, live_server, app):
+    seeded = _seed_model_health_fixture(app, enterprise_role="enterprise_architect")
+
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    try:
+        page = context.new_page()
+        _login(page, live_server, seeded["email"])
+        page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        # reached from the sidebar, not by typing the address
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+            page.get_by_role("link", name="Model Health", exact=True).first.click()
+        expect(page).to_have_url(re.compile(r"/genome/model-health/?$"), timeout=PAGE_TIMEOUT)
+        expect(page.locator("body")).to_contain_text(seeded["orphan_name"], timeout=PAGE_TIMEOUT)
+
+        reason = page.get_by_label("Reason for dismissing this finding").first
+        reason.fill("Kept as an archive copy")
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+            page.get_by_role("button", name="Dismiss", exact=True).first.click()
+
+        for _ in range(2):
+            section = page.locator("#dismissed-findings")
+            expect(section).to_contain_text("Kept as an archive copy", timeout=PAGE_TIMEOUT)
+            expect(page.locator(".genome-drift-finding")).to_have_count(0)
+            page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+            page.get_by_role("button", name="Restore to open list").click()
+        expect(page.locator(".genome-drift-finding")).to_have_count(1, timeout=PAGE_TIMEOUT)
+        expect(page.locator("#dismissed-findings")).to_have_count(0)
     finally:
         context.close()

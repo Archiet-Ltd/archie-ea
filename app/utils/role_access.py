@@ -697,6 +697,7 @@ _MY_WORK_LINKS = {
         # to audit its evolution.
         _link("Model as of", "intelligence_ui.history_as_of_page", "clock"),
         _link("Changes", "intelligence_ui.history_changes_page", "history"),
+        _link("Model Health", "genome_drift.index", "activity"),
     ],
     ROLE_CTO: [
         # A CTO with no route to a roadmap from their own sidebar. Found
