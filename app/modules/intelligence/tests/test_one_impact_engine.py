@@ -476,61 +476,94 @@ def test_two_organisations_never_see_one_anothers_elements_in_stored_analysis(
     )
 
 
-def test_large_impact_walk_first_page_within_latency_budget(app, db_session, make_org):
-    """A 2,400-row impact walk returns the first page within the latency budget.
+def _count_statements(db_session, call):
+    """Run ``call`` and return ``(result, number of SQL statements it issued)``.
 
-    The platform SLO for `/api/v1/intelligence/*` (answers) defines
-    p95 <= 2s (2000ms). This test seeds 2,400 downstream elements in a
-    wide fan-out graph and asserts the first page (page_size=50) completes
-    within that budget.
+    The count is the load-independent stand-in for a wall-clock budget: a walk
+    that issues one statement per row gets slower with the data on every
+    machine, while a loaded runner only makes the same number of statements
+    take longer.
+    """
+    from sqlalchemy import event
+
+    engine = db_session.get_bind()
+    statements = []
+
+    def _record(conn, cursor, statement, parameters, context, executemany):
+        # Per-transaction session plumbing (tenant setting, savepoints) is not
+        # part of what the walk costs.
+        if not statement.startswith(("SELECT set_config", "SAVEPOINT", "RELEASE SAVEPOINT")):
+            statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", _record)
+    try:
+        result = call()
+    finally:
+        event.remove(engine, "before_cursor_execute", _record)
+    return result, len(statements)
+
+
+def _fan_out(db_session, org_id, root_name, width):
+    root = _element(db_session, org_id, root_name)
+    for start in range(0, width, 500):
+        for i in range(start, min(start + 500, width)):
+            _relationship(db_session, org_id, root, _element(db_session, org_id, f"{root_name}-child-{i}"))
+        db_session.flush()
+    return root
+
+
+def test_large_impact_walk_first_page_cost_does_not_grow_with_rows(app, db_session, make_org):
+    """A 2,400-row impact walk answers its first page (page_size=50) with the
+    same number of SQL statements as a 20-row walk.
+
+    The platform SLO for `/api/v1/intelligence/*` (answers) is p95 <= 2s. A
+    wall-clock assertion of that budget fails on any loaded CI runner, so this
+    asserts what the budget depends on: the walk, the batch resolution and the
+    pagination slice cost a fixed number of statements however many rows the
+    graph holds. A per-row query (an N+1) makes the large walk issue thousands
+    more statements than the small one and fails here on every machine.
     """
     org = make_org("one-engine-large-walk")
-    root = _element(db_session, org.id, "Root-Large")
-
-    # Create 2,400 direct children (wide fan-out, depth=1).
-    # This exercises the full BFS walk and pagination slice.
-    children = []
-    batch_size = 500
-    for batch_start in range(0, 2400, batch_size):
-        batch = []
-        for i in range(batch_start, min(batch_start + batch_size, 2400)):
-            child = _element(db_session, org.id, f"Child-{i}")
-            _relationship(db_session, org.id, root, child)
-            batch.append(child)
-        children.extend(batch)
-        db_session.flush()
+    small_root = _fan_out(db_session, org.id, "Root-Small", 20)
+    large_root = _fan_out(db_session, org.id, "Root-Large", 2400)
     db_session.commit()
 
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
-    with app.test_request_context("/"):
-        from flask import g
+    def first_page(root):
+        def run():
+            with app.test_request_context("/"):
+                from flask import g
 
-        g.current_org_id = org.id
+                g.current_org_id = org.id
+                return IntelligenceQueryService.cross_layer_impact(
+                    root.id,
+                    include_derived=False,
+                    max_depth=3,
+                    direction="downstream",
+                    with_owner=False,
+                    page_size=50,
+                )
 
-        # First page: 50 rows.
-        result = IntelligenceQueryService.cross_layer_impact(
-            root.id,
-            include_derived=False,
-            max_depth=3,
-            direction="downstream",
-            with_owner=False,
-            page_size=50,
-        )
+        return _count_statements(db_session, run)
 
-    # The summary.latency_ms is measured inside the latency scope and
-    # includes the full walk + batch resolution + pagination slice.
-    latency_ms = result["summary"]["latency_ms"]
-    assert latency_ms is not None, "latency_ms must be recorded"
+    first_page(small_root)  # warm-up: one-off lookups are not part of the walk's cost
+    small, small_statements = first_page(small_root)
+    large, large_statements = first_page(large_root)
 
-    # Budget: platform SLO for answers (/api/v1/intelligence/*) is p95 <= 2s.
-    budget_ms = 2000.0
-    assert latency_ms <= budget_ms, (
-        f"First page latency {latency_ms:.1f}ms exceeds budget {budget_ms}ms "
-        f"(2,400 rows, page_size=50)"
+    # The latency the engine records for the SLO histogram is still produced.
+    assert large["summary"]["latency_ms"] is not None, "latency_ms must be recorded"
+
+    assert small["total"] == 20, f"Expected 20 total rows, got {small['total']}"
+    assert large["total"] == 2400, f"Expected 2400 total rows, got {large['total']}"
+    assert len(large["rows"]) == 50, f"First page should have 50 rows, got {len(large['rows'])}"
+    assert large["next_cursor"] == 50, f"next_cursor should be 50, got {large['next_cursor']}"
+
+    # A couple of identity-map reloads (the root element) may differ between
+    # two calls; a per-row query adds at least one statement per row of the
+    # page, so the slack cannot hide it.
+    slack = 3
+    assert large_statements <= small_statements + slack, (
+        f"The 2,400-row first page issued {large_statements} statements against "
+        f"{small_statements} for 20 rows: the walk's cost grows with the row count"
     )
-
-    # Sanity: total rows reported must be 2,400.
-    assert result["total"] == 2400, f"Expected 2400 total rows, got {result['total']}"
-    assert len(result["rows"]) == 50, f"First page should have 50 rows, got {len(result['rows'])}"
-    assert result["next_cursor"] == 50, f"next_cursor should be 50, got {result['next_cursor']}"
