@@ -61,10 +61,6 @@ MERGED_PAGES: dict[str, str] = {
 }
 
 HELD_PAGE_URLS: frozenset[str] = frozenset({
-    # /modules/integrations is mid-transition to the new /connectors hub on
-    # a separate branch; left here rather than touched by this fix to avoid
-    # colliding with that change.
-    "/modules/integrations",
     # /docs has no front-matter state field of its own (it is a plain site
     # page, not a module/use-case), so is_held's state-based half cannot see
     # it -- this is its only hold mechanism.

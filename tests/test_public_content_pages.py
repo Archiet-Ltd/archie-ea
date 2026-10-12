@@ -2579,7 +2579,12 @@ def test_modules_integrations_301_to_connectors(app):
 
 
 def test_assistant_connector_page_is_held():
-    assert "/connectors/ai-assistants" in HELD_PAGE_URLS
+    page = load_page("connector", slug="ai-assistants")
+    assert page is not None, "ai-assistants connector page not found"
+    assert _is_held(page), (
+        "ai-assistants connector page should be held (its own front matter "
+        "sets state: held)"
+    )
 
 
 def test_features_lists_every_feed_module_and_connector_page(app):
