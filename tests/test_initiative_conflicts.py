@@ -183,3 +183,8 @@ def test_bad_quarter_is_reported(world):
     _clear_login_cache()
     page = client.get("/portfolio/conflicts?quarter=banana").get_data(as_text=True)
     assert "Quarter must look like 2026-Q4" in page
+
+
+def test_conflict_page_requires_sign_in(app, db_session):
+    resp = app.test_client().get("/portfolio/conflicts")
+    assert resp.status_code in (302, 401)
