@@ -1,0 +1,25 @@
+{% extends 'onboarding/_wizard_shell.html' %}
+{% set step_title = 'Welcome' %}
+{% set step_number = 1 %}
+
+{% block wizard_content %}
+<div class="p-10 text-center space-y-6">
+    <div class="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+        <i data-lucide="layout-dashboard" class="h-7 w-7 text-primary" aria-hidden="true"></i>
+    </div>
+    <div class="space-y-2">
+        <h1 class="text-2xl font-bold text-foreground">Welcome to A.R.C.H.I.E.</h1>
+        <p class="text-sm text-muted-foreground max-w-md mx-auto">
+            A couple of quick questions get your workspace started. Everything after the next
+            step is optional — answer what you know, skip the rest.
+        </p>
+    </div>
+    <a href="{{ url_for('onboarding.company') }}"
+       class="inline-flex items-center justify-center rounded-md text-sm font-medium
+              bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-6 py-2
+              disabled:opacity-50 disabled:pointer-events-none">
+        Let's go
+        <i data-lucide="arrow-right" class="h-4 w-4 ml-2" aria-hidden="true"></i>
+    </a>
+</div>
+{% endblock %}
