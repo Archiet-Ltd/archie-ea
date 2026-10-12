@@ -94,6 +94,7 @@
                 {% if analytics.total_pricing_rows > 0 %}
                     <div class="w-full max-w-xs">
                         <canvas id="confidencePieChart" height="220"></canvas>
+                        {% with chart_id='confidencePieChart', caption='Pricing rows by data source type' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
                     </div>
                 {% else %}
                     <div class="py-12 text-center text-muted-foreground">

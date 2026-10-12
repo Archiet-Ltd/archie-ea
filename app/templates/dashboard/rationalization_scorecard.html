@@ -65,6 +65,7 @@
       <div class="h-64">
         <canvas id="timeChart"></canvas>
       </div>
+      {% with chart_id='timeChart', caption='TIME classification' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
       <div class="grid grid-cols-2 gap-3 mt-4">
         <div class="p-3 bg-muted rounded-lg">
           <div class="text-sm font-medium text-muted-foreground">TOLERATE</div>

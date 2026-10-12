@@ -1261,6 +1261,7 @@
             </div>
             <div class="p-6">
               <canvas id="options-radar-chart" class="max-h-80" aria-label="Radar chart comparing decision criteria across options">Multi-criteria comparison chart renders here</canvas>
+              {% with chart_id='options-radar-chart', caption='Decision criteria by option' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
             </div>
           </div>
 

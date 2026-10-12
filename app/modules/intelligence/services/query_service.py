@@ -712,6 +712,9 @@ class IntelligenceQueryService:
             # The identity map: empty on every branch that returns no rows,
             # otherwise filled below from one tenant-fenced batched select.
             elements: Dict[str, Dict[str, Any]] = {}
+            # The owner of the element asked about, from the same owner
+            # resolution as every row's; None when not asked for or not found.
+            centre_owner: Optional[Dict[str, Any]] = None
 
             if org_id is None:
                 rows: List[Dict[str, Any]] = []
@@ -816,9 +819,12 @@ class IntelligenceQueryService:
                     # small constant number of queries.
                     owners_by_element: Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {}
                     if with_owner and rows:
+                        # The element asked about rides the same batch, so the
+                        # map can show the owner of its centre as well.
                         owners_by_element = _resolve_owners_batch(
-                            [row["element_id"] for row in rows], org_id
+                            [row["element_id"] for row in rows] + [element_id], org_id
                         )
+                        centre_owner = owners_by_element.get(element_id, (None, None))[0]
 
                     for row in rows:
                         if with_owner:
@@ -897,6 +903,7 @@ class IntelligenceQueryService:
             "reasons": reasons,
             "elements": elements,
             "maturity_flags": maturity_flags,
+            "centre_owner": centre_owner,
             "total": total,
             "next_cursor": next_cursor,
         }

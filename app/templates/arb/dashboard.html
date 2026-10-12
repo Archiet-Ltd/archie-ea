@@ -184,6 +184,7 @@
                 </div>
             </dl>
         </div>
+        {% with chart_id='arbStatusChart', caption='Review status' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
         {% else %}
         <div data-testid="arb-empty-status-chart">
             {{ empty_state(

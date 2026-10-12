@@ -832,14 +832,17 @@
         <div class="rounded-lg border bg-card p-4">
           <h4 class="font-semibold text-foreground mb-3">Score Comparison</h4>
           <canvas id="score-chart"></canvas>
+          {% with chart_id='score-chart', caption='Score comparison' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
         </div>
         <div class="rounded-lg border bg-card p-4">
           <h4 class="font-semibold text-foreground mb-3">TCO Comparison</h4>
           <canvas id="tco-chart"></canvas>
+          {% with chart_id='tco-chart', caption='Total cost of ownership comparison' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
         </div>
         <div class="rounded-lg border bg-card p-4">
           <h4 class="font-semibold text-foreground mb-3">Scoring Dimensions</h4>
           <canvas id="radar-chart"></canvas>
+          {% with chart_id='radar-chart', caption='Scoring dimensions' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
         </div>
       </div>
 

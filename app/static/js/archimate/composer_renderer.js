@@ -7,6 +7,14 @@
  *   renderer.loadElements(elements, relationships);
  *   renderer.fitToContent();
  *   renderer.destroy();
+ *
+ * A read-only banded view (the Twin map draws with this):
+ *   var renderer = ComposerRenderer.create(containerEl, { mode: 'view', theme: 'tokens' });
+ *   renderer.drawBands({ width, bands, elements, relationships, classes, buttons });
+ *   renderer.select(elementId, pathKeys);
+ *   renderer.focus(elementId);
+ * `theme: 'tokens'` draws with the design-token classes instead of literal
+ * colours, for pages inside the platform shell (see drawBandedView).
  */
 let ComposerRenderer = (function() {
     'use strict';
@@ -1126,6 +1134,487 @@ let ComposerRenderer = (function() {
         return link;
     }
 
+    /* ── Layer banding: the one layered layout ───────────────
+     *  Places every element cell in a horizontal band for its layer, bands
+     *  top to bottom in LAYER_Y_ORDER (or opts.order). Used by the Composer's
+     *  auto-layout and by every read-only view drawn with this renderer, so
+     *  there is one layered layout, not one per page.
+     *
+     *  applyLayerBanding(graph)                  — the Composer's defaults.
+     *  applyLayerBanding(graph, null, opts)      — a view's own geometry:
+     *    opts.order       [layer, ...] band order; with opts.showEmpty every
+     *                     listed band is laid out even when it holds nothing
+     *    opts.cols        elements per row
+     *    opts.spacingX/Y  cell pitch; opts.bandGap gap between bands
+     *    opts.top         y of the first band; opts.header space above a
+     *                     band's first row for its title; opts.pad inner padding
+     *    opts.width       rows are centred inside this width
+     *  (The second argument is accepted and ignored: an existing Composer call
+     *  passes its paper there.)
+     *  Returns the bands it laid out: [{layer, y, height, count}].
+     */
+    let LAYER_Y_ORDER = {
+        'strategy': 0, 'motivation': 1, 'business': 2,
+        'application': 3, 'technology': 4, 'physical': 5, 'implementation': 6,
+    };
+
+    function applyLayerBanding(graph, _paper, opts) {
+        let cells = graph.getElements().filter(function(c) {
+            return !c.get('isLayerZone') && !c.get('isAnnotation');
+        });
+        if (cells.length === 0 && !(opts && opts.showEmpty)) return [];
+
+        let layersPresent = {};
+        cells.forEach(function(cell) {
+            let layer = (cell.get('elLayer') || '').toLowerCase();
+            if (!layersPresent[layer]) layersPresent[layer] = [];
+            layersPresent[layer].push(cell);
+        });
+
+        if (!opts) {
+            /* The Composer's own layout, unchanged. */
+            let sortedLayers = Object.keys(layersPresent)
+                .filter(function(l) { return LAYER_Y_ORDER[l] !== undefined; })
+                .sort(function(a, b) { return LAYER_Y_ORDER[a] - LAYER_Y_ORDER[b]; });
+            let unknownLayers = Object.keys(layersPresent).filter(function(l) {
+                return LAYER_Y_ORDER[l] === undefined;
+            });
+            sortedLayers = sortedLayers.concat(unknownLayers);
+
+            if (sortedLayers.length < 2) {
+                let cols = Math.ceil(Math.sqrt(cells.length));
+                cells.forEach(function(cell, i) {
+                    cell.position(40 + (i % cols) * 240, 40 + Math.floor(i / cols) * 160);
+                });
+                return [];
+            }
+
+            let COLS_MAX = 10;
+            let SPACING_X = 240;   /* element width 200 + 40px gap */
+            let SPACING_Y = 160;   /* element height 130 + 30px gap */
+            let BAND_GAP = 80;
+            let yOffset = 40;
+            let laid = [];
+
+            sortedLayers.forEach(function(layer) {
+                let nodes = layersPresent[layer];
+                let cols = Math.min(nodes.length, COLS_MAX);
+                let startX = Math.max(40, (cols <= 3 ? 200 : 40));
+                nodes.forEach(function(n, i) {
+                    n.position(startX + (i % cols) * SPACING_X, yOffset + Math.floor(i / cols) * SPACING_Y);
+                });
+                let rows = Math.ceil(nodes.length / cols);
+                laid.push({ layer: layer, y: yOffset, height: rows * SPACING_Y, count: nodes.length });
+                yOffset += rows * SPACING_Y + BAND_GAP;
+            });
+            return laid;
+        }
+
+        let order = (opts.order || Object.keys(LAYER_Y_ORDER)).slice();
+        Object.keys(layersPresent).forEach(function(l) {
+            if (order.indexOf(l) === -1) order.push(l);
+        });
+        let perRow = Math.max(1, opts.cols || 1);
+        let spacingX = opts.spacingX || 240;
+        let spacingY = opts.spacingY || 160;
+        let bandGap = opts.bandGap || 0;
+        let header = opts.header || 0;
+        let pad = opts.pad || 0;
+        let width = opts.width || 0;
+        let y = opts.top || 0;
+        let bands = [];
+
+        order.forEach(function(layer) {
+            let members = layersPresent[layer] || [];
+            if (!members.length && !opts.showEmpty) return;
+            let rows = Math.ceil(members.length / perRow);
+            members.forEach(function(cell, i) {
+                let r = Math.floor(i / perRow);
+                let inRow = Math.min(perRow, members.length - r * perRow);
+                let cellW = cell.size().width;
+                let rowWidth = inRow * spacingX - (spacingX - cellW);
+                let start = width ? (width - rowWidth) / 2 : pad;
+                cell.position(start + (i % perRow) * spacingX, y + header + pad + r * spacingY);
+            });
+            let height = header + pad + (rows ? rows * spacingY - (spacingY - (members[0] ? members[0].size().height : 0)) + pad : 0);
+            bands.push({ layer: layer, y: y, height: height, count: members.length });
+            y += height + bandGap;
+        });
+        return bands;
+    }
+
+    /* ── Relationship type key ────────────────────────────────
+     *  "Serving", "ServingRelationship", "serving_relationship" -> "serving",
+     *  the key REL_STYLES is written in. Unknown types read as association. */
+    function relTypeKey(raw) {
+        let key = String(raw || '').replace(/[_\s-]*relationship$/i, '').replace(/[_\s-]/g, '').toLowerCase();
+        return REL_STYLES[key] ? key : 'association';
+    }
+
+    /* ── Token theme ──────────────────────────────────────────
+     *  A page inside the platform shell draws with the design tokens rather
+     *  than the notation's literal colours, so the picture follows the theme
+     *  (light, dark, high contrast) like the rest of the page. The shapes,
+     *  icons and line styles are the same notation; only where a colour comes
+     *  from changes. Full class names are written out here so the stylesheet
+     *  build can see them. */
+    let TOKEN_BAND_CLASS = {
+        motivation:     'fill-layer-motivation/10 stroke-layer-motivation/40',
+        strategy:       'fill-layer-strategy/10 stroke-layer-strategy/40',
+        business:       'fill-layer-business/10 stroke-layer-business/40',
+        application:    'fill-layer-application/10 stroke-layer-application/40',
+        technology:     'fill-layer-technology/10 stroke-layer-technology/40',
+        physical:       'fill-layer-technology/10 stroke-layer-technology/40',
+        implementation: 'fill-layer-implementation/10 stroke-layer-implementation/40',
+    };
+    let TOKEN_BAND_DEFAULT = 'fill-muted/40 stroke-border';
+    let TOKEN_ELEMENT_STROKE = {
+        motivation:     'stroke-layer-motivation/40',
+        strategy:       'stroke-layer-strategy/40',
+        business:       'stroke-layer-business/40',
+        application:    'stroke-layer-application/40',
+        technology:     'stroke-layer-technology/40',
+        physical:       'stroke-layer-technology/40',
+        implementation: 'stroke-layer-implementation/40',
+    };
+    let TOKEN_ELEMENT_FILL = 'fill-background';
+    let TOKEN_ELEMENT_SELECTED_STROKE = 'stroke-primary';
+    let TOKEN_LINE = 'stroke-muted-foreground';
+    let TOKEN_LINE_ON_PATH = 'stroke-primary';
+
+    function _isLiteralColour(value) {
+        if (!value) return false;
+        let v = String(value).trim().toLowerCase();
+        return v.charAt(0) === '#' || v.indexOf('rgb') === 0 || v === 'white' || v === 'black';
+    }
+
+    function _isLight(value) {
+        let v = String(value).trim().toLowerCase();
+        return v === '#fff' || v === '#ffffff' || v === 'white' || v.indexOf('rgba(255,255,255') === 0 ||
+            v.indexOf('rgba(255, 255, 255') === 0 || v === '#fafbfc' || v === '#f8fafc';
+    }
+
+    function _swap(node, attr, cls) {
+        node.removeAttribute(attr);
+        if (cls) cls.split(' ').forEach(function(c) { if (c) node.classList.add(c); });
+    }
+
+    /* Replace every literal fill and stroke under `root` with a token class.
+       `roleOf(node)` names what the node is, when the caller knows better
+       than its colour does. */
+    function tokeniseTree(root, roleOf) {
+        let nodes = [root].concat(Array.prototype.slice.call(root.querySelectorAll('*')));
+        nodes.forEach(function(node) {
+            if (!node.getAttribute) return;
+            let fill = node.getAttribute('fill');
+            let stroke = node.getAttribute('stroke');
+            if (!_isLiteralColour(fill) && !_isLiteralColour(stroke)) return;
+            let role = roleOf ? roleOf(node) : null;
+            if (role && role.fill !== undefined && _isLiteralColour(fill)) _swap(node, 'fill', role.fill);
+            else if (_isLiteralColour(fill)) _swap(node, 'fill', _isLight(fill) ? 'fill-background' : (node.tagName.toLowerCase() === 'text' ? 'fill-foreground' : 'fill-muted-foreground'));
+            if (role && role.stroke !== undefined && _isLiteralColour(stroke)) _swap(node, 'stroke', role.stroke);
+            else if (_isLiteralColour(stroke)) _swap(node, 'stroke', _isLight(stroke) ? 'stroke-border' : 'stroke-muted-foreground');
+        });
+    }
+
+    function _tokeniseCellView(view) {
+        let cell = view.model;
+        let layer = String(cell.get('zoneLayer') || cell.get('elLayer') || '').toLowerCase();
+        tokeniseTree(view.el, function(node) {
+            let selector = node.getAttribute('joint-selector');
+            if (cell.get('isLayerZone')) {
+                if (selector === 'body') return { fill: TOKEN_BAND_CLASS[layer] || TOKEN_BAND_DEFAULT, stroke: '' };
+                if (selector === 'label') return { fill: 'fill-foreground' };
+                return null;
+            }
+            if (cell.isLink()) {
+                if (selector === 'line') return { stroke: TOKEN_LINE };
+                if (node.tagName.toLowerCase() === 'text') return { fill: 'fill-muted-foreground' };
+                if (node.tagName.toLowerCase() === 'rect') return { fill: 'fill-background', stroke: 'stroke-border' };
+                return null;
+            }
+            if (selector === 'body') return { fill: TOKEN_ELEMENT_FILL, stroke: TOKEN_ELEMENT_STROKE[layer] || 'stroke-border' };
+            if (selector === 'nameLabel') return { fill: 'fill-foreground' };
+            if (selector === 'typeLabel') return { fill: 'fill-muted-foreground' };
+            if (selector === 'typeIcon') return { stroke: 'stroke-muted-foreground' };
+            return null;
+        });
+    }
+
+    /* Markers live in the paper's <defs>, outside any cell view. */
+    function _tokeniseDefs(paper) {
+        let defs = paper.svg ? paper.svg.querySelectorAll('defs') : [];
+        Array.prototype.forEach.call(defs, function(d) { tokeniseTree(d, null); });
+    }
+
+    /* ── Badge on a link: words plus a mark, never colour alone ── */
+    let GLYPH_WORKED_OUT = [
+        ['circle', { cx: 12, cy: 4.5, r: 2.5 }], ['path', { d: 'm10.2 6.3-3.9 3.9' }],
+        ['circle', { cx: 4.5, cy: 12, r: 2.5 }], ['path', { d: 'M7 12h10' }],
+        ['circle', { cx: 19.5, cy: 12, r: 2.5 }], ['path', { d: 'm13.8 17.7 3.9-3.9' }],
+        ['circle', { cx: 12, cy: 19.5, r: 2.5 }]
+    ];
+    let GLYPH_CLOCK = [['circle', { cx: 12, cy: 12, r: 10 }], ['polyline', { points: '12 6 12 12 16 14' }]];
+
+    function _glyphMarkup(parts, x, label) {
+        let g = {
+            tagName: 'g',
+            attributes: {
+                transform: 'translate(' + x + ',-6) scale(0.5)', fill: 'none', 'class': 'stroke-muted-foreground',
+                'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+            },
+            children: []
+        };
+        if (label) {
+            g.attributes.role = 'img';
+            g.attributes['aria-label'] = label;
+            g.children.push({ tagName: 'title', textContent: label });
+        }
+        parts.forEach(function(part) {
+            g.children.push({ tagName: part[0], attributes: part[1] });
+        });
+        return g;
+    }
+
+    /* badge: {text, title, clockLabel?, className?} */
+    function badgeLabel(badge) {
+        let glyphs = badge.clockLabel ? 2 : 1;
+        let width = 8 + glyphs * 16 + Math.ceil(String(badge.text).length * 6.2) + 8;
+        let x = -width / 2 + 8;
+        let children = [
+            { tagName: 'title', textContent: badge.title || badge.text },
+            { tagName: 'rect', attributes: { x: -width / 2, y: -10, width: width, height: 20, rx: 4, 'class': 'fill-background stroke-muted-foreground' } },
+            _glyphMarkup(GLYPH_WORKED_OUT, x)
+        ];
+        x += 16;
+        if (badge.clockLabel) {
+            children.push(_glyphMarkup(GLYPH_CLOCK, x, badge.clockLabel));
+            x += 16;
+        }
+        children.push({ tagName: 'text', attributes: { x: x, y: 4, 'class': 'fill-foreground text-xs' }, textContent: badge.text });
+        return {
+            markup: [{ tagName: 'g', className: badge.className || 'cr-badge', children: children }],
+            attrs: {},
+            position: { distance: 0.5 }
+        };
+    }
+
+    /* ── A read-only banded view: bands, elements, typed links, and a real
+     *  button over every element for keyboard and pointer ───────────────
+     *  spec = {
+     *    width,                                   drawing width in CSS pixels
+     *    bands: [{layer, label}],                 top to bottom
+     *    elements: [{id, name, type, layer, band, subtitle, emphasis}],
+     *    relationships: [{id, source_id, target_id, type, kind, badge}],
+     *        kind 'derived' draws dashed (5,5) with its badge in place of the
+     *        type label; any other kind draws the ArchiMate line of `type`
+     *    classes: {edge, badge},                  class names a page tests by
+     *    buttons: {host, onSelect(id), suffix(id)} optional keyboard layer
+     *  }
+     *  Returns {height}.
+     */
+    let VIEW_NODE_W = 180;
+    let VIEW_NODE_H = 112;
+    let VIEW_GAP_X = 24;
+    let VIEW_GAP_Y = 20;
+    let VIEW_PAD = 12;
+    let VIEW_HEADER = 26;
+    let VIEW_BUTTON_CLASS = 'absolute rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background';
+    let VIEW_HIDDEN_SELECTORS = ['accentBar', 'iconBox', 'resizeHandle', 'resizeHandleTL', 'resizeHandleTR', 'resizeHandleBL',
+        'resizeHandleT', 'resizeHandleR', 'resizeHandleB', 'resizeHandleL', 'maturityBadgeBg', 'maturityBadgeLabel',
+        'maturityLeftLabel', 'maturityRightLabel', 'maturityTrack', 'maturityFill', 'intelligenceBadge'];
+
+    function drawBandedView(state, spec) {
+        let graph = state.graph;
+        let paper = state.paper;
+        let width = Math.max(VIEW_NODE_W + 2 * VIEW_PAD, Math.floor(spec.width || 0));
+        let classes = spec.classes || {};
+        let perRow = Math.max(1, Math.floor((width - 2 * VIEW_PAD + VIEW_GAP_X) / (VIEW_NODE_W + VIEW_GAP_X)));
+        let bandOf = {};
+        (spec.bands || []).forEach(function(b) { bandOf[b.layer] = b; });
+
+        graph.clear();
+        state.cells = {};
+        state.links = {};
+
+        /* Elements first so the layout can place them. */
+        let elementCells = [];
+        (spec.elements || []).forEach(function(el) {
+            let layer = el.band || (el.layer || '').toLowerCase() || guessLayer(el.type);
+            let node = createNode(el.id, el.name || '', el.type || 'ApplicationComponent', layer, 0, 0);
+            if (!node) return;
+            if (node.getPorts && node.getPorts().length) node.removePorts();
+            node.resize(VIEW_NODE_W, VIEW_NODE_H);
+            node.set('elLayer', layer);
+            let attrs = {
+                nameLabel: { text: el.name || 'Not recorded', y: 38, textWrap: { width: -24, maxLineCount: 2, ellipsis: true } },
+                typeLabel: { text: el.subtitle || '', y: 76, fontSize: 10, textWrap: { width: -24, maxLineCount: 2, ellipsis: true } },
+                typeIcon: { transform: 'translate(12, 12) scale(1.2)' },
+            };
+            VIEW_HIDDEN_SELECTORS.forEach(function(sel) { attrs[sel] = { display: 'none' }; });
+            if (el.emphasis) attrs.body = { strokeWidth: 2.5 };
+            node.attr(attrs);
+            elementCells.push(node);
+            state.cells[el.id] = node;
+        });
+        graph.addCells(elementCells);
+
+        let laid = applyLayerBanding(graph, null, {
+            order: (spec.bands || []).map(function(b) { return b.layer; }),
+            showEmpty: true,
+            cols: perRow,
+            spacingX: VIEW_NODE_W + VIEW_GAP_X,
+            spacingY: VIEW_NODE_H + VIEW_GAP_Y,
+            header: VIEW_HEADER,
+            pad: VIEW_PAD,
+            width: width,
+        });
+        let height = 0;
+        let zones = laid.map(function(b) {
+            let def = bandOf[b.layer] || { label: '' };
+            let bandHeight = b.count ? b.height : VIEW_HEADER + 12;
+            let zone = createLayerZone(b.layer, 1, b.y + 1, width - 2, bandHeight - 2, { label: def.label });
+            zone.attr({
+                body: { strokeDasharray: null, opacity: null, rx: 8, ry: 8, strokeWidth: 1 },
+                label: { textTransform: null, letterSpacing: null, fontSize: 12, fontWeight: 500, refX: VIEW_PAD, refY: 8 },
+            });
+            /* Behind everything else on the paper. */
+            zone.set('z', -1);
+            height = Math.max(height, b.y + bandHeight);
+            return zone;
+        });
+        graph.addCells(zones);
+
+        (spec.relationships || []).forEach(function(rel) {
+            let src = state.cells[rel.source_id];
+            let tgt = state.cells[rel.target_id];
+            if (!src || !tgt) return;
+            let derived = rel.kind === 'derived';
+            let link = createLink(src, tgt, relTypeKey(rel.type), rel.id);
+            let style = REL_STYLES[relTypeKey(rel.type)];
+            link.attr('line/strokeDasharray', derived ? '5,5' : (style.strokeDasharray || null));
+            link.attr('line/data-kind', derived ? 'derived' : 'explicit');
+            link.router({ name: 'manhattan', args: { step: 12, padding: 16, excludeTypes: ['standard.Rectangle'] } });
+            if (derived) {
+                link.source({ id: src.id, anchor: { name: 'center', args: { dx: 14 } } });
+                link.target({ id: tgt.id, anchor: { name: 'center', args: { dx: 14 } } });
+                link.labels(rel.badge ? [badgeLabel(Object.assign({ className: classes.badge }, rel.badge))] : []);
+            }
+            link.set('relKey', rel.id);
+            graph.addCell(link);
+            state.links[rel.id] = link;
+        });
+
+        paper.setDimensions(width, height);
+        state.height = height;
+        state.width = width;
+
+        graph.getCells().forEach(function(cell) {
+            let view = paper.findViewByModel(cell);
+            if (!view) return;
+            if (state.theme === 'tokens') _tokeniseCellView(view);
+            if (cell.isLink()) {
+                if (classes.edge) view.el.classList.add(classes.edge);
+                view.el.setAttribute('data-edge', String(cell.get('relKey')));
+                view.el.setAttribute('data-kind', cell.attr('line/data-kind'));
+            } else if (cell.get('isLayerZone')) {
+                view.el.setAttribute('data-layer', cell.get('zoneLayer'));
+            } else {
+                view.el.setAttribute('data-element', String(cell.get('elementId')));
+                view.el.setAttribute('data-layer', cell.get('elLayer'));
+            }
+        });
+        if (state.theme === 'tokens') _tokeniseDefs(paper);
+
+        if (spec.buttons && spec.buttons.host) _drawButtons(state, spec, elementCells);
+        return { height: height };
+    }
+
+    /* Real buttons over the drawing, in reading order (top band first, left
+       to right). They are what a keyboard or a pointer reaches; the drawing
+       itself sits inside the element that describes it to a screen reader. */
+    function _drawButtons(state, spec, elementCells) {
+        let host = spec.buttons.host;
+        let onSelect = spec.buttons.onSelect;
+        let suffix = spec.buttons.suffix;
+        /* A redraw (a resize, the side panel closing) keeps the buttons that
+           are still drawn, so keyboard focus stays where the person left it. */
+        let previous = state.buttons || {};
+        let focused = document.activeElement && host.contains(document.activeElement)
+            ? document.activeElement.getAttribute('data-node') : null;
+        state.buttons = {};
+        let ordered = elementCells.slice().sort(function(a, b) {
+            let pa = a.position();
+            let pb = b.position();
+            return (pa.y - pb.y) || (pa.x - pb.x);
+        });
+        ordered.forEach(function(cell, index) {
+            let id = cell.get('elementId');
+            let pos = cell.position();
+            let size = cell.size();
+            let button = previous[id];
+            if (!button) {
+                button = document.createElement('button');
+                button.type = 'button';
+                button.className = VIEW_BUTTON_CLASS;
+                button.setAttribute('data-node', String(id));
+                button.setAttribute('aria-pressed', 'false');
+                button.appendChild(document.createElement('span'));
+                button.firstChild.className = 'sr-only';
+                button.addEventListener('click', function() { if (onSelect) onSelect(id); });
+            }
+            delete previous[id];
+            button.title = cell.get('elName') || '';
+            button.style.left = pos.x + 'px';
+            button.style.top = pos.y + 'px';
+            button.style.width = size.width + 'px';
+            button.style.height = size.height + 'px';
+            button.firstChild.textContent = (cell.get('elName') || 'Not recorded') + (suffix ? suffix(id) : '');
+            /* Tab order follows the picture; only move a button that is out of place. */
+            if (host.children[index] !== button) host.insertBefore(button, host.children[index] || null);
+            state.buttons[id] = button;
+        });
+        Object.keys(previous).forEach(function(id) {
+            if (previous[id].parentNode === host) host.removeChild(previous[id]);
+        });
+        if (focused && state.buttons[focused] && document.activeElement !== state.buttons[focused]) {
+            state.buttons[focused].focus({ preventScroll: true });
+        }
+    }
+
+    /* Selection and the highlighted path change without a new layout. */
+    function paintSelection(state, selectedId, pathKeys) {
+        pathKeys = pathKeys || {};
+        Object.keys(state.cells || {}).forEach(function(id) {
+            let view = state.paper.findViewByModel(state.cells[id]);
+            if (!view) return;
+            let body = view.el.querySelector('[joint-selector="body"]');
+            let selected = String(id) === String(selectedId);
+            if (body && state.theme === 'tokens') {
+                /* Selected: a primary outline, thicker than the centre's. */
+                let layerStroke = TOKEN_ELEMENT_STROKE[state.cells[id].get('elLayer')] || 'stroke-border';
+                layerStroke.split(' ').forEach(function(c) { body.classList.toggle(c, !selected); });
+                body.classList.toggle(TOKEN_ELEMENT_SELECTED_STROKE, selected);
+                if (!body.hasAttribute('data-stroke-width')) body.setAttribute('data-stroke-width', body.getAttribute('stroke-width') || '1');
+                body.setAttribute('stroke-width', selected ? '3' : body.getAttribute('data-stroke-width'));
+            }
+            let button = state.buttons ? state.buttons[id] : null;
+            if (button) button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        });
+        Object.keys(state.links || {}).forEach(function(key) {
+            let view = state.paper.findViewByModel(state.links[key]);
+            if (!view) return;
+            let line = view.el.querySelector('[joint-selector="line"]');
+            if (!line) return;
+            let on = !!pathKeys[key];
+            line.setAttribute('stroke-width', on ? 3 : 2);
+            if (state.theme === 'tokens') {
+                line.classList.toggle(TOKEN_LINE, !on);
+                line.classList.toggle(TOKEN_LINE_ON_PATH, on);
+            }
+        });
+    }
+
     /* ── Public factory: create a renderer bound to a container element ── */
     function create(containerEl, opts) {
         opts = opts || {};
@@ -1144,7 +1633,7 @@ let ComposerRenderer = (function() {
                 { name: 'dot', args: { color: '#dde1e6', thickness: 1 } },
                 { name: 'dot', args: { color: '#c8cdd3', thickness: 1, scaleFactor: 5 } },
             ] : false,
-            background: { color: opts.background || '#fafbfc' },
+            background: { color: opts.background || (opts.theme === 'tokens' ? 'transparent' : '#fafbfc') },
             interactive: mode === 'edit'
                 ? { linkMove: true, elementMove: true, addLinkFromMagnet: true }
                 : { elementMove: false, addLinkFromMagnet: false },
@@ -1152,11 +1641,30 @@ let ComposerRenderer = (function() {
         });
 
         let canvasElements = {};
+        /* The read-only banded view keeps what it drew here: cells by element
+           id, links by relationship id, and the buttons over the elements. */
+        let viewState = { graph: graph, paper: paper, theme: opts.theme || null, cells: {}, links: {}, buttons: {} };
 
         return {
             graph: graph,
             paper: paper,
             mode: mode,
+
+            /* Draw a read-only banded view (see drawBandedView). */
+            drawBands: function(spec) {
+                return drawBandedView(viewState, spec);
+            },
+
+            /* Mark one element as selected and a set of links as its path. */
+            select: function(selectedId, pathKeys) {
+                paintSelection(viewState, selectedId, pathKeys);
+            },
+
+            /* Move keyboard focus to the button over one element. */
+            focus: function(elementId) {
+                let button = viewState.buttons[elementId];
+                if (button) button.focus();
+            },
 
             loadElements: function(elements, relationships) {
                 graph.clear();
@@ -1200,6 +1708,10 @@ let ComposerRenderer = (function() {
 
     return {
         create: create,
+        LAYER_Y_ORDER: LAYER_Y_ORDER,
+        applyLayerBanding: applyLayerBanding,
+        relTypeKey: relTypeKey,
+        tokeniseTree: tokeniseTree,
         LAYER_COLORS: LAYER_COLORS,
         DEFAULT_LAYER: DEFAULT_LAYER,
         REL_STYLES: REL_STYLES,

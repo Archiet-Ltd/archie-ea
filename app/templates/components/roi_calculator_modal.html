@@ -311,6 +311,7 @@
             <h4 class="text-sm font-semibold mb-3">Cost vs Benefit Over Time</h4>
             <div class="border border-border rounded-lg p-4 bg-background">
                 <canvas id="roiChart" height="200"></canvas>
+                {% with chart_id='roiChart', caption='Return on investment' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
             </div>
         </div>
     </div>

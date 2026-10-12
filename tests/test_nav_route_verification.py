@@ -38,6 +38,23 @@ pytestmark = pytest.mark.usefixtures("db_session")
 # emits; for the two redirect endpoints it is the Location they must send the
 # user to, asserted instead of the body.
 NAV_PAGES = {
+    # Signature screens, each one click from its personas' sidebars.
+    "batch_import_view.dashboard": (
+        "/batch-import/",
+        "Manage bulk application imports and ArchiMate element generation",
+    ),
+    "business_case.index": (
+        "/business-case/",
+        "Consolidated business-case documents",
+    ),
+    "enterprise.enterprise_dashboard": (
+        "/enterprise/",
+        "Strategic architecture management and portfolio intelligence",
+    ),
+    "intelligence_ui.twin_map": (
+        "/intelligence/twin-map",
+        "See how your business connects",
+    ),
     "admin.audit_log_viewer": (
         "/admin/audit-log",
         "Each entry is sealed to the one before it",

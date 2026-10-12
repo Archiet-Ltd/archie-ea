@@ -5,12 +5,19 @@
  * the selected element. They are all built from the same rows in the same
  * pass, so the picture, the table and the panel cannot disagree.
  *
+ * The drawing is the Composer's renderer (ComposerRenderer.drawBands): the same
+ * ArchiMate shapes and relationship lines the Composer draws, laid out in the
+ * renderer's one layered layout, with a real button over every element. This
+ * page only says what to draw; it has no drawing or layout code of its own.
+ *
  * Referenced as x-data="twinMapSurface()"; a top-level window factory, not an
  * Alpine.data() registration (the CSP-safe interpreter never consults those).
  */
 function twinMapSurface() {
     var Intelligence = window.Intelligence;
     var controller = null;
+    var observer = null;
+    var drawnWidth = 0;
 
     function findNode(model, id) {
         for (var i = 0; i < model.nodes.length; i++) {
@@ -28,6 +35,7 @@ function twinMapSurface() {
         includeDerived: true,
         rows: [],
         model: { nodes: [], edges: [], centreId: null },
+        centreOwner: null,
         selectedId: null,
         panel: null,
         railOpen: true,
@@ -56,11 +64,89 @@ function twinMapSurface() {
         /* The drawing is set up the first time it is needed, when the elements
            it draws into exist. */
         ensureDrawing() {
-            if (controller || !window.d3 || !window.IntelligenceGraph || !this.$refs.canvas) return;
+            // The renderer is a top-level `let`, which is global but not a
+            // property of window.
+            var renderer = typeof ComposerRenderer !== 'undefined' ? ComposerRenderer : null;
+            if (controller || !window.joint || !renderer || !this.$refs.canvas) return;
             var self = this;
-            controller = window.IntelligenceGraph.create(this.$refs.canvas, {
-                onSelect: function (id) { self.selectNode(id); }
+            var canvas = this.$refs.canvas;
+            controller = renderer.create(canvas.querySelector('[data-graph-svg]'), {
+                mode: 'view', theme: 'tokens', width: Math.max(1, canvas.clientWidth), height: 1
             });
+            if (window.ResizeObserver) {
+                // Redraw on the next frame, not inside the observer callback: the
+                // drawing sets the height of the element being observed, and doing
+                // that in the callback makes the browser report a resize loop.
+                observer = new window.ResizeObserver(function () {
+                    if (!self.hasGraph || Math.floor(canvas.clientWidth) === drawnWidth) return;
+                    window.requestAnimationFrame(function () { self.draw(); });
+                });
+                observer.observe(canvas);
+            }
+        },
+
+        /* What the renderer draws, from the same model the table lists. */
+        drawingSpec(width) {
+            var self = this;
+            var bands = Intelligence.BANDS.slice();
+            if (this.model.nodes.some(function (n) { return n.band === 'unplaced'; })) bands.push(Intelligence.UNPLACED_BAND);
+            return {
+                width: width,
+                bands: bands,
+                elements: this.model.nodes.map(function (node) {
+                    return {
+                        id: node.id,
+                        name: node.name,
+                        type: node.type,
+                        band: node.band,
+                        subtitle: self.ownerLine(node.id),
+                        emphasis: node.id === self.model.centreId
+                    };
+                }),
+                relationships: this.model.edges.map(function (edge) {
+                    var derived = edge.kind === 'derived';
+                    return {
+                        id: edge.key,
+                        source_id: edge.from,
+                        target_id: edge.to,
+                        type: edge.type,
+                        kind: edge.kind,
+                        badge: derived ? {
+                            text: edge.stale ? Intelligence.WORKED_OUT_STALE : Intelligence.WORKED_OUT,
+                            title: edge.stale ? 'Worked out \u2014 may be out of date' : 'Worked out \u2014 nobody drew it directly',
+                            clockLabel: edge.stale ? 'Last worked out' : null
+                        } : null
+                    };
+                }),
+                classes: { edge: 'intel-edge', badge: 'intel-badge' },
+                buttons: {
+                    host: this.$refs.canvas.querySelector('[data-graph-nodes]'),
+                    onSelect: function (id) { self.selectNode(id); },
+                    suffix: function (id) { return id === self.model.centreId ? ' (centre of the map)' : ''; }
+                }
+            };
+        },
+
+        /* The owner written under an element's name: the owner the answer
+           carries for it, or plainly that none is recorded. */
+        ownerLine(id) {
+            var owner = id === this.model.centreId ? this.centreOwner : null;
+            if (id !== this.model.centreId) {
+                var row = this.primaryRow(id);
+                owner = row !== null ? row.ownerName : null;
+            }
+            return owner ? 'Owner: ' + owner : 'No owner recorded';
+        },
+
+        draw() {
+            if (!controller || !this.hasGraph) return;
+            var canvas = this.$refs.canvas;
+            var width = Math.floor(canvas.clientWidth);
+            if (width < 40) return;
+            drawnWidth = width;
+            var drawn = controller.drawBands(this.drawingSpec(width));
+            if (canvas.style.height !== drawn.height + 'px') canvas.style.height = drawn.height + 'px';
+            controller.select(this.selectedId, this.pathFor(this.selectedId));
         },
 
         onSelect(option) {
@@ -98,6 +184,7 @@ function twinMapSurface() {
 
             this.rows = Intelligence.buildRows(payload, elementId);
             this.model = Intelligence.buildGraph(this.rows, payload, elementId);
+            this.centreOwner = payload.centre_owner && payload.centre_owner.name ? payload.centre_owner.name : null;
             var answer = Intelligence.answerState(payload, this.rows, this.includeDerived);
             this.notComputed = answer.notComputed;
             this.stale = answer.stale;
@@ -127,9 +214,7 @@ function twinMapSurface() {
             // waits a whole task, which left a gap between the two.
             queueMicrotask(function () {
                 self.ensureDrawing();
-                if (controller && self.hasGraph) {
-                    controller.render(self.model, self.selectedId, self.pathFor(self.selectedId));
-                }
+                self.draw();
                 Intelligence.refreshIcons();
                 if (options && options.focusCentre && controller) controller.focus(elementId);
             });
@@ -245,7 +330,8 @@ function twinMapSurface() {
 
         toggleRail() {
             this.railOpen = !this.railOpen;
-            this.$nextTick(function () { if (controller) controller.resize(); });
+            var self = this;
+            this.$nextTick(function () { self.draw(); });
         },
 
         /* Escape on a node closes the details panel and leaves focus and the
@@ -253,7 +339,8 @@ function twinMapSurface() {
         closeRailFromNode() {
             if (!this.railOpen) return;
             this.railOpen = false;
-            this.$nextTick(function () { if (controller) controller.resize(); });
+            var self = this;
+            this.$nextTick(function () { self.draw(); });
         },
 
         async recomputeNow() {

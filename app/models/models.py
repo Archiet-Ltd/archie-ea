@@ -675,6 +675,21 @@ class Requirement(TenantMixin, db.Model):
     )  # DEPRECATED: Use archimate_element_id instead  # dead-code-ok
     jira_issue_id = db.Column(db.Integer, db.ForeignKey("jira_issues.id"))  # Link to JIRA
 
+    # R1-B43 PR 2 (TB-0188/PB-0190): the guided-design requirements-capture
+    # step traces a requirement to the capability it realises. No such
+    # association existed before this column -- unified_capabilities is
+    # the canonical capability store (ADR 0008); this is not a second one.
+    capability_id = db.Column(
+        db.Integer, db.ForeignKey("unified_capabilities.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
+    # The solution whose guided-design journey captured this requirement.
+    # Requirement.architecture_id links to an ArchitectureModel, and
+    # Solution has no architecture_id of its own, so there was no existing
+    # path from a Requirement back to the solution that captured it.
+    solution_id = db.Column(
+        db.Integer, db.ForeignKey("solutions.id", ondelete="CASCADE"), nullable=True, index=True,
+    )
+
     # ArchiMate 3.2 Motivation Layer relationships
     parent_requirement_id = db.Column(db.Integer, db.ForeignKey("requirements.id"), nullable=True)
     stakeholder_id = db.Column(
@@ -754,6 +769,7 @@ class Requirement(TenantMixin, db.Model):
         back_populates="requirements",
         overlaps="requirement_mappings,app_requirement_mappings,application_component,requirement",
     )
+    capability = db.relationship("UnifiedCapability", foreign_keys=[capability_id])
     source_element = db.relationship("ArchiMateElement", foreign_keys=[source_element_id])
     parent_requirement = db.relationship(
         "Requirement",

@@ -116,6 +116,7 @@
                 <div class="relative h-[260px]">
                     <canvas id="cycleTimeChart"></canvas>
                 </div>
+                {% with chart_id='cycleTimeChart', caption='Cycle time' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
                 <template x-if="cycleData && cycleData.data_points.length === 0">
                     <p class="text-sm text-muted-foreground mt-2">No completed cards in range.</p>
                 </template>
@@ -127,6 +128,7 @@
                 <div class="relative h-[260px]">
                     <canvas id="throughputChart"></canvas>
                 </div>
+                {% with chart_id='throughputChart', caption='Throughput' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
                 <template x-if="throughputData && throughputData.periods.length === 0">
                     <p class="text-sm text-muted-foreground mt-2">No completed cards to chart.</p>
                 </template>

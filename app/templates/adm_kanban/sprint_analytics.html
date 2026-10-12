@@ -61,6 +61,7 @@
             <div class="relative" style="height: 220px;">
                 <canvas id="throughput-chart" aria-label="Throughput chart"></canvas>
             </div>
+            {% with chart_id='throughput-chart', caption='Cards completed per day' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
             <p x-show="!analytics.cfd || analytics.cfd.length === 0" x-cloak
                x-cloak
                class="text-sm text-muted-foreground text-center py-4">
@@ -79,6 +80,7 @@
             <div class="relative" style="height: 220px;">
                 <canvas id="cycle-time-chart" aria-label="Cycle time chart"></canvas>
             </div>
+            {% with chart_id='cycle-time-chart', caption='Cycle time, days per card' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
         </div>
     </template>
 
@@ -92,6 +94,7 @@
             <div class="relative" style="height: 260px;">
                 <canvas id="cfd-chart" aria-label="Cumulative flow diagram"></canvas>
             </div>
+            {% with chart_id='cfd-chart', caption='Cumulative flow' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
         </div>
     </template>
 

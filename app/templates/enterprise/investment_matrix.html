@@ -101,6 +101,7 @@
         <div id="investment-bubble-container" class="relative h-[420px]">
             <canvas id="investment-bubble-chart"></canvas>
         </div>
+        {% with chart_id='investment-bubble-chart', caption='Investment matrix' %}{% include 'components/_graph_table_view.html' %}{% endwith %}
     </div>
 
     <!-- Capabilities List -->
