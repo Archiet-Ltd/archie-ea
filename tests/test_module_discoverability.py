@@ -58,6 +58,8 @@ _INFRA_RULES = {
     "/how-archiet-runs-on-entelim",
     "/vs",  # the public comparison hub (app/main/views.py::public_comparison_hub)
     "/use-cases",  # the public use-case index (app/main/views.py::public_use_cases_index)
+    "/roles",  # the public role hub (app/main/views.py::public_roles_index)
+    "/connectors",  # the public connector hub (app/main/views.py::public_connectors_index)
 }
 
 _SINGLE_SEGMENT = re.compile(r"^/[^/]+/?$")
