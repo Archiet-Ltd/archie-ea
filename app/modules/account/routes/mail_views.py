@@ -41,7 +41,10 @@ def _after_confirmation_url(user):
     return url_for("dashboard.overview")
 
 
-def register_view():
+def register_view(trial=False):
+    """Sign-up. With ``trial`` the new organisation starts on a trial, reached
+    from the demonstration banner; the demonstration visitor is signed out
+    first so the trial belongs to the person signing up."""
     chosen = buy_intent.requested()
     if chosen is None and buy_intent.plan_given():
         # An unknown plan key: send the visitor back to choose one.
@@ -57,12 +60,25 @@ def register_view():
 
         log_signup_started()
     if form.validate_on_submit():
+        if trial:
+            from app.services.demonstration_service import is_demonstration_org_id
+
+            if current_user.is_authenticated and is_demonstration_org_id(
+                current_user.organization_id
+            ):
+                AccountService.logout()
         _user, confirmation = AccountService.sign_up(
             first_name=form.first_name.data,
             last_name=form.last_name.data,
             email=form.email.data,
             password=form.password.data,
         )
+        if trial:
+            from app import db
+            from app.services.demonstration_service import start_trial
+
+            start_trial(_user)
+            db.session.commit()
         from app.services.public_analytics_service import log_signup_completed
 
         log_signup_completed()
@@ -88,7 +104,7 @@ def register_view():
             return redirect(url_for("account.login", plan=chosen[0], interval=chosen[1]))
         return redirect(url_for("main.index"))
     return render_template(
-        "account/register.html", form=form,
+        "account/register.html", form=form, trial=trial,
         signin_args={"plan": chosen[0], "interval": chosen[1]} if chosen else {},
     )
 

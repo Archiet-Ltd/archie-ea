@@ -43,6 +43,8 @@
         Skip to sidebar navigation
     </a>
 
+    {% include 'components/_demo_banner.html' %}
+
     <button type="button"
             x-data="{ isDesktop: window.innerWidth >= 1024 }"
             x-init="window.addEventListener('resize', () => { isDesktop = window.innerWidth >= 1024; if (isDesktop) { $store.sidebar.open = false; } })"

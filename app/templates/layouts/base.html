@@ -1,3 +1,4 @@
+{# smoke-coverage-ok: rendered-HTML route tests in tests/test_demonstration_onboarding.py cover the banner and trial form #}
 {# Layout: base.html — LEGACY authenticated layout (no sidebar)
    Usage: NOT RECOMMENDED for new templates.
    When to use: Only for standalone authenticated pages that must NOT show the admin sidebar.
@@ -25,6 +26,7 @@
      class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:rounded-md focus:shadow-lg focus:ring-2 focus:ring-ring">
     Skip to main content
   </a>
+  {% include 'components/_demo_banner.html' %}
   {# Example dropdown menu setup. Uncomment lines to view
   {% set dropdown =
   [

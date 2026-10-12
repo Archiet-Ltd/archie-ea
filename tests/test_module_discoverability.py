@@ -58,6 +58,12 @@ _INFRA_RULES = {
     "/how-archiet-runs-on-entelim",
     "/vs",  # the public comparison hub (app/main/views.py::public_comparison_hub)
     "/use-cases",  # the public use-case index (app/main/views.py::public_use_cases_index)
+    # Public entry to the labelled demonstration organisation and its trial
+    # sign-up (app/main/views.py::demonstration / demonstration_trial) — a
+    # prospect's pre-auth path in, same category as /vision, /vs, /use-cases
+    # above: not a module an already-signed-in persona looks for in nav.
+    "/demonstration",
+    "/demonstration/trial",
 }
 
 _SINGLE_SEGMENT = re.compile(r"^/[^/]+/?$")

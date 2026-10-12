@@ -1,0 +1,16 @@
+{# smoke-coverage-ok: rendered-HTML route tests in tests/test_demonstration_onboarding.py cover the banner and trial form #}
+{# Shown on every screen of the demonstration organisation. Set by the
+   demonstration_banner context processor; nothing renders elsewhere. #}
+{% if demonstration_banner %}
+<div role="region" aria-label="Demonstration organisation"
+     class="bg-warning/10 text-warning-emphasis border-b border-warning/30 px-4 py-2 text-sm flex flex-wrap items-center justify-between gap-2"
+     data-testid="demonstration-banner">
+  <p>
+    <strong>Demonstration.</strong>
+    This is a fictional company with invented data. These figures are not yours.
+  </p>
+  <a href="{{ url_for('main.demonstration_trial') }}"
+     class="inline-flex items-center rounded-md border border-warning/40 px-3 py-1 font-medium underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+     data-testid="demonstration-banner-trial">Start a trial with your own data</a>
+</div>
+{% endif %}

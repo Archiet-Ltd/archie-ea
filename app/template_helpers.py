@@ -322,6 +322,24 @@ def register_template_filters(app):
         }
 
     @app.context_processor
+    def demonstration_banner_context():
+        """True while the signed-in person is inside the demonstration organisation."""
+        from flask_login import current_user
+
+        try:
+            if not current_user.is_authenticated:
+                return {}
+            from app.services.demonstration_service import is_demonstration_org_id
+
+            return {
+                "demonstration_banner": is_demonstration_org_id(
+                    current_user.organization_id
+                )
+            }
+        except Exception:  # fabricated-ok: a banner lookup must never break a page; emits no data
+            return {}
+
+    @app.context_processor
     def plain_language_context():
         """Make plain-language vocabulary and user setting available to JS.
 
