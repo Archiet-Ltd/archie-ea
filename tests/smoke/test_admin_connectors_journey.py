@@ -58,6 +58,11 @@ def _create_two_admins():
 def test_add_approve_and_see_connector_with_masked_credential(browser, live_server):
     org = _create_two_admins()
     context = browser.new_context(ignore_https_errors=True)
+    # N2 (cloud-review-pr448-505c3c2e-v1.md): without this, a fresh context
+    # shows the onboarding tour on first page load, which intercepts the
+    # clicks below. Mark onboarding as already seen, exactly as a real
+    # returning user's browser would have it set.
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
     page = context.new_page()
     page.on("dialog", lambda d: d.accept())
     try:

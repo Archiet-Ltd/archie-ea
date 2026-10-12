@@ -498,3 +498,197 @@ class TestM1CredentialDoesNotTakeEffectBeforeApproval:
         assert vault.retrieve(org_a.id, "jira", f"pending:{proposal.id}:api_token") is None, (
             "the staged row must be discarded, not left as an orphan secret"
         )
+
+
+class TestN1ServicesActuallyReadTheVault:
+    """cloud-review-pr448-505c3c2e-v1.md's N1: the save paths store Jira's
+    api_token and M365's client_secret only in the vault, but the services
+    that use them still read the config row -- a new setup authenticated
+    with nothing, and a rotation kept using the old value."""
+
+    def test_jira_headers_use_the_vault_token_for_a_new_setup(self, db_session, org_a):
+        from app.models.connector_config import ConnectorConfig
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+        from app.services.jira_connector_service import JiraConnectorService
+
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Probe Jira",
+            config={"email": "probe@example.com"},  # no api_token key at all
+        )
+        db_session.add(cfg)
+        db_session.flush()
+        OrgCredentialVault().store(
+            org_id=org_a.id, connector_type="jira", credential_type="api_token", value="vault-token"
+        )
+
+        headers = JiraConnectorService()._get_headers(cfg)
+
+        import base64
+        expected = base64.b64encode(b"probe@example.com:vault-token").decode()
+        assert headers["Authorization"] == f"Basic {expected}"
+
+    def test_jira_headers_use_the_rotated_vault_token_not_the_stale_row_value(self, db_session, org_a):
+        from app.models.connector_config import ConnectorConfig
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+        from app.services.jira_connector_service import JiraConnectorService
+
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Probe Jira Rotate",
+            config={"email": "probe@example.com", "api_token": "old-legacy-token"},
+        )
+        db_session.add(cfg)
+        db_session.flush()
+        OrgCredentialVault().store(
+            org_id=org_a.id, connector_type="jira", credential_type="api_token", value="rotated-token"
+        )
+
+        headers = JiraConnectorService()._get_headers(cfg)
+
+        import base64
+        expected = base64.b64encode(b"probe@example.com:rotated-token").decode()
+        assert headers["Authorization"] == f"Basic {expected}", (
+            "a rotation must use the new vault token, not the stale row value"
+        )
+
+    def test_m365_token_fetch_uses_the_vault_secret_for_a_new_setup(self, db_session, org_a, monkeypatch):
+        from app.models.connector_config import ConnectorConfig
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+        from app.services.m365_service import M365Service
+
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="m365",
+            name="Probe M365",
+            config={"tenant_id": "tenant-1", "client_id": "client-1"},  # no client_secret key
+        )
+        db_session.add(cfg)
+        db_session.flush()
+        OrgCredentialVault().store(
+            org_id=org_a.id, connector_type="m365", credential_type="client_secret", value="vault-secret"
+        )
+
+        captured = {}
+
+        class _Resp:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"access_token": "token-xyz", "expires_in": 3600}
+
+        def _fake_post(url, data=None, timeout=None):
+            captured.update(data or {})
+            return _Resp()
+
+        monkeypatch.setattr("app.services.m365_service.requests.post", _fake_post)
+
+        token = M365Service()._get_token(cfg)
+
+        assert token == "token-xyz"
+        assert captured["client_secret"] == "vault-secret"
+
+
+def _delegate(db_session, org_id, *actions):
+    from app.models.organization import Organization
+
+    org = Organization.query.get(org_id)
+    settings = dict(org.settings or {})
+    delegation = dict(settings.get("connector_action_delegation") or {})
+    for action in actions:
+        delegation[action] = True
+    settings["connector_action_delegation"] = delegation
+    org.settings = settings
+    db_session.flush()
+
+
+class TestN3DelegatedSyncOnTheOldEndpointDoesNotCrash:
+    def test_a_delegated_sync_runs_instead_of_raising_unsupported_action(
+        self, db_session, org_a, admin_a, client, login_as, monkeypatch
+    ):
+        from app.models.connector_config import ConnectorConfig
+        from app.services.connector_framework import CONNECTOR_ACTION_SYNC
+
+        _delegate(db_session, org_a.id, CONNECTOR_ACTION_SYNC)
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Probe Jira",
+            config={"instance_url": "https://probe.atlassian.net"},
+        )
+        db_session.add(cfg)
+        db_session.commit()
+
+        from app.connectors.jira import JiraALMConnector
+
+        monkeypatch.setattr(
+            JiraALMConnector, "batch_sync", lambda self, **kw: {"records_synced": 0}
+        )
+
+        login_as(client, admin_a)
+        resp = client.post(f"/integrations/api/connectors/{cfg.id}/sync")
+
+        assert resp.status_code != 500, (
+            f"a delegated sync must run, not raise 'Unsupported connector action': "
+            f"got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+        payload = resp.get_json()
+        assert payload.get("queued") is False
+
+
+class TestN4CredentialPromotedOnlyAfterTheWriteSucceeds:
+    def test_a_failed_update_leaves_the_credential_staged_not_live(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+        from app.models.connector_config import ConnectorConfig
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Probe Jira",
+            config={"instance_url": "https://probe.atlassian.net", "email": "probe@example.com"},
+        )
+        db_session.add(cfg)
+        db_session.commit()
+        cfg_id = cfg.id
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors/jira",
+            data={
+                "instance_url": "https://probe.atlassian.net",
+                "email": "probe@example.com",
+                "api_token": "doomed-rotation-token",
+                "default_project_key": "ARCH",
+                "enabled": "on",
+            },
+        )
+        proposal = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
+        assert proposal is not None
+
+        # The connector is deleted between proposal and approval -- the
+        # approved update's write must fail (LookupError inside
+        # apply_connector_change), and the staged secret must never have
+        # been promoted ahead of that failure.
+        ConnectorConfig.query.filter_by(id=cfg_id).delete()
+        db_session.commit()
+
+        approver = _make_admin(db_session, org_a.id, "N4Approver")
+        db_session.commit()
+        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        assert result.get("success") is False, (
+            "the write for a deleted connector must fail, not silently succeed"
+        )
+
+        vault = OrgCredentialVault()
+        assert vault.retrieve(org_a.id, "jira", "api_token") is None, (
+            "a credential must not go live when the write it belongs to failed"
+        )

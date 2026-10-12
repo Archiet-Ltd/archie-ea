@@ -595,11 +595,17 @@ def apply_connector_change(
     connector_type = payload.get("connector_type")
     assert_connector_permitted(connector_type)
 
-    if approval is not None and action in (CONNECTOR_ACTION_CREATE, CONNECTOR_ACTION_UPDATE):
+    def _promote_staged_credential_if_any() -> None:
         # M1: the save route staged this connector type's secret (if any)
         # under this approval rather than writing it live; now that the
-        # proposal is genuinely approved, promote it. A no-op when nothing
-        # was staged (plain config edit, no new secret in this change).
+        # write below has actually succeeded, promote it. A no-op when
+        # nothing was staged (plain config edit, no new secret in this
+        # change). N4 (cloud-review-pr448-505c3c2e-v1.md): called only
+        # after the write succeeds -- promoting first would leave a secret
+        # live for an approval whose write then fails (e.g. the connector
+        # was deleted between proposal and approval).
+        if approval is None or action not in (CONNECTOR_ACTION_CREATE, CONNECTOR_ACTION_UPDATE):
+            return
         from app.modules.codegen.services.credential_vault import OrgCredentialVault
 
         vault = OrgCredentialVault()
@@ -627,6 +633,7 @@ def apply_connector_change(
         )
         db.session.add(cfg)
         db.session.flush()
+        _promote_staged_credential_if_any()
         return cfg
 
     if action == CONNECTOR_ACTION_UPDATE:
@@ -664,6 +671,7 @@ def apply_connector_change(
         if "status" in payload and payload["status"]:
             cfg.status = payload["status"]
         db.session.flush()
+        _promote_staged_credential_if_any()
         return cfg
 
     if action == CONNECTOR_ACTION_DELETE:

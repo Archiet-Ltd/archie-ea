@@ -170,26 +170,40 @@ class M365Service:
         cfg_data = config.config or {}
         tenant_id = cfg_data.get("tenant_id", "")
         client_id = cfg_data.get("client_id", "")
-        client_secret_stored = cfg_data.get("client_secret", "")
 
-        if not (tenant_id and client_id and client_secret_stored):
-            logger.warning("COM-017: M365 config is missing required credentials")
-            return None
+        # N1 (cloud-review-pr448-505c3c2e-v1.md): connector_routes.py's save
+        # path stores the secret only in the per-organisation vault, never
+        # on this row, so reading the row left every new setup without a
+        # secret and every rotation still using the old one. Read the vault
+        # first; fall back to the legacy row (its own decryption path) only
+        # for a value that predates the vault-only save path.
+        client_secret = None
+        if config.organization_id:
+            from app.modules.codegen.services.credential_vault import OrgCredentialVault
 
-        try:
-            from app.modules.codegen.services.credential_encryption import (
-                decrypt_credential,
+            client_secret = OrgCredentialVault().retrieve(
+                config.organization_id, "m365", "client_secret"
             )
 
-            raw = client_secret_stored
-            if isinstance(raw, str):
-                raw = raw.encode()
-            client_secret = decrypt_credential(raw)
-        except Exception:
-            logger.warning("COM-017: Failed to decrypt M365 client_secret")
-            return None
-
         if not client_secret:
+            client_secret_stored = cfg_data.get("client_secret", "")
+            if not (tenant_id and client_id and client_secret_stored):
+                logger.warning("COM-017: M365 config is missing required credentials")
+                return None
+            try:
+                from app.modules.codegen.services.credential_encryption import (
+                    decrypt_credential,
+                )
+
+                raw = client_secret_stored
+                if isinstance(raw, str):
+                    raw = raw.encode()
+                client_secret = decrypt_credential(raw)
+            except Exception:
+                logger.warning("COM-017: Failed to decrypt M365 client_secret")
+                return None
+
+        if not (tenant_id and client_id and client_secret):
             logger.warning("COM-017: Decrypted client_secret is empty")
             return None
 

@@ -251,7 +251,9 @@ def api_trigger_sync(connector_id):
     from app.modules.admin.connector_routes import _active_org_id, current_user_id
     from app.services.connector_framework import (
         CONNECTOR_ACTION_SYNC,
+        org_has_delegated_action,
         propose_or_apply_connector_change,
+        run_connector_sync,
     )
 
     try:
@@ -269,6 +271,18 @@ def api_trigger_sync(connector_id):
     org_id = _active_org_id()
     if org_id is None or conn.organization_id != org_id:
         return not_found_response("Connector")
+
+    # N3 (cloud-review-pr448-505c3c2e-v1.md): apply_connector_change only
+    # understands create/update/delete, not sync -- calling
+    # propose_or_apply_connector_change unconditionally crashed every
+    # delegated organisation's sync with "Unsupported connector action".
+    # run_connector_sync (the same path /admin/connectors/<id>/sync uses)
+    # is the real sync executor; only a non-delegated change goes through
+    # the generic propose/apply path, to be queued.
+    if org_has_delegated_action(org_id, CONNECTOR_ACTION_SYNC):
+        result = run_connector_sync(org_id=org_id, connector_id=conn.id, delegated=True)
+        db.session.commit()
+        return jsonify({"queued": False, "success": result.get("success", False)})
 
     result = propose_or_apply_connector_change(
         org_id=org_id,

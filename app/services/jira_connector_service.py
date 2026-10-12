@@ -53,10 +53,25 @@ class JiraConnectorService:
         return config.config or {}
 
     def _get_headers(self, config: ConnectorConfig) -> Dict[str, str]:
-        """Return Jira Basic Auth headers (email:api_token, base64-encoded)."""
+        """Return Jira Basic Auth headers (email:api_token, base64-encoded).
+
+        N1 (cloud-review-pr448-505c3c2e-v1.md): connector_routes.py's save
+        path stores the token only in the per-organisation vault (never on
+        this row), so reading the row left every new setup with an empty
+        token and every rotation still sending the old one. Read the vault
+        first; fall back to the row only for a legacy value that predates
+        the vault-only save path.
+        """
         cfg = self._cfg_data(config)
         email = cfg.get("email", "")
-        api_token = cfg.get("api_token_encrypted") or cfg.get("api_token", "")
+
+        api_token = None
+        if config.organization_id:
+            from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+            api_token = OrgCredentialVault().retrieve(config.organization_id, "jira", "api_token")
+        if not api_token:
+            api_token = cfg.get("api_token_encrypted") or cfg.get("api_token", "")
 
         if isinstance(api_token, (bytes, bytearray)):
             try:
