@@ -5,6 +5,8 @@ Migrated from: app/account/views.py (inline logic extracted to service layer)
 All behavior preserved exactly from the original views.py implementation.
 """
 import logging
+from dataclasses import dataclass
+from typing import Optional
 
 from flask import g, session, url_for
 from flask_login import logout_user
@@ -33,6 +35,51 @@ def _queue_email(*args, **kwargs):
         get_queue().enqueue(send_email, *args, **kwargs)
     else:
         send_email(*args, **kwargs)
+
+
+# Outcomes of AccountService.sign_in_external_identity. The two signed_in_*
+# outcomes carry a user; every other outcome signs nobody in.
+SIGNED_IN_RETURNING = "signed_in_returning"
+SIGNED_IN_NEW = "signed_in_new"
+REFUSED_ACCOUNT_EXISTS = "refused_account_exists"
+REFUSED_UNVERIFIED = "refused_unverified"
+REFUSED_INVITATION_PENDING = "refused_invitation_pending"
+REFUSED_PLATFORM_ADMIN = "refused_platform_admin"
+REFUSED_MISSING_CLAIMS = "refused_missing_claims"
+
+_SIGNED_IN_OUTCOMES = frozenset({SIGNED_IN_RETURNING, SIGNED_IN_NEW})
+
+# What the person is told for each refusal. None of them names an organisation.
+EXTERNAL_SIGN_IN_MESSAGES = {
+    REFUSED_MISSING_CLAIMS: "Your identity provider did not return the details needed to sign you in.",
+    REFUSED_UNVERIFIED: (
+        "We couldn't confirm the email address your identity provider gave us. "
+        "Sign in with your email and password instead."
+    ),
+    REFUSED_INVITATION_PENDING: "You have an invitation waiting. Open the invitation email to join.",
+    REFUSED_ACCOUNT_EXISTS: "An account already exists for this address. Sign in with your password.",
+    REFUSED_PLATFORM_ADMIN: "This account signs in with a password.",
+}
+
+
+@dataclass(frozen=True)
+class ExternalSignInResult:
+    """What a sign-in through an external identity provider resolved to.
+
+    ``user`` is set only for the two signed-in outcomes; the caller then runs
+    its MFA gate and starts the session.
+    """
+
+    outcome: str
+    user: Optional[User] = None
+
+    @property
+    def signed_in(self):
+        return self.outcome in _SIGNED_IN_OUTCOMES
+
+    @property
+    def message(self):
+        return EXTERNAL_SIGN_IN_MESSAGES.get(self.outcome)
 
 
 class AccountService:
@@ -131,13 +178,31 @@ class AccountService:
         """
         # Each self-serve sign-up gets its OWN organization (single-tenant isolation).
         # Team members are invited into an existing org rather than registering here.
-        import re as _re
-        import uuid as _uuid
-        from app.models import Organization
         from app.modules.account.services.invitation_service import release_for_registration
 
         # An address held only by an invitation nobody took up is freed here.
         release_for_registration(email)
+        user = AccountService._create_own_workspace(
+            first_name, last_name, email, password=password, confirmed=confirmed
+        )
+        # Auto-login after registration
+        session_registry.login_and_register(user)
+        return user
+
+    @staticmethod
+    def _create_own_workspace(first_name, last_name, email, **user_fields):
+        """Create an organisation of one and its first user, its administrator.
+
+        The one place a new account gets its own organisation: self-serve
+        registration and a first sign-in through an external identity both
+        come here. ``user_fields`` are passed to ``User`` as they are (for
+        example ``password``, ``confirmed``, ``external_id``). Commits; signs
+        nobody in.
+        """
+        import re as _re
+        import uuid as _uuid
+        from app.models import Organization
+
         _label = ("{} {}".format(first_name or "", last_name or "").strip()
                   or (email.split("@")[0] if email else "New"))
         _base_slug = _re.sub(r"[^a-z0-9]+", "-",
@@ -153,9 +218,8 @@ class AccountService:
             first_name=first_name,
             last_name=last_name,
             email=email,
-            password=password,
-            confirmed=confirmed,
             organization_id=org.id,
+            **user_fields,
         )
         # The user owns the organisation just created for them, so granting
         # org-admin here is always a grant in their own organisation.
@@ -168,9 +232,120 @@ class AccountService:
         except Exception:
             db.session.rollback()
             raise
-        # Auto-login after registration
-        session_registry.login_and_register(user)
         return user
+
+    @staticmethod
+    def sign_in_external_identity(provider, claims):
+        """Decide what a sign-in through the platform identity provider may do.
+
+        Both account blueprints' SSO callbacks call this and nothing else to
+        decide; they keep only the token exchange, the MFA gate and the
+        session. Rules, in order:
+
+        - Claims without an email, or without the provider's subject (for
+          Azure both ``tid`` and ``oid``), are refused.
+        - An account already linked to this provider subject signs in. The
+          email claim plays no part in that match.
+        - Otherwise the address must be one the provider verified
+          (``verified_identity_email``); if it is not, nothing happens.
+        - A verified address with no account gets an organisation of its own.
+        - A verified address that belongs to an existing account signs nobody
+          in and changes nothing: an invitation still waiting is pointed at its
+          email, any other account at its password.
+        - A platform administrator is never signed in this way.
+
+        No branch changes an existing account's email. Every outcome is audited.
+        """
+        from app.auth.sso import external_id_for, find_linked_user, verified_identity_email
+        from app.modules.account.services.invitation_service import is_unactivated
+
+        claims = claims if isinstance(claims, dict) else {}
+
+        def done(outcome, user=None):
+            result = ExternalSignInResult(outcome, user)
+            AccountService._audit_external_sign_in(provider, result)
+            return result
+
+        email = claims.get("email")
+        external_id = external_id_for(provider, claims)
+        if (
+            not isinstance(email, str)
+            or not email.strip()
+            or not external_id
+            or (provider == "azure" and (not claims.get("tid") or not claims.get("oid")))
+        ):
+            return done(REFUSED_MISSING_CLAIMS)
+
+        # Nobody is signed in yet, so there is no session organisation: the
+        # lookups and the writes below resolve the organisation themselves.
+        with platform_scope("SSO sign-in: resolve the account for an external identity"):
+            linked = find_linked_user(provider, claims, User)
+            if linked is not None:
+                if linked.is_platform_admin:
+                    # Also discards find_linked_user's in-place link migration.
+                    db.session.rollback()
+                    return done(REFUSED_PLATFORM_ADMIN)
+                # Commits find_linked_user's legacy link migration, if it made one.
+                db.session.commit()
+                return done(SIGNED_IN_RETURNING, linked)
+
+            verified = verified_identity_email(provider, claims)
+            if not isinstance(verified, str) or not User.normalize_email(verified):
+                return done(REFUSED_UNVERIFIED)
+            verified = verified.strip()
+
+            existing = User.find_by_email(verified)
+            if existing is None:
+                user = AccountService._create_own_workspace(
+                    claims.get("given_name") or "",
+                    claims.get("family_name") or "",
+                    verified,
+                    external_id=external_id,
+                    sso_provider=provider,
+                    confirmed=True,
+                )
+                return done(SIGNED_IN_NEW, user)
+            if existing.is_platform_admin:
+                return done(REFUSED_PLATFORM_ADMIN)
+            if is_unactivated(existing):
+                return done(REFUSED_INVITATION_PENDING)
+            return done(REFUSED_ACCOUNT_EXISTS)
+
+    @staticmethod
+    def _audit_external_sign_in(provider, result):
+        """One audit event per outcome: provider, outcome, user id. Never claims or tokens."""
+        from app.security.audit import AuditEventSeverity, AuditEventType, audit_logger
+
+        try:
+            audit_logger.log_event(
+                AuditEventType.AUTHENTICATION,
+                AuditEventSeverity.LOW if result.signed_in else AuditEventSeverity.HIGH,
+                "sso_callback",
+                details={
+                    "provider": provider,
+                    "outcome": result.outcome,
+                    "user_id": result.user.id if result.user is not None else None,
+                },
+            )
+        except Exception:
+            _log.warning("Audit log failed for SSO outcome %s (%s)", result.outcome, provider, exc_info=True)
+
+    @staticmethod
+    def record_external_sign_in(user, provider):
+        """Record a completed sign-in through an external identity provider.
+
+        Called once the session exists, as the password sign-in does.
+        """
+        from app.security.audit import audit_logger
+        from app.services import auth_audit
+
+        try:
+            audit_logger.log_authentication(success=True, method=f"sso:{provider}")
+        except Exception:
+            _log.warning("Audit log failed on SSO success for %s", provider)
+        login_entry = auth_audit.record_login_success(user)
+        if login_entry is not None:
+            session["_login_audit_id"] = login_entry.id
 
     @staticmethod
     def sign_up(first_name, last_name, email, password):

@@ -612,8 +612,14 @@ def sso_login(provider):
 
 
 @account_bp.route("/sso/callback/<provider>")
+@rate_limit(10, "1m")
 def sso_callback(provider):
-    """Handle SSO callback from identity provider."""
+    """Handle SSO callback from identity provider.
+
+    Which account (if any) the identity signs in to is decided by
+    AccountService.sign_in_external_identity alone; this route only exchanges
+    the code, applies the MFA gate and starts the session.
+    """
     from flask import abort, current_app
 
     if not _sso_enabled():
@@ -647,95 +653,25 @@ def sso_callback(provider):
         flash("SSO authentication failed. Please try again.", "error")
         return redirect(url_for("account.login"))
 
-    # Extract user identity from OIDC claims. external_id is derived
-    # per-provider: Azure uses a tenant-qualified oid+tid composite rather
-    # than the raw `sub` claim, because `sub` is not guaranteed stable
-    # across apps for the same Azure user (see app/auth/sso.py).
-    from app.auth.sso import (
-        external_id_for,
-        find_linked_user,
-        sso_email_claim_is_trusted_for,
-    )
-
-    external_id = external_id_for(provider, userinfo)
-    email = userinfo.get("email", "")
-    first_name = userinfo.get("given_name", "")
-    last_name = userinfo.get("family_name", "")
-
-    if not external_id or not email:
-        flash("SSO provider did not return required user information.", "error")
+    result = _svc.sign_in_external_identity(provider, userinfo)
+    if result.user is None:
+        flash(result.message, "error")
         return redirect(url_for("account.login"))
+    user = result.user
 
-    # Find or create user by external_id
-    from app import db
-    from app.models.user import User
-
-    # tenant-scoping-ok: pre-auth SSO callback, no org context yet -- scoped
-    # by the (external_id, sso_provider) pair, which is unique per IdP.
-    user = find_linked_user(provider, userinfo, User)
-    if user is None:
-        # No existing subject-based link. Falling back to matching by email
-        # is only safe when the provider's claims prove the signing-in
-        # party actually controls that mailbox (nOAuth fix) -- otherwise an
-        # attacker who controls their own IdP tenant/account could claim
-        # any victim's email and be linked onto their existing account.
-        candidate = User.find_by_email(email)
-        if candidate is not None:
-            if not sso_email_claim_is_trusted_for(provider, userinfo, candidate):
-                flash(
-                    "SSO sign-in could not be completed. If you already have "
-                    "an account under this email, sign in with your password "
-                    "and link SSO from your account settings instead.",
-                    "error",
-                )
-                try:
-                    audit_logger.log_authentication(success=False, method=f"sso:{provider}")
-                except Exception as _exc:
-                    _log.warning("Audit log failed on SSO refusal: %s", _exc)
-                return redirect(url_for("account.login"))
-            candidate.external_id = external_id
-            candidate.sso_provider = provider
-            user = candidate
-        else:
-            # Create new user
-            user = User(
-                email=email,
-                first_name=first_name,
-                last_name=last_name,
-                external_id=external_id,
-                sso_provider=provider,
-                confirmed=True,
-            )
-            db.session.add(user)
-
-    # Commit unconditionally: find_linked_user may have migrated a
-    # pre-fix Azure link's external_id to the new oid+tid composite even
-    # when `user` was already resolved above.
-    db.session.commit()
-
-    # R1-B12 PR 2 (TB-0144/PB-0100): the same MFA gate login() applies to a
-    # password sign-in, applied here too -- an administrator must complete
-    # multi-factor before SSO can finish the login, whether enrolling for
-    # the first time or entering a code from an already-enrolled
-    # authenticator app. Checked before the session-fixation reset inside
-    # login_and_register() below, so an IdP response alone never mints a
-    # real session for an administrator account. There is no "remember me"
-    # checkbox in an SSO flow, matching this route's own unconditional
-    # remember=True below; _mfa_pending_next has no equivalent "next" here
-    # either, matching _complete_login_after_mfa()'s own empty-string
-    # fallback.
-    from app.services import mfa_service
+    # The same MFA gate login() applies to a password sign-in: an
+    # administrator completes multi-factor before any session is minted.
+    # There is no "remember me" choice in an SSO flow, so neither path
+    # remembers the session.
+    from app.services import mfa_service, session_registry
 
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
-        session["_mfa_pending_remember"] = True
+        session["_mfa_pending_remember"] = False
         session["_mfa_pending_next"] = ""
         return redirect(url_for("account.mfa_challenge"))
 
-    # Establish Flask-Login session (same as password login)
-    from app.services import session_registry
-
-    session_registry.login_and_register(user, remember=True)
-
+    session_registry.login_and_register(user, remember=False)
+    _svc.record_external_sign_in(user, provider)
     flash("Successfully signed in via SSO.", "success")
     return redirect(url_for("main.index"))

@@ -61,17 +61,25 @@ class _FakeSSOOAuth:
 
 
 def test_sso_callback_logs_in_a_new_user_without_crashing(app, db_session, monkeypatch):
-    """The uncovered path the bug report calls out: a non-admin user whose
-    email isn't registered yet, so sso_callback() hits its 'create new
-    user' branch. Before the fix this raised AttributeError right after the
-    session was established; after the fix it must complete cleanly and the
-    session must actually be the new user's."""
+    """The uncovered path the bug report calls out: a user whose email isn't
+    registered yet, so sso_callback() hits its 'create new user' branch.
+    Before the fix this raised AttributeError right after the session was
+    established. A new account now needs an address the provider verified
+    and owns an organisation of its own, so it is an administrator there and
+    the MFA gate holds the sign-in for enrolment: the request must complete
+    cleanly and the pending sign-in must be the new user's."""
     from app.modules.account.v2.routes import account_routes
 
     _enable_sso_flag(db_session)
 
     email = f"sso-new-{uuid.uuid4().hex[:10]}@example.com"
-    userinfo = {"email": email, "given_name": "Ada", "family_name": "Lovelace"}
+    userinfo = {
+        "sub": f"okta-{uuid.uuid4().hex[:10]}",
+        "email": email,
+        "email_verified": True,
+        "given_name": "Ada",
+        "family_name": "Lovelace",
+    }
     monkeypatch.setattr(
         account_routes, "_get_sso_oauth", lambda: _FakeSSOOAuth(userinfo)
     )
@@ -81,12 +89,13 @@ def test_sso_callback_logs_in_a_new_user_without_crashing(app, db_session, monke
         sess["sso_state"] = "state-abc"
 
     resp = client.get(
-        "/account/sso/callback/azure?state=state-abc", follow_redirects=False
+        "/account/sso/callback/okta?state=state-abc", follow_redirects=False
     )
 
     # Before the fix this was a 500 (AttributeError) even though the user
     # had already been logged in by the time it was raised.
     assert resp.status_code in (302, 303), resp.get_data(as_text=True)
+    assert "/mfa-challenge" in resp.headers.get("Location", "")
 
     from app.models.user import User
 
@@ -94,7 +103,6 @@ def test_sso_callback_logs_in_a_new_user_without_crashing(app, db_session, monke
     assert created is not None
     assert created.confirmed is True
 
-    # The real assertion: session_registry.login_and_register(user) ran and
-    # the request completed, so the signed session cookie names this user.
     with client.session_transaction() as sess:
-        assert sess.get("_user_id") == str(created.id)
+        assert sess.get("_mfa_pending_user_id") == created.id
+        assert "_user_id" not in sess

@@ -220,27 +220,34 @@ def test_okta_unverified_email_claim_is_refused(app, db_session, module_path, mo
 
 
 @pytest.mark.parametrize("module_path", MODULES)
-def test_okta_verified_email_claim_links_and_signs_in(app, db_session, module_path, monkeypatch):
-    """An Okta attacker presenting email_verified: true is the legitimate
-    first-link case -- a real user genuinely linking Okta SSO -- and must
-    succeed."""
+def test_okta_verified_email_claim_for_an_existing_account_neither_links_nor_signs_in(
+    app, db_session, module_path, monkeypatch
+):
+    """A verified Okta address that belongs to an existing account is not
+    proof that the person signing in may use that account: nothing is
+    linked, nobody is signed in, and the person is pointed at their
+    password."""
     _enable_sso(db_session)
-    victim = _make_user(db_session, f"victim-okta-verified-{uuid.uuid4().hex[:6]}@example.com")
+    holder = _make_user(db_session, f"holder-okta-verified-{uuid.uuid4().hex[:6]}@example.com")
     db_session.commit()
 
     userinfo = {
         "sub": "real-okta-sub",
-        "email": victim.email,
+        "email": holder.email,
         "email_verified": True,
-        "given_name": victim.first_name,
-        "family_name": victim.last_name,
+        "given_name": holder.first_name,
+        "family_name": holder.last_name,
     }
-    resp, _flashes = _call_sso_callback(app, module_path, "okta", userinfo, monkeypatch)
+    resp, flashes = _call_sso_callback(app, module_path, "okta", userinfo, monkeypatch)
 
-    assert _redirect_path(resp) == _expect_path(app, "main.index")
-    db_session.expire(victim)
-    assert victim.external_id == "real-okta-sub"
-    assert victim.sso_provider == "okta"
+    assert _redirect_path(resp) == _expect_path(app, "account.login")
+    assert (
+        "error",
+        "An account already exists for this address. Sign in with your password.",
+    ) in flashes
+    db_session.expire(holder)
+    assert holder.external_id is None
+    assert holder.sso_provider is None
 
 
 @pytest.mark.parametrize("module_path", MODULES)
@@ -308,65 +315,84 @@ def test_azure_configured_tenant_but_tid_mismatch_is_refused(app, db_session, mo
 
 
 @pytest.mark.parametrize("module_path", MODULES)
-def test_azure_configured_tenant_matching_preferred_username_succeeds(app, db_session, module_path, monkeypatch):
-    """The legitimate Azure first-link case: a specific tenant is
-    configured, the token is actually from that tenant, and its
-    preferred_username matches the existing user's stored email."""
+def test_azure_configured_tenant_matching_preferred_username_for_an_existing_account_is_refused(
+    app, db_session, module_path, monkeypatch
+):
+    """A specific tenant is configured, the token is from that tenant and its
+    preferred_username matches an existing account: the address is verified,
+    but it belongs to an account already, so nothing is linked and nobody is
+    signed in."""
     monkeypatch.setenv("AZURE_AD_TENANT_ID", "11111111-1111-1111-1111-111111111111")
     _enable_sso(db_session)
-    victim = _make_user(db_session, f"victim-azure-legit-{uuid.uuid4().hex[:6]}@example.com")
+    holder = _make_user(db_session, f"holder-azure-pinned-{uuid.uuid4().hex[:6]}@example.com")
     db_session.commit()
 
     userinfo = {
         "sub": "real-azure-sub",
         "oid": "real-oid",
         "tid": "11111111-1111-1111-1111-111111111111",
-        "email": victim.email,
-        "preferred_username": victim.email,
-        "given_name": victim.first_name,
-        "family_name": victim.last_name,
+        "email": holder.email,
+        "preferred_username": holder.email,
+        "given_name": holder.first_name,
+        "family_name": holder.last_name,
     }
-    resp, _flashes = _call_sso_callback(app, module_path, "azure", userinfo, monkeypatch)
+    resp, flashes = _call_sso_callback(app, module_path, "azure", userinfo, monkeypatch)
 
-    assert _redirect_path(resp) == _expect_path(app, "main.index")
-    db_session.expire(victim)
-    assert victim.external_id == "11111111-1111-1111-1111-111111111111:real-oid"
-    assert victim.sso_provider == "azure"
+    assert _redirect_path(resp) == _expect_path(app, "account.login")
+    assert (
+        "error",
+        "An account already exists for this address. Sign in with your password.",
+    ) in flashes
+    db_session.expire(holder)
+    assert holder.external_id is None
+    assert holder.sso_provider is None
 
 
 @pytest.mark.parametrize("module_path", MODULES)
 @pytest.mark.parametrize(
-    "provider,userinfo_extra",
+    "provider,userinfo_extra,verified",
     [
-        ("okta", {"sub": "new-okta-sub-unverified", "email_verified": False}),
-        ("okta", {"sub": "new-okta-sub-verified", "email_verified": True}),
-        ("azure", {"sub": "new-azure-sub", "oid": "new-oid", "tid": "common"}),
+        ("okta", {"sub": "new-okta-sub-unverified", "email_verified": False}, False),
+        ("okta", {"sub": "new-okta-sub-verified", "email_verified": True}, True),
+        ("azure", {"sub": "new-azure-sub", "oid": "new-oid", "tid": "common"}, False),
     ],
     ids=["okta-unverified", "okta-verified", "azure-default-tenant"],
 )
-def test_brand_new_email_always_succeeds_in_creating_an_account(
-    app, db_session, module_path, provider, userinfo_extra, monkeypatch
+def test_brand_new_email_creates_an_account_only_when_verified(
+    app, db_session, module_path, provider, userinfo_extra, verified, monkeypatch
 ):
-    """A brand-new email (no existing user) must still succeed in creating a
-    new account for either provider, verified or not -- this is a fresh
-    signup, not a takeover, and must not be blocked."""
+    """A brand-new address creates an account only when the provider
+    verified it, and then in an organisation of its own whose administrator
+    it is (so the MFA gate sends it to enrol before any session exists). An
+    unverified address creates nothing."""
     monkeypatch.delenv("AZURE_AD_TENANT_ID", raising=False)
     _enable_sso(db_session)
+    from app.models.org_role import OrgRole
+    from app.models.organization import Organization
     from app.models.user import User
 
     email = f"brand-new-{uuid.uuid4().hex[:10]}@example.com"
     assert User.find_by_email(email) is None
+    orgs_before = Organization.query.count()
 
     userinfo = {"email": email, "given_name": "New", "family_name": "User", **userinfo_extra}
-    resp, _flashes = _call_sso_callback(app, module_path, provider, userinfo, monkeypatch)
+    resp, flashes = _call_sso_callback(app, module_path, provider, userinfo, monkeypatch)
 
-    assert _redirect_path(resp) == _expect_path(app, "main.index"), (
-        f"a brand-new email via {provider} must still create an account, "
-        f"got redirect {resp.location!r}"
-    )
     created = User.find_by_email(email)
+    if not verified:
+        assert _redirect_path(resp) == _expect_path(app, "account.login")
+        assert any(cat == "error" for cat, _msg in flashes)
+        assert created is None
+        assert Organization.query.count() == orgs_before
+        return
+
+    assert _redirect_path(resp) == _expect_path(app, "account.mfa_challenge")
     assert created is not None
     assert created.sso_provider == provider
+    org = db_session.get(Organization, created.organization_id)
+    assert org.slug != "default"
+    assert Organization.query.count() == orgs_before + 1
+    assert OrgRole.get_role(org.id, created.id) == "org_admin"
 
 
 @pytest.mark.parametrize("module_path", MODULES)
@@ -475,9 +501,11 @@ def test_legacy_azure_sub_link_is_recognised_and_migrated_to_oid_tid_composite(
 
 def test_route1_new_azure_user_external_id_is_oid_tid_composite_not_raw_sub(app, db_session, monkeypatch):
     """Route 1 specifically: confirm the Azure external_id stored for a
-    brand-new Azure link is the tenant-qualified oid+tid composite, not the
-    raw sub claim."""
-    monkeypatch.delenv("AZURE_AD_TENANT_ID", raising=False)
+    brand-new Azure account is the tenant-qualified oid+tid composite, not
+    the raw sub claim. A new account needs a verified address, so the
+    tenant is pinned and the token comes from it."""
+    tenant = "55555555-5555-5555-5555-555555555555"
+    monkeypatch.setenv("AZURE_AD_TENANT_ID", tenant)
     _enable_sso(db_session)
     from app.models.user import User
 
@@ -485,17 +513,18 @@ def test_route1_new_azure_user_external_id_is_oid_tid_composite_not_raw_sub(app,
     userinfo = {
         "sub": "raw-sub-must-not-be-stored",
         "oid": "fresh-oid",
-        "tid": "common",
+        "tid": tenant,
         "email": email,
+        "preferred_username": email,
         "given_name": "Fresh",
         "family_name": "Signup",
     }
     resp, _flashes = _call_sso_callback(app, MODULE_V1, "azure", userinfo, monkeypatch)
 
-    assert _redirect_path(resp) == _expect_path(app, "main.index")
+    assert _redirect_path(resp) == _expect_path(app, "account.mfa_challenge")
     created = User.find_by_email(email)
     assert created is not None
-    assert created.external_id == "common:fresh-oid"
+    assert created.external_id == f"{tenant}:fresh-oid"
     assert created.external_id != "raw-sub-must-not-be-stored"
 
 
