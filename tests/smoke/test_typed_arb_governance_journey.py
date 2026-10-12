@@ -1839,27 +1839,7 @@ def test_journey_g_axe_has_no_serious_or_critical_findings(
     }
     print("[journey-g] axe @%dpx: %s" % (width, json.dumps(findings, sort_keys=True)))
 
-    # Recorded from the first real run of this suite. A NEW or worsened finding
-    # still fails hard; these named ones are handed to the owning lane.
-    known = {
-        "/arb/: color-contrast (serious, 1)",
-        "/arb/reviews/<id>: color-contrast (serious, 1)",
-        "/arb/reviews/<id>: label (critical, 1)",
-    }
-    unexpected = serious - known
-    assert not unexpected, (
-        "%d NEW serious/critical WCAG 2.2 AA violation(s) on the ARB "
-        "governance path at %dpx:\n  %s"
-        % (len(unexpected), width, "\n  ".join(sorted(unexpected)))
+    assert not serious, (
+        "%d serious/critical WCAG 2.2 AA violation(s) on the ARB governance "
+        "path at %dpx:\n  %s" % (len(serious), width, "\n  ".join(sorted(serious)))
     )
-    if serious:
-        pytest.xfail(
-            "ARB-UI-6 (measured, this run): %d serious/critical WCAG 2.2 AA "
-            "violation(s) on the ARB governance path at %dpx:\n  %s\n"
-            "The `label` critical is an unlabelled form control on the review "
-            "page - the single largest defect class this engagement already "
-            "closed elsewhere. Neither ARB page is in "
-            "tests/smoke/a11y_baseline.json, so nothing was watching them. "
-            "Owned by the templates lane - not patched here."
-            % (len(serious), width, "\n  ".join(sorted(serious)))
-        )
