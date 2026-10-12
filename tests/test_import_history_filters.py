@@ -197,7 +197,7 @@ def history_page(history_browser):
         origin = f'http://127.0.0.1:{server.server_port}'
         page.on('request', lambda request: unexpected.append(request.url)
                 if not request.url.startswith(origin + '/') else None)
-        page.goto(origin + '/')
+        page.goto(origin + '/', wait_until='domcontentloaded')
         assert wait_for_flag(page, state['started']), 'the history request was never sent'
         return page, state, release
 
