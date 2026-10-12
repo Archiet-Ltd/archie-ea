@@ -10,6 +10,7 @@ Against the shared fixtures in tests/conftest.py per root CLAUDE.md.
 
 from __future__ import annotations
 
+import re
 import uuid
 
 import pytest
@@ -479,8 +480,239 @@ def test_roadmap_api_and_gap_analysis_page_counts_agree(
         "Roadmap API total_gaps should be 2, got %d" % roadmap_total
     )
     assert len(roadmap_data.get("gaps", [])) == roadmap_total
-    # The gap analysis page renders the count somewhere in the HTML
-    assert "Recorded Gaps" in html
-    assert str(roadmap_total) in html, (
-        "Gap analysis page should contain the count %d in its rendered HTML" % roadmap_total
+    # Parse the Recorded Gaps card value from the rendered HTML
+    match = re.search(
+        r"Recorded Gaps</p>\s*<div data-slot=\"card-title\"[^>]*>\s*([0-9]+)\s*</div>",
+        html,
     )
+    assert match is not None, "Recorded Gaps metric not found in rendered page"
+    recorded = int(match.group(1))
+    assert recorded == roadmap_total, (
+        "Recorded Gaps metric (%d) must equal the roadmap API total (%d)" % (recorded, roadmap_total)
+    )
+
+
+# ── Switched-session tests: scope by the active organisation ──────────────────
+
+
+def test_switched_session_gap_analysis_page_shows_active_org(
+    app, db_session, make_org, login_as, client,
+):
+    """When the session is switched to organisation B, the gap analysis page
+    shows B's Recorded Gaps metric and not-addressed list, never A's."""
+    from app.models.org_role import OrgRole
+    from app.models.user import Role, User
+    from app.services.gap_register_service import create_gap
+
+    Role.insert_roles()
+
+    org_a = make_org("switch-a")
+    org_b = make_org("switch-b")
+
+    # User whose home organisation is A
+    user = User(
+        email="switch-user@example.com",
+        first_name="SwitchUser",
+        organization_id=org_a.id,
+        confirmed=True,
+        enterprise_role="enterprise_architect",
+    )
+    db_session.add(user)
+    db_session.flush()
+    role = Role.query.filter_by(name="Administrator").first()
+    if role:
+        user.role = role
+    db_session.flush()
+
+    # Grant access to B via OrgRole
+    OrgRole.set_role(org_b.id, user.id, "architect", granted_by_id=user.id)
+    db_session.commit()
+
+    # Create gaps: 2 in A, 3 in B
+    create_gap(org_a.id, "A Gap 1", gap_type="coverage")
+    create_gap(org_a.id, "A Gap 2", gap_type="coverage")
+    create_gap(org_b.id, "B Gap 1", gap_type="coverage")
+    create_gap(org_b.id, "B Gap 2", gap_type="coverage")
+    create_gap(org_b.id, "B Gap 3", gap_type="coverage")
+    db_session.commit()
+
+    # Login as user (home org A) then switch session to B
+    login_as(client, user)
+    with client.session_transaction() as sess:
+        sess["current_org_id"] = org_b.id
+
+    # GET gap analysis page
+    resp = client.get("/enterprise/implementation/gap-analysis")
+    assert resp.status_code == 200, resp.data[:200]
+    html = resp.data.decode("utf-8")
+
+    # Parse the Recorded Gaps card
+    match = re.search(
+        r"Recorded Gaps</p>\s*<div data-slot=\"card-title\"[^>]*>\s*([0-9]+)\s*</div>",
+        html,
+    )
+    assert match is not None, "Recorded Gaps metric not found"
+    recorded = int(match.group(1))
+    assert recorded == 3, (
+        "Switched to B: Recorded Gaps should be 3 (B's gaps), got %d" % recorded
+    )
+
+    # Not-addressed list should contain B's gaps, not A's
+    assert "B Gap 1" in html
+    assert "B Gap 2" in html
+    assert "B Gap 3" in html
+    assert "A Gap 1" not in html, "A's gaps must not appear when switched to B"
+    assert "A Gap 2" not in html, "A's gaps must not appear when switched to B"
+
+
+def test_switched_session_gap_link_and_unlink_use_active_org(
+    app, db_session, make_org, login_as, client,
+):
+    """When the session is switched to organisation B, POST link and unlink
+    act on B's rows and never touch A's."""
+    from app.models.org_role import OrgRole
+    from app.models.user import Role, User
+    from app.services.gap_register_service import create_gap
+    from flask import g
+
+    Role.insert_roles()
+
+    org_a = make_org("switch-link-a")
+    org_b = make_org("switch-link-b")
+
+    user = User(
+        email="switch-link-user@example.com",
+        first_name="SwitchLinkUser",
+        organization_id=org_a.id,
+        confirmed=True,
+        enterprise_role="enterprise_architect",
+    )
+    db_session.add(user)
+    db_session.flush()
+    role = Role.query.filter_by(name="Administrator").first()
+    if role:
+        user.role = role
+    db_session.flush()
+
+    OrgRole.set_role(org_b.id, user.id, "architect", granted_by_id=user.id)
+
+    # Create gaps and plateaus in both orgs
+    create_gap(org_a.id, "A Link Gap", gap_type="coverage")
+    gap_b = create_gap(org_b.id, "B Link Gap", gap_type="coverage")[0]
+    plat_a = _make_plateau(db_session, org_a, "A Plateau")
+    plat_b = _make_plateau(db_session, org_b, "B Plateau")
+    db_session.commit()
+
+    # Login as user (home org A) then switch session to B
+    login_as(client, user)
+    with client.session_transaction() as sess:
+        sess["current_org_id"] = org_b.id
+
+    # Link B's gap to B's plateau
+    link_resp = client.post(
+        f"/capability-map/api/roadmap/gaps/{gap_b.id}/link-plateau/{plat_b.id}"
+    )
+    assert link_resp.status_code == 200, link_resp.data[:200]
+    link_data = link_resp.get_json()
+    assert link_data.get("success") is True
+
+    # Clear g.current_org_id so direct queries are not tenant-scoped
+    for cached in ("current_org_id", "current_org"):
+        if hasattr(g, cached):
+            delattr(g, cached)
+
+    # Verify the link exists for B
+    from app.services.gap_register_service import get_plateau_gaps
+
+    b_linked = get_plateau_gaps(plat_b.id, org_b.id)
+    assert len(b_linked) == 1
+    assert b_linked[0].id == gap_b.id
+
+    # Verify A's gap is NOT linked to B's plateau
+    a_linked = get_plateau_gaps(plat_a.id, org_a.id)
+    assert len(a_linked) == 0
+
+    # Unlink B's gap from B's plateau
+    unlink_resp = client.post(
+        f"/capability-map/api/roadmap/gaps/{gap_b.id}/unlink-plateau/{plat_b.id}"
+    )
+    assert unlink_resp.status_code == 200, unlink_resp.data[:200]
+    unlink_data = unlink_resp.get_json()
+    assert unlink_data.get("success") is True
+
+    # Verify the link is removed for B
+    b_linked_after = get_plateau_gaps(plat_b.id, org_b.id)
+    assert len(b_linked_after) == 0
+
+
+def test_switched_session_roadmap_gaps_api_shows_active_org(
+    app, db_session, make_org, login_as, client,
+):
+    """When the session is switched to organisation B, the roadmap gaps API
+    returns B's totals, never A's."""
+    from app.models.business_capabilities import BusinessCapability, ApplicationCapabilityCoverage
+    from app.models.org_role import OrgRole
+    from app.models.user import Role, User
+
+    Role.insert_roles()
+
+    org_a = make_org("switch-api-a")
+    org_b = make_org("switch-api-b")
+
+    user = User(
+        email="switch-api-user@example.com",
+        first_name="SwitchApiUser",
+        organization_id=org_a.id,
+        confirmed=True,
+        enterprise_role="enterprise_architect",
+    )
+    db_session.add(user)
+    db_session.flush()
+    role = Role.query.filter_by(name="Administrator").first()
+    if role:
+        user.role = role
+    db_session.flush()
+
+    OrgRole.set_role(org_b.id, user.id, "architect", granted_by_id=user.id)
+
+    # Create business capabilities: 2 uncovered in A, 3 uncovered in B
+    # The roadmap API derives coverage gaps from capabilities with no apps
+    for i in range(2):
+        cap = BusinessCapability(
+            name=f"API A Cap {i}", code=f"API-A-CAP-{i}",
+            organization_id=org_a.id, level=1,
+        )
+        db_session.add(cap)
+    for i in range(3):
+        cap = BusinessCapability(
+            name=f"API B Cap {i}", code=f"API-B-CAP-{i}",
+            organization_id=org_b.id, level=1,
+        )
+        db_session.add(cap)
+    db_session.commit()
+
+    # Login as user (home org A) then switch session to B
+    login_as(client, user)
+    with client.session_transaction() as sess:
+        sess["current_org_id"] = org_b.id
+
+    # GET roadmap gaps API
+    resp = client.get("/capability-map/api/roadmap/gaps")
+    assert resp.status_code == 200, resp.data[:200]
+    data = resp.get_json()
+    assert data.get("success") is True
+
+    stats = data.get("statistics", {})
+    total = stats.get("total_gaps", -1)
+    assert total == 3, (
+        "Switched to B: roadmap API total_gaps should be 3 (B's uncovered "
+        f"capabilities), got {total}"
+    )
+
+    # B's gaps appear in the list, A's do not
+    gap_names = [g.get("name", "") for g in data.get("gaps", [])]
+    assert "API B Cap 0" in gap_names
+    assert "API B Cap 1" in gap_names
+    assert "API B Cap 2" in gap_names
+    assert "API A Cap 0" not in gap_names, "A's gaps must not appear when switched to B"
+    assert "API A Cap 1" not in gap_names, "A's gaps must not appear when switched to B"
