@@ -1,6 +1,6 @@
 """flask backfill-domain-elements -- per-organisation backfill of missing ArchiMate elements.
 
-Every domain record of the nine types must have exactly one ArchiMate element
+Every domain record of the eight types must have exactly one ArchiMate element
 node in its organisation. This command creates the missing elements for a given
 organisation and reports duplicates.
 
@@ -33,7 +33,7 @@ from flask.cli import with_appcontext
 from app import db
 
 
-# Every domain record of the nine types must have exactly one element node.
+# Every domain record of the eight types must have exactly one element node.
 # Each entry is the dotted path of the domain model. The element mapping
 # (type, layer, name fallback, description, provenance) lives in ONE place --
 # ELEMENT_TYPES in app/services/archimate_backbone.py -- so a backfilled
@@ -125,7 +125,7 @@ def backfill_domain_elements(org_id, dry_run=False, session=None):
                     duplicates.append({
                         "name": name,
                         "kept_id": kept.id,
-                        "removed_ids": [e.id for e in removed],
+                        "surplus_ids": [e.id for e in removed],
                     })
 
         created = 0
@@ -207,7 +207,7 @@ def backfill_domain_elements_command(org_id, dry_run):
             for dup in s["duplicates"]:
                 click.echo(
                     f"  {type_name}: '{dup['name']}' -- "
-                    f"kept id={dup['kept_id']}, removed ids={dup['removed_ids']}"
+                    f"kept id={dup['kept_id']}, surplus ids={dup['surplus_ids']}"
                 )
 
     if total_errors:
