@@ -114,6 +114,12 @@ EXCLUDED_CHECKS = {
         "a dedicated job for census, ai-protocol and guide-history journeys; "
         "the aggregate \"Browser journeys (one per archetype)\" is the required check."
     ),
+    "Content page tests": (
+        "runs only on pull requests whose changes are all content "
+        "(is_content_only=true); it never runs on a push to main, so it can "
+        "never gate a deploy. The page tests it runs are also covered by the "
+        "required pytest shards on every non-content run."
+    ),
 }
 CHECK_APP_SLUG = "github-actions"
 MAX_CHECK_PAGES = 10

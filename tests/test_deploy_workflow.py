@@ -223,7 +223,7 @@ def test_every_ci_job_is_required_or_deliberately_excluded():
 
 
 def test_the_only_exclusion_is_the_image_build_and_it_says_why():
-    assert len(dw.EXCLUDED_CHECKS) == 6
+    assert len(dw.EXCLUDED_CHECKS) == 7
     assert "Build immutable release image" in dw.EXCLUDED_CHECKS
     reason = dw.EXCLUDED_CHECKS["Build immutable release image"]
     assert "GHCR" in reason and "bind-mounted" in reason
@@ -234,6 +234,10 @@ def test_the_only_exclusion_is_the_image_build_and_it_says_why():
                        "Browser journeys \u2014 other"):
         assert shard_name in dw.EXCLUDED_CHECKS
         assert "aggregate" in dw.EXCLUDED_CHECKS[shard_name]
+    # The content page tests job only runs on content-only PRs; on a push to
+    # main (the deploy path) it never runs, so it must not be a required check.
+    assert "Content page tests" in dw.EXCLUDED_CHECKS
+    assert "is_content_only" in dw.EXCLUDED_CHECKS["Content page tests"]
     # Everything else the CI runs is required, including the jobs that are red today.
     for name in ("Tests (pytest + coverage)", "SAST (bandit)", "Browser journeys (one per archetype)",
                  "Browser compatibility (webkit)", "Browser compatibility (firefox)"):
