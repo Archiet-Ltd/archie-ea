@@ -62,7 +62,7 @@ def page(browser):
     p.route(BASE + '/api/capabilities/grouped', lambda route: route.fulfill(
         content_type='application/json', body='{"capabilities":{}}'))
     p.route(BASE + '/', lambda route: route.fulfill(content_type='text/html', body=page_html()))
-    p.goto(BASE + '/')
+    p.goto(BASE + '/', wait_until='domcontentloaded')
     p.wait_for_function('window.Alpine && window.Platform && window.Platform.modal')
     # `window.Alpine` exists as soon as its script has run; the roadmap component
     # is usable once Alpine has started it and removed x-cloak from the page.
