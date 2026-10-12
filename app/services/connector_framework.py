@@ -682,15 +682,29 @@ def apply_connector_change(
             # otherwise (a plain config edit with no credential change).
             is_rotating = False
             if approval is not None:
+                from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+                vault = OrgCredentialVault()
                 legacy_credential_type = CONNECTOR_CREDENTIAL_TYPES.get(connector_type)
                 if legacy_credential_type:
-                    from app.modules.codegen.services.credential_vault import OrgCredentialVault
-
-                    staged = OrgCredentialVault().retrieve(
+                    staged = vault.retrieve(
                         resolved, connector_type,
                         OrgCredentialVault._staged_type(legacy_credential_type, approval.id),
                     )
                     is_rotating = staged is not None
+                if not is_rotating:
+                    # D1 (cloud-review-pr448-02b7c0c9-v1.md): the generic
+                    # /admin/connectors page stages a rotated secret under
+                    # the "credentials" blob, not this connector type's
+                    # named key, so checking only the named key missed a
+                    # rotation done there and left the superseded row key
+                    # in place for migrate-connector-row-secrets to vault
+                    # under the name the service reads first.
+                    staged_generic = vault.retrieve(
+                        resolved, connector_type,
+                        OrgCredentialVault._staged_type("credentials", approval.id),
+                    )
+                    is_rotating = staged_generic is not None
             legacy_keys = CONNECTOR_LEGACY_CONFIG_KEYS.get(connector_type, set()) if is_rotating else set()
 
             existing_config = cfg.config or {}

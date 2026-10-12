@@ -91,6 +91,16 @@ def migrate_connector_row_secrets(*, dry_run: bool = False) -> dict:
             stats["legacy_values_found"] += 1
 
             existing_vault_value = vault.retrieve(cfg.organization_id, connector_type, credential_type)
+            if not existing_vault_value:
+                # D1 (cloud-review-pr448-02b7c0c9-v1.md): a rotation done
+                # through the generic /admin/connectors page lands in the
+                # "credentials" blob, not this connector type's named key.
+                # Checking only the named key missed that supersession and
+                # promoted the stale row value into the named key, which
+                # the Jira/M365 service reads before the generic blob --
+                # reviving a secret the rotation was meant to retire.
+                generic_creds = vault.retrieve_credentials(cfg.organization_id, connector_type) or {}
+                existing_vault_value = generic_creds.get("credential") or None
             if existing_vault_value:
                 stats["row_already_superseded_by_vault"] += 1
             else:

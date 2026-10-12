@@ -942,3 +942,102 @@ class TestN6GenericPageCredentialReachesTheConnector:
         import base64
         expected = base64.b64encode(b"generic@example.com:generic-page-token").decode()
         assert headers["Authorization"] == f"Basic {expected}"
+
+
+class TestD1GenericPageRotationDropsTheSupersededRowKey:
+    """D1 (cloud-review-pr448-02b7c0c9-v1.md): F2's is_rotating check only
+    looked at the per-connector-type named vault key, but the generic
+    /admin/connectors page stages a rotation under the "credentials" blob
+    instead (connector_routes.py:203), so a rotation done through that page
+    never tripped is_rotating -- the superseded row key stayed on the row,
+    and migrate-connector-row-secrets then promoted that stale value into
+    the named key the Jira/M365 service reads first, reviving a secret the
+    rotation was meant to retire."""
+
+    def test_rotating_through_the_generic_page_drops_the_legacy_row_key(
+        self, db_session, org_a, admin_a, client, login_as
+    ):
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+        from app.models.connector_config import ConnectorConfig
+        from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Generic-Page Jira",
+            config={
+                "instance_url": "https://generic.atlassian.net",
+                "email": "generic@example.com",
+                "api_token": "stale-legacy-value",
+            },
+        )
+        db_session.add(cfg)
+        db_session.commit()
+
+        login_as(client, admin_a)
+        client.post(
+            "/admin/connectors",
+            data={
+                "connector_type": "jira",
+                "connector_id": str(cfg.id),
+                "name": "Generic-Page Jira",
+                "config_json": '{"instance_url": "https://generic.atlassian.net", "email": "generic@example.com"}',
+                "credential": "rotated-via-generic-page",
+                "enabled": "1",
+            },
+        )
+        proposal = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
+        assert proposal is not None
+
+        approver = _make_admin(db_session, org_a.id, "D1Approver")
+        db_session.commit()
+        result = AIChatApprovalService(user_id=approver.id).approve_and_execute(proposal.id)
+        assert result.get("success") is True, result
+
+        db_session.refresh(cfg)
+        assert "api_token" not in cfg.config, (
+            "a rotation staged through the generic page must also drop the "
+            "superseded row key, not just a rotation staged through the "
+            "per-type Jira/M365 form"
+        )
+
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        creds = OrgCredentialVault().retrieve_credentials(org_a.id, "jira")
+        assert creds.get("credential") == "rotated-via-generic-page"
+
+
+class TestD1MigrateCommandRespectsAGenericBlobSupersession:
+    def test_does_not_promote_a_stale_row_value_over_an_existing_generic_blob(
+        self, db_session, org_a
+    ):
+        from app.commands.migrate_connector_row_secrets import migrate_connector_row_secrets
+        from app.models.connector_config import ConnectorConfig
+        from app.modules.codegen.services.credential_encryption import encrypt_credential
+        from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+        vault = OrgCredentialVault()
+        vault.store_credentials(org_a.id, "jira", {"credential": "current-via-generic-page"})
+
+        stale_encrypted = encrypt_credential("stale-value").decode("utf-8")
+        cfg = ConnectorConfig(
+            organization_id=org_a.id,
+            connector_type="jira",
+            name="Legacy Jira",
+            config={"email": "legacy@example.com", "api_token": stale_encrypted},
+        )
+        db_session.add(cfg)
+        db_session.commit()
+
+        stats = migrate_connector_row_secrets()
+        assert stats["row_already_superseded_by_vault"] == 1
+        assert stats["moved_to_vault"] == 0, (
+            "the stale row value must not be promoted into the named vault "
+            "key when a generic-page credential already supersedes it"
+        )
+        assert vault.retrieve(org_a.id, "jira", "api_token") is None
+
+        db_session.refresh(cfg)
+        assert "api_token" not in cfg.config
