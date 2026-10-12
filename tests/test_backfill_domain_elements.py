@@ -679,3 +679,87 @@ def test_backfill_rollback_path_leaves_exactly_one_element_per_row(app):
                 fresh.close()
     finally:
         _cleanup(app, list(orgs.values()))
+
+
+def test_backfill_flush_failure_clears_pending_map(app):
+    """A flush that fails after before_flush has queued an element clears the
+    pending map for that session; a following work package in the same session
+    gets exactly one element (fails when the after_rollback listener is
+    removed: stale entries in _PENDING cause the next work package to get
+    zero or two elements)."""
+    from app import db
+    from app.models.implementation_migration import WorkPackage
+    from app.services import archimate_backbone
+
+    orgs = _seed_orgs(app, ["bf-flush-fail"])
+    org_id = orgs["bf-flush-fail"]
+    try:
+        with app.app_context():
+            # A work package that will be queued in before_flush.
+            wp1 = WorkPackage(
+                name="Queued Then Failed",
+                context="application",
+                organization_id=org_id,
+            )
+            db.session.add(wp1)
+
+            # A second work package with the same materialisation_key
+            # violates the unique constraint uq_work_package_materialisation.
+            wp2 = WorkPackage(
+                name="Constraint Violator",
+                context="application",
+                organization_id=org_id,
+                materialisation_key="duplicate-key",
+            )
+            db.session.add(wp2)
+            wp3 = WorkPackage(
+                name="Also Duplicate Key",
+                context="application",
+                organization_id=org_id,
+                materialisation_key="duplicate-key",
+            )
+            db.session.add(wp3)
+
+            sid = id(db.session)
+            # The flush fails because of the unique constraint violation.
+            import pytest
+            with pytest.raises(Exception):
+                db.session.flush()
+
+            # Roll back.
+            db.session.rollback()
+
+            # The pending map for this session must be empty.
+            assert sid not in archimate_backbone._PENDING, (
+                "pending map must be cleared after rollback"
+            )
+
+            # A following work package in the same session gets exactly one element.
+            survivor = WorkPackage(
+                name="Survivor After Rollback",
+                context="application",
+                organization_id=org_id,
+            )
+            db.session.add(survivor)
+            db.session.flush()
+            assert survivor.archimate_element_id is not None, (
+                "survivor must get exactly one element"
+            )
+            db.session.expire_all()
+            survivor = db.session.query(WorkPackage).filter_by(
+                name="Survivor After Rollback",
+            ).first()
+            assert survivor is not None
+            assert survivor.archimate_element_id is not None
+
+            # Verify only one element was created for the survivor.
+            from app.models.archimate_core import ArchiMateElement
+            elements = db.session.query(ArchiMateElement).filter(
+                ArchiMateElement.organization_id == org_id,
+                ArchiMateElement.type == "WorkPackage",
+            ).all()
+            assert len(elements) == 1, (
+                "exactly one element for the survivor, not stale entries"
+            )
+    finally:
+        _cleanup(app, [org_id])
