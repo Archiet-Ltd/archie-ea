@@ -89,6 +89,10 @@ NAME_FIELDS = ("name", "title", "risk_name", "goal_name", "driver_name",
 # ArchiMateElement.name is String(100).
 MAX_NAME = 100
 
+# Where each model keeps its display description. Checked in order.
+DESCRIPTION_FIELDS = ("description", "contract_description", "risk_description",
+                      "goal_description", "driver_description")
+
 
 def _first_attr(obj: Any, fields) -> Optional[str]:
     for field in fields:
@@ -227,7 +231,7 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
 
         # Build description: use the per-type template when one exists,
         # otherwise fall back to the object's own description field.
-        description = getattr(obj, "description", None)
+        description = _first_attr(obj, DESCRIPTION_FIELDS)
         if description is None and type_name in DESCRIPTION_TEMPLATES:
             template = DESCRIPTION_TEMPLATES[type_name]
             name_for_desc = name
@@ -239,7 +243,7 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
             element_type=element_type,
             layer=layer,
             name=name,
-            description=getattr(obj, "description", None),
+            description=description,
             organization_id=org_id,
             session=session,
             provenance=properties,

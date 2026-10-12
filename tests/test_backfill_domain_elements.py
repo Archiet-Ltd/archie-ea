@@ -9,6 +9,8 @@ uses, and never silently remove elements.
 
 import pytest
 
+from datetime import date
+
 from app.models.archimate_core import ArchiMateElement
 from app.models.application_portfolio import ApplicationComponent
 from app.models.business_capabilities import BusinessCapability
@@ -557,6 +559,7 @@ def test_backfill_vendor_contract_parity(app):
                 contract_name="ORM Contract",
                 contract_description="Description from ORM",
                 organization_id=org_id,
+                start_date=date(2026, 1, 1),
             )
             db.session.add(orm_contract)
             db.session.flush()
@@ -729,7 +732,6 @@ def test_backfill_flush_failure_clears_pending_map(app):
 
             sid = id(db.session)
             # The flush fails because of the unique constraint violation.
-            import pytest
             with pytest.raises(Exception):
                 db.session.flush()
 
