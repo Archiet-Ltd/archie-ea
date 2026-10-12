@@ -223,7 +223,7 @@ def test_every_ci_job_is_required_or_deliberately_excluded():
 
 
 def test_the_only_exclusion_is_the_image_build_and_it_says_why():
-    assert len(dw.EXCLUDED_CHECKS) == 7
+    assert len(dw.EXCLUDED_CHECKS) == 8
     assert "Build immutable release image" in dw.EXCLUDED_CHECKS
     reason = dw.EXCLUDED_CHECKS["Build immutable release image"]
     assert "GHCR" in reason and "bind-mounted" in reason
@@ -238,13 +238,16 @@ def test_the_only_exclusion_is_the_image_build_and_it_says_why():
     # main (the deploy path) it never runs, so it must not be a required check.
     assert "Content page tests" in dw.EXCLUDED_CHECKS
     assert "is_content_only" in dw.EXCLUDED_CHECKS["Content page tests"]
+    # The detector job routes PR jobs only; on a push every job runs regardless of its result.
+    assert "Detect changed paths" in dw.EXCLUDED_CHECKS
+    assert "Detect changed paths" not in dw.REQUIRED_CHECKS
     # Everything else the CI runs is required, including the jobs that are red today.
     for name in ("Tests (pytest + coverage)", "SAST (bandit)", "Browser journeys (one per archetype)",
                  "Browser compatibility (webkit)", "Browser compatibility (firefox)"):
         assert name in dw.REQUIRED_CHECKS
     for shard in range(8):
         assert f"Tests (pytest + coverage) \u2014 shard {shard}" in dw.REQUIRED_CHECKS
-    assert len(dw.REQUIRED_CHECKS) == 20
+    assert len(dw.REQUIRED_CHECKS) == 19
 
 
 @pytest.mark.parametrize("dry_run", ["true", "false"])

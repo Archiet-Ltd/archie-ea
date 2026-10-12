@@ -69,7 +69,6 @@ USER_RE = re.compile(r"[a-z_][a-z0-9_-]{0,31}")
 # when ci.yml gains, loses or renames a job without this list or the exclusions
 # following, so neither can rot quietly.
 REQUIRED_CHECKS = (
-    "Detect changed paths",
     "Secret scan (gitleaks)",
     "Static gates (compile + ratchets)",
     "Boot health (no database)",
@@ -89,6 +88,9 @@ REQUIRED_CHECKS = (
 # Jobs in ci.yml that are deliberately not required, with the reason. Adding a
 # name here is a decision to let a deploy proceed while that job is red.
 EXCLUDED_CHECKS = {
+    "Detect changed paths": (
+        "routes PR jobs only; on push every job runs regardless of its result"
+    ),
     "Build immutable release image": (
         "builds and pushes a GHCR image, which production does not run: it deploys "
         "a bind-mounted source checkout (see the header of scripts/deploy_verified.sh). "
