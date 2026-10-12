@@ -21,6 +21,8 @@ from typing import Any, Dict
 
 from markupsafe import escape
 
+from app.modules.genome.services.finding_dismissals import finding_key
+
 # Fixed severity ordering + a theme-neutral accent alpha (inline style only, so
 # no Tailwind rebuild and the design-tokens gate is unaffected).
 _SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
@@ -202,6 +204,23 @@ def _render_finding(f: Dict[str, Any]) -> str:
             f'<p class="mt-1 text-xs text-muted-foreground">'
             f'{escape(remediation.get("hint"))}</p>'
         )
+
+    # Dismiss as a false positive: a reason is required and is kept with the
+    # decision. Same relative-path and CSRF-placeholder approach as above.
+    item.append(
+        '<form method="post" class="mt-2 flex flex-wrap items-center gap-2 genome-drift-dismiss" '
+        'action="/genome/model-health/dismiss">'
+        + DRIFT_CSRF_PLACEHOLDER
+        + f'<input type="hidden" name="finding_key" value="{escape(finding_key(f))}">'
+        '<input type="text" name="reason" required minlength="3" maxlength="500" '
+        'aria-label="Reason for dismissing this finding" '
+        'placeholder="Why is this a false positive?" '
+        'class="h-8 w-64 max-w-full rounded-md border border-input bg-background px-2 text-xs">'
+        '<button type="submit" '
+        'class="inline-flex items-center px-3 py-1 text-xs rounded-md border border-border '
+        'text-foreground hover:bg-muted transition-colors">Dismiss</button>'
+        '</form>'
+    )
 
     item.append('</div></div>')
     item.append('</li>')
