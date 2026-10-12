@@ -824,12 +824,11 @@ def accountability_for_element(element_id: int):
     params: this lens is a pure ownership lookup, not a blast-radius
     traversal, unlike every other lens on this blueprint.
 
-    The ownership read itself is currently WITHDRAWN -- see the service
-    method's own docstring (a real tenant-isolation gap found in external
-    review of the original PR; no shared, tenant-safe reader exists yet).
-    This route's element/tenant pre-checks are unchanged and still real;
-    only the body of the answer is a permanent honest empty state until
-    that reader exists.
+    The answer is the element's current ownership, read through the one
+    shared owner chain and fenced to the caller's organisation (see the
+    service method's docstring). Only ownership type, unit name and start
+    date are served; the contact person and e-mail are not. Capacity is not
+    answered yet, so every response says so.
     """
     organization_id = current_organization_id()
     if organization_id is None:

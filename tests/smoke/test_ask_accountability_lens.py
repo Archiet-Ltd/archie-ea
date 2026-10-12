@@ -1,11 +1,10 @@
 """L4, "who's accountable for <element>, and can they take on more?": the
 accountability question on the Ask page, in a real browser.
 
-The ownership read is WITHDRAWN (a tenant-isolation gap found in external
-review of the original PR -- see
+The lens answers from the one shared, tenant-fenced owner chain (see
 IntelligenceQueryService.accountability_for_element's docstring). These
-tests pin the withdrawn state itself, including with a real seeded ownership
-graph present, to guard against silently re-enabling the unsafe read.
+tests seed a real ownership graph and check the card shows the owning unit,
+the ownership type and the capacity note, and never the contact person.
 
 The impact/strategy/risk/portfolio/programme questions must keep working
 exactly as before -- these tests also cover that regression, since all six
@@ -50,9 +49,8 @@ def _seed_accountability_graph(org_id):
         db.session.add(unit)
         db.session.flush()
 
-        # A real, well-formed ownership graph -- exactly the shape the
-        # original (unsafe) implementation would have served. The withdrawn
-        # method must never return this, regardless of what exists.
+        # A real, well-formed ownership graph. The card must show the unit and
+        # the ownership type, and must not show the contact person.
         db.session.add(ApplicationOwnership(
             organization_id=org_id,
             application_id=service_component.id,
@@ -107,7 +105,7 @@ def _ready(page, factory):
     )
 
 
-def test_the_accountability_question_shows_the_withdrawn_state_not_seeded_data(
+def test_the_accountability_question_shows_the_owning_unit_and_no_contact_person(
     page, live_server, seeded, accountability_graph
 ):
     _login(page, live_server, seeded["emails"]["solution_architect"])
@@ -119,11 +117,12 @@ def test_the_accountability_question_shows_the_withdrawn_state_not_seeded_data(
     type_and_wait(page, "ask", accountability_graph["noun"])
     page.locator("#ask-picker-listbox [role=option]", has_text="Service").click()
 
-    expect(page.get_by_text(
-        "Ownership data is not yet connected."
-    )).to_be_visible()
+    row = page.locator("[data-ask-accountability-row]")
+    expect(row).to_have_count(1)
+    expect(row).to_contain_text("Business Owner")
+    expect(row).to_contain_text("%s Finance" % accountability_graph["noun"])
+    assert "Jordan Owner" not in page.content()
     expect(page.get_by_text("Capacity and availability data is not yet connected.")).to_be_visible()
-    assert page.locator("[data-ask-accountability-row]").count() == 0
 
 
 def test_all_six_questions_keep_their_own_answers_separate(

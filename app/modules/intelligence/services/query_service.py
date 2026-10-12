@@ -145,46 +145,79 @@ def _licence_tenant_predicate(org_id: int):
     return LicenseEntitlement.organization_id == org_id
 
 
-def _resolve_owners_batch(
-    element_ids: List[int], org_id: int
-) -> Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]]:
-    """AA-5/SEC-09 owner attach: element -> component -> ownership -> unit,
-    batched across MANY element ids in a small constant number of queries
-    (M7 fix -- see the build report's B2/NEW-3 sections for why this is now
-    the ONLY owner-resolution implementation on this path; a per-row
-    ``_resolve_owner``/``_find_component_for_element`` pair used to exist
-    alongside this and was deleted as dead code -- ``cross_layer_impact`` is
-    this function's only production caller).
+def _ownership_tenant_predicate(org_id: int):
+    """``ApplicationOwnership.organization_id == org_id``, isolated as its own
+    seam (the ``_sec09_tenant_check`` pattern) so a mutation test can replace
+    it and watch the cross-tenant ownership test go red."""
+    from app.models.enterprise_intelligence import ApplicationOwnership
 
-    ``ApplicationComponent`` carries ``TenantMixin`` so the component select
-    below is already fenced by ``do_orm_execute`` (a cross-tenant row is
-    simply not returned in a normal request); ``_sec09_tenant_check`` is the
-    belt-and-braces assertion applied on top of that ORM fencing -- kept for
-    the session-scoped-caller drift it defends against even now that
-    ``ApplicationOwnership`` and ``OrganizationUnit`` carry ``TenantMixin``
-    too and are fenced by the same listener.
+    return ApplicationOwnership.organization_id == org_id
 
-    Only CURRENT ownership is attached: a row whose ``end_date`` has already
-    passed is excluded from the select below, the same rule
-    ``accountability_for_element`` applies, so the two owner-resolution
-    paths agree on one element.
 
-    ``archimate_element_id`` is indexed but NOT unique (a component created
-    before the maintaining listener existed, or by a raw-SQL/import path,
-    can point two components at the same element) -- ``.scalars().all()``
-    with a deterministic ``order_by(id)`` plus ``setdefault`` below picks the
-    same "first" component every time instead of risking
-    ``MultipleResultsFound``.
+def _unit_tenant_predicate(org_id: int):
+    """``OrganizationUnit.organization_id == org_id``, isolated as its own
+    seam for the same reason. A unit with no organisation is excluded."""
+    from app.models.enterprise_intelligence import OrganizationUnit
+
+    return OrganizationUnit.organization_id == org_id
+
+
+def _unit_belongs_to_org(unit_org_id: Optional[int], org_id: int) -> bool:
+    """The post-fetch re-check that a unit belongs to the caller's
+    organisation, isolated as its own seam (the ``_sec09_tenant_check``
+    pattern). It backs ``_unit_tenant_predicate``: a foreign or unowned unit
+    is dropped even if the predicate were ever weakened."""
+    return unit_org_id == org_id
+
+
+def _ownership_is_current(as_of):
+    """The ONE definition of "current" ownership, used by every reader: it has
+    started (``start_date`` unset or on or before ``as_of``) and has not ended
+    (``end_date`` unset or on or after ``as_of``). A future-dated row is not
+    current; a row ending exactly on ``as_of`` still is."""
+    from app.models.enterprise_intelligence import ApplicationOwnership
+
+    return db.and_(
+        db.or_(ApplicationOwnership.start_date.is_(None), ApplicationOwnership.start_date <= as_of),
+        db.or_(ApplicationOwnership.end_date.is_(None), ApplicationOwnership.end_date >= as_of),
+    )
+
+
+def _current_ownerships_batch(
+    element_ids: List[int], org_id: int, as_of=None
+) -> Dict[int, List[Dict[str, Any]]]:
+    """The single owner chain: element -> component -> current ownership ->
+    unit, for MANY element ids in a small constant number of queries. Returns
+    every current ownership row per element (an empty list when there is
+    none), each carrying only ``ownership_id``, ``ownership_type``,
+    ``start_date``, ``unit_id`` and ``unit_name``. The contact person is not
+    read: nothing else in the product shows it, so serving it here would
+    create a new place personal data is displayed.
+
+    ``_resolve_owners_batch`` (``cross_layer_impact``'s single owner) and
+    ``accountability_for_element`` (the whole list) are both projections of
+    this function, so there is no second chain to drift from it.
+
+    Four tenant fences apply, each its own seam: ``_sec09_tenant_check`` on
+    the component, ``_ownership_tenant_predicate`` on the ownership select,
+    ``_unit_tenant_predicate`` on the unit select and ``_unit_belongs_to_org``
+    on the fetched unit. The unit is read by
+    ``select()`` and never through a relationship, so a lazy load cannot
+    bypass the fence, and any row whose unit turns out to belong to another
+    organisation is dropped, never returned.
+
+    Rows are ordered deterministically: ``start_date`` (unset last), then id.
+    ``archimate_element_id`` is indexed but not unique, so the first component
+    by id is used for each element.
     """
     from datetime import date
 
     from app.models.application_portfolio import ApplicationComponent
     from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
 
+    as_of = as_of or date.today()
     distinct_ids = sorted(set(element_ids))
-    results: Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {
-        eid: (None, NO_OWNERSHIP_REASON) for eid in distinct_ids
-    }
+    results: Dict[int, List[Dict[str, Any]]] = {eid: [] for eid in distinct_ids}
     if not distinct_ids:
         return results
 
@@ -197,15 +230,12 @@ def _resolve_owners_batch(
         .scalars()
         .all()
     )
-
-    # Deterministic "first" component per element_id -- same ordering
-    # _find_component_for_element uses for the single-row case.
     component_by_element: Dict[int, Any] = {}
     for comp in components:
         component_by_element.setdefault(comp.archimate_element_id, comp)
 
     # SEC-09: drop any component that fails the tenant assertion before it
-    # is ever used to reach ownership/unit data.
+    # is ever used to reach ownership or unit data.
     guarded_components = {
         eid: comp
         for eid, comp in component_by_element.items()
@@ -219,47 +249,78 @@ def _resolve_owners_batch(
         db.session.execute(
             db.select(ApplicationOwnership)
             .where(ApplicationOwnership.application_id.in_(component_ids))
-            .where(
-                db.or_(
-                    ApplicationOwnership.end_date.is_(None),
-                    ApplicationOwnership.end_date >= date.today(),
-                )
+            .where(_ownership_tenant_predicate(org_id))
+            .where(_ownership_is_current(as_of))
+            .order_by(
+                ApplicationOwnership.start_date.is_(None),
+                ApplicationOwnership.start_date,
+                ApplicationOwnership.id,
             )
         )
         .scalars()
         .all()
     )
-    ownership_by_component: Dict[int, Any] = {}
+    ownerships_by_component: Dict[int, List[Any]] = {}
     for ownership in ownerships:
-        ownership_by_component.setdefault(ownership.application_id, ownership)
+        ownerships_by_component.setdefault(ownership.application_id, []).append(ownership)
 
-    unit_ids = [o.organization_unit_id for o in ownership_by_component.values()]
+    unit_ids = {o.organization_unit_id for o in ownerships if o.organization_unit_id is not None}
     units: Dict[int, Any] = {}
     if unit_ids:
         units = {
             unit.id: unit
             for unit in db.session.execute(
-                db.select(OrganizationUnit).where(OrganizationUnit.id.in_(unit_ids))
+                db.select(OrganizationUnit)
+                .where(OrganizationUnit.id.in_(unit_ids))
+                .where(_unit_tenant_predicate(org_id))
             )
             .scalars()
             .all()
+            # Belt and braces after the predicate: never keep a foreign unit.
+            if _unit_belongs_to_org(unit.organization_id, org_id)
         }
 
     for eid, comp in guarded_components.items():
-        ownership = ownership_by_component.get(comp.id)
-        if ownership is None:
-            continue
-        unit = units.get(ownership.organization_unit_id)
-        if unit is None:
-            continue
-        results[eid] = (
-            {
-                "organization_unit_id": unit.id,
-                "name": unit.name,
-                "ownership_type": ownership.ownership_type,
-            },
-            None,
-        )
+        for ownership in ownerships_by_component.get(comp.id, []):
+            unit = units.get(ownership.organization_unit_id)
+            if unit is None:
+                continue
+            results[eid].append(
+                {
+                    "ownership_id": ownership.id,
+                    "ownership_type": ownership.ownership_type,
+                    "start_date": ownership.start_date,
+                    "unit_id": unit.id,
+                    "unit_name": unit.name,
+                }
+            )
+    return results
+
+
+def _resolve_owners_batch(
+    element_ids: List[int], org_id: int, as_of=None
+) -> Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]]:
+    """AA-5/SEC-09 owner attach for ``cross_layer_impact``: the FIRST current
+    ownership per element, as a projection of ``_current_ownerships_batch``
+    (the only owner chain). Output shape is unchanged: ``({organization_unit_id,
+    name, ownership_type}, None)`` when an owner resolves, ``(None,
+    NO_OWNERSHIP_REASON)`` otherwise.
+    """
+    rows_by_element = _current_ownerships_batch(element_ids, org_id, as_of)
+    results: Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {}
+    for eid, rows in rows_by_element.items():
+        if rows:
+            first = rows[0]
+            results[eid] = (
+                {
+                    "organization_unit_id": first["unit_id"],
+                    "name": first["unit_name"],
+                    "ownership_type": first["ownership_type"],
+                },
+                None,
+            )
+        else:
+            results[eid] = (None, NO_OWNERSHIP_REASON)
     return results
 
 
@@ -1568,47 +1629,82 @@ class IntelligenceQueryService:
 
     @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:
-        """L4, "who's accountable for ___, and can they take on more?":
-        WITHDRAWN -- the ownership data source is decided, but no shared,
-        tenant-safe reader for it exists yet, and this method's own first
-        version shipped one anyway rather than using the one that already
-        existed. Not a "still undecided" state; a "not built safely yet"
-        one, and the two must not be conflated in copy or reason naming.
+        """L4, "who's accountable for ___, and can they take on more?".
 
-        The original version re-implemented the element -> component ->
-        ownership -> unit chain that ``_resolve_owners_batch``/
-        ``_sec09_tenant_check`` already provide (``cross_layer_impact``'s
-        own owner field), without that function's tenant assertion. It also
-        had a real, unreviewed tenant-isolation gap of its own:
-        ``OrganizationUnit`` carries no ``TenantMixin``/``organization_id``,
-        and the original fetched it by ``organization_unit_id`` with no
-        tenant predicate at all, so a cross-tenant-seeded
-        ``organization_unit_id`` on an otherwise correctly-scoped
-        ``ApplicationOwnership`` row would have leaked another
-        organisation's unit name/type/head-of-unit -- not caught by this
-        lens's own tests, which only exercised the element-level
-        cross-tenant case. It also showed expired ownership (no
-        ``end_date`` filter) as current, and serialised PII fields
-        (``contact_email``, ``head_of_unit``, ...) nothing in the template
-        ever rendered.
+        The accountability half: every CURRENT ``ApplicationOwnership`` row
+        for the element's ``ApplicationComponent``, each with its owning
+        unit's name. It reads through ``_current_ownerships_batch``, the one
+        owner chain ``cross_layer_impact`` also uses, so there is no second
+        implementation to drift. Current means started and not ended as of
+        the date returned in ``as_of``.
 
-        Withdrawing the read entirely -- no query against either table --
-        rather than patching those in place, since the underlying gap
-        (``OrganizationUnit`` has no tenant scoping of its own) needs a
-        real, separate fix before ANY reader of it is safe, not just this
-        one. The route, question card and tests stay in place so the lens
-        is easy to re-enable once a shared, tenant-safe reader exists;
-        only the query itself is disabled.
+        Every read is fenced to the caller's organisation (component check,
+        ownership predicate, unit predicate and a post-fetch unit check, each
+        a named seam). Only what the Ask card shows is returned: ownership
+        type, unit name and start date. The contact person and e-mail, the
+        head of unit, percentages and notes are deliberately not served.
+
+        Capacity is not answered here yet, so every response carries
+        ``capacity_not_available`` and its reason.
         """
-        # No record_query_latency wrapper -- there is no query to time, and
-        # sampling a constant into the NFR-5 latency series would only
-        # dilute it with meaningless near-zero readings.
-        del element_id  # withdrawn; kept for a stable call signature
-        return {
-            "owners": [],
-            "capacity_not_available": True,
-            "reasons": [OWNERSHIP_READER_NOT_BUILT_REASON, CAPACITY_NOT_AVAILABLE_REASON],
-        }
+        from datetime import date
+
+        from app.models import ArchiMateElement
+        from app.models.application_portfolio import ApplicationComponent
+
+        org_id = current_org_id()
+
+        with record_query_latency("accountability_for_element") as scope:
+            scope.organization_id = org_id
+
+            def answer(owners, reason, as_of=None):
+                reasons = ([reason] if reason else []) + [CAPACITY_NOT_AVAILABLE_REASON]
+                return {
+                    "owners": owners,
+                    "capacity_not_available": True,
+                    "reasons": reasons,
+                    "as_of": as_of.isoformat() if as_of else None,
+                }
+
+            if org_id is None:
+                return answer([], NO_TENANT_CONTEXT_REASON)
+
+            element = db.session.execute(
+                db.select(ArchiMateElement)
+                .where(ArchiMateElement.id == element_id)
+                .where(ArchiMateElement.organization_id == org_id)
+            ).scalar_one_or_none()
+            if element is None:
+                return answer([], ELEMENT_NOT_FOUND_REASON)
+
+            as_of = date.today()
+            rows = _current_ownerships_batch([element_id], org_id, as_of).get(element_id, [])
+            if rows:
+                owners = [
+                    {
+                        "owner_id": row["ownership_id"],
+                        "ownership_type": row["ownership_type"],
+                        "start_date": row["start_date"].isoformat() if row["start_date"] else None,
+                        "organization_unit": {"id": row["unit_id"], "name": row["unit_name"]},
+                    }
+                    for row in rows
+                ]
+                return answer(owners, None, as_of)
+
+            has_component = (
+                db.session.execute(
+                    db.select(ApplicationComponent.id)
+                    .where(ApplicationComponent.archimate_element_id == element_id)
+                    .where(ApplicationComponent.organization_id == org_id)
+                    .limit(1)
+                ).first()
+                is not None
+            )
+            return answer(
+                [],
+                NO_OWNERSHIP_RECORDS_REASON if has_component else NO_APPLICATION_COMPONENT_REASON,
+                as_of,
+            )
 
     # ------------------------------------------------------------------ #
     # L7: the Data lens.
