@@ -26,6 +26,7 @@ module creates is removed at module teardown; the test database is shared.
 import os
 import re
 import tempfile
+import time
 import uuid
 
 import pytest
@@ -260,6 +261,15 @@ def _open_panel(page, domain_name):
 def _close_panel(page):
     page.get_by_role("button", name="Close detail panel", exact=True).click()
     expect(_content(page).locator("h2")).to_be_hidden()
+
+
+def _wait_for_figure(page, panel, label, expected, seconds=10):
+    """Wait until the rendered (visible) figure under ``label`` reads ``expected``."""
+    deadline = time.monotonic() + seconds
+    while _panel_figure(panel, label)[0] != expected:
+        if time.monotonic() > deadline:
+            return
+        page.wait_for_timeout(50)
 
 
 def _panel_figure(panel, label):
@@ -627,8 +637,10 @@ def test_keyboard_reaches_every_row_and_opens_the_detail_panel(browser, live_ser
         panel = _panel(page)
         expect(panel.get_by_role("heading", name="No domain", exact=True)).to_be_visible()
         # The panel is reused: its heading can switch a moment before the figures
-        # re-render from the previous domain's, so wait for this row's figure.
-        expect(panel.get_by_text("Avg Maturity", exact=True).locator("..")).to_contain_text("2 (1 measured)")
+        # re-render from the previous domain's. Wait on the RENDERED figure: the
+        # block's text also holds the hidden alternative branch, so a text
+        # expectation can pass while the visible figure is still the old one.
+        _wait_for_figure(page, panel, "Avg Maturity", "2 (1 measured)")
         assert _panel_figure(panel, "Avg Maturity")[0] == "2 (1 measured)"
         assert _panel_column(panel, "Not assessed") == [names["nodomain_unassessed"]]
 
