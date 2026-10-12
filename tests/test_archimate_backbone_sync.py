@@ -72,8 +72,16 @@ def test_every_mapped_motivation_model_can_store_its_link(app):
 def test_every_mapping_names_a_real_archimate_layer(layer_expected):
     from app.services.archimate_backbone import ELEMENT_TYPES
 
+    # The mapping now also covers the five domain types the backfill command
+    # mirrors (ApplicationComponent, BusinessCapability, VendorContract,
+    # ApplicationInterface, DataEntity). Their layers are the values the
+    # models' own insert listeners already write -- Application, Strategy,
+    # Business and the lowercase application used by the DataObject mirror.
     layers = {layer for _, layer in ELEMENT_TYPES.values()}
-    assert layers <= {"Motivation", "Implementation", "Business"}, (
+    assert layers <= {
+        "Motivation", "Implementation", "Business", "Application", "Strategy",
+        "application",
+    }, (
         "unexpected ArchiMate layer in the mapping: %s" % sorted(layers)
     )
     assert layer_expected in layers

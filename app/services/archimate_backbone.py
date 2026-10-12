@@ -59,11 +59,21 @@ ELEMENT_TYPES: Dict[str, tuple] = {
     "SolutionRequirement": ("Requirement", "Motivation"),
     "SolutionRisk": ("Assessment", "Motivation"),
     "ApplicationComplianceControl": ("BusinessObject", "Business"),
+    # The five domain types the backfill command used to mirror with its own
+    # name/description templates. Maps them onto the same type/layer the
+    # models' own insert listeners use, so a backfilled element is written by
+    # the one helper -- the same one the flush listener uses.
+    "ApplicationComponent": ("ApplicationComponent", "Application"),
+    "BusinessCapability": ("Capability", "Strategy"),
+    "VendorContract": ("Contract", "Business"),
+    "ApplicationInterface": ("ApplicationInterface", "Application"),
+    "DataEntity": ("DataObject", "application"),
 }
 
 # Where each model keeps its display name. Checked in order.
 NAME_FIELDS = ("name", "title", "risk_name", "goal_name", "driver_name",
-               "constraint_name", "requirement_text", "description", "control_name")
+               "constraint_name", "requirement_text", "description",
+               "control_name", "contract_name")
 
 # ArchiMateElement.name is String(100).
 MAX_NAME = 100
