@@ -84,6 +84,25 @@ def _wants_json() -> bool:
     return request.is_json or request.accept_mimetypes.best == "application/json"
 
 
+def _may_release(user, org_id) -> bool:
+    """The same predicate the ``@admin_required`` release route enforces:
+    Permission.ADMINISTER plus platform-admin or active-org admin authority."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    if not user.can(Permission.ADMINISTER):
+        return False
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    return is_platform_admin(user) or rbac_service.is_org_admin(user, org_id)
+
+
+def _may_write(user) -> bool:
+    """The predicate ``@permission_required(Permission.GENERAL)`` enforces on
+    the classify, assess and owner routes."""
+    return getattr(user, "is_authenticated", False) and user.can(Permission.GENERAL)
+
+
 @ai_systems_genome_bp.route("/ai-systems")
 @login_required
 def ai_systems():
@@ -93,7 +112,11 @@ def ai_systems():
     slice_data = None
     if org_id is not None:
         slice_data = build_ai_systems_slice(org_id, db.session)
-        register_html = emit_ai_systems_register(slice_data)
+        register_html = emit_ai_systems_register(
+            slice_data,
+            can_release=_may_release(current_user, org_id),
+            can_write=_may_write(current_user),
+        )
     return render_template(
         "enterprise_genome/ai_systems.html",
         register_html=register_html,
@@ -156,8 +179,9 @@ def ai_systems_seed():
 def ai_system_release(element_id):
     """Release one AI system.
 
-    Limited to the administrator role, like the approval-queue accept that
-    records the classification and the assessment. Refuses with the named
+    Limited to the administrator role — unlike the approval-queue accept that
+    records the classification and the assessment, which any user with general
+    permission may perform. Refuses with the named
     reason when the gate is shut and leaves the system unreleased: HTTP 409
     JSON to an API client, a redirect back to the register with the reason
     flashed to a browser form. The refusal message is exactly what the
