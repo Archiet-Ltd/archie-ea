@@ -608,6 +608,7 @@ _MY_WORK_LINKS = {
         _link("Architecture Journey", "architecture_journey.index", "compass"),
         _APPROVAL_INBOX_LINK,
         _link("Solutions", "solution_design.list_solutions", "wrench"),
+        _link("What-if comparison", "intelligence_ui.what_if", "git-compare"),
         _link("AI Chat", "unified_ai_chat.index", "message-square"),
         _link("ADM Kanban", "adm_kanban_view.index", "kanban"),
         # Fix round: Programmes was reachable from nowhere in the sidebar.
@@ -704,6 +705,7 @@ _MY_WORK_LINKS = {
         # every journey test passes, because those address it by URL. This
         # persona could not find it from their landing page.
         _link("Roadmaps", "main.capability_roadmap", "milestone"),
+        _link("What-if comparison", "intelligence_ui.what_if", "git-compare"),
         _APPROVAL_INBOX_LINK,
         _link("Transformation programmes", "solution_design.programmes_list", "waypoints"),
         _link("Health Scorecard", "dashboard.health_scorecard", "heart-pulse"),

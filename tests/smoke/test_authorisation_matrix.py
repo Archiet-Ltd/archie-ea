@@ -72,6 +72,7 @@ POLICY = {
     # impact endpoint they read, not by the page.
     "/intelligence/ask":       set(ARCHETYPES),
     "/intelligence/twin-map":  set(ARCHETYPES),
+    "/intelligence/what-if":   set(ARCHETYPES),
 # Model Health / Drift: carries @login_required and no role gate, so every
     # archetype is expected to reach it.
     "/genome/model-health/":   set(ARCHETYPES),
