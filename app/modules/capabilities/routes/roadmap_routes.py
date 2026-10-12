@@ -32,6 +32,7 @@ from datetime import datetime
 
 from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
+from app.middleware.tenant_context import current_org_id
 
 from app.decorators import audit_log
 from app.services.rate_limiter import rate_limit
@@ -2208,7 +2209,7 @@ def api_roadmap_gap_link_plateau(gap_id: int, plateau_id: int):
     try:
         from app.services.gap_register_service import link_gap_to_plateau
 
-        org_id = current_user.organization_id
+        org_id = current_org_id()
         link_gap_to_plateau(gap_id, plateau_id, org_id)
         db.session.commit()
         return jsonify({"success": True, "gap_id": gap_id, "plateau_id": plateau_id})
@@ -2238,7 +2239,7 @@ def api_roadmap_gap_unlink_plateau(gap_id: int, plateau_id: int):
     try:
         from app.services.gap_register_service import unlink_gap_from_plateau
 
-        org_id = current_user.organization_id
+        org_id = current_org_id()
         unlink_gap_from_plateau(gap_id, plateau_id, org_id)
         db.session.commit()
         return jsonify({"success": True, "gap_id": gap_id, "plateau_id": plateau_id})
@@ -2263,7 +2264,7 @@ def api_roadmap_gaps_not_addressed():
     try:
         from app.services.gap_register_service import get_gaps_not_addressed
 
-        org_id = current_user.organization_id
+        org_id = current_org_id()
         gaps = get_gaps_not_addressed(org_id)
         gaps_data = [
             {
