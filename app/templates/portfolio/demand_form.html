@@ -53,17 +53,17 @@
                   placeholder="The cost of not doing it, or the deadline driving it">{{ form.get('business_justification', '') }}</textarea>
       </div>
 
-      <div>
-        <label for="capability_id" class="block text-sm font-medium mb-1.5">Capability this is about</label>
-        <select id="capability_id" name="capability_id"
-                class="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-          <option value="">&mdash;</option>
-          {% for c in capabilities %}
-          <option value="{{ c.id }}" {% if form.get('capability_id')|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
-          {% endfor %}
-        </select>
+      {% if 'intelligence_ui.twin_map' in flask.current_app.view_functions %}
+      {% from 'intelligence/_entity_picker.html' import entity_picker with context %}
+      <div x-data="elementChoice('capabilitypick', 'Capability')" data-capability-picker>
+        <label class="block text-sm font-medium mb-1.5">Capability this is about</label>
+        <input type="hidden" name="capability_element_id" :value="chosenId">
+        {{ entity_picker('capabilitypick', prompt='Type a capability name') }}
         <p class="text-xs text-muted-foreground mt-1">Naming the capability lets triage show what already covers it.</p>
       </div>
+      {% else %}
+      <p class="text-xs text-muted-foreground">Capability search is not available right now, so this demand cannot name one.</p>
+      {% endif %}
 
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
@@ -134,4 +134,10 @@
   </form>
 
 </div>
+{% endblock %}
+
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/portfolio/element_choice.js') }}"></script>
 {% endblock %}

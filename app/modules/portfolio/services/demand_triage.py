@@ -21,13 +21,16 @@ from app.models.unified_capability import UnifiedCapability
 FULL_COVERAGE_PERCENTAGE = 80
 
 
-def visible_capabilities(limit: int = 500) -> List[UnifiedCapability]:
-    """Capabilities the signed-in organisation can pick from (its own and shared)."""
-    return list(
-        db.session.execute(
-            db.select(UnifiedCapability).order_by(UnifiedCapability.name).limit(limit)
-        ).scalars()
-    )
+def capability_for_element(element_id: int) -> Optional[UnifiedCapability]:
+    """The capability an architecture element stands for, if the organisation can use it.
+
+    Visibility is the capability store's own (the organisation's rows and
+    shared reference rows), so an element of another organisation resolves to
+    nothing.
+    """
+    return db.session.execute(
+        db.select(UnifiedCapability).where(UnifiedCapability.archimate_element_id == element_id)
+    ).scalars().first()
 
 
 def coverage_for_capability(capability_id: int) -> List[Dict[str, Any]]:

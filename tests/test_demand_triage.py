@@ -47,9 +47,17 @@ def _client_for(app, db_session, org, role="platform_admin"):
 def _capability(db_session, org, name):
     from app.models.unified_capability import UnifiedCapability
 
+    from app.models.archimate_core import ArchiMateElement
+
     cap = UnifiedCapability(name=name, organization_id=org.id, level=1)
     db_session.add(cap)
     db_session.flush()
+    if cap.archimate_element_id is None:
+        element = ArchiMateElement(name=name, type="Capability", layer="strategy", organization_id=org.id)
+        db_session.add(element)
+        db_session.flush()
+        cap.archimate_element_id = element.id
+        db_session.flush()
     return cap
 
 
@@ -163,7 +171,7 @@ def test_demand_submitted_with_capability_shows_coverage_and_records_route(world
     cap = _capability(db_session, org, "Supplier Onboarding")
     _map(db_session, cap, _application(db_session, org, "Onboard Hub"))
     _clear_login_cache()
-    resp = client.post("/portfolio/demands/new", data={"title": "Faster onboarding", "capability_id": cap.id})
+    resp = client.post("/portfolio/demands/new", data={"title": "Faster onboarding", "capability_element_id": cap.archimate_element_id})
     assert resp.status_code == 302
     _clear_login_cache()
     page = client.get("/portfolio/demands").get_data(as_text=True)
@@ -209,8 +217,41 @@ def test_another_organisations_capability_cannot_be_chosen(world, db_session):
     foreign = _capability(db_session, org_b, "Org B Only")
     _tenant(org_a.id)
     _clear_login_cache()
-    resp = client_a.post("/portfolio/demands/new", data={"title": "Sneaky", "capability_id": foreign.id})
+    resp = client_a.post("/portfolio/demands/new", data={"title": "Sneaky", "capability_element_id": foreign.archimate_element_id})
     assert resp.status_code == 400
     from app.models.demand import Demand
 
     assert db_session.query(Demand).filter_by(title="Sneaky").count() == 0
+
+
+def test_element_that_is_not_a_capability_is_refused(world, db_session):
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.demand import Demand
+
+    org, client = world["a"]
+    _tenant(org.id)
+    node = ArchiMateElement(name="Plain node", type="Node", layer="technology", organization_id=org.id)
+    db_session.add(node)
+    db_session.flush()
+    _clear_login_cache()
+    resp = client.post("/portfolio/demands/new", data={"title": "Odd one", "capability_element_id": node.id})
+    assert resp.status_code == 400
+    assert db_session.query(Demand).filter_by(title="Odd one").count() == 0
+
+
+def test_demand_without_a_capability_still_saves(world, db_session):
+    from app.models.demand import Demand
+
+    org, client = world["a"]
+    _tenant(org.id)
+    _clear_login_cache()
+    assert client.post("/portfolio/demands/new", data={"title": "No capability"}).status_code == 302
+    assert db_session.query(Demand).filter_by(title="No capability").one().capability_id is None
+
+
+def test_form_offers_the_search_picker_not_a_list(world):
+    _, client = world["a"]
+    _clear_login_cache()
+    page = client.get("/portfolio/demands/new").get_data(as_text=True)
+    assert "data-capability-picker" in page
+    assert "<select id=\"capability_id\"" not in page

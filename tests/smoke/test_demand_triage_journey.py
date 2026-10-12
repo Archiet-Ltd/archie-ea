@@ -20,6 +20,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 def _seed(org_id):
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
     from app.models.unified_capability import UnifiedCapability
 
@@ -30,6 +31,11 @@ def _seed(org_id):
         application = ApplicationComponent(name="Onboard Hub %s" % suffix, organization_id=org_id)
         db.session.add_all([cap, application])
         db.session.flush()
+        if cap.archimate_element_id is None:
+            element = ArchiMateElement(name=cap.name, type="Capability", layer="strategy", organization_id=org_id)
+            db.session.add(element)
+            db.session.flush()
+            cap.archimate_element_id = element.id
         db.session.add(UnifiedApplicationCapabilityMapping(
             unified_capability_id=cap.id, application_component_id=application.id,
             support_level="full", coverage_percentage=90, is_active=True))
@@ -55,7 +61,8 @@ def test_demand_shows_existing_coverage_and_records_the_route(browser, live_serv
     sign_in(page, live_server, org["emails"]["portfolio_manager"])
     page.goto(live_server + "/portfolio/demands/new", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     page.fill("#title", title)
-    page.select_option("#capability_id", label=seeded["capability"])
+    page.get_by_role("combobox", name="Type a capability name").fill(seeded["capability"])
+    page.get_by_role("option", name=seeded["capability"]).click()
     with page.expect_navigation(timeout=PAGE_TIMEOUT):
         page.get_by_role("button", name="Submit demand").click()
 
