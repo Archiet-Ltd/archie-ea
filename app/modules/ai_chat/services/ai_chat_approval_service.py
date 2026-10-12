@@ -738,6 +738,19 @@ class AIChatApprovalService:
                         organization_id=org_id,
                     )
                     result = {"success": accepted}
+                elif approval.entity_type == "ai_system_grounding_source":
+                    # Accept a proposed grounding data source. Approving
+                    # writes the proposed-use property through the property
+                    # service; refusing writes nothing.
+                    from app.modules.enterprise_genome.services.ai_system_grounding import (
+                        accept_grounding_source,
+                    )
+                    org_id = approval.organization_id
+                    accepted = accept_grounding_source(
+                        approval_id=approval.id,
+                        organization_id=org_id,
+                    )
+                    result = {"success": accepted}
                 else:
                     return {"success": False, "error": f"Unknown entity type: {approval.entity_type}"}
 
