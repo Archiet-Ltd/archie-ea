@@ -951,8 +951,6 @@ def test_roadmap_writer_outside_a_tenant_request_refuses_to_write(
 ):
     from flask import g
 
-    from app.models.unified_capability import UnifiedCapability
-
     org = make_org("write-org")
     cap_id = _make_capability(
         db_session, tenant_ctx, org, current_maturity_level=2
