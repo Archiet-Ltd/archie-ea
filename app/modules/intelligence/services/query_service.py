@@ -23,6 +23,7 @@ value-streams-at-risk surface.
 
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from app.extensions import db
@@ -63,6 +64,17 @@ NO_BUDGET_RECORDED_REASON = validate_reason_code("no_budget_recorded")
 # the withdrawn one, not removed on the strength of a temporary gap.
 NO_OWNERSHIP_RECORDS_REASON = validate_reason_code("no_ownership_records")
 CAPACITY_NOT_AVAILABLE_REASON = validate_reason_code("capacity_not_available")
+# Impact lifecycle block: the source row carries no status and no dates at
+# all (component or technology), and a guarded component's vendor_product_id
+# is null or resolves to no catalogue row, respectively -- two distinct
+# absence conditions on the impact answer's lifecycle read.
+NO_LIFECYCLE_RECORDED_REASON = validate_reason_code("no_lifecycle_recorded")
+NO_VENDOR_MAPPING_RECORDED_REASON = validate_reason_code("no_vendor_mapping_recorded")
+
+# The statuses a recorded lifecycle_status can carry that mean "already
+# scheduled to stop" on their own, with no date needed.
+_RETIRING_STATUSES = frozenset({"deprecated", "retired"})
+
 # Distinct from a "decision pending" state -- the ownership data source IS
 # decided; what doesn't exist yet is a shared, tenant-safe reader for it.
 OWNERSHIP_READER_NOT_BUILT_REASON = validate_reason_code("ownership_reader_not_built")
@@ -127,6 +139,18 @@ def _sec09_tenant_check(component_org_id: Optional[int], org_id: int) -> bool:
     return component_org_id == org_id
 
 
+def _technology_org_predicate(org_column: Any, org_id: int) -> Any:
+    """The explicit ``organization_id`` predicate every technology select
+    adds on top of the ``TenantMixin`` listener, isolated as its own seam
+    (same pattern as ``_sec09_tenant_check`` above) so a mutation-proof test
+    can monkeypatch exactly this to a no-op (``True``) and confirm a
+    cross-tenant technology read goes red, without editing source under
+    test. Generic over the column passed in -- carries no reference to a
+    specific technology model.
+    """
+    return org_column == org_id
+
+
 def _licence_tenant_predicate(org_id: int):
     """The explicit ``LicenseEntitlement.organization_id ==`` predicate on
     the portfolio component block's licence read, isolated as its own seam
@@ -145,29 +169,19 @@ def _licence_tenant_predicate(org_id: int):
     return LicenseEntitlement.organization_id == org_id
 
 
-def _resolve_owners_batch(
-    element_ids: List[int], org_id: int
-) -> Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]]:
-    """AA-5/SEC-09 owner attach: element -> component -> ownership -> unit,
-    batched across MANY element ids in a small constant number of queries
-    (M7 fix -- see the build report's B2/NEW-3 sections for why this is now
-    the ONLY owner-resolution implementation on this path; a per-row
-    ``_resolve_owner``/``_find_component_for_element`` pair used to exist
-    alongside this and was deleted as dead code -- ``cross_layer_impact`` is
-    this function's only production caller).
+def _resolve_components_batch(element_ids: List[int], org_id: int) -> Dict[int, Any]:
+    """The one element-to-component read on this path: element ->
+    ``ApplicationComponent``, batched across MANY element ids in one select
+    (the first select and two loops that used to open
+    ``_resolve_owners_batch``, extracted so every caller that needs a
+    guarded component map -- owner attach here, the lifecycle block below,
+    and every sibling lens that needs the same map -- shares the one
+    implementation instead of a second element-to-component chain).
 
     ``ApplicationComponent`` carries ``TenantMixin`` so the component select
     below is already fenced by ``do_orm_execute`` (a cross-tenant row is
     simply not returned in a normal request); ``_sec09_tenant_check`` is the
-    belt-and-braces assertion applied on top of that ORM fencing -- kept for
-    the session-scoped-caller drift it defends against even now that
-    ``ApplicationOwnership`` and ``OrganizationUnit`` carry ``TenantMixin``
-    too and are fenced by the same listener.
-
-    Only CURRENT ownership is attached: a row whose ``end_date`` has already
-    passed is excluded from the select below, the same rule
-    ``accountability_for_element`` applies, so the two owner-resolution
-    paths agree on one element.
+    belt-and-braces assertion applied on top of that ORM fencing.
 
     ``archimate_element_id`` is indexed but NOT unique (a component created
     before the maintaining listener existed, or by a raw-SQL/import path,
@@ -175,18 +189,16 @@ def _resolve_owners_batch(
     with a deterministic ``order_by(id)`` plus ``setdefault`` below picks the
     same "first" component every time instead of risking
     ``MultipleResultsFound``.
+
+    An empty *element_ids* returns ``{}`` with no select.
     """
     from datetime import date
 
     from app.models.application_portfolio import ApplicationComponent
-    from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
 
     distinct_ids = sorted(set(element_ids))
-    results: Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {
-        eid: (None, NO_OWNERSHIP_REASON) for eid in distinct_ids
-    }
     if not distinct_ids:
-        return results
+        return {}
 
     components = (
         db.session.execute(
@@ -205,12 +217,47 @@ def _resolve_owners_batch(
         component_by_element.setdefault(comp.archimate_element_id, comp)
 
     # SEC-09: drop any component that fails the tenant assertion before it
-    # is ever used to reach ownership/unit data.
-    guarded_components = {
+    # is ever handed to a caller that would reach ownership/unit/lifecycle
+    # data through it.
+    return {
         eid: comp
         for eid, comp in component_by_element.items()
         if _sec09_tenant_check(comp.organization_id, org_id)
     }
+
+
+def _resolve_owners_batch(
+    element_ids: List[int], org_id: int
+) -> Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]]:
+    """AA-5/SEC-09 owner attach: element -> component -> ownership -> unit,
+    batched across MANY element ids in a small constant number of queries
+    (M7 fix -- see the build report's B2/NEW-3 sections for why this is now
+    the ONLY owner-resolution implementation on this path; a per-row
+    ``_resolve_owner``/``_find_component_for_element`` pair used to exist
+    alongside this and was deleted as dead code -- ``cross_layer_impact`` is
+    this function's only production caller).
+
+    The element-to-component half is ``_resolve_components_batch`` above;
+    this function continues from its guarded result.
+    ``ApplicationOwnership`` and ``OrganizationUnit`` carry no
+    ``organization_id`` column at all, so they are reached ONLY through the
+    already-fenced, already-asserted component -- never queried first.
+
+    Only CURRENT ownership is attached: a row whose ``end_date`` has already
+    passed is excluded from the select below, the same rule
+    ``accountability_for_element`` applies, so the two owner-resolution
+    paths agree on one element.
+    """
+    from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
+
+    distinct_ids = sorted(set(element_ids))
+    results: Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {
+        eid: (None, NO_OWNERSHIP_REASON) for eid in distinct_ids
+    }
+    if not distinct_ids:
+        return results
+
+    guarded_components = _resolve_components_batch(distinct_ids, org_id)
     if not guarded_components:
         return results
 
@@ -261,6 +308,236 @@ def _resolve_owners_batch(
             None,
         )
     return results
+
+
+def _iso_date(value: Any) -> Optional[str]:
+    """None-safe ISO date string. A ``datetime`` (the vendor catalogue's
+    ``end_of_life_date`` column) has its time part dropped; every other
+    source this block reads is already a plain ``Date``.
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    return value.isoformat()
+
+
+def _lifecycle_retiring(
+    status: Optional[str],
+    planned_retirement_date: Optional[date],
+    end_of_life_date: Optional[date],
+    today: date,
+    window: timedelta,
+) -> Tuple[Optional[bool], Optional[str]]:
+    """The one comparison the lifecycle block makes, in order: nothing
+    recorded at all is the honest absence; otherwise ``retiring`` compares a
+    recorded status against the two retiring status words, or a recorded
+    date against the caller's own window -- never a threshold, colour or
+    level word beyond that.
+    """
+    if status is None and planned_retirement_date is None and end_of_life_date is None:
+        return None, NO_LIFECYCLE_RECORDED_REASON
+    retiring = (
+        status in _RETIRING_STATUSES
+        or (planned_retirement_date is not None and planned_retirement_date <= today + window)
+        or (end_of_life_date is not None and end_of_life_date <= today + window)
+    )
+    return retiring, None
+
+
+def _lifecycle_block(
+    *,
+    status: Optional[str],
+    planned_retirement_date: Optional[date],
+    end_of_life_date: Optional[date],
+    support_expiry: Optional[date],
+    licence_expiry: Optional[date],
+    vendor_end_of_life_date: Optional[Any],
+    vendor_reason: Optional[str],
+    source: str,
+    today: date,
+    window: timedelta,
+) -> Dict[str, Any]:
+    """The one ten-key shape for the lifecycle block -- one for both the
+    component and the technology sources; only the caller decides which
+    fields it can fill.
+    """
+    retiring, reason = _lifecycle_retiring(status, planned_retirement_date, end_of_life_date, today, window)
+    return {
+        "status": status,
+        "planned_retirement_date": _iso_date(planned_retirement_date),
+        "end_of_life_date": _iso_date(end_of_life_date),
+        "support_expiry": _iso_date(support_expiry),
+        "licence_expiry": _iso_date(licence_expiry),
+        "vendor_end_of_life_date": _iso_date(vendor_end_of_life_date),
+        "vendor_reason": vendor_reason,
+        "retiring": retiring,
+        "reason": reason,
+        "source": source,
+    }
+
+
+def _resolve_component_lifecycle_batch(
+    row_element_ids: List[int], org_id: int, today: date, window: timedelta
+) -> Dict[int, Dict[str, Any]]:
+    """The guarded component map (the same shared extraction
+    ``_resolve_owners_batch`` calls, no second element-to-component chain)
+    plus one vendor select. Neither select runs when the guarded map is
+    empty. Directly callable with an explicit *org_id*, same shape as
+    ``_resolve_elements_batch``/``_resolve_owners_batch`` above, so a caller
+    can be tested independently of the ambient tenant context.
+    """
+    guarded_components = _resolve_components_batch(row_element_ids, org_id)
+    if not guarded_components:
+        return {}
+
+    from app.models.vendor.vendor_organization import VendorProduct
+
+    vendor_ids = {
+        comp.vendor_product_id
+        for comp in guarded_components.values()
+        if comp.vendor_product_id is not None
+    }
+    vendor_eol_by_id: Dict[int, Any] = {}
+    if vendor_ids:
+        vendor_eol_by_id = dict(
+            db.session.execute(
+                db.select(VendorProduct.id, VendorProduct.end_of_life_date).where(
+                    VendorProduct.id.in_(vendor_ids)
+                )
+            ).all()
+        )
+
+    blocks: Dict[int, Dict[str, Any]] = {}
+    for eid, comp in guarded_components.items():
+        vendor_end_of_life_date = None
+        vendor_reason = NO_VENDOR_MAPPING_RECORDED_REASON
+        if comp.vendor_product_id is not None and comp.vendor_product_id in vendor_eol_by_id:
+            vendor_end_of_life_date = vendor_eol_by_id[comp.vendor_product_id]
+            vendor_reason = None
+        blocks[eid] = _lifecycle_block(
+            status=comp.lifecycle_status,
+            planned_retirement_date=comp.planned_retirement_date,
+            end_of_life_date=comp.end_of_life_date,
+            support_expiry=None,
+            licence_expiry=None,
+            vendor_end_of_life_date=vendor_end_of_life_date,
+            vendor_reason=vendor_reason,
+            source="application_components",
+            today=today,
+            window=window,
+        )
+    return blocks
+
+
+def _resolve_technology_lifecycle_batch(
+    technology_ids: List[int], org_id: int, today: date, window: timedelta
+) -> Dict[int, Dict[str, Any]]:
+    """The three technology selects -- one per class, class order
+    Node, Device, SystemSoftware, ``setdefault`` per element id so an
+    element pointed at by rows of two classes resolves to the first class,
+    every time. Each select carries the explicit ``organization_id``
+    predicate through ``_technology_org_predicate`` (defense in depth on top
+    of the ``TenantMixin`` listener, same pattern as ``_resolve_elements_batch``
+    above). None run when *technology_ids* is empty. Directly callable with
+    an explicit *org_id*, so a caller can be tested independently of the
+    ambient tenant context (the listener no-ops with no ambient context, or
+    disagrees with an explicit *org_id* under a diverged session -- the same
+    two scenarios ``_resolve_elements_batch``'s own tests cover).
+    """
+    if not technology_ids:
+        return {}
+
+    from app.models.technology_layer import Device, Node, SystemSoftware
+
+    blocks: Dict[int, Dict[str, Any]] = {}
+
+    node_rows = db.session.execute(
+        db.select(Node.archimate_element_id, Node.decommission_date, Node.license_expiry_date)
+        .where(
+            Node.archimate_element_id.in_(technology_ids),
+            _technology_org_predicate(Node.organization_id, org_id),
+        )
+        .order_by(Node.id)
+    ).all()
+    for element_id, decommission_date, license_expiry_date in node_rows:
+        blocks.setdefault(
+            element_id,
+            _lifecycle_block(
+                status=None,
+                planned_retirement_date=decommission_date,
+                end_of_life_date=None,
+                support_expiry=None,
+                licence_expiry=license_expiry_date,
+                vendor_end_of_life_date=None,
+                vendor_reason=None,
+                source="technology_nodes",
+                today=today,
+                window=window,
+            ),
+        )
+
+    device_rows = db.session.execute(
+        db.select(
+            Device.archimate_element_id,
+            Device.decommission_date,
+            Device.eol_date,
+            Device.support_contract_expiry,
+        )
+        .where(
+            Device.archimate_element_id.in_(technology_ids),
+            _technology_org_predicate(Device.organization_id, org_id),
+        )
+        .order_by(Device.id)
+    ).all()
+    for element_id, decommission_date, eol_date, support_contract_expiry in device_rows:
+        blocks.setdefault(
+            element_id,
+            _lifecycle_block(
+                status=None,
+                planned_retirement_date=decommission_date,
+                end_of_life_date=eol_date,
+                support_expiry=support_contract_expiry,
+                licence_expiry=None,
+                vendor_end_of_life_date=None,
+                vendor_reason=None,
+                source="technology_devices",
+                today=today,
+                window=window,
+            ),
+        )
+
+    software_rows = db.session.execute(
+        db.select(
+            SystemSoftware.archimate_element_id,
+            SystemSoftware.decommission_date,
+            SystemSoftware.eol_date,
+            SystemSoftware.license_expiry_date,
+        )
+        .where(
+            SystemSoftware.archimate_element_id.in_(technology_ids),
+            _technology_org_predicate(SystemSoftware.organization_id, org_id),
+        )
+        .order_by(SystemSoftware.id)
+    ).all()
+    for element_id, decommission_date, eol_date, license_expiry_date in software_rows:
+        blocks.setdefault(
+            element_id,
+            _lifecycle_block(
+                status=None,
+                planned_retirement_date=decommission_date,
+                end_of_life_date=eol_date,
+                support_expiry=None,
+                licence_expiry=license_expiry_date,
+                vendor_end_of_life_date=None,
+                vendor_reason=None,
+                source="technology_system_software",
+                today=today,
+                window=window,
+            ),
+        )
+
+    return blocks
 
 
 def _resolve_elements_batch(element_ids: Iterable[int], org_id: Optional[int]) -> Dict[str, Dict[str, Any]]:
@@ -694,6 +971,7 @@ class IntelligenceQueryService:
         direction: str = "downstream",
         layer: Optional[str] = None,
         with_owner: bool = True,
+        retirement_window_days: int = 90,
         cursor: Optional[int] = None,
         page_size: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -701,6 +979,8 @@ class IntelligenceQueryService:
             raise ValueError(f"direction must be one of {sorted(VALID_DIRECTIONS)}")
         if not (1 <= max_depth <= 10):
             raise ValueError("max_depth must be between 1 and 10")
+        if not (1 <= retirement_window_days <= 3650):
+            raise ValueError("retirement_window_days must be between 1 and 3650")
 
         org_id = current_org_id()
 
@@ -722,6 +1002,11 @@ class IntelligenceQueryService:
                     "derivation_state": "not_computed",
                 }
                 reasons = [NO_TENANT_CONTEXT_REASON]
+                lifecycle_flags = {
+                    "retiring_element_ids": None,
+                    "reason": NO_TENANT_CONTEXT_REASON,
+                    "window_days": retirement_window_days,
+                }
                 maturity_flags = _maturity_flags(NO_TENANT_CONTEXT_REASON)
             else:
                 from app.models import ArchiMateElement
@@ -739,6 +1024,11 @@ class IntelligenceQueryService:
                         "derivation_state": "not_computed",
                     }
                     reasons = [ELEMENT_NOT_FOUND_REASON]
+                    lifecycle_flags = {
+                        "retiring_element_ids": None,
+                        "reason": ELEMENT_NOT_FOUND_REASON,
+                        "window_days": retirement_window_days,
+                    }
                     maturity_flags = _maturity_flags(ELEMENT_NOT_FOUND_REASON)
                 else:
                     explicit_rows = _walk_explicit(element_id, max_depth, direction)
@@ -787,6 +1077,33 @@ class IntelligenceQueryService:
                     # then let the derived rows name both of their ends.
                     elements = _resolve_elements_batch(_element_ids_in_rows(rows), org_id)
                     _attach_plain_terms(rows, elements)
+
+                    # Lifecycle block: the one guarded component read
+                    # (shared with owner attach below -- no second
+                    # element-to-component chain), one vendor select and
+                    # three technology selects, at most five in total, none
+                    # when there are no rows. Technology ids come from the
+                    # already-resolved identity map above, so a foreign id
+                    # can never reach a select.
+                    component_lifecycle_by_element: Dict[int, Dict[str, Any]] = {}
+                    technology_lifecycle_by_element: Dict[int, Dict[str, Any]] = {}
+                    if rows:
+                        today = date.today()
+                        window = timedelta(days=retirement_window_days)
+                        row_element_ids = [row["element_id"] for row in rows]
+
+                        component_lifecycle_by_element = _resolve_component_lifecycle_batch(
+                            row_element_ids, org_id, today, window
+                        )
+
+                        technology_ids = [
+                            eid
+                            for eid in row_element_ids
+                            if elements.get(str(eid), {}).get("layer") == "technology"
+                        ]
+                        technology_lifecycle_by_element = _resolve_technology_lifecycle_batch(
+                            technology_ids, org_id, today, window
+                        )
 
                     # The distinct Capability element ids the identity map
                     # above already resolved under the tenant predicate --
@@ -852,6 +1169,38 @@ class IntelligenceQueryService:
                         # is stripped.
                         row.pop("_endpoints", None)
 
+                        # A row whose element resolves to a
+                        # guarded component gains the lifecycle block; a
+                        # technology row gains it the same way. Not
+                        # applicable is not an absence, so a row that is
+                        # neither carries no key at all. An element that is
+                        # both (impossible by layer) takes the component
+                        # block -- component looked up first.
+                        eid = row["element_id"]
+                        if eid in component_lifecycle_by_element:
+                            row["lifecycle"] = component_lifecycle_by_element[eid]
+                        elif eid in technology_lifecycle_by_element:
+                            row["lifecycle"] = technology_lifecycle_by_element[eid]
+
+                    if any("lifecycle" in row for row in rows):
+                        retiring_element_ids = sorted(
+                            row["element_id"]
+                            for row in rows
+                            if row.get("lifecycle") is not None
+                            and row["lifecycle"]["retiring"] is True
+                        )
+                        lifecycle_flags = {
+                            "retiring_element_ids": retiring_element_ids,
+                            "reason": None,
+                            "window_days": retirement_window_days,
+                        }
+                    else:
+                        lifecycle_flags = {
+                            "retiring_element_ids": None,
+                            "reason": NO_LIFECYCLE_RECORDED_REASON,
+                            "window_days": retirement_window_days,
+                        }
+
                     explicit_count = sum(1 for r in rows if r["relation"]["kind"] == "explicit")
                     derived_count = sum(1 for r in rows if r["relation"]["kind"] == "derived")
                     stale_count = sum(1 for r in rows if r["relation"].get("stale"))
@@ -896,6 +1245,7 @@ class IntelligenceQueryService:
             "summary": summary,
             "reasons": reasons,
             "elements": elements,
+            "lifecycle_flags": lifecycle_flags,
             "maturity_flags": maturity_flags,
             "total": total,
             "next_cursor": next_cursor,

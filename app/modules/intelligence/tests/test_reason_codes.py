@@ -43,9 +43,11 @@ reality more than once already (found and corrected multiple times,
 independently, by different lenses' briefs each adding a member without
 re-deriving the true count); merging branches that each added members
 independently (L2/L4/role-gating, T-S1, the maturity read helper, the
-programme lens's own plateau/gap pair, and the Portfolio-block additions) is
-the same class of drift, resolved here by re-deriving the real count (39)
-rather than trusting any one side's own stale number.
+programme lens's own plateau/gap pair, the Portfolio-block additions, and
+the impact answer's lifecycle block's ``no_lifecycle_recorded``/
+``no_vendor_mapping_recorded`` pair) is the same class of drift, resolved
+here by re-deriving the real count rather than trusting any one side's own
+stale number.
 """
 
 from __future__ import annotations
@@ -93,6 +95,8 @@ _EXPECTED = {
     "no_ownership_records",
     "capacity_not_available",
     "financial_data_restricted",
+    "no_lifecycle_recorded",
+    "no_vendor_mapping_recorded",
     "ownership_reader_not_built",
     "no_value_stream_recorded",
     "no_capability_linked",
@@ -119,8 +123,8 @@ _EXPECTED = {
 }
 
 
-def test_reason_codes_has_exactly_forty_nine_members():
-    assert len(REASON_CODES) == 49
+def test_reason_codes_has_exactly_fifty_one_members():
+    assert len(REASON_CODES) == 51
     assert REASON_CODES == frozenset(_EXPECTED)
 
 

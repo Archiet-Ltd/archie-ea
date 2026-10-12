@@ -97,6 +97,16 @@ REASON_CODES = frozenset(
         # not_costed/no_budget_recorded already use for a different kind of
         # absence.
         "financial_data_restricted",
+        # Impact lifecycle addition: the impact answer's lifecycle block
+        # (application/technology/vendor rows read as recorded) is absent
+        # when none of the source's own lifecycle fields carry a value --
+        # an honest absence, not an invented "unknown" status.
+        "no_lifecycle_recorded",
+        # Impact lifecycle addition: a guarded component's vendor_product_id
+        # is either null or does not resolve to a catalogue row -- the
+        # vendor's own end-of-life date is then genuinely absent, not a
+        # value this codebase failed to fetch.
+        "no_vendor_mapping_recorded",
         # PR #107 defect remediation (2026-09-23): the L4 Accountability
         # lens's ownership read is withdrawn -- the original implementation
         # read ApplicationOwnership/OrganizationUnit directly with a real,
