@@ -68,6 +68,9 @@
   </div>
 
   <div class="flex flex-wrap gap-4 text-sm">
+    {% if 'intelligence_ui.recommendations_page' in flask.current_app.view_functions %}
+    <a class="underline" href="{{ url_for('intelligence_ui.recommendations_page') }}">Recommendations</a>
+    {% endif %}
     {% if 'enterprise.gap_analysis' in flask.current_app.view_functions %}
     <a class="underline" href="{{ url_for('enterprise.gap_analysis') }}">Gap analysis</a>
     {% endif %}
