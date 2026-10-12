@@ -4,15 +4,16 @@ tenant-safe reader for it exists yet, and the original implementation had a
 real, unreviewed tenant-isolation gap on ``OrganizationUnit`` -- see the
 method's own docstring for the external review that found this.
 
-The withdrawn method deliberately does NOT look up the element, resolve a
-component, or query ApplicationOwnership/OrganizationUnit at all -- the
-safest way to guarantee nothing from the original tenant-isolation gap can
-resurface is for there to be no query to leak from. Real element/tenant
-validation for this route still happens at the route layer
+The withdrawn method deliberately does NOT resolve a component or query
+ApplicationOwnership/OrganizationUnit at all -- the safest way to guarantee
+nothing from the original tenant-isolation gap can resurface is for there to
+be no query to leak from. Real element/tenant validation for this route still
+happens at the route layer
 (app/modules/intelligence/routes/api.py:accountability_for_element), which
 is unchanged and still returns honest 400/404s before ever calling this
-method; these tests cover the service method itself, which is now a
-constant.
+method; these tests cover the withdrawn answer, which is a constant for every
+element type. (For a Capability element the method also reads the RACI
+assignments recorded against it -- see test_accountability_raci.py.)
 
 Fixtures (app, db_session, make_org) are discovered via
 app/modules/conftest.py's import of tests.conftest,

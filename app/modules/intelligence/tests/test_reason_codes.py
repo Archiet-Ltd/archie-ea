@@ -1,7 +1,7 @@
 """T-001 acceptance criterion 13: the DE-14 reason-code vocabulary is closed.
 
 Mapping:
-    13 -> test_reason_codes_has_exactly_forty_three_members,
+    13 -> test_reason_codes_has_exactly_forty_four_members,
           test_unknown_reason_code_is_rejected_not_passed_through
 
 T-004 (US-1) added two members -- ``no_tenant_context`` and
@@ -34,6 +34,10 @@ The connection explanation ("Why?" on a derived row) added four more --
 ``relationship_not_recorded``, ``drawn_by_not_recorded``,
 ``drawn_at_not_recorded`` and ``rule_not_recorded`` -- reusing the existing
 ``element_not_found`` for an element on the chain that does not resolve.
+The accountability answer for a capability added ``no_raci_recorded`` --
+a capability resolved in the caller's chain with no RACI assignment
+recorded against it -- reusing the existing ``no_capability_in_chain``
+for the case with no such capability at all.
 
 "Closed" means no endpoint may invent an absence string inline, not that the
 set is frozen at sixteen forever; the module's own docstring says a new
@@ -43,9 +47,10 @@ reality more than once already (found and corrected multiple times,
 independently, by different lenses' briefs each adding a member without
 re-deriving the true count); merging branches that each added members
 independently (L2/L4/role-gating, T-S1, the maturity read helper, the
-programme lens's own plateau/gap pair, and the Portfolio-block additions) is
-the same class of drift, resolved here by re-deriving the real count (39)
-rather than trusting any one side's own stale number.
+programme lens's own plateau/gap pair, the Portfolio-block additions, the
+connection explanation and the accountability RACI addition) is the same
+class of drift, resolved here by re-deriving the real count (44) rather
+than trusting any one side's own stale number.
 """
 
 from __future__ import annotations
@@ -64,8 +69,8 @@ from app.modules.intelligence.services.reason_codes import (
 # Strategy lenses' four additions, the Accountability lens's two plus its
 # withdrawal reason, role-gating's addition, T-S1's four additions, the
 # programme lens's own plateau/gap pair, the maturity read helper's two
-# additions, the Portfolio-block's four additions and the connection
-# explanation's four.
+# additions, the Portfolio-block's four additions, the connection
+# explanation's four and the accountability RACI addition.
 _EXPECTED = {
     "no_ownership_recorded",
     "no_maturity_recorded",
@@ -98,6 +103,8 @@ _EXPECTED = {
     "no_capability_linked",
     "value_stream_not_linked_to_model",
     "dependency_direction_unknown",
+    "no_capability_in_chain",
+    "no_raci_recorded",
     "no_data_recorded",
     "no_steward_recorded",
     "no_lineage_recorded",
@@ -107,7 +114,6 @@ _EXPECTED = {
     "no_plateau_recorded",
     "no_gap_recorded",
     "no_maturity_target_recorded",
-    "no_capability_in_chain",
     "no_cost_recorded",
     "no_health_recorded",
     "no_licence_recorded",
@@ -119,8 +125,8 @@ _EXPECTED = {
 }
 
 
-def test_reason_codes_has_exactly_forty_nine_members():
-    assert len(REASON_CODES) == 49
+def test_reason_codes_has_exactly_fifty_members():
+    assert len(REASON_CODES) == 50
     assert REASON_CODES == frozenset(_EXPECTED)
 
 
