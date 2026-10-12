@@ -567,7 +567,7 @@ def test_backfill_vendor_contract_parity(app):
             assert orm_element_id is not None
 
             # SQL-seeded contract: no element, needs backfill.
-            sql_id = _seed_contract(app, org_id, "SQL Contract", "Description from SQL")
+            _seed_contract(app, org_id, "SQL Contract", "Description from SQL")
 
             # Backfill creates an element for the SQL-seeded row.
             stats = backfill_domain_elements(org_id)
