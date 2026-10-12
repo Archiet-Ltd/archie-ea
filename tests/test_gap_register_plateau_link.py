@@ -422,8 +422,10 @@ def test_two_org_save_link_and_not_addressed(db_session, make_org):
 def test_roadmap_api_and_gap_analysis_page_counts_agree(
     db_session, app, client, login_as, make_org,
 ):
-    """The roadmap API and the gap analysis page return the same gap count
-    for the same organisation, because both call count_gaps()."""
+    """The roadmap API and the gap analysis page report the same gap count
+    for the same organisation: the roadmap API counts the derived analysis
+    list it returns, and the page metric is the one register count."""
+    from app.models.business_capabilities import BusinessCapability
     from app.models.user import Role, User
     from app.services.gap_register_service import create_gap
 
@@ -431,6 +433,16 @@ def test_roadmap_api_and_gap_analysis_page_counts_agree(
     org = make_org("route-count-compare")
     create_gap(org.id, "Route Gap A", gap_type="coverage")
     create_gap(org.id, "Route Gap B", gap_type="coverage")
+    # Two uncovered business capabilities so the roadmap gap analysis
+    # derives exactly two gaps for this organisation.
+    db_session.add(BusinessCapability(
+        name="Route Compare Capability 1", code="ROUTE-COMPARE-1",
+        organization_id=org.id, level=1,
+    ))
+    db_session.add(BusinessCapability(
+        name="Route Compare Capability 2", code="ROUTE-COMPARE-2",
+        organization_id=org.id, level=1,
+    ))
     db_session.commit()
 
     user = User(
@@ -461,10 +473,12 @@ def test_roadmap_api_and_gap_analysis_page_counts_agree(
     assert gap_analysis_resp.status_code == 200
     html = gap_analysis_resp.data.decode("utf-8")
 
-    # Both screens use count_gaps() — they must agree
+    # Each screen counts the population it lists; for this organisation
+    # both populations have exactly two gaps, so they agree.
     assert roadmap_total == 2, (
         "Roadmap API total_gaps should be 2, got %d" % roadmap_total
     )
+    assert len(roadmap_data.get("gaps", [])) == roadmap_total
     # The gap analysis page renders the count somewhere in the HTML
     assert "Recorded Gaps" in html
     assert str(roadmap_total) in html, (
