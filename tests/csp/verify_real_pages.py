@@ -100,9 +100,32 @@ EXTRACT_JS = r"""
 """
 
 
+def _stop_background_work(app):
+    """Stop the APScheduler a development-config boot starts.
+
+    ``create_app("development")`` starts the scheduler, whose event-log relay
+    fires every few seconds against the database. When this runs inside the
+    pytest process nothing else stops it, so it keeps polling for the rest of
+    the shard and races whichever tests come next: a deadlock on
+    ``transformation_outbox_events`` in the decision-brief tests, and the relay
+    using a ``db.session`` a test had patched in the gateway savepoint tests.
+    ``wait=True`` so no job is still mid-run when this returns.
+    """
+    scheduler = app.extensions.pop("ea_workflow_scheduler", None)
+    if scheduler is not None and scheduler.running:
+        scheduler.shutdown(wait=True)
+
+
 def main():
-    from playwright.sync_api import sync_playwright
     app = _boot_app()
+    try:
+        return _main(app)
+    finally:
+        _stop_background_work(app)
+
+
+def _main(app):
+    from playwright.sync_api import sync_playwright
     uid = _seed_login_user(app)
     srv = make_server("127.0.0.1", 0, app, threaded=True)
     port = srv.socket.getsockname()[1]
@@ -183,6 +206,8 @@ def main():
             b.close()
     finally:
         srv.shutdown()
+        srv.server_close()
+        t.join(timeout=10)
 
     print("=== ARCH-070 real-app-page smoke ===")
     total_page_errors = []
