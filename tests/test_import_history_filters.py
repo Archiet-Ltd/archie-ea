@@ -7,6 +7,7 @@ import json
 import csv
 import io
 import mimetypes
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Event, Thread
@@ -54,6 +55,22 @@ def history_html():
     return env.get_template('dashboard/import_history.html').render(
         url_for=lambda endpoint, **kw: '/static/' + kw['filename'] if endpoint == 'static'
         else '/dashboard/applications/import-history')
+
+
+def wait_for_flag(page, flag, seconds=20):
+    """Wait for a fixture-side ``Event`` while the browser keeps running.
+
+    ``Event.wait`` blocks the thread that dispatches Playwright's own callbacks, and
+    a fixed three seconds is less than a cold Firefox needs to boot Alpine and send
+    its first request on a loaded runner. Polling through ``wait_for_timeout`` keeps
+    the page serviced and leaves a deadline wide enough to mean "never happened".
+    """
+    deadline = time.monotonic() + seconds
+    while not flag.is_set():
+        if time.monotonic() > deadline:
+            return False
+        page.wait_for_timeout(25)
+    return True
 
 
 @pytest.fixture(scope='module')
@@ -178,7 +195,7 @@ def history_page(history_browser):
         page.on('request', lambda request: unexpected.append(request.url)
                 if not request.url.startswith(origin + '/') else None)
         page.goto(origin + '/')
-        assert state['started'].wait(3)
+        assert wait_for_flag(page, state['started']), 'the history request was never sent'
         return page, state, release
 
     yield start
@@ -256,7 +273,7 @@ def test_loading_remains_visible_until_initial_request_finishes(history_page):
     page, state, release = history_page(delayed=True)
     try:
         assert state['requests'] == [{'page': ['1'], 'per_page': ['20']}]
-        expect(page.locator('#loading')).to_be_visible(timeout=1000)
+        expect(page.locator('#loading')).to_be_visible()
     finally:
         release.set()
         expect(page.locator('.import-item')).to_have_count(2)
@@ -272,7 +289,7 @@ def test_newest_request_owns_results_errors_and_loading(history_page, older_stat
                       {'rows': [ROWS[1]], 'status': newer_status}]
     page.get_by_label('Status Filter', exact=True).select_option('completed')
     page.get_by_role('button', name='Apply filters to history', exact=True).click()
-    assert older_started.wait(3)
+    assert wait_for_flag(page, older_started), 'the superseded request was never sent'
     expect(page.locator('#loading')).to_be_visible()
     page.get_by_label('Status Filter', exact=True).select_option('failed')
     with page.expect_response(lambda response: '/dashboard/applications/import-history' in response.url):
@@ -446,7 +463,7 @@ def test_page_recovery_keeps_request_filters_when_draft_controls_change(history_
     state['plans'] = [{'release': release, 'started': started}]
     before = len(state['requests'])
     page.get_by_role('button', name='Refresh', exact=True).click()
-    assert started.wait(3)
+    assert wait_for_flag(page, started), 'the refresh request was never sent'
     page.get_by_label('Status Filter').select_option('failed')
     release.set()
     expect(page.locator('.import-item')).to_have_count(1)
