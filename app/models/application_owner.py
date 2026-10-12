@@ -162,11 +162,24 @@ class ApplicationOwner(db.Model):
         ).all()
 
     @classmethod
-    def get_display_rows_for_application(cls, application_id, organization_id):
-        """Read one application's owners with tenant-fenced user display data."""
+    def get_display_rows_for_applications(
+        cls, application_ids, organization_id
+    ):
+        """Read multiple applications' owners with tenant-fenced user display data.
+
+        Returns a dict mapping each application_id to its list of display rows
+        (same shape as get_display_rows_for_application). Runs two queries
+        total regardless of how many application IDs are passed.
+        """
+        if not application_ids:
+            return {}
         from app.models.user import User
 
-        owner_rows = cls.get_owners_for_application(application_id, organization_id)
+        owner_rows = cls.query.filter(
+            cls.application_id.in_(application_ids),
+            cls.organization_id == organization_id,
+        ).all()
+
         user_ids = [row.user_id for row in owner_rows if row.user_id is not None]
         users = {}
         if user_ids:
@@ -179,11 +192,16 @@ class ApplicationOwner(db.Model):
                 ).scalars()
             }
 
-        display_rows = []
+        result = {}
         for row in owner_rows:
+            app_id = row.application_id
             user = users.get(row.user_id)
-            full_name = " ".join(part for part in (getattr(user, "first_name", None), getattr(user, "last_name", None)) if part).strip()
-            display_rows.append({
+            full_name = " ".join(
+                part
+                for part in (getattr(user, "first_name", None), getattr(user, "last_name", None))
+                if part
+            ).strip()
+            display_row = {
                 "id": row.id,
                 "user_id": row.user_id,
                 "user_name": full_name or (user.email if user else "Unknown"),
@@ -195,8 +213,19 @@ class ApplicationOwner(db.Model):
                 ),
                 "assigned_at": row.assigned_at.isoformat() if row.assigned_at else None,
                 "assigned_by": row.assigned_by,
-            })
-        return display_rows
+            }
+            result.setdefault(app_id, []).append(display_row)
+        return result
+
+    @classmethod
+    def get_display_rows_for_application(cls, application_id, organization_id):
+        """Read one application's owners with tenant-fenced user display data.
+
+        Delegates to the batch reader for a single application ID.
+        """
+        return cls.get_display_rows_for_applications(
+            [application_id], organization_id
+        ).get(application_id, [])
 
     @classmethod
     def get_applications_for_user(cls, user_id, organization_id):
