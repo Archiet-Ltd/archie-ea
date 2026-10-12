@@ -62,6 +62,7 @@ POLICY = {
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
+    "/my-applications/completeness": {"application_manager"},
     "/applications/ownership-coverage": {"cto", "portfolio_manager"},
     "/ai-chat":                set(ARCHETYPES),
     # Ask and Twin map: both pages carry @login_required and no role gate, so
