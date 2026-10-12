@@ -66,6 +66,8 @@ CAPACITY_NOT_AVAILABLE_REASON = validate_reason_code("capacity_not_available")
 # Distinct from a "decision pending" state -- the ownership data source IS
 # decided; what doesn't exist yet is a shared, tenant-safe reader for it.
 OWNERSHIP_READER_NOT_BUILT_REASON = validate_reason_code("ownership_reader_not_built")
+NO_CRITICALITY_RECORDED_REASON = validate_reason_code("no_criticality_recorded")
+NO_RECOVERY_OBJECTIVE_RECORDED_REASON = validate_reason_code("no_recovery_objective_recorded")
 NO_DATA_RECORDED_REASON = validate_reason_code("no_data_recorded")
 NO_STEWARD_RECORDED_REASON = validate_reason_code("no_steward_recorded")
 NO_LINEAGE_RECORDED_REASON = validate_reason_code("no_lineage_recorded")
@@ -127,6 +129,54 @@ def _sec09_tenant_check(component_org_id: Optional[int], org_id: int) -> bool:
     return component_org_id == org_id
 
 
+def _build_criticality_block(
+    *,
+    criticality: Optional[str] = None,
+    business_criticality: Optional[str] = None,
+    lifecycle_status: Optional[str] = None,
+    rto_hours: Optional[int] = None,
+    rpo_hours: Optional[int] = None,
+    source: str,
+) -> Dict[str, Any]:
+    """The nine-key criticality block, one shape for both sources (component and resource).
+
+    Rules, in order: ``reason = "no_criticality_recorded"`` and
+    ``critical = None`` when ``criticality`` and ``business_criticality`` are
+    both ``None``; otherwise ``reason = None`` and ``critical`` is true when
+    the lower-cased ``criticality`` is ``mission_critical`` (a component's
+    word) or ``critical`` (a resource's word), or the lower-cased
+    ``business_criticality`` is ``critical`` — the recorded words, compared
+    case-insensitively, nothing else mapped or ranked;
+    ``recovery_reason = "no_recovery_objective_recorded"`` when ``rto_hours``
+    and ``rpo_hours`` are both ``None``, else ``None``. No hour is ever
+    defaulted; ``0`` hours is a recorded value and is emitted as ``0``.
+    """
+    if criticality is None and business_criticality is None:
+        reason = NO_CRITICALITY_RECORDED_REASON
+        critical = None
+    else:
+        reason = None
+        critical = (criticality or "").lower() in {"mission_critical", "critical"} or (
+            (business_criticality or "").lower() == "critical"
+        )
+    recovery_reason = (
+        NO_RECOVERY_OBJECTIVE_RECORDED_REASON
+        if rto_hours is None and rpo_hours is None
+        else None
+    )
+    return {
+        "criticality": criticality,
+        "business_criticality": business_criticality,
+        "lifecycle_status": lifecycle_status,
+        "rto_hours": rto_hours,
+        "rpo_hours": rpo_hours,
+        "critical": critical,
+        "reason": reason,
+        "recovery_reason": recovery_reason,
+        "source": source,
+    }
+
+
 def _licence_tenant_predicate(org_id: int):
     """The explicit ``LicenseEntitlement.organization_id ==`` predicate on
     the portfolio component block's licence read, isolated as its own seam
@@ -145,29 +195,13 @@ def _licence_tenant_predicate(org_id: int):
     return LicenseEntitlement.organization_id == org_id
 
 
-def _resolve_owners_batch(
+def _resolve_components_batch(
     element_ids: List[int], org_id: int
-) -> Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]]:
-    """AA-5/SEC-09 owner attach: element -> component -> ownership -> unit,
-    batched across MANY element ids in a small constant number of queries
-    (M7 fix -- see the build report's B2/NEW-3 sections for why this is now
-    the ONLY owner-resolution implementation on this path; a per-row
-    ``_resolve_owner``/``_find_component_for_element`` pair used to exist
-    alongside this and was deleted as dead code -- ``cross_layer_impact`` is
-    this function's only production caller).
-
-    ``ApplicationComponent`` carries ``TenantMixin`` so the component select
-    below is already fenced by ``do_orm_execute`` (a cross-tenant row is
-    simply not returned in a normal request); ``_sec09_tenant_check`` is the
-    belt-and-braces assertion applied on top of that ORM fencing -- kept for
-    the session-scoped-caller drift it defends against even now that
-    ``ApplicationOwnership`` and ``OrganizationUnit`` carry ``TenantMixin``
-    too and are fenced by the same listener.
-
-    Only CURRENT ownership is attached: a row whose ``end_date`` has already
-    passed is excluded from the select below, the same rule
-    ``accountability_for_element`` applies, so the two owner-resolution
-    paths agree on one element.
+) -> Dict[int, Any]:
+    """The one element-to-component read on this path: one select of
+    ``ApplicationComponent`` where ``archimate_element_id IN distinct ids``,
+    ``order_by(ApplicationComponent.id)``, ``setdefault`` per element id,
+    then only the components that pass ``_sec09_tenant_check``.
 
     ``archimate_element_id`` is indexed but NOT unique (a component created
     before the maintaining listener existed, or by a raw-SQL/import path,
@@ -175,18 +209,17 @@ def _resolve_owners_batch(
     with a deterministic ``order_by(id)`` plus ``setdefault`` below picks the
     same "first" component every time instead of risking
     ``MultipleResultsFound``.
-    """
-    from datetime import date
 
+    ``ApplicationComponent`` carries ``TenantMixin`` so the component select
+    below is already fenced by ``do_orm_execute`` (a cross-tenant row is
+    simply not returned in a normal request); ``_sec09_tenant_check`` is the
+    belt-and-braces assertion applied on top of that ORM fencing.
+    """
     from app.models.application_portfolio import ApplicationComponent
-    from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
 
     distinct_ids = sorted(set(element_ids))
-    results: Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {
-        eid: (None, NO_OWNERSHIP_REASON) for eid in distinct_ids
-    }
     if not distinct_ids:
-        return results
+        return {}
 
     components = (
         db.session.execute(
@@ -198,19 +231,56 @@ def _resolve_owners_batch(
         .all()
     )
 
-    # Deterministic "first" component per element_id -- same ordering
-    # _find_component_for_element uses for the single-row case.
+    # Deterministic "first" component per element_id.
     component_by_element: Dict[int, Any] = {}
     for comp in components:
         component_by_element.setdefault(comp.archimate_element_id, comp)
 
-    # SEC-09: drop any component that fails the tenant assertion before it
-    # is ever used to reach ownership/unit data.
-    guarded_components = {
+    # Tenant assertion: drop any component that fails the tenant check.
+    return {
         eid: comp
         for eid, comp in component_by_element.items()
         if _sec09_tenant_check(comp.organization_id, org_id)
     }
+
+
+def _resolve_owners_batch(
+    element_ids: List[int], org_id: int
+) -> Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]]:
+    """Owner attach: element -> component -> ownership -> unit,
+    batched across MANY element ids in a small constant number of queries
+    (batch fix -- see the latency register for why this is now
+    the ONLY owner-resolution implementation on this path; a per-row
+    ``_resolve_owner``/``_find_component_for_element`` pair used to exist
+    alongside this and was deleted as dead code -- ``cross_layer_impact`` is
+    this function's only production caller).
+
+    ``ApplicationComponent`` carries ``TenantMixin`` so the component select
+    inside ``_resolve_components_batch`` is already fenced by
+    ``do_orm_execute`` (a cross-tenant row is simply not returned in a normal
+    request); ``_sec09_tenant_check`` is the belt-and-braces assertion applied
+    on top of that ORM fencing -- kept for the session-scoped-caller drift it
+    defends against even now that ``ApplicationOwnership`` and
+    ``OrganizationUnit`` carry ``TenantMixin`` too and are fenced by the same
+    listener.
+
+    Only CURRENT ownership is attached: a row whose ``end_date`` has already
+    passed is excluded from the select below, the same rule
+    ``accountability_for_element`` applies, so the two owner-resolution paths
+    agree on one element.
+    """
+    from datetime import date
+
+    from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
+
+    distinct_ids = sorted(set(element_ids))
+    results: Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {
+        eid: (None, NO_OWNERSHIP_REASON) for eid in distinct_ids
+    }
+    if not distinct_ids:
+        return results
+
+    guarded_components = _resolve_components_batch(element_ids, org_id)
     if not guarded_components:
         return results
 
@@ -722,6 +792,10 @@ class IntelligenceQueryService:
                     "derivation_state": "not_computed",
                 }
                 reasons = [NO_TENANT_CONTEXT_REASON]
+                criticality_flags: Dict[str, Any] = {
+                    "critical_element_ids": None,
+                    "reason": NO_TENANT_CONTEXT_REASON,
+                }
                 maturity_flags = _maturity_flags(NO_TENANT_CONTEXT_REASON)
             else:
                 from app.models import ArchiMateElement
@@ -739,6 +813,10 @@ class IntelligenceQueryService:
                         "derivation_state": "not_computed",
                     }
                     reasons = [ELEMENT_NOT_FOUND_REASON]
+                    criticality_flags = {
+                        "critical_element_ids": None,
+                        "reason": ELEMENT_NOT_FOUND_REASON,
+                    }
                     maturity_flags = _maturity_flags(ELEMENT_NOT_FOUND_REASON)
                 else:
                     explicit_rows = _walk_explicit(element_id, max_depth, direction)
@@ -788,6 +866,44 @@ class IntelligenceQueryService:
                     elements = _resolve_elements_batch(_element_ids_in_rows(rows), org_id)
                     _attach_plain_terms(rows, elements)
 
+                    # Resolve components for criticality block -- one select
+                    # per answer, inside the latency scope.
+                    components_by_element: Dict[int, Any] = {}
+                    if rows:
+                        components_by_element = _resolve_components_batch(
+                            [row["element_id"] for row in rows], org_id
+                        )
+
+                    # Resource select for criticality -- keyed by
+                    # the identity map's ids only, so only ids already resolved
+                    # for this tenant are asked for.
+                    resources_by_element: Dict[int, Dict[str, Any]] = {}
+                    if rows:
+                        from app.models.archimate_technology import Resource
+
+                        resource_element_ids = sorted({
+                            row["element_id"] for row in rows
+                            if str(row["element_id"]) in elements
+                        })
+                        if resource_element_ids:
+                            resource_rows = (
+                                db.session.execute(
+                                    db.select(
+                                        Resource.archimate_element_id,
+                                        Resource.criticality,
+                                        Resource.lifecycle_status,
+                                    )
+                                    .where(Resource.archimate_element_id.in_(resource_element_ids))
+                                    .order_by(Resource.id)
+                                )
+                                .all()
+                            )
+                            for archimate_element_id, res_criticality, res_lifecycle_status in resource_rows:
+                                resources_by_element.setdefault(archimate_element_id, {
+                                    "criticality": res_criticality,
+                                    "lifecycle_status": res_lifecycle_status,
+                                })
+
                     # The distinct Capability element ids the identity map
                     # above already resolved under the tenant predicate --
                     # rows' own elements and every id their chains pass
@@ -809,6 +925,7 @@ class IntelligenceQueryService:
                         maturity_by_element = CapabilityHeatmapService().maturity_for_elements(
                             capability_ids, organization_id=org_id
                         )
+
 
                     # M7 fix: batch owner resolution instead of N+1 --
                     # collect every distinct element id needing a lookup
@@ -852,6 +969,29 @@ class IntelligenceQueryService:
                         # is stripped.
                         row.pop("_endpoints", None)
 
+                        # Attach criticality block: a row whose
+                        # element resolves to a guarded component gets the
+                        # component block; a row whose element is a resource
+                        # (but not a component) gets the resource block; a row
+                        # whose element is neither carries no criticality key.
+                        comp = components_by_element.get(row["element_id"])
+                        if comp is not None:
+                            row["criticality"] = _build_criticality_block(
+                                criticality=comp.criticality,
+                                business_criticality=comp.business_criticality,
+                                rto_hours=comp.rto_hours,
+                                rpo_hours=comp.rpo_hours,
+                                source="application_components",
+                            )
+                        else:
+                            resource = resources_by_element.get(row["element_id"])
+                            if resource is not None:
+                                row["criticality"] = _build_criticality_block(
+                                    criticality=resource["criticality"],
+                                    lifecycle_status=resource["lifecycle_status"],
+                                    source="archimate_resources",
+                                )
+
                     explicit_count = sum(1 for r in rows if r["relation"]["kind"] == "explicit")
                     derived_count = sum(1 for r in rows if r["relation"]["kind"] == "derived")
                     stale_count = sum(1 for r in rows if r["relation"].get("stale"))
@@ -876,6 +1016,25 @@ class IntelligenceQueryService:
                     # standing in for "measured, found none".
                     maturity_flags = _maturity_flags(NO_CAPABILITY_IN_CHAIN_REASON, maturity_by_element)
 
+                    # Whole-answer criticality flags.
+                    any_block = any(
+                        row.get("criticality") is not None for row in rows
+                    )
+                    if any_block:
+                        critical_element_ids = sorted([
+                            row["element_id"] for row in rows
+                            if row.get("criticality", {}).get("critical") is True
+                        ])
+                        criticality_flags = {
+                            "critical_element_ids": critical_element_ids,
+                            "reason": None,
+                        }
+                    else:
+                        criticality_flags = {
+                            "critical_element_ids": None,
+                            "reason": NO_CRITICALITY_RECORDED_REASON,
+                        }
+
         summary["latency_ms"] = scope.latency_ms
 
         # Stable pagination: preserve canonical walk order (explicit rows
@@ -896,6 +1055,7 @@ class IntelligenceQueryService:
             "summary": summary,
             "reasons": reasons,
             "elements": elements,
+            "criticality_flags": criticality_flags,
             "maturity_flags": maturity_flags,
             "total": total,
             "next_cursor": next_cursor,

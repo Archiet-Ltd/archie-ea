@@ -235,9 +235,48 @@ def test_http_data_carries_elements_beside_rows_summary_reasons(app, db_session,
     body = resp.get_json()
     assert body["success"] is True
     data = body["data"]
-    assert set(data.keys()) == {"rows", "summary", "reasons", "elements", "maturity_flags", "total", "next_cursor"}
+    assert set(data.keys()) == {
+        "rows", "summary", "reasons", "elements", "criticality_flags", "maturity_flags",
+        "total", "next_cursor",
+    }
     assert set(data["elements"]) == {str(a.id), str(b.id)}
     assert data["elements"][str(b.id)]["name"] == "Bravo"
+
+
+def test_criticality_flags_and_maturity_flags_both_carry_real_values_in_one_answer(
+    app, db_session, make_org
+):
+    """The two whole-answer flag blocks are computed independently (one from
+    ``components_by_element``/``resources_by_element``, the other from
+    ``capability_ids``/``maturity_by_element``) and both land in the same
+    return dict. Pins that neither computation clobbers or shadows the
+    other when a single chain has both a rated component and an assessed
+    capability."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.unified_capability import UnifiedCapability
+
+    org = make_org("map-both-flags")
+    a = _element(db_session, org.id, "Alpha")
+    component_el = _element(db_session, org.id, "CriticalComp")
+    capability_el = _element(db_session, org.id, "Cap", type_="Capability", layer="strategy")
+    _relationship(db_session, org.id, a, component_el)
+    _relationship(db_session, org.id, a, capability_el)
+    db_session.add(ApplicationComponent(
+        name="CriticalComp", organization_id=org.id,
+        archimate_element_id=component_el.id, criticality="mission_critical",
+    ))
+    db_session.add(UnifiedCapability(
+        name="Cap", code=f"CAP-{uuid.uuid4().hex[:8]}", level=1, organization_id=org.id,
+        archimate_element_id=capability_el.id, current_maturity_level=2, target_maturity_level=4,
+    ))
+    db_session.commit()
+
+    result = _impact(app, org.id, a.id, include_derived=False, with_owner=False)
+
+    assert result["criticality_flags"]["critical_element_ids"] == [component_el.id]
+    assert result["criticality_flags"]["reason"] is None
+    assert result["maturity_flags"]["under_target_capability_ids"] == [capability_el.id]
+    assert result["maturity_flags"]["reason"] is None
 
 
 def test_map_is_empty_object_when_no_rows_and_on_early_return_branches(app, db_session, make_org):
