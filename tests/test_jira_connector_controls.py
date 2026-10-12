@@ -142,7 +142,7 @@ def test_connection_feedback_pending_cleanup_and_double_click(jira_browser, view
         context.route(re.compile(r'^(?!' + re.escape(origin + '/') + r').*'), reject_external_request)
         page = context.new_page()
         page.on('pageerror', lambda error: errors.append(str(error)))
-        page.goto(origin + PAGE_PATH, wait_until='load')
+        page.goto(origin + PAGE_PATH, wait_until='domcontentloaded')
         assert errors == [], f'Current Jira page failed to parse: {errors}'
         # The click handler calls Platform.fetch; act only once it exists.
         page.wait_for_function("() => window.Platform && Platform.fetch && typeof Platform.fetch.post === 'function'")
