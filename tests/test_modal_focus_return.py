@@ -76,7 +76,7 @@ def modal_page(modal_browser):
     page.route(BASE + "/static/**", lambda route: route.fulfill(
         path=str(ROOT / "app" / route.request.url[len(BASE) + 1:])))
     page.route(BASE + "/", lambda route: route.fulfill(content_type="text/html", body=HTML))
-    page.goto(BASE + "/")
+    page.goto(BASE + "/", wait_until="domcontentloaded")
     # modal.js starts its visibility observer in a timer set 100 ms after
     # DOMContentLoaded. A timer registered now is due later than that one, and
     # timers run in due order, so when this resolves the observer is running on
