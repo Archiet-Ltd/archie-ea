@@ -59,6 +59,9 @@ POLICY = {
     "/dashboard/compliance":   set(ARCHETYPES),
     # risk.risk_register is @login_required only.
     "/risks/":                 set(ARCHETYPES),
+    # portfolio.backlog is @login_required only: the open gaps and unscheduled
+    # work packages of the viewer's own organisation.
+    "/portfolio/backlog":      set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
