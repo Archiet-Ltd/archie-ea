@@ -187,10 +187,16 @@ def get_obligations_for_system(
     *organization_id*.
     """
     from app.models.compliance_models import ComplianceRequirement
+    from app.models.models import ArchiMateElement
 
     rows = (
-        ComplianceRequirement.query.filter_by(
-            archimate_element_id=element_id,
+        ComplianceRequirement.query.join(
+            ArchiMateElement,
+            ComplianceRequirement.archimate_element_id == ArchiMateElement.id,
+        )
+        .filter(
+            ComplianceRequirement.archimate_element_id == element_id,
+            ArchiMateElement.organization_id == organization_id,
         )
         .order_by(ComplianceRequirement.id.asc())
         .all()
